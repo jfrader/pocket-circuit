@@ -1,6 +1,15 @@
 [gd_scene format=3 uid="uid://drf85t6nfrbhm"]
 
 [ext_resource type="PackedScene" uid="uid://htjroyo22kqr" path="res://scenes/race/checkpoint.tscn" id="1_nkdn3"]
+[ext_resource type="Texture2D" uid="uid://bkxf41677oucq" path="res://assets/textures/mug.png" id="1_ryv4o"]
+[ext_resource type="Texture2D" uid="uid://ccy5pugt3q5xc" path="res://assets/textures/cereal_box.png" id="2_jetk0"]
+[ext_resource type="Texture2D" uid="uid://cfiwkw0p2cw7q" path="res://assets/textures/sponge.png" id="3_riwtw"]
+[ext_resource type="Texture2D" uid="uid://6nd6u7juntqi" path="res://assets/textures/fork.png" id="4_ksiel"]
+[ext_resource type="Texture2D" uid="uid://b5pjcrh173hl0" path="res://assets/textures/ruler.png" id="5_yqbdy"]
+[ext_resource type="Texture2D" uid="uid://cf1e6l8l4fvvo" path="res://assets/textures/apple.png" id="6_i5pq5"]
+[ext_resource type="Texture2D" uid="uid://bx2m0hkbl77bo" path="res://assets/textures/lime.png" id="7_a4r5k"]
+[ext_resource type="Texture2D" uid="uid://cu75n522638fx" path="res://assets/textures/cup.png" id="8_vvowj"]
+[ext_resource type="Texture2D" uid="uid://cu4guj2coxvyr" path="res://assets/textures/spoon.png" id="9_hqlae"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xb7yb"]
 size = Vector2(2000, 50)
@@ -151,18 +160,25 @@ collision_layer = 2
 shape = SubResource("CircleShape2D_xb7yb")
 
 [node name="Visual" type="Polygon2D" parent="MugA" unique_id=77808704]
+visible = false
 color = Color(0.86, 0.83, 0.7, 1)
 polygon = PackedVector2Array(58, 0, 41, 41, 0, 58, -41, 41, -58, 0, -41, -41, 0, -58, 41, -41)
 
 [node name="Coffee" type="Polygon2D" parent="MugA" unique_id=2108931677]
+visible = false
 scale = Vector2(0.62, 0.62)
 color = Color(0.2, 0.1, 0.05, 1)
 polygon = PackedVector2Array(58, 0, 41, 41, 0, 58, -41, 41, -58, 0, -41, -41, 0, -58, 41, -41)
 
 [node name="Handle" type="Polygon2D" parent="MugA" unique_id=1178027435]
+visible = false
 position = Vector2(58, 0)
 color = Color(0.86, 0.83, 0.7, 1)
 polygon = PackedVector2Array(0, -18, 26, -18, 34, 0, 26, 18, 0, 18, 0, 8, 18, 8, 22, 0, 18, -8, 0, -8)
+
+[node name="Sprite" type="Sprite2D" parent="MugA" unique_id=1643243559]
+scale = Vector2(0.1812, 0.1812)
+texture = ExtResource("1_ryv4o")
 
 [node name="MugB" type="StaticBody2D" parent="." unique_id=662062190]
 position = Vector2(270, 465)
@@ -172,13 +188,19 @@ collision_layer = 2
 shape = SubResource("CircleShape2D_nkdn3")
 
 [node name="Visual" type="Polygon2D" parent="MugB" unique_id=1619923494]
+visible = false
 color = Color(0.42, 0.72, 0.82, 1)
 polygon = PackedVector2Array(52, 0, 37, 37, 0, 52, -37, 37, -52, 0, -37, -37, 0, -52, 37, -37)
 
 [node name="Coffee" type="Polygon2D" parent="MugB" unique_id=1542762222]
+visible = false
 scale = Vector2(0.62, 0.62)
 color = Color(0.18, 0.09, 0.04, 1)
 polygon = PackedVector2Array(52, 0, 37, 37, 0, 52, -37, 37, -52, 0, -37, -37, 0, -52, 37, -37)
+
+[node name="Sprite" type="Sprite2D" parent="MugB" unique_id=1801211312]
+scale = Vector2(0.1625, 0.1625)
+texture = ExtResource("1_ryv4o")
 
 [node name="CerealA" type="StaticBody2D" parent="." unique_id=2016329342]
 position = Vector2(650, 80)
@@ -189,12 +211,18 @@ collision_layer = 2
 shape = SubResource("RectangleShape2D_riwtw")
 
 [node name="Visual" type="Polygon2D" parent="CerealA" unique_id=380760329]
+visible = false
 color = Color(0.94, 0.61, 0.12, 1)
 polygon = PackedVector2Array(-50, -85, 50, -85, 50, 85, -50, 85)
 
 [node name="Stripe" type="Polygon2D" parent="CerealA" unique_id=101544803]
+visible = false
 color = Color(0.85, 0.16, 0.12, 1)
 polygon = PackedVector2Array(-50, -20, 50, -20, 50, 20, -50, 20)
+
+[node name="Sprite" type="Sprite2D" parent="CerealA" unique_id=119680074]
+scale = Vector2(0.1818, 0.2)
+texture = ExtResource("2_jetk0")
 
 [node name="CerealB" type="StaticBody2D" parent="." unique_id=428535964]
 position = Vector2(850, -120)
@@ -205,12 +233,18 @@ collision_layer = 2
 shape = SubResource("RectangleShape2D_ksiel")
 
 [node name="Visual" type="Polygon2D" parent="CerealB" unique_id=703072227]
+visible = false
 color = Color(0.58, 0.76, 0.24, 1)
 polygon = PackedVector2Array(-48, -75, 48, -75, 48, 75, -48, 75)
 
 [node name="Stripe" type="Polygon2D" parent="CerealB" unique_id=641780288]
+visible = false
 color = Color(0.13, 0.4, 0.18, 1)
 polygon = PackedVector2Array(-48, -15, 48, -15, 48, 18, -48, 18)
+
+[node name="Sprite" type="Sprite2D" parent="CerealB" unique_id=1005593625]
+scale = Vector2(0.1745, 0.1765)
+texture = ExtResource("2_jetk0")
 
 [node name="Sponge" type="StaticBody2D" parent="." unique_id=1447204972]
 position = Vector2(120, -265)
@@ -221,13 +255,19 @@ collision_layer = 2
 shape = SubResource("RectangleShape2D_yqbdy")
 
 [node name="Visual" type="Polygon2D" parent="Sponge" unique_id=1210836880]
+visible = false
 color = Color(0.9, 0.78, 0.12, 1)
 polygon = PackedVector2Array(-125, -40, 125, -40, 125, 40, -125, 40)
 
 [node name="Scrub" type="Polygon2D" parent="Sponge" unique_id=636969219]
+visible = false
 position = Vector2(0, -25)
 color = Color(0.2, 0.62, 0.26, 1)
 polygon = PackedVector2Array(-120, -13, 120, -13, 120, 13, -120, 13)
+
+[node name="Sprite" type="Sprite2D" parent="Sponge" unique_id=1766786563]
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("3_riwtw")
 
 [node name="Fork" type="StaticBody2D" parent="." unique_id=5407409]
 position = Vector2(-210, -458)
@@ -238,8 +278,13 @@ collision_layer = 2
 shape = SubResource("RectangleShape2D_i5pq5")
 
 [node name="Visual" type="Polygon2D" parent="Fork" unique_id=1376793992]
+visible = false
 color = Color(0.7, 0.75, 0.78, 1)
 polygon = PackedVector2Array(-110, -12, 110, -12, 110, 12, -110, 12)
+
+[node name="Sprite" type="Sprite2D" parent="Fork" unique_id=774088210]
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("4_ksiel")
 
 [node name="Ruler" type="StaticBody2D" parent="." unique_id=1168667608]
 position = Vector2(-470, 260)
@@ -250,8 +295,13 @@ collision_layer = 2
 shape = SubResource("RectangleShape2D_a4r5k")
 
 [node name="Visual" type="Polygon2D" parent="Ruler" unique_id=1986988379]
+visible = false
 color = Color(0.82, 0.55, 0.19, 1)
 polygon = PackedVector2Array(-135, -14, 135, -14, 135, 14, -135, 14)
+
+[node name="Sprite" type="Sprite2D" parent="Ruler" unique_id=1860055722]
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("5_yqbdy")
 
 [node name="Apple" type="StaticBody2D" parent="." unique_id=956209412]
 position = Vector2(-620, -300)
@@ -261,8 +311,13 @@ collision_layer = 2
 shape = SubResource("CircleShape2D_ryv4o")
 
 [node name="Visual" type="Polygon2D" parent="Apple" unique_id=418767549]
+visible = false
 color = Color(0.78, 0.12, 0.1, 1)
 polygon = PackedVector2Array(45, 0, 32, 32, 0, 45, -32, 32, -45, 0, -32, -32, 0, -45, 32, -32)
+
+[node name="Sprite" type="Sprite2D" parent="Apple" unique_id=521520827]
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("6_i5pq5")
 
 [node name="Lime" type="StaticBody2D" parent="." unique_id=517090897]
 position = Vector2(-825, -290)
@@ -272,8 +327,13 @@ collision_layer = 2
 shape = SubResource("CircleShape2D_jetk0")
 
 [node name="Visual" type="Polygon2D" parent="Lime" unique_id=2109765815]
+visible = false
 color = Color(0.35, 0.72, 0.16, 1)
 polygon = PackedVector2Array(38, 0, 27, 27, 0, 38, -27, 27, -38, 0, -27, -27, 0, -38, 27, -27)
+
+[node name="Sprite" type="Sprite2D" parent="Lime" unique_id=1625956854]
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("7_a4r5k")
 
 [node name="Cup" type="StaticBody2D" parent="." unique_id=338801353]
 position = Vector2(-600, 470)
@@ -283,8 +343,13 @@ collision_layer = 2
 shape = SubResource("CircleShape2D_riwtw")
 
 [node name="Visual" type="Polygon2D" parent="Cup" unique_id=536555465]
+visible = false
 color = Color(0.62, 0.34, 0.76, 1)
 polygon = PackedVector2Array(44, 0, 31, 31, 0, 44, -31, 31, -44, 0, -31, -31, 0, -44, 31, -31)
+
+[node name="Sprite" type="Sprite2D" parent="Cup" unique_id=2050680914]
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("8_vvowj")
 
 [node name="Spoon" type="StaticBody2D" parent="." unique_id=784697144]
 position = Vector2(-835, 55)
@@ -295,8 +360,13 @@ collision_layer = 2
 shape = SubResource("RectangleShape2D_vvowj")
 
 [node name="Visual" type="Polygon2D" parent="Spoon" unique_id=714833342]
+visible = false
 color = Color(0.72, 0.76, 0.8, 1)
 polygon = PackedVector2Array(-90, -13, 90, -13, 105, 0, 90, 13, -90, 13)
+
+[node name="Sprite" type="Sprite2D" parent="Spoon" unique_id=746705649]
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("9_hqlae")
 
 [node name="Labels" type="Node2D" parent="." unique_id=1231572064]
 
