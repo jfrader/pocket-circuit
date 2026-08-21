@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Pocket Circuit Online"
-config/description="Tiny racing, huge world, endless garage. A top-down 3D arcade racer where tiny vehicles race through oversized everyday environments."
+config/description="Tiny racing, huge world, endless garage. A top-down 2D arcade racer where tiny vehicles race through oversized everyday environments."
 run/main_scene="res://scenes/boot/boot.tscn"
 config/features=PackedStringArray("4.7")
 

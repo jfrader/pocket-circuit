@@ -1,24 +1,18 @@
-[gd_scene format=3 uid="uid://dogdu52vn0r41"]
+[gd_scene format=3 uid="uid://cucomc3do5wtg"]
 
-[sub_resource type="BoxMesh" id="BoxMesh_yo7vy"]
-size = Vector3(40, 1, 40)
+[node name="Boot" type="Node2D" unique_id=455815273]
 
-[node name="Boot" type="Node3D" unique_id=14823759]
+[node name="Camera2D" type="Camera2D" parent="." unique_id=1360354722]
+zoom = Vector2(0.5, 0.5)
 
-[node name="Camera3D" type="Camera3D" parent="." unique_id=925624323]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 10, 8)
+[node name="Background" type="ColorRect" parent="." unique_id=1183059948]
+offset_right = 1280.0
+offset_bottom = 720.0
+color = Color(0.11, 0.12, 0.14, 1)
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=1437360026]
+[node name="HUD" type="CanvasLayer" parent="." unique_id=1955649904]
 
-[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=889606935]
-transform = Transform3D(1, 0, 0, 0, 0.7648422, 0.64421767, 0, -0.64421767, 0.7648422, 0, 0, 0)
-
-[node name="Ground" type="MeshInstance3D" parent="." unique_id=804407526]
-mesh = SubResource("BoxMesh_yo7vy")
-
-[node name="HUD" type="CanvasLayer" parent="." unique_id=587748924]
-
-[node name="TitleLabel" type="Label" parent="HUD" unique_id=57334342]
+[node name="TitleLabel" type="Label" parent="HUD" unique_id=635373898]
 offset_left = 40.0
 offset_top = 40.0
 offset_right = 40.0

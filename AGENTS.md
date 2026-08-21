@@ -2,11 +2,15 @@
 
 ## Project
 
-- **Pocket Circuit Online**: a top-down 3D arcade racer. Tiny vehicles race
+- **Pocket Circuit Online**: a top-down **2D** arcade racer. Tiny vehicles race
   through oversized everyday environments (kitchen counters, workshops,
   offices); 2–5 min races feed a persistent garage/progression system.
 - **Engine:** Godot 4.7 (GDScript), editor at `/usr/bin/godot`. Server-side
   services (Phase 3+) live under `server/` and may be a different language.
+- **2D, not 3D:** presentation is Node2D sprites / CanvasLayer. The design
+  spec §7 camera and §9 physics describe 3D concepts — implement their
+  *feel* in 2D (top-down follow camera, speed-aware zoom, arcade physics on
+  a 2D physics body). Where spec says 3D and reality is 2D, 2D wins.
 - **Source of truth for game design:** `docs/game-design-spec.md` — the full
   135-section pre-production spec. Read the relevant section before touching a
   system (driving model §9, camera §7, tracks §11, surfaces §10, networking
@@ -61,12 +65,11 @@ under `assets/`.
 2. Delegate generation to the grok subagent with: a per-asset brief quoting
    the spec (art direction §55, environment props §12, vehicles §55.3),
    the target path under `assets/`, and the render path. Grok works through
-   the Godot MCP (`generate_2d_asset` for SVG→PNG, mesh/material tools for 3D,
-   `create_script` for generators).
-3. Style is **stylized low-poly 3D + SVG textures, toy-like, clear
-   silhouettes, saturated-but-controlled palette** (§55). No photorealism.
-   Original fictional vehicles — no copyrighted car/track/character designs
-   (§109).
+   the Godot MCP (`generate_2d_asset` for SVG→PNG, Sprite2D/TextureRect
+   placement, `create_script` for procedural sprites).
+3. Style is **stylized top-down 2D sprites, toy-like, clear silhouettes,
+   saturated-but-controlled palette** (§55). No photorealism. Original
+   fictional vehicles — no copyrighted car/track/character designs (§109).
 4. Verify each asset renders in-editor (`get_errors`, scene tools) before
    committing. Keep generated assets in `assets/<category>/`; previews go to
    `/tmp/opencode/screenshots/`, never the repo.
