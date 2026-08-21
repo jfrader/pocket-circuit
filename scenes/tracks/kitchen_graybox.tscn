@@ -1,0 +1,407 @@
+[gd_scene format=3 uid="uid://drf85t6nfrbhm"]
+
+[ext_resource type="PackedScene" uid="uid://htjroyo22kqr" path="res://scenes/race/checkpoint.tscn" id="1_nkdn3"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_xb7yb"]
+size = Vector2(2000, 50)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_nkdn3"]
+size = Vector2(2000, 50)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ryv4o"]
+size = Vector2(50, 1200)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_jetk0"]
+size = Vector2(50, 1200)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_xb7yb"]
+radius = 58.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_nkdn3"]
+radius = 52.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_riwtw"]
+size = Vector2(100, 170)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ksiel"]
+size = Vector2(96, 150)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_yqbdy"]
+size = Vector2(250, 80)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_i5pq5"]
+size = Vector2(220, 24)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_a4r5k"]
+size = Vector2(270, 28)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ryv4o"]
+radius = 45.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_jetk0"]
+radius = 38.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_riwtw"]
+radius = 44.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_vvowj"]
+size = Vector2(210, 26)
+
+[node name="KitchenGraybox" type="Node2D" unique_id=126382309 groups=["track"]]
+
+[node name="Floor" type="Polygon2D" parent="." unique_id=2087876993]
+z_index = -20
+color = Color(0.34, 0.29, 0.25, 1)
+polygon = PackedVector2Array(-1000, -600, 1000, -600, 1000, 600, -1000, 600)
+
+[node name="CounterHighlight" type="Polygon2D" parent="." unique_id=890902603]
+z_index = -19
+color = Color(0.42, 0.36, 0.3, 1)
+polygon = PackedVector2Array(-940, -540, 940, -540, 940, 540, -940, 540)
+
+[node name="BottomStraight" type="Polygon2D" parent="." unique_id=2019192704]
+z_index = -10
+color = Color(0.16, 0.19, 0.21, 1)
+polygon = PackedVector2Array(-820, 245, 820, 245, 820, 490, -820, 490)
+
+[node name="RightTechnical" type="Polygon2D" parent="." unique_id=164440069]
+z_index = -10
+color = Color(0.16, 0.19, 0.21, 1)
+polygon = PackedVector2Array(610, -430, 860, -430, 860, 430, 610, 430)
+
+[node name="TopSpeedSection" type="Polygon2D" parent="." unique_id=1741503394]
+z_index = -10
+color = Color(0.16, 0.19, 0.21, 1)
+polygon = PackedVector2Array(-820, -490, 820, -490, 820, -245, -820, -245)
+
+[node name="LeftTechnical" type="Polygon2D" parent="." unique_id=870929199]
+z_index = -10
+color = Color(0.16, 0.19, 0.21, 1)
+polygon = PackedVector2Array(-860, -430, -610, -430, -610, 430, -860, 430)
+
+[node name="InnerIsland" type="Polygon2D" parent="." unique_id=337996889]
+z_index = -9
+color = Color(0.3, 0.25, 0.22, 1)
+polygon = PackedVector2Array(-590, -225, 590, -225, 590, 225, -590, 225)
+
+[node name="SpongeWetPatch" type="Polygon2D" parent="." unique_id=1334197584]
+z_index = -8
+color = Color(0.1, 0.55, 0.62, 0.58)
+polygon = PackedVector2Array(-40, -485, 330, -485, 350, -255, -70, -255)
+
+[node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=689139309]
+z_index = -7
+color = Color(0.96, 0.93, 0.82, 1)
+polygon = PackedVector2Array(-712, 245, -690, 245, -690, 490, -712, 490)
+
+[node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=2091006546]
+z_index = -6
+color = Color(0.05, 0.06, 0.08, 1)
+polygon = PackedVector2Array(-712, 280, -690, 280, -690, 330, -712, 330, -712, 380, -690, 380, -690, 430, -712, 430)
+
+[node name="TopWall" type="StaticBody2D" parent="." unique_id=86774874]
+position = Vector2(0, -575)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TopWall" unique_id=1362556812]
+shape = SubResource("RectangleShape2D_xb7yb")
+
+[node name="Visual" type="Polygon2D" parent="TopWall" unique_id=493745692]
+color = Color(0.08, 0.09, 0.11, 1)
+polygon = PackedVector2Array(-1000, -25, 1000, -25, 1000, 25, -1000, 25)
+
+[node name="BottomWall" type="StaticBody2D" parent="." unique_id=731834591]
+position = Vector2(0, 575)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BottomWall" unique_id=1580728563]
+shape = SubResource("RectangleShape2D_nkdn3")
+
+[node name="Visual" type="Polygon2D" parent="BottomWall" unique_id=2104109006]
+color = Color(0.08, 0.09, 0.11, 1)
+polygon = PackedVector2Array(-1000, -25, 1000, -25, 1000, 25, -1000, 25)
+
+[node name="LeftWall" type="StaticBody2D" parent="." unique_id=2067123434]
+position = Vector2(-975, 0)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LeftWall" unique_id=166120252]
+shape = SubResource("RectangleShape2D_ryv4o")
+
+[node name="Visual" type="Polygon2D" parent="LeftWall" unique_id=163775825]
+color = Color(0.08, 0.09, 0.11, 1)
+polygon = PackedVector2Array(-25, -600, 25, -600, 25, 600, -25, 600)
+
+[node name="RightWall" type="StaticBody2D" parent="." unique_id=115347098]
+position = Vector2(975, 0)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RightWall" unique_id=178922171]
+shape = SubResource("RectangleShape2D_jetk0")
+
+[node name="Visual" type="Polygon2D" parent="RightWall" unique_id=1794445296]
+color = Color(0.08, 0.09, 0.11, 1)
+polygon = PackedVector2Array(-25, -600, 25, -600, 25, 600, -25, 600)
+
+[node name="MugA" type="StaticBody2D" parent="." unique_id=1413375420]
+position = Vector2(70, 270)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MugA" unique_id=2088108962]
+shape = SubResource("CircleShape2D_xb7yb")
+
+[node name="Visual" type="Polygon2D" parent="MugA" unique_id=77808704]
+color = Color(0.86, 0.83, 0.7, 1)
+polygon = PackedVector2Array(58, 0, 41, 41, 0, 58, -41, 41, -58, 0, -41, -41, 0, -58, 41, -41)
+
+[node name="Coffee" type="Polygon2D" parent="MugA" unique_id=2108931677]
+scale = Vector2(0.62, 0.62)
+color = Color(0.2, 0.1, 0.05, 1)
+polygon = PackedVector2Array(58, 0, 41, 41, 0, 58, -41, 41, -58, 0, -41, -41, 0, -58, 41, -41)
+
+[node name="Handle" type="Polygon2D" parent="MugA" unique_id=1178027435]
+position = Vector2(58, 0)
+color = Color(0.86, 0.83, 0.7, 1)
+polygon = PackedVector2Array(0, -18, 26, -18, 34, 0, 26, 18, 0, 18, 0, 8, 18, 8, 22, 0, 18, -8, 0, -8)
+
+[node name="MugB" type="StaticBody2D" parent="." unique_id=662062190]
+position = Vector2(270, 465)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MugB" unique_id=1514863061]
+shape = SubResource("CircleShape2D_nkdn3")
+
+[node name="Visual" type="Polygon2D" parent="MugB" unique_id=1619923494]
+color = Color(0.42, 0.72, 0.82, 1)
+polygon = PackedVector2Array(52, 0, 37, 37, 0, 52, -37, 37, -52, 0, -37, -37, 0, -52, 37, -37)
+
+[node name="Coffee" type="Polygon2D" parent="MugB" unique_id=1542762222]
+scale = Vector2(0.62, 0.62)
+color = Color(0.18, 0.09, 0.04, 1)
+polygon = PackedVector2Array(52, 0, 37, 37, 0, 52, -37, 37, -52, 0, -37, -37, 0, -52, 37, -37)
+
+[node name="CerealA" type="StaticBody2D" parent="." unique_id=2016329342]
+position = Vector2(650, 80)
+rotation = -0.12
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CerealA" unique_id=1774289331]
+shape = SubResource("RectangleShape2D_riwtw")
+
+[node name="Visual" type="Polygon2D" parent="CerealA" unique_id=380760329]
+color = Color(0.94, 0.61, 0.12, 1)
+polygon = PackedVector2Array(-50, -85, 50, -85, 50, 85, -50, 85)
+
+[node name="Stripe" type="Polygon2D" parent="CerealA" unique_id=101544803]
+color = Color(0.85, 0.16, 0.12, 1)
+polygon = PackedVector2Array(-50, -20, 50, -20, 50, 20, -50, 20)
+
+[node name="CerealB" type="StaticBody2D" parent="." unique_id=428535964]
+position = Vector2(850, -120)
+rotation = 0.1
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CerealB" unique_id=1244503691]
+shape = SubResource("RectangleShape2D_ksiel")
+
+[node name="Visual" type="Polygon2D" parent="CerealB" unique_id=703072227]
+color = Color(0.58, 0.76, 0.24, 1)
+polygon = PackedVector2Array(-48, -75, 48, -75, 48, 75, -48, 75)
+
+[node name="Stripe" type="Polygon2D" parent="CerealB" unique_id=641780288]
+color = Color(0.13, 0.4, 0.18, 1)
+polygon = PackedVector2Array(-48, -15, 48, -15, 48, 18, -48, 18)
+
+[node name="Sponge" type="StaticBody2D" parent="." unique_id=1447204972]
+position = Vector2(120, -265)
+rotation = 0.03
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Sponge" unique_id=612563116]
+shape = SubResource("RectangleShape2D_yqbdy")
+
+[node name="Visual" type="Polygon2D" parent="Sponge" unique_id=1210836880]
+color = Color(0.9, 0.78, 0.12, 1)
+polygon = PackedVector2Array(-125, -40, 125, -40, 125, 40, -125, 40)
+
+[node name="Scrub" type="Polygon2D" parent="Sponge" unique_id=636969219]
+position = Vector2(0, -25)
+color = Color(0.2, 0.62, 0.26, 1)
+polygon = PackedVector2Array(-120, -13, 120, -13, 120, 13, -120, 13)
+
+[node name="Fork" type="StaticBody2D" parent="." unique_id=5407409]
+position = Vector2(-210, -458)
+rotation = 0.08
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Fork" unique_id=1924793588]
+shape = SubResource("RectangleShape2D_i5pq5")
+
+[node name="Visual" type="Polygon2D" parent="Fork" unique_id=1376793992]
+color = Color(0.7, 0.75, 0.78, 1)
+polygon = PackedVector2Array(-110, -12, 110, -12, 110, 12, -110, 12)
+
+[node name="Ruler" type="StaticBody2D" parent="." unique_id=1168667608]
+position = Vector2(-470, 260)
+rotation = -0.04
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ruler" unique_id=895947070]
+shape = SubResource("RectangleShape2D_a4r5k")
+
+[node name="Visual" type="Polygon2D" parent="Ruler" unique_id=1986988379]
+color = Color(0.82, 0.55, 0.19, 1)
+polygon = PackedVector2Array(-135, -14, 135, -14, 135, 14, -135, 14)
+
+[node name="Apple" type="StaticBody2D" parent="." unique_id=956209412]
+position = Vector2(-620, -300)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Apple" unique_id=352919419]
+shape = SubResource("CircleShape2D_ryv4o")
+
+[node name="Visual" type="Polygon2D" parent="Apple" unique_id=418767549]
+color = Color(0.78, 0.12, 0.1, 1)
+polygon = PackedVector2Array(45, 0, 32, 32, 0, 45, -32, 32, -45, 0, -32, -32, 0, -45, 32, -32)
+
+[node name="Lime" type="StaticBody2D" parent="." unique_id=517090897]
+position = Vector2(-825, -290)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Lime" unique_id=1259961256]
+shape = SubResource("CircleShape2D_jetk0")
+
+[node name="Visual" type="Polygon2D" parent="Lime" unique_id=2109765815]
+color = Color(0.35, 0.72, 0.16, 1)
+polygon = PackedVector2Array(38, 0, 27, 27, 0, 38, -27, 27, -38, 0, -27, -27, 0, -38, 27, -27)
+
+[node name="Cup" type="StaticBody2D" parent="." unique_id=338801353]
+position = Vector2(-600, 470)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cup" unique_id=2104068892]
+shape = SubResource("CircleShape2D_riwtw")
+
+[node name="Visual" type="Polygon2D" parent="Cup" unique_id=536555465]
+color = Color(0.62, 0.34, 0.76, 1)
+polygon = PackedVector2Array(44, 0, 31, 31, 0, 44, -31, 31, -44, 0, -31, -31, 0, -44, 31, -31)
+
+[node name="Spoon" type="StaticBody2D" parent="." unique_id=784697144]
+position = Vector2(-835, 55)
+rotation = 1.48
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Spoon" unique_id=1238356601]
+shape = SubResource("RectangleShape2D_vvowj")
+
+[node name="Visual" type="Polygon2D" parent="Spoon" unique_id=714833342]
+color = Color(0.72, 0.76, 0.8, 1)
+polygon = PackedVector2Array(-90, -13, 90, -13, 105, 0, 90, 13, -90, 13)
+
+[node name="Labels" type="Node2D" parent="." unique_id=1231572064]
+
+[node name="Title" type="Label" parent="Labels" unique_id=1188845261]
+offset_left = -220.0
+offset_top = -80.0
+offset_right = -220.0
+offset_bottom = -80.0
+theme_override_colors/font_color = Color(0.8, 0.68, 0.5, 0.55)
+theme_override_font_sizes/font_size = 30
+text = "KITCHEN COUNTER CIRCUIT"
+
+[node name="Opening" type="Label" parent="Labels" unique_id=784336664]
+offset_left = -420.0
+offset_top = 500.0
+offset_right = -420.0
+offset_bottom = 500.0
+theme_override_colors/font_color = Color(0.9, 0.83, 0.65, 0.75)
+theme_override_font_sizes/font_size = 18
+text = "OPENING STRAIGHT  →"
+
+[node name="Chicane" type="Label" parent="Labels" unique_id=1817114360]
+offset_left = 30.0
+offset_top = 170.0
+offset_right = 30.0
+offset_bottom = 170.0
+theme_override_colors/font_color = Color(0.9, 0.83, 0.65, 0.75)
+theme_override_font_sizes/font_size = 18
+text = "MUG CHICANE"
+
+[node name="Shortcut" type="Label" parent="Labels" unique_id=349292962]
+offset_left = -10.0
+offset_top = -230.0
+offset_right = -10.0
+offset_bottom = -230.0
+theme_override_colors/font_color = Color(0.38, 0.9, 0.95, 0.85)
+theme_override_font_sizes/font_size = 18
+text = "WET SPONGE SQUEEZE"
+
+[node name="Technical" type="Label" parent="Labels" unique_id=327962199]
+offset_left = 660.0
+offset_top = -20.0
+offset_right = 660.0
+offset_bottom = -20.0
+rotation = -1.5707963
+theme_override_colors/font_color = Color(0.9, 0.83, 0.65, 0.75)
+theme_override_font_sizes/font_size = 18
+text = "TECHNICAL"
+
+[node name="Speed" type="Label" parent="Labels" unique_id=1863446097]
+offset_left = 250.0
+offset_top = -530.0
+offset_right = 250.0
+offset_bottom = -530.0
+theme_override_colors/font_color = Color(0.9, 0.83, 0.65, 0.75)
+theme_override_font_sizes/font_size = 18
+text = "←  SPEED SECTION"
+
+[node name="Checkpoint0Finish" parent="." unique_id=182880676 instance=ExtResource("1_nkdn3")]
+position = Vector2(-700, 360)
+rotation = 1.5707963
+is_finish_line = true
+recovery_rotation = 3.1415927
+recovery_offset = 70.0
+
+[node name="Checkpoint1" parent="." unique_id=842598817 instance=ExtResource("1_nkdn3")]
+position = Vector2(-220, 360)
+checkpoint_index = 1.0
+recovery_rotation = 1.5707963
+recovery_offset = 70.0
+
+[node name="Checkpoint2" parent="." unique_id=1116587237 instance=ExtResource("1_nkdn3")]
+position = Vector2(440, 360)
+checkpoint_index = 2.0
+recovery_rotation = 1.5707963
+recovery_offset = 70.0
+
+[node name="Checkpoint3" parent="." unique_id=1750446836 instance=ExtResource("1_nkdn3")]
+position = Vector2(735, 100)
+rotation = 1.5707963
+checkpoint_index = 3.0
+recovery_offset = 70.0
+
+[node name="Checkpoint4" parent="." unique_id=1343907752 instance=ExtResource("1_nkdn3")]
+position = Vector2(450, -365)
+checkpoint_index = 4.0
+recovery_rotation = -1.5707963
+recovery_offset = 70.0
+
+[node name="Checkpoint5" parent="." unique_id=800978525 instance=ExtResource("1_nkdn3")]
+position = Vector2(-130, -365)
+checkpoint_index = 5.0
+recovery_rotation = -1.5707963
+recovery_offset = 70.0
+
+[node name="Checkpoint6" parent="." unique_id=533544322 instance=ExtResource("1_nkdn3")]
+position = Vector2(-735, -150)
+rotation = 1.5707963
+checkpoint_index = 6.0
+recovery_rotation = 3.1415927
+recovery_offset = 70.0
+
+[node name="Checkpoint7" parent="." unique_id=349431774 instance=ExtResource("1_nkdn3")]
+position = Vector2(-735, 170)
+rotation = 1.5707963
+checkpoint_index = 7.0
+recovery_rotation = 3.1415927
+recovery_offset = 70.0

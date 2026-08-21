@@ -1,0 +1,21 @@
+[gd_scene format=3 uid="uid://htjroyo22kqr"]
+
+[ext_resource type="Script" uid="uid://ct7sd2710q71l" path="res://scripts/race/checkpoint.gd" id="1_jqkdl"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_jqkdl"]
+size = Vector2(34, 260)
+
+[node name="Checkpoint" type="Area2D" unique_id=182880676 groups=["track_checkpoints"]]
+collision_layer = 0
+script = ExtResource("1_jqkdl")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1632340036]
+shape = SubResource("RectangleShape2D_jqkdl")
+
+[node name="GateMarker" type="Polygon2D" parent="." unique_id=1832478814]
+color = Color(0.2, 0.95, 1, 0.32)
+polygon = PackedVector2Array(-7, -130, 7, -130, 7, 130, -7, 130)
+
+[node name="GateCore" type="Polygon2D" parent="." unique_id=1678248364]
+color = Color(0.75, 1, 1, 0.72)
+polygon = PackedVector2Array(-2, -130, 2, -130, 2, 130, -2, 130)

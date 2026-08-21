@@ -47,6 +47,12 @@ scene changes.
 - `addons/godot_mcp/` is the agent's editor bridge — **local dev tool,
   gitignored**, do not commit. Copy it in fresh via `cp -r` from
   `~/Workspace/platformer/game/addons/godot_mcp/` if missing.
+- **Runtime MCP tools** (screenshot, send_input, query_runtime_node) need the
+  `MCPRuntime` autoload. It is NOT committed (it points at the gitignored
+  addon). At the start of a session that needs runtime tools, register it via
+  the MCP `godot_setup_autoload` (name `MCPRuntime`,
+  `res://addons/godot_mcp/runtime/mcp_runtime.gd`), then **revert the
+  `[autoload] MCPRuntime` block from `project.godot` before committing**.
 - Keep scripts small and single-purpose. Vehicle scene structure per spec §62
   (VehicleController / VehiclePhysics / VehicleStats / …). Do not write a
   4,000-line `car.gd`.
@@ -55,6 +61,19 @@ scene changes.
 - Layered architecture per spec §59: Presentation → Gameplay → Network →
   Domain/Shared Rules → Persistence.
 - Debug overlay is dev-only and must never ship (GURI-120).
+
+## Agent division of labor
+
+- **codex** (GPT-5.6-sol, Codex Plus): multi-file GDScript implementation,
+  scene construction, physics tuning, bug fixes. The agent that writes the
+  game code.
+- **grok** (grok-build-0.1): asset generation — stylized top-down 2D sprites,
+  SVG→PNG textures, UI art, through the Godot MCP.
+- **deepseek** (this main agent): orchestration, workflow, verification,
+  Linear/GitHub/vault bookkeeping.
+- Only **one** agent drives the Godot editor connection at a time (the editor
+  has a single MCP socket). Sequence codex and grok; never run both against
+  the editor in parallel.
 
 ## Asset workflow (grok agent)
 

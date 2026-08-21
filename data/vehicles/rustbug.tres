@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="VehicleStats" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_stats"]
+
+[resource]
+script = ExtResource("1_stats")
+mass = 0.85
+engine_power = 720.0
+max_speed = 680.0
+acceleration = 1.08
+reverse_speed = 255.0
+steering_rate = 3.75
+steering_response = 9.5
+grip = 0.84
+lateral_grip = 10.5
+drift_factor = 0.26
+brake_force = 980.0
+handbrake_force = 240.0
+boost_power = 540.0
+boost_capacity = 100.0
+boost_recharge = 10.0
+durability = 52.0
