@@ -41,6 +41,10 @@ func _read_input() -> void:
 	_boosting = Input.is_action_pressed("boost") and boost_amount > 0.0
 
 
+func is_boost_active() -> bool:
+	return _boosting and _throttle_input > 0.0 and boost_amount > 0.0
+
+
 func _apply_drive_forces(_delta: float) -> void:
 	var forward := Vector2.UP.rotated(rotation)
 	var forward_speed := linear_velocity.dot(forward)
@@ -56,7 +60,7 @@ func _apply_drive_forces(_delta: float) -> void:
 		elif forward_speed > -stats.reverse_speed:
 			apply_central_force(-forward * stats.engine_power * 0.55 * _brake_input)
 
-	if _boosting and _throttle_input > 0.0:
+	if is_boost_active():
 		apply_central_force(forward * stats.boost_power)
 
 	if Input.is_action_pressed("handbrake") and speed > 80.0:
@@ -88,7 +92,7 @@ func _apply_steering(delta: float) -> void:
 
 
 func _update_boost(delta: float) -> void:
-	if _boosting and _throttle_input > 0.0:
+	if is_boost_active():
 		boost_amount = maxf(0.0, boost_amount - 32.0 * delta)
 	elif is_drifting and absf(slip_angle) > 8.0 and absf(slip_angle) < 58.0:
 		boost_amount = minf(stats.boost_capacity, boost_amount + stats.boost_recharge * delta)
@@ -109,6 +113,6 @@ func _update_debug_state() -> void:
 
 
 func _limit_top_speed() -> void:
-	var speed_limit := stats.max_speed * (1.2 if _boosting else 1.0)
+	var speed_limit := stats.max_speed * (1.2 if is_boost_active() else 1.0)
 	if linear_velocity.length() > speed_limit:
 		linear_velocity = linear_velocity.limit_length(speed_limit)

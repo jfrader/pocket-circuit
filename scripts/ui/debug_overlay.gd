@@ -7,6 +7,10 @@ var _race_manager: Node
 
 
 func _ready() -> void:
+	visible = false
+	if not OS.is_debug_build():
+		queue_free()
+		return
 	call_deferred("_find_dependencies")
 
 

@@ -1,15 +1,23 @@
 [gd_scene format=3 uid="uid://drf85t6nfrbhm"]
 
+[ext_resource type="Script" uid="uid://cfyt5a68w86ub" path="res://scripts/presentation/kitchen_dressing.gd" id="1_03pr4"]
+[ext_resource type="Texture2D" uid="uid://da3ypkhcli582" path="res://assets/textures/kitchen/mug_cream.png" id="1_as6m8"]
 [ext_resource type="PackedScene" uid="uid://htjroyo22kqr" path="res://scenes/race/checkpoint.tscn" id="1_nkdn3"]
-[ext_resource type="Texture2D" uid="uid://bkxf41677oucq" path="res://assets/textures/mug.png" id="1_ryv4o"]
-[ext_resource type="Texture2D" uid="uid://ccy5pugt3q5xc" path="res://assets/textures/cereal_box.png" id="2_jetk0"]
-[ext_resource type="Texture2D" uid="uid://cfiwkw0p2cw7q" path="res://assets/textures/sponge.png" id="3_riwtw"]
-[ext_resource type="Texture2D" uid="uid://6nd6u7juntqi" path="res://assets/textures/fork.png" id="4_ksiel"]
-[ext_resource type="Texture2D" uid="uid://b5pjcrh173hl0" path="res://assets/textures/ruler.png" id="5_yqbdy"]
-[ext_resource type="Texture2D" uid="uid://cf1e6l8l4fvvo" path="res://assets/textures/apple.png" id="6_i5pq5"]
-[ext_resource type="Texture2D" uid="uid://bx2m0hkbl77bo" path="res://assets/textures/lime.png" id="7_a4r5k"]
-[ext_resource type="Texture2D" uid="uid://cu75n522638fx" path="res://assets/textures/cup.png" id="8_vvowj"]
-[ext_resource type="Texture2D" uid="uid://cu4guj2coxvyr" path="res://assets/textures/spoon.png" id="9_hqlae"]
+[ext_resource type="Texture2D" uid="uid://qik73duuwrqh" path="res://assets/textures/kitchen/mug_blue.png" id="2_as6m8"]
+[ext_resource type="Texture2D" uid="uid://np6dceb0lqk4" path="res://assets/textures/kitchen/cereal_tower_orange.png" id="3_cfsft"]
+[ext_resource type="Texture2D" uid="uid://cqpq74rtue0t3" path="res://assets/textures/kitchen/cereal_tower_green.png" id="4_cfsft"]
+[ext_resource type="Texture2D" uid="uid://heu7ghqtlv50" path="res://assets/textures/kitchen/sponge_wet.png" id="5_cfsft"]
+[ext_resource type="Texture2D" uid="uid://dciq3sng1px6r" path="res://assets/textures/kitchen/fork_cartoon.png" id="6_cfsft"]
+[ext_resource type="Texture2D" uid="uid://cl8cefmlxhv1o" path="res://assets/textures/kitchen/ruler_plank.png" id="7_cfsft"]
+[ext_resource type="Texture2D" uid="uid://t2kwxy4jtw4j" path="res://assets/textures/kitchen/apple_cartoon.png" id="8_cfsft"]
+[ext_resource type="Texture2D" uid="uid://csegpxfki8a4v" path="res://assets/textures/kitchen/lime_cartoon.png" id="9_cfsft"]
+[ext_resource type="Texture2D" uid="uid://c3mhyv42njegh" path="res://assets/textures/kitchen/cup_cartoon.png" id="10_cfsft"]
+[ext_resource type="Texture2D" uid="uid://ce1e1pputc5im" path="res://assets/textures/kitchen/spoon_bridge.png" id="11_cfsft"]
+[ext_resource type="Texture2D" uid="uid://dqxjb386kaxp5" path="res://assets/textures/kitchen/counter_surface.png" id="11_jf3u5"]
+[ext_resource type="Texture2D" uid="uid://dlywy0e7lsodq" path="res://assets/textures/kitchen/track_surface.png" id="12_16w8u"]
+[ext_resource type="Texture2D" uid="uid://ivv4e62vkuvm" path="res://assets/textures/kitchen/wet_spill.png" id="13_y73v3"]
+[ext_resource type="Texture2D" uid="uid://cx5f7ckuy7wbr" path="res://assets/textures/kitchen/start_finish.png" id="14_237h7"]
+[ext_resource type="Texture2D" uid="uid://b35sjchw174x7" path="res://assets/textures/kitchen/counter_edge.png" id="15_dgg4m"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xb7yb"]
 size = Vector2(2000, 50)
@@ -57,13 +65,16 @@ radius = 44.0
 size = Vector2(210, 26)
 
 [node name="KitchenGraybox" type="Node2D" unique_id=126382309 groups=["track"]]
+script = ExtResource("1_03pr4")
 
 [node name="Floor" type="Polygon2D" parent="." unique_id=2087876993]
+visible = false
 z_index = -20
 color = Color(0.34, 0.29, 0.25, 1)
 polygon = PackedVector2Array(-1000, -600, 1000, -600, 1000, 600, -1000, 600)
 
 [node name="CounterHighlight" type="Polygon2D" parent="." unique_id=890902603]
+visible = false
 z_index = -19
 color = Color(0.42, 0.36, 0.3, 1)
 polygon = PackedVector2Array(-940, -540, 940, -540, 940, 540, -940, 540)
@@ -94,16 +105,19 @@ color = Color(0.3, 0.25, 0.22, 1)
 polygon = PackedVector2Array(-590, -225, 590, -225, 590, 225, -590, 225)
 
 [node name="SpongeWetPatch" type="Polygon2D" parent="." unique_id=1334197584]
+visible = false
 z_index = -8
 color = Color(0.1, 0.55, 0.62, 0.58)
 polygon = PackedVector2Array(-40, -485, 330, -485, 350, -255, -70, -255)
 
 [node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=689139309]
+visible = false
 z_index = -7
 color = Color(0.96, 0.93, 0.82, 1)
 polygon = PackedVector2Array(-712, 245, -690, 245, -690, 490, -712, 490)
 
 [node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=2091006546]
+visible = false
 z_index = -6
 color = Color(0.05, 0.06, 0.08, 1)
 polygon = PackedVector2Array(-712, 280, -690, 280, -690, 330, -712, 330, -712, 380, -690, 380, -690, 430, -712, 430)
@@ -177,8 +191,9 @@ color = Color(0.86, 0.83, 0.7, 1)
 polygon = PackedVector2Array(0, -18, 26, -18, 34, 0, 26, 18, 0, 18, 0, 8, 18, 8, 22, 0, 18, -8, 0, -8)
 
 [node name="Sprite" type="Sprite2D" parent="MugA" unique_id=1643243559]
-scale = Vector2(0.1812, 0.1812)
-texture = ExtResource("1_ryv4o")
+z_index = 1
+scale = Vector2(0.34, 0.34)
+texture = ExtResource("1_as6m8")
 
 [node name="MugB" type="StaticBody2D" parent="." unique_id=662062190]
 position = Vector2(270, 465)
@@ -199,8 +214,9 @@ color = Color(0.18, 0.09, 0.04, 1)
 polygon = PackedVector2Array(52, 0, 37, 37, 0, 52, -37, 37, -52, 0, -37, -37, 0, -52, 37, -37)
 
 [node name="Sprite" type="Sprite2D" parent="MugB" unique_id=1801211312]
-scale = Vector2(0.1625, 0.1625)
-texture = ExtResource("1_ryv4o")
+z_index = 1
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_as6m8")
 
 [node name="CerealA" type="StaticBody2D" parent="." unique_id=2016329342]
 position = Vector2(650, 80)
@@ -221,8 +237,9 @@ color = Color(0.85, 0.16, 0.12, 1)
 polygon = PackedVector2Array(-50, -20, 50, -20, 50, 20, -50, 20)
 
 [node name="Sprite" type="Sprite2D" parent="CerealA" unique_id=119680074]
-scale = Vector2(0.1818, 0.2)
-texture = ExtResource("2_jetk0")
+z_index = 1
+scale = Vector2(0.26, 0.295)
+texture = ExtResource("3_cfsft")
 
 [node name="CerealB" type="StaticBody2D" parent="." unique_id=428535964]
 position = Vector2(850, -120)
@@ -243,8 +260,9 @@ color = Color(0.13, 0.4, 0.18, 1)
 polygon = PackedVector2Array(-48, -15, 48, -15, 48, 18, -48, 18)
 
 [node name="Sprite" type="Sprite2D" parent="CerealB" unique_id=1005593625]
-scale = Vector2(0.1745, 0.1765)
-texture = ExtResource("2_jetk0")
+z_index = 1
+scale = Vector2(0.25, 0.276)
+texture = ExtResource("4_cfsft")
 
 [node name="Sponge" type="StaticBody2D" parent="." unique_id=1447204972]
 position = Vector2(120, -265)
@@ -266,8 +284,9 @@ color = Color(0.2, 0.62, 0.26, 1)
 polygon = PackedVector2Array(-120, -13, 120, -13, 120, 13, -120, 13)
 
 [node name="Sprite" type="Sprite2D" parent="Sponge" unique_id=1766786563]
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("3_riwtw")
+z_index = 1
+scale = Vector2(0.4, 0.35)
+texture = ExtResource("5_cfsft")
 
 [node name="Fork" type="StaticBody2D" parent="." unique_id=5407409]
 position = Vector2(-210, -458)
@@ -283,8 +302,9 @@ color = Color(0.7, 0.75, 0.78, 1)
 polygon = PackedVector2Array(-110, -12, 110, -12, 110, 12, -110, 12)
 
 [node name="Sprite" type="Sprite2D" parent="Fork" unique_id=774088210]
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("4_ksiel")
+z_index = 1
+scale = Vector2(0.34, 0.2)
+texture = ExtResource("6_cfsft")
 
 [node name="Ruler" type="StaticBody2D" parent="." unique_id=1168667608]
 position = Vector2(-470, 260)
@@ -300,8 +320,9 @@ color = Color(0.82, 0.55, 0.19, 1)
 polygon = PackedVector2Array(-135, -14, 135, -14, 135, 14, -135, 14)
 
 [node name="Sprite" type="Sprite2D" parent="Ruler" unique_id=1860055722]
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("5_yqbdy")
+z_index = 1
+scale = Vector2(0.35, 0.22)
+texture = ExtResource("7_cfsft")
 
 [node name="Apple" type="StaticBody2D" parent="." unique_id=956209412]
 position = Vector2(-620, -300)
@@ -316,8 +337,9 @@ color = Color(0.78, 0.12, 0.1, 1)
 polygon = PackedVector2Array(45, 0, 32, 32, 0, 45, -32, 32, -45, 0, -32, -32, 0, -45, 32, -32)
 
 [node name="Sprite" type="Sprite2D" parent="Apple" unique_id=521520827]
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("6_i5pq5")
+z_index = 1
+scale = Vector2(0.36, 0.36)
+texture = ExtResource("8_cfsft")
 
 [node name="Lime" type="StaticBody2D" parent="." unique_id=517090897]
 position = Vector2(-825, -290)
@@ -332,8 +354,9 @@ color = Color(0.35, 0.72, 0.16, 1)
 polygon = PackedVector2Array(38, 0, 27, 27, 0, 38, -27, 27, -38, 0, -27, -27, 0, -38, 27, -27)
 
 [node name="Sprite" type="Sprite2D" parent="Lime" unique_id=1625956854]
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("7_a4r5k")
+z_index = 1
+scale = Vector2(0.33, 0.33)
+texture = ExtResource("9_cfsft")
 
 [node name="Cup" type="StaticBody2D" parent="." unique_id=338801353]
 position = Vector2(-600, 470)
@@ -348,8 +371,9 @@ color = Color(0.62, 0.34, 0.76, 1)
 polygon = PackedVector2Array(44, 0, 31, 31, 0, 44, -31, 31, -44, 0, -31, -31, 0, -44, 31, -31)
 
 [node name="Sprite" type="Sprite2D" parent="Cup" unique_id=2050680914]
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("8_vvowj")
+z_index = 1
+scale = Vector2(0.34, 0.34)
+texture = ExtResource("10_cfsft")
 
 [node name="Spoon" type="StaticBody2D" parent="." unique_id=784697144]
 position = Vector2(-835, 55)
@@ -365,12 +389,14 @@ color = Color(0.72, 0.76, 0.8, 1)
 polygon = PackedVector2Array(-90, -13, 90, -13, 105, 0, 90, 13, -90, 13)
 
 [node name="Sprite" type="Sprite2D" parent="Spoon" unique_id=746705649]
-scale = Vector2(0.2, 0.2)
-texture = ExtResource("9_hqlae")
+z_index = 1
+scale = Vector2(0.3, 0.18)
+texture = ExtResource("11_cfsft")
 
 [node name="Labels" type="Node2D" parent="." unique_id=1231572064]
 
 [node name="Title" type="Label" parent="Labels" unique_id=1188845261]
+visible = false
 offset_left = -220.0
 offset_top = -80.0
 offset_right = -220.0
@@ -384,17 +410,21 @@ offset_left = -420.0
 offset_top = 500.0
 offset_right = -420.0
 offset_bottom = 500.0
-theme_override_colors/font_color = Color(0.9, 0.83, 0.65, 0.75)
-theme_override_font_sizes/font_size = 18
-text = "OPENING STRAIGHT  →"
+theme_override_colors/font_color = Color(0.960784, 0.941176, 0.890196, 0.7)
+theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = "START / FINISH  →"
 
 [node name="Chicane" type="Label" parent="Labels" unique_id=1817114360]
 offset_left = 30.0
 offset_top = 170.0
 offset_right = 30.0
 offset_bottom = 170.0
-theme_override_colors/font_color = Color(0.9, 0.83, 0.65, 0.75)
-theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.960784, 0.941176, 0.890196, 0.66)
+theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
 text = "MUG CHICANE"
 
 [node name="Shortcut" type="Label" parent="Labels" unique_id=349292962]
@@ -402,9 +432,11 @@ offset_left = -10.0
 offset_top = -230.0
 offset_right = -10.0
 offset_bottom = -230.0
-theme_override_colors/font_color = Color(0.38, 0.9, 0.95, 0.85)
-theme_override_font_sizes/font_size = 18
-text = "WET SPONGE SQUEEZE"
+theme_override_colors/font_color = Color(0.76, 0.94, 0.9, 0.76)
+theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = "SPONGE SHORTCUT"
 
 [node name="Technical" type="Label" parent="Labels" unique_id=327962199]
 offset_left = 660.0
@@ -412,8 +444,10 @@ offset_top = -20.0
 offset_right = 660.0
 offset_bottom = -20.0
 rotation = -1.5707963
-theme_override_colors/font_color = Color(0.9, 0.83, 0.65, 0.75)
-theme_override_font_sizes/font_size = 18
+theme_override_colors/font_color = Color(0.960784, 0.941176, 0.890196, 0.62)
+theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
 text = "TECHNICAL"
 
 [node name="Speed" type="Label" parent="Labels" unique_id=1863446097]
@@ -421,9 +455,11 @@ offset_left = 250.0
 offset_top = -530.0
 offset_right = 250.0
 offset_bottom = -530.0
-theme_override_colors/font_color = Color(0.9, 0.83, 0.65, 0.75)
-theme_override_font_sizes/font_size = 18
-text = "←  SPEED SECTION"
+theme_override_colors/font_color = Color(0.960784, 0.941176, 0.890196, 0.62)
+theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
+theme_override_constants/outline_size = 4
+theme_override_font_sizes/font_size = 16
+text = "←  TOP STRAIGHT"
 
 [node name="Checkpoint0Finish" parent="." unique_id=182880676 instance=ExtResource("1_nkdn3")]
 position = Vector2(-700, 360)
@@ -475,3 +511,292 @@ rotation = 1.5707963
 checkpoint_index = 7.0
 recovery_rotation = 3.1415927
 recovery_offset = 70.0
+
+[node name="ArtSurfaces" type="Node2D" parent="." unique_id=755919282]
+
+[node name="CounterSurface" type="Sprite2D" parent="ArtSurfaces" unique_id=832705348]
+z_index = -19
+scale = Vector2(1.953125, 1.171875)
+texture = ExtResource("11_jf3u5")
+
+[node name="BottomTrack" type="Sprite2D" parent="ArtSurfaces" unique_id=150604676]
+z_index = -9
+position = Vector2(0, 367.5)
+scale = Vector2(1.6015625, 0.23925781)
+texture = ExtResource("12_16w8u")
+
+[node name="RightTrack" type="Sprite2D" parent="ArtSurfaces" unique_id=862092287]
+z_index = -9
+position = Vector2(735, 0)
+scale = Vector2(0.24414063, 0.83984375)
+texture = ExtResource("12_16w8u")
+
+[node name="TopTrack" type="Sprite2D" parent="ArtSurfaces" unique_id=358263060]
+z_index = -9
+position = Vector2(0, -367.5)
+scale = Vector2(1.6015625, 0.23925781)
+texture = ExtResource("12_16w8u")
+
+[node name="LeftTrack" type="Sprite2D" parent="ArtSurfaces" unique_id=1946667163]
+z_index = -9
+position = Vector2(-735, 0)
+scale = Vector2(0.24414063, 0.83984375)
+texture = ExtResource("12_16w8u")
+
+[node name="WetSpill" type="Sprite2D" parent="ArtSurfaces" unique_id=1980936430]
+z_index = -7
+position = Vector2(140, -370)
+rotation = 0.025
+scale = Vector2(0.82, 0.72)
+texture = ExtResource("13_y73v3")
+
+[node name="StartFinish" type="Sprite2D" parent="ArtSurfaces" unique_id=1907913757]
+z_index = -6
+position = Vector2(-701, 367.5)
+rotation = 1.5707964
+scale = Vector2(0.47851563, 0.171875)
+texture = ExtResource("14_237h7")
+
+[node name="CounterEdge" type="Sprite2D" parent="ArtSurfaces" unique_id=2123962952]
+z_index = -5
+position = Vector2(0, 560)
+scale = Vector2(1.953125, 0.4)
+texture = ExtResource("15_dgg4m")
+
+[node name="OuterLaneEdge" type="Line2D" parent="ArtSurfaces" unique_id=463305629]
+z_index = -7
+points = PackedVector2Array(-835, 505, 835, 505, 875, 465, 875, -465, 835, -505, -835, -505, -875, -465, -875, 465)
+closed = true
+width = 8.0
+default_color = Color(0.960784, 0.941176, 0.890196, 0.72)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="InnerLaneEdge" type="Line2D" parent="ArtSurfaces" unique_id=24274990]
+z_index = -7
+points = PackedVector2Array(-600, 238, 600, 238, 603, 235, 603, -235, 600, -238, -600, -238, -603, -235, -603, 235)
+closed = true
+width = 6.0
+default_color = Color(0.960784, 0.941176, 0.890196, 0.5)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Dressing" type="Node2D" parent="." unique_id=1792961919]
+
+[node name="Plate" type="Sprite2D" parent="Dressing" unique_id=1086090209]
+z_index = -6
+position = Vector2(-265, 20)
+rotation = -0.08
+scale = Vector2(0.38, 0.38)
+
+[node name="CuttingBoard" type="Sprite2D" parent="Dressing" unique_id=1760075142]
+z_index = -16
+position = Vector2(870, 530)
+rotation = 0.08
+scale = Vector2(0.42, 0.42)
+
+[node name="ToasterEdge" type="Sprite2D" parent="Dressing" unique_id=1906353726]
+z_index = -16
+position = Vector2(-455, -555)
+rotation = -0.03
+scale = Vector2(0.45, 0.45)
+
+[node name="Napkin" type="Sprite2D" parent="Dressing" unique_id=612620774]
+z_index = -6
+position = Vector2(185, 70)
+rotation = 0.13
+scale = Vector2(0.42, 0.42)
+
+[node name="CerealScatter" type="Sprite2D" parent="Dressing" unique_id=971862017]
+z_index = -6
+position = Vector2(465, -105)
+rotation = -0.12
+scale = Vector2(0.5, 0.5)
+
+[node name="MicroDressing" type="Node2D" parent="." unique_id=419798813]
+
+[node name="Crumb01A" type="Sprite2D" parent="MicroDressing" unique_id=293467566]
+modulate = Color(1, 1, 1, 0.9)
+z_index = -5
+position = Vector2(-480, 530)
+rotation = 0.1
+scale = Vector2(0.28, 0.28)
+
+[node name="Crumb02A" type="Sprite2D" parent="MicroDressing" unique_id=1144818068]
+modulate = Color(1, 1, 1, 0.86)
+z_index = -5
+position = Vector2(-340, 190)
+rotation = -0.4
+scale = Vector2(0.26, 0.26)
+
+[node name="Crumb01B" type="Sprite2D" parent="MicroDressing" unique_id=1290503121]
+modulate = Color(1, 1, 1, 0.82)
+z_index = -5
+position = Vector2(420, 190)
+rotation = 0.7
+scale = Vector2(0.24, 0.24)
+
+[node name="Crumb02B" type="Sprite2D" parent="MicroDressing" unique_id=1492723538]
+modulate = Color(1, 1, 1, 0.88)
+z_index = -5
+position = Vector2(920, 360)
+rotation = 1.2
+scale = Vector2(0.3, 0.3)
+
+[node name="Crumb01C" type="Sprite2D" parent="MicroDressing" unique_id=1973855958]
+modulate = Color(1, 1, 1, 0.8)
+z_index = -5
+position = Vector2(500, -535)
+rotation = -0.8
+scale = Vector2(0.25, 0.25)
+
+[node name="Crumb02C" type="Sprite2D" parent="MicroDressing" unique_id=1389228951]
+modulate = Color(1, 1, 1, 0.9)
+z_index = -5
+position = Vector2(-920, -40)
+rotation = 0.32
+scale = Vector2(0.3, 0.3)
+
+[node name="Crumb01D" type="Sprite2D" parent="MicroDressing" unique_id=1831405002]
+modulate = Color(1, 1, 1, 0.84)
+z_index = -5
+position = Vector2(340, 535)
+rotation = -0.2
+scale = Vector2(0.26, 0.26)
+
+[node name="Crumb02D" type="Sprite2D" parent="MicroDressing" unique_id=1361508527]
+modulate = Color(1, 1, 1, 0.86)
+z_index = -5
+position = Vector2(905, -455)
+rotation = 0.85
+scale = Vector2(0.27, 0.27)
+
+[node name="ScratchA" type="Sprite2D" parent="MicroDressing" unique_id=1075984447]
+modulate = Color(0.78, 0.67, 0.56, 0.24)
+z_index = -18
+position = Vector2(0, -55)
+rotation = 0.15
+scale = Vector2(0.82, 0.82)
+
+[node name="ScratchB" type="Sprite2D" parent="MicroDressing" unique_id=422249338]
+modulate = Color(0.75, 0.62, 0.5, 0.28)
+z_index = -18
+position = Vector2(850, 535)
+rotation = -0.3
+scale = Vector2(0.7, 0.7)
+
+[node name="ScratchC" type="Sprite2D" parent="MicroDressing" unique_id=1806142065]
+modulate = Color(0.72, 0.6, 0.48, 0.22)
+z_index = -18
+position = Vector2(-900, 520)
+rotation = 0.45
+scale = Vector2(0.9, 0.9)
+
+[node name="ScratchD" type="Sprite2D" parent="MicroDressing" unique_id=446842944]
+modulate = Color(0.77, 0.64, 0.52, 0.26)
+z_index = -18
+position = Vector2(870, -535)
+rotation = -0.15
+scale = Vector2(0.76, 0.76)
+
+[node name="Droplet01A" type="Sprite2D" parent="MicroDressing" unique_id=1523125858]
+modulate = Color(1, 1, 1, 0.85)
+z_index = -5
+position = Vector2(-20, -320)
+rotation = 0.2
+scale = Vector2(0.26, 0.26)
+
+[node name="Droplet02A" type="Sprite2D" parent="MicroDressing" unique_id=1769155457]
+modulate = Color(1, 1, 1, 0.78)
+z_index = -5
+position = Vector2(55, -445)
+rotation = -0.4
+scale = Vector2(0.22, 0.22)
+
+[node name="Droplet01B" type="Sprite2D" parent="MicroDressing" unique_id=1296155828]
+modulate = Color(1, 1, 1, 0.82)
+z_index = -5
+position = Vector2(205, -275)
+rotation = 0.55
+scale = Vector2(0.3, 0.3)
+
+[node name="Droplet02B" type="Sprite2D" parent="MicroDressing" unique_id=1230453067]
+modulate = Color(1, 1, 1, 0.8)
+z_index = -5
+position = Vector2(300, -430)
+rotation = 0.1
+scale = Vector2(0.2, 0.2)
+
+[node name="Droplet01C" type="Sprite2D" parent="MicroDressing" unique_id=1816587569]
+modulate = Color(1, 1, 1, 0.78)
+z_index = -5
+position = Vector2(15, -390)
+rotation = -0.65
+scale = Vector2(0.22, 0.22)
+
+[node name="Droplet02C" type="Sprite2D" parent="MicroDressing" unique_id=776588366]
+modulate = Color(1, 1, 1, 0.9)
+z_index = -5
+position = Vector2(110, -300)
+rotation = 0.72
+scale = Vector2(0.25, 0.25)
+
+[node name="Droplet01D" type="Sprite2D" parent="MicroDressing" unique_id=271759794]
+modulate = Color(1, 1, 1, 0.76)
+z_index = -5
+position = Vector2(245, -470)
+rotation = -0.15
+scale = Vector2(0.27, 0.27)
+
+[node name="Droplet02D" type="Sprite2D" parent="MicroDressing" unique_id=1782615375]
+modulate = Color(1, 1, 1, 0.82)
+z_index = -5
+position = Vector2(325, -355)
+rotation = 0.38
+scale = Vector2(0.23, 0.23)
+
+[node name="SpillA" type="Sprite2D" parent="MicroDressing" unique_id=1451754811]
+modulate = Color(1, 1, 1, 0.52)
+z_index = -6
+position = Vector2(420, 105)
+rotation = 0.16
+scale = Vector2(0.3, 0.3)
+
+[node name="SpillB" type="Sprite2D" parent="MicroDressing" unique_id=1110798116]
+modulate = Color(1, 1, 1, 0.42)
+z_index = -6
+position = Vector2(-915, -490)
+rotation = -0.35
+scale = Vector2(0.25, 0.25)
+
+[node name="SkidA" type="Sprite2D" parent="MicroDressing" unique_id=660700218]
+modulate = Color(0.34, 0.3, 0.27, 0.24)
+z_index = -6
+position = Vector2(-420, 350)
+rotation = 0.02
+scale = Vector2(0.45, 0.5)
+
+[node name="SkidB" type="Sprite2D" parent="MicroDressing" unique_id=1433965423]
+modulate = Color(0.34, 0.3, 0.27, 0.2)
+z_index = -6
+position = Vector2(735, 255)
+rotation = 1.5707964
+scale = Vector2(0.38, 0.46)
+
+[node name="SkidC" type="Sprite2D" parent="MicroDressing" unique_id=1654448081]
+modulate = Color(0.34, 0.3, 0.27, 0.22)
+z_index = -6
+position = Vector2(190, -365)
+rotation = -0.03
+scale = Vector2(0.5, 0.5)
+
+[node name="SkidD" type="Sprite2D" parent="MicroDressing" unique_id=756089437]
+modulate = Color(0.34, 0.3, 0.27, 0.19)
+z_index = -6
+position = Vector2(-735, -370)
+rotation = 1.5707964
+scale = Vector2(0.4, 0.48)

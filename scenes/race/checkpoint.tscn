@@ -6,6 +6,7 @@
 size = Vector2(34, 260)
 
 [node name="Checkpoint" type="Area2D" unique_id=182880676 groups=["track_checkpoints"]]
+visible = false
 collision_layer = 0
 script = ExtResource("1_jqkdl")
 

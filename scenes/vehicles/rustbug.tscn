@@ -1,7 +1,9 @@
 [gd_scene format=3 uid="uid://dg3wsgfax1t31"]
 
 [ext_resource type="Script" uid="uid://b1621ao3hm2ec" path="res://scripts/vehicle/vehicle_controller.gd" id="1_vsirl"]
-[ext_resource type="Texture2D" uid="uid://ywpe5hf3878g" path="res://assets/models/rustbug.png" id="2_llb7f"]
+[ext_resource type="Texture2D" uid="uid://kwh4pao5gqcs" path="res://assets/models/vehicles/rustbug_hero.png" id="2_llb7f"]
+[ext_resource type="Texture2D" uid="uid://lmqal0f7yrfn" path="res://assets/models/vehicles/rustbug_shadow.png" id="3_8y0m5"]
+[ext_resource type="Script" uid="uid://fmjxpkxu3212" path="res://scripts/vehicle/vehicle_vfx.gd" id="4_1xam0"]
 
 [sub_resource type="CapsuleShape2D" id="CapsuleShape2D_vsirl"]
 radius = 18.0
@@ -78,5 +80,15 @@ color = Color(1, 0.94, 0.58, 1)
 polygon = PackedVector2Array(7, -31, 14, -29, 13, -24, 7, -26)
 
 [node name="CarSprite" type="Sprite2D" parent="VisualRoot" unique_id=47377684]
-scale = Vector2(0.05, 0.05)
+scale = Vector2(0.09, 0.09)
 texture = ExtResource("2_llb7f")
+
+[node name="ShadowSprite" type="Sprite2D" parent="VisualRoot" unique_id=90864945]
+modulate = Color(1, 1, 1, 0.72)
+z_index = -1
+position = Vector2(3, 5)
+scale = Vector2(0.09, 0.09)
+texture = ExtResource("3_8y0m5")
+
+[node name="VFX" type="Node2D" parent="." unique_id=843684054]
+script = ExtResource("4_1xam0")

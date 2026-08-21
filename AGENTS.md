@@ -74,6 +74,10 @@ scene changes.
 - Only **one** agent drives the Godot editor connection at a time (the editor
   has a single MCP socket). Sequence codex and grok; never run both against
   the editor in parallel.
+- Do not reduce scope, quality, asset count, or verification to fit one agent
+  invocation. Save tokens with exact briefs, targeted reads, reusable context
+  docs, batched tool calls, and stable handoffs. Resume the same task until it
+  is complete when an agent session reaches a platform step limit.
 
 ## Asset workflow (grok agent)
 
