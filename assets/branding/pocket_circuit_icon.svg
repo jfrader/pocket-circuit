@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256" role="img" aria-labelledby="title desc">
+  <title id="title">Pocket Circuit icon</title>
+  <desc id="desc">An amber miniature wheel joined to a cream circuit trace on an ink background.</desc>
+  <rect width="256" height="256" rx="52" fill="#1A1F23"/>
+  <path d="M54 132c0-43 35-78 78-78 34 0 63 22 73 52" fill="none" stroke="#F4C65A" stroke-width="24" stroke-linecap="round"/>
+  <path d="M132 202c-39 0-72-29-77-67" fill="none" stroke="#F4C65A" stroke-width="24" stroke-linecap="round"/>
+  <circle cx="132" cy="128" r="45" fill="#F5F0E3" stroke="#1A1F23" stroke-width="12"/>
+  <circle cx="132" cy="128" r="17" fill="#F4C65A" stroke="#1A1F23" stroke-width="8"/>
+  <path d="M132 83v25M132 148v25M87 128h25M152 128h25" stroke="#1A1F23" stroke-width="9" stroke-linecap="round"/>
+  <path d="M188 70h22v36M210 106h21M66 184H39v-31" fill="none" stroke="#F5F0E3" stroke-width="12" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="210" cy="66" r="12" fill="#F4C65A" stroke="#1A1F23" stroke-width="6"/>
+  <circle cx="232" cy="106" r="12" fill="#F5F0E3" stroke="#1A1F23" stroke-width="6"/>
+  <circle cx="39" cy="149" r="12" fill="#F4C65A" stroke="#1A1F23" stroke-width="6"/>
+</svg>

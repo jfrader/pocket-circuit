@@ -17,6 +17,9 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(_vehicle) or _recovering:
 		return
+	if not _can_recover():
+		_stuck_time = 0.0
+		return
 	if Input.is_action_just_pressed("reset") or not valid_bounds.has_point(_vehicle.global_position):
 		recover_vehicle()
 		return
@@ -36,7 +39,7 @@ func _find_dependencies() -> void:
 
 
 func recover_vehicle() -> void:
-	if _recovering or not is_instance_valid(_vehicle) or not is_instance_valid(_race_manager):
+	if _recovering or not is_instance_valid(_vehicle) or not _can_recover():
 		return
 	_recovering = true
 	_stuck_time = 0.0
@@ -50,6 +53,8 @@ func recover_vehicle() -> void:
 	_vehicle.global_transform = recovery_transform
 	_vehicle.linear_velocity = Vector2.ZERO
 	_vehicle.angular_velocity = 0.0
+	if _vehicle.has_method("reset_surface_modifiers"):
+		_vehicle.call("reset_surface_modifiers")
 	_vehicle.collision_layer = 0
 	_vehicle.collision_mask = 0
 	_vehicle.modulate.a = 0.45
@@ -64,3 +69,13 @@ func recover_vehicle() -> void:
 		_vehicle.collision_mask = saved_mask
 		_vehicle.modulate.a = 1.0
 	_recovering = false
+
+
+func _can_recover() -> bool:
+	if not is_instance_valid(_vehicle) or not is_instance_valid(_race_manager):
+		return false
+	if not bool(_race_manager.get("is_running")):
+		return false
+	if _race_manager.has_method("is_racer_finished") and bool(_race_manager.call("is_racer_finished", _vehicle)):
+		return false
+	return true

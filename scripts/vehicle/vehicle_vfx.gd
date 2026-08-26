@@ -7,6 +7,7 @@ const SKID_MARK := preload("res://assets/vfx/skid_mark.png")
 const MAX_SKID_MARKS := 24
 const SKID_INTERVAL := 0.11
 const IMPACT_DURATION := 0.18
+const IMPACT_AUDIO_COOLDOWN := 0.14
 
 var _vehicle: RigidBody2D
 var _visual_root: Node2D
@@ -18,11 +19,16 @@ var _impact_flash: Sprite2D
 var _animation_time: float = 0.0
 var _skid_cooldown: float = 0.0
 var _impact_time: float = 0.0
+var _impact_audio_cooldown: float = 0.0
 var _skid_marks: Array[Sprite2D] = []
+var _was_drifting := false
+var _was_boosting := false
+var _app: Node
 
 
 func _ready() -> void:
 	_vehicle = get_parent() as RigidBody2D
+	_app = get_node_or_null("/root/App")
 	_visual_root = _vehicle.get_node("VisualRoot") as Node2D
 	_visual_base_scale = _visual_root.scale
 	_dust_left = _make_effect(DRIFT_DUST, 4, Vector2(-14.0, 24.0), Vector2(0.42, 0.42), -2)
@@ -37,8 +43,16 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	_animation_time += delta
 	_skid_cooldown = maxf(0.0, _skid_cooldown - delta)
+	_impact_audio_cooldown = maxf(0.0, _impact_audio_cooldown - delta)
 	var drifting := bool(_vehicle.get("is_drifting"))
 	var boosting := bool(_vehicle.call("is_boost_active"))
+	if _vehicle.is_in_group("player_vehicle"):
+		if drifting and not _was_drifting:
+			_play_sfx(&"drift", 0.72)
+		if boosting and not _was_boosting:
+			_play_sfx(&"boost", 0.82)
+	_was_drifting = drifting
+	_was_boosting = boosting
 	_update_looping_effects(drifting, boosting)
 	if drifting and _skid_cooldown <= 0.0:
 		_spawn_skid_mark()
@@ -99,8 +113,12 @@ func _on_body_entered(_body: Node) -> void:
 	_impact_flash.visible = true
 	_impact_flash.frame = 0
 	var camera := get_viewport().get_camera_2d()
-	if camera and camera.has_method("add_impact_nudge"):
+	if _vehicle.is_in_group("player_vehicle") and camera and camera.has_method("add_impact_nudge"):
 		camera.call("add_impact_nudge", clampf(_vehicle.linear_velocity.length() / 680.0, 0.25, 1.0))
+	if _vehicle.is_in_group("player_vehicle") and _impact_audio_cooldown <= 0.0:
+		var impact_strength := clampf((_vehicle.linear_velocity.length() - 45.0) / 480.0, 0.18, 0.9)
+		_play_sfx(&"impact", impact_strength)
+		_impact_audio_cooldown = IMPACT_AUDIO_COOLDOWN
 
 
 func _update_impact(delta: float) -> void:
@@ -113,3 +131,8 @@ func _update_impact(delta: float) -> void:
 	_impact_flash.frame = mini(2, int(progress * 3.0))
 	var squash := sin(progress * PI)
 	_visual_root.scale = _visual_base_scale * Vector2(1.0 + squash * 0.035, 1.0 - squash * 0.035)
+
+
+func _play_sfx(sound_name: StringName, volume_scale: float) -> void:
+	if is_instance_valid(_app) and _app.has_method("play_sfx"):
+		_app.call("play_sfx", sound_name, volume_scale)

@@ -10,10 +10,16 @@ config_version=5
 
 [application]
 
-config/name="Pocket Circuit Online"
-config/description="Tiny racing, huge world, endless garage. A top-down 2D arcade racer where tiny vehicles race through oversized everyday environments."
-run/main_scene="res://scenes/race/prototype_race.tscn"
+config/name="Pocket Circuit"
+config/description="Tiny racing. Big stakes. Win the Grand Household Circuit before sunrise in this complete offline arcade championship."
+config/version="1.0.0"
+run/main_scene="res://scenes/boot/boot.tscn"
 config/features=PackedStringArray("4.7")
+config/icon="res://assets/branding/pocket_circuit_icon.svg"
+
+[autoload]
+
+App="*res://scripts/autoload/app.gd"
 
 [display]
 
@@ -23,7 +29,7 @@ window/stretch/mode="canvas_items"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
+enabled=PackedStringArray("res://addons/release_export/plugin.cfg")
 
 [input]
 

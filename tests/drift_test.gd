@@ -19,6 +19,20 @@ func _run_test() -> void:
 	if vehicle == null:
 		_fail("player_vehicle was not found")
 		return
+	var race_manager := get_first_node_in_group("race_manager") as RaceManager
+	if race_manager == null:
+		_fail("race_manager was not found")
+		return
+	var started := [race_manager.is_running]
+	if not started[0]:
+		race_manager.race_started.connect(func() -> void: started[0] = true, CONNECT_ONE_SHOT)
+	var timeout_frames := 300
+	while not bool(started[0]) and timeout_frames > 0:
+		await physics_frame
+		timeout_frames -= 1
+	if not bool(started[0]):
+		_fail("race_started was not emitted before the timeout")
+		return
 
 	Input.action_press("accelerate")
 	var peak_speed := 0.0

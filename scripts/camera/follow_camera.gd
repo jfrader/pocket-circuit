@@ -53,4 +53,7 @@ func set_target(vehicle: Node2D) -> void:
 
 
 func add_impact_nudge(strength: float) -> void:
+	var app := get_node_or_null("/root/App")
+	if app and bool(app.get("reduced_camera_shake")):
+		return
 	_impact_nudge = maxf(_impact_nudge, clampf(strength, 0.0, 1.0))
