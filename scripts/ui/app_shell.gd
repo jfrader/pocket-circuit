@@ -12,8 +12,10 @@ const MUTED := Color("aeb7c8")
 
 var _app: Node
 var _root: Control
+var _scroll: ScrollContainer
 var _content: VBoxContainer
 var _footer: Label
+var _button_focus_chain: Array[Button] = []
 var _screen := "title"
 var _event_id := ""
 var _quick_race := false
@@ -151,7 +153,8 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	_add_button("BACK", Callable(self, "go_back"), CREAM)
 	_footer.text = "ENTER / A  RACE     ·     ESC / B  BACK"
 	if selected_button:
-		call_deferred("_grab_button_focus", selected_button)
+		_queue_content_entrance()
+		_grab_button_focus_after_layout(selected_button, _entrance_generation)
 	else:
 		_focus_first()
 
@@ -293,15 +296,15 @@ func _build_base() -> void:
 	page.add_child(brand)
 	var separator := HSeparator.new()
 	page.add_child(separator)
-	var scroll := ScrollContainer.new()
-	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	page.add_child(scroll)
+	_scroll = ScrollContainer.new()
+	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	page.add_child(_scroll)
 	_content = VBoxContainer.new()
 	_content.custom_minimum_size = Vector2(760.0, 0.0)
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content.add_theme_constant_override("separation", 10)
-	scroll.add_child(_content)
+	_scroll.add_child(_content)
 	_footer = Label.new()
 	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_footer.add_theme_font_size_override("font_size", 13)
@@ -342,6 +345,9 @@ func _style(fill: Color, border: Color, radius: int, width: int = 1) -> StyleBox
 
 func _clear_content() -> void:
 	_entrance_generation += 1
+	_button_focus_chain.clear()
+	_scroll.scroll_vertical = 0
+	_scroll.set_deferred("scroll_vertical", 0)
 	if _content_tween and _content_tween.is_valid():
 		_content_tween.kill()
 	_content.modulate = Color.WHITE
@@ -383,6 +389,8 @@ func _add_section(left: String, right: String) -> void:
 	left_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left_label)
 	var right_label := _label(right, 14, MUTED)
+	right_label.custom_minimum_size = Vector2(320.0, 0.0)
+	right_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	right_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	row.add_child(right_label)
 	_content.add_child(row)
@@ -414,7 +422,27 @@ func _add_button(text: String, callback: Callable, accent: Color, disabled: bool
 	if callback.is_valid():
 		button.pressed.connect(callback)
 	_content.add_child(button)
+	if not disabled:
+		_register_button_focus(button)
 	return button
+
+
+func _register_button_focus(button: Button) -> void:
+	if not _button_focus_chain.is_empty():
+		var previous: Button = _button_focus_chain.back()
+		previous.focus_neighbor_bottom = previous.get_path_to(button)
+		button.focus_neighbor_top = button.get_path_to(previous)
+	_button_focus_chain.append(button)
+	button.focus_entered.connect(_queue_control_visible.bind(button, _entrance_generation))
+
+
+func _queue_control_visible(control: Control, generation: int) -> void:
+	call_deferred("_ensure_control_visible", control, generation)
+
+
+func _ensure_control_visible(control: Control, generation: int) -> void:
+	if generation == _entrance_generation and is_instance_valid(_scroll) and is_instance_valid(control):
+		_scroll.ensure_control_visible(control)
 
 
 func _add_slider(label_text: String, value: float, setting_key: String) -> void:
@@ -450,21 +478,33 @@ func _label(text: String, size: int, color: Color) -> Label:
 
 func _focus_first() -> void:
 	_queue_content_entrance()
-	call_deferred("_grab_first_focus")
+	_grab_first_focus_after_layout(_entrance_generation)
+
+
+func _grab_first_focus_after_layout(generation: int) -> void:
+	await get_tree().process_frame
+	if generation == _entrance_generation:
+		_grab_first_focus()
 
 
 func _grab_first_focus() -> void:
+	_scroll.scroll_vertical = 0
 	for node: Node in _content.find_children("*", "BaseButton", true, false):
 		var button := node as BaseButton
-		if button and not button.disabled and button.visible:
+		if button and not button.is_queued_for_deletion() and not button.disabled and button.visible:
 			button.grab_focus()
 			return
 
 
 func _grab_button_focus(button: BaseButton) -> void:
-	_queue_content_entrance()
 	if is_instance_valid(button) and not button.disabled and button.visible:
 		button.grab_focus()
+
+
+func _grab_button_focus_after_layout(button: BaseButton, generation: int) -> void:
+	await get_tree().process_frame
+	if generation == _entrance_generation:
+		_grab_button_focus(button)
 
 
 func _wire_button_audio(button: BaseButton) -> void:

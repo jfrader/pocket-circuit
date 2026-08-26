@@ -18,3 +18,9 @@
   shake, reduced motion, and pause-aware race audio.
 - Native Windows x86_64 and Linux x86_64 release exports for offline Steam and
   Steam Deck play.
+
+### Fixed
+
+- Championship map and settings metadata remain readable at the release
+  resolution, keyboard focus stays visible after returning between screens, and
+  completed off-screen events remain reachable without a mouse.
