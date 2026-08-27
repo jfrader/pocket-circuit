@@ -24,3 +24,6 @@
 - Championship map and settings metadata remain readable at the release
   resolution, keyboard focus stays visible after returning between screens, and
   completed off-screen events remain reachable without a mouse.
+- Failed disk writes no longer advance championship progress, discard an
+  existing championship, or claim that a race result was saved; affected
+  screens now keep Continue blocked and offer an explicit retry.

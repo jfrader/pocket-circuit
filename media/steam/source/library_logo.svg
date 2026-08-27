@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="720" viewBox="0 0 1280 720">
+
+    <defs>
+      <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#111827"/>
+        <stop offset="0.56" stop-color="#19243B"/>
+        <stop offset="1" stop-color="#273855"/>
+      </linearGradient>
+      <linearGradient id="titleFade" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#111827" stop-opacity="0.98"/>
+        <stop offset="0.68" stop-color="#111827" stop-opacity="0.72"/>
+        <stop offset="1" stop-color="#111827" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="titleFadeVertical" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#FFFFFF"/>
+        <stop offset="0.68" stop-color="#FFFFFF"/>
+        <stop offset="1" stop-color="#000000"/>
+      </linearGradient>
+      <mask id="titleMask"><rect width="100%" height="100%" fill="url(#titleFadeVertical)"/></mask>
+      <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="#FFE7A0" stop-opacity="0.95"/>
+        <stop offset="0.55" stop-color="#F4BF3A" stop-opacity="0.55"/>
+        <stop offset="1" stop-color="#F4BF3A" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="shadow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+        <feOffset dx="0" dy="12" result="offsetblur"/>
+        <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#FFFFFF" stroke-opacity="0.035" stroke-width="2"/>
+      </pattern>
+    </defs>
+
+    <g filter="url(#shadow)">
+    <g transform="translate(230.4 273.6)">
+      <rect x="0" y="-127.5" width="33.1" height="33.1" rx="6.6" fill="#F4BF3A" transform="rotate(45 16.6 -111.0)"/>
+      <text x="49.7" y="0" fill="#FFF8E8" stroke="#111827" stroke-width="5.8" paint-order="stroke" font-family="DejaVu Sans, sans-serif" font-size="165.6" font-weight="900" letter-spacing="4.1">POCKET</text>
+      <text x="0" y="155.7" fill="#F4BF3A" stroke="#111827" stroke-width="5.8" paint-order="stroke" font-family="DejaVu Sans, sans-serif" font-size="165.6" font-weight="900" letter-spacing="3.0">CIRCUIT</text>
+    </g>
+    </g>
+    </svg>

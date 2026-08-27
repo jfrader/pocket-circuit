@@ -6,21 +6,32 @@ const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 class CountingSaveStore extends SaveStore:
 	var save_count := 0
 	var stored_data: Dictionary = {}
+	var should_fail := false
 
 	func _init() -> void:
 		super("user://tests/pocket_circuit_championship_flow_test.json")
 
 	func save_data(data: Dictionary) -> bool:
 		save_count += 1
+		if should_fail:
+			last_save_error = "Injected save failure"
+			return false
 		stored_data = data.duplicate(true)
 		return true
 
 
 class TestShell extends CanvasLayer:
 	var map_shown := false
+	var save_error_shown := false
 
 	func show_map(_summary: Dictionary = {}) -> void:
 		map_shown = true
+
+	func show_save_error(_title: String, _detail: String, _retry_action: Callable, _back_action: Callable) -> void:
+		save_error_shown = true
+
+	func show_title() -> void:
+		pass
 
 
 func _initialize() -> void:
@@ -39,33 +50,58 @@ func _run_test() -> void:
 	progress["reduced_camera_shake"] = true
 	progress["reduced_motion"] = true
 	app.set("_save_data", progress)
+	store.should_fail = true
 	app.call("confirm_new_championship")
-	if not _expect(bool(app.call("get_save_data")["championship_started"]) and bool(app.call("get_save_data")["reduced_motion"]) and bool(app.call("get_save_data")["reduced_camera_shake"]) and store.save_count == 1, "confirming New Championship should preserve comfort settings and persist once"):
+	if not _expect(not bool(app.call("get_save_data")["championship_started"]) and shell.save_error_shown and not shell.map_shown and store.save_count == 1, "a failed New Championship save must preserve progress and show a blocking error"):
+		return
+	store.should_fail = false
+	shell.save_error_shown = false
+	app.call("confirm_new_championship")
+	if not _expect(bool(app.call("get_save_data")["championship_started"]) and bool(app.call("get_save_data")["reduced_motion"]) and bool(app.call("get_save_data")["reduced_camera_shake"]) and store.save_count == 2, "confirming New Championship should preserve comfort settings and persist once"):
+		return
+	progress = app.call("get_save_data")
+	progress["unlocked_vehicles"] = ["rustbug", "pinbolt"]
+	app.set("_save_data", progress)
+	store.should_fail = true
+	shell.save_error_shown = false
+	app.current_race_session.clear()
+	app.call("start_race", "kitchen_crumb_rush", "pinbolt", false)
+	if not _expect(String(app.call("get_save_data")["selected_vehicle"]) == "rustbug" and app.current_race_session.is_empty() and shell.save_error_shown and store.save_count == 3, "a failed vehicle-selection save must not start the championship race or change the selection"):
+		return
+	shell.save_error_shown = false
+	if not _expect(not bool(app.call("update_setting", "difficulty", "clockwork")) and String(app.call("get_save_data")["difficulty"]) == "club_circuit" and shell.save_error_shown and store.save_count == 4, "a failed settings save must keep the previous value and report failure"):
 		return
 
 	app.current_race_session = _session("championship")
-	app.call("report_race_result", 2, 12.0, [])
+	if not _expect(not bool(app.call("report_race_result", 2, 12.0, [])), "a failed result save must report failure"):
+		return
 	progress = app.call("get_save_data")
-	if not _expect(store.save_count == 2 and int(progress["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "a championship result should commit and save immediately"):
+	if not _expect(store.save_count == 5 and progress["best_event_finishes"].is_empty() and not bool(app.current_race_session["result_committed"]) and app.current_race_session.has("save_error"), "failed result persistence must not alter or commit progress"):
+		return
+	store.should_fail = false
+	if not _expect(bool(app.call("report_race_result", 2, 12.0, [])), "retrying a failed result save should succeed"):
+		return
+	progress = app.call("get_save_data")
+	if not _expect(store.save_count == 6 and int(progress["best_event_finishes"]["kitchen_crumb_rush"]) == 2 and bool(app.current_race_session["result_committed"]), "a successful retry should commit the result exactly once"):
 		return
 	app.call("report_race_result", 1, 10.0, [])
-	if not _expect(store.save_count == 2 and int(app.call("get_save_data")["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "a duplicate results signal must not save or alter progress"):
+	if not _expect(store.save_count == 6 and int(app.call("get_save_data")["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "a duplicate results signal must not save or alter progress"):
 		return
 
 	app.call("retry_race", false)
-	if not _expect(not bool(app.current_race_session["result_committed"]) and not app.current_race_session.has("result"), "Retry should create a fresh uncommitted attempt"):
+	if not _expect(not bool(app.current_race_session["result_committed"]) and not app.current_race_session.has("result") and not app.current_race_session.has("save_error"), "Retry should create a fresh uncommitted attempt"):
 		return
 	app.call("report_race_result", 4, 15.0, [])
 	progress = app.call("get_save_data")
-	if not _expect(store.save_count == 3 and int(progress["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "a weaker retry should save once without reducing the best"):
+	if not _expect(store.save_count == 6 and int(progress["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "a weaker retry should not rewrite unchanged progress"):
 		return
 	app.call("report_race_result", 1, 9.0, [])
-	if not _expect(store.save_count == 3, "a duplicate retry result must remain idempotent"):
+	if not _expect(store.save_count == 6, "a duplicate retry result must remain idempotent"):
 		return
 
 	app.current_race_session = _session("quick")
 	app.call("report_race_result", 1, 8.0, [])
-	if not _expect(store.save_count == 3 and int(app.call("get_save_data")["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "Quick Race must not save or mutate championship progress"):
+	if not _expect(store.save_count == 6 and int(app.call("get_save_data")["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "Quick Race must not save or mutate championship progress"):
 		return
 
 	app.current_race_session = _session("championship")

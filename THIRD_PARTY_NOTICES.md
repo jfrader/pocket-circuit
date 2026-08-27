@@ -28,7 +28,13 @@ SOFTWARE.
 
 ## Original project assets
 
-The Pocket Circuit icon and audio are original project assets and do not contain
-third-party samples or branding. This notice makes no license claim about assets
-whose provenance has not been documented; add verified notices before release
-if any third-party material is introduced.
+Pocket Circuit's shipped story, code, graphics, icon, music, and sound effects
+are original project material. They contain no third-party source media,
+samples, characters, vehicle designs, track designs, logos, or branding.
+
+The engine's built-in default font is distributed as part of Godot Engine. No
+separate commercial font is bundled with the game.
+
+Production methods and the pre-generated-content disclosure are documented in
+`ASSET_PROVENANCE.md`. If third-party material is introduced in a future build,
+its notice and license must be added here before release.

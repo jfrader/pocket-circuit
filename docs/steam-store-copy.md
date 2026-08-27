@@ -48,19 +48,80 @@ compatibility status must match Valve's review result rather than this draft.
 
 ## Media checklist
 
-- [ ] Six or more release-build screenshots: title/championship map, each room
-  theme, a reverse event, vehicle select, hazard action, and results/unlock.
-- [ ] Screenshots show final HUD and real gameplay with no debug overlay, editor,
+- [x] Seven release-build screenshots cover the title, championship map,
+  pre-race briefing, vehicle selection, and live Kitchen, Workshop, and Office
+  races.
+- [x] Screenshots show final HUD and real gameplay with no debug overlay, editor,
   placeholder art, unsupported feature, or unreadable small text.
-- [ ] All required Steam capsule formats share the ink/amber/cream miniature
+- [x] All required Steam capsule formats share the ink/amber/cream miniature
   circuit identity and remain legible at their smallest required size.
-- [ ] Library assets, app icon, community icon, and hero/header treatments use
+- [x] Library assets, app icon, community icon, and hero/header treatments use
   approved original source art and current Steamworks dimensions.
-- [ ] A concise gameplay-first trailer opens with racing, shows all three themes
+- [x] A concise gameplay-first trailer opens with racing, shows all three themes
   and four vehicles, includes real UI/audio, and ends on the offline
   championship promise without online claims.
-- [ ] Trailer music, fonts, logos, and every visible asset have documented rights
+- [x] Trailer music, fonts, logos, and every visible asset have documented rights
   before upload.
+
+The repository media packet is in `media/steam/`. `MANIFEST.md` records exact
+dimensions, production rights, encoding, regeneration commands, and the build
+hashes used for capture. Steamworks policy and dimensions must still be checked
+once more immediately before owner upload because Valve can revise requirements.
+
+## Languages
+
+- Interface: English.
+- Full audio: no spoken dialogue.
+- Subtitles: all story and rival dialogue is presented as English on-screen text.
+
+Do not select additional Steam language support until the corresponding in-game
+copy has been translated and tested.
+
+## System requirements draft
+
+### Windows minimum
+
+- 64-bit Windows 10 or later.
+- Dual-core 2.0 GHz processor.
+- 4 GB RAM.
+- Vulkan 1.0-compatible graphics hardware.
+- 500 MB available storage.
+- Keyboard; controller supported but not required.
+
+### Linux minimum
+
+- 64-bit Linux distribution with glibc 2.31 or later.
+- Dual-core 2.0 GHz processor.
+- 4 GB RAM.
+- Vulkan 1.0-compatible graphics hardware and current Mesa/vendor drivers.
+- 500 MB available storage.
+- Keyboard; controller supported but not required.
+
+These are conservative store-page drafts, not owner-approved claims. Confirm
+them on clean low-end target systems and revise from measured results before
+Steamworks submission.
+
+## Support and data-use draft
+
+- Support site: `https://gurisitos.games`
+- Support email: `hola@gurisitos.games`
+- Pocket Circuit requires no account or network connection and contains no
+  advertising, analytics, telemetry, live AI, voice chat, or user-generated
+  content upload.
+- The game stores championship progress and settings locally. Steam Cloud may
+  synchronize those files when the publisher enables it and the Steam client is
+  online.
+
+Publish equivalent wording on the studio privacy/support page before entering a
+privacy-policy URL in Steamworks.
+
+## Content survey draft
+
+Pocket Circuit depicts fictional toy-scale racing and non-realistic vehicle
+collisions without injury, gore, weapons, gambling, drugs, sexual content, or
+strong language. Review the exact final build during Steam's content survey.
+Use the pre-generated AI-assisted-content wording in `ASSET_PROVENANCE.md`; the
+game has no live generative-AI features.
 
 ## Suggested launch price — owner approval required
 

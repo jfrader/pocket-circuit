@@ -81,8 +81,8 @@ func _build_workshop_presentation() -> void:
 	]), Color(STEEL, 0.22), 1)
 	_add_line(art, PackedVector2Array([Vector2(-540, -205), Vector2(540, -205)]), Color(AMBER, 0.72), 8.0)
 	_add_line(art, PackedVector2Array([Vector2(-540, 205), Vector2(540, 205)]), Color(AMBER, 0.45), 5.0)
-	for position: Vector2 in [Vector2(-430, -90), Vector2(-260, 70), Vector2(360, -70), Vector2(470, 95)]:
-		_add_polygon(art, "Fastener", _regular_polygon(position, 18.0, 6), Color("c9d0d2"), 2)
+	for fastener_position: Vector2 in [Vector2(-430, -90), Vector2(-260, 70), Vector2(360, -70), Vector2(470, 95)]:
+		_add_polygon(art, "Fastener", _regular_polygon(fastener_position, 18.0, 6), Color("c9d0d2"), 2)
 	_add_world_sign(art, Vector2(-170, -105), "BENCH 04\nNIGHT SHIFT", Color(PAPER, 0.92), INK)
 
 
@@ -211,10 +211,10 @@ func _add_obstacle_label(obstacle: StaticBody2D, text: String) -> void:
 	obstacle.add_child(label)
 
 
-func _add_world_sign(parent: Node2D, position: Vector2, text: String, paper_color: Color, text_color: Color) -> void:
-	_add_polygon(parent, "PaperSign", _rect_points(position, Vector2(250.0, 105.0)), paper_color, 4)
+func _add_world_sign(parent: Node2D, sign_position: Vector2, text: String, paper_color: Color, text_color: Color) -> void:
+	_add_polygon(parent, "PaperSign", _rect_points(sign_position, Vector2(250.0, 105.0)), paper_color, 4)
 	var label := Label.new()
-	label.position = position - Vector2(125.0, 48.0)
+	label.position = sign_position - Vector2(125.0, 48.0)
 	label.size = Vector2(250.0, 96.0)
 	label.text = text
 	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER

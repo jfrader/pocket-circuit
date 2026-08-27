@@ -77,8 +77,10 @@ engine version without a decision in Linear and matching export templates.
 - **Work tracking:** Linear, project **Pocket Circuit** — see the repo
   `AGENTS.md` `## Linear workflow` section.
 - **Assets:** original project art and audio live under `assets/`; shipped
-  notices and provenance live in `THIRD_PARTY_NOTICES.md` and adjacent license
-  files.
+  notices and production provenance live in `THIRD_PARTY_NOTICES.md`,
+  `ASSET_PROVENANCE.md`, and adjacent license files.
+- **Steam media:** upload-ready capsules, packaged-build screenshots, trailer,
+  source art, hashes, and regeneration commands live under `media/steam/`.
 - **Changelog:** end-user-visible changes recorded in `CHANGELOG.md` (plain
   markdown; no changelog lib in this repo yet).
 

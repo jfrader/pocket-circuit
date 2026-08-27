@@ -8,11 +8,13 @@ func _initialize() -> void:
 		"res://addons/release_export/plugin.cfg",
 		"res://tests/input_map_test.gd",
 		"res://tools/build_release.sh",
+		"res://tools/create_media_save.gd",
+		"res://media/steam/capsules/header_capsule.png",
 	]:
 		if ResourceLoader.exists(excluded_path) or FileAccess.file_exists(excluded_path):
 			_fail("excluded release file is present: %s" % excluded_path)
 			return
-	for required_path in ["res://THIRD_PARTY_NOTICES.md", "res://assets/audio/LICENSE.md"]:
+	for required_path in ["res://ASSET_PROVENANCE.md", "res://THIRD_PARTY_NOTICES.md", "res://assets/audio/LICENSE.md"]:
 		if not FileAccess.file_exists(required_path):
 			_fail("required release notice is missing: %s" % required_path)
 			return

@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+readonly SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+
 usage() {
   cat >&2 <<'USAGE'
 Usage:
@@ -73,6 +75,15 @@ if [[ -z "$steamcmd_path" || ! -x "$steamcmd_path" ]]; then
   printf 'steamcmd is missing or not executable: %s\n' "$steamcmd" >&2
   exit 1
 fi
+if ! command -v python3 >/dev/null 2>&1; then
+	printf 'python3 is required to validate Steam VDF structure.\n' >&2
+	exit 1
+fi
+vdf_validator="$SCRIPT_DIR/validate_vdf.py"
+if [[ ! -f "$vdf_validator" ]]; then
+	printf 'Steam VDF validator is missing: %s\n' "$vdf_validator" >&2
+	exit 1
+fi
 for config_name in config windows_config linux_config; do
   config_value="${!config_name}"
   if [[ ! -f "$config_value" ]]; then
@@ -96,21 +107,12 @@ for placeholder in '<STEAM_APP_ID>' '<WINDOWS_DEPOT_ID>' '<LINUX_DEPOT_ID>' '<CO
     exit 1
   fi
 done
-if [[ "$config_text" != *"\"$app_id\""* || "$config_text" != *"\"$windows_depot_id\""* || "$config_text" != *"\"$linux_depot_id\""* ]]; then
-  printf 'App config does not contain every supplied app/depot ID.\n' >&2
-  exit 1
-fi
-if [[ "$windows_config_text" != *"\"$windows_depot_id\""* || "$linux_config_text" != *"\"$linux_depot_id\""* ]]; then
-	printf 'Depot configs do not match the supplied depot IDs.\n' >&2
-	exit 1
-fi
-if [[ "$config_text" != *"\"$windows_depot_id\" \"$windows_config_path\""* ]]; then
-	printf 'App config must map the Windows depot ID to the exact supplied Windows config path.\n' >&2
-	exit 1
-fi
-if [[ "$config_text" != *"\"$linux_depot_id\" \"$linux_config_path\""* ]]; then
-	printf 'App config must map the Linux depot ID to the exact supplied Linux config path.\n' >&2
-	exit 1
-fi
+python3 "$vdf_validator" \
+	--app-config "$config_path" \
+	--app-id "$app_id" \
+	--windows-depot-id "$windows_depot_id" \
+	--linux-depot-id "$linux_depot_id" \
+	--windows-config "$windows_config_path" \
+	--linux-config "$linux_config_path"
 
 exec "$steamcmd_path" +login "$account" +run_app_build "$config_path" +quit

@@ -65,6 +65,7 @@ var _continue_button: Button
 var _pause_overlay: RacePauseOverlay
 var _pause_resume_button: Button
 var _session: Dictionary = {}
+var _save_error := ""
 var _results_finalized: bool = false
 var _track_variant_presenter: TrackVariantPresenter
 var _countdown_tween: Tween
@@ -208,6 +209,8 @@ func _run_countdown() -> void:
 	_play_sfx(&"go", 0.92)
 	race_manager.report_countdown_tick("GO!")
 	race_manager.start_race()
+	if "--media-capture" in OS.get_cmdline_user_args():
+		print("MEDIA_RACE_READY %s %s" % [String(_session.get("event_id", "unknown")), String(_session.get("vehicle_id", "unknown"))])
 	_countdown_active = false
 	await get_tree().create_timer(COUNTDOWN_STEP_SECONDS, false).timeout
 	_countdown_label.visible = false
@@ -223,9 +226,9 @@ func _update_boost_bar() -> void:
 func _update_position_label() -> void:
 	if not is_instance_valid(_player_vehicle):
 		return
-	var position := race_manager.get_racer_position(_player_vehicle)
+	var race_position := race_manager.get_racer_position(_player_vehicle)
 	var racer_count := race_manager.get_racer_count()
-	_position_label.text = "%s  /  %d" % [_ordinal(position), racer_count]
+	_position_label.text = "%s  /  %d" % [_ordinal(race_position), racer_count]
 
 
 func _on_race_finished(_total_time: float) -> void:
@@ -259,11 +262,7 @@ func _on_results_ready(results: Array) -> void:
 	_results_finalized = true
 	_pause_overlay.enabled = false
 	_results_panel.visible = true
-	_update_results(results)
-	_report_result_to_app(results)
-	_retry_button.disabled = false
-	_continue_button.disabled = false
-	_continue_button.grab_focus()
+	_attempt_result_commit(results)
 
 
 func _update_results(results: Array) -> void:
@@ -278,6 +277,8 @@ func _update_results(results: Array) -> void:
 		])
 	lines.append("")
 	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if String(_session.get("mode", "quick")) == "quick" else "RESULT SAVED · CONTINUE OR RETRY"
+	if not _save_error.is_empty():
+		final_prompt = "SAVE FAILED · RETRY SAVE BEFORE CONTINUING"
 	lines.append("FINALIZING..." if not _results_finalized else final_prompt)
 	_results_label.text = "\n".join(lines)
 
@@ -317,7 +318,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if not _results_finalized:
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
-		restart_race()
+		_on_retry_pressed()
 	elif event.is_action_pressed("ui_cancel"):
 		request_return()
 	else:
@@ -448,7 +449,7 @@ func _create_phase_one_ui() -> void:
 	_retry_button.position = Vector2(120.0, 340.0)
 	_retry_button.size = Vector2(170.0, 48.0)
 	_retry_button.disabled = true
-	_retry_button.pressed.connect(restart_race)
+	_retry_button.pressed.connect(_on_retry_pressed)
 	_results_panel.add_child(_retry_button)
 	_continue_button = Button.new()
 	_continue_button.text = "Continue"
@@ -508,14 +509,37 @@ func _add_pause_button(parent: Control, text: String, callback: Callable) -> But
 	return button
 
 
-func _report_result_to_app(results: Array) -> void:
+func _on_retry_pressed() -> void:
+	if _save_error.is_empty():
+		restart_race()
+	else:
+		_attempt_result_commit(race_manager.get_results())
+
+
+func _attempt_result_commit(results: Array) -> void:
+	var committed := _report_result_to_app(results)
+	_retry_button.disabled = false
+	_continue_button.disabled = not committed
+	_retry_button.text = "Retry" if committed else "Retry Save"
+	_update_results(results)
+	if committed:
+		_continue_button.grab_focus()
+	else:
+		_retry_button.grab_focus()
+
+
+func _report_result_to_app(results: Array) -> bool:
+	_save_error = ""
 	var app := get_node_or_null("/root/App")
 	if app == null or _session.is_empty() or not app.has_method("report_race_result"):
-		return
+		return true
 	for result: Dictionary in results:
 		if result.get("vehicle") == _player_vehicle:
-			app.call("report_race_result", int(result["position"]), float(result["time"]), results, bool(result.get("dnf", false)))
-			return
+			var committed := bool(app.call("report_race_result", int(result["position"]), float(result["time"]), results, bool(result.get("dnf", false))))
+			if not committed and app.has_method("get_last_save_error"):
+				_save_error = String(app.call("get_last_save_error"))
+			return committed
+	return true
 
 
 func _format_time(total_seconds: float) -> String:

@@ -1,0 +1,88 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="3840" height="1240" viewBox="0 0 3840 1240">
+
+    <defs>
+      <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#111827"/>
+        <stop offset="0.56" stop-color="#19243B"/>
+        <stop offset="1" stop-color="#273855"/>
+      </linearGradient>
+      <linearGradient id="titleFade" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#111827" stop-opacity="0.98"/>
+        <stop offset="0.68" stop-color="#111827" stop-opacity="0.72"/>
+        <stop offset="1" stop-color="#111827" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="titleFadeVertical" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#FFFFFF"/>
+        <stop offset="0.68" stop-color="#FFFFFF"/>
+        <stop offset="1" stop-color="#000000"/>
+      </linearGradient>
+      <mask id="titleMask"><rect width="100%" height="100%" fill="url(#titleFadeVertical)"/></mask>
+      <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="#FFE7A0" stop-opacity="0.95"/>
+        <stop offset="0.55" stop-color="#F4BF3A" stop-opacity="0.55"/>
+        <stop offset="1" stop-color="#F4BF3A" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="shadow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+        <feOffset dx="0" dy="12" result="offsetblur"/>
+        <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#FFFFFF" stroke-opacity="0.035" stroke-width="2"/>
+      </pattern>
+    </defs>
+
+    <rect width="3840" height="1240" fill="url(#night)"/>
+    <rect width="3840" height="1240" fill="url(#grid)"/>
+    <circle cx="3225.6" cy="24.8" r="682.0" fill="url(#sun)"/>
+    <path d="M -307.2 892.8 C 614.4 471.2, 1612.8 1153.2, 2342.4 719.2 S 3072.0 198.4, 4147.2 421.6" fill="none" stroke="#0B1220" stroke-width="396.8" stroke-linecap="round"/>
+    <path d="M -307.2 892.8 C 614.4 471.2, 1612.8 1153.2, 2342.4 719.2 S 3072.0 198.4, 4147.2 421.6" fill="none" stroke="#F4E8D0" stroke-width="310.0" stroke-linecap="round"/>
+    <path d="M -307.2 892.8 C 614.4 471.2, 1612.8 1153.2, 2342.4 719.2 S 3072.0 198.4, 4147.2 421.6" fill="none" stroke="#E96B4C" stroke-width="22.3" stroke-dasharray="68.2 55.8" stroke-linecap="round"/>
+
+    <g opacity="0.95">
+      <circle cx="2918.4" cy="248.0" r="161.2" fill="#E8DFCF" stroke="#55A8C9" stroke-width="22.3"/>
+      <circle cx="2918.4" cy="248.0" r="112.8" fill="#27344A"/>
+      <path d="M 3040.9 175.5 Q 3184.4 248.0 3040.9 320.5" fill="none" stroke="#E8DFCF" stroke-width="62.0" stroke-linecap="round"/>
+      <g transform="translate(2918.4 930.0) rotate(-9)">
+        <rect x="-297.6" y="-117.8" width="595.2" height="235.6" rx="22.3" fill="#D9DDE4" stroke="#7A8595" stroke-width="14.9"/>
+        <g fill="#5D687A">
+          <rect x="-235.6" y="-68.2" width="80.6" height="62.0" rx="4"/>
+          <rect x="-117.8" y="-68.2" width="80.6" height="62.0" rx="4"/>
+          <rect x="0" y="-68.2" width="80.6" height="62.0" rx="4"/>
+          <rect x="117.8" y="-68.2" width="80.6" height="62.0" rx="4"/>
+        </g>
+      </g>
+      <g transform="translate(499.2 967.2) rotate(16)">
+        <rect x="-260.4" y="-62.0" width="520.8" height="124.0" rx="18.6" fill="#F4BF3A"/>
+        <g stroke="#111827" stroke-width="9.9">
+          <path d="M -198.4 -62.0 V 12.4"/>
+          <path d="M -99.2 -62.0 V 24.8"/>
+          <path d="M 0 -62.0 V 12.4"/>
+          <path d="M 99.2 -62.0 V 24.8"/>
+        </g>
+      </g>
+    </g>
+
+
+    <g transform="translate(2035.2 830.8) rotate(-63.0)" filter="url(#shadow)">
+      <g opacity="0.5" stroke="#FFF8E8" stroke-width="15.3" stroke-linecap="round">
+        <path d="M -69.4 260.2 L -119.0 503.6"/>
+        <path d="M 69.4 260.2 L 119.0 503.6"/>
+      </g>
+      <rect x="-153.8" y="-142.7" width="59.5" height="176.3" rx="24.8" fill="#11151F"/>
+      <rect x="94.2" y="-142.7" width="59.5" height="176.3" rx="24.8" fill="#11151F"/>
+      <rect x="-153.8" y="54.6" width="59.5" height="176.3" rx="24.8" fill="#11151F"/>
+      <rect x="94.2" y="54.6" width="59.5" height="176.3" rx="24.8" fill="#11151F"/>
+      <path d="M -104.2 193.1 Q -124.0 0 -62.0 -201.5 Q 0 -293.8 62.0 -201.5 Q 124.0 0 104.2 193.1 Q 0 272.8 -104.2 193.1 Z" fill="#E96B4C" stroke="#FFF8E8" stroke-width="13.4"/>
+      <path d="M -67.0 -92.3 Q 0 -176.3 67.0 -92.3 L 49.6 33.6 L -49.6 33.6 Z" fill="#55A8C9" stroke="#111827" stroke-width="9.5"/>
+      <rect x="-13.6" y="-235.0" width="27.3" height="440.7" rx="12.4" fill="#F4BF3A"/>
+      <circle cx="-59.5" cy="-201.5" r="19.8" fill="#FFF8E8"/>
+      <circle cx="59.5" cy="-201.5" r="19.8" fill="#FFF8E8"/>
+    </g>
+
+    <rect x="0" y="0" width="2841.6" height="446.4" fill="url(#titleFade)" mask="url(#titleMask)"/>
+
+    <text x="230.4" y="1116.0" fill="#FFF8E8" font-family="DejaVu Sans, sans-serif" font-size="47.1" font-weight="700" letter-spacing="9.9"></text>
+    <rect x="0" y="0" width="3840" height="1240" fill="none" stroke="#F4BF3A" stroke-width="14.9"/>
+    </svg>

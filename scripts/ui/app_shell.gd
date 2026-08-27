@@ -211,13 +211,32 @@ func show_settings() -> void:
 func show_credits() -> void:
 	_screen = "credits"
 	_clear_content()
-	_add_kicker("CREDITS")
+	_add_kicker("CREDITS & NOTICES")
 	_add_heading("Built after hours")
-	_add_quote("Pocket Circuit\nCreated by Gurisitos Games\nBuilt with Godot Engine")
-	_add_copy("Championship story, characters, vehicles, event names, and dialogue are original to Pocket Circuit.")
-	_add_copy("Original soundtrack and sound effects accompany distinct silhouettes and color accents for every vehicle.", MUTED)
+	_add_section("DEVELOPMENT", "GURISITOS GAMES")
+	_add_quote("Pocket Circuit\nCreated and published by Gurisitos Games")
+	_add_copy("Championship story, characters, vehicles, event names, dialogue, visual assets, music, and sound effects are original to Pocket Circuit.")
+	_add_section("ENGINE", "GODOT ENGINE · MIT LICENSE")
+	_add_copy("Godot Engine copyright © 2007-present Juan Linietsky, Ariel Manzur, and Godot Engine contributors.")
+	_add_copy("The complete MIT license is included with the game in THIRD_PARTY_NOTICES.md.", MUTED)
+	_add_section("PRODUCTION", "AI-ASSISTED ORIGINAL CONTENT")
+	_add_copy("AI-assisted production tools supported developer-directed code, graphics, and synthesized sound creation. No third-party source media, samples, characters, vehicles, tracks, or branding are included.")
+	_add_copy("Asset provenance and original audio details are included with the game in ASSET_PROVENANCE.md and assets/audio/LICENSE.md.", MUTED)
 	_add_button("BACK", Callable(self, "show_title"), CREAM)
 	_footer.text = "ESC / B  BACK"
+	_focus_first()
+
+
+func show_save_error(title: String, detail: String, retry_action: Callable, back_action: Callable) -> void:
+	_screen = "save_error"
+	_clear_content()
+	_add_kicker("SAVE ERROR")
+	_add_heading(title)
+	_add_copy("Pocket Circuit could not write the requested change. Existing progress remains unchanged.", CORAL)
+	_add_quote(detail if not detail.is_empty() else "The save file could not be written. Check available disk space and folder permissions.", CORAL)
+	_add_button("TRY AGAIN", retry_action, AMBER)
+	_add_button("BACK", back_action, CREAM)
+	_footer.text = "DO NOT CLOSE THE GAME UNTIL PROGRESS IS SAVED  ·  ESC / B  TITLE"
 	_focus_first()
 
 
@@ -239,7 +258,7 @@ func go_back() -> void:
 	match _screen:
 		"title":
 			return
-		"map", "settings", "credits", "reset_confirmation":
+		"map", "settings", "credits", "reset_confirmation", "save_error":
 			show_title()
 		"briefing":
 			show_map()
@@ -485,6 +504,7 @@ func _grab_first_focus_after_layout(generation: int) -> void:
 	await get_tree().process_frame
 	if generation == _entrance_generation:
 		_grab_first_focus()
+		_report_media_screen_ready()
 
 
 func _grab_first_focus() -> void:
@@ -505,6 +525,12 @@ func _grab_button_focus_after_layout(button: BaseButton, generation: int) -> voi
 	await get_tree().process_frame
 	if generation == _entrance_generation:
 		_grab_button_focus(button)
+		_report_media_screen_ready()
+
+
+func _report_media_screen_ready() -> void:
+	if "--media-capture" in OS.get_cmdline_user_args():
+		print("MEDIA_SCREEN_READY " + _screen)
 
 
 func _wire_button_audio(button: BaseButton) -> void:

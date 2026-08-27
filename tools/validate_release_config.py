@@ -4,9 +4,13 @@
 from __future__ import annotations
 
 import configparser
+import json
 import re
+import struct
 import subprocess
 import sys
+import tempfile
+import zlib
 from pathlib import Path
 
 
@@ -20,6 +24,7 @@ REQUIRED_EXCLUSIONS = {
     "server/**",
     "docs/**",
     "steam/**",
+    "media/**",
     "runlogs/**",
     "scripts/ui/debug_overlay.gd",
 }
@@ -45,6 +50,31 @@ EXPECTED_STEAM_FILES = {
     "depot_build_windows_example.vdf": {"<WINDOWS_DEPOT_ID>", "<CONTENT_ROOT>"},
     "depot_build_linux_example.vdf": {"<LINUX_DEPOT_ID>", "<CONTENT_ROOT>"},
 }
+REQUIRED_RELEASE_NOTICES = {
+    "ASSET_PROVENANCE.md",
+    "THIRD_PARTY_NOTICES.md",
+    "assets/**/LICENSE*",
+}
+EXPECTED_STEAM_MEDIA = {
+    "capsules/community_icon.png": (184, 184),
+    "capsules/header_capsule.png": (920, 430),
+    "capsules/library_capsule.png": (600, 900),
+    "capsules/library_hero.png": (3840, 1240),
+    "capsules/library_logo.png": (1280, 720),
+    "capsules/main_capsule.png": (1232, 706),
+    "capsules/page_background.png": (1438, 810),
+    "capsules/small_capsule.png": (462, 174),
+    "capsules/vertical_capsule.png": (748, 896),
+    "screenshots/01_title.png": (1920, 1080),
+    "screenshots/02_championship_map.png": (1920, 1080),
+    "screenshots/03_kitchen_briefing.png": (1920, 1080),
+    "screenshots/04_vehicle_select.png": (1920, 1080),
+    "screenshots/05_kitchen_race.png": (1920, 1080),
+    "screenshots/06_workshop_race.png": (1920, 1080),
+    "screenshots/07_office_race.png": (1920, 1080),
+    "trailer/opening_card.png": (1920, 1080),
+    "trailer/ending_card.png": (1920, 1080),
+}
 
 
 def unquote(value: str) -> str:
@@ -52,6 +82,244 @@ def unquote(value: str) -> str:
     if len(value) >= 2 and value[0] == value[-1] == '"':
         return value[1:-1]
     return value
+
+
+def validate_upload_wrapper(upload_wrapper: Path, errors: list[str]) -> None:
+    with tempfile.TemporaryDirectory(prefix="pocket-circuit-steam-wrapper-") as temporary:
+        temporary_path = Path(temporary)
+        fake_steamcmd = temporary_path / "steamcmd"
+        fake_steamcmd.write_text("#!/usr/bin/env bash\nexit 0\n", encoding="utf-8")
+        fake_steamcmd.chmod(0o700)
+
+        windows_config = temporary_path / "windows depot.vdf"
+        linux_config = temporary_path / "linux depot.vdf"
+        windows_config.write_text('"DepotBuildConfig" { "DepotID" "1001" }\n', encoding="utf-8")
+        linux_config.write_text('"DepotBuildConfig" { "DepotID" "1002" }\n', encoding="utf-8")
+        app_config = temporary_path / "app build.vdf"
+        app_config.write_text(
+            '"appbuild"\n{\n'
+            '  "appid" "1000"\n'
+            '  "depots"\n  {\n'
+            f'    "1001" "{windows_config.resolve()}"\n'
+            f'    "1002"   "{linux_config.resolve()}"\n'
+            '  }\n}\n',
+            encoding="utf-8",
+        )
+
+        def run_wrapper() -> subprocess.CompletedProcess[str]:
+            return subprocess.run(
+                [
+                    str(upload_wrapper),
+                    "--upload",
+                    "--steamcmd",
+                    str(fake_steamcmd),
+                    "--account",
+                    "release-validation",
+                    "--app-id",
+                    "1000",
+                    "--windows-depot-id",
+                    "1001",
+                    "--linux-depot-id",
+                    "1002",
+                    "--config",
+                    str(app_config),
+                    "--windows-config",
+                    str(windows_config),
+                    "--linux-config",
+                    str(linux_config),
+                ],
+                cwd=ROOT,
+                capture_output=True,
+                text=True,
+                timeout=10,
+            )
+
+        result = run_wrapper()
+        if result.returncode != 0:
+            output = (result.stderr or result.stdout).strip()
+            errors.append(f"Steam upload wrapper rejected a valid multi-space depot mapping: {output}")
+
+        wrong_windows_path = temporary_path / "decoy windows.vdf"
+        app_config.write_text(
+            '"appbuild"\n{\n'
+            '  "appid" "1000"\n'
+            '  "depots"\n  {\n'
+            f'    "1001" "{wrong_windows_path.resolve()}"\n'
+            f'    "1002" "{linux_config.resolve()}"\n'
+            '  }\n'
+            f'  "decoy" {{ "1001" "{windows_config.resolve()}" }}\n'
+            '}\n',
+            encoding="utf-8",
+        )
+        if run_wrapper().returncode == 0:
+            errors.append("Steam upload wrapper accepted a valid-looking depot mapping outside appbuild.depots")
+
+        app_config.write_text(
+            '"appbuild"\n{\n'
+            '  "appid" "1000"\n'
+            '  "depots"\n  {\n'
+            f'    "1001" "{windows_config.resolve()}"\n'
+            f'    "1001" "{windows_config.resolve()}"\n'
+            f'    "1002" "{linux_config.resolve()}"\n'
+            '  }\n}\n',
+            encoding="utf-8",
+        )
+        if run_wrapper().returncode == 0:
+            errors.append("Steam upload wrapper accepted a duplicate depot mapping")
+
+
+def png_dimensions(path: Path) -> tuple[int, int] | None:
+    try:
+        data = path.read_bytes()
+        if data[:8] != b"\x89PNG\r\n\x1a\n":
+            return None
+        offset = 8
+        dimensions: tuple[int, int] | None = None
+        compressed_image = bytearray()
+        reached_end = False
+        while offset + 12 <= len(data):
+            length = struct.unpack(">I", data[offset : offset + 4])[0]
+            chunk_type = data[offset + 4 : offset + 8]
+            chunk_end = offset + 12 + length
+            if chunk_end > len(data):
+                return None
+            chunk_data = data[offset + 8 : offset + 8 + length]
+            expected_crc = struct.unpack(">I", data[offset + 8 + length : chunk_end])[0]
+            actual_crc = zlib.crc32(chunk_type + chunk_data) & 0xFFFFFFFF
+            if actual_crc != expected_crc:
+                return None
+            if chunk_type == b"IHDR":
+                if length != 13 or dimensions is not None:
+                    return None
+                dimensions = struct.unpack(">II", chunk_data[:8])
+            elif chunk_type == b"IDAT":
+                compressed_image.extend(chunk_data)
+            elif chunk_type == b"IEND":
+                reached_end = True
+                if chunk_end != len(data):
+                    return None
+                break
+            offset = chunk_end
+        if dimensions is None or not compressed_image or not reached_end:
+            return None
+        if not zlib.decompress(compressed_image):
+            return None
+        return dimensions
+    except (OSError, struct.error, zlib.error):
+        return None
+
+
+def png_decodes(path: Path) -> bool:
+    try:
+        result = subprocess.run(
+            ["magick", str(path), "null:"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+    except (FileNotFoundError, subprocess.TimeoutExpired):
+        return False
+    return result.returncode == 0
+
+
+def validate_png_decoder(errors: list[str]) -> None:
+    def chunk(chunk_type: bytes, data: bytes) -> bytes:
+        checksum = zlib.crc32(chunk_type + data) & 0xFFFFFFFF
+        return struct.pack(">I", len(data)) + chunk_type + data + struct.pack(">I", checksum)
+
+    malformed = (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"not pixel scanlines"))
+        + chunk(b"IEND", b"")
+    )
+    with tempfile.TemporaryDirectory(prefix="pocket-circuit-png-validation-") as temporary_dir:
+        malformed_path = Path(temporary_dir) / "malformed.png"
+        malformed_path.write_bytes(malformed)
+        if png_decodes(malformed_path):
+            errors.append("Steam media decoder accepted a malformed PNG pixel stream")
+
+
+def validate_media_integrity(media_root: Path, errors: list[str]) -> None:
+    checksum_path = media_root / "SHA256SUMS"
+    if checksum_path.is_file():
+        result = subprocess.run(
+            ["sha256sum", "--check", "SHA256SUMS"],
+            cwd=media_root,
+            capture_output=True,
+            text=True,
+        )
+        if result.returncode != 0:
+            errors.append(f"Steam media checksum verification failed: {(result.stderr or result.stdout).strip()}")
+
+    trailer_path = media_root / "trailer" / "pocket_circuit_gameplay_trailer.mp4"
+    if not trailer_path.is_file():
+        return
+    try:
+        probe = subprocess.run(
+            [
+                "ffprobe",
+                "-v",
+                "error",
+                "-show_entries",
+                "format=duration:stream=codec_type,codec_name,width,height,pix_fmt,r_frame_rate,sample_rate,channels,bit_rate",
+                "-of",
+                "json",
+                str(trailer_path),
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+            timeout=30,
+        )
+        details = json.loads(probe.stdout)
+    except (FileNotFoundError, subprocess.CalledProcessError, subprocess.TimeoutExpired, json.JSONDecodeError) as error:
+        errors.append(f"could not inspect Steam trailer encoding with ffprobe: {error}")
+        return
+    video_streams = [stream for stream in details.get("streams", []) if stream.get("codec_type") == "video"]
+    audio_streams = [stream for stream in details.get("streams", []) if stream.get("codec_type") == "audio"]
+    if len(video_streams) != 1 or len(audio_streams) != 1:
+        errors.append("Steam trailer must contain exactly one video stream and one audio stream")
+        return
+    video = video_streams[0]
+    audio = audio_streams[0]
+    expected_video = {
+        "codec_name": "h264",
+        "width": 1920,
+        "height": 1080,
+        "pix_fmt": "yuv420p",
+        "r_frame_rate": "30/1",
+    }
+    for field, expected in expected_video.items():
+        if video.get(field) != expected:
+            errors.append(f"Steam trailer {field} must be {expected!r}, found {video.get(field)!r}")
+    try:
+        video_bitrate = int(video["bit_rate"])
+    except (KeyError, TypeError, ValueError):
+        errors.append("Steam trailer video bitrate could not be read")
+    else:
+        if video_bitrate < 5_000_000:
+            errors.append(f"Steam trailer video bitrate must be at least 5000000, found {video_bitrate}")
+    if audio.get("codec_name") != "aac":
+        errors.append(f"Steam trailer audio codec must be 'aac', found {audio.get('codec_name')!r}")
+    if audio.get("sample_rate") != "48000":
+        errors.append(f"Steam trailer audio sample rate must be '48000', found {audio.get('sample_rate')!r}")
+    if audio.get("channels") != 2:
+        errors.append(f"Steam trailer audio must have 2 channels, found {audio.get('channels')!r}")
+    try:
+        audio_bitrate = int(audio["bit_rate"])
+    except (KeyError, TypeError, ValueError):
+        errors.append("Steam trailer audio bitrate could not be read")
+    else:
+        if audio_bitrate < 160_000:
+            errors.append(f"Steam trailer audio bitrate must be at least 160000, found {audio_bitrate}")
+    try:
+        duration = float(details["format"]["duration"])
+    except (KeyError, TypeError, ValueError):
+        errors.append("Steam trailer duration could not be read")
+    else:
+        if not 24.9 <= duration <= 25.1:
+            errors.append(f"Steam trailer duration must be 25 seconds, found {duration:.3f}")
 
 
 def main() -> int:
@@ -84,6 +352,8 @@ def main() -> int:
     ]
     if '"res://addons/release_export/plugin.cfg"' not in project_text:
         errors.append("release export plugin must be enabled")
+    if '"res://addons/godot_mcp/plugin.cfg"' in project_text or re.search(r"^MCPRuntime=", project_text, re.MULTILINE):
+        errors.append("local Godot MCP plugin/autoload entries must be removed before release")
     for plugin_path in release_plugin_paths:
         if not plugin_path.is_file():
             errors.append(f"missing release export plugin file: {plugin_path.relative_to(ROOT)}")
@@ -124,7 +394,7 @@ def main() -> int:
         if unquote(preset.get("export_filter", "")) != "all_resources":
             errors.append(f"{name}: export_filter must keep all game resources")
         include_filter = {item.strip() for item in unquote(preset.get("include_filter", "")).split(",") if item.strip()}
-        if not {"THIRD_PARTY_NOTICES.md", "assets/**/LICENSE*"}.issubset(include_filter):
+        if not REQUIRED_RELEASE_NOTICES.issubset(include_filter):
             errors.append(f"{name}: runtime license notices are not included")
         exclusions = {item.strip() for item in unquote(preset.get("exclude_filter", "")).split(",") if item.strip()}
         missing = REQUIRED_EXCLUSIONS - exclusions
@@ -174,6 +444,37 @@ def main() -> int:
         for guard in ("--upload", "<STEAM_APP_ID>", "<WINDOWS_DEPOT_ID>", "<LINUX_DEPOT_ID>", "<CONTENT_ROOT>", "<WINDOWS_DEPOT_CONFIG>", "<LINUX_DEPOT_CONFIG>"):
             if guard not in wrapper_text:
                 errors.append(f"Steam upload wrapper is missing guard {guard}")
+        validate_upload_wrapper(upload_wrapper, errors)
+    if not (ROOT / "steam/validate_vdf.py").is_file():
+        errors.append("missing structural Steam VDF validator")
+
+    for notice_path in (ROOT / "THIRD_PARTY_NOTICES.md", ROOT / "ASSET_PROVENANCE.md", ROOT / "assets/audio/LICENSE.md"):
+        if not notice_path.is_file():
+            errors.append(f"missing release notice: {notice_path.relative_to(ROOT)}")
+
+    media_root = ROOT / "media" / "steam"
+    validate_png_decoder(errors)
+    for relative_path, expected_dimensions in EXPECTED_STEAM_MEDIA.items():
+        path = media_root / relative_path
+        if not path.is_file():
+            errors.append(f"missing Steam media: media/steam/{relative_path}")
+            continue
+        dimensions = png_dimensions(path)
+        if dimensions != expected_dimensions:
+            errors.append(
+                f"media/steam/{relative_path} must be {expected_dimensions[0]}x{expected_dimensions[1]} PNG, found {dimensions}"
+            )
+        elif not png_decodes(path):
+            errors.append(f"Steam media image cannot be fully decoded: media/steam/{relative_path}")
+    for relative_path in ("BUILD_SHA256SUMS", "MANIFEST.md", "SHA256SUMS"):
+        if not (media_root / relative_path).is_file():
+            errors.append(f"missing Steam media evidence: media/steam/{relative_path}")
+    trailer_path = media_root / "trailer" / "pocket_circuit_gameplay_trailer.mp4"
+    if not trailer_path.is_file() or trailer_path.stat().st_size < 1_000_000:
+        errors.append("Steam gameplay trailer is missing or unexpectedly small")
+    elif b"ftyp" not in trailer_path.read_bytes()[:64]:
+        errors.append("Steam gameplay trailer is not a recognized MP4 container")
+    validate_media_integrity(media_root, errors)
 
     try:
         tracked_output = subprocess.run(

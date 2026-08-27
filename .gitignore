@@ -22,6 +22,8 @@ addons/godot_mcp/
 Thumbs.db
 *.tmp
 *.log
+__pycache__/
+*.pyc
 
 # Local run logs
 /runlogs/

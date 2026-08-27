@@ -44,13 +44,14 @@ for platform_dir in "$linux_dir" "$windows_dir"; do
   mkdir -p -- "$platform_dir"
 done
 
-if ! command -v python3 >/dev/null 2>&1 || ! command -v sha256sum >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1 || ! command -v tee >/dev/null 2>&1; then
-	printf 'python3, sha256sum, grep, and tee are required.\n' >&2
+if ! command -v python3 >/dev/null 2>&1 || ! command -v sha256sum >/dev/null 2>&1 || ! command -v magick >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1 || ! command -v tee >/dev/null 2>&1; then
+	printf 'python3, sha256sum, magick, ffprobe, grep, and tee are required.\n' >&2
 	exit 1
 fi
 
 run_godot_checked() {
 	local command_log
+	local expected_output="${POCKET_CIRCUIT_EXPECT_OUTPUT:-}"
 	command_log="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-godot.XXXXXX")"
 	if ! "$@" 2>&1 | tee "$command_log"; then
 		rm -f -- "$command_log"
@@ -58,6 +59,11 @@ run_godot_checked() {
 	fi
 	if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' "$command_log"; then
 		printf 'Godot reported an error despite returning success.\n' >&2
+		rm -f -- "$command_log"
+		return 1
+	fi
+	if [[ -n "$expected_output" ]] && ! grep -Fq -- "$expected_output" "$command_log"; then
+		printf 'Godot did not report the expected success marker: %s\n' "$expected_output" >&2
 		rm -f -- "$command_log"
 		return 1
 	fi
@@ -136,7 +142,8 @@ chmod +x -- "$linux_binary"
 printf 'Smoke-testing the packaged Linux release...\n'
 (
 	cd -- "$linux_dir"
-	run_godot_checked ./pocket-circuit.x86_64 --headless --quit-after 300 -- --release-smoke
+	POCKET_CIRCUIT_EXPECT_OUTPUT="RELEASE_RACE_SMOKE PASS" \
+		run_godot_checked ./pocket-circuit.x86_64 --headless --quit-after 1200 -- --release-smoke
 )
 
 printf 'Inspecting packaged release contents...\n'

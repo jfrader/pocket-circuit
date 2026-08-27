@@ -19,13 +19,14 @@ var _last_scene: Node
 var _destination := "title"
 var _last_result_summary: Dictionary = {}
 var _test_mode := false
+var _last_save_error := ""
 
 
 func _enter_tree() -> void:
-	_ensure_joypad_button(&"ui_accept", 0)
-	_ensure_joypad_button(&"ui_cancel", 1)
+	_ensure_joypad_button(&"ui_accept", JOY_BUTTON_A)
+	_ensure_joypad_button(&"ui_cancel", JOY_BUTTON_B)
 	_ensure_key(&"pause", KEY_ESCAPE)
-	_ensure_joypad_button(&"pause", 6)
+	_ensure_joypad_button(&"pause", JOY_BUTTON_START)
 
 
 func _ready() -> void:
@@ -47,6 +48,8 @@ func _ready() -> void:
 		if not _test_mode:
 			_save()
 	call_deferred("_sync_current_scene")
+	if "--release-smoke" in OS.get_cmdline_user_args():
+		call_deferred("_run_release_smoke")
 
 
 func _exit_tree() -> void:
@@ -76,6 +79,10 @@ func is_save_read_only() -> bool:
 	return _save_store != null and _save_store.is_read_only
 
 
+func get_last_save_error() -> String:
+	return _last_save_error
+
+
 func get_save_data() -> Dictionary:
 	return _save_data.duplicate(true)
 
@@ -91,7 +98,7 @@ func request_new_championship() -> void:
 		confirm_new_championship()
 
 
-func confirm_new_championship() -> void:
+func confirm_new_championship() -> bool:
 	var preserved_settings := {
 		"difficulty": _save_data["difficulty"],
 		"master_volume": _save_data["master_volume"],
@@ -102,12 +109,20 @@ func confirm_new_championship() -> void:
 		"reduced_motion": _save_data["reduced_motion"],
 		"first_run": false,
 	}
-	_save_data = _save_store.default_data()
+	var candidate := _save_store.default_data()
 	for key: String in preserved_settings:
-		_save_data[key] = preserved_settings[key]
-	_save_data["championship_started"] = true
-	_save()
+		candidate[key] = preserved_settings[key]
+	candidate["championship_started"] = true
+	if not _save_candidate(candidate):
+		_show_save_error(
+			"Championship not started",
+			Callable(self, "confirm_new_championship"),
+			Callable(_shell, "show_title")
+		)
+		return false
+	_save_data = candidate
 	_shell.call("show_map")
+	return true
 
 
 func continue_championship() -> void:
@@ -126,8 +141,18 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 		return
 	if not vehicle_id in _save_data["unlocked_vehicles"]:
 		vehicle_id = "rustbug"
-	_save_data["selected_vehicle"] = vehicle_id
-	_save()
+	var candidate := _save_data.duplicate(true)
+	candidate["selected_vehicle"] = vehicle_id
+	if candidate != _save_data:
+		if _save_candidate(candidate):
+			_save_data = candidate
+		elif not quick_race:
+			_show_save_error(
+				"Vehicle choice not saved",
+				Callable(self, "start_race").bind(event_id, vehicle_id, quick_race),
+				Callable(_shell, "show_vehicle_select").bind(event_id, quick_race)
+			)
+			return
 	current_race_session = {
 		"mode": "quick" if quick_race else "championship",
 		"event_id": event_id,
@@ -141,9 +166,11 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 	get_tree().change_scene_to_file(RACE_SCENE)
 
 
-func report_race_result(player_position: int, total_time: float, results: Array, player_dnf: bool = false) -> void:
-	if current_race_session.is_empty() or bool(current_race_session.get("result_committed", false)):
-		return
+func report_race_result(player_position: int, total_time: float, results: Array, player_dnf: bool = false) -> bool:
+	if current_race_session.is_empty():
+		return false
+	if bool(current_race_session.get("result_committed", false)):
+		return true
 	var event: Dictionary = current_race_session.get("event", {})
 	var racer_count := clampi((event.get("opponents", []) as Array).size() + 1, 1, 4)
 	current_race_session["result"] = {
@@ -154,7 +181,8 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 	}
 	if String(current_race_session["mode"]) == "quick":
 		current_race_session["result_committed"] = true
-		return
+		current_race_session.erase("save_error")
+		return true
 
 	var ending_was_seen := bool(_save_data["ending_seen"])
 	var summary := {
@@ -172,11 +200,16 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 			String(current_race_session["event_id"]),
 			int(current_race_session["result"]["position"])
 		)
-	_save_data = summary["save"]
+	var candidate: Dictionary = summary["save"]
+	if candidate != _save_data and not _save_candidate(candidate):
+		current_race_session["save_error"] = _last_save_error
+		return false
+	_save_data = candidate
 	current_race_session["result_summary"] = summary
 	current_race_session["post_race_destination"] = "ending" if bool(summary["ending_unlocked"]) and not ending_was_seen else "map"
 	current_race_session["result_committed"] = true
-	_save()
+	current_race_session.erase("save_error")
+	return true
 
 
 func continue_after_race(transition_scene: bool = true) -> void:
@@ -201,6 +234,7 @@ func retry_race(reload_scene: bool = true) -> void:
 	current_race_session.erase("result")
 	current_race_session.erase("result_summary")
 	current_race_session.erase("post_race_destination")
+	current_race_session.erase("save_error")
 	current_race_session["result_committed"] = false
 	if reload_scene:
 		get_tree().reload_current_scene()
@@ -214,23 +248,43 @@ func abandon_race() -> void:
 	get_tree().change_scene_to_file(BOOT_SCENE)
 
 
-func update_setting(key: String, value: Variant) -> void:
+func update_setting(key: String, value: Variant) -> bool:
+	var candidate := _save_data.duplicate(true)
 	match key:
 		"difficulty":
 			if value is String and value in SaveStore.VALID_DIFFICULTIES:
-				_save_data[key] = value
+				candidate[key] = value
+			else:
+				return false
 		"master_volume", "music_volume", "sfx_volume":
 			if value is float or value is int:
-				_save_data[key] = clampf(float(value), 0.0, 1.0)
+				candidate[key] = clampf(float(value), 0.0, 1.0)
+			else:
+				return false
 		"fullscreen", "reduced_camera_shake", "reduced_motion":
 			if value is bool:
-				_save_data[key] = value
+				candidate[key] = value
+			else:
+				return false
 		_:
-			return
+			return false
+	if not is_save_read_only() and candidate != _save_data and not _save_candidate(candidate):
+		_show_save_error(
+			"Settings not saved",
+			Callable(self, "_retry_setting").bind(key, value),
+			Callable(_shell, "show_settings")
+		)
+		return false
+	_save_data = candidate
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
 	_apply_settings()
-	_save()
+	return true
+
+
+func _retry_setting(key: String, value: Variant) -> void:
+	if update_setting(key, value):
+		_shell.call("show_settings")
 
 
 func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: float = 1.0) -> bool:
@@ -313,7 +367,7 @@ func _apply_bus_volume(bus_name: String, linear_volume: float) -> void:
 	AudioServer.set_bus_volume_db(bus_index, decibels)
 
 
-func _ensure_joypad_button(action: StringName, button_index: int) -> void:
+func _ensure_joypad_button(action: StringName, button_index: JoyButton) -> void:
 	if not InputMap.has_action(action):
 		InputMap.add_action(action)
 	for event: InputEvent in InputMap.action_get_events(action):
@@ -336,7 +390,72 @@ func _ensure_key(action: StringName, keycode: Key) -> void:
 
 
 func _save() -> bool:
-	if not _save_store.save_data(_save_data):
-		push_warning(_save_store.last_save_error)
+	return _save_candidate(_save_data)
+
+
+func _save_candidate(candidate: Dictionary) -> bool:
+	_last_save_error = ""
+	if not _save_store.save_data(candidate):
+		_last_save_error = _save_store.last_save_error
+		push_warning(_last_save_error)
 		return false
 	return true
+
+
+func _show_save_error(title: String, retry_action: Callable, back_action: Callable) -> void:
+	if is_instance_valid(_shell) and _shell.has_method("show_save_error"):
+		_shell.call("show_save_error", title, _last_save_error, retry_action, back_action)
+
+
+func _run_release_smoke() -> void:
+	await get_tree().process_frame
+	if not confirm_new_championship():
+		_release_smoke_fail("new championship did not persist")
+		return
+	start_race("kitchen_crumb_rush", "rustbug", false)
+	var scene_frames_remaining := 300
+	while scene_frames_remaining > 0 and (get_tree().current_scene == null or get_tree().current_scene.scene_file_path != RACE_SCENE):
+		await get_tree().process_frame
+		scene_frames_remaining -= 1
+	if get_tree().current_scene == null or get_tree().current_scene.scene_file_path != RACE_SCENE:
+		_release_smoke_fail("race scene did not load")
+		return
+	var race := get_tree().current_scene
+	var race_manager := race.get_node_or_null("RaceManager") as RaceManager
+	if race_manager == null:
+		_release_smoke_fail("race manager is missing")
+		return
+	var race_frames_remaining := 900
+	while race_frames_remaining > 0 and not race_manager.is_running:
+		await get_tree().physics_frame
+		race_frames_remaining -= 1
+	if not race_manager.is_running:
+		_release_smoke_fail("race did not start")
+		return
+	var player_vehicle := race.get("_player_vehicle") as Node2D
+	var player_state := race_manager.get_racer_state(player_vehicle)
+	if player_vehicle == null or player_state.is_empty():
+		_release_smoke_fail("player racer state is missing")
+		return
+	race_manager.call("_finish_racer", player_vehicle, player_state)
+	race_manager.finalize_remaining_racers_as_dnf()
+	await get_tree().process_frame
+	if not bool(race.get("_results_finalized")):
+		_release_smoke_fail("results screen did not finalize")
+		return
+	var continue_button := race.get("_continue_button") as Button
+	if continue_button == null or continue_button.disabled:
+		_release_smoke_fail("committed results did not enable Continue")
+		return
+	var verification_store := SAVE_STORE_SCRIPT.new(_save_store.save_path)
+	var persisted: Dictionary = verification_store.load_data()
+	if not bool(persisted["championship_started"]) or int(persisted["best_event_finishes"].get("kitchen_crumb_rush", 0)) != 1:
+		_release_smoke_fail("persisted race result could not be reloaded")
+		return
+	print("RELEASE_RACE_SMOKE PASS")
+	get_tree().quit(0)
+
+
+func _release_smoke_fail(message: String) -> void:
+	push_error("RELEASE_RACE_SMOKE FAIL: " + message)
+	get_tree().quit(1)
