@@ -35,7 +35,10 @@ func _physics_process(delta: float) -> void:
 
 	var speed_ratio := clampf(speed / speed_for_max_zoom, 0.0, 1.0)
 	var boosting := bool(target_vehicle.call("is_boost_active"))
-	_boost_pulse = lerpf(_boost_pulse, 1.0 if boosting else 0.0, 1.0 - exp(-8.0 * delta))
+	if _reduced_motion_enabled():
+		_boost_pulse = 0.0
+	else:
+		_boost_pulse = lerpf(_boost_pulse, 1.0 if boosting else 0.0, 1.0 - exp(-8.0 * delta))
 	var target_zoom := Vector2.ONE * lerpf(slow_zoom, fast_zoom, speed_ratio) * (1.0 - _boost_pulse * 0.015)
 	var zoom_weight := 1.0 - exp(-zoom_smoothing * delta)
 	zoom = zoom.lerp(target_zoom, zoom_weight)
@@ -50,6 +53,11 @@ func _find_target() -> void:
 func set_target(vehicle: Node2D) -> void:
 	target_vehicle = vehicle
 	global_position = vehicle.global_position
+
+
+func _reduced_motion_enabled() -> bool:
+	var app := get_node_or_null("/root/App")
+	return bool(app.get("reduced_motion")) if app else false
 
 
 func add_impact_nudge(strength: float) -> void:

@@ -1,5 +1,6 @@
 extends SceneTree
 
+const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 const TEST_PATH := "user://tests/pocket_circuit_save_store_test.json"
 
@@ -58,6 +59,22 @@ func _run_test() -> void:
 	_write_raw(TEST_PATH, "{ definitely not json")
 	loaded = store.load_data()
 	if not _expect(loaded["difficulty"] == "clockwork" and loaded["selected_vehicle"] == "pinbolt", "a malformed primary should recover the validated backup"):
+		return
+
+	var champion := store.default_data()
+	champion["championship_started"] = true
+	for event: Dictionary in CATALOG.EVENTS:
+		champion = CATALOG.apply_event_result(champion, String(event["id"]), 1)["save"]
+	if not _expect(CATALOG.is_ending_pending(champion) and store.save_data(champion), "a completed championship should save with its ending pending"):
+		return
+	loaded = store.load_data()
+	if not _expect(CATALOG.is_ending_pending(loaded) and not bool(loaded["ending_seen"]), "loading a completed championship should retain its pending ending"):
+		return
+	champion["ending_seen"] = true
+	if not _expect(store.save_data(champion), "an acknowledged championship ending should save"):
+		return
+	loaded = store.load_data()
+	if not _expect(bool(loaded["ending_seen"]) and not CATALOG.is_ending_pending(loaded), "loading should retain a valid ending acknowledgment"):
 		return
 
 	_write_raw(TEST_PATH, '{"version":99,"championship_started":true,"best_event_finishes":{"kitchen_crumb_rush":1}}')

@@ -126,11 +126,35 @@ func confirm_new_championship() -> bool:
 
 
 func continue_championship() -> void:
-	_shell.call("show_map")
+	if CATALOG.is_ending_pending(_save_data):
+		_shell.call("show_ending")
+	else:
+		_shell.call("show_map")
+
+
+func finish_ending(destination: String = "map") -> bool:
+	if not destination in ["map", "title"]:
+		return false
+	var candidate := _save_data.duplicate(true)
+	if CATALOG.is_ending_pending(candidate):
+		candidate["ending_seen"] = true
+		if not _save_candidate(candidate):
+			_show_save_error(
+				"Championship ending not saved",
+				Callable(self, "finish_ending").bind(destination),
+				Callable(_shell, "show_ending")
+			)
+			return false
+		_save_data = candidate
+	if destination == "map":
+		_shell.call("show_map")
+	else:
+		_shell.call("show_title")
+	return true
 
 
 func open_quick_race() -> void:
-	_shell.call("show_vehicle_select", "kitchen_crumb_rush", true)
+	_shell.call("show_quick_race")
 
 
 func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) -> void:
@@ -184,7 +208,6 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 		current_race_session.erase("save_error")
 		return true
 
-	var ending_was_seen := bool(_save_data["ending_seen"])
 	var summary := {
 		"save": _save_data.duplicate(true),
 		"event_id": String(current_race_session["event_id"]),
@@ -206,7 +229,7 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 		return false
 	_save_data = candidate
 	current_race_session["result_summary"] = summary
-	current_race_session["post_race_destination"] = "ending" if bool(summary["ending_unlocked"]) and not ending_was_seen else "map"
+	current_race_session["post_race_destination"] = "ending" if CATALOG.is_ending_pending(candidate) else "map"
 	current_race_session["result_committed"] = true
 	current_race_session.erase("save_error")
 	return true
@@ -322,7 +345,10 @@ func _sync_current_scene() -> void:
 			"ending":
 				_shell.call("show_ending")
 			_:
-				_shell.call("show_title")
+				if CATALOG.is_ending_pending(_save_data):
+					_shell.call("show_ending")
+				else:
+					_shell.call("show_title")
 		_last_result_summary = {}
 		_destination = "title"
 		current_race_session.clear()

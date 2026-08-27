@@ -12,6 +12,10 @@ func _run_test() -> void:
 	root.add_child(prototype)
 	current_scene = prototype
 	var manager := prototype.get_node("RaceManager") as RaceManager
+	prototype.call("_on_lap_completed", manager.laps_to_finish - 1)
+	var race_flash := prototype.get("_race_flash_label") as Label
+	if not _expect(race_flash.visible and race_flash.text == "FINAL LAP", "the HUD should clearly announce the final lap"):
+		return
 	prototype.call("_toggle_pause")
 	var overlay := prototype.get("_pause_overlay") as Control
 	if not _expect(paused and overlay.visible and not manager.is_running, "countdown should pause before the race starts"):

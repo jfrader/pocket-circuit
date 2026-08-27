@@ -285,6 +285,10 @@ static func has_progress(progress: Dictionary) -> bool:
 	return bool(progress.get("championship_started", false))
 
 
+static func is_ending_pending(progress: Dictionary) -> bool:
+	return "office" in progress.get("completed_acts", []) and not bool(progress.get("ending_seen", false))
+
+
 static func apply_event_result(progress: Dictionary, event_id: String, position: int) -> Dictionary:
 	var updated := progress.duplicate(true)
 	var event := get_event(event_id)
@@ -334,8 +338,7 @@ static func apply_event_result(progress: Dictionary, event_id: String, position:
 			summary["unlocked_vehicles"].append(vehicle_id)
 		updated["unlocked_vehicles"] = unlocked
 		if int(event["act"]) == 3:
-			updated["ending_seen"] = true
-			summary["ending_unlocked"] = true
+			summary["ending_unlocked"] = is_ending_pending(updated)
 
 	summary["save"] = updated
 	return summary

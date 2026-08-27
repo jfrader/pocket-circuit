@@ -63,7 +63,7 @@ func recover_vehicle() -> void:
 	if "boost_amount" in _vehicle:
 		_vehicle.boost_amount *= 0.5
 
-	await get_tree().create_timer(ghost_duration).timeout
+	await get_tree().create_timer(ghost_duration, false).timeout
 	if is_instance_valid(_vehicle):
 		_vehicle.collision_layer = saved_layer
 		_vehicle.collision_mask = saved_mask

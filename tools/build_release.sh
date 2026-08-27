@@ -88,6 +88,12 @@ for test_path in "${tests[@]}"; do
 	run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative"
 done
 
+printf 'Smoke-testing the boot scene...\n'
+run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --scene res://scenes/boot/boot.tscn --quit-after 300
+
+printf 'Smoke-testing the race scene...\n'
+run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --scene res://scenes/race/prototype_race.tscn --quit-after 600
+
 data_home="${XDG_DATA_HOME:-$HOME/.local/share}"
 templates_dir="$data_home/godot/export_templates/$TEMPLATE_VERSION"
 required_templates=(

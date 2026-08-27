@@ -146,8 +146,13 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	if supplied_finishes is Dictionary:
 		raw_finishes = supplied_finishes as Dictionary
 	var derived := _derive_progress(raw_finishes)
-	for key: String in ["best_event_finishes", "best_event_points", "completed_events", "completed_acts", "unlocked_vehicles", "ending_seen"]:
+	for key: String in ["best_event_finishes", "best_event_points", "completed_events", "completed_acts", "unlocked_vehicles"]:
 		normalized[key] = derived[key]
+	normalized["ending_seen"] = (
+		raw.get("ending_seen") is bool
+		and bool(raw["ending_seen"])
+		and "office" in (derived["completed_acts"] as Array)
+	)
 	var started: Variant = raw.get("championship_started")
 	normalized["championship_started"] = (started is bool and bool(started)) or not derived["completed_events"].is_empty()
 

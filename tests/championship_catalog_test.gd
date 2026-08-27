@@ -68,7 +68,12 @@ func _run_test() -> void:
 		return
 	for event_id: String in ["office_paper_trail", "office_keyboard_cut", "office_last_light"]:
 		progress = CATALOG.apply_event_result(progress, event_id, 1)["save"]
-	if not _expect(progress["ending_seen"] and "flicker" in progress["unlocked_vehicles"], "winning the final should unlock Flicker and the ending"):
+	if not _expect(
+			not bool(progress["ending_seen"])
+			and CATALOG.is_ending_pending(progress)
+			and "flicker" in progress["unlocked_vehicles"],
+			"winning the final should unlock Flicker and leave the ending pending acknowledgment"
+	):
 		return
 
 	print("CHAMPIONSHIP_CATALOG_TEST PASS")

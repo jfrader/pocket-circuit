@@ -128,7 +128,7 @@ func _recover_vehicle() -> void:
 	vehicle.linear_velocity = recovery_forward * 55.0
 	vehicle.boost_amount *= 0.5
 
-	await get_tree().create_timer(RECOVERY_GHOST_TIME).timeout
+	await get_tree().create_timer(RECOVERY_GHOST_TIME, false).timeout
 	if is_instance_valid(vehicle):
 		vehicle.collision_layer = saved_layer
 		vehicle.collision_mask = saved_mask

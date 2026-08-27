@@ -1,5 +1,6 @@
 extends SceneTree
 
+const BOOT_SCENE := preload("res://scenes/boot/boot.tscn")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 
@@ -22,16 +23,21 @@ class CountingSaveStore extends SaveStore:
 
 class TestShell extends CanvasLayer:
 	var map_shown := false
+	var ending_shown := false
 	var save_error_shown := false
+	var title_shown := false
 
 	func show_map(_summary: Dictionary = {}) -> void:
 		map_shown = true
+
+	func show_ending() -> void:
+		ending_shown = true
 
 	func show_save_error(_title: String, _detail: String, _retry_action: Callable, _back_action: Callable) -> void:
 		save_error_shown = true
 
 	func show_title() -> void:
-		pass
+		title_shown = true
 
 
 func _initialize() -> void:
@@ -111,6 +117,39 @@ func _run_test() -> void:
 	if not _expect(store.save_count == saves_before_continue and int(app.get("_last_result_summary")["points_gained"]) == 3, "Continue should only navigate with the latest committed summary"):
 		return
 
+	var pre_final := store.default_data()
+	pre_final["championship_started"] = true
+	for event_index in CATALOG.EVENTS.size() - 1:
+		var event_id := String(CATALOG.EVENTS[event_index]["id"])
+		pre_final = CATALOG.apply_event_result(pre_final, event_id, 1)["save"]
+	app.set("_save_data", pre_final)
+	app.current_race_session = _session("championship", "office_last_light")
+	if not _expect(bool(app.call("report_race_result", 1, 40.0, [])), "the championship-winning result should persist"):
+		return
+	progress = app.call("get_save_data")
+	if not _expect(CATALOG.is_ending_pending(progress) and not bool(progress["ending_seen"]) and String(app.current_race_session["post_race_destination"]) == "ending", "winning the championship should persist a pending, not pre-acknowledged, ending"):
+		return
+
+	app.set("_save_data", store.stored_data.duplicate(true))
+	app.current_race_session.clear()
+	var boot := BOOT_SCENE.instantiate()
+	root.add_child(boot)
+	current_scene = boot
+	app.set("_last_scene", null)
+	app.set("_destination", "title")
+	app.call("_sync_current_scene")
+	if not _expect(shell.ending_shown, "reloading before Continue should recover the pending ending"):
+		return
+	var saves_before_acknowledge := store.save_count
+	if not _expect(bool(app.call("finish_ending", "map")), "leaving the ending should persist its acknowledgment"):
+		return
+	progress = app.call("get_save_data")
+	if not _expect(bool(progress["ending_seen"]) and not CATALOG.is_ending_pending(progress) and store.save_count == saves_before_acknowledge + 1 and shell.map_shown, "ending acknowledgment should save exactly once before navigation"):
+		return
+	root.remove_child(boot)
+	boot.free()
+	current_scene = null
+
 	app.current_race_session.clear()
 	app.set("_shell", null)
 	shell.free()
@@ -119,11 +158,11 @@ func _run_test() -> void:
 	quit(0)
 
 
-func _session(mode: String) -> Dictionary:
+func _session(mode: String, event_id: String = "kitchen_crumb_rush") -> Dictionary:
 	return {
 		"mode": mode,
-		"event_id": "kitchen_crumb_rush",
-		"event": CATALOG.get_event("kitchen_crumb_rush"),
+		"event_id": event_id,
+		"event": CATALOG.get_event(event_id),
 		"vehicle_id": "rustbug",
 		"difficulty": "club_circuit",
 		"result_committed": false,

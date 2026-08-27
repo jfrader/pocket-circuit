@@ -136,12 +136,13 @@ persisted Master, Music, and SFX settings.
 ```text
 BOOT
   -> TITLE
-  -> NEW CHAMPIONSHIP / CONTINUE / QUICK RACE / SETTINGS / CREDITS / QUIT
+  -> NEW CHAMPIONSHIP / CONTINUE / QUICK RACE PICKER / SETTINGS / CREDITS / QUIT
   -> CHAMPIONSHIP MAP
   -> EVENT CARD + RIVAL LINE
   -> VEHICLE SELECT
   -> COUNTDOWN
   -> RACE
+  -> PAUSE / AUDIO + COMFORT SETTINGS
   -> RESULTS + POINTS + UNLOCKS
   -> CHAMPIONSHIP MAP
   -> FINAL ENDING
@@ -149,16 +150,18 @@ BOOT
 ```
 
 The last selected vehicle and settings persist. Save data is written when a
-championship result is finalized, as well as after an unlock, setting change,
-and ending. A missing or corrupt primary save recovers a validated backup when
-available, otherwise it falls back to defaults without blocking the title
-screen. A save from a newer game version remains untouched: the current build
-enters read-only mode, disables New Championship, and explains how to preserve
-the existing progress.
+championship result is finalized, as well as after an unlock or setting change.
+The final result stores the ending as pending; leaving the ending screen records
+its acknowledgment, so a restart before Continue presents it again. A missing
+or corrupt primary save recovers a validated backup when available, otherwise
+it falls back to defaults without blocking the title screen. A save from a
+newer game version remains untouched: the current build enters read-only mode,
+disables New Championship, and explains how to preserve the existing progress.
 
-The comfort settings expose reduced camera shake and reduced motion separately.
-Reduced motion skips AppShell screen entrance tweens and countdown scaling while
-preserving all content, focus indication, timing, and audio cues.
+The comfort settings expose reduced camera shake and reduced motion separately,
+including from the pause menu. Reduced motion skips AppShell screen entrance
+tweens, countdown scaling, decorative track pulses, and the boost camera pulse
+while preserving content, focus indication, race timing, and audio cues.
 
 ## Difficulty
 

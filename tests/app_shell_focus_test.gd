@@ -68,6 +68,29 @@ func _run_test() -> void:
 		push_error("APP_SHELL_FOCUS_TEST FAIL: returning to another screen should focus a live control")
 		quit(1)
 		return
+	shell.call("show_quick_race")
+	await process_frame
+	await process_frame
+	focus_owner = root.get_viewport().gui_get_focus_owner()
+	if focus_owner == null or focus_owner.name != "QuickRace_kitchen_crumb_rush":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should open a focused event picker")
+		quit(1)
+		return
+	shell.call("go_back")
+	await process_frame
+	if String(shell.get("_screen")) != "title":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race cancel should return to the title screen")
+		quit(1)
+		return
+	var contextual_back := func() -> void:
+		shell.call("show_map")
+	shell.call("show_save_error", "Test save error", "Injected failure", func() -> void: pass, contextual_back)
+	shell.call("go_back")
+	await process_frame
+	if String(shell.get("_screen")) != "map":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: save-error cancel should invoke its contextual back action")
+		quit(1)
+		return
 	shell.call("_clear_content")
 	shell.call("_add_section", "ACT 1", "REWARDS AND ACCESS NEVER CHANGE")
 	await process_frame

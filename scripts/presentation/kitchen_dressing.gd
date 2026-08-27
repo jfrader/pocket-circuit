@@ -37,11 +37,22 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
+	if _reduced_motion_enabled():
+		if _droplet_a:
+			_droplet_a.scale = _droplet_a_scale
+		if _droplet_b:
+			_droplet_b.scale = _droplet_b_scale
+		return
 	_ambient_time += delta
 	if _droplet_a:
 		_droplet_a.scale = _droplet_a_scale * (1.0 + sin(_ambient_time * 1.8) * 0.035)
 	if _droplet_b:
 		_droplet_b.scale = _droplet_b_scale * (1.0 + sin(_ambient_time * 1.45 + 1.2) * 0.03)
+
+
+func _reduced_motion_enabled() -> bool:
+	var app := get_node_or_null("/root/App")
+	return bool(app.get("reduced_motion")) if app else false
 
 
 func _assign_dressing_textures() -> void:

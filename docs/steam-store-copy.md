@@ -7,7 +7,7 @@ multiplayer, live-service, or future-content promise.
 
 Race tiny machines across giant kitchen, workshop, and office circuits in a
 complete offline arcade championship. Master nine brisk events, outdrive three
-rivals, and unlock four distinct vehicles before sunrise.
+rivals, and unlock four tuned handling builds before sunrise.
 
 ## About this game
 
