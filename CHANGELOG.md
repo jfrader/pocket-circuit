@@ -10,8 +10,8 @@
   duels, reverse races, legal checkpoint ranking, finish order, and DNF grace.
 - Kitchen, Workshop, and Office room identities with distinct surfaces, moving
   hazards, track dressing, and event conditions.
-- Controller-safe title, championship, briefing, vehicle, settings, credits,
-  pause, results, and ending screens.
+- Fixed-height, controller-safe title, paged championship, briefing, vehicle,
+  settings, credits, pause, results, and ending screens without menu scrolling.
 - A Quick Race circuit picker plus in-race audio and comfort settings that keep
   the current race paused.
 - Versioned local saves with atomic replacement, validated backup recovery,
