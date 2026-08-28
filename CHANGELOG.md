@@ -31,6 +31,8 @@
 
 ### Fixed
 
+- Menu music now plays a longer melodic loop instead of repeating an alarm-like
+  pulse every half second.
 - Championship map and settings metadata remain readable at the release
   resolution, keyboard focus stays visible after returning between screens, and
   completed off-screen events remain reachable without a mouse.

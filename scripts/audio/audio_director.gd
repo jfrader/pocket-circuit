@@ -194,7 +194,5 @@ func _make_runtime_loop(source: AudioStreamWAV) -> AudioStreamWAV:
 	var looped := source.duplicate() as AudioStreamWAV
 	looped.loop_mode = AudioStreamWAV.LOOP_FORWARD
 	looped.loop_begin = 0
-	var channel_count := 2 if looped.stereo else 1
-	var bytes_per_sample := 2 if looped.format == AudioStreamWAV.FORMAT_16_BITS else 1
-	looped.loop_end = floori(float(looped.data.size()) / float(maxi(1, channel_count * bytes_per_sample)))
+	looped.loop_end = maxi(0, roundi(looped.get_length() * float(looped.mix_rate)) - 1)
 	return looped

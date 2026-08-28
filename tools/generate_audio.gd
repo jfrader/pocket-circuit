@@ -3,6 +3,39 @@ extends SceneTree
 const SAMPLE_RATE := 22050
 const OUTPUT_DIR := "res://assets/audio"
 const TAU_F := TAU
+const MENU_DURATION := 16.0
+const MENU_CHORD_SECONDS := 2.0
+const MENU_NOTE_SECONDS := 0.5
+const MENU_CHORDS := [
+	[57, 60, 64, 69],
+	[53, 57, 60, 65],
+	[48, 55, 60, 64],
+	[55, 59, 62, 67],
+	[50, 53, 57, 62],
+	[52, 57, 60, 64],
+	[53, 57, 60, 65],
+	[55, 59, 62, 67],
+]
+const MENU_BASS_NOTES := [
+	45, 52, 57, 52,
+	41, 48, 53, 48,
+	36, 43, 48, 43,
+	43, 50, 55, 50,
+	38, 45, 50, 45,
+	40, 47, 52, 47,
+	41, 48, 53, 48,
+	43, 50, 55, 50,
+]
+const MENU_MELODY_NOTES := [
+	69, -1, 72, 76,
+	72, 69, -1, 67,
+	67, -1, 72, 76,
+	74, 71, -1, 67,
+	69, -1, 65, 69,
+	71, 72, 76, -1,
+	72, 69, 67, 65,
+	67, 71, 74, -1,
+]
 
 
 func _initialize() -> void:
@@ -13,7 +46,7 @@ func _initialize() -> void:
 		return
 
 	var definitions: Array[Dictionary] = [
-		{"name": "menu_loop", "duration": 4.0, "loop": true, "kind": "menu"},
+		{"name": "menu_loop", "duration": MENU_DURATION, "loop": true, "kind": "menu"},
 		{"name": "race_loop", "duration": 4.0, "loop": true, "kind": "race"},
 		{"name": "engine_loop", "duration": 0.5, "loop": true, "kind": "engine"},
 		{"name": "countdown", "duration": 0.24, "loop": false, "kind": "countdown"},
@@ -54,17 +87,14 @@ func _render_sound(definition: Dictionary) -> Error:
 	if bool(definition["loop"]):
 		stream.loop_mode = AudioStreamWAV.LOOP_FORWARD
 		stream.loop_begin = 0
-		stream.loop_end = sample_count
+		stream.loop_end = sample_count - 1
 	return stream.save_to_wav("%s/%s.wav" % [OUTPUT_DIR, definition["name"]])
 
 
 func _sample(kind: String, time: float, duration: float, index: int) -> float:
 	match kind:
 		"menu":
-			var slow_pulse := 0.58 + 0.42 * cos(TAU_F * 2.0 * time)
-			var texture := _sine(55.0, time) + 0.42 * _sine(83.0, time) + 0.18 * _sine(137.0, time)
-			var tick := pow(maxf(0.0, cos(TAU_F * 4.0 * time)), 18.0) * _sine(660.0, time)
-			return texture * slow_pulse * 0.075 + tick * 0.028
+			return _menu_music(time, duration)
 		"race":
 			var drive := _sine(62.0, time) + 0.48 * _sine(124.0, time) + 0.16 * _sine(248.0, time)
 			var motor_gate := 0.52 + 0.48 * cos(TAU_F * 4.0 * time)
@@ -99,6 +129,48 @@ func _sample(kind: String, time: float, duration: float, index: int) -> float:
 			var alternating := 360.0 if fmod(time, 0.24) < 0.12 else 270.0
 			return (_sine(alternating, time) + 0.22 * _sine(alternating * 2.0, time)) * envelope * 0.18
 	return 0.0
+
+
+func _menu_music(time: float, duration: float) -> float:
+	var chord_position := time / MENU_CHORD_SECONDS
+	var chord_index := posmod(floori(chord_position), MENU_CHORDS.size())
+	var next_chord_index := (chord_index + 1) % MENU_CHORDS.size()
+	var chord_phase := fmod(time, MENU_CHORD_SECONDS) / MENU_CHORD_SECONDS
+	var chord_blend := smoothstep(0.72, 1.0, chord_phase)
+	var current_chord := _menu_chord(MENU_CHORDS[chord_index], time, duration)
+	var next_chord := _menu_chord(MENU_CHORDS[next_chord_index], time, duration)
+	var pad := lerpf(current_chord, next_chord, chord_blend) * 0.085
+
+	var note_index := posmod(floori(time / MENU_NOTE_SECONDS), MENU_BASS_NOTES.size())
+	var note_time := fmod(time, MENU_NOTE_SECONDS)
+	var note_envelope := _attack_release(note_time, MENU_NOTE_SECONDS, 0.025, 0.16)
+	var bass_frequency := _midi_frequency(MENU_BASS_NOTES[note_index])
+	var bass := (_sine(bass_frequency, note_time) + 0.2 * _sine(bass_frequency * 2.0, note_time)) * note_envelope * 0.035
+
+	var melody_note: int = MENU_MELODY_NOTES[note_index]
+	var melody := 0.0
+	if melody_note >= 0:
+		var melody_frequency := _midi_frequency(melody_note)
+		var melody_envelope := _attack_release(note_time, MENU_NOTE_SECONDS, 0.035, 0.14)
+		melody = (_sine(melody_frequency, note_time) + 0.16 * _sine(melody_frequency * 2.0, note_time)) * melody_envelope * 0.052
+	var seam_fade := minf(smoothstep(0.0, 0.008, time), smoothstep(0.0, 0.008, duration - time))
+	return (pad + bass + melody) * seam_fade
+
+
+func _menu_chord(chord: Array, time: float, duration: float) -> float:
+	var sample := 0.0
+	for midi_note: int in chord:
+		var frequency := _loop_frequency(_midi_frequency(midi_note), duration)
+		sample += _sine(frequency, time) + 0.14 * _sine(frequency * 2.0, time)
+	return sample / float(chord.size())
+
+
+func _midi_frequency(midi_note: int) -> float:
+	return 440.0 * pow(2.0, (float(midi_note) - 69.0) / 12.0)
+
+
+func _loop_frequency(frequency: float, duration: float) -> float:
+	return round(frequency * duration) / duration
 
 
 func _sine(frequency: float, time: float) -> float:

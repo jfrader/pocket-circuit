@@ -24,11 +24,15 @@ func _run_test() -> void:
 	director.play_menu_music()
 	if not _expect(director.get_music_context() == &"menu" and director.get_node("MusicPlayer").get_instance_id() == music_player_id, "re-entering a context should reuse its single music player"):
 		return
+	var menu_stream := music_player.stream as AudioStreamWAV
+	var engine_stream := (director.get_node("EnginePlayer") as AudioStreamPlayer).stream as AudioStreamWAV
+	if not _expect(_loop_spans_stream(menu_stream) and _loop_spans_stream(engine_stream), "menu and engine loops should span decoded samples instead of compressed bytes"):
+		return
 	director.play_race_music()
 	director.play_race_music()
 	if not _expect(director.get_music_context() == &"race" and director.get_sfx_player_count() == 6, "race music and the fixed SFX pool should remain singletons"):
 		return
-	if not _expect((music_player.stream as AudioStreamWAV).loop_mode == AudioStreamWAV.LOOP_FORWARD, "music loops should be configured at runtime when import metadata is absent"):
+	if not _expect(_loop_spans_stream(music_player.stream as AudioStreamWAV), "race music should span decoded samples when import metadata is absent"):
 		return
 	director.set_race_paused(true)
 	if not _expect(is_equal_approx(music_player.volume_db, -9.0), "pausing should duck race music"):
@@ -51,6 +55,11 @@ func _bus_occurrences(bus_name: StringName) -> int:
 		if AudioServer.get_bus_name(index) == bus_name:
 			matches += 1
 	return matches
+
+
+func _loop_spans_stream(stream: AudioStreamWAV) -> bool:
+	var expected_end := maxi(0, roundi(stream.get_length() * float(stream.mix_rate)) - 1)
+	return stream.loop_mode == AudioStreamWAV.LOOP_FORWARD and stream.loop_begin == 0 and stream.loop_end == expected_end
 
 
 func _expect(condition: bool, message: String) -> bool:
