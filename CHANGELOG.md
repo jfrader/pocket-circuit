@@ -6,8 +6,9 @@
 
 - The complete nine-event Grand Household Circuit, with three story acts,
   persistent standings, unlocks, replayable events, and a championship ending.
-- Four tuned handling builds and four-racer fields with AI opponents, rival
-  duels, reverse races, legal checkpoint ranking, finish order, and DNF grace.
+- Four tuned handling builds and four-racer fields with AI opponents that plan
+  for corners, hold stable racing lines, recover from stalls, and contest rival
+  duels, reverse races, legal checkpoint ranking, and finish order.
 - Kitchen, Workshop, and Office room identities with distinct surfaces, moving
   hazards, track dressing, and event conditions.
 - Controller-safe title, championship, briefing, vehicle, settings, credits,
