@@ -38,11 +38,11 @@ const REVERSE_GRID_TRANSFORMS: Array[Transform2D] = [
 	Transform2D(0.0, Vector2(-680.0, 420.0)),
 	Transform2D(0.0, Vector2(-785.0, 420.0)),
 ]
-const RACER_TINTS: Array[Color] = [
-	Color.WHITE,
-	Color(0.62, 0.82, 1.0),
-	Color(0.67, 1.0, 0.7),
-	Color(0.94, 0.68, 1.0),
+const RACER_MARKER_COLORS: Array[Color] = [
+	Color("fff8e8"),
+	Color("71b7ff"),
+	Color("82d49b"),
+	Color("ca78ff"),
 ]
 const AI_LANE_OFFSETS: Array[float] = [-28.0, 26.0, 4.0]
 
@@ -181,9 +181,7 @@ func _configure_vehicle(
 	var vehicle_data := CATALOG.get_vehicle(vehicle_id)
 	var vehicle_name := String(vehicle_data.get("name", "Rustbug"))
 	vehicle.configure_identity(driver_name, vehicle_name, vehicle_id)
-	var car_sprite := vehicle.get_node_or_null("VisualRoot/CarSprite") as Sprite2D
-	if car_sprite:
-		car_sprite.self_modulate = Color.from_string(String(vehicle_data.get("tint", "ffffff")), RACER_TINTS[racer_index])
+	vehicle.configure_racer_marker(RACER_MARKER_COLORS[racer_index])
 	race_manager.register_racer(vehicle, driver_name, vehicle_name, is_player)
 
 

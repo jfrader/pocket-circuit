@@ -133,8 +133,8 @@ rooms, route geometry, palette, interface, and story.
   focused machine without requiring external source art.
 - Vehicle selection exposes all four silhouettes and progression locks at once;
   focus updates the hero machine and its speed, grip, mass, and drift profile.
-- Driver portraits use broad geometric features, individual hair and clothing
-  shapes, and the assigned vehicle accent color for instant recognition.
+- Driver portraits use crisp deterministic pixel features, individual hair,
+  clothing, accessories, and accent palettes for instant recognition.
 - Screen transitions remain a short slide and fade and are disabled by reduced
   motion.
 

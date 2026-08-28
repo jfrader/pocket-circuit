@@ -1,6 +1,8 @@
 class_name VehicleController
 extends RigidBody2D
 
+const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+
 enum ControlMode { PLAYER, EXTERNAL }
 
 @export var stats: VehicleStats = preload("res://data/vehicles/rustbug.tres")
@@ -119,67 +121,36 @@ func configure_visual_identity(vehicle_id: String) -> void:
 	var existing := visual_root.get_node_or_null("IdentityAccents")
 	if existing:
 		existing.free()
-	if vehicle_id.is_empty() or vehicle_id == "rustbug":
+	if vehicle_id.is_empty():
 		return
-	var accents := Node2D.new()
-	accents.name = "IdentityAccents"
-	accents.z_index = 2
-	visual_root.add_child(accents)
-	match vehicle_id:
-		"pinbolt":
-			_add_identity_polygon(accents, "NarrowNose", PackedVector2Array([
-				Vector2(-7.0, -39.0), Vector2(7.0, -39.0),
-				Vector2(14.0, -23.0), Vector2(-14.0, -23.0),
-			]), Color("d8f1ff"))
-			_add_identity_polygon(accents, "LeftGripFin", PackedVector2Array([
-				Vector2(-22.0, -13.0), Vector2(-32.0, -7.0),
-				Vector2(-31.0, 13.0), Vector2(-21.0, 8.0),
-			]), Color("2e6f9f"))
-			_add_identity_polygon(accents, "RightGripFin", PackedVector2Array([
-				Vector2(22.0, -13.0), Vector2(32.0, -7.0),
-				Vector2(31.0, 13.0), Vector2(21.0, 8.0),
-			]), Color("2e6f9f"))
-		"scrapjaw":
-			_add_identity_polygon(accents, "WideFrontBumper", PackedVector2Array([
-				Vector2(-34.0, -31.0), Vector2(34.0, -31.0),
-				Vector2(32.0, -24.0), Vector2(-32.0, -24.0),
-			]), Color("6f3027"))
-			_add_identity_polygon(accents, "WideRearBumper", PackedVector2Array([
-				Vector2(-33.0, 20.0), Vector2(33.0, 20.0),
-				Vector2(35.0, 28.0), Vector2(-35.0, 28.0),
-			]), Color("6f3027"))
-			_add_identity_polygon(accents, "HeavyRoofBlock", PackedVector2Array([
-				Vector2(-18.0, -9.0), Vector2(18.0, -9.0),
-				Vector2(20.0, 12.0), Vector2(-20.0, 12.0),
-			]), Color("e8a367"))
-		"flicker":
-			_add_identity_polygon(accents, "RearWing", PackedVector2Array([
-				Vector2(-32.0, 22.0), Vector2(32.0, 22.0),
-				Vector2(30.0, 29.0), Vector2(-30.0, 29.0),
-			]), Color("50246c"))
-			_add_identity_polygon(accents, "LeftWingMount", PackedVector2Array([
-				Vector2(-20.0, 14.0), Vector2(-14.0, 14.0),
-				Vector2(-14.0, 24.0), Vector2(-20.0, 24.0),
-			]), Color("ead5ff"))
-			_add_identity_polygon(accents, "RightWingMount", PackedVector2Array([
-				Vector2(14.0, 14.0), Vector2(20.0, 14.0),
-				Vector2(20.0, 24.0), Vector2(14.0, 24.0),
-			]), Color("ead5ff"))
-			_add_identity_polygon(accents, "DriftStripe", PackedVector2Array([
-				Vector2(-5.0, -30.0), Vector2(3.0, -31.0),
-				Vector2(11.0, 19.0), Vector2(3.0, 21.0),
-			]), Color("f4bf3a"))
-		_:
-			accents.free()
+	var texture := IDENTITIES.car_texture(vehicle_id)
+	var car_sprite := visual_root.get_node_or_null("CarSprite") as Sprite2D
+	if texture == null or car_sprite == null:
+		return
+	car_sprite.texture = texture
+	car_sprite.scale = Vector2.ONE
+	car_sprite.self_modulate = Color.WHITE
+	car_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	var legacy_shadow := visual_root.get_node_or_null("ShadowSprite") as Sprite2D
+	if legacy_shadow:
+		legacy_shadow.visible = false
 
 
-func _add_identity_polygon(parent: Node2D, polygon_name: String, points: PackedVector2Array, color: Color) -> Polygon2D:
-	var polygon := Polygon2D.new()
-	polygon.name = polygon_name
-	polygon.polygon = points
-	polygon.color = color
-	parent.add_child(polygon)
-	return polygon
+func configure_racer_marker(marker_color: Color) -> void:
+	var visual_root := get_node_or_null("VisualRoot") as Node2D
+	if visual_root == null:
+		return
+	var existing := visual_root.get_node_or_null("RacerMarker")
+	if existing:
+		existing.free()
+	var marker := Line2D.new()
+	marker.name = "RacerMarker"
+	marker.points = PackedVector2Array([Vector2(-7.0, 29.0), Vector2(0.0, 35.0), Vector2(7.0, 29.0)])
+	marker.width = 3.0
+	marker.default_color = marker_color
+	marker.antialiased = false
+	marker.z_index = 3
+	visual_root.add_child(marker)
 
 
 func apply_stats(new_stats: VehicleStats) -> void:

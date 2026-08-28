@@ -14,7 +14,14 @@ func _initialize() -> void:
 		if ResourceLoader.exists(excluded_path) or FileAccess.file_exists(excluded_path):
 			_fail("excluded release file is present: %s" % excluded_path)
 			return
-	for required_path in ["res://ASSET_PROVENANCE.md", "res://THIRD_PARTY_NOTICES.md", "res://assets/audio/LICENSE.md"]:
+	for required_path in [
+		"res://ASSET_PROVENANCE.md",
+		"res://THIRD_PARTY_NOTICES.md",
+		"res://assets/audio/LICENSE.md",
+		"res://data/vendor/procedural_2d/avatar_catalog.json",
+		"res://data/vendor/procedural_2d/car_catalog.json",
+		"res://data/vendor/procedural_2d/LICENSE",
+	]:
 		if not FileAccess.file_exists(required_path):
 			_fail("required release notice is missing: %s" % required_path)
 			return

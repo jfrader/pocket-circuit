@@ -110,12 +110,11 @@ field formats, and reverse events change how that footprint races in each act.
 Vehicle unlocks are permanent on the local save. They are side-grades, not a
 power ladder. Any unlocked vehicle can replay any completed event.
 
-The four machines share a compact championship chassis and use lightweight
-Polygon2D body-kit accents under each vehicle's VisualRoot. Pinbolt receives a
-narrow nose and side grip fins, Scrapjaw receives wide bumpers and a heavy roof
-block, and Flicker receives a rear wing and drift stripe. Rustbug remains the
-clean baseline. The accents inherit the vehicle transform, preserve common
-collision dimensions, and keep each silhouette readable at race speed.
+The four machines use explicit deterministic Procedural 2D mappings shared by
+the garage and live race. Rustbug, Pinbolt, Scrapjaw, and Flicker keep distinct
+compact, coupe, muscle, and buggy silhouettes with fixed palettes and parts.
+The generated textures replace presentation only: every machine retains its
+existing VehicleStats, transform, common collision geometry, and save identity.
 
 ## Audio and Feedback
 

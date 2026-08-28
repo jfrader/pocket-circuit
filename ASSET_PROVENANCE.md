@@ -11,6 +11,11 @@ music, sound effects, and branding are original project material produced for
 Gurisitos Games. The release contains no third-party source images, recordings,
 samples, characters, vehicle or track designs, logos, or branding.
 
+The deterministic portrait and car generators are adapted from the first-party
+Gurisitos Games Procedural 2D project at revision
+`cb4ae73df94b60590b7dea95f09a7209775be9e1`. The vendored source, catalogs,
+local compatibility edits, and MIT terms are shipped with the game.
+
 The only third-party software included with the release is Godot Engine. Its MIT
 license is reproduced in `THIRD_PARTY_NOTICES.md`. The game uses Godot's built-in
 default font and does not bundle a separately licensed commercial font.
@@ -23,7 +28,8 @@ default font and does not bundle a separately licensed commercial font.
 | `assets/branding/pocket_circuit_icon.svg` | Original project vector artwork assembled from simple geometric shapes and the game's palette. | Cleared for this release |
 | `assets/audio/*.wav` | Synthesized locally from mathematical waveforms and deterministic noise by `tools/generate_audio.gd`; no samples, recordings, or borrowed melodies. | Cleared for this release |
 | Kitchen, Workshop, and Office track variants not represented by image files | Original runtime presentation drawn by project GDScript with Godot primitives, project-authored text, and the Pocket Circuit palette. | Cleared for this release |
-| Championship driver portraits, vehicle illustrations, route boards, and garage presentation in `scripts/ui/app_shell_stage.gd` | Original runtime vector illustration drawn from project-authored geometric primitives and Pocket Circuit character/vehicle data; no source images or third-party designs are used. | Cleared for this release |
+| Championship driver portraits and machine sprites in `scripts/vendor/procedural_2d/`, `data/vendor/procedural_2d/`, and `scripts/presentation/procedural_identity_library.gd` | Deterministic local pixel rendering from explicit Pocket Circuit cast and vehicle mappings. Adapted from the first-party Procedural 2D project at the pinned revision above; no source images, network service, player prompt, or third-party design is used. | Cleared for this release |
+| Route boards and supporting garage presentation in `scripts/ui/app_shell_stage.gd` | Original runtime vector illustration drawn from project-authored geometric primitives and Pocket Circuit data. | Cleared for this release |
 | Story, dialogue, event names, vehicle names, rules, and interface copy | Developer-directed, AI-assisted original writing and implementation, edited for this game. | Cleared for this release |
 
 Unused original prototype images under `assets/models/` and `assets/textures/`
@@ -39,7 +45,9 @@ integrated, and reviewed by the developer. No third-party source media, samples,
 characters, brands, vehicle designs, or track designs were used.
 
 The game has no live generative-AI features. It does not send player input or
-gameplay data to an AI service, and no content is generated while the game runs.
+gameplay data to an AI service. Fixed local GDScript deterministically renders
+the assigned cast portraits and machine sprites at startup, without AI or a
+network dependency.
 
 The publisher must review this wording against the final uploaded build and
 submit the disclosure in Steamworks before store review.
