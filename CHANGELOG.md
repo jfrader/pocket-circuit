@@ -21,6 +21,12 @@
 - Native Windows x86_64 and Linux x86_64 release exports for offline Steam and
   Steam Deck play.
 
+### Changed
+
+- Championship screens now pair controller-safe actions with original driver,
+  vehicle, garage, and route illustrations; the garage visibly presents the
+  full four-car roster, unlock requirements, and focused-machine stats.
+
 ### Fixed
 
 - Championship map and settings metadata remain readable at the release
@@ -34,3 +40,5 @@
 - Recovery ghost periods no longer expire while paused, save-error Back returns
   to its originating screen, and reduced motion also disables decorative track
   pulses and the boost camera pulse.
+- The full inner circuit now has collision aligned to a continuous visible
+  guardrail, preventing cars from cutting through the painted infield.

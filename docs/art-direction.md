@@ -1,4 +1,4 @@
-# Kitchen Counter Circuit Art Direction
+# Pocket Circuit Art Direction
 
 ## Visual Thesis
 
@@ -10,6 +10,21 @@ small details that sell the miniature scale.
 This is a top-down 2D game. Visuals must read while rotating at speed and at
 roughly 32-55 pixels on screen. Everything is original; no protected vehicle,
 track, character, branding, or UI designs are copied.
+
+The championship shell presents that world as a midnight workbench: editorial
+type and focused controls occupy the left side while an illustrated garage,
+driver, machine, or route board occupies the right. The visual stage reacts to
+the focused screen or vehicle so the cast and four-car roster are always
+visible rather than described only in text.
+
+## Reference Principles
+
+The direction uses genre principles observed across classic *Micro Machines*,
+*Toybox Turbos*, *Mini Motor Racing*, and *Circuit Superstars*: oversized room
+objects sell scale, cars need distinct top-down silhouettes, and every track
+edge or shortcut must be legible before the player reaches it. These references
+are evaluation targets only. Pocket Circuit uses its own cast, machines,
+rooms, route geometry, palette, interface, and story.
 
 ## Palette
 
@@ -38,6 +53,8 @@ track, character, branding, or UI designs are copied.
   white. Shadows offset down and right with a warm dark-brown tint.
 - Track edges are broad, rounded, and slightly hand-drawn rather than perfect
   vector radii. Track value contrast must remain clear at speed.
+- The full inner island is solid and outlined by a continuous amber guardrail.
+  Traversable shortcuts are explicit authored openings, never missing physics.
 - Kitchen props are oversized, friendly, and readable from directly above.
   Details are broad shapes, not thin linework.
 - Micro details such as crumbs, fibers, droplets, scratches, and wood grain use
@@ -109,6 +126,18 @@ track, character, branding, or UI designs are copied.
 - No MMO card chrome. Race position, lap, timer, and boost remain dominant.
 - Debug telemetry stays dev-only and visually separate from the race HUD.
 
+### Championship Shell
+
+- The left column carries hierarchy, copy, and controller-safe actions.
+- The right illustration stage shows Rae, rivals, room routes, or the currently
+  focused machine without requiring external source art.
+- Vehicle selection exposes all four silhouettes and progression locks at once;
+  focus updates the hero machine and its speed, grip, mass, and drift profile.
+- Driver portraits use broad geometric features, individual hair and clothing
+  shapes, and the assigned vehicle accent color for instant recognition.
+- Screen transitions remain a short slide and fade and are disabled by reduced
+  motion.
+
 ## Motion Thesis
 
 Use only effects that communicate handling:
@@ -126,4 +155,5 @@ Effects never obscure the car, racing line, checkpoint, or nearby hazards.
 At 1280x720, a player must immediately identify the car, road, next route,
 start/finish, mug chicane, sponge shortcut, and outer counter drop. The slice
 must feel like one illustrated world rather than unrelated SVG assets placed
-on gray geometry.
+on gray geometry. Before a race, the player must also see the protagonist,
+rival, selected car, locked roster, and relevant room without reading body copy.

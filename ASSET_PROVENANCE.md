@@ -23,6 +23,7 @@ default font and does not bundle a separately licensed commercial font.
 | `assets/branding/pocket_circuit_icon.svg` | Original project vector artwork assembled from simple geometric shapes and the game's palette. | Cleared for this release |
 | `assets/audio/*.wav` | Synthesized locally from mathematical waveforms and deterministic noise by `tools/generate_audio.gd`; no samples, recordings, or borrowed melodies. | Cleared for this release |
 | Kitchen, Workshop, and Office track variants not represented by image files | Original runtime presentation drawn by project GDScript with Godot primitives, project-authored text, and the Pocket Circuit palette. | Cleared for this release |
+| Championship driver portraits, vehicle illustrations, route boards, and garage presentation in `scripts/ui/app_shell_stage.gd` | Original runtime vector illustration drawn from project-authored geometric primitives and Pocket Circuit character/vehicle data; no source images or third-party designs are used. | Cleared for this release |
 | Story, dialogue, event names, vehicle names, rules, and interface copy | Developer-directed, AI-assisted original writing and implementation, edited for this game. | Cleared for this release |
 
 Unused original prototype images under `assets/models/` and `assets/textures/`

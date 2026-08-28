@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const CATALOG := preload("res://data/championship/catalog.gd")
+const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 
 const INK := Color("172033")
 const PAPER := Color("f2ead7")
@@ -14,6 +15,7 @@ var _app: Node
 var _root: Control
 var _scroll: ScrollContainer
 var _content: VBoxContainer
+var _stage: AppShellStage
 var _footer: Label
 var _button_focus_chain: Array[Button] = []
 var _screen := "title"
@@ -35,6 +37,7 @@ func show_title() -> void:
 	_event_id = ""
 	_quick_race = false
 	_clear_content()
+	_configure_stage(&"title")
 	_add_kicker("GRAND HOUSEHOLD CIRCUIT · OFFLINE CHAMPIONSHIP")
 	_add_heading("Tiny racing.\nBig stakes.")
 	_add_copy("Win the Grand Household Circuit before sunrise. Three rooms, nine events, four original machines.")
@@ -56,6 +59,7 @@ func show_title() -> void:
 func show_reset_confirmation() -> void:
 	_screen = "reset_confirmation"
 	_clear_content()
+	_configure_stage(&"title")
 	_add_kicker("NEW CHAMPIONSHIP")
 	_add_heading("Erase the current standings?")
 	_add_copy("Best finishes, act wins, vehicle unlocks, and the ending flag will be reset. Settings stay exactly as they are.")
@@ -71,6 +75,7 @@ func show_map(result_summary: Dictionary = {}) -> void:
 	_event_id = ""
 	_quick_race = false
 	_clear_content()
+	_configure_stage(&"map")
 	_add_kicker("CHAMPIONSHIP MAP")
 	_add_heading("Grand Household Circuit")
 	if not result_summary.is_empty():
@@ -128,6 +133,7 @@ func show_quick_race() -> void:
 	_event_id = ""
 	_quick_race = true
 	_clear_content()
+	_configure_stage(&"map")
 	_add_kicker("QUICK RACE · EXHIBITION")
 	_add_heading("Pick a circuit")
 	_add_copy("Practice Crumb Rush or replay a completed event without changing championship standings, points, or unlocks.")
@@ -163,6 +169,9 @@ func show_briefing(event_id: String) -> void:
 	_event_id = event_id
 	_quick_race = false
 	_clear_content()
+	var opponent_ids: Array = event.get("opponents", [])
+	var rival_id := String(opponent_ids[0]) if not opponent_ids.is_empty() else "juniper"
+	_configure_stage(&"briefing", "rustbug", rival_id, String(event.get("theme", "kitchen")), "rae")
 	_add_kicker("ACT %d · EVENT BRIEFING" % int(event["act"]))
 	_add_heading(String(event["name"]))
 	_add_copy("%s  ·  %s" % [String(event["environment"]), String(event["format"])], AMBER)
@@ -193,22 +202,28 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	_add_copy("Every unlocked vehicle is a side-grade. Pick the handling style that suits your line.")
 	var progress: Dictionary = _app.call("get_save_data")
 	var selected_vehicle := String(progress.get("selected_vehicle", "rustbug"))
+	var unlocked_vehicles: Array = progress.get("unlocked_vehicles", ["rustbug"])
+	var event_theme := String(event.get("theme", "kitchen"))
+	_configure_stage(&"vehicle", selected_vehicle, "rae", event_theme, "", unlocked_vehicles)
 	var selected_button: Button
-	for vehicle_id: String in progress.get("unlocked_vehicles", ["rustbug"]):
-		var vehicle := CATALOG.get_vehicle(vehicle_id)
-		if vehicle.is_empty():
-			continue
-		var summary := "%s · %s\n%s\nTradeoff: %s" % [
+	for vehicle: Dictionary in CATALOG.VEHICLES:
+		var vehicle_id := String(vehicle["id"])
+		var unlocked := vehicle_id in unlocked_vehicles
+		var access := "READY" if unlocked else "LOCKED · %s" % String(vehicle["unlock"])
+		var summary := "%s · %s · %s\n%s\nTradeoff: %s" % [
 			String(vehicle["name"]), String(vehicle["archetype"]),
-			String(vehicle["strength"]), String(vehicle["tradeoff"]),
+			access, String(vehicle["strength"]), String(vehicle["tradeoff"]),
 		]
 		var vehicle_button := _add_button(
 			summary,
 			Callable(self, "_start_with_vehicle").bind(vehicle_id),
 			Color.from_string(String(vehicle["tint"]), AMBER),
-			false,
+			not unlocked,
 			"Vehicle_%s" % vehicle_id
 		)
+		if unlocked:
+			vehicle_button.focus_entered.connect(_preview_vehicle.bind(vehicle_id, event_theme, unlocked_vehicles))
+			vehicle_button.mouse_entered.connect(_preview_vehicle.bind(vehicle_id, event_theme, unlocked_vehicles))
 		if vehicle_id == selected_vehicle:
 			selected_button = vehicle_button
 	_add_button("BACK", Callable(self, "go_back"), CREAM)
@@ -223,6 +238,7 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 func show_settings() -> void:
 	_screen = "settings"
 	_clear_content()
+	_configure_stage(&"settings", "rustbug", "inez")
 	_add_kicker("SETTINGS")
 	_add_heading("Race your way")
 	var settings: Dictionary = _app.call("get_save_data")
@@ -272,6 +288,7 @@ func show_settings() -> void:
 func show_credits() -> void:
 	_screen = "credits"
 	_clear_content()
+	_configure_stage(&"credits")
 	_add_kicker("CREDITS & NOTICES")
 	_add_heading("Built after hours")
 	_add_section("DEVELOPMENT", "GURISITOS GAMES")
@@ -291,6 +308,7 @@ func show_credits() -> void:
 func show_save_error(title: String, detail: String, retry_action: Callable, back_action: Callable) -> void:
 	_screen = "save_error"
 	_clear_content()
+	_configure_stage(&"title")
 	_save_error_back_action = back_action
 	_add_kicker("SAVE ERROR")
 	_add_heading(title)
@@ -305,6 +323,7 @@ func show_save_error(title: String, detail: String, retry_action: Callable, back
 func show_ending() -> void:
 	_screen = "ending"
 	_clear_content()
+	_configure_stage(&"ending", "rustbug", "rae", "office", "cass")
 	_add_kicker("CHAMPIONSHIP COMPLETE")
 	_add_heading("The circuit stays open.")
 	_add_quote("The office clock ticks into sunrise as Cass rolls aside. Rae's Rustbug crosses the last pool of lamplight, and every rookie waiting below the desk gets a place on next year's grid.", AMBER)
@@ -394,15 +413,29 @@ func _build_base() -> void:
 	page.add_child(brand)
 	var separator := HSeparator.new()
 	page.add_child(separator)
+	var body := HBoxContainer.new()
+	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	body.add_theme_constant_override("separation", 24)
+	page.add_child(body)
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_scroll.size_flags_stretch_ratio = 1.65
+	_scroll.custom_minimum_size = Vector2(650.0, 0.0)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-	page.add_child(_scroll)
+	body.add_child(_scroll)
 	_content = VBoxContainer.new()
-	_content.custom_minimum_size = Vector2(760.0, 0.0)
+	_content.custom_minimum_size = Vector2(620.0, 0.0)
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_content.add_theme_constant_override("separation", 10)
 	_scroll.add_child(_content)
+	_stage = STAGE_SCRIPT.new() as AppShellStage
+	_stage.name = "IllustrationStage"
+	_stage.custom_minimum_size = Vector2(370.0, 500.0)
+	_stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_stage.size_flags_stretch_ratio = 0.85
+	body.add_child(_stage)
 	_footer = Label.new()
 	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	_footer.add_theme_font_size_override("font_size", 13)
@@ -452,6 +485,22 @@ func _clear_content() -> void:
 	_content.modulate = Color.WHITE
 	for child: Node in _content.get_children():
 		child.queue_free()
+
+
+func _configure_stage(
+		mode: StringName,
+		vehicle_id: String = "rustbug",
+		driver_id: String = "rae",
+		theme_id: String = "kitchen",
+		secondary_driver_id: String = "",
+		unlocked_vehicle_ids: Array = ["rustbug"]
+) -> void:
+	if is_instance_valid(_stage):
+		_stage.configure(mode, vehicle_id, driver_id, theme_id, secondary_driver_id, unlocked_vehicle_ids)
+
+
+func _preview_vehicle(vehicle_id: String, event_theme: String, unlocked_vehicles: Array) -> void:
+	_configure_stage(&"vehicle", vehicle_id, "rae", event_theme, "", unlocked_vehicles)
 
 
 func _add_kicker(text: String) -> void:
