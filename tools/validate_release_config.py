@@ -54,6 +54,8 @@ REQUIRED_RELEASE_NOTICES = {
     "ASSET_PROVENANCE.md",
     "THIRD_PARTY_NOTICES.md",
     "assets/**/LICENSE*",
+    "data/vendor/**/LICENSE*",
+    "data/vendor/procedural_2d/*.json",
 }
 EXPECTED_STEAM_MEDIA = {
     "capsules/community_icon.png": (184, 184),
@@ -448,7 +450,12 @@ def main() -> int:
     if not (ROOT / "steam/validate_vdf.py").is_file():
         errors.append("missing structural Steam VDF validator")
 
-    for notice_path in (ROOT / "THIRD_PARTY_NOTICES.md", ROOT / "ASSET_PROVENANCE.md", ROOT / "assets/audio/LICENSE.md"):
+    for notice_path in (
+        ROOT / "THIRD_PARTY_NOTICES.md",
+        ROOT / "ASSET_PROVENANCE.md",
+        ROOT / "assets/audio/LICENSE.md",
+        ROOT / "data/vendor/procedural_2d/LICENSE",
+    ):
         if not notice_path.is_file():
             errors.append(f"missing release notice: {notice_path.relative_to(ROOT)}")
 

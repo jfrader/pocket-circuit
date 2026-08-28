@@ -2,6 +2,7 @@ class_name AppShellStage
 extends Control
 
 const CATALOG := preload("res://data/championship/catalog.gd")
+const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 
 const INK := Color("101827")
 const PANEL := Color("1b2940")
@@ -11,15 +12,6 @@ const AMBER := Color("f4bf3a")
 const CORAL := Color("e96b4c")
 const BLUE := Color("55a8c9")
 const MUTED := Color("92a2b8")
-
-const PORTRAITS := {
-	"rae": {"skin": Color("d89b74"), "hair": Color("18243a"), "shirt": Color("e96b4c"), "accent": Color("f4bf3a")},
-	"inez": {"skin": Color("bb795c"), "hair": Color("3b2429"), "shirt": Color("55a8c9"), "accent": Color("f2ead7")},
-	"juniper": {"skin": Color("f0c6a1"), "hair": Color("c94f65"), "shirt": Color("3e78a8"), "accent": Color("71b7ff")},
-	"milo": {"skin": Color("8f563f"), "hair": Color("241b22"), "shirt": Color("874536"), "accent": Color("db724d")},
-	"tess": {"skin": Color("c98a6f"), "hair": Color("4b2b61"), "shirt": Color("76509b"), "accent": Color("ca78ff")},
-	"cass": {"skin": Color("d7a784"), "hair": Color("d8dfe8"), "shirt": Color("263b57"), "accent": Color("f4bf3a")},
-}
 
 var mode: StringName = &"title"
 var vehicle_id := "rustbug"
@@ -31,6 +23,7 @@ var unlocked_vehicle_ids: Array[String] = ["rustbug"]
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	queue_redraw()
 
 
@@ -207,114 +200,25 @@ func _draw_vehicle_roster(origin: Vector2, width: float) -> void:
 
 
 func _draw_vehicle(center: Vector2, scale_factor: float, id: String, angle: float = 0.0) -> void:
-	var vehicle := CATALOG.get_vehicle(id)
-	var body_color := Color.from_string(String(vehicle.get("tint", "f4bf3a")), AMBER)
-	draw_set_transform(center + Vector2(5.0, 7.0) * scale_factor, angle, Vector2.ONE * scale_factor)
-	draw_colored_polygon(_vehicle_body_points(id), Color(0.0, 0.0, 0.0, 0.34))
-	draw_set_transform(center, angle, Vector2.ONE * scale_factor)
-	for wheel_rect: Rect2 in _vehicle_wheel_rects(id):
-		draw_rect(wheel_rect, Color("080c13"))
-		draw_rect(wheel_rect.grow(-3.0), Color("37404a"))
-	var body_points := _vehicle_body_points(id)
-	draw_colored_polygon(body_points, body_color)
-	var outline := body_points.duplicate()
-	outline.append(body_points[0])
-	draw_polyline(outline, INK, 5.0, true)
-	var canopy := PackedVector2Array([Vector2(-24.0, -27.0), Vector2(24.0, -27.0), Vector2(28.0, 14.0), Vector2(-28.0, 14.0)])
-	if id == "pinbolt":
-		canopy = PackedVector2Array([Vector2(-17.0, -32.0), Vector2(17.0, -32.0), Vector2(23.0, 12.0), Vector2(-23.0, 12.0)])
-	draw_colored_polygon(canopy, Color("26384f"))
-	draw_polyline(PackedVector2Array([canopy[0], canopy[1], canopy[2], canopy[3], canopy[0]]), Color("8ed4e8"), 3.0, true)
-	draw_line(Vector2(0.0, -60.0), Vector2(0.0, 55.0), Color(CREAM, 0.66), 5.0)
-	draw_circle(Vector2(-18.0, -49.0), 5.0, Color("fff2a0"))
-	draw_circle(Vector2(18.0, -49.0), 5.0, Color("fff2a0"))
-	match id:
-		"pinbolt":
-			draw_colored_polygon(PackedVector2Array([Vector2(-9.0, -72.0), Vector2(9.0, -72.0), Vector2(16.0, -54.0), Vector2(-16.0, -54.0)]), Color("d8f1ff"))
-		"scrapjaw":
-			draw_rect(Rect2(-49.0, -58.0, 98.0, 12.0), Color("6f3027"))
-			draw_rect(Rect2(-44.0, 48.0, 88.0, 12.0), Color("6f3027"))
-		"flicker":
-			draw_rect(Rect2(-45.0, 45.0, 90.0, 9.0), Color("50246c"))
-			draw_line(Vector2(-9.0, -58.0), Vector2(12.0, 48.0), AMBER, 6.0)
-		_:
-			draw_circle(Vector2(0.0, 42.0), 11.0, Color("ca263e"))
+	var texture := IDENTITIES.car_texture(id)
+	if texture == null:
+		return
+	var draw_size := Vector2(48.0, 64.0) * 2.15 * scale_factor
+	draw_set_transform(center, angle)
+	draw_texture_rect(texture, Rect2(-draw_size * 0.5, draw_size), false)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-func _vehicle_body_points(id: String) -> PackedVector2Array:
-	match id:
-		"pinbolt":
-			return PackedVector2Array([Vector2(-27, 66), Vector2(-35, 42), Vector2(-31, -43), Vector2(-18, -72), Vector2(18, -72), Vector2(31, -43), Vector2(35, 42), Vector2(27, 66)])
-		"scrapjaw":
-			return PackedVector2Array([Vector2(-48, 64), Vector2(-52, 42), Vector2(-50, -49), Vector2(-40, -65), Vector2(40, -65), Vector2(50, -49), Vector2(52, 42), Vector2(48, 64)])
-		"flicker":
-			return PackedVector2Array([Vector2(-38, 64), Vector2(-43, 35), Vector2(-32, -49), Vector2(-20, -71), Vector2(20, -71), Vector2(32, -49), Vector2(43, 35), Vector2(38, 64)])
-		_:
-			return PackedVector2Array([Vector2(-39, 64), Vector2(-46, 40), Vector2(-42, -48), Vector2(-30, -67), Vector2(30, -67), Vector2(42, -48), Vector2(46, 40), Vector2(39, 64)])
-
-
-func _vehicle_wheel_rects(id: String) -> Array[Rect2]:
-	var half_width := 52.0 if id == "scrapjaw" else 45.0
-	return [
-		Rect2(-half_width - 10.0, -45.0, 16.0, 35.0),
-		Rect2(half_width - 6.0, -45.0, 16.0, 35.0),
-		Rect2(-half_width - 10.0, 26.0, 16.0, 35.0),
-		Rect2(half_width - 6.0, 26.0, 16.0, 35.0),
-	]
-
-
 func _draw_portrait(center: Vector2, radius: float, id: String) -> void:
-	var palette: Dictionary = PORTRAITS.get(id, PORTRAITS["rae"])
-	var skin: Color = palette["skin"]
-	var hair: Color = palette["hair"]
-	var shirt: Color = palette["shirt"]
-	var accent: Color = palette["accent"]
+	var payload := IDENTITIES.avatar_payload(id)
+	var texture := IDENTITIES.avatar_texture(id)
+	if payload.is_empty() or texture == null:
+		return
+	var accent := Color(String(payload["palette"]["accent"]))
 	draw_circle(center, radius + 8.0, Color(accent, 0.18))
+	var draw_size := Vector2.ONE * radius * 2.0
+	draw_texture_rect(texture, Rect2(center - draw_size * 0.5, draw_size), false)
 	draw_arc(center, radius + 8.0, -2.8, 2.8, 40, accent, 4.0, true)
-	draw_colored_polygon(PackedVector2Array([
-		center + Vector2(-radius * 0.88, radius * 0.9), center + Vector2(-radius * 0.62, radius * 0.35),
-		center + Vector2(radius * 0.62, radius * 0.35), center + Vector2(radius * 0.88, radius * 0.9),
-	]), shirt)
-	draw_rect(Rect2(center + Vector2(-radius * 0.18, radius * 0.18), Vector2(radius * 0.36, radius * 0.35)), skin)
-	draw_circle(center - Vector2(0.0, radius * 0.12), radius * 0.5, skin)
-	draw_circle(center + Vector2(-radius * 0.48, -radius * 0.1), radius * 0.1, skin)
-	draw_circle(center + Vector2(radius * 0.48, -radius * 0.1), radius * 0.1, skin)
-	_draw_hair(center, radius, id, hair)
-	for eye_x in [-0.18, 0.18]:
-		draw_circle(center + Vector2(radius * eye_x, -radius * 0.08), radius * 0.045, INK)
-	draw_line(center + Vector2(-radius * 0.14, radius * 0.16), center + Vector2(radius * 0.14, radius * 0.16), Color("7b3f3a"), maxf(2.0, radius * 0.035), true)
-	match id:
-		"rae":
-			draw_arc(center - Vector2(radius * 0.22, radius * 0.48), radius * 0.13, 0.0, TAU, 20, AMBER, radius * 0.07, true)
-			draw_arc(center + Vector2(radius * 0.22, -radius * 0.48), radius * 0.13, 0.0, TAU, 20, AMBER, radius * 0.07, true)
-			draw_line(center + Vector2(-radius * 0.08, -radius * 0.48), center + Vector2(radius * 0.08, -radius * 0.48), AMBER, radius * 0.05)
-		"inez":
-			_draw_wrench(center + Vector2(radius * 0.61, radius * 0.59), radius / 74.0, PAPER)
-		"juniper":
-			draw_line(center + Vector2(-radius * 0.38, -radius * 0.2), center + Vector2(radius * 0.38, -radius * 0.2), accent, radius * 0.07)
-		"milo":
-			draw_rect(Rect2(center + Vector2(-radius * 0.5, -radius * 0.56), Vector2(radius, radius * 0.15)), accent)
-		"tess":
-			draw_circle(center + Vector2(radius * 0.52, -radius * 0.2), radius * 0.2, hair)
-		"cass":
-			draw_line(center + Vector2(-radius * 0.28, -radius * 0.52), center + Vector2(radius * 0.1, -radius * 0.34), CREAM, radius * 0.09)
-
-
-func _draw_hair(center: Vector2, radius: float, id: String, hair: Color) -> void:
-	var hair_points := PackedVector2Array([
-		center + Vector2(-radius * 0.5, -radius * 0.08), center + Vector2(-radius * 0.4, -radius * 0.48),
-		center + Vector2(-radius * 0.1, -radius * 0.66), center + Vector2(radius * 0.42, -radius * 0.48),
-		center + Vector2(radius * 0.5, -radius * 0.08), center + Vector2(radius * 0.22, -radius * 0.32),
-		center + Vector2(-radius * 0.15, -radius * 0.27),
-	])
-	draw_colored_polygon(hair_points, hair)
-	if id == "inez":
-		draw_circle(center + Vector2(0.0, -radius * 0.66), radius * 0.22, hair)
-	elif id == "juniper":
-		draw_colored_polygon(PackedVector2Array([center + Vector2(-radius * 0.52, -radius * 0.1), center + Vector2(-radius * 0.65, radius * 0.36), center + Vector2(-radius * 0.36, radius * 0.16)]), hair)
-	elif id == "cass":
-		draw_colored_polygon(PackedVector2Array([center + Vector2(radius * 0.15, -radius * 0.58), center + Vector2(radius * 0.57, -radius * 0.18), center + Vector2(radius * 0.48, radius * 0.24), center + Vector2(radius * 0.28, -radius * 0.18)]), hair)
 
 
 func _draw_track_loop(center: Vector2, radii: Vector2, color: Color) -> void:

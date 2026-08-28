@@ -26,6 +26,8 @@
 - Championship screens now pair controller-safe actions with original driver,
   vehicle, garage, and route illustrations; the garage visibly presents the
   full four-car roster, unlock requirements, and focused-machine stats.
+- Driver portraits and race machines now use distinct, deterministic pixel-art
+  identities throughout the championship shell and live races.
 
 ### Fixed
 

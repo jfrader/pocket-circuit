@@ -12,6 +12,16 @@ const CAST := [
 		"role": "Player driver",
 		"identity": "Adaptable newcomer; starts in the Rustbug",
 		"vehicle_id": "rustbug",
+		"avatar_art": {
+			"seed": 91001,
+			"options": {
+				"face_shape": "oval", "skin_tone": "golden", "hair_style": "curls",
+				"hair_color": "blue_black", "brow_style": "arched", "eye_style": "wide",
+				"eye_color": "hazel", "nose_style": "short", "mouth_style": "grin",
+				"facial_hair": "none", "accessory": "headband", "marking": "freckles",
+				"outfit": "jacket", "accent_palette": "marigold", "facing": "right",
+			},
+		},
 	},
 	{
 		"id": "inez",
@@ -19,6 +29,16 @@ const CAST := [
 		"role": "Mentor and garage owner",
 		"identity": "Practical, warm, never stops tuning",
 		"vehicle_id": "rustbug",
+		"avatar_art": {
+			"seed": 91002,
+			"options": {
+				"face_shape": "square", "skin_tone": "amber", "hair_style": "top_knot",
+				"hair_color": "espresso", "brow_style": "thick", "eye_style": "hooded",
+				"eye_color": "coffee", "nose_style": "broad", "mouth_style": "smile",
+				"facial_hair": "none", "accessory": "earring", "marking": "beauty_spot",
+				"outfit": "collared", "accent_palette": "lagoon", "facing": "right",
+			},
+		},
 	},
 	{
 		"id": "juniper",
@@ -26,6 +46,16 @@ const CAST := [
 		"role": "Act I rival",
 		"identity": "Precise lines and late braking in the Pinbolt",
 		"vehicle_id": "pinbolt",
+		"avatar_art": {
+			"seed": 91003,
+			"options": {
+				"face_shape": "diamond", "skin_tone": "ivory", "hair_style": "side_part",
+				"hair_color": "copper", "brow_style": "angled", "eye_style": "narrow",
+				"eye_color": "sky", "nose_style": "angular", "mouth_style": "serious",
+				"facial_hair": "none", "accessory": "hair_clip", "marking": "brow_scar",
+				"outfit": "armor", "accent_palette": "cobalt", "facing": "left",
+			},
+		},
 	},
 	{
 		"id": "milo",
@@ -33,6 +63,16 @@ const CAST := [
 		"role": "Act II rival",
 		"identity": "Heavy contact and fearless shortcuts in the Scrapjaw",
 		"vehicle_id": "scrapjaw",
+		"avatar_art": {
+			"seed": 91004,
+			"options": {
+				"face_shape": "square", "skin_tone": "cocoa", "hair_style": "buzz",
+				"hair_color": "black", "brow_style": "thick", "eye_style": "wide",
+				"eye_color": "amber", "nose_style": "broad", "mouth_style": "grin",
+				"facial_hair": "stubble", "accessory": "none", "marking": "cheek_scar",
+				"outfit": "armor", "accent_palette": "berry", "facing": "left",
+			},
+		},
 	},
 	{
 		"id": "tess",
@@ -40,6 +80,16 @@ const CAST := [
 		"role": "Act III rival",
 		"identity": "Long controlled drifts in the Flicker",
 		"vehicle_id": "flicker",
+		"avatar_art": {
+			"seed": 91005,
+			"options": {
+				"face_shape": "heart", "skin_tone": "olive", "hair_style": "locs",
+				"hair_color": "auburn", "brow_style": "soft", "eye_style": "upturned",
+				"eye_color": "violet", "nose_style": "button", "mouth_style": "smirk",
+				"facial_hair": "none", "accessory": "earring", "marking": "beauty_spot",
+				"outfit": "turtleneck", "accent_palette": "orchid", "facing": "left",
+			},
+		},
 	},
 	{
 		"id": "cass",
@@ -47,6 +97,16 @@ const CAST := [
 		"role": "Reigning champion",
 		"identity": "Calm, fast, and dismissive until Rae earns respect",
 		"vehicle_id": "flicker",
+		"avatar_art": {
+			"seed": 91006,
+			"options": {
+				"face_shape": "long", "skin_tone": "ivory", "hair_style": "quiff",
+				"hair_color": "silver", "brow_style": "angled", "eye_style": "narrow",
+				"eye_color": "slate", "nose_style": "hooked", "mouth_style": "serious",
+				"facial_hair": "stubble", "accessory": "none", "marking": "brow_scar",
+				"outfit": "collared", "accent_palette": "marigold", "facing": "left",
+			},
+		},
 	},
 ]
 
@@ -59,6 +119,13 @@ const VEHICLES := [
 		"tradeoff": "No dominant specialty",
 		"unlock": "Start",
 		"tint": "f5d25c",
+		"car_art": {
+			"seed": 92001, "type": "compact",
+			"options": {"palette": "citrus_pop", "parts": {
+				"hood": "smooth", "cabin": "bubble", "bumpers": "utility",
+				"wheels": "classic", "spoiler": "none", "livery": "center_stripe",
+			}},
+		},
 		"stats": {
 			"mass": 0.85, "engine_power": 720.0, "max_speed": 680.0,
 			"acceleration": 1.08, "reverse_speed": 255.0,
@@ -77,6 +144,13 @@ const VEHICLES := [
 		"tradeoff": "Lower drift boost and top speed",
 		"unlock": "Win Act I",
 		"tint": "71b7ff",
+		"car_art": {
+			"seed": 92002, "type": "coupe",
+			"options": {"palette": "marina_blue", "parts": {
+				"hood": "twin_vents", "cabin": "angular", "bumpers": "sport",
+				"wheels": "mesh", "spoiler": "lip", "livery": "twin_stripe",
+			}},
+		},
 		"stats": {
 			"mass": 0.78, "engine_power": 700.0, "max_speed": 640.0,
 			"acceleration": 1.1, "reverse_speed": 250.0,
@@ -95,6 +169,13 @@ const VEHICLES := [
 		"tradeoff": "Slow turn-in and recovery",
 		"unlock": "Win Act II",
 		"tint": "db724d",
+		"car_art": {
+			"seed": 92003, "type": "muscle",
+			"options": {"palette": "candy_red", "parts": {
+				"hood": "power_scoop", "cabin": "panoramic", "bumpers": "utility",
+				"wheels": "rugged", "spoiler": "none", "livery": "solid",
+			}},
+		},
 		"stats": {
 			"mass": 1.15, "engine_power": 780.0, "max_speed": 700.0,
 			"acceleration": 1.0, "reverse_speed": 240.0,
@@ -113,6 +194,13 @@ const VEHICLES := [
 		"tradeoff": "Demands precise counter-steer",
 		"unlock": "Complete championship",
 		"tint": "ca78ff",
+		"car_art": {
+			"seed": 92004, "type": "buggy",
+			"options": {"palette": "plum_soda", "parts": {
+				"hood": "smooth", "cabin": "bubble", "bumpers": "sport",
+				"wheels": "mesh", "spoiler": "wing", "livery": "side_flash",
+			}},
+		},
 		"stats": {
 			"mass": 0.72, "engine_power": 700.0, "max_speed": 665.0,
 			"acceleration": 1.12, "reverse_speed": 255.0,
