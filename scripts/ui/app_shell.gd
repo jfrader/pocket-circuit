@@ -21,6 +21,8 @@ var _button_focus_chain: Array[Button] = []
 var _screen := "title"
 var _event_id := ""
 var _quick_race := false
+var _map_act_number := 1
+var _quick_race_act_number := 1
 var _content_tween: Tween
 var _entrance_generation := 0
 var _save_error_back_action := Callable()
@@ -40,10 +42,11 @@ func show_title() -> void:
 	_configure_stage(&"title")
 	_add_kicker("GRAND HOUSEHOLD CIRCUIT · OFFLINE CHAMPIONSHIP")
 	_add_heading("Tiny racing.\nBig stakes.")
-	_add_copy("Win the Grand Household Circuit before sunrise. Three rooms, nine events, four original machines.")
 	var save_read_only := bool(_app.call("is_save_read_only"))
 	if save_read_only:
-		_add_copy("A save from a newer Pocket Circuit version was found. It remains untouched; championship changes are disabled in this version.", CORAL)
+		_add_copy("READ-ONLY SAVE · NEWER FILE DETECTED · FILE UNTOUCHED", CORAL)
+	else:
+		_add_copy("Three rooms. Nine events. Four machines.")
 	_add_spacer(10)
 	if bool(_app.call("has_championship_progress")):
 		_add_button("CONTINUE CHAMPIONSHIP", Callable(_app, "continue_championship"), AMBER)
@@ -70,16 +73,11 @@ func show_reset_confirmation() -> void:
 	_focus_first()
 
 
-func show_map(result_summary: Dictionary = {}) -> void:
+func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 	_screen = "map"
 	_event_id = ""
 	_quick_race = false
 	_clear_content()
-	_configure_stage(&"map")
-	_add_kicker("CHAMPIONSHIP MAP")
-	_add_heading("Grand Household Circuit")
-	if not result_summary.is_empty():
-		_add_result_notice(result_summary)
 	var progress: Dictionary = _app.call("get_save_data")
 	var best_finishes: Dictionary = progress.get("best_event_finishes", {})
 	var recommended_event_id := ""
@@ -88,39 +86,53 @@ func show_map(result_summary: Dictionary = {}) -> void:
 		if CATALOG.is_event_unlocked(candidate_id, progress) and int(best_finishes.get(candidate_id, 0)) == 0:
 			recommended_event_id = candidate_id
 			break
-	if not recommended_event_id.is_empty():
+	if requested_act > 0:
+		_map_act_number = clampi(requested_act, 1, CATALOG.ACTS.size())
+	elif not recommended_event_id.is_empty():
+		_map_act_number = int(CATALOG.get_event(recommended_event_id).get("act", _map_act_number))
+	var visible_act := CATALOG.get_act(_map_act_number)
+	_configure_stage(&"map")
+	_add_kicker("CHAMPIONSHIP · ACT %d OF %d" % [_map_act_number, CATALOG.ACTS.size()])
+	_add_heading(String(visible_act.get("name", "Grand Household Circuit")))
+	if not result_summary.is_empty():
+		_add_result_notice(result_summary)
+	if (
+		result_summary.is_empty()
+		and not recommended_event_id.is_empty()
+		and int(CATALOG.get_event(recommended_event_id).get("act", 0)) == _map_act_number
+	):
 		var recommended_event := CATALOG.get_event(recommended_event_id)
-		_add_quote("NEXT UP  ·  %s  ·  %s" % [String(recommended_event["name"]), String(recommended_event["format"])], AMBER)
+		_add_copy("NEXT  ·  %s  ·  %s" % [String(recommended_event["name"]), String(recommended_event["format"])], AMBER)
 	var recommended_button: Button
-	for act: Dictionary in CATALOG.ACTS:
-		var act_number := int(act["number"])
-		var act_complete: bool = String(act["id"]) in progress.get("completed_acts", [])
-		var standings := "%d PTS" % CATALOG.act_points(progress, act_number)
-		if act_complete:
-			standings += "  ·  WON"
-		_add_section("ACT %d  ·  %s" % [act_number, String(act["name"])], standings)
-		for event: Dictionary in CATALOG.EVENTS:
-			if int(event["act"]) != act_number:
-				continue
-			var event_id := String(event["id"])
-			var unlocked := CATALOG.is_event_unlocked(event_id, progress)
-			var finish := int(best_finishes.get(event_id, 0))
-			var status := "LOCKED · %s" % String(event["unlock"])
-			if unlocked:
-				status = "OPEN · %s" % String(event["format"])
-			if finish > 0:
-				status = "BEST %s · %d PTS" % [_ordinal(finish), int(progress["best_event_points"].get(event_id, 0))]
-			var event_button := _add_button(
-				"%s\n%s  ·  %s" % [String(event["name"]), String(event["environment"]), status],
-				Callable(self, "_open_event").bind(event_id),
-				AMBER if unlocked else MUTED,
-				not unlocked,
-				"Event_%s" % event_id
-			)
-			if event_id == recommended_event_id:
-				recommended_button = event_button
-	_add_button("RETURN TO TITLE", Callable(self, "show_title"), CREAM)
-	_footer.text = "10 POINTS OPENS EVENT TWO  ·  20 POINTS OPENS EACH FINALE  ·  ESC / B BACK"
+	var act_complete: bool = String(visible_act.get("id", "")) in progress.get("completed_acts", [])
+	var standings := "%d PTS" % CATALOG.act_points(progress, _map_act_number)
+	if act_complete:
+		standings += "  ·  WON"
+	_add_section("EVENTS", standings)
+	for event: Dictionary in CATALOG.EVENTS:
+		if int(event["act"]) != _map_act_number:
+			continue
+		var event_id := String(event["id"])
+		var unlocked := CATALOG.is_event_unlocked(event_id, progress)
+		var finish := int(best_finishes.get(event_id, 0))
+		var status := "LOCKED · %s" % String(event["unlock"])
+		if unlocked:
+			status = "OPEN · %s" % String(event["format"])
+		if finish > 0:
+			status = "BEST %s · %d PTS" % [_ordinal(finish), int(progress["best_event_points"].get(event_id, 0))]
+		var event_button := _add_button(
+			"%s\n%s" % [String(event["name"]), status],
+			Callable(self, "_open_event").bind(event_id),
+			AMBER if unlocked else MUTED,
+			not unlocked,
+			"Event_%s" % event_id
+		)
+		if event_id == recommended_event_id:
+			recommended_button = event_button
+	var act_navigation := _add_act_navigation(_map_act_number, Callable(self, "_show_map_act"))
+	var return_button := _add_button("RETURN TO TITLE", Callable(self, "show_title"), CREAM)
+	_complete_focus_row(act_navigation, return_button)
+	_footer.text = "SELECT AN ACT, THEN AN EVENT  ·  ESC / B  BACK"
 	if recommended_button:
 		_queue_content_entrance()
 		_grab_button_focus_after_layout(recommended_button, _entrance_generation)
@@ -128,20 +140,36 @@ func show_map(result_summary: Dictionary = {}) -> void:
 		_focus_first()
 
 
-func show_quick_race() -> void:
+func show_quick_race(requested_act: int = 0) -> void:
 	_screen = "quick_race"
 	_event_id = ""
 	_quick_race = true
 	_clear_content()
 	_configure_stage(&"map")
-	_add_kicker("QUICK RACE · EXHIBITION")
-	_add_heading("Pick a circuit")
-	_add_copy("Practice Crumb Rush or replay a completed event without changing championship standings, points, or unlocks.")
 	var progress: Dictionary = _app.call("get_save_data")
 	var completed_events: Array = progress.get("completed_events", [])
 	var best_finishes: Dictionary = progress.get("best_event_finishes", {})
+	var available_acts: Array[int] = []
+	for event: Dictionary in CATALOG.EVENTS:
+		var candidate_id := String(event["id"])
+		if candidate_id == "kitchen_crumb_rush" or candidate_id in completed_events:
+			var act_number := int(event["act"])
+			if not act_number in available_acts:
+				available_acts.append(act_number)
+	if requested_act > 0 and requested_act in available_acts:
+		_quick_race_act_number = requested_act
+	elif not _quick_race_act_number in available_acts:
+		_quick_race_act_number = available_acts[0] if not available_acts.is_empty() else 1
+	var visible_act := CATALOG.get_act(_quick_race_act_number)
+	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
+	_add_heading("Pick a circuit")
+	if completed_events.is_empty():
+		_add_copy("Finish championship events to unlock them here.", MUTED)
+	_add_section("ACT %d · %s" % [_quick_race_act_number, String(visible_act.get("name", "EXHIBITION"))], "")
 	for event: Dictionary in CATALOG.EVENTS:
 		var event_id := String(event["id"])
+		if int(event["act"]) != _quick_race_act_number:
+			continue
 		if event_id != "kitchen_crumb_rush" and not event_id in completed_events:
 			continue
 		var finish := int(best_finishes.get(event_id, 0))
@@ -149,13 +177,15 @@ func show_quick_race() -> void:
 		if finish > 0:
 			status = "BEST %s · %d PTS" % [_ordinal(finish), int(progress["best_event_points"].get(event_id, 0))]
 		_add_button(
-			"%s\n%s  ·  %s  ·  %s" % [String(event["name"]), String(event["environment"]), String(event["format"]), status],
+			"%s\n%s  ·  %s" % [String(event["name"]), String(event["format"]), status],
 			Callable(self, "show_vehicle_select").bind(event_id, true),
 			BLUE,
 			false,
 			"QuickRace_%s" % event_id
 		)
-	_add_button("BACK TO TITLE", Callable(self, "show_title"), CREAM)
+	var act_navigation := _add_available_act_navigation(available_acts, _quick_race_act_number, Callable(self, "_show_quick_race_act"))
+	var back_button := _add_button("BACK TO TITLE", Callable(self, "show_title"), CREAM)
+	_complete_focus_row(act_navigation, back_button)
 	_footer.text = "EXHIBITION RESULTS DO NOT SAVE  ·  ESC / B  BACK"
 	_focus_first()
 
@@ -175,9 +205,9 @@ func show_briefing(event_id: String) -> void:
 	_add_kicker("ACT %d · EVENT BRIEFING" % int(event["act"]))
 	_add_heading(String(event["name"]))
 	_add_copy("%s  ·  %s" % [String(event["environment"]), String(event["format"])], AMBER)
-	_add_spacer(10)
-	_add_quote(String(event["story"]))
-	_add_quote(String(event["rival_line"]), BLUE)
+	var rival := CATALOG.get_driver(rival_id)
+	var rival_vehicle := CATALOG.get_vehicle(String(rival.get("vehicle_id", "rustbug")))
+	_add_section("LEAD RIVAL", "%s · %s" % [String(rival.get("name", "RACER")), String(rival_vehicle.get("name", "MACHINE"))])
 	var progress: Dictionary = _app.call("get_save_data")
 	if event_id == "kitchen_crumb_rush" and int(progress.get("best_event_finishes", {}).get(event_id, 0)) == 0:
 		_add_section("FIRST RACE", "LEARN THE LINE, THEN FIND SPEED")
@@ -199,7 +229,6 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	_add_kicker("QUICK RACE · %s" % String(event.get("name", "EVENT")) if quick_race else "GARAGE · %s" % String(event.get("name", "EVENT")))
 	_add_heading("Choose your machine")
 	_add_copy("%s  ·  %s" % [String(event.get("environment", "CIRCUIT")), String(event.get("format", "RACE"))], BLUE)
-	_add_copy("Every unlocked vehicle is a side-grade. Pick the handling style that suits your line.")
 	var progress: Dictionary = _app.call("get_save_data")
 	var selected_vehicle := String(progress.get("selected_vehicle", "rustbug"))
 	var unlocked_vehicles: Array = progress.get("unlocked_vehicles", ["rustbug"])
@@ -210,10 +239,7 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 		var vehicle_id := String(vehicle["id"])
 		var unlocked := vehicle_id in unlocked_vehicles
 		var access := "READY" if unlocked else "LOCKED · %s" % String(vehicle["unlock"])
-		var summary := "%s · %s · %s\n%s\nTradeoff: %s" % [
-			String(vehicle["name"]), String(vehicle["archetype"]),
-			access, String(vehicle["strength"]), String(vehicle["tradeoff"]),
-		]
+		var summary := "%s  ·  %s  ·  %s" % [String(vehicle["name"]), String(vehicle["archetype"]), access]
 		var vehicle_button := _add_button(
 			summary,
 			Callable(self, "_start_with_vehicle").bind(vehicle_id),
@@ -238,24 +264,24 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 func show_settings() -> void:
 	_screen = "settings"
 	_clear_content()
+	_content.add_theme_constant_override("separation", 5)
 	_configure_stage(&"settings", "rustbug", "inez")
 	_add_kicker("SETTINGS")
 	_add_heading("Race your way")
 	var settings: Dictionary = _app.call("get_save_data")
-	_add_section("DIFFICULTY", "REWARDS AND ACCESS NEVER CHANGE")
+	_add_section("DIFFICULTY", "PACE ONLY · REWARDS & ACCESS UNCHANGED")
 	var difficulty := OptionButton.new()
 	difficulty.name = "Difficulty"
 	difficulty.custom_minimum_size = Vector2(460.0, 48.0)
 	var difficulty_ids := ["sunday_drive", "club_circuit", "clockwork"]
-	for label: String in ["Sunday Drive", "Club Circuit", "Clockwork"]:
+	for label: String in ["Sunday Drive · Earlier braking", "Club Circuit · Balanced", "Clockwork · Later braking"]:
 		difficulty.add_item(label)
 	var selected_index := maxi(0, difficulty_ids.find(String(settings["difficulty"])))
 	difficulty.select(selected_index)
 	difficulty.item_selected.connect(func(index: int) -> void: _app.call("update_setting", "difficulty", difficulty_ids[index]))
 	_wire_button_audio(difficulty)
 	_content.add_child(difficulty)
-	_add_copy("Sunday Drive brakes early. Club Circuit is the intended baseline. Clockwork attacks late and clean.")
-	_add_section("AUDIO", "APPLIES IMMEDIATELY WHEN THE BUS EXISTS")
+	_add_section("AUDIO", "")
 	_add_slider("Master", float(settings["master_volume"]), "master_volume")
 	_add_slider("Music", float(settings["music_volume"]), "music_volume")
 	_add_slider("SFX", float(settings["sfx_volume"]), "sfx_volume")
@@ -290,19 +316,13 @@ func show_credits() -> void:
 	_clear_content()
 	_configure_stage(&"credits")
 	_add_kicker("CREDITS & NOTICES")
-	_add_heading("Built after hours")
-	_add_section("DEVELOPMENT", "GURISITOS GAMES")
-	_add_quote("Pocket Circuit\nCreated and published by Gurisitos Games")
-	_add_copy("Championship story, characters, vehicles, event names, dialogue, visual assets, music, and sound effects are original to Pocket Circuit.")
-	_add_section("ENGINE", "GODOT ENGINE · MIT LICENSE")
-	_add_copy("Godot Engine copyright © 2007-present Juan Linietsky, Ariel Manzur, and Godot Engine contributors.")
-	_add_copy("The complete MIT license is included with the game in THIRD_PARTY_NOTICES.md.", MUTED)
-	_add_section("PROCEDURAL ART", "PROCEDURAL 2D · MIT LICENSE")
-	_add_copy("Fixed local generators render the assigned cast portraits and machine sprites from Pocket Circuit's project-authored mappings.")
-	_add_copy("The pinned source revision and MIT terms are included with the game.", MUTED)
-	_add_section("PRODUCTION", "AI-ASSISTED ORIGINAL CONTENT")
-	_add_copy("AI-assisted production tools supported developer-directed code, graphics, and synthesized sound creation. No third-party source media, samples, characters, vehicles, tracks, or branding are included.")
-	_add_copy("Asset provenance and original audio details are included with the game in ASSET_PROVENANCE.md and assets/audio/LICENSE.md.", MUTED)
+	_add_heading("Pocket Circuit")
+	_add_section("CREATED & PUBLISHED", "GURISITOS GAMES")
+	_add_section("ENGINE", "GODOT · MIT")
+	_add_section("PROCEDURAL ART", "PROCEDURAL 2D · MIT")
+	_add_section("PRODUCTION", "DEVELOPER-DIRECTED · AI-ASSISTED")
+	_add_copy("Original code, characters, vehicles, tracks, graphics, music, and synthesized sound.")
+	_add_copy("Licenses and provenance are included in THIRD_PARTY_NOTICES.md and ASSET_PROVENANCE.md.", MUTED)
 	_add_button("BACK", Callable(self, "show_title"), CREAM)
 	_footer.text = "ESC / B  BACK"
 	_focus_first()
@@ -328,9 +348,8 @@ func show_ending() -> void:
 	_clear_content()
 	_configure_stage(&"ending", "rustbug", "rae", "office", "cass")
 	_add_kicker("CHAMPIONSHIP COMPLETE")
-	_add_heading("The circuit stays open.")
-	_add_quote("The office clock ticks into sunrise as Cass rolls aside. Rae's Rustbug crosses the last pool of lamplight, and every rookie waiting below the desk gets a place on next year's grid.", AMBER)
-	_add_quote("Cass: The circuit needed a champion. Turns out it needed a newcomer more.", BLUE)
+	_add_heading("Champion.")
+	_add_copy("Grand Household Circuit complete.", AMBER)
 	var progress: Dictionary = _app.call("get_save_data")
 	var series_points := 0
 	for act: Dictionary in CATALOG.ACTS:
@@ -426,6 +445,9 @@ func _build_base() -> void:
 	_scroll.size_flags_stretch_ratio = 1.65
 	_scroll.custom_minimum_size = Vector2(650.0, 0.0)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.follow_focus = false
+	_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(_scroll)
 	_content = VBoxContainer.new()
 	_content.custom_minimum_size = Vector2(620.0, 0.0)
@@ -486,6 +508,7 @@ func _clear_content() -> void:
 	if _content_tween and _content_tween.is_valid():
 		_content_tween.kill()
 	_content.modulate = Color.WHITE
+	_content.add_theme_constant_override("separation", 10)
 	for child: Node in _content.get_children():
 		child.queue_free()
 
@@ -556,16 +579,24 @@ func _add_result_notice(summary: Dictionary) -> void:
 	var unlocked: Array = summary.get("unlocked_vehicles", [])
 	if not unlocked.is_empty():
 		message += "  ·  %s UNLOCKED" % String(CATALOG.get_vehicle(String(unlocked[0]))["name"]).to_upper()
-	_add_quote(message, AMBER)
+	_add_copy(message, AMBER)
 
 
 func _add_button(text: String, callback: Callable, accent: Color, disabled: bool = false, node_name: String = "") -> Button:
+	var button := _make_button(text, callback, accent, disabled, node_name)
+	_content.add_child(button)
+	if not disabled:
+		_register_button_focus(button)
+	return button
+
+
+func _make_button(text: String, callback: Callable, accent: Color, disabled: bool = false, node_name: String = "") -> Button:
 	var button := Button.new()
 	if not node_name.is_empty():
 		button.name = node_name
 	button.text = text
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-	button.custom_minimum_size = Vector2(560.0, 52.0)
+	button.custom_minimum_size = Vector2(0.0, 44.0)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.focus_mode = Control.FOCUS_ALL
 	button.disabled = disabled
@@ -574,10 +605,51 @@ func _add_button(text: String, callback: Callable, accent: Color, disabled: bool
 	_wire_button_audio(button)
 	if callback.is_valid():
 		button.pressed.connect(callback)
-	_content.add_child(button)
-	if not disabled:
-		_register_button_focus(button)
 	return button
+
+
+func _add_act_navigation(act_number: int, callback: Callable) -> Array[Button]:
+	var act_numbers: Array[int] = []
+	for act: Dictionary in CATALOG.ACTS:
+		act_numbers.append(int(act["number"]))
+	return _add_available_act_navigation(act_numbers, act_number, callback)
+
+
+func _add_available_act_navigation(act_numbers: Array[int], act_number: int, callback: Callable) -> Array[Button]:
+	var current_index := act_numbers.find(act_number)
+	var previous_focus: Button = _button_focus_chain.back() if not _button_focus_chain.is_empty() else null
+	var focusable_buttons: Array[Button] = []
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_content.add_child(row)
+	var previous_disabled := current_index <= 0
+	var previous_act := act_numbers[maxi(0, current_index - 1)] if not act_numbers.is_empty() else act_number
+	var previous := _make_button("← PREVIOUS ACT", callback.bind(previous_act), CREAM, previous_disabled)
+	previous.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(previous)
+	if not previous_disabled:
+		focusable_buttons.append(previous)
+	var next_disabled := current_index < 0 or current_index >= act_numbers.size() - 1
+	var next_act := act_numbers[mini(act_numbers.size() - 1, current_index + 1)] if not act_numbers.is_empty() else act_number
+	var next := _make_button("NEXT ACT →", callback.bind(next_act), CREAM, next_disabled)
+	next.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(next)
+	if not next_disabled:
+		focusable_buttons.append(next)
+	if not focusable_buttons.is_empty():
+		_register_button_focus(focusable_buttons[0])
+		for button: Button in focusable_buttons.slice(1):
+			if previous_focus:
+				button.focus_neighbor_top = button.get_path_to(previous_focus)
+	if focusable_buttons.size() == 2:
+		focusable_buttons[0].focus_neighbor_right = focusable_buttons[0].get_path_to(focusable_buttons[1])
+		focusable_buttons[1].focus_neighbor_left = focusable_buttons[1].get_path_to(focusable_buttons[0])
+	return focusable_buttons
+
+
+func _complete_focus_row(focusable_buttons: Array[Button], following_button: Button) -> void:
+	for button: Button in focusable_buttons.slice(1):
+		button.focus_neighbor_bottom = button.get_path_to(following_button)
 
 
 func _register_button_focus(button: Button) -> void:
@@ -586,16 +658,6 @@ func _register_button_focus(button: Button) -> void:
 		previous.focus_neighbor_bottom = previous.get_path_to(button)
 		button.focus_neighbor_top = button.get_path_to(previous)
 	_button_focus_chain.append(button)
-	button.focus_entered.connect(_queue_control_visible.bind(button, _entrance_generation))
-
-
-func _queue_control_visible(control: Control, generation: int) -> void:
-	call_deferred("_ensure_control_visible", control, generation)
-
-
-func _ensure_control_visible(control: Control, generation: int) -> void:
-	if generation == _entrance_generation and is_instance_valid(_scroll) and is_instance_valid(control):
-		_scroll.ensure_control_visible(control)
 
 
 func _add_slider(label_text: String, value: float, setting_key: String) -> void:
@@ -647,6 +709,7 @@ func _grab_first_focus() -> void:
 		var button := node as BaseButton
 		if button and not button.is_queued_for_deletion() and not button.disabled and button.visible:
 			button.grab_focus()
+			_scroll.scroll_vertical = 0
 			return
 
 
@@ -717,6 +780,14 @@ func _reduced_motion_enabled() -> bool:
 
 func _open_event(event_id: String) -> void:
 	show_briefing(event_id)
+
+
+func _show_map_act(act_number: int) -> void:
+	show_map({}, act_number)
+
+
+func _show_quick_race_act(act_number: int) -> void:
+	show_quick_race(act_number)
 
 
 func _start_with_vehicle(vehicle_id: String) -> void:
