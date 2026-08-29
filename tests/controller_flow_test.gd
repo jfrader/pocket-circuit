@@ -31,20 +31,18 @@ func _run_test() -> void:
 	if not _expect(focused_title_action != null and focused_title_action.text == "QUICK RACE", "controller navigation should focus Quick Race before it is accepted"):
 		return
 	await _tap_joypad_button(0)
-	if not _expect(String(shell.get("_screen")) == "quick_race", "gamepad A should open Quick Race from the title screen"):
+	await _wait_until(func() -> bool: return String(shell.get("_screen")) == "quick_race", 30)
+	if not _expect(bool(shell.get("_quick_race")), "gamepad A should open the Quick Race builder"):
 		return
-	await _tap_joypad_button(0)
-	await _wait_until(func() -> bool: return String(shell.get("_screen")) == "vehicle_select", 30)
-	if not _expect(bool(shell.get("_quick_race")), "gamepad A should accept the focused Quick Race circuit"):
-		return
-	await _tap_joypad_button(0)
-	await _tap_joypad_button(12)
+	await _wait_until(func() -> bool: return root.get_viewport().gui_get_focus_owner() != null, 30)
+	await _tap_action(&"ui_down")
+	await _tap_action(&"ui_down")
 	await _wait_until(func() -> bool:
 		var focused := root.get_viewport().gui_get_focus_owner() as Button
 		return focused != null and focused.text == "PLAY"
 	, 30)
-	var focused_vehicle_action := root.get_viewport().gui_get_focus_owner() as Button
-	if not _expect(focused_vehicle_action != null and focused_vehicle_action.text == "PLAY", "controller navigation should focus PLAY after choosing a vehicle"):
+	var focused_play_action := root.get_viewport().gui_get_focus_owner() as Button
+	if not _expect(focused_play_action != null and focused_play_action.text == "PLAY", "controller navigation should reach PLAY in Quick Race"):
 		return
 	await _tap_joypad_button(0)
 	await _wait_until(func() -> bool: return current_scene != null and current_scene.scene_file_path == RACE_SCENE.resource_path, 60)
@@ -54,8 +52,9 @@ func _run_test() -> void:
 			race != null
 			and race.scene_file_path == RACE_SCENE.resource_path
 			and String(session.get("mode", "")) == "quick"
-			and String(session.get("event_id", "")) == "kitchen_crumb_rush",
-			"accepting the focused Quick Race vehicle should load the race and keep the tree alive"
+			and String(session.get("event_id", "")).begins_with("circuit_")
+			and String(session.get("event", {}).get("circuit", "")) == "generated",
+			"accepting PLAY should load a generated Quick Race and keep the tree alive"
 	):
 		return
 	await _wait_until(func() -> bool: return race.get("_pause_overlay") != null and bool(race.get("_countdown_active")), 60)
@@ -80,6 +79,18 @@ func _run_test() -> void:
 	current_scene = null
 	print("CONTROLLER_FLOW_TEST PASS")
 	quit(0)
+
+
+func _tap_action(action: StringName) -> void:
+	var event := InputEventAction.new()
+	event.action = action
+	event.pressed = true
+	Input.parse_input_event(event)
+	await process_frame
+	event = event.duplicate()
+	event.pressed = false
+	Input.parse_input_event(event)
+	await process_frame
 
 
 func _tap_joypad_button(button_index: int) -> void:

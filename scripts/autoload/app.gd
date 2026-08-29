@@ -161,6 +161,13 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 	var event := CATALOG.get_event(event_id)
 	if event.is_empty():
 		return
+	if String(event.get("theme", "")) in ["kitchen", "workshop", "office"]:
+		event = event.duplicate(true)
+		var random := RandomNumberGenerator.new()
+		random.randomize()
+		event["circuit"] = "generated"
+		event["room"] = "classic"
+		event["seed"] = random.randi_range(0, 99999)
 	if not quick_race and not CATALOG.is_event_unlocked(event_id, _save_data):
 		return
 	if not vehicle_id in _save_data["unlocked_vehicles"]:

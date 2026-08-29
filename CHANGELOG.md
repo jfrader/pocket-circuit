@@ -17,6 +17,20 @@
   so every baked circuit is playable, plus a circuit roster catalog and test.
 - Brightened generated floor/island textures (desk mat, wood planks, toolbox,
   keyboard) and per-theme furniture edge strips on all room walls.
+- Any-seed circuit generation: the track builder is now a runtime library
+  (`tools/track_builder_core.gd`), so a race can build an arbitrary seed on
+  demand — no pre-baked file required.
+- Quick Race redesigned: pick a room (kitchen / workshop / office), the seed
+  defaults to a random value, and any seed can be typed in (with controller
+  step buttons and a reroll); PLAY races it. Generated kitchen circuits are
+  new (counter surface, painted track, big plate island).
+- Championship races now run on a random seed per event, so every race is a
+  fresh circuit.
+- Fifteen new prop sprites (barrel, flower pot, basketball, soccer ball,
+  football, watermelon, frying pan, remote, wrench, hammer, strawberry, bolt,
+  screw, coin, small plant) wired into the island fills at huge/medium/small/
+  tiny sizes, plus corridor obstacles pushed toward the track edges and the
+  office's flat "paper sheet" debug-looking rectangle removed.
 - Room-canvas variety: circuits now live in differently shaped rooms — the
   classic square bench, a long horizontal counter (~2350×900), and a tall
   vertical shelf (~1150×1450) — with polygon wall segments, room-shaped

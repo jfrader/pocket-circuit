@@ -34,6 +34,7 @@ const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controll
 const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const CIRCUIT_ROSTER := preload("res://data/circuits/circuit_roster.gd")
+const TRACK_BUILDER := preload("res://tools/track_builder_core.gd")
 const RACE_HUD_SCRIPT := preload("res://scripts/ui/race_hud.gd")
 const COUNTDOWN_STEP_SECONDS := 0.65
 const FALLBACK_OPPONENTS: Array[String] = ["juniper", "milo", "tess"]
@@ -200,16 +201,22 @@ func _configure_track_variant() -> void:
 	var event: Dictionary = _session.get("event", {})
 	var requested_theme := StringName(event.get("theme", "kitchen"))
 	var scene_path := ""
+	var packed: PackedScene = null
 	if not String(event.get("circuit", "")).is_empty():
-		scene_path = CIRCUIT_ROSTER.scene_path(requested_theme, StringName(event.get("room", "classic")), int(event.get("seed", 0)))
+		var circuit_room := StringName(event.get("room", "classic"))
+		var circuit_seed := int(event.get("seed", 0))
+		scene_path = CIRCUIT_ROSTER.scene_path(requested_theme, circuit_room, circuit_seed)
+		packed = load(scene_path) as PackedScene
+		if packed == null:
+			var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed)
+			packed = built["scene"] as PackedScene
 	elif requested_theme != &"kitchen":
 		scene_path = String(TRACK_SCENES.get(requested_theme, ""))
-	if not scene_path.is_empty():
 		var track_override := OS.get_environment("PC_TRACK_SCENE")
 		if not track_override.is_empty():
 			scene_path = track_override
-		var packed := load(scene_path) as PackedScene
-		if packed:
+		packed = load(scene_path) as PackedScene
+	if packed:
 			var embedded := track_root
 			embedded.get_parent().remove_child(embedded)
 			embedded.free()

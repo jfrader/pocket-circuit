@@ -99,8 +99,8 @@ func _run_test() -> void:
 	await process_frame
 	await process_frame
 	focus_owner = root.get_viewport().gui_get_focus_owner()
-	if focus_owner == null or focus_owner.name != "QuickRace_kitchen_crumb_rush":
-		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should open a focused event picker")
+	if focus_owner == null or focus_owner.name != "QuickRaceRoom_workshop":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should open with the selected room focused")
 		quit(1)
 		return
 	shell.call("go_back")
