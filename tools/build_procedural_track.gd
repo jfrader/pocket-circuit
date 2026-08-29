@@ -32,6 +32,7 @@ const LAYOUTS := {
 		"floor_texture": "",
 		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top.jpg",
 		"prop_label": "Toolbox",
+		"island_expansion": 10.0,
 		"obstacles": {
 			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
 			"MugA": {"pos": Vector2(-300, 290), "r": 36.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
@@ -57,10 +58,11 @@ const LAYOUTS := {
 		"scene": "res://scenes/tracks/office_desk.tscn",
 		"root_name": "OfficeDesk",
 		"controls": [
-			Vector2(640, 370), Vector2(300, 370), Vector2(-300, 370), Vector2(-735, 330),
-			Vector2(-735, 0), Vector2(-735, -250), Vector2(-600, -420), Vector2(-300, -470),
-			Vector2(0, -480), Vector2(300, -470), Vector2(600, -420), Vector2(735, -250),
-			Vector2(735, 0), Vector2(735, 370),
+			Vector2(640, 370), Vector2(300, 370), Vector2(-300, 370), Vector2(-400, 340),
+			Vector2(-700, 260), Vector2(-820, 215), Vector2(-750, 180), Vector2(-600, 112),
+			Vector2(-400, 22), Vector2(-200, -67), Vector2(0, -157), Vector2(200, -246),
+			Vector2(400, -336), Vector2(600, -420), Vector2(735, -300), Vector2(735, 0),
+			Vector2(735, 370),
 		],
 		"floor": Color("4a6a8a"),
 		"highlight": Color("5a7a9a"),
@@ -71,25 +73,27 @@ const LAYOUTS := {
 		"floor_texture": "",
 		"prop_texture": "res://assets/textures/imagine/office_keyboard_top.jpg",
 		"prop_label": "Keyboard",
+		"island_expansion": 4.0,
+		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.74, 0.74],
 		"obstacles": {
 			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
-			"MugA": {"pos": Vector2(-300, 290), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
-			"MugB": {"pos": Vector2(-60, 500), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_blue.png"},
+			"MugA": {"pos": Vector2(-300, 500), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
+			"MugB": {"pos": Vector2(-60, 520), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_blue.png"},
 			"Sponge": {"pos": Vector2(-180, 300), "r": 34.0, "tex": "res://assets/textures/kitchen/sponge_wet.png"},
-			"Ruler": {"pos": Vector2(-60, 290), "r": 32.0, "tex": "res://assets/textures/kitchen/ruler_plank.png"},
+			"Ruler": {"pos": Vector2(-60, 200), "r": 32.0, "tex": "res://assets/textures/kitchen/ruler_plank.png"},
 			"Fork": {"pos": Vector2(-820, -330), "r": 34.0, "tex": "res://assets/textures/kitchen/fork_cartoon.png"},
-			"Spoon": {"pos": Vector2(830, -80), "r": 36.0, "tex": "res://assets/textures/imagine/hazard_office_cable.png"},
-			"Apple": {"pos": Vector2(-500, 35), "r": 36.0, "tex": "res://assets/textures/kitchen/apple_cartoon.png"},
-			"Lime": {"pos": Vector2(-390, 120), "r": 36.0, "tex": "res://assets/textures/kitchen/lime_cartoon.png"},
+			"Spoon": {"pos": Vector2(830, 120), "r": 36.0, "tex": "res://assets/textures/imagine/hazard_office_cable.png"},
+			"Apple": {"pos": Vector2(-470, 60), "r": 36.0, "tex": "res://assets/textures/kitchen/apple_cartoon.png"},
+			"Lime": {"pos": Vector2(-410, 170), "r": 36.0, "tex": "res://assets/textures/kitchen/lime_cartoon.png"},
 			"Cup": {"pos": Vector2(-560, 540), "r": 36.0, "tex": "res://assets/textures/kitchen/cup_cartoon.png"},
 			"CerealB": {"pos": Vector2(200, -60), "r": 36.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
 		},
 		"apron_props": [
-			{"pos": Vector2(-840, -480), "r": 24.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
-			{"pos": Vector2(-800, -540), "r": 22.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
-			{"pos": Vector2(-750, -480), "r": 24.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
-			{"pos": Vector2(-150, -540), "r": 26.0, "tex": "res://assets/textures/kitchen/sponge_wet.png"},
-			{"pos": Vector2(60, -560), "r": 24.0, "tex": "res://assets/textures/kitchen/lime_cartoon.png"},
+			{"pos": Vector2(-300, -340), "r": 24.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
+			{"pos": Vector2(-500, -420), "r": 22.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
+			{"pos": Vector2(-180, -480), "r": 26.0, "tex": "res://assets/textures/kitchen/sponge_wet.png"},
+			{"pos": Vector2(-420, -560), "r": 24.0, "tex": "res://assets/textures/kitchen/lime_cartoon.png"},
+			{"pos": Vector2(180, -560), "r": 22.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
 		],
 	},
 }
@@ -200,13 +204,13 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 
 	# Checkpoints along the arc, aligned to the tangent. The last lap gate sits
 	# slightly past the corner rejoin so its recovery point stays on a straight.
-	const GATE_FRACTIONS := [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.84]
+	var gate_fractions: Array = spec.get("gate_fractions", [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.84])
 	var arc := _arc_lengths(centerline)
 	var total := arc[arc.size() - 1]
 	var start := centerline[0]
 	var start_tangent := (centerline[1] - centerline[centerline.size() - 1]).normalized()
 	for gate_index in GATE_COUNT:
-		var fraction: float = GATE_FRACTIONS[gate_index]
+		var fraction: float = gate_fractions[gate_index]
 		var sample := _sample_at_arc(centerline, arc, total * fraction)
 		var tangent := _tangent_at_arc(centerline, arc, total * fraction)
 		var rotation := atan2(-tangent.y, -tangent.x)
@@ -313,7 +317,7 @@ func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: PackedVector
 	var last := Vector2(INF, INF)
 	for index in inner_loop.size():
 		var toward_track := (centerline[index] - inner_loop[index]).normalized()
-		var point := inner_loop[index] + toward_track * 10.0
+		var point := inner_loop[index] + toward_track * float(spec.get("island_expansion", 10.0))
 		if point.distance_to(last) > 3.0:
 			expanded.append(point)
 			last = point
@@ -473,6 +477,21 @@ func _add_wall(parent: Node, node_name: String, position: Vector2, size: Vector2
 	visual.polygon = _rect_points(Vector2.ZERO, size)
 	visual.color = Color("0e1524")
 	wall.add_child(visual)
+	var edge_texture := load("res://assets/textures/kitchen/counter_edge.png") as Texture2D
+	if edge_texture:
+		var horizontal := size.x > size.y
+		var edge_length := maxf(size.x, size.y)
+		var tile_count := maxi(1, int(ceil(edge_length / 470.0)))
+		for tile in tile_count:
+			var strip := Sprite2D.new()
+			strip.name = "EdgeStrip"
+			strip.texture = edge_texture
+			strip.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			var offset := (float(tile) - float(tile_count - 1) * 0.5) * (edge_length / float(tile_count))
+			strip.position = Vector2(offset, 0.0) if horizontal else Vector2(0.0, offset)
+			strip.rotation = 0.0 if horizontal else PI * 0.5
+			strip.scale = Vector2(edge_length / (470.0 * float(tile_count)), size.y / 470.0) if horizontal else Vector2(edge_length / (470.0 * float(tile_count)), size.x / 470.0)
+			wall.add_child(strip)
 
 
 func _add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float) -> void:

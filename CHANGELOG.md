@@ -11,6 +11,12 @@
   duels, reverse races, legal checkpoint ranking, and finish order.
 - Kitchen, Workshop, and Office room identities with distinct surfaces, moving
   hazards, track dressing, and event conditions.
+- The Office circuit rebuilt as a desk-triangle route with a keyboard island,
+  reversing the lap direction and distinct gate fractions so it no longer
+  mirrors the Workshop paperclip.
+- Counter-top edge strips along every room wall, and a big plate and cutting
+  board dressed across the Kitchen island so walls and the island read as
+  real furniture instead of invisible barriers.
 - Fixed-height, controller-safe title, paged championship, briefing, vehicle,
   settings, credits, pause, results, and ending screens without menu scrolling.
 - A Quick Race circuit picker plus in-race audio and comfort settings that keep

@@ -42,6 +42,27 @@ func _build_kitchen_presentation() -> void:
 		_add_line(art, PackedVector2Array([Vector2(-940, y), Vector2(940, y)]), Color(0.92, 0.78, 0.55, 0.08), 2.0)
 	_add_line(art, PackedVector2Array([Vector2(-540, -205), Vector2(540, -205)]), Color(AMBER, 0.55), 6.0)
 	_add_line(art, PackedVector2Array([Vector2(-540, 205), Vector2(540, 205)]), Color(AMBER, 0.35), 4.0)
+	var plate_texture := load("res://assets/textures/kitchen/plate_large.png") as Texture2D
+	if plate_texture:
+		var plate := Sprite2D.new()
+		plate.name = "IslandPlate"
+		plate.texture = plate_texture
+		plate.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		plate.position = Vector2(90.0, 10.0)
+		plate.scale = Vector2(1.9, 1.9)
+		plate.z_index = -8
+		add_child(plate)
+	var board_texture := load("res://assets/textures/kitchen/cutting_board.png") as Texture2D
+	if board_texture:
+		var board := Sprite2D.new()
+		board.name = "IslandBoard"
+		board.texture = board_texture
+		board.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		board.position = Vector2(-320.0, 30.0)
+		board.rotation = -0.06
+		board.scale = Vector2(1.15, 1.15)
+		board.z_index = -8
+		add_child(board)
 
 
 func _create_surface_zones() -> void:
