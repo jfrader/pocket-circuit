@@ -36,9 +36,13 @@
   off-track excursions still count the lap.
 - Kitchen, Workshop, and Office are now three different circuits: the kitchen
   keeps its counter loop, while the workshop and office are generated from
-  smooth closed splines (a long-straight L-circuit for the workshop, a wide
-  paperclip with a rounded hairpin for the office) with rounded corners,
-  swept-curve corridors, and race-grid-aligned starting lineups.
+  smooth closed splines (a wide bench oval for the workshop, a tall paperclip
+  for the office) with rounded corners, painted surfaces, and race-grid-aligned
+  starting lineups.
+- The generated tracks are painted layouts on real environments: the workshop
+  is a wooden-plank bench with a giant toolbox island and scattered hardware,
+  and the office is a desk mat with a giant keyboard island, sticky notes, and
+  paper clips — the props are the collision, not invisible track walls.
 - The title and machine bay now use a high-contrast after-hours workbench
   presentation with one dominant race action and the full four-car roster.
 - Title PLAY starts the championship; Quick Race, Options, Credits, and Quit are real buttons under it.
