@@ -29,6 +29,7 @@ const LAYOUTS := {
 		"asphalt": Color("2e2c28"),
 		"apron": Color("5c4638"),
 		"track_texture": "res://assets/textures/imagine/track_asphalt_tile_bright.png",
+		"track_tile_modulate": 1.05,
 		"floor_texture": "res://assets/textures/imagine/workshop_planks_tile_bright.jpg",
 		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top_bright.jpg",
 		"prop_label": "Toolbox",
@@ -42,11 +43,23 @@ const LAYOUTS := {
 		],
 		"island_fill_textures": [
 			"res://assets/textures/imagine/plank_wood.png",
-			"res://assets/textures/imagine/hose_coil.png",
 			"res://assets/textures/imagine/workshop_paint_can.png",
 			"res://assets/textures/imagine/hazard_workshop_socket.png",
 			"res://assets/textures/kitchen/fork_cartoon.png",
 			"res://assets/textures/kitchen/ruler_plank.png",
+		],
+		"island_fill_big": [
+			"res://assets/textures/imagine/hose_coil.png",
+			"res://assets/textures/imagine/workshop_toolbox_top_bright.jpg",
+		],
+		"island_fill_small": [
+			"res://assets/textures/kitchen/apple_cartoon.png",
+			"res://assets/textures/kitchen/lime_cartoon.png",
+			"res://assets/textures/kitchen/sponge_wet.png",
+		],
+		"island_fill_tiny": [
+			"res://assets/textures/imagine/paperclip.png",
+			"res://assets/textures/kitchen/napkin.png",
 		],
 		"island_expansion": 10.0,
 		"obstacles": {
@@ -86,6 +99,7 @@ const LAYOUTS := {
 		"asphalt": Color("272b31"),
 		"apron": Color("3a4a5a"),
 		"track_texture": "res://assets/textures/imagine/track_asphalt_tile_bright.png",
+		"track_tile_modulate": 1.35,
 		"floor_texture": "res://assets/textures/imagine/office_deskmat_tile_bright.jpg",
 		"prop_texture": "res://assets/textures/imagine/office_keyboard_top_bright.jpg",
 		"prop_label": "Keyboard",
@@ -101,6 +115,18 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/plank_wood.png",
 			"res://assets/textures/imagine/office_keycap.png",
 			"res://assets/textures/kitchen/ruler_plank.png",
+		],
+		"island_fill_big": [
+			"res://assets/textures/imagine/hose_coil.png",
+			"res://assets/textures/imagine/office_keyboard_top_bright.jpg",
+		],
+		"island_fill_small": [
+			"res://assets/textures/kitchen/apple_cartoon.png",
+			"res://assets/textures/kitchen/lime_cartoon.png",
+			"res://assets/textures/kitchen/sponge_wet.png",
+		],
+		"island_fill_tiny": [
+			"res://assets/textures/imagine/paperclip.png",
 			"res://assets/textures/kitchen/napkin.png",
 		],
 		"island_expansion": 4.0,
@@ -244,7 +270,7 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	_add_polygon(root, "TrackRibbon", clipped, spec["asphalt"], -10)
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
-		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30))
+		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30), float(spec.get("track_tile_modulate", 1.35)))
 
 	# Painted edge lines on BOTH sides of the ribbon so the course reads clearly
 	var outer_loop := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
@@ -864,7 +890,7 @@ func _add_edge_line(parent: Node, points: PackedVector2Array, color: Color) -> v
 	parent.add_child(line)
 
 
-func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, scale: Vector2) -> void:
+func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, scale: Vector2, modulate_value: float = 1.35) -> void:
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
@@ -881,7 +907,7 @@ func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture
 		sprite.position = centerline[index]
 		sprite.rotation = atan2(tangent.y, tangent.x)
 		sprite.scale = scale
-		sprite.modulate = Color(1.35, 1.35, 1.35)
+		sprite.modulate = Color(modulate_value, modulate_value, modulate_value)
 		tiles.add_child(sprite)
 
 

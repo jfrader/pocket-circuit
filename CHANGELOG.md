@@ -17,6 +17,12 @@
   so every baked circuit is playable, plus a circuit roster catalog and test.
 - Brightened generated floor/island textures (desk mat, wood planks, toolbox,
   keyboard) and per-theme furniture edge strips on all room walls.
+- Wild-racing art pass: removed the circuit markings (white edge lines and
+  dashed centerline) so the course reads as painted-on-real-surface plus props
+  instead of a marked circuit; added a prop size hierarchy on every island
+  (huge hose/toolbox, medium books and planks, small apples and limes, tiny
+  paperclips) and a new hand-drawn paperclip prop; fixed a fuchsia-background
+  cable hazard; per-theme ribbon contrast tuning.
 - Dense collidable island fills: the inner park of every circuit is now packed
   with real objects (books, wooden planks, hose coils, paint cans, utensils)
   that physically block shortcut cuts, layered behind the island prop barrier.
