@@ -18,10 +18,10 @@ const LAYOUTS := {
 		"scene": "res://scenes/tracks/workshop_workbench.tscn",
 		"root_name": "WorkshopWorkbench",
 		"controls": [
-			Vector2(640, 400), Vector2(300, 400), Vector2(-300, 400), Vector2(-640, 380),
-			Vector2(-735, 300), Vector2(-735, 0), Vector2(-735, -300), Vector2(-640, -380),
-			Vector2(-300, -400), Vector2(300, -400), Vector2(640, -380), Vector2(735, -300),
-			Vector2(735, 0), Vector2(735, 400),
+			Vector2(640, 370), Vector2(300, 370), Vector2(-300, 370), Vector2(-735, 330),
+			Vector2(-735, 0), Vector2(-735, -250), Vector2(-600, -420), Vector2(-300, -470),
+			Vector2(0, -480), Vector2(300, -470), Vector2(600, -420), Vector2(735, -250),
+			Vector2(735, 0), Vector2(735, 370),
 		],
 		"floor": Color("31261f"),
 		"highlight": Color("49372b"),
@@ -33,20 +33,20 @@ const LAYOUTS := {
 		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top.jpg",
 		"prop_label": "Toolbox",
 		"obstacles": {
-			"MugA": {"pos": Vector2(450, 430), "r": 40.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
-			"MugB": {"pos": Vector2(480, 480), "r": 40.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
-			"CerealA": {"pos": Vector2(520, 530), "r": 38.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
-			"Fork": {"pos": Vector2(-600, 490), "r": 34.0, "tex": "res://assets/textures/kitchen/fork_cartoon.png"},
-			"Spoon": {"pos": Vector2(850, -480), "r": 36.0, "tex": "res://assets/textures/imagine/hazard_workshop_socket.png"},
-			"Ruler": {"pos": Vector2(830, 510), "r": 32.0, "tex": "res://assets/textures/kitchen/ruler_plank.png"},
-			"Apple": {"pos": Vector2(-420, 150), "r": 36.0, "tex": "res://assets/textures/kitchen/apple_cartoon.png"},
+			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
+			"MugA": {"pos": Vector2(-300, 290), "r": 36.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
+			"MugB": {"pos": Vector2(-60, 500), "r": 36.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
+			"Sponge": {"pos": Vector2(-180, 300), "r": 34.0, "tex": "res://assets/textures/kitchen/sponge_wet.png"},
+			"Ruler": {"pos": Vector2(-60, 290), "r": 32.0, "tex": "res://assets/textures/kitchen/ruler_plank.png"},
+			"Fork": {"pos": Vector2(-820, -330), "r": 34.0, "tex": "res://assets/textures/kitchen/fork_cartoon.png"},
+			"Spoon": {"pos": Vector2(830, -80), "r": 36.0, "tex": "res://assets/textures/imagine/hazard_workshop_socket.png"},
+			"Apple": {"pos": Vector2(-500, 35), "r": 36.0, "tex": "res://assets/textures/kitchen/apple_cartoon.png"},
 			"Lime": {"pos": Vector2(-390, 120), "r": 36.0, "tex": "res://assets/textures/kitchen/lime_cartoon.png"},
-			"Cup": {"pos": Vector2(-560, 540), "r": 36.0, "tex": "res://assets/textures/kitchen/cup_cartoon.png"},
+			"Cup": {"pos": Vector2(-510, 520), "r": 36.0, "tex": "res://assets/textures/kitchen/cup_cartoon.png"},
 			"CerealB": {"pos": Vector2(200, -60), "r": 36.0, "tex": "res://assets/textures/kitchen/cereal_tower_green.png"},
-			"Sponge": {"pos": Vector2(120, 60), "r": 34.0, "tex": "res://assets/textures/kitchen/sponge_wet.png"},
 		},
 		"apron_props": [
-			{"pos": Vector2(-560, -260), "r": 26.0, "tex": "res://assets/textures/kitchen/apple_cartoon.png"},
+															{"pos": Vector2(-560, -260), "r": 26.0, "tex": "res://assets/textures/kitchen/apple_cartoon.png"},
 			{"pos": Vector2(-450, -300), "r": 24.0, "tex": "res://assets/textures/kitchen/lime_cartoon.png"},
 			{"pos": Vector2(-510, -180), "r": 22.0, "tex": "res://assets/textures/kitchen/sponge_wet.png"},
 			{"pos": Vector2(120, -520), "r": 30.0, "tex": "res://assets/textures/imagine/hazard_workshop_socket.png"},
@@ -275,7 +275,7 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		if absf(tangent.x) < 0.45 or absf(tangent.y) < 0.45:
 			continue
 		var outward := (outer_loop2[index] - centerline[index]).normalized()
-		var prop_position := centerline[index] + outward * 140.0
+		var prop_position := centerline[index] + outward * 175.0
 		if absf(prop_position.x) > 830.0 or absf(prop_position.y) > 530.0:
 			continue
 		if not Geometry2D.is_point_in_polygon(prop_position, corridor):
