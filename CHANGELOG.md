@@ -34,11 +34,13 @@
 - The start/finish checker now sits on the left straight behind the starting
   grid, and lap gates span the full drivable corridor, so wide lines and brief
   off-track excursions still count the lap.
-- Kitchen, Workshop, and Office are now three distinct layouts: the kitchen
-  keeps its counter loop, the workshop runs a reversed-flow bench circuit with
-  a paint-can slalom and slick zones, and the office is a wide desk sprint with
-  a keycap chicane and a paper-mail boost lane. Each track has its own art,
-  hazards, and boost strips.
+- Kitchen, Workshop, and Office are now three genuinely different course
+  shapes: the kitchen keeps its counter loop, the workshop runs a
+  counterclockwise switchback serpentine (bottom, left climb, half-top, middle
+  return) with a paint-can slalom and a tool-wall apron, and the office runs a
+  clockwise mirrored serpentine with a keycap chicane, archive-shelf apron, and
+  a mail-shoot boost lane. Each track has its own hazards, surface zones, and
+  boost strips.
 - The title and machine bay now use a high-contrast after-hours workbench
   presentation with one dominant race action and the full four-car roster.
 - Title PLAY starts the championship; Quick Race, Options, Credits, and Quit are real buttons under it.
