@@ -27,6 +27,8 @@ const LAYOUTS := {
 		"island": Color("38332e"),
 		"asphalt": Color("1a1f28"),
 		"apron": Color("241c17"),
+		"track_texture": "res://assets/textures/imagine/track_asphalt_tile.jpg",
+		"floor_texture": "res://assets/textures/imagine/counter_wood_tile.jpg",
 		"obstacles": {
 			"MugA": {"pos": Vector2(450, 430), "r": 40.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
 			"MugB": {"pos": Vector2(480, 480), "r": 40.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
@@ -55,6 +57,7 @@ const LAYOUTS := {
 		"island": Color("29435f"),
 		"asphalt": Color("1a1f28"),
 		"apron": Color("16232e"),
+		"track_texture": "res://assets/textures/imagine/track_asphalt_tile.jpg",
 		"obstacles": {
 			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
 			"MugA": {"pos": Vector2(-300, 290), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
@@ -245,13 +248,27 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	# Rounded edge lines tracing the corridor
 	_add_edge_line(root, corridor, Color("f2ead7", 0.5))
 
+	# Kerbs along the inner edge
+	var inner_loop := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
+	_add_kerbs(root, inner_loop, centerline)
+
+	# Textured track surface tiles along the centerline
+	var track_texture := String(spec.get("track_texture", ""))
+	if not track_texture.is_empty():
+		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30))
+
+	# Themed floor tiling
+	var floor_texture := String(spec.get("floor_texture", ""))
+	if not floor_texture.is_empty():
+		_add_floor_tiles(root, floor_texture, 3, 2, Vector2(0.75, 0.75))
+
 	# Obstacles
 	var obstacles: Dictionary = spec["obstacles"]
 	for obstacle_name: String in obstacles:
 		var data: Dictionary = obstacles[obstacle_name]
 		_add_obstacle(root, obstacle_name, data["pos"], float(data["r"]), String(data["tex"]))
 
-	# Sparse themed centerpiece
+	# Sparse themed centerpiece + props
 	if _theme == &"workshop":
 		_add_polygon(root, "ViseJaw", PackedVector2Array([
 			Vector2(-190, -60), Vector2(-70, -60), Vector2(-70, 40), Vector2(-190, 40),
@@ -259,6 +276,10 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		_add_polygon(root, "ViseHandle", PackedVector2Array([
 			Vector2(-80, -20), Vector2(40, -20), Vector2(40, 0), Vector2(-80, 0),
 		]), Color("f4bf3a"), -8)
+		_add_prop(root, "res://assets/textures/kitchen/fork_cartoon.png", Vector2(90, 120), 0.5, 0.2, -8)
+		_add_prop(root, "res://assets/textures/kitchen/ruler_plank.png", Vector2(300, 80), 0.6, -0.35, -8)
+		_add_prop(root, "res://assets/textures/kitchen/cutting_board.png", Vector2(-260, -120), 0.7, 0.12, -8)
+		_add_prop(root, "res://assets/textures/kitchen/toaster_edge.png", Vector2(-460, -40), 0.65, -0.05, -8)
 	else:
 		for row in 3:
 			for column in 5:
@@ -268,6 +289,15 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 					Vector2(-260 + column * 120 + 84, -170 + row * 60 + 40),
 					Vector2(-260 + column * 120, -170 + row * 60 + 40),
 				]), Color("7594b0") if (row + column) % 3 else Color("e7dfc9"), -13)
+		_add_sticky_notes(root, Vector2(-430, 60), 0.12)
+		_add_sticky_notes(root, Vector2(420, 100), -0.2)
+		_add_polygon(root, "PaperSheet", PackedVector2Array([
+			Vector2(-300, -150), Vector2(-120, -150), Vector2(-120, -60), Vector2(-300, -60),
+		]), Color("f2ead7", 0.85), -12)
+		_add_cable_line(root, [Vector2(350, -100), Vector2(480, -60), Vector2(410, -10), Vector2(520, 40)])
+
+	# Start banner above the finish line
+	_add_start_banner(root, start, start_tangent, corridor)
 
 
 func _polygon_area(points: PackedVector2Array) -> float:
@@ -407,6 +437,134 @@ func _add_edge_line(parent: Node, points: PackedVector2Array, color: Color) -> v
 	line.antialiased = true
 	line.z_index = -7
 	parent.add_child(line)
+
+
+func _add_kerbs(parent: Node, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
+	var kerb := Polygon2D.new()
+	kerb.name = "Kerbs"
+	kerb.z_index = -8
+	var points := PackedVector2Array()
+	var colors := PackedColorArray()
+	var count := centerline.size()
+	for index in range(0, inner_loop.size(), 4):
+		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
+		var into_track := (centerline[index] - inner_loop[index]).normalized()
+		var half_long := 16.0
+		var quad := PackedVector2Array([
+			inner_loop[index] + tangent * half_long,
+			inner_loop[index] - tangent * half_long,
+			inner_loop[index] - tangent * half_long + into_track * 11.0,
+			inner_loop[index] + tangent * half_long + into_track * 11.0,
+		])
+		var block_color := Color("c94f38") if (index / 4) % 2 == 0 else Color("f2ead7")
+		var base := points.size()
+		points.append_array(quad)
+		for corner in 4:
+			colors.append(block_color)
+	parent.add_child(kerb)
+	kerb.polygon = points
+	kerb.vertex_colors = colors
+
+
+func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, scale: Vector2) -> void:
+	var texture := load(texture_path) as Texture2D
+	if texture == null:
+		return
+	var count := centerline.size()
+	var tiles := Node2D.new()
+	tiles.name = "TrackSurfaceTiles"
+	tiles.z_index = -9
+	parent.add_child(tiles)
+	for index in range(0, count, 6):
+		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sprite.position = centerline[index]
+		sprite.rotation = atan2(tangent.y, tangent.x)
+		sprite.scale = scale
+		sprite.modulate = Color(1, 1, 1, 0.92)
+		tiles.add_child(sprite)
+
+
+func _add_floor_tiles(parent: Node, texture_path: String, columns: int, rows: int, scale: Vector2) -> void:
+	var texture := load(texture_path) as Texture2D
+	if texture == null:
+		return
+	var tiles := Node2D.new()
+	tiles.name = "FloorTiles"
+	tiles.z_index = -18
+	parent.add_child(tiles)
+	var tile_width := 940.0 / float(columns)
+	var tile_height := 540.0 / float(rows)
+	for column in columns:
+		for row in rows:
+			var sprite := Sprite2D.new()
+			sprite.texture = texture
+			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			sprite.position = Vector2(-940.0 + tile_width * (column + 0.5), -540.0 + tile_height * (row + 0.5))
+			sprite.scale = Vector2(tile_width / 940.0, tile_height / 540.0) * scale * 0.92
+			sprite.modulate = Color(1, 1, 1, 0.55)
+			tiles.add_child(sprite)
+
+
+func _add_prop(parent: Node, texture_path: String, position: Vector2, scale: float, rotation: float, z: int) -> void:
+	var texture := load(texture_path) as Texture2D
+	if texture == null:
+		return
+	var sprite := Sprite2D.new()
+	sprite.texture = texture
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.position = position
+	sprite.rotation = rotation
+	sprite.scale = Vector2.ONE * scale
+	sprite.z_index = z
+	parent.add_child(sprite)
+
+
+func _add_sticky_notes(parent: Node, center: Vector2, rotation: float) -> void:
+	for offset: Vector2 in [Vector2(-30, -14), Vector2(0, 8), Vector2(26, -6)]:
+		var note := Polygon2D.new()
+		note.polygon = PackedVector2Array([
+			Vector2(-34, -30), Vector2(34, -30), Vector2(34, 30), Vector2(-34, 30),
+		])
+		note.color = Color("f4bf3a") if offset.x < 0.0 else Color("f2ead7")
+		note.position = center + offset
+		note.rotation = rotation + (0.1 if offset.x == 0.0 else 0.0)
+		note.z_index = -12
+		parent.add_child(note)
+
+
+func _add_cable_line(parent: Node, points: Array) -> void:
+	var line := Line2D.new()
+	var packed := PackedVector2Array()
+	for point: Vector2 in points:
+		packed.append(point)
+	line.points = packed
+	line.width = 9.0
+	line.default_color = Color("6f91b8")
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.antialiased = true
+	line.z_index = -12
+	parent.add_child(line)
+
+
+func _add_start_banner(parent: Node, start: Vector2, tangent: Vector2, corridor: PackedVector2Array) -> void:
+	var normal := tangent.rotated(PI * 0.5)
+	var along := Vector2(tangent.y, -tangent.x)
+	if Geometry2D.is_point_in_polygon(start + normal * (HALF_WIDTH + 60.0), corridor):
+		normal = -normal
+	var banner_center := start - normal * (HALF_WIDTH + 46.0)
+	for block in 6:
+		var center := banner_center + along * (float(block) - 2.5) * 22.0
+		_add_polygon(parent, "BannerBlock%d" % block, PackedVector2Array([
+			center - tangent * 22.0 - along * 11.0,
+			center + tangent * 22.0 - along * 11.0,
+			center + tangent * 22.0 + along * 11.0,
+			center - tangent * 22.0 + along * 11.0,
+		]), Color("f2ead7") if block % 2 == 0 else Color("c94f38"), -8)
 
 
 func _mark_owned(root: Node) -> void:
