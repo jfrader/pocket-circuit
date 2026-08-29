@@ -1,1496 +1,1251 @@
 [gd_scene format=3]
 
-[ext_resource type="PackedScene" path="res://scenes/race/checkpoint.tscn" id="1_c8up6"]
-[ext_resource type="Script" path="res://scripts/race/checkpoint.gd" id="2_eieel"]
+[ext_resource type="PackedScene" path="res://scenes/race/checkpoint.tscn" id="1_vkhcm"]
+[ext_resource type="Script" path="res://scripts/race/checkpoint.gd" id="2_6rq36"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/kitchen_mug_hero.png" id="3_yfsrn"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/kitchen_mug_blue.png" id="4_jq18l"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/office_keycap.png" id="5_g837n"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/hazard_office_cable.png" id="6_hv1w3"]
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_0d33d"]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_dguxg"]
 size = Vector2(2000, 50)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_ytslc"]
-size = Vector2(2000, 50)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_vkhcm"]
-size = Vector2(50, 1200)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_6rq36"]
-size = Vector2(50, 1200)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_yfsrn"]
-size = Vector2(810, 735)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_jq18l"]
-size = Vector2(350, 470)
-
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_g837n"]
-size = Vector2(260, 240)
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_hv1w3"]
-radius = 36.0
-
-[sub_resource type="CircleShape2D" id="CircleShape2D_dguxg"]
-radius = 34.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_qyfbg"]
-size = Vector2(74, 66)
+size = Vector2(2000, 50)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_8o576"]
-size = Vector2(70, 64)
+size = Vector2(50, 1200)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_0p8aj"]
-size = Vector2(82, 48)
+size = Vector2(50, 1200)
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_8tvg7"]
-size = Vector2(82, 22)
+[sub_resource type="CircleShape2D" id="CircleShape2D_8tvg7"]
+radius = 43.0
 
-[sub_resource type="RectangleShape2D" id="RectangleShape2D_bpune"]
-size = Vector2(88, 22)
+[sub_resource type="CircleShape2D" id="CircleShape2D_bpune"]
+radius = 40.0
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_i4p8i"]
-size = Vector2(66, 54)
+size = Vector2(64, 54)
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_aw8o1"]
-radius = 33.0
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_aw8o1"]
+size = Vector2(64, 54)
 
-[sub_resource type="CircleShape2D" id="CircleShape2D_usfa5"]
-radius = 32.0
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_usfa5"]
+size = Vector2(72, 54)
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_eq445"]
-size = Vector2(84, 20)
+size = Vector2(120, 18)
 
-[node name="OfficeDesk" type="Node2D" unique_id=553298061 groups=["track"]]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ir8b7"]
+size = Vector2(180, 24)
 
-[node name="Floor" type="Polygon2D" parent="." unique_id=445920258]
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_coo05"]
+size = Vector2(70, 48)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_51cwl"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_3yh0c"]
+radius = 38.0
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_busos"]
+size = Vector2(150, 24)
+
+[node name="OfficeDesk" type="Node2D" unique_id=733293149]
+
+[node name="Floor" type="Polygon2D" parent="." unique_id=1469022342]
 z_index = -20
 color = Color(0.14901961, 0.21960784, 0.30980393, 1)
 polygon = PackedVector2Array(-1000, -600, 1000, -600, 1000, 600, -1000, 600)
 
-[node name="CounterHighlight" type="Polygon2D" parent="." unique_id=2125970099]
+[node name="CounterHighlight" type="Polygon2D" parent="." unique_id=1800335163]
 z_index = -19
 color = Color(0.21176471, 0.32941177, 0.4509804, 1)
 polygon = PackedVector2Array(-940, -540, 940, -540, 940, 540, -940, 540)
 
-[node name="BottomStraight" type="Polygon2D" parent="." unique_id=1733675434]
+[node name="ArchiveApron" type="Polygon2D" parent="." unique_id=232910442]
+z_index = -15
+color = Color(0.12156863, 0.1882353, 0.27058825, 1)
+polygon = PackedVector2Array(-875, -575, 559, -575, 559, -544, -871, 96, -875, 96)
+
+[node name="BottomStraight" type="Polygon2D" parent="." unique_id=1738011076]
 z_index = -10
 color = Color(0.101960786, 0.12156863, 0.15686275, 1)
 polygon = PackedVector2Array(-820, 210, 820, 210, 820, 530, -820, 530)
 
-[node name="RightTechnical" type="Polygon2D" parent="." unique_id=1481304916]
+[node name="RightLane" type="Polygon2D" parent="." unique_id=1567211595]
 z_index = -10
 color = Color(0.101960786, 0.12156863, 0.15686275, 1)
 polygon = PackedVector2Array(610, -430, 860, -430, 860, 430, 610, 430)
 
-[node name="TopSpeedSection" type="Polygon2D" parent="." unique_id=835770662]
+[node name="ChuteDiagonal" type="Polygon2D" parent="." unique_id=1927019748]
 z_index = -10
 color = Color(0.101960786, 0.12156863, 0.15686275, 1)
-polygon = PackedVector2Array(100, -490, 820, -490, 820, -245, 100, -245)
+polygon = PackedVector2Array(661, -316, -769, 324, -871, 96, 559, -544)
 
-[node name="MidReturn" type="Polygon2D" parent="." unique_id=106860027]
-z_index = -10
-color = Color(0.101960786, 0.12156863, 0.15686275, 1)
-polygon = PackedVector2Array(10, -490, 260, -490, 260, 430, 10, 430)
+[node name="InnerIsland" type="Polygon2D" parent="." unique_id=254727847]
+z_index = -9
+color = Color(0.16078432, 0.2627451, 0.37254903, 1)
+polygon = PackedVector2Array(-425, 190, 590, -264, 590, 190)
 
-[node name="TopWall" type="StaticBody2D" parent="." unique_id=232165974]
+[node name="OuterCourseEdge" type="Line2D" parent="." unique_id=985401073]
+z_index = -7
+points = PackedVector2Array(-820, 530, 820, 530, 860, 430, 860, -430, 559, -544, -871, 96, -820, 210)
+closed = true
+width = 6.0
+default_color = Color(0.9490196, 0.91764706, 0.84313726, 0.5)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="InnerCourseEdge" type="Line2D" parent="." unique_id=242228632]
+z_index = -7
+points = PackedVector2Array(-769, 324, -820, 324, -820, 210, -425, 210, -425, 190, 590, -264, 610, -430, 661, -316)
+width = 6.0
+default_color = Color(0.9490196, 0.91764706, 0.84313726, 0.5)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ChuteOuterPaperEdge" type="Line2D" parent="." unique_id=628323002]
+z_index = -7
+points = PackedVector2Array(559, -544, -871, 96)
+width = 9.0
+default_color = Color(0.9490196, 0.91764706, 0.84313726, 0.82)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ChuteInnerPaperEdge" type="Line2D" parent="." unique_id=959603507]
+z_index = -7
+points = PackedVector2Array(661, -316, -769, 324)
+width = 9.0
+default_color = Color(0.9490196, 0.91764706, 0.84313726, 0.82)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="TopWall" type="StaticBody2D" parent="." unique_id=304076092]
 position = Vector2(0, -575)
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="TopWall" unique_id=1961936238]
-shape = SubResource("RectangleShape2D_0d33d")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TopWall" unique_id=1645238321]
+shape = SubResource("RectangleShape2D_dguxg")
 
-[node name="Visual" type="Polygon2D" parent="TopWall" unique_id=306816471]
-color = Color(0.06666667, 0.09803922, 0.13725491, 1)
+[node name="Visual" type="Polygon2D" parent="TopWall" unique_id=95880029]
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
 polygon = PackedVector2Array(-1000, -25, 1000, -25, 1000, 25, -1000, 25)
 
-[node name="Highlight" type="Polygon2D" parent="TopWall" unique_id=1917768939]
-z_index = 1
-color = Color(0.12941177, 0.19607843, 0.28627452, 1)
-polygon = PackedVector2Array(-995, -20, 995, -20, 995, 20, -995, 20)
-
-[node name="BottomWall" type="StaticBody2D" parent="." unique_id=1565458466]
+[node name="BottomWall" type="StaticBody2D" parent="." unique_id=1797977944]
 position = Vector2(0, 575)
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="BottomWall" unique_id=1923719819]
-shape = SubResource("RectangleShape2D_ytslc")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BottomWall" unique_id=2123561880]
+shape = SubResource("RectangleShape2D_qyfbg")
 
-[node name="Visual" type="Polygon2D" parent="BottomWall" unique_id=1454571471]
-color = Color(0.06666667, 0.09803922, 0.13725491, 1)
+[node name="Visual" type="Polygon2D" parent="BottomWall" unique_id=166583556]
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
 polygon = PackedVector2Array(-1000, -25, 1000, -25, 1000, 25, -1000, 25)
 
-[node name="Highlight" type="Polygon2D" parent="BottomWall" unique_id=1748659712]
-z_index = 1
-color = Color(0.12941177, 0.19607843, 0.28627452, 1)
-polygon = PackedVector2Array(-995, -20, 995, -20, 995, 20, -995, 20)
-
-[node name="LeftWall" type="StaticBody2D" parent="." unique_id=309467737]
+[node name="LeftWall" type="StaticBody2D" parent="." unique_id=1089924126]
 position = Vector2(-875, 0)
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="LeftWall" unique_id=563508642]
-shape = SubResource("RectangleShape2D_vkhcm")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LeftWall" unique_id=1237188066]
+shape = SubResource("RectangleShape2D_8o576")
 
-[node name="Visual" type="Polygon2D" parent="LeftWall" unique_id=312424615]
-color = Color(0.06666667, 0.09803922, 0.13725491, 1)
+[node name="Visual" type="Polygon2D" parent="LeftWall" unique_id=892786885]
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
 polygon = PackedVector2Array(-25, -600, 25, -600, 25, 600, -25, 600)
 
-[node name="Highlight" type="Polygon2D" parent="LeftWall" unique_id=1714744198]
-z_index = 1
-color = Color(0.12941177, 0.19607843, 0.28627452, 1)
-polygon = PackedVector2Array(-20, -595, 20, -595, 20, 595, -20, 595)
-
-[node name="RightWall" type="StaticBody2D" parent="." unique_id=1912881931]
+[node name="RightWall" type="StaticBody2D" parent="." unique_id=1687636791]
 position = Vector2(875, 0)
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="RightWall" unique_id=2146493876]
-shape = SubResource("RectangleShape2D_6rq36")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RightWall" unique_id=74381669]
+shape = SubResource("RectangleShape2D_0p8aj")
 
-[node name="Visual" type="Polygon2D" parent="RightWall" unique_id=190188663]
-color = Color(0.06666667, 0.09803922, 0.13725491, 1)
+[node name="Visual" type="Polygon2D" parent="RightWall" unique_id=1046533586]
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
 polygon = PackedVector2Array(-25, -600, 25, -600, 25, 600, -25, 600)
 
-[node name="Highlight" type="Polygon2D" parent="RightWall" unique_id=1615659739]
-z_index = 1
-color = Color(0.12941177, 0.19607843, 0.28627452, 1)
-polygon = PackedVector2Array(-20, -595, 20, -595, 20, 595, -20, 595)
-
-[node name="LeftIsland" type="Polygon2D" parent="." unique_id=1028184229]
-z_index = -9
-color = Color(0.16078432, 0.2627451, 0.37254903, 1)
-polygon = PackedVector2Array(-820, -490, -10, -490, -10, 245, -820, 245)
-
-[node name="LeftIslandBarrier" type="StaticBody2D" parent="." unique_id=1247875614]
-position = Vector2(-415, -122.5)
+[node name="InnerBarrier" type="StaticBody2D" parent="." unique_id=1908629504]
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="LeftIslandBarrier" unique_id=1394144693]
-shape = SubResource("RectangleShape2D_yfsrn")
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="InnerBarrier" unique_id=799734349]
+polygon = PackedVector2Array(40, 30, 360, 30, 360, 180, 40, 180)
 
-[node name="RightIsland" type="Polygon2D" parent="." unique_id=1211273382]
-z_index = -9
-color = Color(0.16078432, 0.2627451, 0.37254903, 1)
-polygon = PackedVector2Array(260, -225, 610, -225, 610, 245, 260, 245)
-
-[node name="RightIslandBarrier" type="StaticBody2D" parent="." unique_id=1315380784]
-position = Vector2(435, 10)
-collision_layer = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="RightIslandBarrier" unique_id=254141107]
-shape = SubResource("RectangleShape2D_jq18l")
-
-[node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=1821386562]
-z_index = -7
-color = Color(0.9607843, 0.93333334, 0.78431374, 1)
-polygon = PackedVector2Array(-5, 233, 275, 233, 275, 267, -5, 267)
-
-[node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=1481138713]
+[node name="InnerBarrierInk" type="Line2D" parent="." unique_id=1380788988]
 z_index = -6
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-5, 236, 35, 236, 35, 264, -5, 264)
-
-[node name="Block65" type="Polygon2D" parent="StartFinishBlack" unique_id=1464407268]
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(65, 236, 105, 236, 105, 264, 65, 264)
-
-[node name="Block135" type="Polygon2D" parent="StartFinishBlack" unique_id=1519618312]
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(135, 236, 175, 236, 175, 264, 135, 264)
-
-[node name="Block205" type="Polygon2D" parent="StartFinishBlack" unique_id=1566831572]
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(205, 236, 245, 236, 245, 264, 205, 264)
-
-[node name="GridForward" type="Node2D" parent="." unique_id=1517687231]
-
-[node name="0" type="Node2D" parent="GridForward" unique_id=1109028799]
-position = Vector2(105, 340)
-rotation = 1.5707964
-
-[node name="Shadow" type="Polygon2D" parent="GridForward/0" unique_id=169323472]
-z_index = -5
-position = Vector2(3, 4)
-color = Color(0.02, 0.03, 0.05, 0.72)
-polygon = PackedVector2Array(-10.5, -29, 10.5, -29, 17.5, -22, 17.5, 22, 10.5, 29, -10.5, 29, -17.5, 22, -17.5, -22)
-
-[node name="Marker" type="Polygon2D" parent="GridForward/0" unique_id=309533693]
-z_index = -4
-color = Color(0.5568628, 0.8392157, 0.7882353, 1)
-polygon = PackedVector2Array(-9.5, -27, 9.5, -27, 15.5, -21, 15.5, 21, 9.5, 27, -9.5, 27, -15.5, 21, -15.5, -21)
-
-[node name="Direction" type="Line2D" parent="GridForward/0" unique_id=1204429865]
-z_index = -3
-points = PackedVector2Array(0, 14, 0, -13, -7, -5, 0, -13, 7, -5)
-width = 3.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+points = PackedVector2Array(-425, 190, 590, -264, 590, 190)
+closed = true
+width = 14.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
 antialiased = true
 
-[node name="1" type="Node2D" parent="GridForward" unique_id=1561314599]
-position = Vector2(165, 340)
-rotation = 1.5707964
+[node name="ApronBarrier" type="StaticBody2D" parent="." unique_id=997431981]
+collision_layer = 2
 
-[node name="Shadow" type="Polygon2D" parent="GridForward/1" unique_id=1619571691]
-z_index = -5
-position = Vector2(3, 4)
-color = Color(0.02, 0.03, 0.05, 0.72)
-polygon = PackedVector2Array(-10.5, -29, 10.5, -29, 17.5, -22, 17.5, 22, 10.5, 29, -10.5, 29, -17.5, 22, -17.5, -22)
+[node name="CollisionPolygon2D" type="CollisionPolygon2D" parent="ApronBarrier" unique_id=1320862128]
+polygon = PackedVector2Array(-875, -575, 559, -575, 559, -544, -871, 96, -875, 96)
 
-[node name="Marker" type="Polygon2D" parent="GridForward/1" unique_id=1791596559]
-z_index = -4
-color = Color(0.5568628, 0.8392157, 0.7882353, 1)
-polygon = PackedVector2Array(-9.5, -27, 9.5, -27, 15.5, -21, 15.5, 21, 9.5, 27, -9.5, 27, -15.5, 21, -15.5, -21)
-
-[node name="Direction" type="Line2D" parent="GridForward/1" unique_id=993813841]
-z_index = -3
-points = PackedVector2Array(0, 14, 0, -13, -7, -5, 0, -13, 7, -5)
-width = 3.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-antialiased = true
-
-[node name="2" type="Node2D" parent="GridForward" unique_id=392205601]
-position = Vector2(105, 440)
-rotation = 1.5707964
-
-[node name="Shadow" type="Polygon2D" parent="GridForward/2" unique_id=1636346889]
-z_index = -5
-position = Vector2(3, 4)
-color = Color(0.02, 0.03, 0.05, 0.72)
-polygon = PackedVector2Array(-10.5, -29, 10.5, -29, 17.5, -22, 17.5, 22, 10.5, 29, -10.5, 29, -17.5, 22, -17.5, -22)
-
-[node name="Marker" type="Polygon2D" parent="GridForward/2" unique_id=1703495334]
-z_index = -4
-color = Color(0.5568628, 0.8392157, 0.7882353, 1)
-polygon = PackedVector2Array(-9.5, -27, 9.5, -27, 15.5, -21, 15.5, 21, 9.5, 27, -9.5, 27, -15.5, 21, -15.5, -21)
-
-[node name="Direction" type="Line2D" parent="GridForward/2" unique_id=695579908]
-z_index = -3
-points = PackedVector2Array(0, 14, 0, -13, -7, -5, 0, -13, 7, -5)
-width = 3.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-antialiased = true
-
-[node name="3" type="Node2D" parent="GridForward" unique_id=2123611421]
-position = Vector2(165, 440)
-rotation = 1.5707964
-
-[node name="Shadow" type="Polygon2D" parent="GridForward/3" unique_id=410773718]
-z_index = -5
-position = Vector2(3, 4)
-color = Color(0.02, 0.03, 0.05, 0.72)
-polygon = PackedVector2Array(-10.5, -29, 10.5, -29, 17.5, -22, 17.5, 22, 10.5, 29, -10.5, 29, -17.5, 22, -17.5, -22)
-
-[node name="Marker" type="Polygon2D" parent="GridForward/3" unique_id=1692101567]
-z_index = -4
-color = Color(0.5568628, 0.8392157, 0.7882353, 1)
-polygon = PackedVector2Array(-9.5, -27, 9.5, -27, 15.5, -21, 15.5, 21, 9.5, 27, -9.5, 27, -15.5, 21, -15.5, -21)
-
-[node name="Direction" type="Line2D" parent="GridForward/3" unique_id=1064580107]
-z_index = -3
-points = PackedVector2Array(0, 14, 0, -13, -7, -5, 0, -13, 7, -5)
-width = 3.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-antialiased = true
-
-[node name="GridReverse" type="Node2D" parent="." unique_id=1105801180]
-
-[node name="0" type="Node2D" parent="GridReverse" unique_id=1187145696]
-position = Vector2(105, 90)
-rotation = -1.5707964
-
-[node name="Shadow" type="Polygon2D" parent="GridReverse/0" unique_id=1677373537]
-z_index = -5
-position = Vector2(3, 4)
-color = Color(0.02, 0.03, 0.05, 0.72)
-polygon = PackedVector2Array(-10.5, -29, 10.5, -29, 17.5, -22, 17.5, 22, 10.5, 29, -10.5, 29, -17.5, 22, -17.5, -22)
-
-[node name="Marker" type="Polygon2D" parent="GridReverse/0" unique_id=1161832284]
-z_index = -4
-color = Color(0.94509804, 0.76862746, 0.36078432, 1)
-polygon = PackedVector2Array(-9.5, -27, 9.5, -27, 15.5, -21, 15.5, 21, 9.5, 27, -9.5, 27, -15.5, 21, -15.5, -21)
-
-[node name="Direction" type="Line2D" parent="GridReverse/0" unique_id=2075516378]
-z_index = -3
-points = PackedVector2Array(0, 14, 0, -13, -7, -5, 0, -13, 7, -5)
-width = 3.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-antialiased = true
-
-[node name="1" type="Node2D" parent="GridReverse" unique_id=450936061]
-position = Vector2(165, 90)
-rotation = -1.5707964
-
-[node name="Shadow" type="Polygon2D" parent="GridReverse/1" unique_id=30206821]
-z_index = -5
-position = Vector2(3, 4)
-color = Color(0.02, 0.03, 0.05, 0.72)
-polygon = PackedVector2Array(-10.5, -29, 10.5, -29, 17.5, -22, 17.5, 22, 10.5, 29, -10.5, 29, -17.5, 22, -17.5, -22)
-
-[node name="Marker" type="Polygon2D" parent="GridReverse/1" unique_id=583170291]
-z_index = -4
-color = Color(0.94509804, 0.76862746, 0.36078432, 1)
-polygon = PackedVector2Array(-9.5, -27, 9.5, -27, 15.5, -21, 15.5, 21, 9.5, 27, -9.5, 27, -15.5, 21, -15.5, -21)
-
-[node name="Direction" type="Line2D" parent="GridReverse/1" unique_id=1394457268]
-z_index = -3
-points = PackedVector2Array(0, 14, 0, -13, -7, -5, 0, -13, 7, -5)
-width = 3.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-antialiased = true
-
-[node name="2" type="Node2D" parent="GridReverse" unique_id=321784202]
-position = Vector2(105, 190)
-rotation = -1.5707964
-
-[node name="Shadow" type="Polygon2D" parent="GridReverse/2" unique_id=720095415]
-z_index = -5
-position = Vector2(3, 4)
-color = Color(0.02, 0.03, 0.05, 0.72)
-polygon = PackedVector2Array(-10.5, -29, 10.5, -29, 17.5, -22, 17.5, 22, 10.5, 29, -10.5, 29, -17.5, 22, -17.5, -22)
-
-[node name="Marker" type="Polygon2D" parent="GridReverse/2" unique_id=1442252849]
-z_index = -4
-color = Color(0.94509804, 0.76862746, 0.36078432, 1)
-polygon = PackedVector2Array(-9.5, -27, 9.5, -27, 15.5, -21, 15.5, 21, 9.5, 27, -9.5, 27, -15.5, 21, -15.5, -21)
-
-[node name="Direction" type="Line2D" parent="GridReverse/2" unique_id=1614673013]
-z_index = -3
-points = PackedVector2Array(0, 14, 0, -13, -7, -5, 0, -13, 7, -5)
-width = 3.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-antialiased = true
-
-[node name="3" type="Node2D" parent="GridReverse" unique_id=2124656789]
-position = Vector2(165, 190)
-rotation = -1.5707964
-
-[node name="Shadow" type="Polygon2D" parent="GridReverse/3" unique_id=1444477249]
-z_index = -5
-position = Vector2(3, 4)
-color = Color(0.02, 0.03, 0.05, 0.72)
-polygon = PackedVector2Array(-10.5, -29, 10.5, -29, 17.5, -22, 17.5, 22, 10.5, 29, -10.5, 29, -17.5, 22, -17.5, -22)
-
-[node name="Marker" type="Polygon2D" parent="GridReverse/3" unique_id=1804821200]
-z_index = -4
-color = Color(0.94509804, 0.76862746, 0.36078432, 1)
-polygon = PackedVector2Array(-9.5, -27, 9.5, -27, 15.5, -21, 15.5, 21, 9.5, 27, -9.5, 27, -15.5, 21, -15.5, -21)
-
-[node name="Direction" type="Line2D" parent="GridReverse/3" unique_id=865606584]
-z_index = -3
-points = PackedVector2Array(0, 14, 0, -13, -7, -5, 0, -13, 7, -5)
-width = 3.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-antialiased = true
-
-[node name="Checkpoint1" type="Area2D" parent="." unique_id=182880676 groups=["track_checkpoints"] instance=ExtResource("1_c8up6")]
+[node name="Checkpoint0Finish" type="Area2D" parent="." unique_id=182880676 groups=["track_checkpoints"] instance=ExtResource("1_vkhcm")]
 visible = false
-position = Vector2(-400, 370)
+position = Vector2(735, 250)
+rotation = 1.5708
 collision_layer = 0
-script = ExtResource("2_eieel")
-checkpoint_index = 1
-recovery_rotation = 1.5708
+script = ExtResource("2_6rq36")
+is_finish_line = true
 recovery_offset = 70.0
 
-[node name="OpeningMergeTrigger" type="CollisionShape2D" parent="Checkpoint1" unique_id=83234337]
-position = Vector2(130, 0)
-shape = SubResource("RectangleShape2D_g837n")
-
-[node name="Checkpoint2" type="Area2D" parent="." unique_id=176228817 groups=["track_checkpoints"] instance=ExtResource("1_c8up6")]
-visible = false
-position = Vector2(440, 370)
-collision_layer = 0
-script = ExtResource("2_eieel")
-checkpoint_index = 2
-recovery_rotation = 1.5708
-recovery_offset = 70.0
-
-[node name="Checkpoint3" type="Area2D" parent="." unique_id=85371542 groups=["track_checkpoints"] instance=ExtResource("1_c8up6")]
+[node name="Checkpoint1" type="Area2D" parent="." unique_id=1026014877 groups=["track_checkpoints"] instance=ExtResource("1_vkhcm")]
 visible = false
 position = Vector2(735, -100)
 rotation = 1.5708
 collision_layer = 0
-script = ExtResource("2_eieel")
+script = ExtResource("2_6rq36")
+checkpoint_index = 1
+recovery_offset = 70.0
+
+[node name="Checkpoint2" type="Area2D" parent="." unique_id=729239284 groups=["track_checkpoints"] instance=ExtResource("1_vkhcm")]
+visible = false
+position = Vector2(400, -336)
+rotation = 1.15
+collision_layer = 0
+script = ExtResource("2_6rq36")
+checkpoint_index = 2
+recovery_rotation = -1.99
+recovery_offset = 70.0
+
+[node name="Checkpoint3" type="Area2D" parent="." unique_id=1168283090 groups=["track_checkpoints"] instance=ExtResource("1_vkhcm")]
+visible = false
+position = Vector2(-100, -170)
+rotation = 1.15
+collision_layer = 0
+script = ExtResource("2_6rq36")
 checkpoint_index = 3
-recovery_rotation = -1.5708
+recovery_rotation = -1.99
 recovery_offset = 70.0
 
-[node name="Checkpoint4" type="Area2D" parent="." unique_id=1464654886 groups=["track_checkpoints"] instance=ExtResource("1_c8up6")]
+[node name="Checkpoint4" type="Area2D" parent="." unique_id=1001153476 groups=["track_checkpoints"] instance=ExtResource("1_vkhcm")]
 visible = false
-position = Vector2(540, -367)
+position = Vector2(-480, -10)
+rotation = 1.15
 collision_layer = 0
-script = ExtResource("2_eieel")
+script = ExtResource("2_6rq36")
 checkpoint_index = 4
-recovery_rotation = -1.5708
+recovery_rotation = -1.99
 recovery_offset = 70.0
 
-[node name="Checkpoint5" type="Area2D" parent="." unique_id=1671907144 groups=["track_checkpoints"] instance=ExtResource("1_c8up6")]
+[node name="Checkpoint5" type="Area2D" parent="." unique_id=389718788 groups=["track_checkpoints"] instance=ExtResource("1_vkhcm")]
 visible = false
-position = Vector2(250, -367)
+position = Vector2(-400, 370)
 collision_layer = 0
-script = ExtResource("2_eieel")
+script = ExtResource("2_6rq36")
 checkpoint_index = 5
-recovery_rotation = -1.5708
+recovery_rotation = 1.5708
 recovery_offset = 70.0
 
-[node name="Checkpoint6" type="Area2D" parent="." unique_id=2114517447 groups=["track_checkpoints"] instance=ExtResource("1_c8up6")]
+[node name="Checkpoint6" type="Area2D" parent="." unique_id=518812267 groups=["track_checkpoints"] instance=ExtResource("1_vkhcm")]
 visible = false
-position = Vector2(135, -150)
-rotation = 1.5708
+position = Vector2(-100, 370)
 collision_layer = 0
-script = ExtResource("2_eieel")
+script = ExtResource("2_6rq36")
 checkpoint_index = 6
-recovery_rotation = 3.1415927
+recovery_rotation = 1.5708
 recovery_offset = 70.0
 
-[node name="Checkpoint7" type="Area2D" parent="." unique_id=1445767606 groups=["track_checkpoints"] instance=ExtResource("1_c8up6")]
+[node name="Checkpoint7" type="Area2D" parent="." unique_id=1817675745 groups=["track_checkpoints"] instance=ExtResource("1_vkhcm")]
 visible = false
-position = Vector2(135, 60)
-rotation = 1.5708
+position = Vector2(440, 370)
 collision_layer = 0
-script = ExtResource("2_eieel")
+script = ExtResource("2_6rq36")
 checkpoint_index = 7
-recovery_rotation = 3.1415927
+recovery_rotation = 1.5708
 recovery_offset = 70.0
 
-[node name="Checkpoint0Finish" type="Area2D" parent="." unique_id=596719877 groups=["track_checkpoints"] instance=ExtResource("1_c8up6")]
-visible = false
-position = Vector2(135, 250)
-rotation = 1.5708
-collision_layer = 0
-script = ExtResource("2_eieel")
-is_finish_line = true
-recovery_rotation = 3.1415927
-recovery_offset = 70.0
-
-[node name="ArtSurfaces" type="Node2D" parent="." unique_id=1028638720]
-
-[node name="OuterCourseEdge" type="Line2D" parent="ArtSurfaces" unique_id=861099919]
+[node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=375189651]
 z_index = -7
-points = PackedVector2Array(-820, 530, 820, 530, 820, 430, 860, 430, 860, -430, 820, -430, 820, -490, 10, -490, 10, 210, -820, 210)
-width = 6.0
-default_color = Color(0.949, 0.918, 0.843, 0.52)
-antialiased = true
+color = Color(0.9607843, 0.93333334, 0.78431374, 1)
+polygon = PackedVector2Array(595, 233, 875, 233, 875, 267, 595, 267)
 
-[node name="ArchiveCourseEdge" type="Line2D" parent="ArtSurfaces" unique_id=1693230363]
-z_index = -7
-points = PackedVector2Array(-820, -490, -10, -490, -10, 245, -820, 245)
-closed = true
-width = 6.0
-default_color = Color(0.949, 0.918, 0.843, 0.5)
-antialiased = true
-
-[node name="DeskMatCourseEdge" type="Line2D" parent="ArtSurfaces" unique_id=1412495859]
-z_index = -7
-points = PackedVector2Array(260, -225, 610, -225, 610, 245, 260, 245)
-closed = true
-width = 6.0
-default_color = Color(0.949, 0.918, 0.843, 0.5)
-antialiased = true
-
-[node name="ArchiveShelvesDressing" type="Node2D" parent="ArtSurfaces" unique_id=265039072]
-
-[node name="Shelf95" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=998031972]
-z_index = -8
-points = PackedVector2Array(-785, -405, -45, -405)
-width = 13.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="ShelfGlint95" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=1741407797]
-z_index = -7
-points = PackedVector2Array(-775, -410, -55, -410)
-width = 3.0
-default_color = Color(0.463, 0.58, 0.69, 0.8)
-antialiased = true
-
-[node name="Shelf240" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=376188337]
-z_index = -8
-points = PackedVector2Array(-785, -260, -45, -260)
-width = 13.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="ShelfGlint240" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=667072286]
-z_index = -7
-points = PackedVector2Array(-775, -265, -55, -265)
-width = 3.0
-default_color = Color(0.463, 0.58, 0.69, 0.8)
-antialiased = true
-
-[node name="Shelf385" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=1938875456]
-z_index = -8
-points = PackedVector2Array(-785, -115, -45, -115)
-width = 13.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="ShelfGlint385" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=101910101]
-z_index = -7
-points = PackedVector2Array(-775, -120, -55, -120)
-width = 3.0
-default_color = Color(0.463, 0.58, 0.69, 0.8)
-antialiased = true
-
-[node name="Shelf530" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=1488086917]
-z_index = -8
-points = PackedVector2Array(-785, 30, -45, 30)
-width = 13.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="ShelfGlint530" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=880211339]
-z_index = -7
-points = PackedVector2Array(-775, 25, -55, 25)
-width = 3.0
-default_color = Color(0.463, 0.58, 0.69, 0.8)
-antialiased = true
-
-[node name="Shelf675" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=984229345]
-z_index = -8
-points = PackedVector2Array(-785, 175, -45, 175)
-width = 13.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="ShelfGlint675" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=790323393]
-z_index = -7
-points = PackedVector2Array(-775, 170, -55, 170)
-width = 3.0
-default_color = Color(0.463, 0.58, 0.69, 0.8)
-antialiased = true
-
-[node name="PaperSheet0" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=1148556934]
-z_index = -7
-position = Vector2(-700, -455)
-rotation = -0.05
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(-60, -29, 60, -29, 60, 29, -60, 29)
-
-[node name="PaperRule0" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/PaperSheet0" unique_id=1203980813]
-z_index = 1
-position = Vector2(0, 8)
-points = PackedVector2Array(-40.8, 0, 40.8, 0)
-width = 3.0
-default_color = Color(0.25, 0.35, 0.48, 0.5)
-antialiased = true
-
-[node name="PaperSheet1" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=1995148329]
-z_index = -7
-position = Vector2(-510, -315)
-rotation = 0.04
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(-75, -31, 75, -31, 75, 31, -75, 31)
-
-[node name="PaperRule1" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/PaperSheet1" unique_id=272357678]
-z_index = 1
-position = Vector2(0, 8)
-points = PackedVector2Array(-51, 0, 51, 0)
-width = 3.0
-default_color = Color(0.25, 0.35, 0.48, 0.5)
-antialiased = true
-
-[node name="PaperSheet2" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=940574966]
-z_index = -7
-position = Vector2(-280, -168)
-rotation = -0.07
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(-65, -30, 65, -30, 65, 30, -65, 30)
-
-[node name="PaperRule2" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/PaperSheet2" unique_id=83562231]
-z_index = 1
-position = Vector2(0, 8)
-points = PackedVector2Array(-44.2, 0, 44.2, 0)
-width = 3.0
-default_color = Color(0.25, 0.35, 0.48, 0.5)
-antialiased = true
-
-[node name="PaperSheet3" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=1196239956]
-z_index = -7
-position = Vector2(-655, -20)
-rotation = 0.06
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(-72.5, -29, 72.5, -29, 72.5, 29, -72.5, 29)
-
-[node name="PaperRule3" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/PaperSheet3" unique_id=638479553]
-z_index = 1
-position = Vector2(0, 8)
-points = PackedVector2Array(-49.3, 0, 49.3, 0)
-width = 3.0
-default_color = Color(0.25, 0.35, 0.48, 0.5)
-antialiased = true
-
-[node name="PaperSheet4" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=2044998040]
-z_index = -7
-position = Vector2(-350, 115)
-rotation = -0.03
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(-77.5, -31, 77.5, -31, 77.5, 31, -77.5, 31)
-
-[node name="PaperRule4" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/PaperSheet4" unique_id=1560002969]
-z_index = 1
-position = Vector2(0, 8)
-points = PackedVector2Array(-52.7, 0, 52.7, 0)
-width = 3.0
-default_color = Color(0.25, 0.35, 0.48, 0.5)
-antialiased = true
-
-[node name="StickyNote0" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=1005812275]
+[node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=1621660124]
 z_index = -6
-position = Vector2(-790, -330)
-rotation = -0.12
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-36, -31, 36, -31, 36, 31, -36, 31)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(595, 236, 635, 236, 635, 264, 595, 264)
 
-[node name="NoteFold0" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/StickyNote0" unique_id=1553012710]
-z_index = 1
-points = PackedVector2Array(12, 22, 28, 22, 28, 6)
-width = 2.0
-default_color = Color(0.2, 0.16, 0.08, 0.36)
-antialiased = true
+[node name="Block1" type="Polygon2D" parent="StartFinishBlack" unique_id=466636979]
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(675, 236, 715, 236, 715, 264, 675, 264)
 
-[node name="StickyNote1" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=1686286950]
-z_index = -6
-position = Vector2(-600, -185)
-rotation = 0.09
-color = Color(1, 0.972549, 0.9098039, 1)
-polygon = PackedVector2Array(-36, -31, 36, -31, 36, 31, -36, 31)
+[node name="Block2" type="Polygon2D" parent="StartFinishBlack" unique_id=1648400720]
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(755, 236, 795, 236, 795, 264, 755, 264)
 
-[node name="NoteFold1" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/StickyNote1" unique_id=958794757]
-z_index = 1
-points = PackedVector2Array(12, 22, 28, 22, 28, 6)
-width = 2.0
-default_color = Color(0.2, 0.16, 0.08, 0.36)
-antialiased = true
+[node name="Block3" type="Polygon2D" parent="StartFinishBlack" unique_id=128618313]
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(835, 236, 875, 236, 875, 264, 835, 264)
 
-[node name="StickyNote2" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=2065587893]
-z_index = -6
-position = Vector2(-425, -40)
-rotation = -0.08
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-36, -31, 36, -31, 36, 31, -36, 31)
+[node name="GridForward" type="Node2D" parent="." unique_id=873016561]
 
-[node name="NoteFold2" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/StickyNote2" unique_id=1777914583]
-z_index = 1
-points = PackedVector2Array(12, 22, 28, 22, 28, 6)
-width = 2.0
-default_color = Color(0.2, 0.16, 0.08, 0.36)
-antialiased = true
+[node name="0" type="Marker2D" parent="GridForward" unique_id=1201327645]
+position = Vector2(630, 90)
+rotation = -1.5708
 
-[node name="StickyNote3" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=249196555]
-z_index = -6
-position = Vector2(-190, 100)
-rotation = 0.12
-color = Color(1, 0.972549, 0.9098039, 1)
-polygon = PackedVector2Array(-36, -31, 36, -31, 36, 31, -36, 31)
-
-[node name="NoteFold3" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/StickyNote3" unique_id=1508168418]
-z_index = 1
-points = PackedVector2Array(12, 22, 28, 22, 28, 6)
-width = 2.0
-default_color = Color(0.2, 0.16, 0.08, 0.36)
-antialiased = true
-
-[node name="StickyNote4" type="Polygon2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=110141133]
-z_index = -6
-position = Vector2(-760, 130)
-rotation = 0.06
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-36, -31, 36, -31, 36, 31, -36, 31)
-
-[node name="NoteFold4" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing/StickyNote4" unique_id=1819432541]
-z_index = 1
-points = PackedVector2Array(12, 22, 28, 22, 28, 6)
-width = 2.0
-default_color = Color(0.2, 0.16, 0.08, 0.36)
-antialiased = true
-
-[node name="ArchiveCable" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=213041626]
-z_index = -6
-points = PackedVector2Array(-800, -440, -720, -350, -760, -210, -560, -95, -610, 55, -390, 185, -80, 170)
-width = 14.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="ArchiveCableGlint" type="Line2D" parent="ArtSurfaces/ArchiveShelvesDressing" unique_id=2029951202]
+[node name="Arrow" type="Polygon2D" parent="GridForward/0" unique_id=1737434484]
 z_index = -5
-points = PackedVector2Array(-800, -444, -720, -354, -760, -214, -560, -99, -610, 51, -390, 181, -80, 166)
-width = 3.0
-default_color = Color(0.46, 0.58, 0.69, 0.7)
-antialiased = true
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.38)
+polygon = PackedVector2Array(18, 0, -12, -12, -7, 0, -12, 12)
 
-[node name="DeskMatKeycaps" type="Node2D" parent="ArtSurfaces" unique_id=46621848]
-z_index = -13
+[node name="1" type="Marker2D" parent="GridForward" unique_id=503082635]
+position = Vector2(690, 90)
+rotation = -1.5708
 
-[node name="KeyShadow0" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=504822967]
-z_index = 4
-position = Vector2(319, -165)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
+[node name="Arrow" type="Polygon2D" parent="GridForward/1" unique_id=1056423555]
+z_index = -5
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.38)
+polygon = PackedVector2Array(18, 0, -12, -12, -7, 0, -12, 12)
 
-[node name="Key0" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=292903983]
-z_index = 5
-position = Vector2(315, -170)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
+[node name="2" type="Marker2D" parent="GridForward" unique_id=1112061120]
+position = Vector2(630, 190)
+rotation = -1.5708
 
-[node name="KeyFace0" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key0" unique_id=1983300984]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
+[node name="Arrow" type="Polygon2D" parent="GridForward/2" unique_id=851632484]
+z_index = -5
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.38)
+polygon = PackedVector2Array(18, 0, -12, -12, -7, 0, -12, 12)
 
-[node name="KeyShadow1" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=2026679396]
-z_index = 4
-position = Vector2(419, -165)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
+[node name="3" type="Marker2D" parent="GridForward" unique_id=208533815]
+position = Vector2(690, 190)
+rotation = -1.5708
 
-[node name="Key1" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1064937958]
-z_index = 5
-position = Vector2(415, -170)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
+[node name="Arrow" type="Polygon2D" parent="GridForward/3" unique_id=1829581045]
+z_index = -5
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.38)
+polygon = PackedVector2Array(18, 0, -12, -12, -7, 0, -12, 12)
 
-[node name="KeyFace1" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key1" unique_id=1984146821]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
+[node name="GridReverse" type="Node2D" parent="." unique_id=721138587]
 
-[node name="KeyShadow2" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=32046630]
-z_index = 4
-position = Vector2(519, -165)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
+[node name="0" type="Marker2D" parent="GridReverse" unique_id=2033798086]
+position = Vector2(630, 330)
+rotation = 1.5708
 
-[node name="Key2" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1468348479]
-z_index = 5
-position = Vector2(515, -170)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
+[node name="Arrow" type="Polygon2D" parent="GridReverse/0" unique_id=1037226151]
+z_index = -5
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.38)
+polygon = PackedVector2Array(18, 0, -12, -12, -7, 0, -12, 12)
 
-[node name="KeyFace2" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key2" unique_id=1361553501]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow3" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=2012221873]
-z_index = 4
-position = Vector2(579, -165)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key3" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1329854713]
-z_index = 5
-position = Vector2(575, -170)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace3" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key3" unique_id=1692883390]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow4" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1028992807]
-z_index = 4
-position = Vector2(319, -65)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key4" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=2068373686]
-z_index = 5
-position = Vector2(315, -70)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace4" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key4" unique_id=69728462]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow5" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=254088023]
-z_index = 4
-position = Vector2(419, -65)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key5" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1861800333]
-z_index = 5
-position = Vector2(415, -70)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace5" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key5" unique_id=85691323]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow6" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=736027322]
-z_index = 4
-position = Vector2(519, -65)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key6" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1491601981]
-z_index = 5
-position = Vector2(515, -70)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace6" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key6" unique_id=1645414135]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow7" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=68966512]
-z_index = 4
-position = Vector2(579, -65)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key7" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=205542705]
-z_index = 5
-position = Vector2(575, -70)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace7" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key7" unique_id=318605743]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow8" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=825929034]
-z_index = 4
-position = Vector2(319, 35)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key8" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1183870226]
-z_index = 5
-position = Vector2(315, 30)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace8" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key8" unique_id=1396520779]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow9" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1108970046]
-z_index = 4
-position = Vector2(419, 35)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key9" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1984277146]
-z_index = 5
-position = Vector2(415, 30)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace9" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key9" unique_id=622256177]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow10" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1448135505]
-z_index = 4
-position = Vector2(519, 35)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key10" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1164144504]
-z_index = 5
-position = Vector2(515, 30)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace10" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key10" unique_id=1791551632]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow11" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=187348953]
-z_index = 4
-position = Vector2(319, 135)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key11" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1640167343]
-z_index = 5
-position = Vector2(315, 130)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace11" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key11" unique_id=1631104873]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow12" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1125396916]
-z_index = 4
-position = Vector2(419, 135)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key12" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=896044517]
-z_index = 5
-position = Vector2(415, 130)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace12" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key12" unique_id=978736902]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow13" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1030691281]
-z_index = 4
-position = Vector2(519, 135)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key13" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=2033338918]
-z_index = 5
-position = Vector2(515, 130)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace13" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key13" unique_id=828133316]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow14" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1714983458]
-z_index = 4
-position = Vector2(579, 135)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key14" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1787191568]
-z_index = 5
-position = Vector2(575, 130)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace14" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key14" unique_id=875071356]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow15" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=57978968]
-z_index = 4
-position = Vector2(319, 210)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key15" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=664580666]
-z_index = 5
-position = Vector2(315, 205)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace15" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key15" unique_id=1059409242]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow16" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1363648132]
-z_index = 4
-position = Vector2(419, 210)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key16" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=392138063]
-z_index = 5
-position = Vector2(415, 205)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace16" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key16" unique_id=739147263]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow17" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=2035897960]
-z_index = 4
-position = Vector2(519, 210)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key17" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1602207147]
-z_index = 5
-position = Vector2(515, 205)
-color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace17" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key17" unique_id=1381825343]
-z_index = 1
-color = Color(0.9171765, 0.8895686, 0.8136471, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="KeyShadow18" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=337946747]
-z_index = 4
-position = Vector2(579, 210)
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-26, -29, 26, -29, 36, -19, 36, 19, 26, 29, -26, 29, -36, 19, -36, -19)
-
-[node name="Key18" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps" unique_id=1311243485]
-z_index = 5
-position = Vector2(575, 205)
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-25, -27, 25, -27, 34, -18, 34, 18, 25, 27, -25, 27, -34, 18, -34, -18)
-
-[node name="KeyFace18" type="Polygon2D" parent="ArtSurfaces/DeskMatKeycaps/Key18" unique_id=1261628251]
-z_index = 1
-color = Color(0.5237647, 0.6307451, 0.7273726, 1)
-polygon = PackedVector2Array(-15, -14, 15, -14, 21, -8, 21, 8, 15, 14, -15, 14, -21, 8, -21, -8)
-
-[node name="ScuffsBottomRight" type="Node2D" parent="ArtSurfaces" unique_id=1214834517]
+[node name="1" type="Marker2D" parent="GridReverse" unique_id=1862962959]
 position = Vector2(690, 330)
-rotation = -0.85
+rotation = 1.5708
 
-[node name="Mark0" type="Line2D" parent="ArtSurfaces/ScuffsBottomRight" unique_id=794835809]
-z_index = -6
-points = PackedVector2Array(-55, -14, 0, -19, 55, -10)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
+[node name="Arrow" type="Polygon2D" parent="GridReverse/1" unique_id=2042310268]
+z_index = -5
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.38)
+polygon = PackedVector2Array(18, 0, -12, -12, -7, 0, -12, 12)
 
-[node name="Mark14" type="Line2D" parent="ArtSurfaces/ScuffsBottomRight" unique_id=1704271268]
-z_index = -6
-points = PackedVector2Array(-55, 0, 0, -5, 55, 4)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
+[node name="2" type="Marker2D" parent="GridReverse" unique_id=1515530896]
+position = Vector2(630, 430)
+rotation = 1.5708
 
-[node name="Mark28" type="Line2D" parent="ArtSurfaces/ScuffsBottomRight" unique_id=1144308281]
-z_index = -6
-points = PackedVector2Array(-55, 14, 0, 9, 55, 18)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
+[node name="Arrow" type="Polygon2D" parent="GridReverse/2" unique_id=347848234]
+z_index = -5
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.38)
+polygon = PackedVector2Array(18, 0, -12, -12, -7, 0, -12, 12)
 
-[node name="ScuffsTopRight" type="Node2D" parent="ArtSurfaces" unique_id=1443612282]
-position = Vector2(690, -355)
-rotation = 0.85
+[node name="3" type="Marker2D" parent="GridReverse" unique_id=738059225]
+position = Vector2(690, 430)
+rotation = 1.5708
 
-[node name="Mark0" type="Line2D" parent="ArtSurfaces/ScuffsTopRight" unique_id=1020728448]
-z_index = -6
-points = PackedVector2Array(-55, -14, 0, -19, 55, -10)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
+[node name="Arrow" type="Polygon2D" parent="GridReverse/3" unique_id=1914662937]
+z_index = -5
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.38)
+polygon = PackedVector2Array(18, 0, -12, -12, -7, 0, -12, 12)
 
-[node name="Mark14" type="Line2D" parent="ArtSurfaces/ScuffsTopRight" unique_id=1789956037]
-z_index = -6
-points = PackedVector2Array(-55, 0, 0, -5, 55, 4)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
-
-[node name="Mark28" type="Line2D" parent="ArtSurfaces/ScuffsTopRight" unique_id=1013192013]
-z_index = -6
-points = PackedVector2Array(-55, 14, 0, 9, 55, 18)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
-
-[node name="ScuffsMidTurn" type="Node2D" parent="ArtSurfaces" unique_id=222813620]
-position = Vector2(135, -330)
-rotation = 1.52
-
-[node name="Mark0" type="Line2D" parent="ArtSurfaces/ScuffsMidTurn" unique_id=2013193621]
-z_index = -6
-points = PackedVector2Array(-55, -14, 0, -19, 55, -10)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
-
-[node name="Mark14" type="Line2D" parent="ArtSurfaces/ScuffsMidTurn" unique_id=267501948]
-z_index = -6
-points = PackedVector2Array(-55, 0, 0, -5, 55, 4)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
-
-[node name="Mark28" type="Line2D" parent="ArtSurfaces/ScuffsMidTurn" unique_id=553265556]
-z_index = -6
-points = PackedVector2Array(-55, 14, 0, 9, 55, 18)
-width = 5.0
-default_color = Color(0.04, 0.055, 0.08, 0.34)
-antialiased = true
-
-[node name="MugA" type="StaticBody2D" parent="." unique_id=423727152]
-position = Vector2(-500, 240)
-rotation = -0.05
+[node name="MugA" type="StaticBody2D" parent="." unique_id=435427767]
+position = Vector2(-700, -450)
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="MugA" unique_id=292157102]
-shape = SubResource("CircleShape2D_hv1w3")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MugA" unique_id=400399739]
+shape = SubResource("CircleShape2D_8tvg7")
 
-[node name="Ink" type="Polygon2D" parent="MugA" unique_id=142623046]
+[node name="Visual" type="Polygon2D" parent="MugA" unique_id=1610964638]
 z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(41, 0, 37.87906, 15.690021, 28.991377, 28.991377, 15.690021, 37.87906, 2.510526e-15, 41, -15.690021, 37.87906, -28.991377, 28.991377, -37.87906, 15.690021, -41, 5.021052e-15, -37.87906, -15.690021, -28.991377, -28.991377, -15.690021, -37.87906, -7.531577e-15, -41, 15.690021, -37.87906, 28.991377, -28.991377, 37.87906, -15.690021)
-
-[node name="Visual" type="Polygon2D" parent="MugA" unique_id=2011552546]
-z_index = 2
 color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(36, 0, 33.259663, 13.776604, 25.455843, 25.455843, 13.776604, 33.259663, 2.2043643e-15, 36, -13.776604, 33.259663, -25.455843, 25.455843, -33.259663, 13.776604, -36, 4.4087286e-15, -33.259663, -13.776604, -25.455843, -25.455843, -13.776604, -33.259663, -6.6130924e-15, -36, 13.776604, -33.259663, 25.455843, -25.455843, 33.259663, -13.776604)
+polygon = PackedVector2Array(43, 0, 30.405592, 30.405592, -1.8795897e-06, 43, -30.405592, 30.405592, -43, -3.7591794e-06, -30.405594, -30.405588, 5.127699e-07, -43, 30.405586, -30.405596)
 
-[node name="Opening" type="Polygon2D" parent="MugA" unique_id=589740556]
-z_index = 3
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(22.32, 0, 20.109625, 9.684284, 13.916292, 17.45048, 4.966667, 21.760391, -4.966667, 21.760391, -13.916292, 17.45048, -20.109625, 9.684284, -22.32, 2.7334117e-15, -20.109625, -9.684284, -13.916292, -17.45048, -4.966667, -21.760391, 4.966667, -21.760391, 13.916292, -17.45048, 20.109625, -9.684284)
-
-[node name="Pen0" type="Polygon2D" parent="MugA" unique_id=1207056493]
-z_index = 4
-position = Vector2(-13, -20.75)
-rotation = -0.104
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-4, -29, 4, -29, 4, 29, -4, 29)
-
-[node name="Pen13" type="Polygon2D" parent="MugA" unique_id=193971519]
-z_index = 4
-position = Vector2(0, -24)
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-4, -29, 4, -29, 4, 29, -4, 29)
-
-[node name="Pen26" type="Polygon2D" parent="MugA" unique_id=42731487]
-z_index = 4
-position = Vector2(13, -20.75)
-rotation = 0.104
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-4, -29, 4, -29, 4, 29, -4, 29)
-
-[node name="MugB" type="StaticBody2D" parent="." unique_id=449781536]
-position = Vector2(150, 500)
-rotation = 0.08
-collision_layer = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="MugB" unique_id=2134952252]
-shape = SubResource("CircleShape2D_dguxg")
-
-[node name="Ink" type="Polygon2D" parent="MugB" unique_id=413276066]
-z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(39, 0, 36.0313, 14.924654, 27.577164, 27.577164, 14.924654, 36.0313, 2.3880614e-15, 39, -14.924654, 36.0313, -27.577164, 27.577164, -36.0313, 14.924654, -39, 4.7761228e-15, -36.0313, -14.924654, -27.577164, -27.577164, -14.924654, -36.0313, -7.1641835e-15, -39, 14.924654, -36.0313, 27.577164, -27.577164, 36.0313, -14.924654)
-
-[node name="Visual" type="Polygon2D" parent="MugB" unique_id=1115721877]
+[node name="Ink" type="Line2D" parent="MugA" unique_id=1068868514]
 z_index = 2
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(34, 0, 31.411903, 13.011236, 24.04163, 24.04163, 13.011236, 31.411903, 2.0818996e-15, 34, -13.011236, 31.411903, -24.04163, 24.04163, -31.411903, 13.011236, -34, 4.1637992e-15, -31.411903, -13.011236, -24.04163, -24.04163, -13.011236, -31.411903, -6.2456987e-15, -34, 13.011236, -31.411903, 24.04163, -24.04163, 31.411903, -13.011236)
-
-[node name="Opening" type="Polygon2D" parent="MugB" unique_id=1980936908]
-z_index = 3
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(21.08, 0, 18.992424, 9.146269, 13.143165, 16.481009, 4.690741, 20.55148, -4.690741, 20.55148, -13.143165, 16.481009, -18.992424, 9.146269, -21.08, 2.5815555e-15, -18.992424, -9.146269, -13.143165, -16.481009, -4.690741, -20.55148, 4.690741, -20.55148, 13.143165, -16.481009, 18.992424, -9.146269)
-
-[node name="Pen0" type="Polygon2D" parent="MugB" unique_id=1577467418]
-z_index = 4
-position = Vector2(-13, -20.75)
-rotation = -0.104
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(-4, -29, 4, -29, 4, 29, -4, 29)
-
-[node name="Pen13" type="Polygon2D" parent="MugB" unique_id=613449086]
-z_index = 4
-position = Vector2(0, -24)
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(-4, -29, 4, -29, 4, 29, -4, 29)
-
-[node name="Pen26" type="Polygon2D" parent="MugB" unique_id=1711558074]
-z_index = 4
-position = Vector2(13, -20.75)
-rotation = 0.104
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(-4, -29, 4, -29, 4, 29, -4, 29)
-
-[node name="CerealA" type="StaticBody2D" parent="." unique_id=1104254628]
-position = Vector2(650, 270)
-rotation = -0.12
-collision_layer = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="CerealA" unique_id=1987070785]
-shape = SubResource("RectangleShape2D_qyfbg")
-
-[node name="Ink" type="Polygon2D" parent="CerealA" unique_id=1258027103]
-z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-33, -38, 33, -38, 42, -29, 42, 29, 33, 38, -33, 38, -42, 29, -42, -29)
-
-[node name="Visual" type="Polygon2D" parent="CerealA" unique_id=1684428807]
-z_index = 2
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-30, -33, 30, -33, 37, -26, 37, 26, 30, 33, -30, 33, -37, 26, -37, -26)
-
-[node name="KeyFace" type="Polygon2D" parent="CerealA" unique_id=1914937807]
-z_index = 3
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-15.940001, -20.460001, 15.940001, -20.460001, 22.94, -13.460001, 22.94, 13.460001, 15.940001, 20.460001, -15.940001, 20.460001, -22.94, 13.460001, -22.94, -13.460001)
-
-[node name="KeyGlyph" type="Line2D" parent="CerealA" unique_id=1878640117]
-z_index = 4
-points = PackedVector2Array(-13, 4, 0, -9, 13, 4)
+points = PackedVector2Array(43, 0, 30.405592, 30.405592, -1.8795897e-06, 43, -30.405592, 30.405592, -43, -3.7591794e-06, -30.405594, -30.405588, 5.127699e-07, -43, 30.405586, -30.405596, 43, 0)
 width = 4.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
 antialiased = true
 
-[node name="CerealB" type="StaticBody2D" parent="." unique_id=1355399316]
-position = Vector2(300, 470)
-rotation = 0.1
+[node name="PenCupSprite" type="Sprite2D" parent="MugA" unique_id=1838650199]
+z_index = 2
+scale = Vector2(0.075, 0.075)
+texture = ExtResource("3_yfsrn")
+
+[node name="Pen0" type="Line2D" parent="MugA" unique_id=826108574]
+z_index = 3
+points = PackedVector2Array(-12, -15, -18, -68)
+width = 6.0
+default_color = Color(0.9372549, 0.42745098, 0.38431373, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Pen1" type="Line2D" parent="MugA" unique_id=299588175]
+z_index = 3
+points = PackedVector2Array(0, -15, -3, -75)
+width = 6.0
+default_color = Color(0.8862745, 0.6627451, 0.23137255, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Pen2" type="Line2D" parent="MugA" unique_id=193266506]
+z_index = 3
+points = PackedVector2Array(12, -15, 12, -82)
+width = 6.0
+default_color = Color(0.43529412, 0.5686275, 0.72156864, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="MugB" type="StaticBody2D" parent="." unique_id=2014281677]
+position = Vector2(-500, -450)
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="CerealB" unique_id=1074046169]
-shape = SubResource("RectangleShape2D_8o576")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MugB" unique_id=1331453677]
+shape = SubResource("CircleShape2D_bpune")
 
-[node name="Ink" type="Polygon2D" parent="CerealB" unique_id=1443270757]
+[node name="Visual" type="Polygon2D" parent="MugB" unique_id=274275471]
 z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-31, -37, 31, -37, 40, -28, 40, 28, 31, 37, -31, 37, -40, 28, -40, -28)
-
-[node name="Visual" type="Polygon2D" parent="CerealB" unique_id=1407814772]
-z_index = 2
 color = Color(0.90588236, 0.8745098, 0.7882353, 1)
-polygon = PackedVector2Array(-28, -32, 28, -32, 35, -25, 35, 25, 28, 32, -28, 32, -35, 25, -35, -25)
+polygon = PackedVector2Array(40, 0, 28.284271, 28.284271, -1.7484556e-06, 40, -28.284271, 28.284271, -40, -3.4969112e-06, -28.284273, -28.284267, 4.7699524e-07, -40, 28.284266, -28.284275)
 
-[node name="KeyFace" type="Polygon2D" parent="CerealB" unique_id=1040472372]
-z_index = 3
-color = Color(0.8117647, 0.36078432, 0.33333334, 1)
-polygon = PackedVector2Array(-14.700001, -19.84, 14.700001, -19.84, 21.7, -12.84, 21.7, 12.84, 14.700001, 19.84, -14.700001, 19.84, -21.7, 12.84, -21.7, -12.84)
-
-[node name="KeyGlyph" type="Line2D" parent="CerealB" unique_id=1123661378]
-z_index = 4
-points = PackedVector2Array(-13, 4, 0, -9, 13, 4)
+[node name="Ink" type="Line2D" parent="MugB" unique_id=1116731545]
+z_index = 2
+points = PackedVector2Array(40, 0, 28.284271, 28.284271, -1.7484556e-06, 40, -28.284271, 28.284271, -40, -3.4969112e-06, -28.284273, -28.284267, 4.7699524e-07, -40, 28.284266, -28.284275, 40, 0)
 width = 4.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
 antialiased = true
 
-[node name="Sponge" type="StaticBody2D" parent="." unique_id=901932476]
-position = Vector2(300, 250)
-rotation = 0.03
-collision_layer = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Sponge" unique_id=918754109]
-shape = SubResource("RectangleShape2D_0p8aj")
-
-[node name="Ink" type="Polygon2D" parent="Sponge" unique_id=1890717406]
-z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-37, -29, 37, -29, 46, -20, 46, 20, 37, 29, -37, 29, -46, 20, -46, -20)
-
-[node name="Visual" type="Polygon2D" parent="Sponge" unique_id=1875394388]
+[node name="PenCupSprite" type="Sprite2D" parent="MugB" unique_id=933652204]
 z_index = 2
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-34, -24, 34, -24, 41, -17, 41, 17, 34, 24, -34, 24, -41, 17, -41, -17)
+scale = Vector2(0.075, 0.075)
+texture = ExtResource("4_jq18l")
 
-[node name="EraserBand" type="Polygon2D" parent="Sponge" unique_id=600732531]
+[node name="Pen0" type="Line2D" parent="MugB" unique_id=921425083]
 z_index = 3
-color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(-29.52, -6, 29.52, -6, 29.52, 6, -29.52, 6)
+points = PackedVector2Array(-12, -15, -18, -68)
+width = 6.0
+default_color = Color(0.9372549, 0.42745098, 0.38431373, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
 
-[node name="Fork" type="StaticBody2D" parent="." unique_id=62766545]
-position = Vector2(820, -380)
-rotation = 1.48
+[node name="Pen1" type="Line2D" parent="MugB" unique_id=2021743783]
+z_index = 3
+points = PackedVector2Array(0, -15, -3, -75)
+width = 6.0
+default_color = Color(0.8862745, 0.6627451, 0.23137255, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Pen2" type="Line2D" parent="MugB" unique_id=145132452]
+z_index = 3
+points = PackedVector2Array(12, -15, 12, -82)
+width = 6.0
+default_color = Color(0.43529412, 0.5686275, 0.72156864, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="CerealA" type="StaticBody2D" parent="." unique_id=487928835]
+position = Vector2(-300, -450)
+rotation = -0.08
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Fork" unique_id=1772944219]
-shape = SubResource("RectangleShape2D_8tvg7")
-
-[node name="Ink" type="Polygon2D" parent="Fork" unique_id=1538410706]
-z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-37, -16, 37, -16, 46, -7, 46, 7, 37, 16, -37, 16, -46, 7, -46, -7)
-
-[node name="Visual" type="Polygon2D" parent="Fork" unique_id=507908112]
-z_index = 2
-color = Color(0.85882354, 0.9019608, 0.9372549, 1)
-polygon = PackedVector2Array(-34, -11, 34, -11, 41, -4, 41, 4, 34, 11, -34, 11, -41, 4, -41, -4)
-
-[node name="PenNib" type="Polygon2D" parent="Fork" unique_id=821099875]
-z_index = 3
-color = Color(0.16078432, 0.2627451, 0.37254903, 1)
-polygon = PackedVector2Array(-41, 0, -20, -10, -20, 10)
-
-[node name="PenSeam" type="Line2D" parent="Fork" unique_id=304788032]
-z_index = 3
-points = PackedVector2Array(-10, 0, 35, 0)
-width = 4.0
-default_color = Color(0.16078432, 0.2627451, 0.37254903, 1)
-antialiased = true
-
-[node name="Ruler" type="StaticBody2D" parent="." unique_id=629858176]
-position = Vector2(20, 500)
-rotation = -0.06
-collision_layer = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Ruler" unique_id=1278536758]
-shape = SubResource("RectangleShape2D_bpune")
-
-[node name="Ink" type="Polygon2D" parent="Ruler" unique_id=1564775981]
-z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-40, -16, 40, -16, 49, -7, 49, 7, 40, 16, -40, 16, -49, 7, -49, -7)
-
-[node name="Visual" type="Polygon2D" parent="Ruler" unique_id=1070014039]
-z_index = 2
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-37, -11, 37, -11, 44, -4, 44, 4, 37, 11, -37, 11, -44, 4, -44, -4)
-
-[node name="Tick0" type="Line2D" parent="Ruler" unique_id=476741122]
-z_index = 3
-points = PackedVector2Array(-30, -8, -30, 1)
-width = 2.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="Tick15" type="Line2D" parent="Ruler" unique_id=2014773241]
-z_index = 3
-points = PackedVector2Array(-15, -8, -15, 1)
-width = 2.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="Tick30" type="Line2D" parent="Ruler" unique_id=95051771]
-z_index = 3
-points = PackedVector2Array(0, -8, 0, 1)
-width = 2.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="Tick45" type="Line2D" parent="Ruler" unique_id=2122763229]
-z_index = 3
-points = PackedVector2Array(15, -8, 15, 1)
-width = 2.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="Tick60" type="Line2D" parent="Ruler" unique_id=1098031469]
-z_index = 3
-points = PackedVector2Array(30, -8, 30, 1)
-width = 2.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
-antialiased = true
-
-[node name="Apple" type="StaticBody2D" parent="." unique_id=928884840]
-position = Vector2(-500, 35)
-rotation = -0.18
-collision_layer = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Apple" unique_id=2082858687]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CerealA" unique_id=979499039]
 shape = SubResource("RectangleShape2D_i4p8i")
 
-[node name="Ink" type="Polygon2D" parent="Apple" unique_id=2066530000]
+[node name="Visual" type="Polygon2D" parent="CerealA" unique_id=1007129372]
 z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-29, -32, 29, -32, 38, -23, 38, 23, 29, 32, -29, 32, -38, 23, -38, -23)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-25, -27, 25, -27, 32, -20, 32, 20, 25, 27, -25, 27, -32, 20, -32, -20)
 
-[node name="Visual" type="Polygon2D" parent="Apple" unique_id=71624966]
+[node name="Ink" type="Line2D" parent="CerealA" unique_id=422867731]
 z_index = 2
-color = Color(0.8117647, 0.36078432, 0.33333334, 1)
-polygon = PackedVector2Array(-26, -27, 26, -27, 33, -20, 33, 20, 26, 27, -26, 27, -33, 20, -33, -20)
-
-[node name="BinderWire" type="Line2D" parent="Apple" unique_id=128785749]
-z_index = 3
-points = PackedVector2Array(-20, -8, 0, -24, 20, -8)
-width = 5.0
-default_color = Color(0.09019608, 0.1254902, 0.2, 1)
+points = PackedVector2Array(-25, -27, 25, -27, 32, -20, 32, 20, 25, 27, -25, 27, -32, 20, -32, -20)
+closed = true
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
 antialiased = true
 
-[node name="BinderJaw" type="Polygon2D" parent="Apple" unique_id=1662382860]
-z_index = 3
-color = Color(0.09019608, 0.1254902, 0.2, 1)
-polygon = PackedVector2Array(-21, -7, 21, -7, 21, 7, -21, 7)
+[node name="KeycapSprite" type="Sprite2D" parent="CerealA" unique_id=1897232640]
+z_index = 2
+scale = Vector2(0.13, 0.13)
+texture = ExtResource("5_g837n")
 
-[node name="Lime" type="StaticBody2D" parent="." unique_id=1768932454]
-position = Vector2(-390, 120)
+[node name="CerealB" type="StaticBody2D" parent="." unique_id=993951416]
+position = Vector2(-100, -450)
+rotation = 0.07
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Lime" unique_id=1637593446]
-shape = SubResource("CircleShape2D_aw8o1")
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CerealB" unique_id=1762565336]
+shape = SubResource("RectangleShape2D_aw8o1")
 
-[node name="Ink" type="Polygon2D" parent="Lime" unique_id=2033699845]
+[node name="Visual" type="Polygon2D" parent="CerealB" unique_id=1755083264]
 z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(38, 0, 35.10742, 14.54197, 26.870058, 26.870058, 14.54197, 35.10742, 2.326829e-15, 38, -14.54197, 35.10742, -26.870058, 26.870058, -35.10742, 14.54197, -38, 4.653658e-15, -35.10742, -14.54197, -26.870058, -26.870058, -14.54197, -35.10742, -6.9804866e-15, -38, 14.54197, -35.10742, 26.870058, -26.870058, 35.10742, -14.54197)
-
-[node name="Visual" type="Polygon2D" parent="Lime" unique_id=1876525071]
-z_index = 2
-color = Color(0.5529412, 0.7607843, 0.48235294, 1)
-polygon = PackedVector2Array(33, 0, 30.488024, 12.628553, 23.334524, 23.334524, 12.628553, 30.488024, 2.0206674e-15, 33, -12.628553, 30.488024, -23.334524, 23.334524, -30.488024, 12.628553, -33, 4.041335e-15, -30.488024, -12.628553, -23.334524, -23.334524, -12.628553, -30.488024, -6.0620014e-15, -33, 12.628553, -30.488024, 23.334524, -23.334524, 30.488024, -12.628553)
-
-[node name="TapeCore" type="Polygon2D" parent="Lime" unique_id=1724922617]
-z_index = 3
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(15.18, 0, 13.676707, 6.586355, 9.464576, 11.868202, 3.377868, 14.799406, -3.377868, 14.799406, -9.464576, 11.868202, -13.676707, 6.586355, -15.18, 1.859014e-15, -13.676707, -6.586355, -9.464576, -11.868202, -3.377868, -14.799406, 3.377868, -14.799406, 9.464576, -11.868202, 13.676707, -6.586355)
-
-[node name="TapeHole" type="Polygon2D" parent="Lime" unique_id=290852233]
-z_index = 4
-color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-polygon = PackedVector2Array(7.92, 0, 7.1356735, 3.4363592, 4.9380393, 6.192106, 1.7623658, 7.721429, -1.7623658, 7.721429, -4.9380393, 6.192106, -7.1356735, 3.4363592, -7.92, 9.699203e-16, -7.1356735, -3.4363592, -4.9380393, -6.192106, -1.7623658, -7.721429, 1.7623658, -7.721429, 4.9380393, -6.192106, 7.1356735, -3.4363592)
-
-[node name="Cup" type="StaticBody2D" parent="." unique_id=1907942878]
-position = Vector2(-510, 520)
-rotation = 0.04
-collision_layer = 2
-
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Cup" unique_id=1843526263]
-shape = SubResource("CircleShape2D_usfa5")
-
-[node name="Ink" type="Polygon2D" parent="Cup" unique_id=1712338000]
-z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(37, 0, 34.18354, 14.1592865, 26.16295, 26.16295, 14.1592865, 34.18354, 2.2655967e-15, 37, -14.1592865, 34.18354, -26.16295, 26.16295, -34.18354, 14.1592865, -37, 4.5311934e-15, -34.18354, -14.1592865, -26.16295, -26.16295, -14.1592865, -34.18354, -6.7967897e-15, -37, 14.1592865, -34.18354, 26.16295, -26.16295, 34.18354, -14.1592865)
-
-[node name="Visual" type="Polygon2D" parent="Cup" unique_id=1463022796]
-z_index = 2
 color = Color(0.45882353, 0.5803922, 0.6901961, 1)
-polygon = PackedVector2Array(32, 0, 29.564144, 12.24587, 22.627417, 22.627417, 12.24587, 29.564144, 1.959435e-15, 32, -12.24587, 29.564144, -22.627417, 22.627417, -29.564144, 12.24587, -32, 3.91887e-15, -29.564144, -12.24587, -22.627417, -22.627417, -12.24587, -29.564144, -5.8783045e-15, -32, 12.24587, -29.564144, 22.627417, -22.627417, 29.564144, -12.24587)
+polygon = PackedVector2Array(-25, -27, 25, -27, 32, -20, 32, 20, 25, 27, -25, 27, -32, 20, -32, -20)
 
-[node name="Clip0" type="Line2D" parent="Cup" unique_id=210195876]
-z_index = 4
-rotation = -0.5
-points = PackedVector2Array(-8, -18, 8, -18, 8, 18, -5, 18)
-width = 3.0
-default_color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+[node name="Ink" type="Line2D" parent="CerealB" unique_id=545966352]
+z_index = 2
+points = PackedVector2Array(-25, -27, 25, -27, 32, -20, 32, 20, 25, 27, -25, 27, -32, 20, -32, -20)
+closed = true
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
 antialiased = true
 
-[node name="Clip5" type="Line2D" parent="Cup" unique_id=1911824735]
-z_index = 4
-points = PackedVector2Array(-8, -18, 8, -18, 8, 18, -5, 18)
-width = 3.0
-default_color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-antialiased = true
+[node name="KeycapSprite" type="Sprite2D" parent="CerealB" unique_id=459282011]
+z_index = 2
+scale = Vector2(0.13, 0.13)
+texture = ExtResource("5_g837n")
 
-[node name="Clip10" type="Line2D" parent="Cup" unique_id=426738157]
-z_index = 4
-rotation = 0.5
-points = PackedVector2Array(-8, -18, 8, -18, 8, 18, -5, 18)
-width = 3.0
-default_color = Color(0.9490196, 0.91764706, 0.84313726, 1)
-antialiased = true
-
-[node name="Spoon" type="StaticBody2D" parent="." unique_id=61952406]
-position = Vector2(150, -480)
-rotation = 0.08
+[node name="Sponge" type="StaticBody2D" parent="." unique_id=3522834]
+position = Vector2(100, -500)
+rotation = -0.05
 collision_layer = 2
 
-[node name="CollisionShape2D" type="CollisionShape2D" parent="Spoon" unique_id=717939943]
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Sponge" unique_id=366345508]
+shape = SubResource("RectangleShape2D_usfa5")
+
+[node name="Visual" type="Polygon2D" parent="Sponge" unique_id=518207673]
+z_index = 1
+color = Color(0.8862745, 0.6627451, 0.23137255, 1)
+polygon = PackedVector2Array(-29, -27, 29, -27, 36, -20, 36, 20, 29, 27, -29, 27, -36, 20, -36, -20)
+
+[node name="Ink" type="Line2D" parent="Sponge" unique_id=957816410]
+z_index = 2
+points = PackedVector2Array(-29, -27, 29, -27, 36, -20, 36, 20, 29, 27, -29, 27, -36, 20, -36, -20)
+closed = true
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="KeycapSprite" type="Sprite2D" parent="Sponge" unique_id=1781372683]
+z_index = 2
+scale = Vector2(0.13, 0.13)
+texture = ExtResource("5_g837n")
+
+[node name="Fork" type="StaticBody2D" parent="." unique_id=1549732742]
+position = Vector2(-820, -300)
+rotation = 1.5708
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Fork" unique_id=848695348]
 shape = SubResource("RectangleShape2D_eq445")
 
-[node name="Ink" type="Polygon2D" parent="Spoon" unique_id=2117455356]
+[node name="Visual" type="Polygon2D" parent="Fork" unique_id=1007855213]
 z_index = 1
-color = Color(0.050980393, 0.05882353, 0.078431375, 1)
-polygon = PackedVector2Array(-38, -15, 38, -15, 47, -6, 47, 6, 38, 15, -38, 15, -47, 6, -47, -6)
+color = Color(0.8392157, 0.8901961, 0.92156863, 1)
+polygon = PackedVector2Array(-53, -9, 53, -9, 60, -2, 60, 2, 53, 9, -53, 9, -60, 2, -60, -2)
 
-[node name="Visual" type="Polygon2D" parent="Spoon" unique_id=612495360]
+[node name="Ink" type="Line2D" parent="Fork" unique_id=1805037922]
 z_index = 2
-color = Color(0.85882354, 0.9019608, 0.9372549, 1)
-polygon = PackedVector2Array(-35, -10, 35, -10, 42, -3, 42, 3, 35, 10, -35, 10, -42, 3, -42, -3)
+points = PackedVector2Array(-53, -9, 53, -9, 60, -2, 60, 2, 53, 9, -53, 9, -60, 2, -60, -2)
+closed = true
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
 
-[node name="LetterOpenerTip" type="Polygon2D" parent="Spoon" unique_id=951093599]
-z_index = 3
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-42, 0, -22, -9, -22, 9)
+[node name="Ruler" type="StaticBody2D" parent="." unique_id=486950754]
+position = Vector2(300, -500)
+rotation = 0.12
+collision_layer = 2
 
-[node name="LetterOpenerGrip" type="Polygon2D" parent="Spoon" unique_id=935839391]
-z_index = 3
-position = Vector2(19, 0)
-color = Color(0.95686275, 0.7490196, 0.22745098, 1)
-polygon = PackedVector2Array(-13, -7.5, 13, -7.5, 18, -2.5, 18, 2.5, 13, 7.5, -13, 7.5, -18, 2.5, -18, -2.5)
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ruler" unique_id=1952727933]
+shape = SubResource("RectangleShape2D_ir8b7")
+
+[node name="Visual" type="Polygon2D" parent="Ruler" unique_id=779394032]
+z_index = 1
+color = Color(0.8862745, 0.6627451, 0.23137255, 1)
+polygon = PackedVector2Array(-83, -12, 83, -12, 90, -5, 90, 5, 83, 12, -83, 12, -90, 5, -90, -5)
+
+[node name="Ink" type="Line2D" parent="Ruler" unique_id=278976421]
+z_index = 2
+points = PackedVector2Array(-83, -12, 83, -12, 90, -5, 90, 5, 83, 12, -83, 12, -90, 5, -90, -5)
+closed = true
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Apple" type="StaticBody2D" parent="." unique_id=386269430]
+position = Vector2(100, 100)
+rotation = -0.15
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Apple" unique_id=951299963]
+shape = SubResource("RectangleShape2D_coo05")
+
+[node name="Visual" type="Polygon2D" parent="Apple" unique_id=1863311934]
+z_index = 1
+color = Color(0.9372549, 0.42745098, 0.38431373, 1)
+polygon = PackedVector2Array(-28, -24, 28, -24, 35, -17, 35, 17, 28, 24, -28, 24, -35, 17, -35, -17)
+
+[node name="Ink" type="Line2D" parent="Apple" unique_id=543861075]
+z_index = 2
+points = PackedVector2Array(-28, -24, 28, -24, 35, -17, 35, 17, 28, 24, -28, 24, -35, 17, -35, -17)
+closed = true
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Lime" type="StaticBody2D" parent="." unique_id=1991584914]
+position = Vector2(220, 100)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Lime" unique_id=442891047]
+shape = SubResource("CircleShape2D_51cwl")
+
+[node name="Visual" type="Polygon2D" parent="Lime" unique_id=1044608715]
+z_index = 1
+color = Color(0.45490196, 0.7764706, 0.69803923, 1)
+polygon = PackedVector2Array(36, 0, 25.455843, 25.455843, -1.57361e-06, 36, -25.455843, 25.455843, -36, -3.14722e-06, -25.455845, -25.455841, 4.292957e-07, -36, 25.45584, -25.455849)
+
+[node name="Ink" type="Line2D" parent="Lime" unique_id=1210263164]
+z_index = 2
+points = PackedVector2Array(36, 0, 25.455843, 25.455843, -1.57361e-06, 36, -25.455843, 25.455843, -36, -3.14722e-06, -25.455845, -25.455841, 4.292957e-07, -36, 25.45584, -25.455849, 36, 0)
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Cup" type="StaticBody2D" parent="." unique_id=1064327211]
+position = Vector2(340, 100)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cup" unique_id=1200368612]
+shape = SubResource("CircleShape2D_3yh0c")
+
+[node name="Visual" type="Polygon2D" parent="Cup" unique_id=1411510719]
+z_index = 1
+color = Color(0.79607844, 0.8509804, 0.89411765, 1)
+polygon = PackedVector2Array(38, 0, 26.870058, 26.870058, -1.6610328e-06, 38, -26.870058, 26.870058, -38, -3.3220656e-06, -26.87006, -26.870054, 4.5314547e-07, -38, 26.870052, -26.870062)
+
+[node name="Ink" type="Line2D" parent="Cup" unique_id=1617045986]
+z_index = 2
+points = PackedVector2Array(38, 0, 26.870058, 26.870058, -1.6610328e-06, 38, -26.870058, 26.870058, -38, -3.3220656e-06, -26.87006, -26.870054, 4.5314547e-07, -38, 26.870052, -26.870062, 38, 0)
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Spoon" type="StaticBody2D" parent="." unique_id=1719816801]
+position = Vector2(450, -540)
+rotation = -0.42
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Spoon" unique_id=1385521118]
+shape = SubResource("RectangleShape2D_busos")
+
+[node name="Visual" type="Polygon2D" parent="Spoon" unique_id=362274966]
+z_index = 1
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-68, -12, 68, -12, 75, -5, 75, 5, 68, 12, -68, 12, -75, 5, -75, -5)
+
+[node name="Ink" type="Line2D" parent="Spoon" unique_id=1857830465]
+z_index = 2
+points = PackedVector2Array(-68, -12, 68, -12, 75, -5, 75, 5, 68, 12, -68, 12, -75, 5, -75, -5)
+closed = true
+width = 4.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="RulerTicks" type="Line2D" parent="." unique_id=1994323711]
+z_index = 2
+points = PackedVector2Array(235, -514, 235, -502, 275, -509, 275, -500, 315, -504, 315, -496, 355, -499, 355, -492)
+width = 3.0
+default_color = Color(0.41960785, 0.2901961, 0.16862746, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="BinderClipHandles" type="Line2D" parent="." unique_id=589032368]
+z_index = 2
+points = PackedVector2Array(75, 80, 100, 45, 125, 80)
+width = 5.0
+default_color = Color(0.8392157, 0.8901961, 0.92156863, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="TapeHole" type="Polygon2D" parent="." unique_id=1898665086]
+z_index = 2
+position = Vector2(220, 100)
+color = Color(0.14901961, 0.21960784, 0.30980393, 1)
+polygon = PackedVector2Array(16, 0, 11.313708, 11.313708, -6.993822e-07, 16, -11.313708, 11.313708, -16, -1.3987644e-06, -11.313709, -11.313707, 1.9079809e-07, -16, 11.313706, -11.31371)
+
+[node name="PaperClipJarGlint" type="Line2D" parent="." unique_id=1243610161]
+z_index = 2
+points = PackedVector2Array(326, 80, 344, 120, 362, 86)
+width = 4.0
+default_color = Color(1, 1, 1, 0.65)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Dressing" type="Node2D" parent="." unique_id=975979508]
+
+[node name="DeskKey00" type="Polygon2D" parent="Dressing" unique_id=1613560995]
+z_index = -8
+position = Vector2(-130, 125)
+rotation = -0.025
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey01" type="Polygon2D" parent="Dressing" unique_id=1429436859]
+z_index = -8
+position = Vector2(-25, 125)
+rotation = 0.018
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey02" type="Polygon2D" parent="Dressing" unique_id=1996017273]
+z_index = -8
+position = Vector2(80, 125)
+rotation = 0.018
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey03" type="Polygon2D" parent="Dressing" unique_id=979058178]
+z_index = -8
+position = Vector2(185, 125)
+rotation = -0.025
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey04" type="Polygon2D" parent="Dressing" unique_id=816468908]
+z_index = -8
+position = Vector2(290, 125)
+rotation = 0.018
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey05" type="Polygon2D" parent="Dressing" unique_id=1071799008]
+z_index = -8
+position = Vector2(395, 125)
+rotation = 0.018
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey06" type="Polygon2D" parent="Dressing" unique_id=453655983]
+z_index = -8
+position = Vector2(500, 125)
+rotation = -0.025
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey07" type="Polygon2D" parent="Dressing" unique_id=1435680862]
+z_index = -8
+position = Vector2(65, 25)
+rotation = 0.018
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey08" type="Polygon2D" parent="Dressing" unique_id=786198569]
+z_index = -8
+position = Vector2(170, 25)
+rotation = 0.018
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey09" type="Polygon2D" parent="Dressing" unique_id=1588594951]
+z_index = -8
+position = Vector2(275, 25)
+rotation = -0.025
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey10" type="Polygon2D" parent="Dressing" unique_id=360708850]
+z_index = -8
+position = Vector2(380, 25)
+rotation = 0.018
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey11" type="Polygon2D" parent="Dressing" unique_id=802614370]
+z_index = -8
+position = Vector2(485, 25)
+rotation = 0.018
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey12" type="Polygon2D" parent="Dressing" unique_id=99449578]
+z_index = -8
+position = Vector2(275, -75)
+rotation = -0.025
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey13" type="Polygon2D" parent="Dressing" unique_id=121796660]
+z_index = -8
+position = Vector2(380, -75)
+rotation = 0.018
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="DeskKey14" type="Polygon2D" parent="Dressing" unique_id=1514851646]
+z_index = -8
+position = Vector2(485, -75)
+rotation = 0.018
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-31, -29, 31, -29, 41, -19, 41, 19, 31, 29, -31, 29, -41, 19, -41, -19)
+
+[node name="StickyNote0" type="Polygon2D" parent="Dressing" unique_id=504627513]
+z_index = -7
+position = Vector2(470, 140)
+rotation = -0.09
+color = Color(0.8862745, 0.6627451, 0.23137255, 1)
+polygon = PackedVector2Array(-41, -31, 41, -31, 46, -26, 46, 26, 41, 31, -41, 31, -46, 26, -46, -26)
+
+[node name="StickyInk0" type="Line2D" parent="Dressing/StickyNote0" unique_id=1860615845]
+z_index = 1
+points = PackedVector2Array(-25, -7, 24, -7, -20, 8, 18, 8)
+width = 3.0
+default_color = Color(0.4627451, 0.35686275, 0.20784314, 0.62)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="StickyNote1" type="Polygon2D" parent="Dressing" unique_id=708073375]
+z_index = -7
+position = Vector2(365, -150)
+rotation = 0.12
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-38, -29, 38, -29, 43, -24, 43, 24, 38, 29, -38, 29, -43, 24, -43, -24)
+
+[node name="StickyInk1" type="Line2D" parent="Dressing/StickyNote1" unique_id=1899005327]
+z_index = 1
+points = PackedVector2Array(-25, -7, 24, -7, -20, 8, 18, 8)
+width = 3.0
+default_color = Color(0.4627451, 0.35686275, 0.20784314, 0.62)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="StickyNote2" type="Polygon2D" parent="Dressing" unique_id=1802599125]
+z_index = -7
+position = Vector2(170, 155)
+rotation = 0.06
+color = Color(0.9372549, 0.78039217, 0.36862746, 1)
+polygon = PackedVector2Array(-31, -24, 31, -24, 36, -19, 36, 19, 31, 24, -31, 24, -36, 19, -36, -19)
+
+[node name="StickyInk2" type="Line2D" parent="Dressing/StickyNote2" unique_id=762193875]
+z_index = 1
+points = PackedVector2Array(-25, -7, 24, -7, -20, 8, 18, 8)
+width = 3.0
+default_color = Color(0.4627451, 0.35686275, 0.20784314, 0.62)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ChutePaper0" type="Polygon2D" parent="Dressing" unique_id=1935353731]
+z_index = -8
+position = Vector2(470, -385)
+rotation = -0.421
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.25)
+polygon = PackedVector2Array(-70, -46, 70, -46, 75, -41, 75, 41, 70, 46, -70, 46, -75, 41, -75, -41)
+
+[node name="PaperFold0" type="Line2D" parent="Dressing/ChutePaper0" unique_id=1356629641]
+z_index = 1
+points = PackedVector2Array(-45, -17, 35, -17, -45, 3, 18, 3)
+width = 3.0
+default_color = Color(0.7254902, 0.6745098, 0.5803922, 0.45)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ChutePaper1" type="Polygon2D" parent="Dressing" unique_id=2015932045]
+z_index = -8
+position = Vector2(130, -232)
+rotation = -0.421
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.25)
+polygon = PackedVector2Array(-70, -46, 70, -46, 75, -41, 75, 41, 70, 46, -70, 46, -75, 41, -75, -41)
+
+[node name="PaperFold1" type="Line2D" parent="Dressing/ChutePaper1" unique_id=539501868]
+z_index = 1
+points = PackedVector2Array(-45, -17, 35, -17, -45, 3, 18, 3)
+width = 3.0
+default_color = Color(0.7254902, 0.6745098, 0.5803922, 0.45)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ChutePaper2" type="Polygon2D" parent="Dressing" unique_id=202709939]
+z_index = -8
+position = Vector2(-210, -80)
+rotation = -0.421
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.25)
+polygon = PackedVector2Array(-70, -46, 70, -46, 75, -41, 75, 41, 70, 46, -70, 46, -75, 41, -75, -41)
+
+[node name="PaperFold2" type="Line2D" parent="Dressing/ChutePaper2" unique_id=1598664110]
+z_index = 1
+points = PackedVector2Array(-45, -17, 35, -17, -45, 3, 18, 3)
+width = 3.0
+default_color = Color(0.7254902, 0.6745098, 0.5803922, 0.45)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ChutePaper3" type="Polygon2D" parent="Dressing" unique_id=1328072607]
+z_index = -8
+position = Vector2(-545, 70)
+rotation = -0.421
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.25)
+polygon = PackedVector2Array(-70, -46, 70, -46, 75, -41, 75, 41, 70, 46, -70, 46, -75, 41, -75, -41)
+
+[node name="PaperFold3" type="Line2D" parent="Dressing/ChutePaper3" unique_id=1285138334]
+z_index = 1
+points = PackedVector2Array(-45, -17, 35, -17, -45, 3, 18, 3)
+width = 3.0
+default_color = Color(0.7254902, 0.6745098, 0.5803922, 0.45)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ArchiveShelf0" type="Line2D" parent="Dressing" unique_id=1083509409]
+z_index = -7
+points = PackedVector2Array(-810, -505, -260, -505)
+width = 13.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ArchivePaper0_0" type="Polygon2D" parent="Dressing" unique_id=1765187020]
+z_index = -8
+position = Vector2(-745, -531)
+rotation = -0.025
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper0_1" type="Polygon2D" parent="Dressing" unique_id=90686899]
+z_index = -8
+position = Vector2(-613, -531)
+color = Color(0.84313726, 0.7882353, 0.6666667, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper0_2" type="Polygon2D" parent="Dressing" unique_id=1059094848]
+z_index = -8
+position = Vector2(-481, -531)
+rotation = 0.025
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper0_3" type="Polygon2D" parent="Dressing" unique_id=1348696852]
+z_index = -8
+position = Vector2(-349, -531)
+rotation = 0.05
+color = Color(0.84313726, 0.7882353, 0.6666667, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchiveShelf1" type="Line2D" parent="Dressing" unique_id=53566760]
+z_index = -7
+points = PackedVector2Array(-810, -427, -260, -427)
+width = 13.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ArchivePaper1_0" type="Polygon2D" parent="Dressing" unique_id=887532538]
+z_index = -8
+position = Vector2(-745, -453)
+rotation = -0.025
+color = Color(0.84313726, 0.7882353, 0.6666667, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper1_1" type="Polygon2D" parent="Dressing" unique_id=660422243]
+z_index = -8
+position = Vector2(-613, -453)
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper1_2" type="Polygon2D" parent="Dressing" unique_id=237492012]
+z_index = -8
+position = Vector2(-481, -453)
+rotation = 0.025
+color = Color(0.84313726, 0.7882353, 0.6666667, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper1_3" type="Polygon2D" parent="Dressing" unique_id=701337843]
+z_index = -8
+position = Vector2(-349, -453)
+rotation = 0.05
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchiveShelf2" type="Line2D" parent="Dressing" unique_id=1182164711]
+z_index = -7
+points = PackedVector2Array(-810, -349, -260, -349)
+width = 13.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ArchivePaper2_0" type="Polygon2D" parent="Dressing" unique_id=1590975945]
+z_index = -8
+position = Vector2(-745, -375)
+rotation = -0.025
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper2_1" type="Polygon2D" parent="Dressing" unique_id=1992118807]
+z_index = -8
+position = Vector2(-613, -375)
+color = Color(0.84313726, 0.7882353, 0.6666667, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper2_2" type="Polygon2D" parent="Dressing" unique_id=541720522]
+z_index = -8
+position = Vector2(-481, -375)
+rotation = 0.025
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper2_3" type="Polygon2D" parent="Dressing" unique_id=937515798]
+z_index = -8
+position = Vector2(-349, -375)
+rotation = 0.05
+color = Color(0.84313726, 0.7882353, 0.6666667, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchiveShelf3" type="Line2D" parent="Dressing" unique_id=842851720]
+z_index = -7
+points = PackedVector2Array(-810, -271, -260, -271)
+width = 13.0
+default_color = Color(0.050980393, 0.08235294, 0.12941177, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ArchivePaper3_0" type="Polygon2D" parent="Dressing" unique_id=1703444438]
+z_index = -8
+position = Vector2(-745, -297)
+rotation = -0.025
+color = Color(0.84313726, 0.7882353, 0.6666667, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper3_1" type="Polygon2D" parent="Dressing" unique_id=933064071]
+z_index = -8
+position = Vector2(-613, -297)
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper3_2" type="Polygon2D" parent="Dressing" unique_id=11820270]
+z_index = -8
+position = Vector2(-481, -297)
+rotation = 0.025
+color = Color(0.84313726, 0.7882353, 0.6666667, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="ArchivePaper3_3" type="Polygon2D" parent="Dressing" unique_id=573589389]
+z_index = -8
+position = Vector2(-349, -297)
+rotation = 0.05
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-42, -21, 42, -21, 46, -17, 46, 17, 42, 21, -42, 21, -46, 17, -46, -17)
+
+[node name="DeskCableA" type="Line2D" parent="Dressing" unique_id=1392222861]
+z_index = -7
+points = PackedVector2Array(30, 170, 90, 95, 175, 85, 240, 140, 325, 115)
+width = 12.0
+default_color = Color(0.43529412, 0.5686275, 0.72156864, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="DeskCableB" type="Line2D" parent="Dressing" unique_id=842538105]
+z_index = -7
+points = PackedVector2Array(360, 175, 430, 95, 515, 80, 565, 15)
+width = 8.0
+default_color = Color(0.43529412, 0.5686275, 0.72156864, 0.72)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="OfficeCable" type="Sprite2D" parent="Dressing" unique_id=1819348152]
+modulate = Color(1, 1, 1, 0.42)
+z_index = -7
+position = Vector2(440, 80)
+scale = Vector2(0.24, 0.24)
+texture = ExtResource("6_hv1w3")
+
+[node name="ScuffBottomLeft" type="Node2D" parent="Dressing" unique_id=1718101319]
+position = Vector2(-710, 400)
+rotation = -0.15
+
+[node name="Stroke0" type="Line2D" parent="Dressing/ScuffBottomLeft" unique_id=943894646]
+z_index = -6
+points = PackedVector2Array(-42, 0, -8, -6, 35, 0)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Stroke1" type="Line2D" parent="Dressing/ScuffBottomLeft" unique_id=736700583]
+z_index = -6
+points = PackedVector2Array(-42, 11, -8, 5, 35, 11)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Stroke2" type="Line2D" parent="Dressing/ScuffBottomLeft" unique_id=829044243]
+z_index = -6
+points = PackedVector2Array(-42, 22, -8, 16, 35, 22)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ScuffBottomRight" type="Node2D" parent="Dressing" unique_id=59054946]
+position = Vector2(730, 410)
+rotation = -1.35
+
+[node name="Stroke0" type="Line2D" parent="Dressing/ScuffBottomRight" unique_id=1431141145]
+z_index = -6
+points = PackedVector2Array(-42, 0, -8, -6, 35, 0)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Stroke1" type="Line2D" parent="Dressing/ScuffBottomRight" unique_id=588089995]
+z_index = -6
+points = PackedVector2Array(-42, 11, -8, 5, 35, 11)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Stroke2" type="Line2D" parent="Dressing/ScuffBottomRight" unique_id=790562328]
+z_index = -6
+points = PackedVector2Array(-42, 22, -8, 16, 35, 22)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ScuffTopRight" type="Node2D" parent="Dressing" unique_id=969683510]
+position = Vector2(720, -350)
+rotation = 0.45
+
+[node name="Stroke0" type="Line2D" parent="Dressing/ScuffTopRight" unique_id=1193976511]
+z_index = -6
+points = PackedVector2Array(-42, 0, -8, -6, 35, 0)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Stroke1" type="Line2D" parent="Dressing/ScuffTopRight" unique_id=814028485]
+z_index = -6
+points = PackedVector2Array(-42, 11, -8, 5, 35, 11)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Stroke2" type="Line2D" parent="Dressing/ScuffTopRight" unique_id=182183269]
+z_index = -6
+points = PackedVector2Array(-42, 22, -8, 16, 35, 22)
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.28)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
