@@ -1,7 +1,7 @@
 extends RefCounted
+## Vendored from GurisitosGames/procedural-2d at f8eb038 for GURI-319.
 class_name ProceduralAvatarGenerator
 
-## Vendored from GurisitosGames/procedural-2d at cb4ae73 for GURI-319.
 ## Deterministic, catalog-driven 64px portrait generation with independent trait domains.
 
 const CATALOG_PATH := "res://data/vendor/procedural_2d/avatar_catalog.json"

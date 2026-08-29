@@ -1,7 +1,7 @@
 extends RefCounted
+## Vendored from GurisitosGames/procedural-2d at f8eb038 for GURI-319.
 class_name ProceduralCarGenerator
 
-## Vendored from GurisitosGames/procedural-2d at cb4ae73 for GURI-319.
 ## Deterministic, JSON-friendly top-down toy car generation.
 
 const CATALOG_PATH := "res://data/vendor/procedural_2d/car_catalog.json"
@@ -12,12 +12,12 @@ const PALETTE_IDS: Array[String] = [
 ]
 const PART_FIELDS: Array[String] = ["hood", "cabin", "bumpers", "wheels", "spoiler", "livery"]
 const PART_IDS := {
-	"hood": ["smooth", "twin_vents", "power_scoop"],
-	"cabin": ["bubble", "angular", "panoramic"],
-	"bumpers": ["chrome", "sport", "utility"],
-	"wheels": ["classic", "mesh", "rugged"],
-	"spoiler": ["none", "lip", "wing"],
-	"livery": ["solid", "center_stripe", "twin_stripe", "side_flash", "checker", "sunburst"],
+	"hood": ["smooth", "twin_vents", "power_scoop", "flat", "dual_scoop", "ridged"],
+	"cabin": ["bubble", "angular", "panoramic", "low", "notched", "fastback", "cage"],
+	"bumpers": ["chrome", "sport", "utility", "slim", "wide", "pipe"],
+	"wheels": ["classic", "mesh", "rugged", "spoke", "disc", "open", "beadlock"],
+	"spoiler": ["none", "lip", "wing", "tall", "winged", "hoop"],
+	"livery": ["solid", "center_stripe", "twin_stripe", "side_flash", "checker", "sunburst", "hood_stripe", "side_swoosh", "two_tone", "racing_stripe", "dust_kick", "hash_marks"],
 }
 const STREAM_SALTS := {
 	"palette": 104729,

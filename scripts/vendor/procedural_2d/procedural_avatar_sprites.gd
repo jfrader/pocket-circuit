@@ -1,10 +1,15 @@
 extends RefCounted
+## Vendored from GurisitosGames/procedural-2d at f8eb038 for GURI-319.
 class_name ProceduralAvatarSprites
 
-## Vendored from GurisitosGames/procedural-2d at cb4ae73 for GURI-319.
 ## Hard-pixel 64x64 head-and-shoulders rendering from self-contained payloads only.
 
 const IMAGE_SIZE := 64
+const FACE_CENTER_X := 32
+const FAR_EYE_CENTER_X := 24
+const NEAR_EYE_CENTER_X := 40
+const NOSE_CENTER_X := FACE_CENTER_X + 1
+const MOUTH_CENTER_X := FACE_CENTER_X + 1
 const TOP_LEVEL_FIELDS := [
 	"schema_version", "seed", "sprite_size", "facing", "traits", "palette",
 	"display_name", "tags",
@@ -135,14 +140,14 @@ static func _render_avatar(image: Image, payload: Dictionary) -> void:
 	_draw_hair_back(image, traits["hair_style"], colors)
 	_draw_outfit(image, traits["outfit"], colors)
 	_draw_neck(image, colors)
-	_draw_ears(image, colors)
+	_draw_ears(image, traits["face_shape"], colors)
 	_draw_face(image, traits["face_shape"], colors)
 	_draw_marking(image, traits["marking"], colors)
-	_draw_brows(image, traits["brow_style"], colors)
-	_draw_eyes(image, traits["eye_style"], colors)
+	_draw_brows(image, traits["face_shape"], traits["brow_style"], colors)
+	_draw_eyes(image, traits["face_shape"], traits["eye_style"], colors)
 	_draw_nose(image, traits["nose_style"], colors)
 	_draw_mouth(image, traits["mouth_style"], colors)
-	_draw_facial_hair(image, traits["facial_hair"], colors)
+	_draw_facial_hair(image, traits["face_shape"], traits["facial_hair"], colors)
 	_draw_hair_front(image, traits["hair_style"], colors)
 	_draw_accessory(image, traits["accessory"], colors)
 
@@ -220,12 +225,15 @@ static func _draw_neck(image: Image, colors: Dictionary) -> void:
 	_draw_core(image, core, colors["outline"], 2)
 
 
-static func _draw_ears(image: Image, colors: Dictionary) -> void:
-	_rect(image, 13, 23, 6, 11, colors["outline"])
-	_rect(image, 15, 25, 4, 7, colors["skin_shadow"])
-	_rect(image, 46, 22, 6, 11, colors["outline"])
-	_rect(image, 46, 24, 4, 7, colors["skin_base"])
-	_rect(image, 48, 26, 2, 3, colors["skin_shadow"])
+static func _draw_ears(image: Image, shape: String, colors: Dictionary) -> void:
+	var face_width := _face_span(shape, 27)
+	var left_x := face_width.x - 4
+	var right_x := face_width.y
+	_rect(image, left_x, 24, 5, 10, colors["outline"])
+	_rect(image, left_x + 2, 26, 3, 6, colors["skin_shadow"])
+	_rect(image, right_x, 24, 5, 10, colors["outline"])
+	_rect(image, right_x, 26, 3, 6, colors["skin_base"])
+	_rect(image, right_x + 1, 28, 2, 2, colors["skin_shadow"])
 
 
 static func _draw_face(image: Image, shape: String, colors: Dictionary) -> void:
@@ -240,118 +248,229 @@ static func _draw_face(image: Image, shape: String, colors: Dictionary) -> void:
 		var inner_end := span.y - 2
 		_span(image, y, inner_start, inner_end, colors["skin_base"])
 		if y >= 15 and y <= 39:
-			_span(image, y, maxi(inner_start, inner_end - 8), inner_end, colors["skin_shadow"])
-		if y >= 13 and y <= 32:
-			_span(image, y, inner_start, mini(inner_start + 3, inner_end), colors["skin_highlight"])
-		if y in [13, 14, 18, 19] and inner_start + 5 <= inner_end:
-			_span(image, y, inner_start + 2, inner_start + 5, colors["skin_rim"])
-	# A deliberate near-cheek plane sells the three-quarter turn.
-	_rect(image, 39, 28, 5, 8, colors["skin_shadow"])
-	_rect(image, 18, 31, 3, 5, colors["skin_highlight"])
+			_span(image, y, maxi(inner_start, inner_end - 2), inner_end, colors["skin_shadow"])
+		if y >= 21 and y <= 34:
+			_set_pixel(image, inner_start, y, colors["skin_highlight"])
+		if y in [16, 17] and inner_start + 3 <= inner_end:
+			_span(image, y, inner_start + 2, inner_start + 3, colors["skin_rim"])
 
 
 static func _face_span(shape: String, y: int) -> Vector2i:
 	if y < 9 or y > 44:
 		return Vector2i(1, 0)
-	var left := 18
-	var right := 48
-	if y <= 11:
-		left = 23 - (y - 9) * 2
-		right = 41 + (y - 9) * 2
-	elif y <= 16:
-		left = 18 - mini(y - 12, 2)
-		right = 46 + mini(y - 12, 2)
-	elif y >= 36:
-		var taper := y - 35
-		left = 17 + taper
-		right = 49 - taper
+	var left := 16
+	var right := 49
+	if y == 9:
+		left = 24
+		right = 40
+	elif y == 10:
+		left = 21
+		right = 43
+	elif y == 11:
+		left = 18
+		right = 46
+	elif y <= 15:
+		left = 16
+		right = 48
 	match shape:
 		"square":
-			if y >= 16 and y <= 39:
+			if y < 16:
+				pass
+			elif y <= 36:
 				left = 16
 				right = 49
-			if y >= 40:
+			elif y <= 40:
+				left = 17
+				right = 48
+			elif y >= 41:
 				left = 19
 				right = 46
 		"round":
-			if y >= 16 and y <= 31:
-				left = 15
-				right = 49
-			if y >= 32:
-				left += 1
-				right -= 1
-		"long":
-			left += 2
-			right -= 1
-			if y >= 36:
-				left -= 1
-				right += 1
-		"diamond":
-			if y <= 16:
-				left += 2
-				right -= 2
-			elif y <= 30:
+			if y < 16:
+				pass
+			elif y <= 29:
 				left = 15
 				right = 50
-			elif y >= 34:
-				left += 2
-				right -= 2
+			elif y <= 33:
+				left = 16
+				right = 49
+			elif y <= 36:
+				left = 17
+				right = 48
+			elif y <= 38:
+				left = 18
+				right = 47
+			else:
+				var round_taper := y - 39
+				left = 20 + round_taper * 2
+				right = 45 - round_taper * 2
+		"long":
+			if y < 12:
+				pass
+			elif y <= 34:
+				left = 18
+				right = 47
+			elif y <= 37:
+				left = 19
+				right = 46
+			elif y <= 40:
+				left = 20
+				right = 45
+			else:
+				var long_taper := y - 41
+				left = 22 + long_taper * 2
+				right = 43 - long_taper * 2
+		"diamond":
+			if y < 12:
+				pass
+			elif y <= 21:
+				left = 17
+				right = 48
+			elif y <= 29:
+				left = 15
+				right = 50
+			elif y <= 32:
+				left = 16
+				right = 49
+			elif y <= 35:
+				left = 18
+				right = 47
+			else:
+				var diamond_taper := y - 36
+				left = 20 + diamond_taper
+				right = 45 - diamond_taper
 		"heart":
-			if y <= 23:
-				left -= 1
-				right += 1
-			elif y >= 31:
-				left += 2
-				right -= 2
+			if y < 16:
+				pass
+			elif y <= 23:
+				left = 15
+				right = 50
+			elif y <= 29:
+				left = 16
+				right = 49
+			elif y <= 32:
+				left = 18
+				right = 47
+			elif y <= 35:
+				left = 19
+				right = 46
+			elif y <= 37:
+				left = 20
+				right = 45
+			elif y <= 42:
+				var heart_taper := y - 38
+				left = 21 + heart_taper
+				right = 44 - heart_taper
+			elif y == 43:
+				left = 27
+				right = 38
+			else:
+				left = 29
+				right = 36
 		_:
-			pass
+			if y < 31:
+				pass
+			elif y <= 34:
+				left = 17
+				right = 48
+			elif y <= 37:
+				left = 18
+				right = 47
+			elif y <= 39:
+				left = 19
+				right = 46
+			elif y == 40:
+				left = 21
+				right = 44
+			elif y >= 41:
+				var oval_taper := y - 41
+				left = 22 + oval_taper * 2
+				right = 43 - oval_taper * 2
 	return Vector2i(left, right)
 
 
-static func _draw_brows(image: Image, style: String, colors: Dictionary) -> void:
+static func _draw_face_span(image: Image, shape: String, y: int, from_x: int, to_x: int, color: Color, inset: int = 2) -> void:
+	var face := _face_span(shape, y)
+	var left := maxi(from_x, face.x + inset)
+	var right := mini(to_x, face.y - inset)
+	if left <= right:
+		_span(image, y, left, right, color)
+
+
+static func _draw_face_rect(image: Image, shape: String, rect: Rect2i, color: Color, inset: int = 2) -> void:
+	for y in range(rect.position.y, rect.end.y):
+		_draw_face_span(image, shape, y, rect.position.x, rect.end.x - 1, color, inset)
+
+
+static func _draw_face_pixel(image: Image, shape: String, x: int, y: int, color: Color, inset: int = 2) -> void:
+	var face := _face_span(shape, y)
+	if x >= face.x + inset and x <= face.y - inset:
+		_set_pixel(image, x, y, color)
+
+
+static func _draw_brows(image: Image, shape: String, style: String, colors: Dictionary) -> void:
 	var color: Color = colors["hair_shadow"]
-	var thickness := 2 if style == "thick" else 1
-	match style:
-		"arched":
-			_rect(image, 21, 23, 2, 1, color); _rect(image, 23, 22, 5, thickness, color)
-			_rect(image, 36, 22, 5, thickness, color); _rect(image, 41, 23, 3, 1, color)
-		"soft":
-			_rect(image, 21, 23, 4, 1, color); _rect(image, 25, 24, 3, 1, color)
-			_rect(image, 36, 24, 3, 1, color); _rect(image, 39, 23, 5, 1, color)
-		"angled":
-			_rect(image, 21, 24, 3, thickness, color); _rect(image, 24, 22, 5, thickness, color)
-			_rect(image, 36, 22, 5, thickness, color); _rect(image, 41, 24, 3, thickness, color)
-		"unibrow":
-			_rect(image, 21, 22, 23, 2, color)
-		_:
-			_rect(image, 21, 23, 7, thickness, color); _rect(image, 36, 23, 8, thickness, color)
+	_draw_brow(image, shape, FAR_EYE_CENTER_X, -1, style, color)
+	_draw_brow(image, shape, NEAR_EYE_CENTER_X, 1, style, color)
+	if style == "unibrow":
+		_draw_face_span(image, shape, 23, 28, 36, color)
 
 
-static func _draw_eyes(image: Image, style: String, colors: Dictionary) -> void:
-	var far_rect := Rect2i(22, 26, 6, 4)
-	var near_rect := Rect2i(36, 26, 8, 4)
-	if style == "narrow":
-		far_rect = Rect2i(22, 27, 6, 2); near_rect = Rect2i(36, 27, 8, 2)
+static func _draw_brow(image: Image, shape: String, center_x: int, outer_direction: int, style: String, color: Color) -> void:
+	for index in range(8):
+		var x := center_x + outer_direction * (4 - index)
+		var y := 22
+		match style:
+			"arched":
+				y = 23 if index in [0, 7] else (22 if index in [1, 6] else 21)
+			"soft":
+				y = 22 if index <= 3 else 23
+			"angled":
+				y = 23 if index <= 2 else (22 if index <= 4 else 21)
+			"thick", "unibrow":
+				y = 21
+			_:
+				pass
+		_draw_face_pixel(image, shape, x, y, color)
+		if style in ["thick", "unibrow"]:
+			_draw_face_pixel(image, shape, x, y + 1, color)
+
+
+static func _draw_eyes(image: Image, shape: String, style: String, colors: Dictionary) -> void:
+	_draw_eye(image, shape, FAR_EYE_CENTER_X, -1, style, colors["iris"], colors)
+	_draw_eye(image, shape, NEAR_EYE_CENTER_X, 1, style, colors["iris_light"], colors)
+
+
+static func _draw_eye(image: Image, shape: String, center_x: int, outer_direction: int, style: String, iris: Color, colors: Dictionary) -> void:
+	var white_top := 26
+	var white_height := 3
+	if style in ["narrow", "hooded"]:
+		white_top = 27
+		white_height = 2
 	elif style == "wide":
-		far_rect = Rect2i(21, 26, 7, 5); near_rect = Rect2i(36, 25, 8, 6)
-	elif style == "hooded":
-		_rect(image, 21, 25, 8, 2, colors["skin_shadow"])
-		_rect(image, 35, 25, 10, 2, colors["skin_shadow"])
+		white_top = 25
+		white_height = 4
+	var white_left := center_x - 2
+	var white_right := center_x + 2
+	_draw_face_span(image, shape, white_top - 1, white_left, white_right, colors["eye_dark"])
+	_draw_face_span(image, shape, white_top + white_height, white_left, white_right, colors["eye_dark"])
+	for y in range(white_top, white_top + white_height):
+		_draw_face_pixel(image, shape, white_left - 1, y, colors["eye_dark"])
+		_draw_face_pixel(image, shape, white_right + 1, y, colors["eye_dark"])
+	_draw_face_rect(image, shape, Rect2i(white_left, white_top, 5, white_height), colors["eye_white"])
+	var outer_x := center_x + outer_direction * 2
+	var inner_x := center_x - outer_direction * 2
+	if style == "hooded":
+		_draw_face_span(image, shape, white_top - 2, white_left - 1, white_right + 1, colors["skin_shadow"])
 	elif style == "upturned":
-		_rect(image, 20, 27, 2, 1, colors["eye_dark"])
-		_rect(image, 44, 25, 2, 1, colors["eye_dark"])
+		_draw_face_pixel(image, shape, outer_x, white_top - 1, colors["eye_white"])
+		_draw_face_pixel(image, shape, inner_x, white_top + white_height - 1, colors["eye_dark"])
 	elif style == "downturned":
-		far_rect.position.y += 1
-		near_rect.position.y += 1
-		_rect(image, 20, 26, 2, 1, colors["eye_dark"])
-		_rect(image, 44, 29, 2, 1, colors["eye_dark"])
-	_rect(image, far_rect.position.x, far_rect.position.y, far_rect.size.x, far_rect.size.y, colors["eye_white"])
-	_rect(image, near_rect.position.x, near_rect.position.y, near_rect.size.x, near_rect.size.y, colors["eye_white"])
-	_rect(image, far_rect.position.x + 3, far_rect.position.y, 2, far_rect.size.y, colors["iris"])
-	_rect(image, near_rect.position.x + 2, near_rect.position.y, 3, near_rect.size.y, colors["iris_light"])
-	_rect(image, far_rect.position.x + 4, far_rect.position.y + 1, 1, maxi(1, far_rect.size.y - 1), colors["eye_dark"])
-	_rect(image, near_rect.position.x + 3, near_rect.position.y + 1, 2, maxi(1, near_rect.size.y - 1), colors["eye_dark"])
-	_set_pixel(image, near_rect.position.x + 2, near_rect.position.y, colors["eye_white"])
+		_draw_face_pixel(image, shape, outer_x, white_top + white_height, colors["eye_white"])
+		_draw_face_pixel(image, shape, inner_x, white_top, colors["eye_dark"])
+	_draw_face_rect(image, shape, Rect2i(center_x - 1, white_top, 2, white_height), iris)
+	_draw_face_rect(image, shape, Rect2i(center_x, white_top + 1, 1, maxi(1, white_height - 1)), colors["eye_dark"])
+	_draw_face_pixel(image, shape, center_x - 1, white_top, colors["eye_white"])
 
 
 static func _draw_nose(image: Image, style: String, colors: Dictionary) -> void:
@@ -359,61 +478,186 @@ static func _draw_nose(image: Image, style: String, colors: Dictionary) -> void:
 	var light: Color = colors["skin_highlight"]
 	match style:
 		"broad":
-			_rect(image, 34, 29, 2, 6, light); _rect(image, 36, 34, 7, 2, shadow); _rect(image, 41, 33, 2, 2, shadow)
+			_rect(image, NOSE_CENTER_X - 1, 29, 2, 5, light)
+			_rect(image, NOSE_CENTER_X - 3, 34, 7, 2, shadow)
+			_set_pixel(image, NOSE_CENTER_X + 3, 33, shadow)
 		"short":
-			_rect(image, 35, 30, 2, 4, light); _rect(image, 37, 33, 4, 2, shadow)
+			_rect(image, NOSE_CENTER_X - 1, 30, 2, 3, light)
+			_rect(image, NOSE_CENTER_X - 2, 33, 5, 2, shadow)
 		"angular":
-			_rect(image, 35, 29, 2, 5, light); _rect(image, 37, 33, 2, 2, shadow); _rect(image, 39, 34, 3, 2, shadow)
+			_rect(image, NOSE_CENTER_X - 1, 29, 2, 5, light)
+			_rect(image, NOSE_CENTER_X + 1, 32, 2, 2, shadow)
+			_rect(image, NOSE_CENTER_X, 34, 4, 2, shadow)
 		"hooked":
-			_rect(image, 35, 28, 2, 7, light); _rect(image, 37, 33, 3, 2, shadow); _rect(image, 39, 34, 4, 2, shadow); _set_pixel(image, 42, 33, shadow)
+			_rect(image, NOSE_CENTER_X - 1, 28, 2, 7, light)
+			_rect(image, NOSE_CENTER_X + 1, 33, 3, 2, shadow)
+			_rect(image, NOSE_CENTER_X, 35, 5, 1, shadow)
+			_set_pixel(image, NOSE_CENTER_X + 4, 34, shadow)
 		"button":
-			_rect(image, 36, 32, 2, 2, light); _rect(image, 37, 34, 4, 2, shadow); _set_pixel(image, 41, 33, shadow)
+			_rect(image, NOSE_CENTER_X - 1, 32, 2, 2, light)
+			_rect(image, NOSE_CENTER_X - 2, 34, 5, 2, shadow)
+			_set_pixel(image, NOSE_CENTER_X + 3, 33, shadow)
 		_:
-			_rect(image, 35, 29, 2, 6, light); _rect(image, 37, 34, 4, 2, shadow)
+			_rect(image, NOSE_CENTER_X - 1, 29, 2, 6, light)
+			_rect(image, NOSE_CENTER_X, 34, 4, 2, shadow)
 
 
 static func _draw_mouth(image: Image, style: String, colors: Dictionary) -> void:
 	var mouth: Color = colors["mouth"]
+	if _luminance_delta(mouth, colors["skin_base"]) < 0.1:
+		var best_delta := _luminance_delta(mouth, colors["skin_base"])
+		for candidate: Color in [colors["outline"], colors["skin_rim"]]:
+			var candidate_delta := _luminance_delta(candidate, colors["skin_base"])
+			if candidate_delta > best_delta:
+				mouth = candidate
+				best_delta = candidate_delta
 	match style:
 		"smile":
-			_set_pixel(image, 30, 38, mouth); _rect(image, 31, 39, 9, 2, mouth); _set_pixel(image, 40, 38, mouth)
+			_set_pixel(image, MOUTH_CENTER_X - 6, 39, mouth)
+			_rect(image, MOUTH_CENTER_X - 5, 40, 11, 1, mouth)
+			_set_pixel(image, MOUTH_CENTER_X + 6, 39, mouth)
 		"wide":
-			_rect(image, 29, 39, 13, 2, mouth)
+			_rect(image, MOUTH_CENTER_X - 6, 40, 12, 1, mouth)
 		"serious":
-			_rect(image, 30, 40, 10, 2, mouth); _rect(image, 40, 39, 2, 1, mouth)
+			_rect(image, MOUTH_CENTER_X - 5, 40, 11, 1, mouth)
+			_rect(image, MOUTH_CENTER_X + 5, 39, 2, 1, mouth)
 		"grin":
-			_rect(image, 30, 38, 11, 2, mouth); _rect(image, 32, 38, 7, 1, colors["eye_white"]); _rect(image, 32, 40, 7, 1, mouth)
+			_rect(image, MOUTH_CENTER_X - 6, 38, 13, 2, mouth)
+			_rect(image, MOUTH_CENTER_X - 5, 40, 11, 1, mouth)
+			_rect(image, MOUTH_CENTER_X - 4, 38, 9, 1, colors["eye_white"])
 		"smirk":
-			_rect(image, 30, 40, 8, 2, mouth); _rect(image, 38, 39, 4, 2, mouth)
+			_rect(image, MOUTH_CENTER_X - 5, 40, 9, 1, mouth)
+			_rect(image, MOUTH_CENTER_X + 3, 39, 4, 1, mouth)
 		"open":
-			_rect(image, 31, 38, 10, 4, mouth); _rect(image, 33, 39, 6, 1, colors["eye_white"])
+			_rect(image, MOUTH_CENTER_X - 4, 39, 9, 2, mouth)
+			_rect(image, MOUTH_CENTER_X - 3, 41, 7, 1, mouth)
+			_rect(image, MOUTH_CENTER_X - 2, 39, 5, 1, colors["eye_white"])
 		_:
-			_rect(image, 30, 39, 11, 2, mouth)
+			_rect(image, MOUTH_CENTER_X - 5, 40, 11, 1, mouth)
 
 
-static func _draw_facial_hair(image: Image, style: String, colors: Dictionary) -> void:
+static func _draw_facial_hair(image: Image, shape: String, style: String, colors: Dictionary) -> void:
 	var hair: Color = colors["hair_base"]
+	var hair_shadow: Color = colors["hair_shadow"]
+	if _luminance_delta(hair, colors["skin_base"]) < 0.12:
+		var best_delta := _luminance_delta(hair, colors["skin_base"])
+		for candidate: Color in [hair_shadow, colors["hair_highlight"], colors["outline"]]:
+			var candidate_delta := _luminance_delta(candidate, colors["skin_base"])
+			if candidate_delta > best_delta:
+				hair = candidate
+				best_delta = candidate_delta
+			if candidate_delta >= 0.12:
+				break
+		if hair == colors["hair_shadow"]:
+			hair_shadow = colors["outline"]
+		elif hair == colors["hair_highlight"]:
+			hair_shadow = colors["hair_base"]
+	var stubble: Color = colors["hair_shadow"]
+	if _luminance_delta(stubble, colors["skin_base"]) < 0.12:
+		var best_delta := _luminance_delta(stubble, colors["skin_base"])
+		for candidate: Color in [colors["hair_base"], colors["hair_highlight"], colors["outline"]]:
+			var candidate_delta := _luminance_delta(candidate, colors["skin_base"])
+			if candidate_delta > best_delta:
+				stubble = candidate
+				best_delta = candidate_delta
 	match style:
 		"stubble":
-			for point in [Vector2i(24, 36), Vector2i(28, 38), Vector2i(43, 37), Vector2i(23, 40), Vector2i(27, 43), Vector2i(32, 44), Vector2i(38, 43), Vector2i(43, 41)]:
-				_set_pixel(image, point.x, point.y, colors["hair_shadow"])
+			_draw_stubble(image, shape, stubble)
 		"moustache":
-			# Broad tapered wings; never a narrow centered toothbrush block.
-			_rect(image, 27, 37, 5, 2, hair); _rect(image, 39, 37, 5, 2, hair)
-			_rect(image, 29, 39, 4, 1, hair); _rect(image, 38, 39, 4, 1, hair)
+			_draw_moustache(image, shape, hair, 6)
 		"goatee":
-			_rect(image, 29, 37, 4, 2, hair); _rect(image, 39, 37, 4, 2, hair)
-			_rect(image, 34, 41, 5, 5, hair)
+			_draw_face_span(image, shape, 42, MOUTH_CENTER_X - 1, MOUTH_CENTER_X + 1, hair)
+			_draw_face_span(image, shape, 43, MOUTH_CENTER_X - 2, MOUTH_CENTER_X + 2, hair)
+			_draw_face_span(image, shape, 44, MOUTH_CENTER_X - 2, MOUTH_CENTER_X + 2, hair_shadow)
 		"short_beard":
-			_rect(image, 20, 35, 4, 7, hair); _rect(image, 42, 34, 4, 8, hair)
-			_rect(image, 24, 42, 18, 4, hair); _rect(image, 27, 38, 5, 2, hair); _rect(image, 39, 38, 4, 2, hair)
+			_draw_moustache(image, shape, hair, 5)
+			_draw_jaw_beard(image, shape, 37, 2, 9, hair, hair_shadow)
 		"full_beard":
-			_rect(image, 19, 33, 5, 10, hair); _rect(image, 42, 33, 5, 10, hair)
-			_rect(image, 23, 41, 20, 7, hair); _rect(image, 28, 37, 5, 2, hair); _rect(image, 39, 37, 5, 2, hair)
+			_draw_moustache(image, shape, hair, 5)
+			_draw_jaw_beard(image, shape, 35, 3, 12, hair, hair_shadow)
 		"chinstrap":
-			_rect(image, 19, 35, 3, 8, hair); _rect(image, 44, 34, 3, 9, hair); _rect(image, 22, 43, 22, 3, hair)
+			_draw_chinstrap(image, shape, hair, hair_shadow)
 		_:
 			pass
+
+
+static func _draw_moustache(image: Image, shape: String, color: Color, half_width: int) -> void:
+	_draw_face_span(image, shape, 36, MOUTH_CENTER_X - half_width, MOUTH_CENTER_X - 2, color)
+	_draw_face_span(image, shape, 36, MOUTH_CENTER_X + 1, MOUTH_CENTER_X + half_width - 1, color)
+	_draw_face_span(image, shape, 37, MOUTH_CENTER_X - half_width + 1, MOUTH_CENTER_X - 2, color)
+	_draw_face_span(image, shape, 37, MOUTH_CENTER_X + 1, MOUTH_CENTER_X + half_width - 2, color)
+
+
+static func _draw_jaw_beard(image: Image, shape: String, start_y: int, side_width: int, lower_half_width: int, hair: Color, shadow: Color) -> void:
+	for y in range(start_y, 45):
+		var face := _face_span(shape, y)
+		var inner_left := face.x + 2
+		var inner_right := face.y - 2
+		if inner_left > inner_right:
+			continue
+		if y <= 41:
+			var width := mini(side_width + maxi(0, y - 39), maxi(1, int((inner_right - inner_left + 1) / 2)))
+			var left_end := inner_left + width - 1
+			var right_start := inner_right - width + 1
+			if y >= 38 and y <= 39:
+				left_end = mini(left_end, MOUTH_CENTER_X - 7)
+				right_start = maxi(right_start, MOUTH_CENTER_X + 7)
+			elif y == 40:
+				left_end = mini(left_end, MOUTH_CENTER_X - 7)
+				right_start = maxi(right_start, MOUTH_CENTER_X + 6)
+			elif y == 41:
+				left_end = mini(left_end, MOUTH_CENTER_X - 4)
+				right_start = maxi(right_start, MOUTH_CENTER_X + 4)
+			_draw_face_span(image, shape, y, inner_left, left_end, hair)
+			_draw_face_span(image, shape, y, right_start, inner_right, hair)
+		else:
+			var taper := y - 42
+			var half_width := maxi(2, lower_half_width - taper * 2)
+			_draw_face_span(
+				image,
+				shape,
+				y,
+				maxi(inner_left, MOUTH_CENTER_X - half_width),
+				mini(inner_right, MOUTH_CENTER_X + half_width),
+				shadow if y == 44 else hair
+			)
+
+
+static func _draw_chinstrap(image: Image, shape: String, hair: Color, shadow: Color) -> void:
+	for y in range(35, 43):
+		var face := _face_span(shape, y)
+		var inner_left := face.x + 2
+		var inner_right := face.y - 2
+		var left_end := inner_left + 1
+		var right_start := inner_right - 1
+		if y >= 38 and y <= 39:
+			left_end = mini(left_end, MOUTH_CENTER_X - 7)
+			right_start = maxi(right_start, MOUTH_CENTER_X + 7)
+		elif y == 40:
+			left_end = mini(left_end, MOUTH_CENTER_X - 7)
+			right_start = maxi(right_start, MOUTH_CENTER_X + 6)
+		elif y == 41:
+			left_end = mini(left_end, MOUTH_CENTER_X - 4)
+			right_start = maxi(right_start, MOUTH_CENTER_X + 4)
+		_draw_face_span(image, shape, y, inner_left, left_end, hair)
+		_draw_face_span(image, shape, y, right_start, inner_right, hair)
+	var chin := _face_span(shape, 43)
+	_draw_face_span(image, shape, 43, chin.x + 2, chin.y - 2, hair)
+	var tip := _face_span(shape, 44)
+	_draw_face_span(image, shape, 44, tip.x + 2, tip.y - 2, shadow)
+
+
+static func _draw_stubble(image: Image, shape: String, color: Color) -> void:
+	for y in [35, 37, 42]:
+		var face := _face_span(shape, y)
+		var inner_left := face.x + 3
+		var inner_right := face.y - 3
+		if inner_left > inner_right:
+			continue
+		var third := maxi(2, int((inner_right - inner_left) / 3))
+		for x in [inner_left, inner_left + third, inner_right - third, inner_right]:
+			_draw_face_pixel(image, shape, x, y, color)
+	_draw_face_pixel(image, shape, MOUTH_CENTER_X, 44, color)
 
 
 static func _draw_marking(image: Image, style: String, colors: Dictionary) -> void:
@@ -440,24 +684,24 @@ static func _draw_hair_back(image: Image, style: String, colors: Dictionary) -> 
 		_core_rect(core, 45, 12, 8, 36, colors["hair_shadow"])
 		_core_rect(core, 14, 42, 36, 6, colors["hair_base"])
 	elif style == "ponytail":
-		_core_rect(core, 48, 16, 8, 22, colors["hair_base"])
-		_core_rect(core, 52, 35, 7, 10, colors["hair_shadow"])
-		_core_rect(core, 55, 42, 4, 6, colors["hair_base"])
+		_core_rect(core, 48, 16, 7, 18, colors["hair_base"])
+		_core_rect(core, 51, 31, 6, 9, colors["hair_shadow"])
+		_core_rect(core, 54, 38, 4, 7, colors["hair_base"])
 	elif style == "locs":
 		for x in [12, 16, 48, 52]:
 			_core_rect(core, x, 17, 4, 27 if x in [12, 52] else 23, colors["hair_base"] if x < 48 else colors["hair_shadow"])
 	elif style == "braids":
 		for x in [13, 17, 48, 52]:
 			for y in range(18, 44, 4):
-				_core_rect(core, x + (2 if floori(float(y) / 4.0) % 2 else 0), y, 3, 3, colors["hair_base"])
+				_core_rect(core, x + (2 if int(y / 4) % 2 else 0), y, 3, 3, colors["hair_base"])
 	if not core.is_empty():
 		_draw_core(image, core, colors["outline"], 2)
 
 
 static func _draw_hair_front(image: Image, style: String, colors: Dictionary) -> void:
 	if style == "bald":
-		_rect(image, 23, 11, 9, 2, colors["skin_rim"])
-		_rect(image, 18, 15, 3, 2, colors["skin_highlight"])
+		_rect(image, 24, 11, 4, 1, colors["skin_rim"])
+		_set_pixel(image, 19, 17, colors["skin_highlight"])
 		return
 	var core := {}
 	match style:
@@ -503,6 +747,7 @@ static func _draw_hair_front(image: Image, style: String, colors: Dictionary) ->
 		"ponytail":
 			_core_rect(core, 17, 8, 31, 9, colors["hair_base"])
 			_core_rect(core, 16, 14, 6, 8, colors["hair_shadow"])
+			_core_rect(core, 45, 14, 6, 8, colors["hair_base"])
 			_core_rect(core, 25, 7, 20, 3, colors["hair_highlight"])
 		"top_knot":
 			_core_rect(core, 17, 9, 31, 9, colors["hair_base"])
@@ -528,40 +773,44 @@ static func _draw_hair_front(image: Image, style: String, colors: Dictionary) ->
 static func _draw_accessory(image: Image, style: String, colors: Dictionary) -> void:
 	match style:
 		"glasses":
-			_outline_rect(image, Rect2i(19, 24, 11, 8), colors["accent"])
-			_outline_rect(image, Rect2i(34, 24, 12, 8), colors["accent"])
-			_rect(image, 30, 26, 5, 2, colors["accent"])
+			_outline_rect_thin(image, Rect2i(FAR_EYE_CENTER_X - 5, 24, 10, 8), colors["accent"])
+			_outline_rect_thin(image, Rect2i(NEAR_EYE_CENTER_X - 5, 24, 10, 8), colors["accent"])
+			_rect(image, 29, 27, 7, 1, colors["accent"])
 		"round_glasses":
-			_round_frame(image, Vector2i(25, 28), colors["metal"])
-			_round_frame(image, Vector2i(40, 28), colors["metal"])
-			_rect(image, 30, 27, 5, 2, colors["metal"])
+			_round_frame(image, Vector2i(FAR_EYE_CENTER_X, 28), colors["metal"])
+			_round_frame(image, Vector2i(NEAR_EYE_CENTER_X, 28), colors["metal"])
+			_rect(image, 29, 27, 7, 1, colors["metal"])
 		"earring":
-			_rect(image, 49, 31, 3, 3, colors["metal"]); _rect(image, 50, 34, 3, 4, colors["accent_light"])
+			_set_pixel(image, 50, 32, colors["metal"])
+			_rect(image, 50, 33, 2, 2, colors["metal"])
+			_rect(image, 51, 35, 2, 2, colors["accent_light"])
 		"headband":
-			_rect(image, 14, 15, 38, 4, colors["accent"]); _rect(image, 17, 15, 29, 1, colors["accent_light"])
+			_rect(image, 16, 15, 34, 2, colors["accent"])
+			_rect(image, 20, 15, 26, 1, colors["accent_light"])
 		"hair_clip":
-			_rect(image, 43, 13, 7, 3, colors["accent_light"]); _rect(image, 45, 12, 3, 5, colors["metal"])
+			_rect(image, 44, 13, 5, 2, colors["accent_light"])
+			_rect(image, 46, 12, 2, 4, colors["metal"])
 		_:
 			pass
 
 
-static func _outline_rect(image: Image, rect: Rect2i, color: Color) -> void:
-	_rect(image, rect.position.x, rect.position.y, rect.size.x, 2, color)
-	_rect(image, rect.position.x, rect.end.y - 2, rect.size.x, 2, color)
-	_rect(image, rect.position.x, rect.position.y, 2, rect.size.y, color)
-	_rect(image, rect.end.x - 2, rect.position.y, 2, rect.size.y, color)
+static func _outline_rect_thin(image: Image, rect: Rect2i, color: Color) -> void:
+	_span(image, rect.position.y, rect.position.x, rect.end.x - 1, color)
+	_span(image, rect.end.y - 1, rect.position.x, rect.end.x - 1, color)
+	_rect(image, rect.position.x, rect.position.y + 1, 1, rect.size.y - 2, color)
+	_rect(image, rect.end.x - 1, rect.position.y + 1, 1, rect.size.y - 2, color)
 
 
 static func _round_frame(image: Image, center: Vector2i, color: Color) -> void:
-	_rect(image, center.x - 4, center.y - 4, 8, 2, color)
-	_rect(image, center.x - 4, center.y + 3, 8, 2, color)
-	_rect(image, center.x - 5, center.y - 3, 2, 7, color)
-	_rect(image, center.x + 3, center.y - 3, 2, 7, color)
+	_span(image, center.y - 4, center.x - 3, center.x + 3, color)
+	_span(image, center.y + 4, center.x - 3, center.x + 3, color)
+	_rect(image, center.x - 4, center.y - 3, 1, 7, color)
+	_rect(image, center.x + 4, center.y - 3, 1, 7, color)
 
 
 static func _draw_core(image: Image, core: Dictionary, outline: Color, radius: int) -> void:
 	for key: Variant in core.keys():
-		var point := Vector2i(int(key) % IMAGE_SIZE, floori(float(int(key)) / float(IMAGE_SIZE)))
+		var point := Vector2i(int(key) % IMAGE_SIZE, int(key) / IMAGE_SIZE)
 		for offset_y in range(-radius, radius + 1):
 			for offset_x in range(-radius, radius + 1):
 				if absi(offset_x) + absi(offset_y) > radius:
@@ -570,7 +819,7 @@ static func _draw_core(image: Image, core: Dictionary, outline: Color, radius: i
 				if not core.has(_key(neighbor.x, neighbor.y)):
 					_set_pixel(image, neighbor.x, neighbor.y, outline)
 	for key: Variant in core.keys():
-		var point := Vector2i(int(key) % IMAGE_SIZE, floori(float(int(key)) / float(IMAGE_SIZE)))
+		var point := Vector2i(int(key) % IMAGE_SIZE, int(key) / IMAGE_SIZE)
 		_set_pixel(image, point.x, point.y, core[key])
 
 
@@ -599,6 +848,14 @@ static func _rect(image: Image, x: int, y: int, width: int, height: int, color: 
 static func _set_pixel(image: Image, x: int, y: int, color: Color) -> void:
 	if x >= 0 and x < IMAGE_SIZE and y >= 0 and y < IMAGE_SIZE:
 		image.set_pixel(x, y, color)
+
+
+static func _luminance_delta(first: Color, second: Color) -> float:
+	return absf(
+		(first.r - second.r) * 0.2126
+		+ (first.g - second.g) * 0.7152
+		+ (first.b - second.b) * 0.0722
+	)
 
 
 static func _key(x: int, y: int) -> int:

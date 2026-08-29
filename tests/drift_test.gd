@@ -12,6 +12,10 @@ func _run_test() -> void:
 	root.add_child(prototype)
 	current_scene = prototype
 
+	for settle in 6:
+		await create_timer(0.1).timeout
+	paused = false
+
 	for _frame in 5:
 		await physics_frame
 

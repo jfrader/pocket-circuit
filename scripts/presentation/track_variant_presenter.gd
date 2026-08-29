@@ -32,13 +32,11 @@ func configure(track_root: Node2D, requested_theme: StringName) -> void:
 			_prepare_runtime_variant()
 			_build_workshop_presentation()
 			_configure_obstacles(_workshop_obstacles())
-			_configure_labels("WORKSHOP NIGHT SHIFT", "PAINT-CAN CHICANE", "OIL / SAWDUST", "TOOL RUN", "←  METAL STRAIGHT")
 		&"office":
 			base_surface_name = &"desk mat"
 			_prepare_runtime_variant()
 			_build_office_presentation()
 			_configure_obstacles(_office_obstacles())
-			_configure_labels("OFFICE LAST LIGHT", "KEYCAP CHICANE", "PAPER CUT", "CABLE TURN", "←  DESK-MAT STRAIGHT")
 		_:
 			base_surface_name = &"polished counter"
 			_build_kitchen_presentation()
@@ -194,46 +192,12 @@ func _create_hazard() -> void:
 	hazard.configure(theme, travel_start, travel_end)
 
 
-func _configure_labels(_title: String, _chicane: String, _shortcut: String, _technical: String, _speed: String) -> void:
-	var labels := _track.get_node_or_null("Labels") as CanvasItem
-	if labels:
-		labels.visible = false
-
-
 func _show_polygon(path: String, color: Color) -> void:
 	var polygon := _track.get_node_or_null(path) as Polygon2D
 	if polygon:
 		polygon.visible = true
 		polygon.texture = null
 		polygon.color = color
-
-
-func _add_obstacle_label(obstacle: StaticBody2D, text: String) -> void:
-	var label := Label.new()
-	label.name = "RuntimeLabel"
-	label.position = Vector2(-80.0, -24.0)
-	label.size = Vector2(160.0, 48.0)
-	label.text = text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 13)
-	label.add_theme_color_override("font_color", CREAM)
-	label.add_theme_color_override("font_outline_color", INK)
-	label.add_theme_constant_override("outline_size", 4)
-	obstacle.add_child(label)
-
-
-func _add_world_sign(parent: Node2D, sign_position: Vector2, text: String, paper_color: Color, text_color: Color) -> void:
-	_add_polygon(parent, "PaperSign", _rect_points(sign_position, Vector2(250.0, 105.0)), paper_color, 4)
-	var label := Label.new()
-	label.position = sign_position - Vector2(125.0, 48.0)
-	label.size = Vector2(250.0, 96.0)
-	label.text = text
-	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	label.add_theme_font_size_override("font_size", 20)
-	label.add_theme_color_override("font_color", text_color)
-	parent.add_child(label)
 
 
 func _add_polygon(parent: Node2D, node_name: String, points: PackedVector2Array, color: Color, z: int) -> Polygon2D:

@@ -8,7 +8,7 @@ const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker"]
 
 
 func _initialize() -> void:
-	if not _expect(IDENTITIES.SOURCE_REVISION == "cb4ae73df94b60590b7dea95f09a7209775be9e1", "the vendored source revision should stay pinned"):
+	if not _expect(IDENTITIES.SOURCE_REVISION == "f8eb03805f3fcc30fec56553033ad01988ef7857", "the vendored source revision should stay pinned"):
 		return
 	for driver_id: String in DRIVER_IDS:
 		var mapping: Dictionary = CATALOG.get_driver(driver_id).get("avatar_art", {})

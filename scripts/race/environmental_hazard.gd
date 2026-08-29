@@ -21,7 +21,6 @@ const HAZARD_SPRITES := {
 @export_range(0.4, 1.0, 0.01) var impact_slow_multiplier := 0.78
 
 var theme: StringName = &"kitchen"
-var hazard_name := "ROLLING FRUIT"
 var state: HazardState = HazardState.WARNING
 var start_position := Vector2.ZERO
 var end_position := Vector2.ZERO
@@ -145,16 +144,6 @@ func _build_visuals() -> void:
 	warning_line.points = PackedVector2Array([start_position, end_position])
 	warning_line.antialiased = true
 	_warning_visual.add_child(warning_line)
-	var warning_label := Label.new()
-	warning_label.position = start_position.lerp(end_position, 0.5) - Vector2(105.0, 48.0)
-	warning_label.size = Vector2(210.0, 32.0)
-	warning_label.text = "!  %s  !" % _theme_hazard_name()
-	warning_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	warning_label.add_theme_font_size_override("font_size", 16)
-	warning_label.add_theme_color_override("font_color", AMBER)
-	warning_label.add_theme_color_override("font_outline_color", INK)
-	warning_label.add_theme_constant_override("outline_size", 5)
-	_warning_visual.add_child(warning_label)
 
 	_moving_visual = Node2D.new()
 	_moving_visual.name = "MovingHazard"
@@ -165,13 +154,11 @@ func _build_visuals() -> void:
 	polygon.name = "HazardBody"
 	match theme:
 		&"workshop":
-			hazard_name = "SLIDING SOCKET"
 			polygon.color = Color("bcc4c9")
 			polygon.polygon = _regular_polygon(30.0, 6)
 			shape = CircleShape2D.new()
 			(shape as CircleShape2D).radius = 29.0
 		&"office":
-			hazard_name = "SWINGING CABLE"
 			polygon.color = Color("6f91b8")
 			polygon.polygon = PackedVector2Array([
 				Vector2(-30.0, -18.0), Vector2(30.0, -18.0),
@@ -186,7 +173,6 @@ func _build_visuals() -> void:
 			cable.antialiased = true
 			_moving_visual.add_child(cable)
 		_:
-			hazard_name = "ROLLING FRUIT"
 			polygon.color = Color("e96b4c")
 			polygon.polygon = _regular_polygon(31.0, 12)
 			shape = CircleShape2D.new()
@@ -217,16 +203,6 @@ func _build_visuals() -> void:
 	_collision.name = "HazardCollision"
 	_collision.shape = shape
 	add_child(_collision)
-
-
-func _theme_hazard_name() -> String:
-	match theme:
-		&"workshop":
-			return "SOCKET CROSSING"
-		&"office":
-			return "CABLE SWING"
-		_:
-			return "FRUIT CROSSING"
 
 
 func _regular_polygon(radius: float, sides: int) -> PackedVector2Array:

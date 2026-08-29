@@ -14,7 +14,7 @@ logos, branding, or borrowed melodies.
 
 The deterministic portrait and car generators are adapted from the first-party
 Gurisitos Games Procedural 2D project at revision
-`cb4ae73df94b60590b7dea95f09a7209775be9e1`. The vendored source, catalogs,
+`f8eb03805f3fcc30fec56553033ad01988ef7857`. The vendored source, catalogs,
 local compatibility edits, and MIT terms are shipped with the game.
 
 Third-party material is limited to Godot Engine and the Kenney CC0 review

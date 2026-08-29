@@ -17,7 +17,6 @@
 [ext_resource type="Texture2D" uid="uid://dlywy0e7lsodq" path="res://assets/textures/kitchen/track_surface.png" id="12_16w8u"]
 [ext_resource type="Texture2D" uid="uid://ivv4e62vkuvm" path="res://assets/textures/kitchen/wet_spill.png" id="13_y73v3"]
 [ext_resource type="Texture2D" uid="uid://b35sjchw174x7" path="res://assets/textures/kitchen/counter_edge.png" id="15_dgg4m"]
-[ext_resource type="Texture2D" uid="uid://byjwtk5kjuet1" path="res://assets/textures/imagine/kitchen_start_finish.png" id="17_03pr4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xb7yb"]
 size = Vector2(2000, 50)
@@ -114,16 +113,14 @@ color = Color(0.1, 0.55, 0.62, 0.58)
 polygon = PackedVector2Array(-40, -485, 330, -485, 350, -255, -70, -255)
 
 [node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=689139309]
-visible = false
 z_index = -7
 color = Color(0.96, 0.93, 0.82, 1)
-polygon = PackedVector2Array(-712, 245, -690, 245, -690, 490, -712, 490)
+polygon = PackedVector2Array(-875, 223, -595, 223, -595, 257, -875, 257)
 
 [node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=2091006546]
-visible = false
 z_index = -6
 color = Color(0.05, 0.06, 0.08, 1)
-polygon = PackedVector2Array(-712, 280, -690, 280, -690, 330, -712, 330, -712, 380, -690, 380, -690, 430, -712, 430)
+polygon = PackedVector2Array(-875, 226, -835, 226, -835, 254, -875, 254, -805, 226, -765, 226, -765, 254, -805, 254, -735, 226, -695, 226, -695, 254, -735, 254, -665, 226, -625, 226, -625, 254, -665, 254)
 
 [node name="TopWall" type="StaticBody2D" parent="." unique_id=86774874]
 position = Vector2(0, -575)
@@ -397,77 +394,8 @@ rotation = 1.5708
 scale = Vector2(0.28, 0.28)
 texture = ExtResource("12_03pr4")
 
-[node name="Labels" type="Node2D" parent="." unique_id=1231572064]
-visible = false
-
-[node name="Title" type="Label" parent="Labels" unique_id=1188845261]
-visible = false
-offset_left = -220.0
-offset_top = -80.0
-offset_right = -220.0
-offset_bottom = -80.0
-theme_override_colors/font_color = Color(0.8, 0.68, 0.5, 0.55)
-theme_override_font_sizes/font_size = 30
-text = "KITCHEN COUNTER CIRCUIT"
-
-[node name="Opening" type="Label" parent="Labels" unique_id=784336664]
-offset_left = -420.0
-offset_top = 500.0
-offset_right = -420.0
-offset_bottom = 500.0
-theme_override_colors/font_color = Color(0.960784, 0.941176, 0.890196, 0.7)
-theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 16
-text = "START / FINISH  →"
-
-[node name="Chicane" type="Label" parent="Labels" unique_id=1817114360]
-offset_left = 30.0
-offset_top = 170.0
-offset_right = 30.0
-offset_bottom = 170.0
-theme_override_colors/font_color = Color(0.960784, 0.941176, 0.890196, 0.66)
-theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 16
-text = "MUG CHICANE"
-
-[node name="Shortcut" type="Label" parent="Labels" unique_id=349292962]
-offset_left = -10.0
-offset_top = -230.0
-offset_right = -10.0
-offset_bottom = -230.0
-theme_override_colors/font_color = Color(0.76, 0.94, 0.9, 0.76)
-theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 16
-text = "SPONGE SHORTCUT"
-
-[node name="Technical" type="Label" parent="Labels" unique_id=327962199]
-offset_left = 660.0
-offset_top = -20.0
-offset_right = 660.0
-offset_bottom = -20.0
-rotation = -1.5707963
-theme_override_colors/font_color = Color(0.960784, 0.941176, 0.890196, 0.62)
-theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 16
-text = "TECHNICAL"
-
-[node name="Speed" type="Label" parent="Labels" unique_id=1863446097]
-offset_left = 250.0
-offset_top = -530.0
-offset_right = 250.0
-offset_bottom = -530.0
-theme_override_colors/font_color = Color(0.960784, 0.941176, 0.890196, 0.62)
-theme_override_colors/font_outline_color = Color(0.101961, 0.121569, 0.137255, 0.9)
-theme_override_constants/outline_size = 4
-theme_override_font_sizes/font_size = 16
-text = "←  TOP STRAIGHT"
-
 [node name="Checkpoint0Finish" parent="." unique_id=182880676 instance=ExtResource("1_nkdn3")]
-position = Vector2(-700, 360)
+position = Vector2(-735, 240)
 rotation = 1.5707963
 is_finish_line = true
 recovery_rotation = 3.1415927
@@ -554,13 +482,6 @@ position = Vector2(140, -370)
 rotation = 0.025
 scale = Vector2(0.82, 0.72)
 texture = ExtResource("13_y73v3")
-
-[node name="StartFinish" type="Sprite2D" parent="ArtSurfaces" unique_id=1907913757]
-z_index = -6
-position = Vector2(-701, 367.5)
-rotation = 1.5707964
-scale = Vector2(0.22, 0.22)
-texture = ExtResource("17_03pr4")
 
 [node name="CounterEdge" type="Sprite2D" parent="ArtSurfaces" unique_id=2123962952]
 z_index = -5

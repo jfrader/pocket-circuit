@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://ct7sd2710q71l" path="res://scripts/race/checkpoint.gd" id="1_jqkdl"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_jqkdl"]
-size = Vector2(34, 260)
+size = Vector2(34, 280)
 
 [node name="Checkpoint" type="Area2D" unique_id=182880676 groups=["track_checkpoints"]]
 visible = false

@@ -55,27 +55,44 @@
     "hood": [
       {"id": "smooth", "display_name": "Smooth Hood"},
       {"id": "twin_vents", "display_name": "Twin-Vent Hood"},
-      {"id": "power_scoop", "display_name": "Power-Scoop Hood"}
+      {"id": "power_scoop", "display_name": "Power-Scoop Hood"},
+      {"id": "flat", "display_name": "Flat Hood"},
+      {"id": "dual_scoop", "display_name": "Dual-Scoop Hood"},
+      {"id": "ridged", "display_name": "Ridged Hood"}
     ],
     "cabin": [
       {"id": "bubble", "display_name": "Bubble Cabin"},
       {"id": "angular", "display_name": "Angular Cabin"},
-      {"id": "panoramic", "display_name": "Panoramic Cabin"}
+      {"id": "panoramic", "display_name": "Panoramic Cabin"},
+      {"id": "low", "display_name": "Low Cabin"},
+      {"id": "notched", "display_name": "Notched Cabin"},
+      {"id": "fastback", "display_name": "Fastback Cabin"},
+      {"id": "cage", "display_name": "Cage Cabin"}
     ],
     "bumpers": [
       {"id": "chrome", "display_name": "Chrome Bumpers"},
       {"id": "sport", "display_name": "Sport Bumpers"},
-      {"id": "utility", "display_name": "Utility Bumpers"}
+      {"id": "utility", "display_name": "Utility Bumpers"},
+      {"id": "slim", "display_name": "Slim Bumpers"},
+      {"id": "wide", "display_name": "Wide Bumpers"},
+      {"id": "pipe", "display_name": "Pipe Bumpers"}
     ],
     "wheels": [
       {"id": "classic", "display_name": "Classic Wheels"},
       {"id": "mesh", "display_name": "Mesh Wheels"},
-      {"id": "rugged", "display_name": "Rugged Wheels"}
+      {"id": "rugged", "display_name": "Rugged Wheels"},
+      {"id": "spoke", "display_name": "Spoke Wheels"},
+      {"id": "disc", "display_name": "Disc Wheels"},
+      {"id": "open", "display_name": "Open Wheels"},
+      {"id": "beadlock", "display_name": "Beadlock Wheels"}
     ],
     "spoiler": [
       {"id": "none", "display_name": "No Spoiler"},
       {"id": "lip", "display_name": "Deck-Lip Spoiler"},
-      {"id": "wing", "display_name": "Raised Wing"}
+      {"id": "wing", "display_name": "Raised Wing"},
+      {"id": "tall", "display_name": "Tall Spoiler"},
+      {"id": "winged", "display_name": "Winged Spoiler"},
+      {"id": "hoop", "display_name": "Rear Hoop"}
     ],
     "livery": [
       {"id": "solid", "display_name": "Solid"},
@@ -83,7 +100,13 @@
       {"id": "twin_stripe", "display_name": "Twin Stripes"},
       {"id": "side_flash", "display_name": "Side Flash"},
       {"id": "checker", "display_name": "Checker Band"},
-      {"id": "sunburst", "display_name": "Sunburst"}
+      {"id": "sunburst", "display_name": "Sunburst"},
+      {"id": "hood_stripe", "display_name": "Hood Stripe"},
+      {"id": "side_swoosh", "display_name": "Side Swoosh"},
+      {"id": "two_tone", "display_name": "Two-Tone Split"},
+      {"id": "racing_stripe", "display_name": "Racing Stripe"},
+      {"id": "dust_kick", "display_name": "Dust Kick"},
+      {"id": "hash_marks", "display_name": "Hash Marks"}
     ]
   }
 }

@@ -1,7 +1,7 @@
 class_name ProceduralIdentityLibrary
 extends RefCounted
 
-const SOURCE_REVISION := "cb4ae73df94b60590b7dea95f09a7209775be9e1"
+const SOURCE_REVISION := "f8eb03805f3fcc30fec56553033ad01988ef7857"
 const CATALOG := preload("res://data/championship/catalog.gd")
 const AVATAR_GENERATOR := preload("res://scripts/vendor/procedural_2d/procedural_avatar_generator.gd")
 const AVATAR_SPRITES := preload("res://scripts/vendor/procedural_2d/procedural_avatar_sprites.gd")

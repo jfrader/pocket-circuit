@@ -33,6 +33,10 @@ func _run_direction(direction_label: String, reverse: bool) -> bool:
 		player.collision_layer = 0
 		player.collision_mask = 0
 
+	for settle in 6:
+		await create_timer(0.1).timeout
+	paused = false
+
 	var checkpoint_counts: Dictionary = {}
 	var ai_vehicles: Array[Node2D] = []
 	for racer: Node in get_nodes_in_group("race_vehicle"):

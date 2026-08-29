@@ -28,7 +28,12 @@
   vehicle, garage, and route illustrations; the garage visibly presents the
   full four-car roster, unlock requirements, and focused-machine stats.
 - Driver portraits and race machines now use distinct, deterministic pixel-art
-  identities throughout the championship shell and live races.
+  identities throughout the championship shell and live races, rendered by the
+  refined Procedural 2D avatar and car generators with sharper faces and a
+  wider part catalog.
+- The start/finish checker now sits on the left straight behind the starting
+  grid, and lap gates span the full drivable corridor, so wide lines and brief
+  off-track excursions still count the lap.
 - The title and machine bay now use a high-contrast after-hours workbench
   presentation with one dominant race action and the full four-car roster.
 - Title PLAY starts the championship; Quick Race, Options, Credits, and Quit are real buttons under it.
@@ -50,6 +55,7 @@
 
 ### Fixed
 
+- Debug hazard warnings and on-track section labels no longer appear in races.
 - Menu music now plays a longer melodic loop instead of repeating an alarm-like
   pulse every half second.
 - Championship map and settings metadata remain readable at the release
