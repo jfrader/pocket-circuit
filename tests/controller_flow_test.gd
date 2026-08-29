@@ -26,15 +26,28 @@ func _run_test() -> void:
 	if not _expect(String(shell.get("_screen")) == "title", "gamepad B should navigate back from the championship map"):
 		return
 	await _tap_joypad_button(12)
-	await _tap_joypad_button(12)
+	await _tap_joypad_button(14)
+	var focused_title_action := root.get_viewport().gui_get_focus_owner() as Button
+	if not _expect(focused_title_action != null and focused_title_action.text == "QUICK RACE", "controller navigation should focus Quick Race before it is accepted"):
+		return
 	await _tap_joypad_button(0)
 	if not _expect(String(shell.get("_screen")) == "quick_race", "gamepad A should open Quick Race from the title screen"):
 		return
 	await _tap_joypad_button(0)
-	if not _expect(String(shell.get("_screen")) == "vehicle_select" and bool(shell.get("_quick_race")), "gamepad A should accept the focused Quick Race circuit"):
+	await _wait_until(func() -> bool: return String(shell.get("_screen")) == "vehicle_select", 30)
+	if not _expect(bool(shell.get("_quick_race")), "gamepad A should accept the focused Quick Race circuit"):
 		return
 	await _tap_joypad_button(0)
-	await _wait_frames(3)
+	await _tap_joypad_button(12)
+	await _wait_until(func() -> bool:
+		var focused := root.get_viewport().gui_get_focus_owner() as Button
+		return focused != null and focused.text == "PLAY"
+	, 30)
+	var focused_vehicle_action := root.get_viewport().gui_get_focus_owner() as Button
+	if not _expect(focused_vehicle_action != null and focused_vehicle_action.text == "PLAY", "controller navigation should focus PLAY after choosing a vehicle"):
+		return
+	await _tap_joypad_button(0)
+	await _wait_until(func() -> bool: return current_scene != null and current_scene.scene_file_path == RACE_SCENE.resource_path, 60)
 	var race := current_scene
 	var session: Dictionary = app.call("get_current_race_session")
 	if not _expect(
@@ -45,6 +58,7 @@ func _run_test() -> void:
 			"accepting the focused Quick Race vehicle should load the race and keep the tree alive"
 	):
 		return
+	await _wait_until(func() -> bool: return race.get("_pause_overlay") != null and bool(race.get("_countdown_active")), 60)
 	await _tap_joypad_button(6)
 	var pause_overlay := race.get("_pause_overlay") as Control
 	if not _expect(paused and pause_overlay.visible, "gamepad Start should pause during the countdown"):
@@ -61,7 +75,6 @@ func _run_test() -> void:
 	await _tap_joypad_button(1)
 	if not _expect(not paused and not pause_overlay.visible, "gamepad B should resume from the pause menu"):
 		return
-
 	root.remove_child(race)
 	race.free()
 	current_scene = null
@@ -83,6 +96,13 @@ func _tap_joypad_button(button_index: int) -> void:
 
 func _wait_frames(count: int) -> void:
 	for frame in count:
+		await process_frame
+
+
+func _wait_until(condition: Callable, max_frames: int) -> void:
+	for frame in max_frames:
+		if bool(condition.call()):
+			return
 		await process_frame
 
 

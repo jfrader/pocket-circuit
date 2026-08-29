@@ -9,8 +9,6 @@ const AMBER := Color("f4c65a")
 const RUST := Color("e85a2e")
 const CYAN := Color("4a8fb8")
 const DARK_METER := Color("27313a")
-const HUD_TOP := preload("res://assets/ui/imagine/hud_top_plate.png")
-const HUD_BOTTOM := preload("res://assets/ui/imagine/hud_bottom_plate.png")
 
 var race_position := 1
 var racer_count := 4
@@ -57,54 +55,57 @@ func _draw() -> void:
 	if size.x < 640.0 or size.y < 360.0:
 		return
 	var font := ThemeDB.fallback_font
-	var top_height := 76.0
-	var bottom_top := size.y - 48.0
-
-	draw_rect(Rect2(0.0, 0.0, size.x, top_height), Color(INK, 0.88))
-	draw_texture_rect(HUD_TOP, Rect2(0.0, 0.0, size.x, top_height), false)
-	draw_rect(Rect2(0.0, top_height - 4.0, size.x, 4.0), AMBER)
-
-	draw_string(font, Vector2(28.0, 25.0), "POSITION", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 13, MUTED)
-	draw_string(font, Vector2(28.0, 65.0), _ordinal(race_position), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 42, RUST)
-	draw_string(font, Vector2(166.0, 59.0), "/ %d" % racer_count, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 22, PAPER)
-
-	draw_string(font, Vector2(276.0, 25.0), "LAP", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 13, MUTED)
-	draw_string(font, Vector2(276.0, 61.0), "%d / %d" % [current_lap, lap_total], HORIZONTAL_ALIGNMENT_LEFT, -1.0, 31, PAPER)
-	draw_string(font, Vector2(480.0, 25.0), event_name, HORIZONTAL_ALIGNMENT_LEFT, 390.0, 13, AMBER)
-	draw_string(font, Vector2(480.0, 61.0), _format_time(elapsed_seconds), HORIZONTAL_ALIGNMENT_LEFT, -1.0, 31, PAPER)
-
-	var display_speed := roundi(speed_ratio * 180.0)
-	draw_string(font, Vector2(936.0, 25.0), "SPEED", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 13, MUTED)
-	draw_string(font, Vector2(936.0, 63.0), "%03d" % display_speed, HORIZONTAL_ALIGNMENT_LEFT, -1.0, 36, CYAN)
-	draw_string(font, Vector2(1062.0, 59.0), "KM/H", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, PAPER)
-	draw_string(font, Vector2(size.x - 174.0, 25.0), vehicle_name, HORIZONTAL_ALIGNMENT_RIGHT, 150.0, 12, MUTED)
-
-	draw_rect(Rect2(0.0, bottom_top, size.x, 48.0), Color(INK, 0.88))
-	draw_texture_rect(HUD_BOTTOM, Rect2(0.0, bottom_top, size.x, 48.0), false)
-	draw_string(font, Vector2(24.0, bottom_top + 33.0), "BOOST", HORIZONTAL_ALIGNMENT_LEFT, -1.0, 18, PAPER)
-	_draw_boost_meter(Rect2(112.0, bottom_top + 14.0, 392.0, 20.0))
-	draw_string(font, Vector2(size.x - 444.0, bottom_top + 31.0), "R  RECOVER     ESC / START  PAUSE", HORIZONTAL_ALIGNMENT_RIGHT, 420.0, 13, MUTED)
-
+	_draw_position_cluster(font)
+	_draw_clock_cluster(font)
+	_draw_speed_cluster(font)
 	if wrong_way:
-		var warning_rect := Rect2(size.x * 0.5 - 176.0, 96.0, 352.0, 48.0)
-		draw_rect(warning_rect, Color(INK, 0.94))
-		draw_rect(Rect2(warning_rect.position, Vector2(8.0, warning_rect.size.y)), RUST)
-		draw_rect(Rect2(warning_rect.end - Vector2(8.0, warning_rect.size.y), Vector2(8.0, warning_rect.size.y)), RUST)
-		draw_string(font, warning_rect.position + Vector2(0.0, 34.0), "WRONG WAY", HORIZONTAL_ALIGNMENT_CENTER, warning_rect.size.x, 26, RUST)
+		_draw_wrong_way(font)
 
 
-func _draw_boost_meter(rect: Rect2) -> void:
-	draw_rect(rect, DARK_METER)
-	var segment_count := 10
-	var gap := 4.0
-	var segment_width := (rect.size.x - gap * float(segment_count + 1)) / float(segment_count)
-	var active_segments := ceili(boost_ratio * float(segment_count))
-	for index in segment_count:
-		var segment_rect := Rect2(rect.position + Vector2(gap + float(index) * (segment_width + gap), gap), Vector2(segment_width, rect.size.y - gap * 2.0))
-		var segment_color := AMBER if index < active_segments else Color("39434d")
-		if index < active_segments and index >= 7:
-			segment_color = RUST
-		draw_rect(segment_rect, segment_color)
+func _outlined(font: Font, pos: Vector2, text: String, width: float, font_size: int, color: Color, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT) -> void:
+	draw_string_outline(font, pos, text, alignment, width, font_size, 8, INK)
+	draw_string(font, pos, text, alignment, width, font_size, color)
+
+
+func _draw_position_cluster(font: Font) -> void:
+	_outlined(font, Vector2(36.0, 86.0), _ordinal(race_position), -1.0, 72, RUST)
+	_outlined(font, Vector2(36.0, 112.0), "POS  %d / %d" % [race_position, racer_count], -1.0, 16, MUTED)
+
+
+func _draw_clock_cluster(font: Font) -> void:
+	var width := 280.0
+	var left := size.x - width - 36.0
+	_outlined(font, Vector2(left, 48.0), _format_time(elapsed_seconds), width, 30, PAPER, HORIZONTAL_ALIGNMENT_RIGHT)
+	_outlined(font, Vector2(left, 76.0), "LAP  %d / %d" % [current_lap, lap_total], width, 18, AMBER, HORIZONTAL_ALIGNMENT_RIGHT)
+	_outlined(font, Vector2(left, 98.0), event_name, width, 13, MUTED, HORIZONTAL_ALIGNMENT_RIGHT)
+
+
+func _draw_speed_cluster(font: Font) -> void:
+	var center := Vector2(size.x - 158.0, size.y - 142.0)
+	var start_angle := deg_to_rad(140.0)
+	var end_angle := deg_to_rad(400.0)
+	var span := end_angle - start_angle
+	var speed := clampf(speed_ratio, 0.0, 1.0)
+	var speed_color := CYAN if speed < 0.86 else RUST
+	draw_circle(center, 108.0, Color(INK, 0.38))
+	draw_arc(center, 92.0, start_angle, end_angle, 52, Color(0.1, 0.133, 0.173, 0.95), 16.0, true)
+	draw_arc(center, 92.0, start_angle, start_angle + span * speed, 52, speed_color, 16.0, true)
+	draw_arc(center, 74.0, start_angle, end_angle, 36, Color("24303a"), 8.0, true)
+	draw_arc(center, 74.0, start_angle, start_angle + span * boost_ratio, 36, AMBER, 8.0, true)
+	var kmh := "%03d" % roundi(speed_ratio * 180.0)
+	_outlined(font, Vector2(center.x - 90.0, center.y + 8.0), kmh, 180.0, 48, PAPER, HORIZONTAL_ALIGNMENT_CENTER)
+	_outlined(font, Vector2(center.x - 90.0, center.y + 34.0), "KM/H", 180.0, 14, CYAN, HORIZONTAL_ALIGNMENT_CENTER)
+	_outlined(font, Vector2(center.x - 90.0, center.y + 56.0), vehicle_name, 180.0, 13, MUTED, HORIZONTAL_ALIGNMENT_CENTER)
+	_outlined(font, Vector2(center.x - 90.0, center.y + 80.0), "BOOST  %d%%" % roundi(boost_ratio * 100.0), 180.0, 12, AMBER, HORIZONTAL_ALIGNMENT_CENTER)
+	_outlined(font, Vector2(32.0, size.y - 28.0), "R  RECOVER      ESC / START  PAUSE", -1.0, 14, Color(MUTED, 0.9))
+
+
+func _draw_wrong_way(font: Font) -> void:
+	var warning_rect := Rect2(size.x * 0.5 - 176.0, 128.0, 352.0, 48.0)
+	draw_rect(warning_rect, Color(INK, 0.86))
+	draw_rect(Rect2(warning_rect.position, Vector2(8.0, warning_rect.size.y)), RUST)
+	draw_rect(Rect2(warning_rect.end - Vector2(8.0, warning_rect.size.y), Vector2(8.0, warning_rect.size.y)), RUST)
+	_outlined(font, warning_rect.position + Vector2(0.0, 34.0), "WRONG WAY", warning_rect.size.x, 26, RUST, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _format_time(total_seconds: float) -> String:

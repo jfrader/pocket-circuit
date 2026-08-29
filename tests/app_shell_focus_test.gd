@@ -79,7 +79,7 @@ func _run_test() -> void:
 	await process_frame
 	await process_frame
 	focus_owner = root.get_viewport().gui_get_focus_owner()
-	if focus_owner == null or focus_owner.get("text") != "RACE  ·  CONTINUE CHAMPIONSHIP":
+	if focus_owner == null or focus_owner.get("text") != "PLAY":
 		push_error("APP_SHELL_FOCUS_TEST FAIL: returning to another screen should focus a live control")
 		quit(1)
 		return

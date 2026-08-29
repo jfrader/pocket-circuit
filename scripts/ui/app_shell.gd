@@ -2,11 +2,7 @@ extends CanvasLayer
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
-const LOGO_TEXTURE := preload("res://assets/ui/imagine/logo_lockup.png")
-const MENU_BACKGROUND := preload("res://assets/ui/imagine/menu_night_kitchen.png")
-const BTN_PRIMARY := preload("res://assets/ui/imagine/btn_primary.png")
-const BTN_SECONDARY := preload("res://assets/ui/imagine/btn_secondary.png")
-const BTN_FOCUS := preload("res://assets/ui/imagine/btn_focus.png")
+const MENU_BACKGROUND := preload("res://assets/ui/imagine/menu_night_kitchen_cartoon.png")
 
 const INK := Color("0e151f")
 const PAPER := Color("f5f0e3")
@@ -32,15 +28,12 @@ var _quick_race_act_number := 1
 var _content_tween: Tween
 var _entrance_generation := 0
 var _save_error_back_action := Callable()
-var _btn_primary_tex: Texture2D
-var _btn_secondary_tex: Texture2D
-var _btn_focus_tex: Texture2D
+var _current_vehicle_select_id := ""
 
 
 func configure(app: Node) -> void:
 	_app = app
 	if _root == null:
-		_load_button_textures()
 		_build_base()
 
 
@@ -56,23 +49,25 @@ func show_title() -> void:
 	var has_progress := bool(_app.call("has_championship_progress"))
 	if save_read_only:
 		_add_copy("READ-ONLY SAVE · NEWER FILE DETECTED · FILE UNTOUCHED", CORAL)
+	elif has_progress:
+		_add_copy("CHAMPIONSHIP IN PROGRESS · PLAY CONTINUES YOUR RUN", AMBER)
 	else:
-		_add_copy("THREE ROOMS  /  NINE EVENTS  /  FOUR MACHINES", MUTED)
+		_add_copy("START YOUR CHAMPIONSHIP", AMBER)
 	_add_spacer(8)
-	_add_primary_button(
-		"RACE  ·  CONTINUE CHAMPIONSHIP" if has_progress else "RACE  ·  START CHAMPIONSHIP",
+	_add_big_play_button(
 		Callable(_app, "continue_championship") if has_progress else Callable(_app, "request_new_championship"),
 		save_read_only and not has_progress
 	)
+	_add_spacer(6)
 	var race_actions: Array[Dictionary] = []
 	if has_progress:
-		race_actions.append({"text": "NEW RUN", "callback": Callable(_app, "request_new_championship"), "accent": CORAL, "disabled": save_read_only})
-	race_actions.append({"text": "QUICK RACE", "callback": Callable(_app, "open_quick_race"), "accent": BLUE, "disabled": false})
+		race_actions.append({"text": "NEW RUN", "callback": Callable(_app, "request_new_championship"), "accent": CREAM, "disabled": save_read_only})
+	race_actions.append({"text": "QUICK RACE", "callback": Callable(_app, "open_quick_race"), "accent": CREAM, "disabled": false})
 	_add_action_row(race_actions)
 	_add_action_row([
 		{"text": "OPTIONS", "callback": Callable(self, "show_settings"), "accent": CREAM, "disabled": false},
 		{"text": "CREDITS", "callback": Callable(self, "show_credits"), "accent": CREAM, "disabled": false},
-		{"text": "QUIT", "callback": Callable(_app, "quit_game"), "accent": CORAL, "disabled": false},
+		{"text": "QUIT", "callback": Callable(_app, "quit_game"), "accent": CREAM, "disabled": false},
 	])
 	_footer.text = "ARROWS / STICK  MOVE     ·     ENTER / A  SELECT"
 	_focus_first()
@@ -247,10 +242,10 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	var event := CATALOG.get_event(event_id)
 	_add_kicker("QUICK RACE · %s" % String(event.get("name", "EVENT")) if quick_race else "GARAGE · %s" % String(event.get("name", "EVENT")))
 	_add_heading("Choose machine")
-	_add_copy("FOUR MACHINES  /  NO BEST PICK  /  COMMIT TO A LINE", MUTED)
 	_add_copy("%s  ·  %s" % [String(event.get("environment", "CIRCUIT")), String(event.get("format", "RACE"))], BLUE)
 	var progress: Dictionary = _app.call("get_save_data")
-	var selected_vehicle := String(progress.get("selected_vehicle", "rustbug"))
+	var selected_vehicle: String = String(progress.get("selected_vehicle", "rustbug"))
+	_current_vehicle_select_id = selected_vehicle
 	var unlocked_vehicles: Array = progress.get("unlocked_vehicles", ["rustbug"])
 	var event_theme := String(event.get("theme", "kitchen"))
 	_configure_stage(&"vehicle", selected_vehicle, "rae", event_theme, "", unlocked_vehicles)
@@ -259,24 +254,26 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 		var vehicle: Dictionary = CATALOG.VEHICLES[vehicle_index]
 		var vehicle_id := String(vehicle["id"])
 		var unlocked := vehicle_id in unlocked_vehicles
-		var access := "READY" if unlocked else "LOCKED · %s" % String(vehicle["unlock"])
-		var summary := "%02d  /  %s  /  %s  /  %s" % [vehicle_index + 1, String(vehicle["name"]), String(vehicle["archetype"]), access]
+		var access := "READY" if unlocked else "LOCKED"
+		var summary := "%s  ·  %s" % [String(vehicle["name"]), access]
 		var vehicle_button := _add_button(
 			summary,
-			Callable(self, "_start_with_vehicle").bind(vehicle_id),
+			func(): _select_vehicle_for_play(vehicle_id, event_theme, unlocked_vehicles),
 			Color.from_string(String(vehicle["tint"]), AMBER),
 			not unlocked,
 			"Vehicle_%s" % vehicle_id
 		)
-		vehicle_button.custom_minimum_size = Vector2(0.0, 50.0)
-		vehicle_button.add_theme_font_size_override("font_size", 15)
+		vehicle_button.custom_minimum_size = Vector2(0.0, 48.0)
+		vehicle_button.add_theme_font_size_override("font_size", 16)
 		if unlocked:
 			vehicle_button.focus_entered.connect(_preview_vehicle.bind(vehicle_id, event_theme, unlocked_vehicles))
 			vehicle_button.mouse_entered.connect(_preview_vehicle.bind(vehicle_id, event_theme, unlocked_vehicles))
 		if vehicle_id == selected_vehicle:
 			selected_button = vehicle_button
+	_add_spacer(8)
+	_add_big_play_button(Callable(self, "_start_current_selected_vehicle"), false)
 	_add_button("BACK", Callable(self, "go_back"), CREAM)
-	_footer.text = "ENTER / A  RACE     ·     ESC / B  BACK"
+	_footer.text = "ENTER / A  SELECT     ·     PLAY  RACE     ·     ESC / B  BACK"
 	if selected_button:
 		_queue_content_entrance()
 		_grab_button_focus_after_layout(selected_button, _entrance_generation)
@@ -433,7 +430,7 @@ func _build_base() -> void:
 	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	backdrop.modulate = Color(1.0, 1.0, 1.0, 0.42)
+	backdrop.modulate = Color.WHITE
 	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(backdrop)
 	var top_rail := ColorRect.new()
@@ -455,7 +452,6 @@ func _build_base() -> void:
 	bench_rail.color = WORKBENCH
 	bench_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(bench_rail)
-
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	margin.add_theme_constant_override("margin_left", 48)
@@ -471,8 +467,7 @@ func _build_base() -> void:
 	brand.add_theme_font_size_override("font_size", 13)
 	brand.add_theme_color_override("font_color", AMBER)
 	page.add_child(brand)
-	var separator := HSeparator.new()
-	page.add_child(separator)
+	page.add_child(HSeparator.new())
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	body.add_theme_constant_override("separation", 16)
@@ -516,11 +511,21 @@ func _make_theme() -> Theme:
 	theme.set_font_size("font_size", "Button", 18)
 	theme.set_font_size("font_size", "OptionButton", 18)
 	theme.set_font_size("font_size", "CheckButton", 18)
-	theme.set_stylebox("normal", "Button", _style(Color("182333"), Color("46536b"), 0, 2))
-	theme.set_stylebox("hover", "Button", _style(Color("243247"), AMBER, 0, 3))
-	theme.set_stylebox("pressed", "Button", _style(Color("0a111b"), AMBER, 0, 3))
-	theme.set_stylebox("focus", "Button", _style(Color("243247"), AMBER, 0, 5))
-	theme.set_stylebox("disabled", "Button", _style(Color("161e2b"), Color("30394d"), 0, 2))
+	theme.set_stylebox("normal", "Button", _plate(Color("1c2633"), Color("4a5a6c"), 2))
+	theme.set_stylebox("hover", "Button", _plate(Color("2a3646"), AMBER, 2))
+	theme.set_stylebox("pressed", "Button", _plate(Color("17202a"), AMBER, 2))
+	theme.set_stylebox("focus", "Button", _plate(Color("2a3646"), AMBER, 3))
+	theme.set_stylebox("disabled", "Button", _plate(Color("161c24"), Color("2a323c"), 1))
+	theme.set_color("font_hover_color", "Button", CREAM)
+	theme.set_color("font_focus_color", "Button", CREAM)
+	for kind: String in ["OptionButton", "CheckButton"]:
+		theme.set_stylebox("normal", kind, _plate(Color("1c2633"), Color("4a5a6c"), 2))
+		theme.set_stylebox("hover", kind, _plate(Color("2a3646"), AMBER, 2))
+		theme.set_stylebox("pressed", kind, _plate(Color("17202a"), AMBER, 2))
+		theme.set_stylebox("focus", kind, _plate(Color("2a3646"), AMBER, 3))
+		theme.set_color("font_color", kind, PAPER)
+		theme.set_color("font_hover_color", kind, CREAM)
+		theme.set_color("font_focus_color", kind, CREAM)
 	return theme
 
 
@@ -537,41 +542,24 @@ func _style(fill: Color, border: Color, radius: int, width: int = 1) -> StyleBox
 	return box
 
 
-func _load_button_textures() -> void:
-	_btn_primary_tex = BTN_PRIMARY
-	_btn_secondary_tex = BTN_SECONDARY
-	_btn_focus_tex = BTN_FOCUS
-
-
-func _texture_style(texture: Texture2D) -> StyleBoxTexture:
-	var box := StyleBoxTexture.new()
-	box.texture = texture
-	box.texture_margin_left = 32.0
-	box.texture_margin_top = 16.0
-	box.texture_margin_right = 32.0
-	box.texture_margin_bottom = 16.0
-	box.content_margin_left = 22.0
-	box.content_margin_right = 22.0
-	box.content_margin_top = 10.0
-	box.content_margin_bottom = 10.0
-	return box
+func _plate(fill: Color, border: Color, width: int = 2, radius: int = 8) -> StyleBoxFlat:
+	return _style(fill, border, radius, width)
 
 
 func _apply_button_art(button: Button, primary: bool) -> void:
-	var plate := _btn_primary_tex if primary else _btn_secondary_tex
-	var ink := INK if primary else CREAM
-	button.add_theme_color_override("font_color", ink)
+	var fill := CORAL if primary else Color("1c2633")
+	var border := AMBER if primary else Color("4a5a6c")
+	var active_fill := Color("f6a43d") if primary else Color("2a3646")
+	button.add_theme_color_override("font_color", INK if primary else CREAM)
 	button.add_theme_color_override("font_hover_color", INK if primary else AMBER)
 	button.add_theme_color_override("font_focus_color", INK if primary else AMBER)
-	if plate == null:
-		return
-	var normal := _texture_style(plate)
-	var focus := _texture_style(_btn_focus_tex if _btn_focus_tex else plate)
-	button.add_theme_stylebox_override("normal", normal)
-	button.add_theme_stylebox_override("hover", focus)
-	button.add_theme_stylebox_override("pressed", focus)
-	button.add_theme_stylebox_override("focus", focus)
-	button.add_theme_stylebox_override("disabled", normal)
+	button.add_theme_color_override("font_pressed_color", INK if primary else CREAM)
+	button.add_theme_color_override("font_disabled_color", Color(MUTED, 0.55))
+	button.add_theme_stylebox_override("normal", _plate(fill, border, 2))
+	button.add_theme_stylebox_override("hover", _plate(active_fill, AMBER, 2))
+	button.add_theme_stylebox_override("pressed", _plate(fill.darkened(0.16), AMBER, 2))
+	button.add_theme_stylebox_override("focus", _plate(active_fill, AMBER, 3))
+	button.add_theme_stylebox_override("disabled", _plate(Color("161c24"), Color("2a323c"), 1))
 
 
 func _clear_content() -> void:
@@ -597,6 +585,7 @@ func _configure_stage(
 		unlocked_vehicle_ids: Array = ["rustbug"]
 ) -> void:
 	if is_instance_valid(_stage):
+		_stage.visible = mode != &"title"
 		_stage.configure(mode, vehicle_id, driver_id, theme_id, secondary_driver_id, unlocked_vehicle_ids)
 
 
@@ -604,24 +593,29 @@ func _preview_vehicle(vehicle_id: String, event_theme: String, unlocked_vehicles
 	_configure_stage(&"vehicle", vehicle_id, "rae", event_theme, "", unlocked_vehicles)
 
 
+func _select_vehicle_for_play(vehicle_id: String, event_theme: String, unlocked_vehicles: Array) -> void:
+	_current_vehicle_select_id = vehicle_id
+	_configure_stage(&"vehicle", vehicle_id, "rae", event_theme, "", unlocked_vehicles)
+
+
 func _add_title_lockup() -> void:
-	var logo := TextureRect.new()
-	logo.texture = LOGO_TEXTURE
-	logo.custom_minimum_size = Vector2(540.0, 168.0)
-	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	logo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_content.add_child(logo)
+	var pocket := _label("POCKET", 54, CREAM)
+	pocket.add_theme_constant_override("outline_size", 8)
+	pocket.custom_minimum_size = Vector2(0.0, 60.0)
+	_content.add_child(pocket)
+	var circuit := _label("CIRCUIT", 64, AMBER)
+	circuit.add_theme_constant_override("outline_size", 8)
+	circuit.custom_minimum_size = Vector2(0.0, 70.0)
+	_content.add_child(circuit)
 	var tagline := _label("TINY RACING  /  BIG HOUSE", 15, PAPER)
-	tagline.custom_minimum_size = Vector2(0.0, 28.0)
+	tagline.custom_minimum_size = Vector2(0.0, 26.0)
 	_content.add_child(tagline)
 
 
-func _add_primary_button(text: String, callback: Callable, disabled: bool) -> Button:
-	var button := _make_button(text, callback, CORAL, disabled, "PrimaryRaceAction")
+func _add_big_play_button(callback: Callable, disabled: bool) -> Button:
+	var button := _make_button("PLAY", callback, CORAL, disabled)
 	button.custom_minimum_size = Vector2(0.0, 72.0)
-	button.add_theme_font_size_override("font_size", 23)
+	button.add_theme_font_size_override("font_size", 28)
 	_content.add_child(button)
 	if not disabled:
 		_register_button_focus(button)
@@ -643,7 +637,7 @@ func _add_action_row(actions: Array[Dictionary]) -> void:
 			bool(action.get("disabled", false))
 		)
 		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
-		button.custom_minimum_size = Vector2(0.0, 42.0)
+		button.custom_minimum_size = Vector2(0.0, 44.0)
 		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		button.add_theme_font_size_override("font_size", 15)
 		row.add_child(button)
@@ -669,8 +663,8 @@ func _add_kicker(text: String) -> void:
 
 
 func _add_heading(text: String) -> void:
-	var label := _label(text, 44, CREAM)
-	label.custom_minimum_size = Vector2(0.0, 70.0)
+	var label := _label(text, 36, CREAM)
+	label.custom_minimum_size = Vector2(0.0, 52.0)
 	_content.add_child(label)
 
 
@@ -819,6 +813,8 @@ func _label(text: String, size: int, color: Color) -> Label:
 	label.text = text
 	label.add_theme_font_size_override("font_size", size)
 	label.add_theme_color_override("font_color", color)
+	label.add_theme_color_override("font_outline_color", INK)
+	label.add_theme_constant_override("outline_size", 4 if size > 20 else 2)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	return label
 
@@ -924,6 +920,11 @@ func _show_quick_race_act(act_number: int) -> void:
 
 func _start_with_vehicle(vehicle_id: String) -> void:
 	_app.call("start_race", _event_id, vehicle_id, _quick_race)
+
+
+func _start_current_selected_vehicle() -> void:
+	if not _current_vehicle_select_id.is_empty():
+		_start_with_vehicle(_current_vehicle_select_id)
 
 
 func _ordinal(value: int) -> String:

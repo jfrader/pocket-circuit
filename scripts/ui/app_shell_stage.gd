@@ -3,8 +3,6 @@ extends Control
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
-const TITLE_ART := preload("res://assets/ui/imagine/menu_workbench.png")
-
 const INK := Color("0e151f")
 const PANEL := Color("182333")
 const PAPER := Color("f5f0e3")
@@ -73,29 +71,19 @@ func _draw() -> void:
 
 
 func _draw_stage_frame() -> void:
-	var frame := Rect2(Vector2(6.0, 8.0), size - Vector2(12.0, 16.0))
+	var frame := Rect2(Vector2(8.0, 8.0), size - Vector2(16.0, 16.0))
 	draw_rect(frame, PANEL)
-	draw_rect(frame, Color("526278"), false, 3.0)
-	for y in range(40, int(size.y) - 20, 32):
-		draw_line(Vector2(18.0, float(y)), Vector2(size.x - 18.0, float(y)), Color(0.55, 0.68, 0.84, 0.035), 1.0)
-	for x in range(34, int(size.x) - 20, 52):
-		draw_circle(Vector2(float(x), size.y - 22.0), 2.0, Color("718096"))
-	_draw_panel(Rect2(20.0, 20.0, minf(205.0, size.x - 40.0), 30.0), AMBER, CREAM, 0, 2)
-	_draw_text("GHC / AFTER HOURS", Vector2(30.0, 42.0), 13, INK)
-	for bolt_position: Vector2 in [Vector2(24.0, size.y - 24.0), Vector2(size.x - 24.0, size.y - 24.0)]:
-		draw_circle(bolt_position, 8.0, Color("75849a"))
-		draw_line(bolt_position - Vector2(4.0, 0.0), bolt_position + Vector2(4.0, 0.0), INK, 2.0)
-		draw_line(bolt_position - Vector2(0.0, 4.0), bolt_position + Vector2(0.0, 4.0), INK, 2.0)
+	draw_rect(Rect2(frame.position, Vector2(frame.size.x, 3.0)), AMBER)
 
 
 func _draw_title_stage() -> void:
-	_draw_text("BAY 04  /  GRID READY", Vector2(24.0, 82.0), 17, CREAM)
-	_draw_text("KITCHEN COUNTER · 00:17", Vector2(24.0, 104.0), 11, MUTED)
-	var bench := Rect2(22.0, 126.0, size.x - 44.0, size.y - 190.0)
-	draw_rect(bench, WORKBENCH)
-	draw_texture_rect(TITLE_ART, bench, false)
-	draw_rect(bench, Color("816854"), false, 2.0)
-	_draw_tape_label(Rect2(34.0, size.y - 100.0, size.x - 68.0, 48.0), "KITCHEN COUNTER", "AFTER HOURS  ·  GRID READY")
+	_draw_text("TONIGHT", Vector2(24.0, 78.0), 12, MUTED)
+	_draw_text("GRAND HOUSEHOLD", Vector2(24.0, 108.0), 26, CREAM)
+	_draw_text("CIRCUIT", Vector2(24.0, 138.0), 26, AMBER)
+	var center := Vector2(size.x * 0.5, size.y * 0.52)
+	draw_circle(center + Vector2(0.0, 36.0), 118.0, Color(CORAL, 0.12))
+	_draw_vehicle(center, 1.9, "rustbug", -0.12)
+	_draw_text("KITCHEN  ·  WORKSHOP  ·  OFFICE", Vector2(24.0, size.y - 72.0), 13, AMBER, size.x - 48.0, HORIZONTAL_ALIGNMENT_CENTER)
 
 
 func _draw_vehicle_stage() -> void:

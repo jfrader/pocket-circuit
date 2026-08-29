@@ -6,16 +6,26 @@ class RacePauseOverlay extends Control:
 	signal cancel_pressed(requested_pause: bool)
 
 	var enabled := true
+	var settings_open := false
 
 	func _init() -> void:
 		process_mode = Node.PROCESS_MODE_ALWAYS
-		set_process_unhandled_input(true)
+		set_process_input(true)
 
-	func _unhandled_input(event: InputEvent) -> void:
+	func _input(event: InputEvent) -> void:
 		var requested_pause := InputMap.has_action("pause") and event.is_action_pressed("pause")
+		if event is InputEventKey:
+			requested_pause = requested_pause or (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_ESCAPE
+		elif event is InputEventJoypadButton:
+			requested_pause = requested_pause or (event as InputEventJoypadButton).pressed and (event as InputEventJoypadButton).button_index == 6
 		var requested_resume := get_tree().paused and event.is_action_pressed("ui_cancel")
 		if enabled and (requested_pause or requested_resume):
-			cancel_pressed.emit(requested_pause)
+			if get_tree().paused and not settings_open:
+				get_tree().paused = false
+				visible = false
+				cancel_pressed.emit(false)
+			else:
+				cancel_pressed.emit(requested_pause)
 			get_viewport().set_input_as_handled()
 
 
@@ -334,16 +344,22 @@ func _unhandled_input(event: InputEvent) -> void:
 
 
 func _on_pause_cancel(requested_pause: bool) -> void:
-	if not requested_pause and is_instance_valid(_pause_settings_panel) and _pause_settings_panel.visible:
+	if not get_tree().paused:
+		if requested_pause:
+			_toggle_pause()
+		else:
+			_set_paused(false)
+		return
+	if is_instance_valid(_pause_settings_panel) and _pause_settings_panel.visible:
 		_show_pause_menu()
-	else:
+	elif requested_pause or get_tree().paused:
 		_toggle_pause()
 
 
 func _toggle_pause() -> void:
 	if _finished or _results_finalized:
 		return
-	if not _countdown_active and not race_manager.is_running:
+	if not get_tree().paused and not _countdown_active and not race_manager.is_running:
 		return
 	if is_instance_valid(_player_vehicle) and race_manager.is_racer_finished(_player_vehicle):
 		return
@@ -472,6 +488,7 @@ func _create_phase_one_ui() -> void:
 	_results_panel.offset_right = 950.0
 	_results_panel.offset_bottom = 565.0
 	_results_panel.visible = false
+	_results_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.96), Color("f4c65a")))
 	hud.add_child(_results_panel)
 	_results_label = Label.new()
 	_results_label.offset_left = 28.0
@@ -484,17 +501,21 @@ func _create_phase_one_ui() -> void:
 	_results_panel.add_child(_results_label)
 
 	_retry_button = Button.new()
-	_retry_button.text = "Retry"
+	_retry_button.text = "RETRY"
 	_retry_button.position = Vector2(120.0, 340.0)
 	_retry_button.size = Vector2(170.0, 48.0)
 	_retry_button.disabled = true
+	_apply_menu_button_art(_retry_button)
+	_retry_button.add_theme_font_size_override("font_size", 16)
 	_retry_button.pressed.connect(_on_retry_pressed)
 	_results_panel.add_child(_retry_button)
 	_continue_button = Button.new()
-	_continue_button.text = "Continue"
+	_continue_button.text = "CONTINUE"
 	_continue_button.position = Vector2(330.0, 340.0)
 	_continue_button.size = Vector2(170.0, 48.0)
 	_continue_button.disabled = true
+	_apply_menu_button_art(_continue_button)
+	_continue_button.add_theme_font_size_override("font_size", 16)
 	_continue_button.pressed.connect(request_return)
 	_results_panel.add_child(_continue_button)
 
@@ -517,7 +538,7 @@ func _create_pause_overlay() -> void:
 
 	_pause_menu_panel = PanelContainer.new()
 	_pause_menu_panel.name = "PauseMenuPanel"
-	_pause_menu_panel.add_theme_stylebox_override("panel", _pause_style(Color("121925"), Color("f4bf3a"), 12, 2))
+	_pause_menu_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.94), Color("f4c65a")))
 	_pause_menu_panel.position = Vector2(370.0, 105.0)
 	_pause_menu_panel.size = Vector2(540.0, 510.0)
 	_pause_overlay.add_child(_pause_menu_panel)
@@ -543,7 +564,7 @@ func _create_pause_overlay() -> void:
 
 	_pause_settings_panel = PanelContainer.new()
 	_pause_settings_panel.name = "PauseSettingsPanel"
-	_pause_settings_panel.add_theme_stylebox_override("panel", _pause_style(Color("121925"), Color("55a8c9"), 12, 2))
+	_pause_settings_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.94), Color("4a8fb8")))
 	_pause_settings_panel.position = Vector2(320.0, 50.0)
 	_pause_settings_panel.size = Vector2(640.0, 620.0)
 	_pause_settings_panel.visible = false
@@ -602,6 +623,7 @@ func _show_pause_menu() -> void:
 		return
 	_pause_menu_panel.visible = true
 	_pause_settings_panel.visible = false
+	_pause_overlay.settings_open = false
 	if is_instance_valid(_pause_resume_button):
 		_pause_resume_button.grab_focus()
 
@@ -611,6 +633,7 @@ func _show_pause_settings() -> void:
 		return
 	_pause_menu_panel.visible = false
 	_pause_settings_panel.visible = true
+	_pause_overlay.settings_open = true
 	_pause_settings_status.text = ""
 	if is_instance_valid(_pause_settings_first_control):
 		_pause_settings_first_control.grab_focus()
@@ -651,13 +674,39 @@ func _update_pause_setting(setting_key: String, value: Variant) -> void:
 		_pause_settings_status.text = "Saved."
 
 
-func _pause_style(fill: Color, border: Color, radius: int, width: int = 1) -> StyleBoxFlat:
+func _pause_panel_style(fill: Color, border: Color) -> StyleBoxFlat:
+	var box := StyleBoxFlat.new()
+	box.bg_color = fill
+	box.border_color = border
+	box.set_border_width_all(3)
+	box.set_corner_radius_all(10)
+	return box
+
+
+func _menu_plate(fill: Color, border: Color, width: int = 2) -> StyleBoxFlat:
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
 	box.border_color = border
 	box.set_border_width_all(width)
-	box.set_corner_radius_all(radius)
+	box.set_corner_radius_all(8)
+	box.content_margin_left = 22.0
+	box.content_margin_right = 22.0
+	box.content_margin_top = 10.0
+	box.content_margin_bottom = 12.0
+	box.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
+	box.shadow_size = 3
+	box.shadow_offset = Vector2(0, 2)
 	return box
+
+
+func _apply_menu_button_art(button: Button) -> void:
+	button.add_theme_stylebox_override("normal", _menu_plate(Color("1c2633"), Color("4a5a6c"), 2))
+	button.add_theme_stylebox_override("hover", _menu_plate(Color("2a3646"), Color("f4c65a"), 2))
+	button.add_theme_stylebox_override("pressed", _menu_plate(Color("17202a"), Color("f4c65a"), 2))
+	button.add_theme_stylebox_override("focus", _menu_plate(Color("2a3646"), Color("f4c65a"), 3))
+	button.add_theme_color_override("font_color", Color("fff8e8"))
+	button.add_theme_color_override("font_hover_color", Color("fff8e8"))
+	button.add_theme_color_override("font_focus_color", Color("fff8e8"))
 
 
 func _add_pause_button(parent: Control, text: String, callback: Callable) -> Button:
@@ -666,12 +715,7 @@ func _add_pause_button(parent: Control, text: String, callback: Callable) -> But
 	button.custom_minimum_size = Vector2(400.0, 58.0)
 	button.focus_mode = Control.FOCUS_ALL
 	button.add_theme_font_size_override("font_size", 18)
-	button.add_theme_color_override("font_hover_color", Color("fff8e8"))
-	button.add_theme_color_override("font_focus_color", Color("f4bf3a"))
-	button.add_theme_stylebox_override("normal", _pause_style(Color("1b2638"), Color("36455d"), 8))
-	button.add_theme_stylebox_override("hover", _pause_style(Color("263650"), Color("f4bf3a"), 8, 2))
-	button.add_theme_stylebox_override("pressed", _pause_style(Color("111a29"), Color("f4bf3a"), 8, 2))
-	button.add_theme_stylebox_override("focus", _pause_style(Color("263650"), Color("f4bf3a"), 8, 3))
+	_apply_menu_button_art(button)
 	button.focus_entered.connect(_play_sfx.bind(&"ui_move", 0.62))
 	button.pressed.connect(callback)
 	button.pressed.connect(_play_sfx.bind(&"ui_confirm", 0.78))

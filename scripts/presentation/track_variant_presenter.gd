@@ -3,10 +3,6 @@ extends Node2D
 
 const SURFACE_ZONE_SCRIPT := preload("res://scripts/race/surface_zone.gd")
 const HAZARD_SCRIPT := preload("res://scripts/race/environmental_hazard.gd")
-const ASPHALT_TEXTURE := preload("res://assets/textures/imagine/track_asphalt_tile.png")
-const WOOD_TEXTURE := preload("res://assets/textures/imagine/counter_wood_tile.png")
-const PAINT_CAN_TEXTURE := preload("res://assets/textures/imagine/workshop_paint_can.png")
-const KEYCAP_TEXTURE := preload("res://assets/textures/imagine/office_keycap.png")
 
 const INK := Color("172033")
 const PAPER := Color("f2ead7")
@@ -45,31 +41,9 @@ func configure(track_root: Node2D, requested_theme: StringName) -> void:
 			_configure_labels("OFFICE LAST LIGHT", "KEYCAP CHICANE", "PAPER CUT", "CABLE TURN", "←  DESK-MAT STRAIGHT")
 		_:
 			base_surface_name = &"polished counter"
-	_apply_surface_textures()
+			_build_kitchen_presentation()
 	_create_surface_zones()
 	_create_hazard()
-
-
-func _apply_surface_textures() -> void:
-	for path: String in TRACK_POLYGONS:
-		_texture_polygon(path, ASPHALT_TEXTURE)
-	_texture_polygon("Floor", WOOD_TEXTURE)
-	_texture_polygon("CounterHighlight", WOOD_TEXTURE)
-	_texture_polygon("InnerIsland", WOOD_TEXTURE)
-	for sprite_path: String in ["ArtSurfaces/BottomTrack", "ArtSurfaces/RightTrack", "ArtSurfaces/TopTrack", "ArtSurfaces/LeftTrack"]:
-		var sprite := _track.get_node_or_null(sprite_path) as Sprite2D
-		if sprite:
-			sprite.texture = ASPHALT_TEXTURE
-	var counter := _track.get_node_or_null("ArtSurfaces/CounterSurface") as Sprite2D
-	if counter:
-		counter.texture = WOOD_TEXTURE
-
-
-func _texture_polygon(path: String, texture: Texture2D) -> void:
-	var polygon := _track.get_node_or_null(path) as Polygon2D
-	if polygon == null or texture == null:
-		return
-	polygon.texture = texture
 
 
 func _prepare_runtime_variant() -> void:
@@ -78,17 +52,39 @@ func _prepare_runtime_variant() -> void:
 		if container:
 			container.visible = false
 
-	_show_polygon("Floor", Color("31261f") if theme == &"workshop" else Color("26384f"))
-	_show_polygon("CounterHighlight", Color("49372b") if theme == &"workshop" else Color("365473"))
+	var floor_color := Color("5c4638")
+	var highlight_color := Color("7a5c45")
+	var island_color := Color("6e5644")
+	if theme == &"workshop":
+		floor_color = Color("31261f")
+		highlight_color = Color("49372b")
+		island_color = Color("5a4636")
+	elif theme == &"office":
+		floor_color = Color("26384f")
+		highlight_color = Color("365473")
+		island_color = Color("29435f")
+	_show_polygon("Floor", floor_color)
+	_show_polygon("CounterHighlight", highlight_color)
 	for path: String in TRACK_POLYGONS:
-		_show_polygon(path, INK.lightened(0.04))
-	_show_polygon("InnerIsland", Color("5a4636") if theme == &"workshop" else Color("29435f"))
+		_show_polygon(path, Color("1a1f28"))
+	_show_polygon("InnerIsland", island_color)
 	_show_polygon("StartFinishWhite", AMBER)
 	_show_polygon("StartFinishBlack", INK)
 	for wall_name: String in ["TopWall", "BottomWall", "LeftWall", "RightWall"]:
 		var wall_visual := _track.get_node_or_null("%s/Visual" % wall_name) as Polygon2D
 		if wall_visual:
 			wall_visual.color = Color("0e1524")
+
+
+func _build_kitchen_presentation() -> void:
+	var art := Node2D.new()
+	art.name = "KitchenRuntimeArt"
+	art.z_index = -17
+	add_child(art)
+	for y in range(-540, 541, 48):
+		_add_line(art, PackedVector2Array([Vector2(-940, y), Vector2(940, y)]), Color(0.92, 0.78, 0.55, 0.08), 2.0)
+	_add_line(art, PackedVector2Array([Vector2(-540, -205), Vector2(540, -205)]), Color(AMBER, 0.55), 6.0)
+	_add_line(art, PackedVector2Array([Vector2(-540, 205), Vector2(540, 205)]), Color(AMBER, 0.35), 4.0)
 
 
 func _build_workshop_presentation() -> void:
@@ -138,23 +134,20 @@ func _configure_obstacles(definitions: Dictionary) -> void:
 		var data: Dictionary = definitions[obstacle_name]
 		obstacle.position = data["position"]
 		obstacle.rotation = float(data.get("rotation", 0.0))
+		var use_sprites := theme == &"kitchen"
 		var visual := obstacle.get_node_or_null("Visual") as Polygon2D
 		if visual:
-			visual.visible = false
+			visual.visible = not use_sprites
 		var stripe := obstacle.get_node_or_null("Stripe") as Polygon2D
 		if stripe:
-			stripe.visible = false
+			stripe.visible = not use_sprites
 		for child_name: String in ["Coffee", "Handle", "Scrub"]:
 			var child := obstacle.get_node_or_null(child_name) as CanvasItem
 			if child:
-				child.visible = false
+				child.visible = not use_sprites
 		var sprite := obstacle.get_node_or_null("Sprite") as Sprite2D
 		if sprite:
-			sprite.visible = true
-			if theme == &"workshop" and obstacle_name.begins_with("Mug"):
-				sprite.texture = PAINT_CAN_TEXTURE
-			elif theme == &"office" and obstacle_name.begins_with("Cereal"):
-				sprite.texture = KEYCAP_TEXTURE
+			sprite.visible = use_sprites
 
 
 func _create_surface_zones() -> void:
@@ -211,6 +204,7 @@ func _show_polygon(path: String, color: Color) -> void:
 	var polygon := _track.get_node_or_null(path) as Polygon2D
 	if polygon:
 		polygon.visible = true
+		polygon.texture = null
 		polygon.color = color
 
 

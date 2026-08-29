@@ -27,7 +27,7 @@ func _run_test() -> void:
 		await process_frame
 	if not _expect(not manager.is_running, "pause-aware countdown timers must not advance while paused"):
 		return
-	prototype.call("_toggle_pause")
+	prototype.call("_set_paused", false)
 	if not _expect(not paused and not overlay.visible, "countdown should resume from the pause menu"):
 		return
 	var started := [manager.is_running]

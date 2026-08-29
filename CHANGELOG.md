@@ -31,12 +31,9 @@
   identities throughout the championship shell and live races.
 - The title and machine bay now use a high-contrast after-hours workbench
   presentation with one dominant race action and the full four-car roster.
-- The title screen now uses a Pocket Circuit logo, after-hours kitchen backdrop,
-  painted workbench art, and illustrated menu buttons instead of flat type and
-  default Godot chrome.
-- On-track debug labels such as chicane and section names are gone.
-- Race HUD bars use painted metal plates; kitchen asphalt and counter wood use
-  illustrated tiles.
+- Title PLAY starts the championship; Quick Race, Options, Credits, and Quit are real buttons under it.
+- Vehicle select previews a machine, then PLAY confirms the race.
+- Title uses a cartoon night-kitchen poster with clean amber and coral action plates; race HUD stays floating clusters.
 - Kitchen mugs, fruit, cereal, sponge, utensils, start/finish, and moving
   hazards now use illustrated toy-scale sprites instead of flat polygons.
 - The race HUD now keeps position, lap, timer, speed, boost, recovery controls,

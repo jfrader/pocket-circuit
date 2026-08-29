@@ -50,11 +50,11 @@ func _ready() -> void:
 	gravity_scale = 0.0
 	linear_damp = 0.0
 	angular_damp = 2.5
-	var material := PhysicsMaterial.new()
-	material.bounce = 0.0
-	material.friction = 0.06
-	material.absorbent = true
-	physics_material_override = material
+	var physics_material := PhysicsMaterial.new()
+	physics_material.bounce = 0.0
+	physics_material.friction = 0.06
+	physics_material.absorbent = true
+	physics_material_override = physics_material
 	_last_output_velocity = linear_velocity
 
 
