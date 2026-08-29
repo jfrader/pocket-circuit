@@ -190,11 +190,12 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 	get_tree().change_scene_to_file(RACE_SCENE)
 
 
-func start_circuit_race(theme: StringName, seed: int, vehicle_id: String) -> void:
+func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String) -> void:
 	var event := {
-		"id": "circuit_%s_%d" % [String(theme), seed],
-		"name": "Circuit %s %d" % [String(theme).capitalize(), seed],
+		"id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
+		"name": "%s %s Circuit %d" % [String(theme).capitalize(), String(room).capitalize(), seed],
 		"theme": String(theme),
+		"room": String(room),
 		"seed": seed,
 		"circuit": "generated",
 		"race_format": "circuit",

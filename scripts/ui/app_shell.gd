@@ -1038,7 +1038,7 @@ func _start_circuit(entry: Dictionary) -> void:
 	var vehicle_id := String(progress.get("selected_vehicle", "rustbug"))
 	if not vehicle_id in progress.get("unlocked_vehicles", ["rustbug"]):
 		vehicle_id = "rustbug"
-	_app.call("start_circuit_race", StringName(entry["theme"]), int(entry["seed"]), vehicle_id)
+	_app.call("start_circuit_race", StringName(entry["theme"]), StringName(entry.get("room", "classic")), int(entry["seed"]), vehicle_id)
 
 
 func _start_with_vehicle(vehicle_id: String) -> void:

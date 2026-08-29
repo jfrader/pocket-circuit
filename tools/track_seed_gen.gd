@@ -27,11 +27,12 @@ static func archetype_params(seed: int, base: Dictionary) -> Dictionary:
 	# gentle corners), technical (tight and busy), asymmetric (one dominant side),
 	# hairpin (a genuine U-turn).
 	var result := base.duplicate()
+	var base_self := float(base.get("min_self_distance", 0.0))
 	match posmod(seed, 4):
 		0:
 			result["min_point_distance"] = 250.0
 			result["max_angle_deg"] = 62.0
-			result["min_self_distance"] = 300.0
+			result["min_self_distance"] = base_self if base_self > 0.0 else 300.0
 			result["point_count"] = 10
 			result["displacement_min"] = 0.04
 			result["displacement_max"] = 0.10
@@ -45,7 +46,7 @@ static func archetype_params(seed: int, base: Dictionary) -> Dictionary:
 		2:
 			result["min_point_distance"] = 210.0
 			result["max_angle_deg"] = 78.0
-			result["min_self_distance"] = 290.0
+			result["min_self_distance"] = base_self if base_self > 0.0 else 290.0
 			result["point_count"] = 13
 			result["displacement_min"] = 0.06
 			result["displacement_max"] = 0.14
@@ -69,10 +70,21 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 	var min_self_distance := float(profile.get("min_self_distance", 300.0))
 	var min_loop_length := float(profile.get("min_loop_length", 1900.0))
 	var point_count := int(profile.get("point_count", 0))
-	var displacement_min := float(profile.get("displacement_min", 0.05))
-	var displacement_max := float(profile.get("displacement_max", 0.16))
+	var displacement_min := float(profile.get("displacement_min", 0.05)) * float(profile.get("displacement_scale", 1.0))
+	var displacement_max := float(profile.get("displacement_max", 0.16)) * float(profile.get("displacement_scale", 1.0))
 	var side_bias := profile.get("side_bias", Vector2.ZERO) as Vector2
+	var room_polygon: PackedVector2Array = profile.get("room_polygon", PackedVector2Array())
+	var sample_rect: Rect2 = profile.get("sample_rect", Rect2())
 	var bounds := Rect2(room_rect.position + Vector2(margin, margin), room_rect.size - Vector2(margin, margin) * 2.0)
+	if sample_rect.size.x > 0.0 and sample_rect.size.y > 0.0:
+		bounds = Rect2(sample_rect.position + Vector2(margin, margin), sample_rect.size - Vector2(margin, margin) * 2.0)
+	elif not room_polygon.is_empty():
+		var min_point := Vector2(INF, INF)
+		var max_point := Vector2(-INF, -INF)
+		for point: Vector2 in room_polygon:
+			min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
+			max_point = Vector2(maxf(max_point.x, point.x), maxf(max_point.y, point.y))
+		bounds = Rect2(min_point + Vector2(margin, margin), (max_point - min_point) - Vector2(margin, margin) * 2.0)
 
 	# 1. Random spread points, kept apart
 	var seeds := PackedVector2Array()
@@ -84,6 +96,8 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 			_rng.randf_range(bounds.position.y, bounds.end.y))
 		if side_bias != Vector2.ZERO and _rng.randf() < 0.45:
 			candidate.x = bounds.position.x + (bounds.end.x - bounds.position.x) * (0.5 + side_bias.x * _rng.randf_range(0.2, 0.5))
+		if not room_polygon.is_empty() and not _inside_with_margin(candidate, room_polygon, margin):
+			continue
 		var too_close := false
 		for existing: Vector2 in seeds:
 			if existing.distance_to(candidate) < min_point_distance:
@@ -134,6 +148,11 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 	for iteration in 2:
 		even = _fix_angles(even, deg_to_rad(max_angle_deg))
 		even = _push_apart(even, 130.0)
+	if not room_polygon.is_empty():
+		var check_margin := float(profile.get("room_check_margin", 42.0))
+		for check_point: Vector2 in centerline_checkpoints(even):
+			if not _inside_with_margin(check_point, room_polygon, check_margin):
+				return PackedVector2Array()
 	var centerline := _sample_centerline(even)
 	if _polyline_length(centerline) < min_loop_length:
 		return PackedVector2Array()
@@ -169,6 +188,27 @@ static func _convex_hull(points: PackedVector2Array) -> PackedVector2Array:
 
 static func _cross(o: Vector2, a: Vector2, b: Vector2) -> float:
 	return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+
+
+static func _inside_with_margin(point: Vector2, polygon: PackedVector2Array, margin: float) -> bool:
+	if not Geometry2D.is_point_in_polygon(point, polygon):
+		return false
+	var count := polygon.size()
+	for index in count:
+		var from: Vector2 = polygon[index]
+		var to: Vector2 = polygon[(index + 1) % count]
+		var edge := to - from
+		var length := edge.length()
+		if length < 0.001:
+			continue
+		var normal := Vector2(-edge.y, edge.x) / length
+		if absf((point - from).dot(normal)) < margin:
+			return false
+	return true
+
+
+static func centerline_checkpoints(controls: PackedVector2Array) -> PackedVector2Array:
+	return _sample_centerline(controls)
 
 
 static func _centroid(points: PackedVector2Array) -> Vector2:

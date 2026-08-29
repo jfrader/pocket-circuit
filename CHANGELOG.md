@@ -17,6 +17,11 @@
   so every baked circuit is playable, plus a circuit roster catalog and test.
 - Brightened generated floor/island textures (desk mat, wood planks, toolbox,
   keyboard) and per-theme furniture edge strips on all room walls.
+- Room-canvas variety: circuits now live in differently shaped rooms — the
+  classic square bench, a long horizontal counter (~2350×900), and a tall
+  vertical shelf (~1150×1450) — with polygon wall segments, room-shaped
+  surfaces, and corridor clipping to the room outline. The circuit roster
+  grew to 52 tracks (26 per theme: 16 classic, 5 wide, 5 tall).
 - Track archetypes: the circuit generator now rolls one of four personalities
   per seed — fast (long straights, gentle corners), technical (tight S-curves
   and chicanes), asymmetric (one dominant side), and switchback (sharp

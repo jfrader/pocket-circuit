@@ -13,6 +13,13 @@ const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
 const ROOM := Vector2(1750, 1150)
 
+var ROOM_SHAPES := {
+	"classic": PackedVector2Array([Vector2(-875, -575), Vector2(875, -575), Vector2(875, 575), Vector2(-875, 575)]),
+	"wide": PackedVector2Array([Vector2(-1175, -450), Vector2(1175, -450), Vector2(1175, 450), Vector2(-1175, 450)]),
+	"tall": PackedVector2Array([Vector2(-575, -725), Vector2(575, -725), Vector2(575, 725), Vector2(-575, 725)]),
+	"el": PackedVector2Array([Vector2(-1000, -550), Vector2(300, -550), Vector2(300, -50), Vector2(1000, -50), Vector2(1000, 550), Vector2(-1000, 550)]),
+}
+
 const LAYOUTS := {
 	&"workshop": {
 		"scene": "res://scenes/tracks/workshop_workbench.tscn",
@@ -156,6 +163,7 @@ const LAYOUTS := {
 
 var _theme: StringName = &"workshop"
 var _seed: int = -1
+var _room_shape: StringName = &"classic"
 
 
 func _init() -> void:
@@ -165,19 +173,35 @@ func _init() -> void:
 	var seed_env := OS.get_environment("PC_SEED")
 	if not seed_env.is_empty():
 		_seed = int(seed_env)
+	var room_env := OS.get_environment("PC_ROOM")
+	if room_env in [&"classic", &"wide", &"tall", &"el"]:
+		_room_shape = StringName(room_env)
 	call_deferred("_run")
 
 
 func _run() -> void:
 	var spec: Dictionary = LAYOUTS[_theme]
+	var room_polygon: PackedVector2Array = ROOM_SHAPES[_room_shape]
 	if _seed >= 0:
-		var gen := TrackSeedGen.generate_with_retries(_seed, Rect2(-940, -540, 1880, 1080), {
+		var room_params := {
 			"margin": 150.0,
 			"min_point_distance": 210.0,
 			"max_angle_deg": 80.0,
 			"min_self_distance": 280.0,
 			"min_loop_length": 1900.0,
-		})
+			"room_polygon": room_polygon,
+		}
+		match _room_shape:
+			&"tall":
+				room_params["min_self_distance"] = 252.0
+				room_params["displacement_scale"] = 0.55
+			&"el":
+				room_params["min_self_distance"] = 270.0
+				room_params["displacement_scale"] = 0.8
+				room_params["min_loop_length"] = 1600.0
+				room_params["sample_rect"] = Rect2(-1000, -550, 1300, 1100)
+				room_params["room_check_margin"] = 10.0
+		var gen := TrackSeedGen.generate_with_retries(_seed, Rect2(-940, -540, 1880, 1080), room_params)
 		if gen["points"].is_empty():
 			push_error("could not generate a valid circuit near seed " + str(_seed))
 			quit(1)
@@ -195,7 +219,7 @@ func _run() -> void:
 
 	var centerline := _sample_centerline(spec["controls"])
 	var edges := _corridor_edges(centerline)
-	_build_scene(root, spec, centerline, edges)
+	_build_scene(root, spec, centerline, edges, room_polygon)
 
 	_mark_owned(root)
 	print("CHILDREN ", str(root.get_children().map(func(child: Node) -> String: return String(child.name))))
@@ -244,25 +268,26 @@ func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
 	return {"left": left, "right": right, "centerline": centerline}
 
 
-func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary) -> void:
+func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array) -> void:
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
 	# Floor: base fill extends well past the room so the camera never sees a void,
 	# themed texture tiles on top at full brightness
-	_add_polygon(root, "Floor", _rect_points(Vector2(-600, -500), Vector2(2600, 1700)), spec["floor"], -22)
-	_add_polygon(root, "CounterHighlight", _rect_points(Vector2(0, 0), Vector2(1880, 1080)), Color(spec["highlight"], 0.5), -21)
 	var floor_texture := String(spec.get("floor_texture", ""))
+	_add_polygon(root, "Floor", _rect_points(Vector2(-600, -500), Vector2(2600, 1700)), spec["floor"], -22)
+	_add_polygon(root, "CounterHighlight", _rect_points(Vector2(-940, -540), Vector2(940, 540)), Color(spec["highlight"], 0.5), -21)
 	if not floor_texture.is_empty():
 		_add_floor_tiles(root, floor_texture, Vector2(-600, -500), Vector2(2600, 1700), 6, 4, Vector2(1.0, 1.0))
+	var room_surface := _expand_loop(room_polygon, 26.0)
+	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20)
 
 	# Painted track ribbon (visual only — no collision)
 	var corridor := PackedVector2Array()
 	corridor.append_array(left)
 	for index in range(right.size() - 1, -1, -1):
 		corridor.append(right[index])
-	var room_rect := _rect_points(Vector2(0, 0), ROOM)
-	var clipped_pieces: Array[PackedVector2Array] = Geometry2D.intersect_polygons(room_rect, corridor)
+	var clipped_pieces: Array[PackedVector2Array] = Geometry2D.intersect_polygons(room_polygon, corridor)
 	var clipped := PackedVector2Array()
 	for piece: PackedVector2Array in clipped_pieces:
 		if piece.size() > clipped.size():
@@ -282,12 +307,19 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	_add_edge_line(root, inner_loop, Color("f2ead7", 0.95))
 	_build_island_prop(root, spec, inner_loop, centerline)
 
-	# Room walls (real furniture edges)
+	# Room walls (real furniture edges along the room outline)
 	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
-	_add_wall(root, "TopWall", Vector2(0, -575), Vector2(2000, 50), edge_texture)
-	_add_wall(root, "BottomWall", Vector2(0, 575), Vector2(2000, 50), edge_texture)
-	_add_wall(root, "LeftWall", Vector2(-875, 0), Vector2(50, 1200), edge_texture)
-	_add_wall(root, "RightWall", Vector2(875, 0), Vector2(50, 1200), edge_texture)
+	var wall_index := 0
+	for index in room_polygon.size():
+		var from: Vector2 = room_polygon[index]
+		var to: Vector2 = room_polygon[(index + 1) % room_polygon.size()]
+		var mid := (from + to) * 0.5
+		var edge_vector := to - from
+		var length := edge_vector.length()
+		if length < 1.0:
+			continue
+		_add_wall_segment(root, "Wall%d" % wall_index, mid, length, atan2(edge_vector.y, edge_vector.x), edge_texture)
+		wall_index += 1
 
 	# Checkpoints along the arc, aligned to the tangent. The last lap gate sits
 	# slightly past the corner rejoin so its recovery point stays on a straight.
@@ -348,7 +380,7 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 
 	# Track obstacles (real props with collision)
 	if spec.get("seed_obstacles", false):
-		_scatter_seed_props(root, spec, centerline, corridor, gate_samples)
+		_scatter_seed_props(root, spec, centerline, corridor, gate_samples, room_polygon)
 	else:
 		var obstacles: Dictionary = spec["obstacles"]
 		for obstacle_name: String in obstacles:
@@ -376,7 +408,7 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 			continue
 		var outward := (outer_loop2[index] - centerline[index]).normalized()
 		var prop_position := centerline[index] + outward * 175.0
-		if absf(prop_position.x) > 830.0 or absf(prop_position.y) > 530.0:
+		if not Geometry2D.is_point_in_polygon(prop_position, room_polygon):
 			continue
 		if not Geometry2D.is_point_in_polygon(prop_position, corridor):
 			_add_prop_with_collision(root, prop_position, 30.0, prop_textures[hardware_index % prop_textures.size()])
@@ -558,36 +590,34 @@ func _add_polygon(parent: Node, node_name: String, points: PackedVector2Array, c
 	parent.add_child(polygon)
 
 
-func _add_wall(parent: Node, node_name: String, position: Vector2, size: Vector2, edge_texture_path: String) -> void:
+func _add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String) -> void:
 	var wall := StaticBody2D.new()
 	wall.name = node_name
 	wall.position = position
+	wall.rotation = rotation
 	wall.collision_layer = 2
 	parent.add_child(wall)
 	var shape := RectangleShape2D.new()
-	shape.size = size
+	shape.size = Vector2(length + 60.0, 50.0)
 	var cs := CollisionShape2D.new()
 	cs.shape = shape
 	wall.add_child(cs)
 	var visual := Polygon2D.new()
 	visual.name = "Visual"
-	visual.polygon = _rect_points(Vector2.ZERO, size)
+	visual.polygon = _rect_points(Vector2.ZERO, Vector2(length + 60.0, 50.0))
 	visual.color = Color("0e1524")
 	wall.add_child(visual)
 	var edge_texture := load(edge_texture_path) as Texture2D
 	if edge_texture:
-		var horizontal := size.x > size.y
-		var edge_length := maxf(size.x, size.y)
-		var tile_count := maxi(1, int(ceil(edge_length / 1024.0)))
+		var tile_count := maxi(1, int(ceil((length + 60.0) / 1024.0)))
 		for tile in tile_count:
 			var strip := Sprite2D.new()
 			strip.name = "EdgeStrip"
 			strip.texture = edge_texture
 			strip.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-			var offset := (float(tile) - float(tile_count - 1) * 0.5) * (edge_length / float(tile_count))
-			strip.position = Vector2(offset, 0.0) if horizontal else Vector2(0.0, offset)
-			strip.rotation = 0.0 if horizontal else PI * 0.5
-			strip.scale = Vector2(edge_length / (1024.0 * float(tile_count)), size.y / 220.0) if horizontal else Vector2(edge_length / (1024.0 * float(tile_count)), size.x / 220.0)
+			var offset := (float(tile) - float(tile_count - 1) * 0.5) * ((length + 60.0) / float(tile_count))
+			strip.position = Vector2(offset, 0.0)
+			strip.scale = Vector2((length + 60.0) / (1024.0 * float(tile_count)), 50.0 / 220.0)
 			wall.add_child(strip)
 
 
@@ -620,7 +650,7 @@ func _add_grid(parent: Node, node_name: String, rotation: float, positions: Arra
 		grid.add_child(marker)
 
 
-func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, corridor: PackedVector2Array, gate_samples: PackedVector2Array) -> void:
+func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, corridor: PackedVector2Array, gate_samples: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(spec.get("seed", 0))
 	var textures: Array = spec.get("scatter_textures", [])
@@ -659,6 +689,8 @@ func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var apron_props := PackedVector2Array()
 	for attempt in 400:
 		var candidate := Vector2(rng.randf_range(-830.0, 830.0), rng.randf_range(-530.0, 530.0))
+		if not Geometry2D.is_point_in_polygon(candidate, room_polygon):
+			continue
 		if Geometry2D.is_point_in_polygon(candidate, corridor):
 			continue
 		if _point_in_loop(candidate, centerline):
@@ -846,6 +878,45 @@ func _add_cable_line(parent: Node, points: Array) -> void:
 	line.antialiased = true
 	line.z_index = -12
 	parent.add_child(line)
+
+
+func _add_textured_polygon(parent: Node, node_name: String, points: PackedVector2Array, texture_path: String, fallback_color: Color, z: int) -> void:
+	var visual := Polygon2D.new()
+	visual.name = node_name
+	visual.z_index = z
+	visual.polygon = points
+	var texture := load(texture_path) as Texture2D if not texture_path.is_empty() else null
+	if texture:
+		visual.texture = texture
+		visual.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var min_point := Vector2(INF, INF)
+		for point: Vector2 in points:
+			min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
+		var uvs := PackedVector2Array()
+		for point: Vector2 in points:
+			uvs.append((point - min_point) / 512.0)
+		visual.uv = uvs
+	else:
+		visual.color = fallback_color
+	parent.add_child(visual)
+
+
+func _expand_loop(points: PackedVector2Array, distance: float) -> PackedVector2Array:
+	var count := points.size()
+	var result := PackedVector2Array()
+	for index in count:
+		var prev := points[(index - 1 + count) % count]
+		var next := points[(index + 1) % count]
+		var tangent := (next - prev).normalized()
+		var normal := tangent.rotated(-PI * 0.5)
+		var centroid := Vector2.ZERO
+		for point: Vector2 in points:
+			centroid += point
+		centroid /= float(count)
+		if normal.dot(centroid - points[index]) < 0.0:
+			normal = -normal
+		result.append(points[index] + normal * distance)
+	return result
 
 
 func _add_dashed_centerline(parent: Node, centerline: PackedVector2Array) -> void:

@@ -201,7 +201,7 @@ func _configure_track_variant() -> void:
 	var requested_theme := StringName(event.get("theme", "kitchen"))
 	var scene_path := ""
 	if not String(event.get("circuit", "")).is_empty():
-		scene_path = CIRCUIT_ROSTER.scene_path(requested_theme, int(event.get("seed", 0)))
+		scene_path = CIRCUIT_ROSTER.scene_path(requested_theme, StringName(event.get("room", "classic")), int(event.get("seed", 0)))
 	elif requested_theme != &"kitchen":
 		scene_path = String(TRACK_SCENES.get(requested_theme, ""))
 	if not scene_path.is_empty():

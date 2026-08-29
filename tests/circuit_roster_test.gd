@@ -9,15 +9,20 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	var entries: Array = CIRCUIT_ROSTER.entries()
-	if not _expect(entries.size() == 32, "the roster should contain 32 generated circuits"):
+	if not _expect(entries.size() == 52, "the roster should contain 52 generated circuits (26 per theme)"):
 		return
 	if not _expect(
-		CIRCUIT_ROSTER.scene_path(&"workshop", 6) == "res://scenes/tracks/circuits/workshop_seed_6.tscn",
-		"scene paths should use the theme and seed filename format"
+		CIRCUIT_ROSTER.scene_path(&"workshop", &"classic", 6) == "res://scenes/tracks/circuits/workshop_seed_6.tscn",
+		"classic scene paths should use the theme and seed filename format"
+	):
+		return
+	if not _expect(
+		CIRCUIT_ROSTER.scene_path(&"workshop", &"wide", 5) == "res://scenes/tracks/circuits/workshop_wide_seed_5.tscn",
+		"room-variant scene paths should include the room"
 	):
 		return
 	for entry: Dictionary in entries:
-		var scene_path := CIRCUIT_ROSTER.scene_path(StringName(entry["theme"]), int(entry["seed"]))
+		var scene_path := CIRCUIT_ROSTER.scene_path(StringName(entry["theme"]), StringName(entry["room"]), int(entry["seed"]))
 		if not _expect(FileAccess.file_exists(scene_path), "%s should exist" % scene_path):
 			return
 	print("CIRCUIT_ROSTER_TEST PASS")
