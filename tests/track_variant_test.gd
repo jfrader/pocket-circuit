@@ -1,7 +1,17 @@
 extends SceneTree
 
 const PRESENTER_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
-const KITCHEN_SCENE := preload("res://scenes/tracks/kitchen_graybox.tscn")
+const OBSTACLE_NAMES: Array[String] = ["MugA", "MugB", "CerealA", "CerealB", "Sponge", "Fork", "Ruler", "Apple", "Lime", "Cup", "Spoon"]
+const THEME_SCENES: Dictionary = {
+	&"kitchen": "res://scenes/tracks/kitchen_graybox.tscn",
+	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
+	&"office": "res://scenes/tracks/office_desk.tscn",
+}
+const THEME_EXPECTATIONS: Dictionary = {
+	&"kitchen": {"base_surface": &"polished counter", "zones": 2, "hazard": "KitchenHazard"},
+	&"workshop": {"base_surface": &"workbench", "zones": 3, "hazard": "WorkshopHazard"},
+	&"office": {"base_surface": &"desk mat", "zones": 3, "hazard": "OfficeHazard"},
+}
 
 
 func _initialize() -> void:
@@ -9,60 +19,41 @@ func _initialize() -> void:
 
 
 func _run_test() -> void:
-	if not await _test_variant(&"kitchen", &"polished counter", 1, "KitchenHazard", ""):
-		return
-	if not await _test_variant(&"workshop", &"workbench", 2, "WorkshopHazard", "WorkshopRuntimeArt"):
-		return
-	if not await _test_variant(&"office", &"desk mat", 2, "OfficeHazard", "OfficeRuntimeArt"):
-		return
-	if not await _test_proven_footprint_variant(&"workshop"):
-		return
-	if not await _test_proven_footprint_variant(&"office"):
-		return
+	for theme: StringName in [&"kitchen", &"workshop", &"office"]:
+		if not await _test_theme(theme):
+			return
 	print("TRACK_VARIANT_TEST PASS")
 	quit(0)
 
 
-func _test_variant(theme: StringName, base_surface: StringName, surface_count: int, hazard_node_name: String, art_node_name: String) -> bool:
-	var track := Node2D.new()
-	track.name = "AssetFreeTrack"
+func _test_theme(theme: StringName) -> bool:
+	var packed := load(String(THEME_SCENES[theme])) as PackedScene
+	if not _expect(packed != null, "%s track scene should exist" % theme):
+		return false
+	var track := packed.instantiate() as Node2D
+	track.name = "Track"
 	root.add_child(track)
 	var presenter := PRESENTER_SCRIPT.new() as TrackVariantPresenter
 	track.add_child(presenter)
 	presenter.configure(track, theme)
-	if not _expect(presenter.theme == theme and presenter.base_surface_name == base_surface, "%s should configure its runtime theme and base surface" % theme):
+	var expected: Dictionary = THEME_EXPECTATIONS[theme]
+	if not _expect(presenter.theme == theme and presenter.base_surface_name == expected["base_surface"], "%s should configure its runtime theme and base surface" % theme):
 		return false
-	if not _expect(presenter.surface_zones.size() == surface_count, "%s should create the documented surface zones" % theme):
+	if not _expect(presenter.surface_zones.size() == int(expected["zones"]), "%s should create the documented surface zones (%d)" % [theme, presenter.surface_zones.size()]):
 		return false
-	if not _expect(presenter.hazard != null and presenter.hazard.name == hazard_node_name and presenter.hazard.get_state_name() == &"warning", "%s should create a telegraphed deterministic hazard" % theme):
+	if not _expect(presenter.hazard != null and presenter.hazard.name == String(expected["hazard"]) and presenter.hazard.get_state_name() == &"warning", "%s should create a telegraphed deterministic hazard" % theme):
 		return false
-	if not art_node_name.is_empty() and not _expect(presenter.has_node(art_node_name), "%s should build an asset-free vector presentation" % theme):
-		return false
-	track.queue_free()
-	await process_frame
-	return true
-
-
-func _test_proven_footprint_variant(theme: StringName) -> bool:
-	var track := KITCHEN_SCENE.instantiate() as Node2D
-	root.add_child(track)
-	var presenter := PRESENTER_SCRIPT.new() as TrackVariantPresenter
-	track.add_child(presenter)
-	presenter.configure(track, theme)
-	var art_surfaces := track.get_node("ArtSurfaces") as Node2D
-	var floor := track.get_node("Floor") as Polygon2D
-	var obstacle_sprite := track.get_node("MugA/Sprite") as Sprite2D
-	var obstacle_fallback := track.get_node("MugA/Visual") as Polygon2D
-	if not _expect(not art_surfaces.visible and floor.visible, "%s should replace Kitchen texture layers with runtime vectors" % theme):
-		return false
-	if not _expect(not obstacle_sprite.visible and obstacle_fallback.visible, "%s should reveal safe collision-matched obstacle fallbacks" % theme):
+	var art_surfaces := track.get_node_or_null("ArtSurfaces") as Node2D
+	if art_surfaces and not _expect(art_surfaces.visible, "%s should keep its authored art visible" % theme):
 		return false
 	var checkpoints: Array[Node] = []
 	for child: Node in track.get_children():
 		if child.is_in_group("track_checkpoints"):
 			checkpoints.append(child)
-	for obstacle_name: String in TrackVariantPresenter.OBSTACLE_NAMES:
-		var obstacle := track.get_node(obstacle_name) as StaticBody2D
+	for obstacle_name: String in OBSTACLE_NAMES:
+		var obstacle := track.get_node_or_null(obstacle_name) as StaticBody2D
+		if obstacle == null:
+			continue
 		for checkpoint: Node2D in checkpoints:
 			if not _expect(obstacle.position.distance_to(checkpoint.position) >= 145.0, "%s obstacle %s should not block checkpoint %s" % [theme, obstacle_name, checkpoint.name]):
 				return false

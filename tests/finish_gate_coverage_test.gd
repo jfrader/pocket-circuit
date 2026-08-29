@@ -2,6 +2,11 @@ extends SceneTree
 
 const TRACK_SCENE := preload("res://scenes/tracks/kitchen_graybox.tscn")
 const CHECKPOINT_SCENE := preload("res://scenes/race/checkpoint.tscn")
+const THEME_SCENES: Dictionary = {
+	&"kitchen": "res://scenes/tracks/kitchen_graybox.tscn",
+	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
+	&"office": "res://scenes/tracks/office_desk.tscn",
+}
 
 const FINISH_CENTER := Vector2(-735.0, 240.0)
 const GRID_TRANSFORMS: Array[Transform2D] = [
@@ -22,33 +27,98 @@ func _run_test() -> void:
 	if not _expect(gate_shape.size.is_equal_approx(Vector2(34.0, 280.0)), "checkpoint gates should span the full drivable corridor"):
 		return
 
+	if not await _test_kitchen_contract():
+		return
+	for theme: StringName in [&"workshop", &"office"]:
+		if not await _test_theme_gate(theme):
+			return
+	print("FINISH_GATE_COVERAGE_TEST PASS")
+	quit(0)
+
+
+func _test_kitchen_contract() -> bool:
 	var track := TRACK_SCENE.instantiate()
 	root.add_child(track)
 	var finish := track.get_node("Checkpoint0Finish") as Area2D
 	var corners := _gate_corners(finish)
 	if not _expect(
 		finish.position.is_equal_approx(FINISH_CENTER),
-		"the finish gate should sit on the left straight behind the start grid"
+		"the kitchen finish gate should sit on the left straight behind the start grid"
 	):
-		return
+		return false
 	if not _expect(
 		corners["min_x"] <= -874.0
 		and corners["max_x"] >= -596.0
 		and corners["min_y"] <= 224.0
 		and corners["max_y"] >= 256.0,
-		"the finish gate should reach edge to edge of the drivable corridor (%.0f..%.0f x %.0f..%.0f)" % [corners["min_x"], corners["max_x"], corners["min_y"], corners["max_y"]]
+		"the kitchen finish gate should reach edge to edge of the drivable corridor (%.0f..%.0f x %.0f..%.0f)" % [corners["min_x"], corners["max_x"], corners["min_y"], corners["max_y"]]
 	):
-		return
+		return false
 	for grid_transform: Transform2D in GRID_TRANSFORMS:
 		var grid_origin := grid_transform.origin
-		if not _expect(grid_origin.y >= corners["max_y"] + 20.0, "the start grid should sit past the finish gate in driving order (grid=%s gate_bottom=%.0f)" % [str(grid_origin), corners["max_y"]]):
-			return
+		if not _expect(grid_origin.y >= corners["max_y"] + 20.0, "the kitchen start grid should sit past the finish gate in driving order (grid=%s gate_bottom=%.0f)" % [str(grid_origin), corners["max_y"]]):
+			return false
 	if not _expect(track.get_node_or_null("Labels") == null, "debug track labels should be removed"):
-		return
+		return false
 	if not _expect(track.get_node_or_null("ArtSurfaces/StartFinish") == null, "the misplaced illustrated start/finish sprite should be removed"):
-		return
-	print("FINISH_GATE_COVERAGE_TEST PASS")
-	quit(0)
+		return false
+	track.queue_free()
+	await process_frame
+	return true
+
+
+func _test_theme_gate(theme: StringName) -> bool:
+	var packed := load(String(THEME_SCENES[theme])) as PackedScene
+	if not _expect(packed != null, "%s track scene should exist" % theme):
+		return false
+	var track := packed.instantiate()
+	root.add_child(track)
+	var finish: Area2D
+	for child: Node in track.get_children():
+		if child is Area2D and bool(child.get("is_finish_line")):
+			finish = child as Area2D
+			break
+	if not _expect(finish != null, "%s should define a finish-line checkpoint" % theme):
+		return false
+	var corners := _gate_corners(finish)
+	var width: float = corners["max_x"] - corners["min_x"]
+	var height: float = corners["max_y"] - corners["min_y"]
+	var long_axis := maxf(width, height)
+	var short_axis := minf(width, height)
+	if not _expect(
+		long_axis >= 272.0 and short_axis <= 60.0,
+		"%s finish gate should be a full-corridor line (%.0f x %.0f)" % [theme, width, height]
+	):
+		return false
+	var white := track.get_node_or_null("StartFinishWhite") as Polygon2D
+	var black := track.get_node_or_null("StartFinishBlack") as Polygon2D
+	if not _expect(white != null and black != null and white.visible and black.visible, "%s should show its checker strip at the finish line" % theme):
+		return false
+	for container_name: String in ["GridForward", "GridReverse"]:
+		var container := track.get_node_or_null(container_name) as Node2D
+		if not _expect(container != null and container.get_child_count() == 4, "%s should place four %s spawn markers" % [theme, container_name]):
+			return false
+		for child: Node in container.get_children():
+			var marker := child as Node2D
+			if marker == null:
+				continue
+			var marker_position := marker.global_position
+			var inside_gate: bool = (
+				marker_position.x > corners["min_x"] - 24.0
+				and marker_position.x < corners["max_x"] + 24.0
+				and marker_position.y > corners["min_y"] - 24.0
+				and marker_position.y < corners["max_y"] + 24.0
+			)
+			if not _expect(not inside_gate, "%s %s marker %s overlaps the finish gate" % [theme, container_name, child.name]):
+				return false
+			if not _expect(
+				absf(marker_position.x) <= 900.0 and absf(marker_position.y) <= 600.0,
+				"%s %s marker %s should stay inside the drivable world bounds" % [theme, container_name, child.name]
+			):
+				return false
+	track.queue_free()
+	await process_frame
+	return true
 
 
 func _gate_corners(gate: Area2D) -> Dictionary:

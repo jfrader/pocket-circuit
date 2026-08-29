@@ -219,7 +219,7 @@ scale = Vector2(0.08, 0.08)
 texture = ExtResource("3_03pr4")
 
 [node name="CerealA" type="StaticBody2D" parent="." unique_id=2016329342]
-position = Vector2(650, 80)
+position = Vector2(820, 250)
 rotation = -0.12
 collision_layer = 2
 
@@ -289,7 +289,7 @@ scale = Vector2(0.32, 0.32)
 texture = ExtResource("6_03pr4")
 
 [node name="Fork" type="StaticBody2D" parent="." unique_id=5407409]
-position = Vector2(-210, -458)
+position = Vector2(-430, -470)
 rotation = 0.08
 collision_layer = 2
 

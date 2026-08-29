@@ -55,6 +55,10 @@ const RACER_MARKER_COLORS: Array[Color] = [
 	Color("ca78ff"),
 ]
 const AI_LANE_OFFSETS: Array[float] = [-42.0, 38.0, 6.0]
+const TRACK_SCENES: Dictionary = {
+	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
+	&"office": "res://scenes/tracks/office_desk.tscn",
+}
 
 @onready var race_manager: RaceManager = $RaceManager
 @onready var hud_label: Label = $HUD/HUDLabel
@@ -159,7 +163,7 @@ func _configure_vehicle(
 		driver: Dictionary,
 		vehicle_id: String
 ) -> void:
-	var grid := REVERSE_GRID_TRANSFORMS if race_manager.is_reverse_direction() else GRID_TRANSFORMS
+	var grid := _grid_transforms(race_manager.is_reverse_direction())
 	vehicle.global_transform = grid[racer_index]
 	vehicle.collision_layer |= 1
 	vehicle.collision_mask |= 1
@@ -179,7 +183,9 @@ func _configure_vehicle(
 func _configure_session() -> void:
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("get_current_race_session"):
-		_session = app.call("get_current_race_session")
+		var session: Variant = app.call("get_current_race_session")
+		if session is Dictionary and not (session as Dictionary).is_empty():
+			_session = session
 	var event: Dictionary = _session.get("event", {})
 	if not event.is_empty():
 		race_manager.laps_to_finish = clampi(int(event.get("laps", 3)), 1, 99)
@@ -192,9 +198,37 @@ func _configure_session() -> void:
 func _configure_track_variant() -> void:
 	var event: Dictionary = _session.get("event", {})
 	var requested_theme := StringName(event.get("theme", "kitchen"))
+	if requested_theme != &"kitchen":
+		var scene_path := String(TRACK_SCENES.get(requested_theme, ""))
+		var packed := load(scene_path) as PackedScene if not scene_path.is_empty() else null
+		if packed:
+			var embedded := track_root
+			embedded.get_parent().remove_child(embedded)
+			embedded.free()
+			track_root = packed.instantiate() as Node2D
+			track_root.name = "Track"
+			add_child(track_root)
 	_track_variant_presenter = TRACK_VARIANT_SCRIPT.new() as TrackVariantPresenter
 	track_root.add_child(_track_variant_presenter)
 	_track_variant_presenter.configure(track_root, requested_theme)
+	var discovered_checkpoints: Array[Node] = []
+	for child: Node in track_root.get_children():
+		if child.is_in_group("track_checkpoints"):
+			discovered_checkpoints.append(child)
+	race_manager.configure_checkpoints(discovered_checkpoints)
+
+
+func _grid_transforms(reverse: bool) -> Array[Transform2D]:
+	var container := track_root.get_node_or_null("GridReverse" if reverse else "GridForward") as Node2D
+	var transforms: Array[Transform2D] = []
+	if container:
+		for child: Node in container.get_children():
+			var marker := child as Node2D
+			if marker:
+				transforms.append(Transform2D(marker.rotation, marker.position))
+	if transforms.size() == 4:
+		return transforms
+	return REVERSE_GRID_TRANSFORMS if reverse else GRID_TRANSFORMS
 
 
 func _run_countdown() -> void:

@@ -34,6 +34,11 @@
 - The start/finish checker now sits on the left straight behind the starting
   grid, and lap gates span the full drivable corridor, so wide lines and brief
   off-track excursions still count the lap.
+- Kitchen, Workshop, and Office are now three distinct layouts: the kitchen
+  keeps its counter loop, the workshop runs a reversed-flow bench circuit with
+  a paint-can slalom and slick zones, and the office is a wide desk sprint with
+  a keycap chicane and a paper-mail boost lane. Each track has its own art,
+  hazards, and boost strips.
 - The title and machine bay now use a high-contrast after-hours workbench
   presentation with one dominant race action and the full four-car roster.
 - Title PLAY starts the championship; Quick Race, Options, Credits, and Quit are real buttons under it.
@@ -46,7 +51,10 @@
 - Vehicle-to-vehicle contact now separates along the physics normal instead of
   gluing cars together, caps heading only on the first hit, and restores
   steering as soon as they split.
-- AI opponents now stay in the track corridor, dodge cars and moving hazards,
+- AI opponents now hold near-top speed on straights, use their boost meter on
+  open stretches, and carry more speed through corners, so club races stay
+  close and clockwork races apply real pressure.
+- AI opponents also stay in the track corridor, dodge cars and moving hazards,
   catch up from behind without cheating top speed, and recover heading instead
   of stalling short of a lap.
 - Engine, countdown, launch, drift, boost, impact, warning, and menu interaction

@@ -1,0 +1,1700 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/kitchen_mug_hero.png" id="1_jq18l"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/kitchen_mug_blue.png" id="2_g837n"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/office_keycap.png" id="3_hv1w3"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/kitchen_cup.png" id="4_dguxg"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/hazard_office_cable.png" id="5_qyfbg"]
+[ext_resource type="PackedScene" path="res://scenes/race/checkpoint.tscn" id="6_8o576"]
+[ext_resource type="Script" path="res://scripts/race/checkpoint.gd" id="7_0p8aj"]
+[ext_resource type="Texture2D" path="res://assets/textures/kitchen/skid_mark.png" id="8_8tvg7"]
+[ext_resource type="Texture2D" path="res://assets/textures/kitchen/wood_scratch.png" id="9_bpune"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_aw8o1"]
+size = Vector2(1180, 450)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_usfa5"]
+size = Vector2(1800, 50)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_eq445"]
+size = Vector2(1800, 50)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ir8b7"]
+size = Vector2(50, 1200)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_coo05"]
+size = Vector2(50, 1200)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_51cwl"]
+radius = 42.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_3yh0c"]
+radius = 40.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_busos"]
+radius = 39.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_y6gja"]
+radius = 38.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_168dw"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ue60i"]
+radius = 32.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_v7u4v"]
+radius = 34.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_en3ed"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_xeboo"]
+radius = 38.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_hdock"]
+radius = 39.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ecv00"]
+radius = 40.0
+
+[node name="OfficeDesk" type="Node2D" unique_id=979450327 groups=["track"]]
+
+[node name="Floor" type="Polygon2D" parent="." unique_id=1842756365]
+z_index = -20
+color = Color(0.14901961, 0.21960784, 0.30980393, 1)
+polygon = PackedVector2Array(-1000, -600, 1000, -600, 1000, 600, -1000, 600)
+
+[node name="CounterHighlight" type="Polygon2D" parent="." unique_id=320945417]
+z_index = -19
+color = Color(0.21176471, 0.32941177, 0.4509804, 1)
+polygon = PackedVector2Array(-940, -540, 940, -540, 940, 540, -940, 540)
+
+[node name="LampGlow" type="Polygon2D" parent="." unique_id=216986215]
+z_index = -18
+position = Vector2(720, -465)
+color = Color(0.93, 0.62, 0.22, 0.1)
+polygon = PackedVector2Array(290, 0, 285.59424, 50.35797, 272.51086, 99.18584, 251.14737, 145, 222.1529, 186.4084, 186.40842, 222.1529, 144.99998, 251.14738, 99.185844, 272.51086, 50.357986, 285.59424, -1.26763025e-05, 290, -50.357975, 285.59424, -99.18584, 272.51086, -145.00002, 251.14737, -186.40842, 222.1529, -222.1529, 186.40842, -251.14737, 145.00002, -272.51086, 99.18586, -285.59424, 50.358006, -290, -2.5352605e-05, -285.59424, -50.357986, -272.51086, -99.185844, -251.14737, -144.99998, -222.15291, -186.4084, -186.40839, -222.15292, -144.99997, -251.14738, -99.18582, -272.51086, -50.35796, -285.59427, 3.4582154e-06, -290, 50.357964, -285.59424, 99.18583, -272.51086, 144.99997, -251.14738, 186.40839, -222.15291, 222.15285, -186.40845, 251.14734, -145.00005, 272.51083, -99.185905, 285.59427, -50.35791)
+
+[node name="LampGlowCore" type="Polygon2D" parent="." unique_id=693545131]
+z_index = -17
+position = Vector2(720, -465)
+color = Color(1, 0.76, 0.35, 0.08)
+polygon = PackedVector2Array(150, 0, 147.11778, 29.263548, 138.58192, 57.40252, 124.720436, 83.33553, 106.06602, 106.06602, 83.33553, 124.720436, 57.402515, 138.58192, 29.263554, 147.11778, -6.5567083e-06, 150, -29.263548, 147.11778, -57.402508, 138.58194, -83.335526, 124.72045, -106.06602, 106.06602, -124.72045, 83.335526, -138.58192, 57.402523, -147.1178, 29.263546, -150, -1.3113417e-05, -147.1178, -29.263536, -138.58192, -57.402515, -124.72043, -83.33555, -106.066025, -106.06601, -83.33556, -124.72042, -57.402534, -138.58192, -29.263557, -147.11778, 1.7887321e-06, -150, 29.263561, -147.11778, 57.402542, -138.58191, 83.33551, -124.72046, 106.065994, -106.06603, 124.720436, -83.33555, 138.58194, -57.402515, 147.1178, -29.263535)
+
+[node name="BottomStraight" type="Polygon2D" parent="." unique_id=576742048]
+z_index = -10
+color = Color(0.101960786, 0.12156863, 0.15686275, 1)
+polygon = PackedVector2Array(-820, 210, 820, 210, 820, 530, -820, 530)
+
+[node name="RightTechnical" type="Polygon2D" parent="." unique_id=750992442]
+z_index = -10
+color = Color(0.101960786, 0.12156863, 0.15686275, 1)
+polygon = PackedVector2Array(610, -430, 860, -430, 860, 430, 610, 430)
+
+[node name="TopSpeedSection" type="Polygon2D" parent="." unique_id=1421339114]
+z_index = -10
+color = Color(0.101960786, 0.12156863, 0.15686275, 1)
+polygon = PackedVector2Array(-820, -490, 820, -490, 820, -245, -820, -245)
+
+[node name="LeftTechnical" type="Polygon2D" parent="." unique_id=1132050488]
+z_index = -10
+color = Color(0.101960786, 0.12156863, 0.15686275, 1)
+polygon = PackedVector2Array(-860, -430, -610, -430, -610, 430, -860, 430)
+
+[node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=335793517]
+z_index = -7
+color = Color(0.9607843, 0.93333334, 0.78431374, 1)
+polygon = PackedVector2Array(-875, 238, -595, 238, -595, 272, -875, 272)
+
+[node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=813060665]
+z_index = -6
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-875, 241, -835, 241, -835, 269, -875, 269, -805, 241, -765, 241, -765, 269, -805, 269, -735, 241, -695, 241, -695, 269, -735, 269, -665, 241, -625, 241, -625, 269, -665, 269)
+
+[node name="IslandShadow" type="Polygon2D" parent="." unique_id=1174506192]
+z_index = -11
+position = Vector2(8, 10)
+color = Color(0.03, 0.06, 0.1, 0.72)
+polygon = PackedVector2Array(-610, -242, 610, -242, 610, 242, -610, 242)
+
+[node name="InnerIsland" type="Polygon2D" parent="." unique_id=99440139]
+z_index = -9
+color = Color(0.16078432, 0.2627451, 0.37254903, 1)
+polygon = PackedVector2Array(-590, -225, 590, -225, 590, 225, -590, 225)
+
+[node name="KeyboardGrid" type="Node2D" parent="." unique_id=88103094]
+z_index = 5
+
+[node name="Key_00_00" type="Polygon2D" parent="KeyboardGrid" unique_id=186431122]
+z_index = -13
+position = Vector2(-455, -145)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_00" unique_id=748636747]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_00_00" unique_id=327699289]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_00_01" type="Polygon2D" parent="KeyboardGrid" unique_id=2096761379]
+z_index = -13
+position = Vector2(-359, -145)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_01" unique_id=1382729191]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_00_02" type="Polygon2D" parent="KeyboardGrid" unique_id=809602797]
+z_index = -13
+position = Vector2(-263, -145)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_02" unique_id=188510207]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_00_03" type="Polygon2D" parent="KeyboardGrid" unique_id=744941432]
+z_index = -13
+position = Vector2(-167, -145)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_03" unique_id=133274153]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_00_03" unique_id=1917262030]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_00_04" type="Polygon2D" parent="KeyboardGrid" unique_id=1191330290]
+z_index = -13
+position = Vector2(-71, -145)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_04" unique_id=853283128]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_00_05" type="Polygon2D" parent="KeyboardGrid" unique_id=1728901301]
+z_index = -13
+position = Vector2(25, -145)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_05" unique_id=1262290637]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_00_06" type="Polygon2D" parent="KeyboardGrid" unique_id=1049920011]
+z_index = -13
+position = Vector2(121, -145)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_06" unique_id=1170836211]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_00_06" unique_id=1571406295]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_00_07" type="Polygon2D" parent="KeyboardGrid" unique_id=2141180246]
+z_index = -13
+position = Vector2(217, -145)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_07" unique_id=1167550962]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_00_08" type="Polygon2D" parent="KeyboardGrid" unique_id=40108952]
+z_index = -13
+position = Vector2(313, -145)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_08" unique_id=1676307394]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_00_09" type="Polygon2D" parent="KeyboardGrid" unique_id=546617625]
+z_index = -13
+position = Vector2(409, -145)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_00_09" unique_id=684936622]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_00_09" unique_id=1275229567]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_01_00" type="Polygon2D" parent="KeyboardGrid" unique_id=1319517202]
+z_index = -13
+position = Vector2(-433, -51)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_00" unique_id=1055970926]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_01_01" type="Polygon2D" parent="KeyboardGrid" unique_id=1287721527]
+z_index = -13
+position = Vector2(-337, -51)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_01" unique_id=1010197400]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_01_02" type="Polygon2D" parent="KeyboardGrid" unique_id=1254870099]
+z_index = -13
+position = Vector2(-241, -51)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_02" unique_id=1929791837]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_01_02" unique_id=1015044138]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_01_03" type="Polygon2D" parent="KeyboardGrid" unique_id=1115014293]
+z_index = -13
+position = Vector2(-145, -51)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_03" unique_id=66787069]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_01_04" type="Polygon2D" parent="KeyboardGrid" unique_id=284882097]
+z_index = -13
+position = Vector2(-49, -51)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_04" unique_id=145918501]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_01_05" type="Polygon2D" parent="KeyboardGrid" unique_id=1237032347]
+z_index = -13
+position = Vector2(47, -51)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_05" unique_id=582886888]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_01_05" unique_id=178186077]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_01_06" type="Polygon2D" parent="KeyboardGrid" unique_id=910318876]
+z_index = -13
+position = Vector2(143, -51)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_06" unique_id=1082856099]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_01_07" type="Polygon2D" parent="KeyboardGrid" unique_id=1772289429]
+z_index = -13
+position = Vector2(239, -51)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_07" unique_id=1795728282]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_01_08" type="Polygon2D" parent="KeyboardGrid" unique_id=1973115014]
+z_index = -13
+position = Vector2(335, -51)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_08" unique_id=714192926]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_01_08" unique_id=1110918749]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_01_09" type="Polygon2D" parent="KeyboardGrid" unique_id=1959686391]
+z_index = -13
+position = Vector2(431, -51)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_01_09" unique_id=827973306]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_02_00" type="Polygon2D" parent="KeyboardGrid" unique_id=1712301602]
+z_index = -13
+position = Vector2(-445, 43)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_00" unique_id=1514624201]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_02_01" type="Polygon2D" parent="KeyboardGrid" unique_id=1557912860]
+z_index = -13
+position = Vector2(-349, 43)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_01" unique_id=2008722522]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_02_01" unique_id=1512003060]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_02_02" type="Polygon2D" parent="KeyboardGrid" unique_id=736989501]
+z_index = -13
+position = Vector2(-253, 43)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_02" unique_id=26940783]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_02_03" type="Polygon2D" parent="KeyboardGrid" unique_id=1652161903]
+z_index = -13
+position = Vector2(-157, 43)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_03" unique_id=1670683934]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_02_04" type="Polygon2D" parent="KeyboardGrid" unique_id=1765372220]
+z_index = -13
+position = Vector2(-61, 43)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_04" unique_id=2041606135]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_02_04" unique_id=1442009556]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_02_05" type="Polygon2D" parent="KeyboardGrid" unique_id=680780364]
+z_index = -13
+position = Vector2(35, 43)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_05" unique_id=1223839840]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_02_06" type="Polygon2D" parent="KeyboardGrid" unique_id=567229042]
+z_index = -13
+position = Vector2(131, 43)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_06" unique_id=381105923]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_02_07" type="Polygon2D" parent="KeyboardGrid" unique_id=1560438872]
+z_index = -13
+position = Vector2(227, 43)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_07" unique_id=164663019]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_02_07" unique_id=618421861]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_02_08" type="Polygon2D" parent="KeyboardGrid" unique_id=1908740618]
+z_index = -13
+position = Vector2(323, 43)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_08" unique_id=722321978]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_02_09" type="Polygon2D" parent="KeyboardGrid" unique_id=67465936]
+z_index = -13
+position = Vector2(419, 43)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_02_09" unique_id=1087986272]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_03_00" type="Polygon2D" parent="KeyboardGrid" unique_id=432720157]
+z_index = -13
+position = Vector2(-417, 137)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_00" unique_id=2092337481]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_03_00" unique_id=974285409]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_03_01" type="Polygon2D" parent="KeyboardGrid" unique_id=2018416854]
+z_index = -13
+position = Vector2(-321, 137)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_01" unique_id=1613750763]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_03_02" type="Polygon2D" parent="KeyboardGrid" unique_id=362955971]
+z_index = -13
+position = Vector2(-225, 137)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_02" unique_id=1514561392]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_03_03" type="Polygon2D" parent="KeyboardGrid" unique_id=912408501]
+z_index = -13
+position = Vector2(-129, 137)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_03" unique_id=570753463]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_03_03" unique_id=1888213196]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_03_04" type="Polygon2D" parent="KeyboardGrid" unique_id=746643171]
+z_index = -13
+position = Vector2(-33, 137)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_04" unique_id=1547934765]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_03_05" type="Polygon2D" parent="KeyboardGrid" unique_id=74295137]
+z_index = -13
+position = Vector2(63, 137)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_05" unique_id=1620963824]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_03_06" type="Polygon2D" parent="KeyboardGrid" unique_id=242281992]
+z_index = -13
+position = Vector2(159, 137)
+color = Color(0.90588236, 0.8745098, 0.7882353, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_06" unique_id=1044438413]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_03_06" unique_id=1484201838]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="Key_03_07" type="Polygon2D" parent="KeyboardGrid" unique_id=292504261]
+z_index = -13
+position = Vector2(255, 137)
+color = Color(0.4, 0.5294118, 0.64705884, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_07" unique_id=144253491]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_03_08" type="Polygon2D" parent="KeyboardGrid" unique_id=1393519959]
+z_index = -13
+position = Vector2(351, 137)
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_08" unique_id=1178449227]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Key_03_09" type="Polygon2D" parent="KeyboardGrid" unique_id=1885634095]
+z_index = -13
+position = Vector2(447, 137)
+color = Color(0.45882353, 0.5803922, 0.6901961, 1)
+polygon = PackedVector2Array(-27, -26, 27, -26, 35, -18, 35, 18, 27, 26, -27, 26, -35, 18, -35, -18)
+
+[node name="InkEdge" type="Polygon2D" parent="KeyboardGrid/Key_03_09" unique_id=310086562]
+z_index = 1
+position = Vector2(0, 4)
+color = Color(0.05, 0.07, 0.1, 0.2)
+polygon = PackedVector2Array(-25, -22, 25, -22, 31, -16, 31, 16, 25, 22, -25, 22, -31, 16, -31, -16)
+
+[node name="Legend" type="Polygon2D" parent="KeyboardGrid/Key_03_09" unique_id=1361138699]
+z_index = 2
+position = Vector2(-11, -9)
+color = Color(1, 0.98, 0.89, 0.62)
+polygon = PackedVector2Array(-9, -2, 9, -2, 9, 2, -9, 2)
+
+[node name="StickyNoteClusters" type="Node2D" parent="." unique_id=1400765250]
+z_index = 5
+
+[node name="LeftNotes" type="Node2D" parent="StickyNoteClusters" unique_id=1784864855]
+position = Vector2(-425, 45)
+rotation = -0.08
+
+[node name="Shadow" type="Polygon2D" parent="StickyNoteClusters/LeftNotes" unique_id=1643289887]
+z_index = -12
+position = Vector2(10, 10)
+color = Color(0.03, 0.04, 0.06, 0.32)
+polygon = PackedVector2Array(-74, -65, 74, -65, 80, -59, 80, 59, 74, 65, -74, 65, -80, 59, -80, -59)
+
+[node name="BackNote" type="Polygon2D" parent="StickyNoteClusters/LeftNotes" unique_id=1912694907]
+z_index = -12
+position = Vector2(6, 5)
+rotation = 0.07
+color = Color(0.8117647, 0.5686275, 0.21568628, 1)
+polygon = PackedVector2Array(-73, -63, 73, -63, 78, -58, 78, 58, 73, 63, -73, 63, -78, 58, -78, -58)
+
+[node name="TopNote" type="Polygon2D" parent="StickyNoteClusters/LeftNotes" unique_id=1321891902]
+z_index = -12
+color = Color(0.90588236, 0.72156864, 0.2901961, 1)
+polygon = PackedVector2Array(-73, -63, 73, -63, 78, -58, 78, 58, 73, 63, -73, 63, -78, 58, -78, -58)
+
+[node name="Scribble" type="Line2D" parent="StickyNoteClusters/LeftNotes" unique_id=593610922]
+z_index = -11
+points = PackedVector2Array(-45, -18, 38, -18, 28, -3, -25, -3, -10, 12)
+width = 4.0
+default_color = Color(0.31, 0.24, 0.15, 0.38)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="RightNotes" type="Node2D" parent="StickyNoteClusters" unique_id=1270770339]
+position = Vector2(395, -80)
+rotation = 0.11
+
+[node name="Shadow" type="Polygon2D" parent="StickyNoteClusters/RightNotes" unique_id=1541526391]
+z_index = -12
+position = Vector2(10, 10)
+color = Color(0.03, 0.04, 0.06, 0.32)
+polygon = PackedVector2Array(-74, -65, 74, -65, 80, -59, 80, 59, 74, 65, -74, 65, -80, 59, -80, -59)
+
+[node name="BackNote" type="Polygon2D" parent="StickyNoteClusters/RightNotes" unique_id=2054557798]
+z_index = -12
+position = Vector2(6, 5)
+rotation = 0.07
+color = Color(0.8117647, 0.5686275, 0.21568628, 1)
+polygon = PackedVector2Array(-73, -63, 73, -63, 78, -58, 78, 58, 73, 63, -73, 63, -78, 58, -78, -58)
+
+[node name="TopNote" type="Polygon2D" parent="StickyNoteClusters/RightNotes" unique_id=2033591416]
+z_index = -12
+color = Color(0.94509804, 0.8745098, 0.6117647, 1)
+polygon = PackedVector2Array(-73, -63, 73, -63, 78, -58, 78, 58, 73, 63, -73, 63, -78, 58, -78, -58)
+
+[node name="Scribble" type="Line2D" parent="StickyNoteClusters/RightNotes" unique_id=553106397]
+z_index = -11
+points = PackedVector2Array(-45, -18, 38, -18, 28, -3, -25, -3, -10, 12)
+width = 4.0
+default_color = Color(0.31, 0.24, 0.15, 0.38)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="InnerBarrier" type="StaticBody2D" parent="." unique_id=1085507318]
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="InnerBarrier" unique_id=620699345]
+shape = SubResource("RectangleShape2D_aw8o1")
+
+[node name="InnerBarrierShadow" type="Line2D" parent="." unique_id=648687581]
+z_index = -8
+points = PackedVector2Array(-590, -225, 590, -225, 590, 225, -590, 225)
+closed = true
+width = 24.0
+default_color = Color(0.0627451, 0.101960786, 0.15294118, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="InnerBarrierAmberRail" type="Line2D" parent="." unique_id=289786409]
+z_index = -7
+points = PackedVector2Array(-590, -225, 590, -225, 590, 225, -590, 225)
+closed = true
+width = 11.0
+default_color = Color(0.83137256, 0.6039216, 0.18431373, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="InnerBarrierHighlight" type="Line2D" parent="." unique_id=440394583]
+z_index = -6
+points = PackedVector2Array(-590, -225, 590, -225, 590, 225, -590, 225)
+closed = true
+width = 3.0
+default_color = Color(1, 0.84, 0.42, 0.45)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="ArtSurfaces" type="Node2D" parent="." unique_id=404274953]
+
+[node name="OuterLaneEdge" type="Line2D" parent="ArtSurfaces" unique_id=791960854]
+z_index = -7
+points = PackedVector2Array(-835, 535, 835, 535, 875, 495, 875, -455, 835, -505, -835, -505, -875, -465, -875, 495)
+closed = true
+width = 6.0
+default_color = Color(0.95, 0.92, 0.84, 0.52)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="InnerLaneEdge" type="Line2D" parent="ArtSurfaces" unique_id=431319022]
+z_index = -7
+points = PackedVector2Array(-600, 235, 600, 235, 605, 230, 605, -230, 600, -235, -600, -235, -605, -230, -605, 230)
+closed = true
+width = 6.0
+default_color = Color(0.95, 0.92, 0.84, 0.48)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="CornerAmberNE" type="Line2D" parent="ArtSurfaces" unique_id=1781135113]
+z_index = -6
+points = PackedVector2Array(825, -470, 850, -445, 850, -350)
+default_color = Color(0.89, 0.63, 0.2, 0.72)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="CornerAmberSE" type="Line2D" parent="ArtSurfaces" unique_id=414750493]
+z_index = -6
+points = PackedVector2Array(850, 350, 850, 490, 815, 515)
+default_color = Color(0.89, 0.63, 0.2, 0.72)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="CornerAmberNW" type="Line2D" parent="ArtSurfaces" unique_id=440127777]
+z_index = -6
+points = PackedVector2Array(-825, -470, -850, -445, -850, -350)
+default_color = Color(0.89, 0.63, 0.2, 0.72)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="TopWall" type="StaticBody2D" parent="." unique_id=1956579578]
+position = Vector2(0, -575)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TopWall" unique_id=1792211452]
+shape = SubResource("RectangleShape2D_usfa5")
+
+[node name="Visual" type="Polygon2D" parent="TopWall" unique_id=1787971115]
+z_index = -1
+color = Color(0.043137256, 0.06666667, 0.105882354, 1)
+polygon = PackedVector2Array(-900, -25, 900, -25, 900, 25, -900, 25)
+
+[node name="AmberEdge" type="Polygon2D" parent="TopWall" unique_id=230906149]
+position = Vector2(0, 18)
+color = Color(0.84, 0.58, 0.17, 0.58)
+polygon = PackedVector2Array(-900, -3, 900, -3, 900, 3, -900, 3)
+
+[node name="BottomWall" type="StaticBody2D" parent="." unique_id=734256097]
+position = Vector2(0, 575)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BottomWall" unique_id=1074752040]
+shape = SubResource("RectangleShape2D_eq445")
+
+[node name="Visual" type="Polygon2D" parent="BottomWall" unique_id=1540542313]
+z_index = -1
+color = Color(0.043137256, 0.06666667, 0.105882354, 1)
+polygon = PackedVector2Array(-900, -25, 900, -25, 900, 25, -900, 25)
+
+[node name="AmberEdge" type="Polygon2D" parent="BottomWall" unique_id=2097169036]
+position = Vector2(0, -18)
+color = Color(0.84, 0.58, 0.17, 0.58)
+polygon = PackedVector2Array(-900, -3, 900, -3, 900, 3, -900, 3)
+
+[node name="LeftWall" type="StaticBody2D" parent="." unique_id=375699132]
+position = Vector2(-875, 0)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LeftWall" unique_id=1819477065]
+shape = SubResource("RectangleShape2D_ir8b7")
+
+[node name="Visual" type="Polygon2D" parent="LeftWall" unique_id=341242589]
+z_index = -1
+color = Color(0.043137256, 0.06666667, 0.105882354, 1)
+polygon = PackedVector2Array(-25, -600, 25, -600, 25, 600, -25, 600)
+
+[node name="AmberEdge" type="Polygon2D" parent="LeftWall" unique_id=350811701]
+position = Vector2(18, 0)
+color = Color(0.84, 0.58, 0.17, 0.58)
+polygon = PackedVector2Array(-3, -600, 3, -600, 3, 600, -3, 600)
+
+[node name="RightWall" type="StaticBody2D" parent="." unique_id=1115883227]
+position = Vector2(875, 0)
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RightWall" unique_id=1130430735]
+shape = SubResource("RectangleShape2D_coo05")
+
+[node name="Visual" type="Polygon2D" parent="RightWall" unique_id=696214379]
+z_index = -1
+color = Color(0.043137256, 0.06666667, 0.105882354, 1)
+polygon = PackedVector2Array(-25, -600, 25, -600, 25, 600, -25, 600)
+
+[node name="AmberEdge" type="Polygon2D" parent="RightWall" unique_id=1117448259]
+position = Vector2(-18, 0)
+color = Color(0.84, 0.58, 0.17, 0.58)
+polygon = PackedVector2Array(-3, -600, 3, -600, 3, 600, -3, 600)
+
+[node name="MugA" type="StaticBody2D" parent="." unique_id=1980710329]
+position = Vector2(-450, 240)
+rotation = -0.08
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MugA" unique_id=908114207]
+shape = SubResource("CircleShape2D_51cwl")
+
+[node name="Shadow" type="Polygon2D" parent="MugA" unique_id=1357375872]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(49, 0, 45.270096, 18.75149, 34.64823, 34.64823, 18.751488, 45.270096, -2.141858e-06, 49, -18.751486, 45.2701, -34.64823, 34.64823, -45.270096, 18.751492, -49, -4.283716e-06, -45.270096, -18.751488, -34.648235, -34.648228, -18.751495, -45.270096, 5.8431914e-07, -49, 18.751497, -45.270092, 34.648228, -34.64824, 45.2701, -18.751488)
+
+[node name="Visual" type="Sprite2D" parent="MugA" unique_id=867427042]
+z_index = 1
+scale = Vector2(0.105, 0.105)
+texture = ExtResource("1_jq18l")
+
+[node name="MugB" type="StaticBody2D" parent="." unique_id=1575146569]
+position = Vector2(150, 500)
+rotation = 0.06
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="MugB" unique_id=623640011]
+shape = SubResource("CircleShape2D_3yh0c")
+
+[node name="Shadow" type="Polygon2D" parent="MugB" unique_id=280211031]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(47, 0, 43.422337, 17.986122, 33.234016, 33.234016, 17.98612, 43.422337, -2.0544353e-06, 47, -17.98612, 43.42234, -33.234016, 33.234016, -43.422337, 17.986124, -47, -4.1088706e-06, -43.422337, -17.98612, -33.23402, -33.234016, -17.986128, -43.422337, 5.604694e-07, -47, 17.98613, -43.422333, 33.234013, -33.234024, 43.42234, -17.98612)
+
+[node name="Visual" type="Sprite2D" parent="MugB" unique_id=1933705884]
+z_index = 1
+scale = Vector2(0.102, 0.102)
+texture = ExtResource("2_g837n")
+
+[node name="CerealA" type="StaticBody2D" parent="." unique_id=445328372]
+position = Vector2(650, 270)
+rotation = -0.08
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CerealA" unique_id=1786692434]
+shape = SubResource("CircleShape2D_busos")
+
+[node name="Shadow" type="Polygon2D" parent="CerealA" unique_id=453505996]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(46, 0, 42.49846, 17.60344, 32.526913, 32.526913, 17.603437, 42.49846, -2.0107238e-06, 46, -17.603436, 42.49846, -32.526913, 32.526913, -42.49846, 17.603441, -46, -4.0214477e-06, -42.49846, -17.603437, -32.526913, -32.52691, -17.603445, -42.49846, 5.485445e-07, -46, 17.603445, -42.498455, 32.526905, -32.526917, 42.49846, -17.603437)
+
+[node name="KeycapLower" type="Polygon2D" parent="CerealA" unique_id=319550638]
+position = Vector2(5, 7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-34, -42, 34, -42, 44, -32, 44, 32, 34, 42, -34, 42, -44, 32, -44, -32)
+
+[node name="Visual" type="Sprite2D" parent="CerealA" unique_id=165583426]
+modulate = Color(0.45882353, 0.5803922, 0.6901961, 1)
+z_index = 1
+scale = Vector2(0.115, 0.115)
+texture = ExtResource("3_hv1w3")
+
+[node name="Legend" type="Polygon2D" parent="CerealA" unique_id=2102596709]
+z_index = 2
+position = Vector2(-12, -16)
+color = Color(1, 0.98, 0.88, 0.9)
+polygon = PackedVector2Array(-10, -3, 10, -3, 10, 3, -10, 3)
+
+[node name="CerealB" type="StaticBody2D" parent="." unique_id=895441413]
+position = Vector2(300, 470)
+rotation = 0.1
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="CerealB" unique_id=1291720714]
+shape = SubResource("CircleShape2D_y6gja")
+
+[node name="Shadow" type="Polygon2D" parent="CerealB" unique_id=442410174]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(45, 0, 41.574577, 17.220755, 31.819805, 31.819805, 17.220755, 41.574577, -1.9670124e-06, 45, -17.220753, 41.57458, -31.819805, 31.819805, -41.574577, 17.220757, -45, -3.934025e-06, -41.574577, -17.220755, -31.819807, -31.819801, -17.22076, -41.574577, 5.366196e-07, -45, 17.220762, -41.574574, 31.8198, -31.81981, 41.57458, -17.220755)
+
+[node name="KeycapLower" type="Polygon2D" parent="CerealB" unique_id=19375459]
+position = Vector2(5, 7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-34, -42, 34, -42, 44, -32, 44, 32, 34, 42, -34, 42, -44, 32, -44, -32)
+
+[node name="Visual" type="Sprite2D" parent="CerealB" unique_id=242203311]
+modulate = Color(0.90588236, 0.8745098, 0.7882353, 1)
+z_index = 1
+scale = Vector2(0.115, 0.115)
+texture = ExtResource("3_hv1w3")
+
+[node name="Legend" type="Polygon2D" parent="CerealB" unique_id=423172679]
+z_index = 2
+position = Vector2(-12, -16)
+color = Color(1, 0.98, 0.88, 0.9)
+polygon = PackedVector2Array(-10, -3, 10, -3, 10, 3, -10, 3)
+
+[node name="Sponge" type="StaticBody2D" parent="." unique_id=801787312]
+position = Vector2(300, 250)
+rotation = -0.06
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Sponge" unique_id=1149743575]
+shape = SubResource("CircleShape2D_168dw")
+
+[node name="Shadow" type="Polygon2D" parent="Sponge" unique_id=1032320186]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(43, 0, 39.726818, 16.455389, 30.405592, 30.405592, 16.455387, 39.726818, -1.8795897e-06, 43, -16.455385, 39.72682, -30.405592, 30.405592, -39.726818, 16.455389, -43, -3.7591794e-06, -39.726818, -16.455387, -30.405594, -30.405588, -16.455393, -39.726818, 5.127699e-07, -43, 16.455395, -39.726814, 30.405586, -30.405596, 39.72682, -16.455387)
+
+[node name="StickyBack" type="Polygon2D" parent="Sponge" unique_id=1028590540]
+position = Vector2(6, 6)
+rotation = 0.08
+color = Color(0.8392157, 0.54509807, 0.19607843, 1)
+polygon = PackedVector2Array(-44, -35, 44, -35, 49, -30, 49, 30, 44, 35, -44, 35, -49, 30, -49, -30)
+
+[node name="Visual" type="Polygon2D" parent="Sponge" unique_id=478241519]
+z_index = 1
+position = Vector2(-3, -3)
+color = Color(0.9411765, 0.79607844, 0.4, 1)
+polygon = PackedVector2Array(-44, -35, 44, -35, 49, -30, 49, 30, 44, 35, -44, 35, -49, 30, -49, -30)
+
+[node name="NoteLines" type="Line2D" parent="Sponge" unique_id=2124934544]
+z_index = 2
+points = PackedVector2Array(-25, -8, 20, -8, 20, 1, -10, 1)
+width = 3.0
+default_color = Color(0.35, 0.28, 0.18, 0.38)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Fork" type="StaticBody2D" parent="." unique_id=2050355238]
+position = Vector2(-640, -470)
+rotation = -0.05
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Fork" unique_id=435657326]
+shape = SubResource("CircleShape2D_ue60i")
+
+[node name="Shadow" type="Polygon2D" parent="Fork" unique_id=2110953666]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(39, 0, 36.0313, 14.924655, 27.577164, 27.577164, 14.924654, 36.0313, -1.7047441e-06, 39, -14.924652, 36.031303, -27.577164, 27.577164, -36.0313, 14.924656, -39, -3.4094883e-06, -36.0313, -14.924654, -27.577166, -27.577162, -14.92466, -36.0313, 4.6507034e-07, -39, 14.924661, -36.0313, 27.57716, -27.57717, 36.031303, -14.924654)
+
+[node name="Visual" type="Polygon2D" parent="Fork" unique_id=1093873555]
+z_index = 1
+color = Color(0.09019608, 0.20392157, 0.3254902, 1)
+polygon = PackedVector2Array(-88, -12, 72, -12, 92, 0, 72, 12, -88, 12)
+
+[node name="PenNib" type="Polygon2D" parent="Fork" unique_id=2123796339]
+z_index = 2
+color = Color(0.84313726, 0.7882353, 0.654902, 1)
+polygon = PackedVector2Array(72, -12, 104, 0, 72, 12)
+
+[node name="PenShine" type="Polygon2D" parent="Fork" unique_id=669280727]
+z_index = 2
+position = Vector2(-20, -5)
+color = Color(0.55, 0.76, 0.92, 0.75)
+polygon = PackedVector2Array(-55, -2, 55, -2, 55, 2, -55, 2)
+
+[node name="Ruler" type="StaticBody2D" parent="." unique_id=832667341]
+position = Vector2(60, 250)
+rotation = 0.02
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Ruler" unique_id=720637647]
+shape = SubResource("CircleShape2D_v7u4v")
+
+[node name="Shadow" type="Polygon2D" parent="Ruler" unique_id=854642117]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(41, 0, 37.87906, 15.6900215, 28.991377, 28.991377, 15.690021, 37.87906, -1.7921669e-06, 41, -15.69002, 37.879063, -28.991377, 28.991377, -37.87906, 15.690022, -41, -3.5843339e-06, -37.87906, -15.690021, -28.99138, -28.991375, -15.690026, -37.87906, 4.889201e-07, -41, 15.690028, -37.87906, 28.991373, -28.991383, 37.879063, -15.690021)
+
+[node name="Visual" type="Polygon2D" parent="Ruler" unique_id=1675048424]
+z_index = 1
+color = Color(0.8392157, 0.60784316, 0.20784314, 1)
+polygon = PackedVector2Array(-104, -14, 104, -14, 108, -10, 108, 10, 104, 14, -104, 14, -108, 10, -108, -10)
+
+[node name="Tick0" type="Polygon2D" parent="Ruler" unique_id=1604210547]
+z_index = 2
+position = Vector2(-88, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -5, 1.5, -5, 1.5, 5, -1.5, 5)
+
+[node name="Tick1" type="Polygon2D" parent="Ruler" unique_id=275768459]
+z_index = 2
+position = Vector2(-66, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -3, 1.5, -3, 1.5, 3, -1.5, 3)
+
+[node name="Tick2" type="Polygon2D" parent="Ruler" unique_id=664038855]
+z_index = 2
+position = Vector2(-44, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -5, 1.5, -5, 1.5, 5, -1.5, 5)
+
+[node name="Tick3" type="Polygon2D" parent="Ruler" unique_id=888391652]
+z_index = 2
+position = Vector2(-22, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -3, 1.5, -3, 1.5, 3, -1.5, 3)
+
+[node name="Tick4" type="Polygon2D" parent="Ruler" unique_id=1201232394]
+z_index = 2
+position = Vector2(0, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -5, 1.5, -5, 1.5, 5, -1.5, 5)
+
+[node name="Tick5" type="Polygon2D" parent="Ruler" unique_id=752125853]
+z_index = 2
+position = Vector2(22, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -3, 1.5, -3, 1.5, 3, -1.5, 3)
+
+[node name="Tick6" type="Polygon2D" parent="Ruler" unique_id=20285250]
+z_index = 2
+position = Vector2(44, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -5, 1.5, -5, 1.5, 5, -1.5, 5)
+
+[node name="Tick7" type="Polygon2D" parent="Ruler" unique_id=952565388]
+z_index = 2
+position = Vector2(66, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -3, 1.5, -3, 1.5, 3, -1.5, 3)
+
+[node name="Tick8" type="Polygon2D" parent="Ruler" unique_id=1217151779]
+z_index = 2
+position = Vector2(88, -7)
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-1.5, -5, 1.5, -5, 1.5, 5, -1.5, 5)
+
+[node name="Apple" type="StaticBody2D" parent="." unique_id=620440908]
+position = Vector2(-500, 35)
+rotation = -0.12
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Apple" unique_id=489389945]
+shape = SubResource("CircleShape2D_en3ed")
+
+[node name="Shadow" type="Polygon2D" parent="Apple" unique_id=2052309035]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(43, 0, 39.726818, 16.455389, 30.405592, 30.405592, 16.455387, 39.726818, -1.8795897e-06, 43, -16.455385, 39.72682, -30.405592, 30.405592, -39.726818, 16.455389, -43, -3.7591794e-06, -39.726818, -16.455387, -30.405594, -30.405588, -16.455393, -39.726818, 5.127699e-07, -43, 16.455395, -39.726814, 30.405586, -30.405596, 39.72682, -16.455387)
+
+[node name="Visual" type="Polygon2D" parent="Apple" unique_id=1836733349]
+z_index = 1
+color = Color(0.101960786, 0.14509805, 0.20392157, 1)
+polygon = PackedVector2Array(-38, -28, 38, -28, 31, 30, -31, 30)
+
+[node name="ClipFace" type="Polygon2D" parent="Apple" unique_id=310961562]
+z_index = 2
+color = Color(0.2509804, 0.35686275, 0.4627451, 1)
+polygon = PackedVector2Array(-31, -20, 31, -20, 25, 22, -25, 22)
+
+[node name="ClipWire" type="Line2D" parent="Apple" unique_id=2126779231]
+z_index = 2
+points = PackedVector2Array(-24, -25, -42, -50, -5, -55, 0, -25, 5, -55, 42, -50, 24, -25)
+width = 5.0
+default_color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Lime" type="StaticBody2D" parent="." unique_id=943539154]
+position = Vector2(-390, 120)
+rotation = 0.08
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Lime" unique_id=1459508857]
+shape = SubResource("CircleShape2D_xeboo")
+
+[node name="Shadow" type="Polygon2D" parent="Lime" unique_id=1196717203]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(45, 0, 41.574577, 17.220755, 31.819805, 31.819805, 17.220755, 41.574577, -1.9670124e-06, 45, -17.220753, 41.57458, -31.819805, 31.819805, -41.574577, 17.220757, -45, -3.934025e-06, -41.574577, -17.220755, -31.819807, -31.819801, -17.22076, -41.574577, 5.366196e-07, -45, 17.220762, -41.574574, 31.8198, -31.81981, 41.57458, -17.220755)
+
+[node name="Visual" type="Polygon2D" parent="Lime" unique_id=577184633]
+z_index = 1
+color = Color(0.43529412, 0.5686275, 0.72156864, 1)
+polygon = PackedVector2Array(46, 0, 43.7486, 14.214782, 37.214783, 27.03812, 27.03812, 37.214783, 14.214781, 43.7486, -2.0107238e-06, 46, -14.214784, 43.748596, -27.038118, 37.214783, -37.214787, 27.038118, -43.748596, 14.214784, -46, -4.0214477e-06, -43.7486, -14.214781, -37.21478, -27.038126, -27.038113, -37.214787, -14.214787, -43.748596, 5.485445e-07, -46, 14.2147875, -43.748596, 27.038113, -37.214787, 37.21478, -27.038124, 43.7486, -14.214779)
+
+[node name="TapeInnerInk" type="Polygon2D" parent="Lime" unique_id=1859949920]
+z_index = 2
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(23, 0, 21.61293, 7.8664627, 17.619022, 14.784114, 11.499999, 19.918585, 3.9939091, 22.650578, -3.9939084, 22.650578, -11.500001, 19.918585, -17.619022, 14.784116, -21.61293, 7.866465, -23, -2.0107238e-06, -21.61293, -7.8664637, -17.619024, -14.784114, -11.499998, -19.918585, -3.993907, -22.65058, 3.9939075, -22.650578, 11.499998, -19.918585, 17.619019, -14.784119, 21.612928, -7.8664684)
+
+[node name="TapeInner" type="Polygon2D" parent="Lime" unique_id=1056083648]
+z_index = 3
+color = Color(0.84705883, 0.8117647, 0.7176471, 1)
+polygon = PackedVector2Array(15, 0, 13.858192, 5.740252, 10.606602, 10.606602, 5.7402515, 13.858192, -6.556708e-07, 15, -5.740251, 13.858193, -10.606602, 10.606602, -13.858192, 5.7402525, -15, -1.3113416e-06, -13.858192, -5.7402515, -10.606603, -10.606601, -5.7402534, -13.858192, 1.7887321e-07, -15, 5.740254, -13.8581915, 10.6066, -10.606604, 13.858193, -5.7402515)
+
+[node name="TapeGlint" type="Polygon2D" parent="Lime" unique_id=773902691]
+z_index = 3
+color = Color(0.72, 0.87, 0.96, 0.7)
+polygon = PackedVector2Array(-30, -23, -8, -39, 7, -35, -20, -18)
+
+[node name="Cup" type="StaticBody2D" parent="." unique_id=1503371774]
+position = Vector2(-510, 520)
+rotation = -0.08
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Cup" unique_id=297355582]
+shape = SubResource("CircleShape2D_hdock")
+
+[node name="Shadow" type="Polygon2D" parent="Cup" unique_id=2122005634]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(46, 0, 42.49846, 17.60344, 32.526913, 32.526913, 17.603437, 42.49846, -2.0107238e-06, 46, -17.603436, 42.49846, -32.526913, 32.526913, -42.49846, 17.603441, -46, -4.0214477e-06, -42.49846, -17.603437, -32.526913, -32.52691, -17.603445, -42.49846, 5.485445e-07, -46, 17.603445, -42.498455, 32.526905, -32.526917, 42.49846, -17.603437)
+
+[node name="Visual" type="Sprite2D" parent="Cup" unique_id=1261925936]
+z_index = 1
+scale = Vector2(0.112, 0.112)
+texture = ExtResource("4_dguxg")
+
+[node name="PaperClip0" type="Line2D" parent="Cup" unique_id=435182439]
+z_index = 2
+rotation = -0.2
+points = PackedVector2Array(-20, -8, -26, -21, -12, -25)
+width = 3.0
+default_color = Color(0.84705883, 0.8745098, 0.8745098, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="PaperClip1" type="Line2D" parent="Cup" unique_id=158837789]
+z_index = 2
+rotation = 0.02
+points = PackedVector2Array(-2, -8, -8, -21, 6, -25)
+width = 3.0
+default_color = Color(0.84705883, 0.8745098, 0.8745098, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="PaperClip2" type="Line2D" parent="Cup" unique_id=576278812]
+z_index = 2
+rotation = 0.24
+points = PackedVector2Array(16, -8, 10, -21, 24, -25)
+width = 3.0
+default_color = Color(0.84705883, 0.8745098, 0.8745098, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="Spoon" type="StaticBody2D" parent="." unique_id=1605624633]
+position = Vector2(820, -380)
+rotation = 0.16
+collision_layer = 2
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Spoon" unique_id=1821590285]
+shape = SubResource("CircleShape2D_ecv00")
+
+[node name="Shadow" type="Polygon2D" parent="Spoon" unique_id=2146673735]
+z_index = -1
+position = Vector2(5, 7)
+color = Color(0.02, 0.03, 0.05, 0.55)
+polygon = PackedVector2Array(47, 0, 43.422337, 17.986122, 33.234016, 33.234016, 17.98612, 43.422337, -2.0544353e-06, 47, -17.98612, 43.42234, -33.234016, 33.234016, -43.422337, 17.986124, -47, -4.1088706e-06, -43.422337, -17.98612, -33.23402, -33.234016, -17.986128, -43.422337, 5.604694e-07, -47, 17.98613, -43.422333, 33.234013, -33.234024, 43.42234, -17.98612)
+
+[node name="Visual" type="Sprite2D" parent="Spoon" unique_id=1449397592]
+z_index = 1
+scale = Vector2(0.13, 0.13)
+texture = ExtResource("5_qyfbg")
+
+[node name="Checkpoint0Finish" type="Area2D" parent="." unique_id=182880676 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(-735, 255)
+rotation = 1.5708
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+is_finish_line = true
+recovery_rotation = 3.1415927
+recovery_offset = 70.0
+
+[node name="Checkpoint1" type="Area2D" parent="." unique_id=804766308 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(-220, 370)
+rotation = 1.5708
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+checkpoint_index = 1
+recovery_rotation = 1.5708
+recovery_offset = 70.0
+
+[node name="Checkpoint2" type="Area2D" parent="." unique_id=18543775 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(440, 370)
+rotation = 1.5708
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+checkpoint_index = 2
+recovery_rotation = 1.5708
+recovery_offset = 70.0
+
+[node name="Checkpoint3" type="Area2D" parent="." unique_id=1635424804 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(730, -110)
+rotation = 1.5708
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+checkpoint_index = 3
+recovery_rotation = -1.5708
+recovery_offset = 70.0
+
+[node name="Checkpoint4" type="Area2D" parent="." unique_id=1841049844 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(450, -365)
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+checkpoint_index = 4
+recovery_rotation = -1.5708
+recovery_offset = 70.0
+
+[node name="Checkpoint5" type="Area2D" parent="." unique_id=1954546424 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(-130, -365)
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+checkpoint_index = 5
+recovery_rotation = -1.5708
+recovery_offset = 70.0
+
+[node name="Checkpoint6" type="Area2D" parent="." unique_id=2096846314 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(-735, -80)
+rotation = 1.5708
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+checkpoint_index = 6
+recovery_rotation = 3.1415927
+recovery_offset = 70.0
+
+[node name="Checkpoint7" type="Area2D" parent="." unique_id=1686696190 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(-735, 150)
+rotation = 1.5708
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+checkpoint_index = 7
+recovery_rotation = 3.1415927
+recovery_offset = 70.0
+
+[node name="Checkpoint8" type="Area2D" parent="." unique_id=1926916105 groups=["track_checkpoints"] instance=ExtResource("6_8o576")]
+visible = false
+position = Vector2(-735, 205)
+rotation = 1.5708
+collision_layer = 0
+script = ExtResource("7_0p8aj")
+checkpoint_index = 8
+recovery_rotation = 3.1415927
+recovery_offset = 70.0
+
+[node name="GridForward" type="Node2D" parent="." unique_id=1561626718]
+
+[node name="0" type="Node2D" parent="GridForward" unique_id=1920839838]
+position = Vector2(-700, 340)
+rotation = 1.5708
+
+[node name="1" type="Node2D" parent="GridForward" unique_id=1203148998]
+position = Vector2(-760, 340)
+rotation = 1.5708
+
+[node name="2" type="Node2D" parent="GridForward" unique_id=1682582422]
+position = Vector2(-700, 440)
+rotation = 1.5708
+
+[node name="3" type="Node2D" parent="GridForward" unique_id=163970161]
+position = Vector2(-760, 440)
+rotation = 1.5708
+
+[node name="GridReverse" type="Node2D" parent="." unique_id=1160713039]
+
+[node name="0" type="Node2D" parent="GridReverse" unique_id=758645610]
+position = Vector2(-700, 90)
+rotation = -1.5708
+
+[node name="1" type="Node2D" parent="GridReverse" unique_id=277403385]
+position = Vector2(-760, 90)
+rotation = -1.5708
+
+[node name="2" type="Node2D" parent="GridReverse" unique_id=705955632]
+position = Vector2(-700, 190)
+rotation = -1.5708
+
+[node name="3" type="Node2D" parent="GridReverse" unique_id=884267359]
+position = Vector2(-760, 190)
+rotation = -1.5708
+
+[node name="PaperDressing" type="Node2D" parent="." unique_id=798764802]
+z_index = 5
+
+[node name="PaperSheetA" type="Node2D" parent="PaperDressing" unique_id=1998950628]
+position = Vector2(-385, -390)
+rotation = -0.08
+
+[node name="Shadow" type="Polygon2D" parent="PaperDressing/PaperSheetA" unique_id=1464546650]
+z_index = -12
+position = Vector2(8, 9)
+color = Color(0.02, 0.03, 0.05, 0.34)
+polygon = PackedVector2Array(-75, -44, 75, -44, 75, 44, -75, 44)
+
+[node name="Paper" type="Polygon2D" parent="PaperDressing/PaperSheetA" unique_id=887091048]
+z_index = -12
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-75, -44, 75, -44, 75, 44, -75, 44)
+
+[node name="AmberTab" type="Polygon2D" parent="PaperDressing/PaperSheetA" unique_id=575534331]
+z_index = -11
+position = Vector2(-42, -29.92)
+color = Color(0.8862745, 0.6627451, 0.23137255, 1)
+polygon = PackedVector2Array(-24, -5, 24, -5, 24, 5, -24, 5)
+
+[node name="Line0" type="Polygon2D" parent="PaperDressing/PaperSheetA" unique_id=1505032612]
+z_index = -11
+position = Vector2(-18, -7.92)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-42, -1.5, 42, -1.5, 42, 1.5, -42, 1.5)
+
+[node name="Line1" type="Polygon2D" parent="PaperDressing/PaperSheetA" unique_id=2047160884]
+z_index = -11
+position = Vector2(-18, 6.08)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-36.75, -1.5, 36.75, -1.5, 36.75, 1.5, -36.75, 1.5)
+
+[node name="Line2" type="Polygon2D" parent="PaperDressing/PaperSheetA" unique_id=795669287]
+z_index = -11
+position = Vector2(-18, 20.08)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-31.5, -1.5, 31.5, -1.5, 31.5, 1.5, -31.5, 1.5)
+
+[node name="PaperSheetB" type="Node2D" parent="PaperDressing" unique_id=508394167]
+position = Vector2(70, -430)
+rotation = 0.05
+
+[node name="Shadow" type="Polygon2D" parent="PaperDressing/PaperSheetB" unique_id=2139196540]
+z_index = -12
+position = Vector2(8, 9)
+color = Color(0.02, 0.03, 0.05, 0.34)
+polygon = PackedVector2Array(-87.5, -48, 87.5, -48, 87.5, 48, -87.5, 48)
+
+[node name="Paper" type="Polygon2D" parent="PaperDressing/PaperSheetB" unique_id=698405190]
+z_index = -12
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-87.5, -48, 87.5, -48, 87.5, 48, -87.5, 48)
+
+[node name="AmberTab" type="Polygon2D" parent="PaperDressing/PaperSheetB" unique_id=27835692]
+z_index = -11
+position = Vector2(-49, -32.64)
+color = Color(0.8862745, 0.6627451, 0.23137255, 1)
+polygon = PackedVector2Array(-28, -5, 28, -5, 28, 5, -28, 5)
+
+[node name="Line0" type="Polygon2D" parent="PaperDressing/PaperSheetB" unique_id=1117020941]
+z_index = -11
+position = Vector2(-21, -8.64)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-49, -1.5, 49, -1.5, 49, 1.5, -49, 1.5)
+
+[node name="Line1" type="Polygon2D" parent="PaperDressing/PaperSheetB" unique_id=845772969]
+z_index = -11
+position = Vector2(-21, 5.36)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-42.875, -1.5, 42.875, -1.5, 42.875, 1.5, -42.875, 1.5)
+
+[node name="Line2" type="Polygon2D" parent="PaperDressing/PaperSheetB" unique_id=1294655824]
+z_index = -11
+position = Vector2(-21, 19.36)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-36.75, -1.5, 36.75, -1.5, 36.75, 1.5, -36.75, 1.5)
+
+[node name="PaperSheetC" type="Node2D" parent="PaperDressing" unique_id=221325563]
+position = Vector2(570, -380)
+rotation = -0.11
+
+[node name="Shadow" type="Polygon2D" parent="PaperDressing/PaperSheetC" unique_id=1474739715]
+z_index = -12
+position = Vector2(8, 9)
+color = Color(0.02, 0.03, 0.05, 0.34)
+polygon = PackedVector2Array(-69, -42, 69, -42, 69, 42, -69, 42)
+
+[node name="Paper" type="Polygon2D" parent="PaperDressing/PaperSheetC" unique_id=2020780022]
+z_index = -12
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-69, -42, 69, -42, 69, 42, -69, 42)
+
+[node name="AmberTab" type="Polygon2D" parent="PaperDressing/PaperSheetC" unique_id=2084925799]
+z_index = -11
+position = Vector2(-38.64, -28.56)
+color = Color(0.8862745, 0.6627451, 0.23137255, 1)
+polygon = PackedVector2Array(-22.08, -5, 22.08, -5, 22.08, 5, -22.08, 5)
+
+[node name="Line0" type="Polygon2D" parent="PaperDressing/PaperSheetC" unique_id=641097394]
+z_index = -11
+position = Vector2(-16.56, -7.56)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-38.64, -1.5, 38.64, -1.5, 38.64, 1.5, -38.64, 1.5)
+
+[node name="Line1" type="Polygon2D" parent="PaperDressing/PaperSheetC" unique_id=103655268]
+z_index = -11
+position = Vector2(-16.56, 6.44)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-33.81, -1.5, 33.81, -1.5, 33.81, 1.5, -33.81, 1.5)
+
+[node name="Line2" type="Polygon2D" parent="PaperDressing/PaperSheetC" unique_id=219118900]
+z_index = -11
+position = Vector2(-16.56, 20.44)
+color = Color(0.21, 0.28, 0.36, 0.48)
+polygon = PackedVector2Array(-28.98, -1.5, 28.98, -1.5, 28.98, 1.5, -28.98, 1.5)
+
+[node name="CableDressing" type="Node2D" parent="." unique_id=1310842766]
+z_index = 5
+
+[node name="DeskCableA" type="Line2D" parent="CableDressing" unique_id=1551046163]
+z_index = -12
+points = PackedVector2Array(-555, -175, -505, -130, -470, -45, -515, 40, -560, 85)
+width = 11.0
+default_color = Color(0.43529412, 0.5686275, 0.72156864, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="DeskCableAInk" type="Line2D" parent="CableDressing" unique_id=2068089919]
+z_index = -11
+points = PackedVector2Array(-555, -175, -505, -130, -470, -45, -515, 40, -560, 85)
+width = 3.0
+default_color = Color(0.04, 0.06, 0.09, 0.55)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="DeskCableB" type="Line2D" parent="CableDressing" unique_id=1663605444]
+z_index = -12
+points = PackedVector2Array(530, -195, 480, -155, 515, -95, 545, -20, 515, 55)
+default_color = Color(0.43529412, 0.5686275, 0.72156864, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="MicroDressing" type="Node2D" parent="." unique_id=1253875914]
+
+[node name="SkidBottomA" type="Sprite2D" parent="MicroDressing" unique_id=575419905]
+modulate = Color(0.12, 0.15, 0.19, 0.33)
+z_index = -6
+position = Vector2(-360, 335)
+rotation = 0.04
+scale = Vector2(0.46, 0.46)
+texture = ExtResource("8_8tvg7")
+
+[node name="SkidBottomB" type="Sprite2D" parent="MicroDressing" unique_id=1162393367]
+modulate = Color(0.1, 0.13, 0.17, 0.28)
+z_index = -6
+position = Vector2(510, 420)
+rotation = -0.08
+scale = Vector2(0.4, 0.42)
+texture = ExtResource("8_8tvg7")
+
+[node name="SkidTopA" type="Sprite2D" parent="MicroDressing" unique_id=1432693132]
+modulate = Color(0.1, 0.13, 0.17, 0.3)
+z_index = -6
+position = Vector2(240, -330)
+rotation = 0.03
+scale = Vector2(0.44, 0.46)
+texture = ExtResource("8_8tvg7")
+
+[node name="SkidLeftA" type="Sprite2D" parent="MicroDressing" unique_id=517410988]
+modulate = Color(0.1, 0.13, 0.17, 0.3)
+z_index = -6
+position = Vector2(-760, -270)
+rotation = 1.52
+scale = Vector2(0.36, 0.42)
+texture = ExtResource("8_8tvg7")
+
+[node name="DeskScuffA" type="Sprite2D" parent="MicroDressing" unique_id=179661519]
+modulate = Color(0.72, 0.8, 0.88, 0.2)
+z_index = -18
+position = Vector2(-760, -520)
+rotation = 0.18
+scale = Vector2(0.7, 0.62)
+texture = ExtResource("9_bpune")
+
+[node name="DeskScuffB" type="Sprite2D" parent="MicroDressing" unique_id=38324069]
+modulate = Color(0.72, 0.8, 0.88, 0.18)
+z_index = -18
+position = Vector2(720, 540)
+rotation = -0.14
+scale = Vector2(0.65, 0.58)
+texture = ExtResource("9_bpune")
+
+[node name="LaneTicks" type="Node2D" parent="." unique_id=223803686]
+
+[node name="BottomTick0" type="Polygon2D" parent="LaneTicks" unique_id=16106035]
+z_index = -7
+position = Vector2(-500, 520)
+color = Color(0.95, 0.92, 0.84, 0.26)
+polygon = PackedVector2Array(-20, -2, 20, -2, 20, 2, -20, 2)
+
+[node name="BottomTick1" type="Polygon2D" parent="LaneTicks" unique_id=535174841]
+z_index = -7
+position = Vector2(-330, 520)
+color = Color(0.95, 0.92, 0.84, 0.26)
+polygon = PackedVector2Array(-20, -2, 20, -2, 20, 2, -20, 2)
+
+[node name="BottomTick2" type="Polygon2D" parent="LaneTicks" unique_id=1273340701]
+z_index = -7
+position = Vector2(-160, 520)
+color = Color(0.95, 0.92, 0.84, 0.26)
+polygon = PackedVector2Array(-20, -2, 20, -2, 20, 2, -20, 2)
+
+[node name="BottomTick3" type="Polygon2D" parent="LaneTicks" unique_id=1654894555]
+z_index = -7
+position = Vector2(10, 520)
+color = Color(0.95, 0.92, 0.84, 0.26)
+polygon = PackedVector2Array(-20, -2, 20, -2, 20, 2, -20, 2)
+
+[node name="BottomTick4" type="Polygon2D" parent="LaneTicks" unique_id=606476186]
+z_index = -7
+position = Vector2(180, 520)
+color = Color(0.95, 0.92, 0.84, 0.26)
+polygon = PackedVector2Array(-20, -2, 20, -2, 20, 2, -20, 2)
+
+[node name="BottomTick5" type="Polygon2D" parent="LaneTicks" unique_id=15919624]
+z_index = -7
+position = Vector2(350, 520)
+color = Color(0.95, 0.92, 0.84, 0.26)
+polygon = PackedVector2Array(-20, -2, 20, -2, 20, 2, -20, 2)
+
+[node name="BottomTick6" type="Polygon2D" parent="LaneTicks" unique_id=829296910]
+z_index = -7
+position = Vector2(520, 520)
+color = Color(0.95, 0.92, 0.84, 0.26)
+polygon = PackedVector2Array(-20, -2, 20, -2, 20, 2, -20, 2)
+
+[node name="TopTick0" type="Polygon2D" parent="LaneTicks" unique_id=237402347]
+z_index = -7
+position = Vector2(-430, -478)
+color = Color(0.95, 0.92, 0.84, 0.22)
+polygon = PackedVector2Array(-22, -2, 22, -2, 22, 2, -22, 2)
+
+[node name="TopTick1" type="Polygon2D" parent="LaneTicks" unique_id=777261802]
+z_index = -7
+position = Vector2(-255, -478)
+color = Color(0.95, 0.92, 0.84, 0.22)
+polygon = PackedVector2Array(-22, -2, 22, -2, 22, 2, -22, 2)
+
+[node name="TopTick2" type="Polygon2D" parent="LaneTicks" unique_id=1180290576]
+z_index = -7
+position = Vector2(-80, -478)
+color = Color(0.95, 0.92, 0.84, 0.22)
+polygon = PackedVector2Array(-22, -2, 22, -2, 22, 2, -22, 2)
+
+[node name="TopTick3" type="Polygon2D" parent="LaneTicks" unique_id=1635752099]
+z_index = -7
+position = Vector2(95, -478)
+color = Color(0.95, 0.92, 0.84, 0.22)
+polygon = PackedVector2Array(-22, -2, 22, -2, 22, 2, -22, 2)
+
+[node name="TopTick4" type="Polygon2D" parent="LaneTicks" unique_id=191888889]
+z_index = -7
+position = Vector2(270, -478)
+color = Color(0.95, 0.92, 0.84, 0.22)
+polygon = PackedVector2Array(-22, -2, 22, -2, 22, 2, -22, 2)
+
+[node name="TopTick5" type="Polygon2D" parent="LaneTicks" unique_id=171685287]
+z_index = -7
+position = Vector2(445, -478)
+color = Color(0.95, 0.92, 0.84, 0.22)
+polygon = PackedVector2Array(-22, -2, 22, -2, 22, 2, -22, 2)

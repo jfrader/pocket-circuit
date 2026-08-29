@@ -4,6 +4,7 @@ const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
 const CHECKPOINTS_PER_LAP := 8
 const MAX_PHYSICS_FRAMES := 2400
 const MAX_RECOVERIES_PER_LAP := 2
+const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 
 
 func _initialize() -> void:
@@ -12,17 +13,20 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	Engine.time_scale = 1.0
-	if not await _run_direction("forward", false):
-		return
-	if not await _run_direction("reverse", true):
-		return
+	for theme: StringName in THEMES:
+		if not await _run_direction(theme, false):
+			return
+		if not await _run_direction(theme, true):
+			return
 	Engine.time_scale = 1.0
-	print("AI_RACE_SMOKE_TEST PASS forward_and_reverse")
+	print("AI_RACE_SMOKE_TEST PASS all_themes")
 	quit(0)
 
 
-func _run_direction(direction_label: String, reverse: bool) -> bool:
+func _run_direction(theme: StringName, reverse: bool) -> bool:
+	var direction_label := "reverse" if reverse else "forward"
 	var prototype := PROTOTYPE_SCENE.instantiate()
+	prototype.set("_session", {"event": {"theme": theme, "reverse": reverse}})
 	var manager := prototype.get_node("RaceManager") as RaceManager
 	manager.set_reverse_direction(reverse)
 	root.add_child(prototype)
@@ -53,13 +57,14 @@ func _run_direction(direction_label: String, reverse: bool) -> bool:
 		await physics_frame
 		frame += 1
 
-	if not _expect(ai_vehicles.size() == 3, "%s prototype should create a full three-opponent field" % direction_label):
+	if not _expect(ai_vehicles.size() == 3, "%s %s prototype should create a full three-opponent field" % [theme, direction_label]):
 		return false
 	for racer: Node2D in ai_vehicles:
 		var controller := _get_ai_controller(racer)
 		print(
-			"AI_RACE_STATE %s %s checkpoints=%d expected=%d position=%s speed=%.1f recoveries=%d recovering=%s stuck=%.2f"
+			"AI_RACE_STATE %s %s %s checkpoints=%d expected=%d position=%s speed=%.1f recoveries=%d recovering=%s stuck=%.2f"
 			% [
+				theme,
 				direction_label,
 				racer.name,
 				int(checkpoint_counts.get(racer, 0)),
@@ -74,16 +79,16 @@ func _run_direction(direction_label: String, reverse: bool) -> bool:
 	for racer: Node2D in ai_vehicles:
 		if not _expect(
 			int(checkpoint_counts.get(racer, 0)) >= CHECKPOINTS_PER_LAP,
-			"%s %s should complete a legal lap (checkpoints=%d)" % [direction_label, racer.name, int(checkpoint_counts.get(racer, 0))]
+			"%s %s %s should complete a legal lap (checkpoints=%d)" % [theme, direction_label, racer.name, int(checkpoint_counts.get(racer, 0))]
 		):
 			return false
 		var controller := _get_ai_controller(racer)
 		if not _expect(
 			controller != null and controller.recovery_count <= MAX_RECOVERIES_PER_LAP,
-			"%s %s should not rely on repeated recovery (recoveries=%d)" % [direction_label, racer.name, controller.recovery_count if controller else -1]
+			"%s %s %s should not rely on repeated recovery (recoveries=%d)" % [theme, direction_label, racer.name, controller.recovery_count if controller else -1]
 		):
 			return false
-	print("AI_RACE_DIRECTION_PASS %s frames=%d checkpoints=%s" % [direction_label, frame, str(checkpoint_counts.values())])
+	print("AI_RACE_DIRECTION_PASS %s %s frames=%d checkpoints=%s" % [theme, direction_label, frame, str(checkpoint_counts.values())])
 	current_scene = null
 	prototype.queue_free()
 	await process_frame

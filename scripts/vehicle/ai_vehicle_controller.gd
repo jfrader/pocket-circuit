@@ -122,7 +122,7 @@ func _physics_process(delta: float) -> void:
 		next_turn_severity = _checkpoint_turn_severity(int(next_checkpoint.get("checkpoint_index")))
 	var planned_turn_severity := maxf(turn_severity, next_turn_severity * 0.84)
 	var corner_ratio := clampf(planned_turn_severity / 1.45, 0.0, 1.0)
-	var pace_multiplier := 0.82 if difficulty == "sunday_drive" else (1.04 if difficulty == "clockwork" else 1.0)
+	var pace_multiplier := 0.86 if difficulty == "sunday_drive" else (1.12 if difficulty == "clockwork" else 1.06)
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var handling_pace := clampf(vehicle.stats.steering_rate / 3.75, 0.78, 1.08)
 	var target_speed := effective_max_speed * lerpf(0.94, 0.40, corner_ratio) * pace_multiplier
@@ -142,17 +142,19 @@ func _physics_process(delta: float) -> void:
 		throttle = 0.42 if not should_brake else 0.0
 	var brake := clampf((vehicle.speed - target_speed) / 90.0, 0.0, 1.0) if should_brake else 0.0
 	var position := race_manager.get_racer_position(vehicle)
+	var baseline_power := 1.0 if difficulty == "sunday_drive" else (1.16 if difficulty == "clockwork" else 1.08)
 	var catch_up_power := 0.0
 	if difficulty == "club_circuit":
 		var progress_deficit := _leader_progress_deficit()
 		catch_up_power = minf(0.08, maxf(float(maxi(0, position - 1)) * 0.02, progress_deficit * 0.04))
-	vehicle.set_external_power_multiplier(1.0 + catch_up_power)
+	vehicle.set_external_power_multiplier(baseline_power + catch_up_power)
 	var boost := (
-		position > 1
+		difficulty != "sunday_drive"
 		and absf(steering_angle) < 0.26
 		and turn_severity < 0.45
 		and not should_brake
 		and vehicle.speed > 180.0
+		and vehicle.boost_amount > 10.0
 	)
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
