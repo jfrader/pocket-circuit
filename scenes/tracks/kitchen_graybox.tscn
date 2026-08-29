@@ -1,23 +1,23 @@
 [gd_scene format=3 uid="uid://drf85t6nfrbhm"]
 
 [ext_resource type="Script" uid="uid://cfyt5a68w86ub" path="res://scripts/presentation/kitchen_dressing.gd" id="1_03pr4"]
-[ext_resource type="Texture2D" uid="uid://da3ypkhcli582" path="res://assets/textures/kitchen/mug_cream.png" id="1_as6m8"]
 [ext_resource type="PackedScene" uid="uid://htjroyo22kqr" path="res://scenes/race/checkpoint.tscn" id="1_nkdn3"]
-[ext_resource type="Texture2D" uid="uid://qik73duuwrqh" path="res://assets/textures/kitchen/mug_blue.png" id="2_as6m8"]
-[ext_resource type="Texture2D" uid="uid://np6dceb0lqk4" path="res://assets/textures/kitchen/cereal_tower_orange.png" id="3_cfsft"]
-[ext_resource type="Texture2D" uid="uid://cqpq74rtue0t3" path="res://assets/textures/kitchen/cereal_tower_green.png" id="4_cfsft"]
-[ext_resource type="Texture2D" uid="uid://heu7ghqtlv50" path="res://assets/textures/kitchen/sponge_wet.png" id="5_cfsft"]
-[ext_resource type="Texture2D" uid="uid://dciq3sng1px6r" path="res://assets/textures/kitchen/fork_cartoon.png" id="6_cfsft"]
-[ext_resource type="Texture2D" uid="uid://cl8cefmlxhv1o" path="res://assets/textures/kitchen/ruler_plank.png" id="7_cfsft"]
-[ext_resource type="Texture2D" uid="uid://t2kwxy4jtw4j" path="res://assets/textures/kitchen/apple_cartoon.png" id="8_cfsft"]
-[ext_resource type="Texture2D" uid="uid://csegpxfki8a4v" path="res://assets/textures/kitchen/lime_cartoon.png" id="9_cfsft"]
-[ext_resource type="Texture2D" uid="uid://c3mhyv42njegh" path="res://assets/textures/kitchen/cup_cartoon.png" id="10_cfsft"]
-[ext_resource type="Texture2D" uid="uid://ce1e1pputc5im" path="res://assets/textures/kitchen/spoon_bridge.png" id="11_cfsft"]
+[ext_resource type="Texture2D" uid="uid://t1gvbub3hpkq" path="res://assets/textures/imagine/kitchen_mug_hero.png" id="2_03pr4"]
+[ext_resource type="Texture2D" uid="uid://c2cav88bd61jc" path="res://assets/textures/imagine/kitchen_mug_blue.png" id="3_03pr4"]
+[ext_resource type="Texture2D" uid="uid://of7uuvmkbk3y" path="res://assets/textures/imagine/kitchen_cereal_orange.png" id="4_03pr4"]
+[ext_resource type="Texture2D" uid="uid://dvpeheks7fvj5" path="res://assets/textures/imagine/kitchen_cereal_green.png" id="5_03pr4"]
+[ext_resource type="Texture2D" uid="uid://b3v7yib0y65tk" path="res://assets/textures/imagine/kitchen_sponge.png" id="6_03pr4"]
+[ext_resource type="Texture2D" uid="uid://vuol4neuucbu" path="res://assets/textures/imagine/kitchen_fork.png" id="7_03pr4"]
+[ext_resource type="Texture2D" uid="uid://3qcog33844rc" path="res://assets/textures/imagine/kitchen_ruler.png" id="8_03pr4"]
+[ext_resource type="Texture2D" uid="uid://dusdx64yesxdh" path="res://assets/textures/imagine/hazard_kitchen_apple.png" id="9_03pr4"]
+[ext_resource type="Texture2D" uid="uid://b0nhntpvljkad" path="res://assets/textures/imagine/kitchen_lime.png" id="10_03pr4"]
+[ext_resource type="Texture2D" uid="uid://iijuq58ooh6s" path="res://assets/textures/imagine/kitchen_cup.png" id="11_03pr4"]
 [ext_resource type="Texture2D" uid="uid://dqxjb386kaxp5" path="res://assets/textures/kitchen/counter_surface.png" id="11_jf3u5"]
+[ext_resource type="Texture2D" uid="uid://cda7muw5xweq2" path="res://assets/textures/imagine/kitchen_spoon.png" id="12_03pr4"]
 [ext_resource type="Texture2D" uid="uid://dlywy0e7lsodq" path="res://assets/textures/kitchen/track_surface.png" id="12_16w8u"]
 [ext_resource type="Texture2D" uid="uid://ivv4e62vkuvm" path="res://assets/textures/kitchen/wet_spill.png" id="13_y73v3"]
-[ext_resource type="Texture2D" uid="uid://cx5f7ckuy7wbr" path="res://assets/textures/kitchen/start_finish.png" id="14_237h7"]
 [ext_resource type="Texture2D" uid="uid://b35sjchw174x7" path="res://assets/textures/kitchen/counter_edge.png" id="15_dgg4m"]
+[ext_resource type="Texture2D" uid="uid://byjwtk5kjuet1" path="res://assets/textures/imagine/kitchen_start_finish.png" id="17_03pr4"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xb7yb"]
 size = Vector2(2000, 50)
@@ -195,8 +195,8 @@ polygon = PackedVector2Array(0, -18, 26, -18, 34, 0, 26, 18, 0, 18, 0, 8, 18, 8,
 
 [node name="Sprite" type="Sprite2D" parent="MugA" unique_id=1643243559]
 z_index = 1
-scale = Vector2(0.34, 0.34)
-texture = ExtResource("1_as6m8")
+scale = Vector2(0.08, 0.08)
+texture = ExtResource("2_03pr4")
 
 [node name="MugB" type="StaticBody2D" parent="." unique_id=662062190]
 position = Vector2(270, 465)
@@ -218,8 +218,8 @@ polygon = PackedVector2Array(52, 0, 37, 37, 0, 52, -37, 37, -52, 0, -37, -37, 0,
 
 [node name="Sprite" type="Sprite2D" parent="MugB" unique_id=1801211312]
 z_index = 1
-scale = Vector2(0.3, 0.3)
-texture = ExtResource("2_as6m8")
+scale = Vector2(0.08, 0.08)
+texture = ExtResource("3_03pr4")
 
 [node name="CerealA" type="StaticBody2D" parent="." unique_id=2016329342]
 position = Vector2(650, 80)
@@ -241,8 +241,8 @@ polygon = PackedVector2Array(-50, -20, 50, -20, 50, 20, -50, 20)
 
 [node name="Sprite" type="Sprite2D" parent="CerealA" unique_id=119680074]
 z_index = 1
-scale = Vector2(0.26, 0.295)
-texture = ExtResource("3_cfsft")
+scale = Vector2(0.24, 0.24)
+texture = ExtResource("4_03pr4")
 
 [node name="CerealB" type="StaticBody2D" parent="." unique_id=428535964]
 position = Vector2(850, -120)
@@ -264,8 +264,8 @@ polygon = PackedVector2Array(-48, -15, 48, -15, 48, 18, -48, 18)
 
 [node name="Sprite" type="Sprite2D" parent="CerealB" unique_id=1005593625]
 z_index = 1
-scale = Vector2(0.25, 0.276)
-texture = ExtResource("4_cfsft")
+scale = Vector2(0.16, 0.16)
+texture = ExtResource("5_03pr4")
 
 [node name="Sponge" type="StaticBody2D" parent="." unique_id=1447204972]
 position = Vector2(120, -265)
@@ -288,8 +288,8 @@ polygon = PackedVector2Array(-120, -13, 120, -13, 120, 13, -120, 13)
 
 [node name="Sprite" type="Sprite2D" parent="Sponge" unique_id=1766786563]
 z_index = 1
-scale = Vector2(0.4, 0.35)
-texture = ExtResource("5_cfsft")
+scale = Vector2(0.32, 0.32)
+texture = ExtResource("6_03pr4")
 
 [node name="Fork" type="StaticBody2D" parent="." unique_id=5407409]
 position = Vector2(-210, -458)
@@ -306,8 +306,8 @@ polygon = PackedVector2Array(-110, -12, 110, -12, 110, 12, -110, 12)
 
 [node name="Sprite" type="Sprite2D" parent="Fork" unique_id=774088210]
 z_index = 1
-scale = Vector2(0.34, 0.2)
-texture = ExtResource("6_cfsft")
+scale = Vector2(0.18, 0.18)
+texture = ExtResource("7_03pr4")
 
 [node name="Ruler" type="StaticBody2D" parent="." unique_id=1168667608]
 position = Vector2(-470, 260)
@@ -324,8 +324,8 @@ polygon = PackedVector2Array(-135, -14, 135, -14, 135, 14, -135, 14)
 
 [node name="Sprite" type="Sprite2D" parent="Ruler" unique_id=1860055722]
 z_index = 1
-scale = Vector2(0.35, 0.22)
-texture = ExtResource("7_cfsft")
+scale = Vector2(0.22, 0.22)
+texture = ExtResource("8_03pr4")
 
 [node name="Apple" type="StaticBody2D" parent="." unique_id=956209412]
 position = Vector2(-620, -300)
@@ -341,8 +341,8 @@ polygon = PackedVector2Array(45, 0, 32, 32, 0, 45, -32, 32, -45, 0, -32, -32, 0,
 
 [node name="Sprite" type="Sprite2D" parent="Apple" unique_id=521520827]
 z_index = 1
-scale = Vector2(0.36, 0.36)
-texture = ExtResource("8_cfsft")
+scale = Vector2(0.08, 0.08)
+texture = ExtResource("9_03pr4")
 
 [node name="Lime" type="StaticBody2D" parent="." unique_id=517090897]
 position = Vector2(-825, -290)
@@ -358,8 +358,8 @@ polygon = PackedVector2Array(38, 0, 27, 27, 0, 38, -27, 27, -38, 0, -27, -27, 0,
 
 [node name="Sprite" type="Sprite2D" parent="Lime" unique_id=1625956854]
 z_index = 1
-scale = Vector2(0.33, 0.33)
-texture = ExtResource("9_cfsft")
+scale = Vector2(0.07, 0.07)
+texture = ExtResource("10_03pr4")
 
 [node name="Cup" type="StaticBody2D" parent="." unique_id=338801353]
 position = Vector2(-600, 470)
@@ -375,8 +375,8 @@ polygon = PackedVector2Array(44, 0, 31, 31, 0, 44, -31, 31, -44, 0, -31, -31, 0,
 
 [node name="Sprite" type="Sprite2D" parent="Cup" unique_id=2050680914]
 z_index = 1
-scale = Vector2(0.34, 0.34)
-texture = ExtResource("10_cfsft")
+scale = Vector2(0.14, 0.14)
+texture = ExtResource("11_03pr4")
 
 [node name="Spoon" type="StaticBody2D" parent="." unique_id=784697144]
 position = Vector2(-835, 55)
@@ -393,10 +393,12 @@ polygon = PackedVector2Array(-90, -13, 90, -13, 105, 0, 90, 13, -90, 13)
 
 [node name="Sprite" type="Sprite2D" parent="Spoon" unique_id=746705649]
 z_index = 1
-scale = Vector2(0.3, 0.18)
-texture = ExtResource("11_cfsft")
+rotation = 1.5708
+scale = Vector2(0.28, 0.28)
+texture = ExtResource("12_03pr4")
 
 [node name="Labels" type="Node2D" parent="." unique_id=1231572064]
+visible = false
 
 [node name="Title" type="Label" parent="Labels" unique_id=1188845261]
 visible = false
@@ -557,8 +559,8 @@ texture = ExtResource("13_y73v3")
 z_index = -6
 position = Vector2(-701, 367.5)
 rotation = 1.5707964
-scale = Vector2(0.47851563, 0.171875)
-texture = ExtResource("14_237h7")
+scale = Vector2(0.22, 0.22)
+texture = ExtResource("17_03pr4")
 
 [node name="CounterEdge" type="Sprite2D" parent="ArtSurfaces" unique_id=2123962952]
 z_index = -5

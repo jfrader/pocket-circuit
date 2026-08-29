@@ -1,18 +1,24 @@
 extends SceneTree
 
-const AUDIO_NAMES: Array[String] = [
-	"menu_loop", "race_loop", "engine_loop", "countdown", "go", "ui_move",
-	"ui_confirm", "drift", "boost", "impact", "hazard_warning",
+const MUSIC_WAV_NAMES: Array[String] = ["menu_loop", "race_loop"]
+const REVIEW_OGG_NAMES: Array[String] = [
+	"engine_loop", "countdown", "go", "ui_move", "ui_confirm", "drift", "boost",
+	"impact", "hazard_warning",
 ]
+
+
 func _initialize() -> void:
-	for sound_name: String in AUDIO_NAMES:
+	for sound_name: String in MUSIC_WAV_NAMES:
 		var path := "res://assets/audio/%s.wav" % sound_name
-		if not FileAccess.file_exists(path):
-			_fail("missing audio asset %s" % path)
-			return
 		var stream := load(path) as AudioStreamWAV
 		if stream == null or stream.data.is_empty() or stream.mix_rate != 22050:
 			_fail("%s should load as non-empty 22.05 kHz PCM" % path)
+			return
+	for sound_name: String in REVIEW_OGG_NAMES:
+		var path := "res://assets/audio/%s.ogg" % sound_name
+		var stream := load(path) as AudioStreamOggVorbis
+		if stream == null or stream.get_length() <= 0.0:
+			_fail("%s should load as non-empty OGG audio" % path)
 			return
 	print("AUDIO_ASSETS_TEST PASS")
 	quit(0)

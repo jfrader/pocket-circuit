@@ -23,7 +23,7 @@ const RUSTBUG_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
-const BOOST_FILL_SCALE := Vector2(0.52, 0.52)
+const RACE_HUD_SCRIPT := preload("res://scripts/ui/race_hud.gd")
 const COUNTDOWN_STEP_SECONDS := 0.65
 const FALLBACK_OPPONENTS: Array[String] = ["juniper", "milo", "tess"]
 const GRID_TRANSFORMS: Array[Transform2D] = [
@@ -44,11 +44,10 @@ const RACER_MARKER_COLORS: Array[Color] = [
 	Color("82d49b"),
 	Color("ca78ff"),
 ]
-const AI_LANE_OFFSETS: Array[float] = [-28.0, 26.0, 4.0]
+const AI_LANE_OFFSETS: Array[float] = [-42.0, 38.0, 6.0]
 
 @onready var race_manager: RaceManager = $RaceManager
 @onready var hud_label: Label = $HUD/HUDLabel
-@onready var boost_fill: Sprite2D = $HUD/RaceHUDArt/BoostBar/BoostFill
 @onready var controls_label: Label = $HUD/ControlsLabel
 @onready var camera: Camera2D = $FollowCamera2D
 @onready var track_root: Node2D = $KitchenGraybox
@@ -57,6 +56,7 @@ var _player_vehicle: VehicleController
 var _finished: bool = false
 var _countdown_label: Label
 var _race_flash_label: Label
+var _race_hud: RaceHUD
 var _position_label: Label
 var _wrong_way_label: Label
 var _results_panel: Panel
@@ -90,10 +90,7 @@ func _ready() -> void:
 	race_manager.lap_completed.connect(_on_lap_completed)
 	race_manager.racer_finished.connect(_on_racer_finished)
 	race_manager.results_ready.connect(_on_results_ready)
-	boost_fill.z_index = 2
-	controls_label.text += "   ·   ESC / START pause"
 	if OS.is_debug_build():
-		controls_label.text += "   ·   F3 telemetry"
 		_ensure_debug_overlay()
 	_countdown_active = true
 	call_deferred("_run_countdown")
@@ -108,23 +105,7 @@ func _exit_tree() -> void:
 
 
 func _process(_delta: float) -> void:
-	var elapsed: float = race_manager.race_time
-	var minutes := int(elapsed / 60.0)
-	var seconds := fmod(elapsed, 60.0)
-	var shown_lap: int = mini(race_manager.lap_count + 1, race_manager.laps_to_finish)
-	_update_boost_bar()
-	_update_position_label()
-	if _finished:
-		hud_label.text = "RESULTS FINAL" if _results_finalized else "FINISH  ·  FINALIZING THE FIELD"
-	elif race_manager.is_running:
-		hud_label.text = "LAP %d/%d   ·   %02d:%04.1f" % [
-			shown_lap,
-			race_manager.laps_to_finish,
-			minutes,
-			seconds,
-		]
-	else:
-		hud_label.text = "LAP 1/%d   ·   00:00.0" % race_manager.laps_to_finish
+	_update_race_hud()
 
 
 func _configure_racers() -> void:
@@ -181,7 +162,7 @@ func _configure_vehicle(
 	var vehicle_data := CATALOG.get_vehicle(vehicle_id)
 	var vehicle_name := String(vehicle_data.get("name", "Rustbug"))
 	vehicle.configure_identity(driver_name, vehicle_name, vehicle_id)
-	vehicle.configure_racer_marker(RACER_MARKER_COLORS[racer_index])
+	vehicle.configure_racer_marker(RACER_MARKER_COLORS[racer_index], racer_index)
 	race_manager.register_racer(vehicle, driver_name, vehicle_name, is_player)
 
 
@@ -193,6 +174,9 @@ func _configure_session() -> void:
 	if not event.is_empty():
 		race_manager.laps_to_finish = clampi(int(event.get("laps", 3)), 1, 99)
 		race_manager.set_reverse_direction(bool(event.get("reverse", false)))
+		if is_instance_valid(_race_hud):
+			var vehicle := CATALOG.get_vehicle(String(_session.get("vehicle_id", "rustbug")))
+			_race_hud.set_context(String(event.get("name", "Household Circuit")), String(vehicle.get("name", "Rustbug")))
 
 
 func _configure_track_variant() -> void:
@@ -221,23 +205,26 @@ func _run_countdown() -> void:
 	_countdown_label.visible = false
 
 
-func _update_boost_bar() -> void:
-	var ratio: float = 0.0
-	if is_instance_valid(_player_vehicle):
-		ratio = clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.stats.boost_capacity, 0.001), 0.0, 1.0)
-	boost_fill.scale = Vector2(BOOST_FILL_SCALE.x * ratio, BOOST_FILL_SCALE.y)
-
-
-func _update_position_label() -> void:
-	if not is_instance_valid(_player_vehicle):
+func _update_race_hud() -> void:
+	if not is_instance_valid(_race_hud) or not is_instance_valid(_player_vehicle):
 		return
-	var race_position := race_manager.get_racer_position(_player_vehicle)
-	var racer_count := race_manager.get_racer_count()
-	_position_label.text = "%s  /  %d" % [_ordinal(race_position), racer_count]
+	var shown_lap := mini(race_manager.lap_count + 1, race_manager.laps_to_finish)
+	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.stats.boost_capacity, 0.001), 0.0, 1.0)
+	var speed_ratio := clampf(_player_vehicle.speed / maxf(_player_vehicle.get_effective_max_speed(), 0.001), 0.0, 1.2)
+	_race_hud.set_telemetry(
+		race_manager.get_racer_position(_player_vehicle),
+		race_manager.get_racer_count(),
+		shown_lap,
+		race_manager.laps_to_finish,
+		race_manager.race_time,
+		speed_ratio,
+		boost_ratio
+	)
 
 
 func _on_race_finished(_total_time: float) -> void:
 	_finished = true
+	_race_hud.visible = false
 	_results_panel.visible = true
 	_retry_button.disabled = true
 	_continue_button.disabled = true
@@ -246,12 +233,12 @@ func _on_race_finished(_total_time: float) -> void:
 
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:
 	if racer == _player_vehicle:
-		_update_position_label()
+		_update_race_hud()
 
 
 func _on_wrong_way_changed(racer: Node2D, wrong_way: bool) -> void:
-	if racer == _player_vehicle:
-		_wrong_way_label.visible = wrong_way
+	if racer == _player_vehicle and is_instance_valid(_race_hud):
+		_race_hud.set_wrong_way(wrong_way)
 
 
 func _on_lap_completed(lap: int) -> void:
@@ -280,6 +267,7 @@ func _on_results_ready(results: Array) -> void:
 	_finished = true
 	_results_finalized = true
 	_pause_overlay.enabled = false
+	_race_hud.visible = false
 	_results_panel.visible = true
 	_attempt_result_commit(results)
 
@@ -412,6 +400,15 @@ func _ensure_debug_overlay() -> void:
 
 func _create_phase_one_ui() -> void:
 	var hud := $HUD as CanvasLayer
+	hud_label.visible = false
+	controls_label.visible = false
+	var legacy_art := hud.get_node_or_null("RaceHUDArt") as CanvasItem
+	if legacy_art:
+		legacy_art.visible = false
+	_race_hud = RACE_HUD_SCRIPT.new() as RaceHUD
+	_race_hud.name = "RaceHUD"
+	hud.add_child(_race_hud)
+
 	_countdown_label = Label.new()
 	_countdown_label.name = "CountdownLabel"
 	_countdown_label.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -427,9 +424,9 @@ func _create_phase_one_ui() -> void:
 	_race_flash_label = Label.new()
 	_race_flash_label.name = "RaceFlashLabel"
 	_race_flash_label.offset_left = 440.0
-	_race_flash_label.offset_top = 62.0
+	_race_flash_label.offset_top = 92.0
 	_race_flash_label.offset_right = 840.0
-	_race_flash_label.offset_bottom = 112.0
+	_race_flash_label.offset_bottom = 144.0
 	_race_flash_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_race_flash_label.add_theme_font_size_override("font_size", 30)
 	_race_flash_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.25))
@@ -450,6 +447,7 @@ func _create_phase_one_ui() -> void:
 	_position_label.add_theme_color_override("font_color", Color(1.0, 0.86, 0.25))
 	_position_label.add_theme_color_override("font_outline_color", Color(0.08, 0.09, 0.12))
 	_position_label.add_theme_constant_override("outline_size", 6)
+	_position_label.visible = false
 	hud.add_child(_position_label)
 
 	_wrong_way_label = Label.new()

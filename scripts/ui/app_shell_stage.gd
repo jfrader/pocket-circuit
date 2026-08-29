@@ -3,15 +3,17 @@ extends Control
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const TITLE_ART := preload("res://assets/ui/imagine/menu_workbench.png")
 
-const INK := Color("101827")
-const PANEL := Color("1b2940")
-const PAPER := Color("f2ead7")
+const INK := Color("0e151f")
+const PANEL := Color("182333")
+const PAPER := Color("f5f0e3")
 const CREAM := Color("fff8e8")
-const AMBER := Color("f4bf3a")
-const CORAL := Color("e96b4c")
-const BLUE := Color("55a8c9")
-const MUTED := Color("92a2b8")
+const AMBER := Color("f4c65a")
+const CORAL := Color("e85a2e")
+const BLUE := Color("4a8fb8")
+const MUTED := Color("8793a8")
+const WORKBENCH := Color("5c4638")
 
 var mode: StringName = &"title"
 var vehicle_id := "rustbug"
@@ -71,38 +73,55 @@ func _draw() -> void:
 
 
 func _draw_stage_frame() -> void:
-	var frame := Rect2(Vector2(8.0, 8.0), size - Vector2(16.0, 16.0))
-	_draw_panel(frame, Color("142137"), Color("394c68"), 18, 2)
-	for y in range(38, int(size.y) - 24, 26):
-		draw_line(Vector2(20.0, float(y)), Vector2(size.x - 20.0, float(y)), Color(0.55, 0.68, 0.84, 0.035), 1.0)
-	_draw_panel(Rect2(24.0, 22.0, minf(188.0, size.x - 48.0), 28.0), AMBER, AMBER, 4)
-	_draw_text("GHC / AFTER HOURS", Vector2(34.0, 43.0), 13, INK)
-	for bolt_position: Vector2 in [Vector2(26.0, size.y - 28.0), Vector2(size.x - 26.0, size.y - 28.0)]:
+	var frame := Rect2(Vector2(6.0, 8.0), size - Vector2(12.0, 16.0))
+	draw_rect(frame, PANEL)
+	draw_rect(frame, Color("526278"), false, 3.0)
+	for y in range(40, int(size.y) - 20, 32):
+		draw_line(Vector2(18.0, float(y)), Vector2(size.x - 18.0, float(y)), Color(0.55, 0.68, 0.84, 0.035), 1.0)
+	for x in range(34, int(size.x) - 20, 52):
+		draw_circle(Vector2(float(x), size.y - 22.0), 2.0, Color("718096"))
+	_draw_panel(Rect2(20.0, 20.0, minf(205.0, size.x - 40.0), 30.0), AMBER, CREAM, 0, 2)
+	_draw_text("GHC / AFTER HOURS", Vector2(30.0, 42.0), 13, INK)
+	for bolt_position: Vector2 in [Vector2(24.0, size.y - 24.0), Vector2(size.x - 24.0, size.y - 24.0)]:
 		draw_circle(bolt_position, 8.0, Color("75849a"))
 		draw_line(bolt_position - Vector2(4.0, 0.0), bolt_position + Vector2(4.0, 0.0), INK, 2.0)
 		draw_line(bolt_position - Vector2(0.0, 4.0), bolt_position + Vector2(0.0, 4.0), INK, 2.0)
 
 
 func _draw_title_stage() -> void:
-	_draw_text("BAY 04", Vector2(26.0, 82.0), 18, CREAM)
-	_draw_text("THE GRID OPENS AT MIDNIGHT", Vector2(26.0, 103.0), 11, MUTED)
-	_draw_track_loop(Vector2(size.x * 0.5, size.y * 0.57), Vector2(size.x * 0.41, size.y * 0.3), Color(BLUE, 0.22))
-	_draw_portrait(Vector2(size.x - 86.0, 152.0), 58.0, "rae")
-	_draw_vehicle(Vector2(size.x * 0.48, size.y * 0.59), 1.42, "rustbug", -0.12)
-	_draw_tape_label(Rect2(30.0, size.y - 112.0, size.x - 60.0, 52.0), "RAE + RUSTBUG", "ROOKIE ENTRY / ALL-ROUND SETUP")
+	_draw_text("BAY 04  /  GRID READY", Vector2(24.0, 82.0), 17, CREAM)
+	_draw_text("KITCHEN COUNTER · 00:17", Vector2(24.0, 104.0), 11, MUTED)
+	var bench := Rect2(22.0, 126.0, size.x - 44.0, size.y - 190.0)
+	draw_rect(bench, WORKBENCH)
+	draw_texture_rect(TITLE_ART, bench, false)
+	draw_rect(bench, Color("816854"), false, 2.0)
+	_draw_tape_label(Rect2(34.0, size.y - 100.0, size.x - 68.0, 48.0), "KITCHEN COUNTER", "AFTER HOURS  ·  GRID READY")
 
 
 func _draw_vehicle_stage() -> void:
 	var vehicle := CATALOG.get_vehicle(vehicle_id)
 	var accent := Color.from_string(String(vehicle.get("tint", "f4bf3a")), AMBER)
-	_draw_text(String(vehicle.get("name", "RUSTBUG")).to_upper(), Vector2(26.0, 84.0), 24, CREAM)
-	_draw_text(String(vehicle.get("archetype", "BALANCED")).to_upper() + " MACHINE", Vector2(26.0, 106.0), 12, accent)
-	_draw_portrait(Vector2(size.x - 64.0, 92.0), 34.0, driver_id)
-	_draw_track_loop(Vector2(size.x * 0.5, 215.0), Vector2(size.x * 0.38, 112.0), Color(accent, 0.17))
-	_draw_vehicle(Vector2(size.x * 0.5, 215.0), 1.15, vehicle_id, -0.1)
-	_draw_vehicle_stats(vehicle, Vector2(30.0, 335.0), size.x - 60.0)
-	_draw_text("THE FOUR MACHINES", Vector2(28.0, size.y - 116.0), 12, MUTED)
-	_draw_vehicle_roster(Vector2(38.0, size.y - 72.0), size.x - 76.0)
+	_draw_text("MACHINE BAY  /  01–04", Vector2(24.0, 80.0), 12, MUTED)
+	_draw_text(String(vehicle.get("name", "RUSTBUG")).to_upper(), Vector2(24.0, 110.0), 29, CREAM)
+	_draw_text(String(vehicle.get("archetype", "BALANCED")).to_upper() + " / HOMOLOGATED", Vector2(24.0, 132.0), 12, accent)
+	var plate_center := Vector2(size.x * 0.5, 228.0)
+	var plate := PackedVector2Array([
+		plate_center + Vector2(-158.0, -78.0),
+		plate_center + Vector2(158.0, -78.0),
+		plate_center + Vector2(190.0, 0.0),
+		plate_center + Vector2(158.0, 78.0),
+		plate_center + Vector2(-158.0, 78.0),
+		plate_center + Vector2(-190.0, 0.0),
+	])
+	draw_colored_polygon(plate, Color(accent, 0.12))
+	draw_polyline(plate + PackedVector2Array([plate[0]]), Color(accent, 0.62), 3.0)
+	for spoke in 8:
+		var spoke_angle := TAU * float(spoke) / 8.0
+		draw_line(plate_center, plate_center + Vector2.from_angle(spoke_angle) * 92.0, Color(accent, 0.12), 2.0)
+	_draw_vehicle(plate_center, 1.52, vehicle_id, -0.1)
+	_draw_vehicle_stats(vehicle, Vector2(28.0, 338.0), size.x - 56.0)
+	_draw_text("FOUR MACHINES  /  ONE GARAGE", Vector2(26.0, size.y - 110.0), 12, MUTED)
+	_draw_vehicle_roster(Vector2(38.0, size.y - 68.0), size.x - 76.0)
 
 
 func _draw_briefing_stage() -> void:
@@ -288,12 +307,12 @@ func _draw_tape_label(rect: Rect2, title: String, subtitle: String) -> void:
 	_draw_text(subtitle, rect.position + Vector2(12.0, 42.0), 10, Color("4c5666"))
 
 
-func _draw_panel(rect: Rect2, fill: Color, border: Color, radius: int, border_width: int = 1) -> void:
+func _draw_panel(rect: Rect2, fill: Color, border: Color, _radius: int, border_width: int = 1) -> void:
 	var box := StyleBoxFlat.new()
 	box.bg_color = fill
 	box.border_color = border
 	box.set_border_width_all(border_width)
-	box.set_corner_radius_all(radius)
+	box.set_corner_radius_all(0)
 	draw_style_box(box, rect)
 
 

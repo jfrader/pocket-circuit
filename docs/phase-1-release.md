@@ -118,15 +118,15 @@ existing VehicleStats, transform, common collision geometry, and save identity.
 
 ## Audio and Feedback
 
-Phase 1 includes an original synthesized PCM sound set. The compact menu, race,
-and engine loops and the countdown, go, UI, drift, boost, impact, and
-hazard-warning effects use mathematical waveforms and deterministic noise,
-without third-party samples or a recognizable melody. Asset licensing details
-live in `assets/audio/LICENSE.md`.
+The current review build keeps original synthesized menu and race loops pending
+the project composer's final cues. Engine, countdown, go, UI, drift, boost,
+impact, and hazard-warning effects use edited 48 kHz audio from Kenney's CC0
+Interface, Impact, and Sci-Fi packs. Exact sources, transformations, and pack
+hashes live in `ASSET_PROVENANCE.md` and `assets/audio/LICENSE.md`.
 
 One persistent AudioDirector owns a single music player, a local-player engine
 loop, and a fixed one-shot effects pool. It switches rather than stacks menu
-and race loops, follows local vehicle speed for engine pitch and level, ducks
+and race loops, follows local vehicle speed and throttle for engine pitch and level, ducks
 race music and silences engine feedback while paused, and routes through the
 persisted Master, Music, and SFX settings.
 

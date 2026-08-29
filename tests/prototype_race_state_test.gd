@@ -12,6 +12,9 @@ func _run_test() -> void:
 	root.add_child(prototype)
 	current_scene = prototype
 	var manager := prototype.get_node("RaceManager") as RaceManager
+	var race_hud := prototype.get("_race_hud") as Control
+	if not _expect(race_hud.visible, "race telemetry should be visible while driving"):
+		return
 	prototype.call("_on_lap_completed", manager.laps_to_finish - 1)
 	var race_flash := prototype.get("_race_flash_label") as Label
 	if not _expect(race_flash.visible and race_flash.text == "FINAL LAP", "the HUD should clearly announce the final lap"):
@@ -47,6 +50,9 @@ func _run_test() -> void:
 	manager.finalize_remaining_racers_as_dnf()
 	await process_frame
 	if not _expect(not paused and bool(prototype.get("_finished")) and bool(prototype.get("_results_finalized")), "results_ready should enter an unpaused finished state even when the player DNFed"):
+		return
+	var results_panel := prototype.get("_results_panel") as Control
+	if not _expect(results_panel.visible and not race_hud.visible, "final results should replace live race telemetry instead of overlapping it"):
 		return
 	prototype.call("_toggle_pause")
 	if not _expect(not paused and not overlay.visible, "finished results must not be pausable"):

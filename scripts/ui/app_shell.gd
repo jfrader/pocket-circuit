@@ -2,14 +2,20 @@ extends CanvasLayer
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
+const LOGO_TEXTURE := preload("res://assets/ui/imagine/logo_lockup.png")
+const MENU_BACKGROUND := preload("res://assets/ui/imagine/menu_night_kitchen.png")
+const BTN_PRIMARY := preload("res://assets/ui/imagine/btn_primary.png")
+const BTN_SECONDARY := preload("res://assets/ui/imagine/btn_secondary.png")
+const BTN_FOCUS := preload("res://assets/ui/imagine/btn_focus.png")
 
-const INK := Color("172033")
-const PAPER := Color("f2ead7")
+const INK := Color("0e151f")
+const PAPER := Color("f5f0e3")
 const CREAM := Color("fff8e8")
-const AMBER := Color("f4bf3a")
-const CORAL := Color("e96b4c")
-const BLUE := Color("55a8c9")
+const AMBER := Color("f4c65a")
+const CORAL := Color("e85a2e")
+const BLUE := Color("4a8fb8")
 const MUTED := Color("aeb7c8")
+const WORKBENCH := Color("5c4638")
 
 var _app: Node
 var _root: Control
@@ -26,11 +32,15 @@ var _quick_race_act_number := 1
 var _content_tween: Tween
 var _entrance_generation := 0
 var _save_error_back_action := Callable()
+var _btn_primary_tex: Texture2D
+var _btn_secondary_tex: Texture2D
+var _btn_focus_tex: Texture2D
 
 
 func configure(app: Node) -> void:
 	_app = app
 	if _root == null:
+		_load_button_textures()
 		_build_base()
 
 
@@ -39,22 +49,31 @@ func show_title() -> void:
 	_event_id = ""
 	_quick_race = false
 	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
 	_configure_stage(&"title")
-	_add_kicker("GRAND HOUSEHOLD CIRCUIT · OFFLINE CHAMPIONSHIP")
-	_add_heading("Tiny racing.\nBig stakes.")
+	_add_title_lockup()
 	var save_read_only := bool(_app.call("is_save_read_only"))
+	var has_progress := bool(_app.call("has_championship_progress"))
 	if save_read_only:
 		_add_copy("READ-ONLY SAVE · NEWER FILE DETECTED · FILE UNTOUCHED", CORAL)
 	else:
-		_add_copy("Three rooms. Nine events. Four machines.")
-	_add_spacer(10)
-	if bool(_app.call("has_championship_progress")):
-		_add_button("CONTINUE CHAMPIONSHIP", Callable(_app, "continue_championship"), AMBER)
-	_add_button("NEW CHAMPIONSHIP", Callable(_app, "request_new_championship"), CREAM, save_read_only)
-	_add_button("QUICK RACE", Callable(_app, "open_quick_race"), BLUE)
-	_add_button("SETTINGS", Callable(self, "show_settings"), CREAM)
-	_add_button("CREDITS", Callable(self, "show_credits"), CREAM)
-	_add_button("QUIT", Callable(_app, "quit_game"), CORAL)
+		_add_copy("THREE ROOMS  /  NINE EVENTS  /  FOUR MACHINES", MUTED)
+	_add_spacer(8)
+	_add_primary_button(
+		"RACE  ·  CONTINUE CHAMPIONSHIP" if has_progress else "RACE  ·  START CHAMPIONSHIP",
+		Callable(_app, "continue_championship") if has_progress else Callable(_app, "request_new_championship"),
+		save_read_only and not has_progress
+	)
+	var race_actions: Array[Dictionary] = []
+	if has_progress:
+		race_actions.append({"text": "NEW RUN", "callback": Callable(_app, "request_new_championship"), "accent": CORAL, "disabled": save_read_only})
+	race_actions.append({"text": "QUICK RACE", "callback": Callable(_app, "open_quick_race"), "accent": BLUE, "disabled": false})
+	_add_action_row(race_actions)
+	_add_action_row([
+		{"text": "OPTIONS", "callback": Callable(self, "show_settings"), "accent": CREAM, "disabled": false},
+		{"text": "CREDITS", "callback": Callable(self, "show_credits"), "accent": CREAM, "disabled": false},
+		{"text": "QUIT", "callback": Callable(_app, "quit_game"), "accent": CORAL, "disabled": false},
+	])
 	_footer.text = "ARROWS / STICK  MOVE     ·     ENTER / A  SELECT"
 	_focus_first()
 
@@ -227,7 +246,8 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	_clear_content()
 	var event := CATALOG.get_event(event_id)
 	_add_kicker("QUICK RACE · %s" % String(event.get("name", "EVENT")) if quick_race else "GARAGE · %s" % String(event.get("name", "EVENT")))
-	_add_heading("Choose your machine")
+	_add_heading("Choose machine")
+	_add_copy("FOUR MACHINES  /  NO BEST PICK  /  COMMIT TO A LINE", MUTED)
 	_add_copy("%s  ·  %s" % [String(event.get("environment", "CIRCUIT")), String(event.get("format", "RACE"))], BLUE)
 	var progress: Dictionary = _app.call("get_save_data")
 	var selected_vehicle := String(progress.get("selected_vehicle", "rustbug"))
@@ -235,11 +255,12 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	var event_theme := String(event.get("theme", "kitchen"))
 	_configure_stage(&"vehicle", selected_vehicle, "rae", event_theme, "", unlocked_vehicles)
 	var selected_button: Button
-	for vehicle: Dictionary in CATALOG.VEHICLES:
+	for vehicle_index in CATALOG.VEHICLES.size():
+		var vehicle: Dictionary = CATALOG.VEHICLES[vehicle_index]
 		var vehicle_id := String(vehicle["id"])
 		var unlocked := vehicle_id in unlocked_vehicles
 		var access := "READY" if unlocked else "LOCKED · %s" % String(vehicle["unlock"])
-		var summary := "%s  ·  %s  ·  %s" % [String(vehicle["name"]), String(vehicle["archetype"]), access]
+		var summary := "%02d  /  %s  /  %s  /  %s" % [vehicle_index + 1, String(vehicle["name"]), String(vehicle["archetype"]), access]
 		var vehicle_button := _add_button(
 			summary,
 			Callable(self, "_start_with_vehicle").bind(vehicle_id),
@@ -247,6 +268,8 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 			not unlocked,
 			"Vehicle_%s" % vehicle_id
 		)
+		vehicle_button.custom_minimum_size = Vector2(0.0, 50.0)
+		vehicle_button.add_theme_font_size_override("font_size", 15)
 		if unlocked:
 			vehicle_button.focus_entered.connect(_preview_vehicle.bind(vehicle_id, event_theme, unlocked_vehicles))
 			vehicle_button.mouse_entered.connect(_preview_vehicle.bind(vehicle_id, event_theme, unlocked_vehicles))
@@ -320,8 +343,9 @@ func show_credits() -> void:
 	_add_section("CREATED & PUBLISHED", "GURISITOS GAMES")
 	_add_section("ENGINE", "GODOT · MIT")
 	_add_section("PROCEDURAL ART", "PROCEDURAL 2D · MIT")
+	_add_section("REVIEW SOUND EFFECTS", "KENNEY · CC0")
 	_add_section("PRODUCTION", "DEVELOPER-DIRECTED · AI-ASSISTED")
-	_add_copy("Original code, characters, vehicles, tracks, graphics, music, and synthesized sound.")
+	_add_copy("Original code, characters, vehicles, tracks, graphics, and music. Selected review effects use edited CC0 Kenney audio.")
 	_add_copy("Licenses and provenance are included in THIRD_PARTY_NOTICES.md and ASSET_PROVENANCE.md.", MUTED)
 	_add_button("BACK", Callable(self, "show_title"), CREAM)
 	_footer.text = "ESC / B  BACK"
@@ -404,66 +428,80 @@ func _build_base() -> void:
 	background.color = INK
 	background.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(background)
-	var rail := ColorRect.new()
-	rail.set_anchors_and_offsets_preset(Control.PRESET_LEFT_WIDE)
-	rail.offset_right = 24.0
-	rail.color = AMBER
-	rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(rail)
-	var corner := ColorRect.new()
-	corner.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
-	corner.offset_left = -240.0
-	corner.offset_bottom = 12.0
-	corner.color = CORAL
-	corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_root.add_child(corner)
+	var backdrop := TextureRect.new()
+	backdrop.texture = MENU_BACKGROUND
+	backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	backdrop.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	backdrop.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	backdrop.modulate = Color(1.0, 1.0, 1.0, 0.42)
+	backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(backdrop)
+	var top_rail := ColorRect.new()
+	top_rail.set_anchors_and_offsets_preset(Control.PRESET_TOP_WIDE)
+	top_rail.offset_bottom = 8.0
+	top_rail.color = AMBER
+	top_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(top_rail)
+	var rail_cut := ColorRect.new()
+	rail_cut.set_anchors_and_offsets_preset(Control.PRESET_TOP_RIGHT)
+	rail_cut.offset_left = -310.0
+	rail_cut.offset_bottom = 8.0
+	rail_cut.color = CORAL
+	rail_cut.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(rail_cut)
+	var bench_rail := ColorRect.new()
+	bench_rail.set_anchors_and_offsets_preset(Control.PRESET_BOTTOM_WIDE)
+	bench_rail.offset_top = -22.0
+	bench_rail.color = WORKBENCH
+	bench_rail.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(bench_rail)
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 72)
-	margin.add_theme_constant_override("margin_top", 42)
-	margin.add_theme_constant_override("margin_right", 72)
-	margin.add_theme_constant_override("margin_bottom", 32)
+	margin.add_theme_constant_override("margin_left", 48)
+	margin.add_theme_constant_override("margin_top", 28)
+	margin.add_theme_constant_override("margin_right", 48)
+	margin.add_theme_constant_override("margin_bottom", 28)
 	_root.add_child(margin)
 	var page := VBoxContainer.new()
-	page.add_theme_constant_override("separation", 10)
+	page.add_theme_constant_override("separation", 8)
 	margin.add_child(page)
 	var brand := Label.new()
-	brand.text = "POCKET / CIRCUIT"
-	brand.add_theme_font_size_override("font_size", 18)
+	brand.text = "GHC / AFTER HOURS WORKSHOP"
+	brand.add_theme_font_size_override("font_size", 13)
 	brand.add_theme_color_override("font_color", AMBER)
 	page.add_child(brand)
 	var separator := HSeparator.new()
 	page.add_child(separator)
 	var body := HBoxContainer.new()
 	body.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	body.add_theme_constant_override("separation", 24)
+	body.add_theme_constant_override("separation", 16)
 	page.add_child(body)
 	_scroll = ScrollContainer.new()
 	_scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_scroll.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_scroll.size_flags_stretch_ratio = 1.65
-	_scroll.custom_minimum_size = Vector2(650.0, 0.0)
+	_scroll.size_flags_stretch_ratio = 1.12
+	_scroll.custom_minimum_size = Vector2(590.0, 0.0)
 	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	_scroll.follow_focus = false
 	_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	body.add_child(_scroll)
 	_content = VBoxContainer.new()
-	_content.custom_minimum_size = Vector2(620.0, 0.0)
+	_content.custom_minimum_size = Vector2(580.0, 0.0)
 	_content.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	_content.add_theme_constant_override("separation", 10)
+	_content.add_theme_constant_override("separation", 9)
 	_scroll.add_child(_content)
 	_stage = STAGE_SCRIPT.new() as AppShellStage
 	_stage.name = "IllustrationStage"
-	_stage.custom_minimum_size = Vector2(370.0, 500.0)
+	_stage.custom_minimum_size = Vector2(490.0, 500.0)
 	_stage.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	_stage.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	_stage.size_flags_stretch_ratio = 0.85
+	_stage.size_flags_stretch_ratio = 1.0
 	body.add_child(_stage)
 	_footer = Label.new()
 	_footer.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	_footer.add_theme_font_size_override("font_size", 13)
+	_footer.add_theme_font_size_override("font_size", 12)
 	_footer.add_theme_color_override("font_color", MUTED)
 	page.add_child(_footer)
 
@@ -478,11 +516,11 @@ func _make_theme() -> Theme:
 	theme.set_font_size("font_size", "Button", 18)
 	theme.set_font_size("font_size", "OptionButton", 18)
 	theme.set_font_size("font_size", "CheckButton", 18)
-	theme.set_stylebox("normal", "Button", _style(Color("242f46"), Color("46536b"), 8))
-	theme.set_stylebox("hover", "Button", _style(Color("303f5b"), AMBER, 8))
-	theme.set_stylebox("pressed", "Button", _style(Color("1e293d"), AMBER, 8))
-	theme.set_stylebox("focus", "Button", _style(Color("344761"), AMBER, 8, 4))
-	theme.set_stylebox("disabled", "Button", _style(Color("20283a"), Color("30394d"), 8))
+	theme.set_stylebox("normal", "Button", _style(Color("182333"), Color("46536b"), 0, 2))
+	theme.set_stylebox("hover", "Button", _style(Color("243247"), AMBER, 0, 3))
+	theme.set_stylebox("pressed", "Button", _style(Color("0a111b"), AMBER, 0, 3))
+	theme.set_stylebox("focus", "Button", _style(Color("243247"), AMBER, 0, 5))
+	theme.set_stylebox("disabled", "Button", _style(Color("161e2b"), Color("30394d"), 0, 2))
 	return theme
 
 
@@ -497,6 +535,43 @@ func _style(fill: Color, border: Color, radius: int, width: int = 1) -> StyleBox
 	box.content_margin_top = 12.0
 	box.content_margin_bottom = 12.0
 	return box
+
+
+func _load_button_textures() -> void:
+	_btn_primary_tex = BTN_PRIMARY
+	_btn_secondary_tex = BTN_SECONDARY
+	_btn_focus_tex = BTN_FOCUS
+
+
+func _texture_style(texture: Texture2D) -> StyleBoxTexture:
+	var box := StyleBoxTexture.new()
+	box.texture = texture
+	box.texture_margin_left = 32.0
+	box.texture_margin_top = 16.0
+	box.texture_margin_right = 32.0
+	box.texture_margin_bottom = 16.0
+	box.content_margin_left = 22.0
+	box.content_margin_right = 22.0
+	box.content_margin_top = 10.0
+	box.content_margin_bottom = 10.0
+	return box
+
+
+func _apply_button_art(button: Button, primary: bool) -> void:
+	var plate := _btn_primary_tex if primary else _btn_secondary_tex
+	var ink := INK if primary else CREAM
+	button.add_theme_color_override("font_color", ink)
+	button.add_theme_color_override("font_hover_color", INK if primary else AMBER)
+	button.add_theme_color_override("font_focus_color", INK if primary else AMBER)
+	if plate == null:
+		return
+	var normal := _texture_style(plate)
+	var focus := _texture_style(_btn_focus_tex if _btn_focus_tex else plate)
+	button.add_theme_stylebox_override("normal", normal)
+	button.add_theme_stylebox_override("hover", focus)
+	button.add_theme_stylebox_override("pressed", focus)
+	button.add_theme_stylebox_override("focus", focus)
+	button.add_theme_stylebox_override("disabled", normal)
 
 
 func _clear_content() -> void:
@@ -527,6 +602,64 @@ func _configure_stage(
 
 func _preview_vehicle(vehicle_id: String, event_theme: String, unlocked_vehicles: Array) -> void:
 	_configure_stage(&"vehicle", vehicle_id, "rae", event_theme, "", unlocked_vehicles)
+
+
+func _add_title_lockup() -> void:
+	var logo := TextureRect.new()
+	logo.texture = LOGO_TEXTURE
+	logo.custom_minimum_size = Vector2(540.0, 168.0)
+	logo.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	logo.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	logo.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	logo.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_content.add_child(logo)
+	var tagline := _label("TINY RACING  /  BIG HOUSE", 15, PAPER)
+	tagline.custom_minimum_size = Vector2(0.0, 28.0)
+	_content.add_child(tagline)
+
+
+func _add_primary_button(text: String, callback: Callable, disabled: bool) -> Button:
+	var button := _make_button(text, callback, CORAL, disabled, "PrimaryRaceAction")
+	button.custom_minimum_size = Vector2(0.0, 72.0)
+	button.add_theme_font_size_override("font_size", 23)
+	_content.add_child(button)
+	if not disabled:
+		_register_button_focus(button)
+	return button
+
+
+func _add_action_row(actions: Array[Dictionary]) -> void:
+	if actions.is_empty():
+		return
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	_content.add_child(row)
+	var row_buttons: Array[Button] = []
+	for action: Dictionary in actions:
+		var button := _make_button(
+			String(action.get("text", "ACTION")),
+			action.get("callback", Callable()) as Callable,
+			action.get("accent", CREAM) as Color,
+			bool(action.get("disabled", false))
+		)
+		button.alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.custom_minimum_size = Vector2(0.0, 42.0)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override("font_size", 15)
+		row.add_child(button)
+		if not button.disabled:
+			row_buttons.append(button)
+	if not row_buttons.is_empty():
+		var previous_focus: Button = _button_focus_chain.back() if not _button_focus_chain.is_empty() else null
+		_register_button_focus(row_buttons[0])
+		for button: Button in row_buttons.slice(1):
+			if previous_focus:
+				button.focus_neighbor_top = button.get_path_to(previous_focus)
+	for index in row_buttons.size():
+		if index > 0:
+			row_buttons[index].focus_neighbor_left = row_buttons[index].get_path_to(row_buttons[index - 1])
+		if index < row_buttons.size() - 1:
+			row_buttons[index].focus_neighbor_right = row_buttons[index].get_path_to(row_buttons[index + 1])
 
 
 func _add_kicker(text: String) -> void:
@@ -595,13 +728,12 @@ func _make_button(text: String, callback: Callable, accent: Color, disabled: boo
 	if not node_name.is_empty():
 		button.name = node_name
 	button.text = text
-	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+	button.alignment = HORIZONTAL_ALIGNMENT_CENTER
 	button.custom_minimum_size = Vector2(0.0, 44.0)
 	button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	button.focus_mode = Control.FOCUS_ALL
 	button.disabled = disabled
-	button.add_theme_color_override("font_hover_color", accent)
-	button.add_theme_color_override("font_focus_color", accent)
+	_apply_button_art(button, accent == CORAL)
 	_wire_button_audio(button)
 	if callback.is_valid():
 		button.pressed.connect(callback)

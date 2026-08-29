@@ -2,6 +2,9 @@ class_name VehicleController
 extends RigidBody2D
 
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
+const CONTACT_RELEASE_GRACE := 0.12
+const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 
 enum ControlMode { PLAYER, EXTERNAL }
 
@@ -34,6 +37,12 @@ var _external_power_multiplier: float = 1.0
 var _base_surface: StringName = &"polished counter"
 var _surface_modifiers: Dictionary = {}
 var _surface_sequence: int = 0
+var _contact_elapsed := 0.0
+var _contact_pair_last_seen: Dictionary = {}
+var _last_output_velocity := Vector2.ZERO
+var last_collision_response: Dictionary = {}
+var _racer_tag: Label
+var _racer_tag_offset := Vector2(-45.0, -64.0)
 
 
 func _ready() -> void:
@@ -41,9 +50,17 @@ func _ready() -> void:
 	gravity_scale = 0.0
 	linear_damp = 0.0
 	angular_damp = 2.5
+	var material := PhysicsMaterial.new()
+	material.bounce = 0.0
+	material.friction = 0.06
+	material.absorbent = true
+	physics_material_override = material
+	_last_output_velocity = linear_velocity
 
 
 func _physics_process(delta: float) -> void:
+	if is_instance_valid(_racer_tag):
+		_racer_tag.global_position = global_position + _racer_tag_offset
 	_read_input()
 	_update_debug_state()
 	_apply_drive_forces(delta)
@@ -112,6 +129,7 @@ func configure_identity(driver_name: String, racer_vehicle_name: String, vehicle
 	set_meta(&"driver_display_name", driver_name)
 	set_meta(&"vehicle_display_name", racer_vehicle_name)
 	configure_visual_identity(vehicle_id)
+	_configure_racer_tag(driver_name)
 
 
 func configure_visual_identity(vehicle_id: String) -> void:
@@ -136,7 +154,35 @@ func configure_visual_identity(vehicle_id: String) -> void:
 		legacy_shadow.visible = false
 
 
-func configure_racer_marker(marker_color: Color) -> void:
+func _configure_racer_tag(driver_name: String) -> void:
+	var visual_root := get_node_or_null("VisualRoot") as Node2D
+	if visual_root == null:
+		return
+	var existing := visual_root.get_node_or_null("RacerTag")
+	if existing:
+		existing.free()
+	var tag := Label.new()
+	tag.name = "RacerTag"
+	tag.text = "YOU" if control_mode == ControlMode.PLAYER else driver_name.to_upper()
+	tag.position = _racer_tag_offset
+	tag.size = Vector2(90.0, 18.0)
+	tag.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	tag.add_theme_font_size_override("font_size", 10)
+	tag.add_theme_color_override("font_color", Color("f5f0e3"))
+	tag.add_theme_color_override("font_outline_color", Color("0e151f"))
+	tag.add_theme_constant_override("outline_size", 4)
+	tag.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	tag.top_level = true
+	tag.z_index = 4
+	visual_root.add_child(tag)
+	_racer_tag = tag
+	_racer_tag.global_position = global_position + _racer_tag_offset
+
+
+func configure_racer_marker(marker_color: Color, racer_index: int = 0) -> void:
+	_racer_tag_offset.y = RACER_TAG_Y_OFFSETS[clampi(racer_index, 0, RACER_TAG_Y_OFFSETS.size() - 1)]
+	if is_instance_valid(_racer_tag):
+		_racer_tag.global_position = global_position + _racer_tag_offset
 	var visual_root := get_node_or_null("VisualRoot") as Node2D
 	if visual_root == null:
 		return
@@ -207,6 +253,14 @@ func _refresh_surface_modifier() -> void:
 
 func is_boost_active() -> bool:
 	return _boosting and _throttle_input > 0.0 and boost_amount > 0.0
+
+
+func get_engine_load() -> float:
+	return maxf(_throttle_input, _brake_input * 0.55)
+
+
+func collision_snapshot() -> Dictionary:
+	return {"mass": mass}
 
 
 func _apply_drive_forces(_delta: float) -> void:
@@ -282,6 +336,66 @@ func _update_debug_state() -> void:
 		and absf(_steer_input) > 0.2
 		and speed > 110.0
 	)
+
+
+func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
+	var delta := state.step
+	_contact_elapsed += delta
+	var intended_forward := Vector2.UP.rotated(state.transform.get_rotation())
+	var strongest_contact: Dictionary = {}
+	var strongest_score := -1.0
+	var seen_pairs: Dictionary = {}
+
+	for contact_index in state.get_contact_count():
+		var collider := state.get_contact_collider_object(contact_index)
+		if not collider is Node or collider == self or not (collider as Node).is_in_group("race_vehicle"):
+			continue
+		if not collider.has_method("collision_snapshot"):
+			continue
+		var collider_id := collider.get_instance_id()
+		seen_pairs[collider_id] = true
+		var world_normal := state.get_contact_local_normal(contact_index).normalized()
+		var own_contact_velocity := state.get_contact_local_velocity_at_position(contact_index)
+		var collider_velocity := state.get_contact_collider_velocity_at_position(contact_index)
+		var relative_velocity := own_contact_velocity - collider_velocity
+		var impulse := state.get_contact_impulse(contact_index)
+		var score := maxf(0.0, -relative_velocity.dot(world_normal)) + impulse.length() / maxf(mass, 0.01)
+		if score <= strongest_score:
+			continue
+		strongest_score = score
+		strongest_contact = {
+			"collider_id": collider_id,
+			"other_mass": float((collider.call("collision_snapshot") as Dictionary).get("mass", 1.0)),
+			"normal": world_normal,
+			"relative_velocity": relative_velocity,
+			"impulse": impulse,
+		}
+
+	for pair_id: int in _contact_pair_last_seen.keys():
+		if not seen_pairs.has(pair_id) and _contact_elapsed - float(_contact_pair_last_seen[pair_id]) > CONTACT_RELEASE_GRACE:
+			_contact_pair_last_seen.erase(pair_id)
+
+	if not strongest_contact.is_empty():
+		var collider_id := int(strongest_contact["collider_id"])
+		var is_new_contact := not _contact_pair_last_seen.has(collider_id)
+		_contact_pair_last_seen[collider_id] = _contact_elapsed
+		last_collision_response = COLLISION_RESPONSE.resolve_contact({
+			"delta": delta,
+			"intended_forward": intended_forward,
+			"normal": strongest_contact["normal"],
+			"relative_velocity": strongest_contact["relative_velocity"],
+			"impulse": strongest_contact["impulse"],
+			"previous_velocity": _last_output_velocity,
+			"solver_velocity": state.linear_velocity,
+			"solver_angular_velocity": state.angular_velocity,
+			"self_mass": mass,
+			"other_mass": strongest_contact["other_mass"],
+			"is_new_contact": is_new_contact,
+		})
+		state.linear_velocity = last_collision_response["velocity"]
+		state.angular_velocity = float(last_collision_response["angular_velocity"])
+
+	_last_output_velocity = state.linear_velocity
 
 
 func _limit_top_speed() -> void:

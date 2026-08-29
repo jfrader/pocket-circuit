@@ -8,6 +8,11 @@ enum HazardState { WARNING, ACTIVE, COOLDOWN }
 const INK := Color("172033")
 const CREAM := Color("fff8e8")
 const AMBER := Color("f4bf3a")
+const HAZARD_SPRITES := {
+	&"kitchen": preload("res://assets/textures/imagine/hazard_kitchen_apple.png"),
+	&"workshop": preload("res://assets/textures/imagine/hazard_workshop_socket.png"),
+	&"office": preload("res://assets/textures/imagine/hazard_office_cable.png"),
+}
 
 @export_range(0.2, 5.0, 0.1) var warning_duration := 1.2
 @export_range(0.2, 5.0, 0.1) var active_duration := 1.6
@@ -32,6 +37,7 @@ func configure(hazard_theme: StringName, travel_start: Vector2, travel_end: Vect
 	theme = hazard_theme
 	start_position = travel_start
 	end_position = travel_end
+	add_to_group("track_hazard")
 	collision_layer = 0
 	collision_mask = 1
 	monitoring = true
@@ -192,6 +198,20 @@ func _build_visuals() -> void:
 	shine.points = PackedVector2Array([Vector2(-11.0, -10.0), Vector2(8.0, -16.0)])
 	shine.antialiased = true
 	_moving_visual.add_child(shine)
+	var sprite_texture := HAZARD_SPRITES.get(theme, HAZARD_SPRITES[&"kitchen"]) as Texture2D
+	if sprite_texture:
+		var sprite := Sprite2D.new()
+		sprite.name = "HazardSprite"
+		sprite.texture = sprite_texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var longest := maxf(sprite_texture.get_width(), sprite_texture.get_height())
+		sprite.scale = Vector2.ONE * (68.0 / maxf(longest, 1.0))
+		_moving_visual.add_child(sprite)
+		polygon.visible = false
+		shine.visible = false
+		var cable := _moving_visual.get_node_or_null("Cable") as CanvasItem
+		if cable:
+			cable.visible = false
 
 	_collision = CollisionShape2D.new()
 	_collision.name = "HazardCollision"

@@ -7,14 +7,18 @@ const RECOVERY_GHOST_TIME := 1.0
 const CORNER_GUIDE_AXIS_THRESHOLD := 180.0
 const CORNER_GUIDE_BLEND_DISTANCE := 180.0
 const CORNER_GUIDE_REACHED_DISTANCE := 40.0
-const CORNER_GUIDE_OUTWARD_OFFSET := 15.0
+const CORNER_GUIDE_OUTWARD_OFFSET := 22.0
 const CORNER_GUIDE_PASS_WIDTH := 80.0
-const LOOK_AHEAD_DISTANCE := 240.0
-const MAX_LOOK_AHEAD_WEIGHT := 0.22
+const LOOK_AHEAD_DISTANCE := 340.0
+const MAX_LOOK_AHEAD_WEIGHT := 0.38
 const TRACK_COLLISION_MASK := 2
-const OBSTACLE_FEELER_ANGLE := 0.52
-const OBSTACLE_FEELER_HALF_WIDTH := 16.0
+const VEHICLE_COLLISION_MASK := 1
+const OBSTACLE_FEELER_ANGLES: Array[float] = [-0.95, -0.5, 0.0, 0.5, 0.95]
+const OBSTACLE_FRONT_OFFSET := 30.0
+const OBSTACLE_FEELER_HALF_WIDTH := 14.0
 const GATE_TARGET_OFFSETS: Array[float] = [-72.0, -48.0, -24.0, 0.0, 24.0, 48.0, 72.0]
+const CORRIDOR_PROBE_DISTANCE := 150.0
+const HAZARD_AVOID_DISTANCE := 160.0
 
 var vehicle: VehicleController
 var race_manager: RaceManager
@@ -97,17 +101,19 @@ func _physics_process(delta: float) -> void:
 			look_ahead_weight
 		)
 
-	var desired_direction := vehicle.global_position.direction_to(target_position)
 	var forward := Vector2.UP.rotated(vehicle.rotation)
+	target_position = _pull_into_corridor(target_position, forward)
+	var desired_direction := vehicle.global_position.direction_to(target_position)
+	desired_direction = _avoid_hazards(desired_direction, forward)
+	var obstacle_plan := _obstacle_avoidance(forward, desired_direction)
+	if float(obstacle_plan["weight"]) > 0.35:
+		desired_direction = desired_direction.lerp(
+			obstacle_plan["avoid_direction"] as Vector2,
+			float(obstacle_plan["weight"])
+		).normalized()
 	var steering_angle := forward.angle_to(desired_direction)
 	var steering_divisor := 0.64 if difficulty == "clockwork" else 0.72
 	var requested_steer := clampf(steering_angle / steering_divisor, -1.0, 1.0)
-	var obstacle_plan := _obstacle_avoidance(forward, desired_direction)
-	requested_steer = lerpf(
-		requested_steer,
-		float(obstacle_plan["steer"]),
-		float(obstacle_plan["weight"])
-	)
 	var steering_response := 11.0 if difficulty == "sunday_drive" else (16.0 if difficulty == "clockwork" else 13.0)
 	_smoothed_steer = lerpf(_smoothed_steer, requested_steer, 1.0 - exp(-steering_response * delta))
 	var turn_severity := _checkpoint_turn_severity(expected_index)
@@ -119,20 +125,27 @@ func _physics_process(delta: float) -> void:
 	var pace_multiplier := 0.82 if difficulty == "sunday_drive" else (1.04 if difficulty == "clockwork" else 1.0)
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var handling_pace := clampf(vehicle.stats.steering_rate / 3.75, 0.78, 1.08)
-	var target_speed := effective_max_speed * lerpf(0.92, 0.22, corner_ratio) * pace_multiplier
+	var target_speed := effective_max_speed * lerpf(0.94, 0.40, corner_ratio) * pace_multiplier
 	target_speed *= lerpf(1.0, handling_pace, corner_ratio)
 	target_speed *= float(obstacle_plan["speed_scale"])
-	if absf(steering_angle) > 1.05:
-		target_speed = minf(target_speed, effective_max_speed * 0.36)
+	var heading_error := absf(steering_angle)
+	if heading_error > 1.05:
+		target_speed = minf(target_speed, effective_max_speed * 0.52)
+	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
+		target_speed = minf(target_speed, effective_max_speed * 0.34)
 
-	var braking_distance := lerpf(280.0, 560.0, corner_ratio)
+	var braking_distance := lerpf(240.0, 500.0, corner_ratio)
 	braking_distance *= 1.12 if difficulty == "sunday_drive" else (0.9 if difficulty == "clockwork" else 1.0)
 	var should_brake := vehicle.speed > target_speed and distance_to_target < braking_distance
 	var throttle := 0.0 if should_brake else 1.0
+	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
+		throttle = 0.42 if not should_brake else 0.0
 	var brake := clampf((vehicle.speed - target_speed) / 90.0, 0.0, 1.0) if should_brake else 0.0
 	var position := race_manager.get_racer_position(vehicle)
-	var catch_up_steps := maxi(0, position - 1)
-	var catch_up_power := minf(0.08, float(catch_up_steps) * 0.025) if difficulty == "club_circuit" else 0.0
+	var catch_up_power := 0.0
+	if difficulty == "club_circuit":
+		var progress_deficit := _leader_progress_deficit()
+		catch_up_power = minf(0.08, maxf(float(maxi(0, position - 1)) * 0.02, progress_deficit * 0.04))
 	vehicle.set_external_power_multiplier(1.0 + catch_up_power)
 	var boost := (
 		position > 1
@@ -204,26 +217,22 @@ func _checkpoint_entry_guide_position(checkpoint_index: int) -> Variant:
 
 
 func _checkpoint_target_position(checkpoint_index: int) -> Vector2:
-	if _gate_targets.has(checkpoint_index):
-		return _gate_targets[checkpoint_index]
 	var checkpoint := _checkpoints_by_index.get(checkpoint_index) as Node2D
 	if checkpoint == null:
 		return vehicle.global_position if is_instance_valid(vehicle) else Vector2.ZERO
 	var corner_ratio := clampf(_checkpoint_turn_severity(checkpoint_index) / 1.45, 0.0, 1.0)
 	var gate_lane_direction := Vector2.DOWN.rotated(checkpoint.global_rotation)
-	var lane_scale := lerpf(1.0, 0.1, corner_ratio)
+	var lane_scale := lerpf(1.0, 0.12, corner_ratio)
 	var preferred_target := (
 		checkpoint.global_position
 		+ gate_lane_direction * lane_offset * lane_scale
 	)
-	var selected_target := _select_clear_gate_target(
+	return _select_clear_gate_target(
 		checkpoint_index,
 		checkpoint.global_position,
 		gate_lane_direction,
 		preferred_target
 	)
-	_gate_targets[checkpoint_index] = selected_target
-	return selected_target
 
 
 func _select_clear_gate_target(
@@ -273,56 +282,126 @@ func _checkpoint_turn_severity(checkpoint_index: int) -> float:
 	return absf(path_in.angle_to(path_out))
 
 
+func _pull_into_corridor(target: Vector2, forward: Vector2) -> Vector2:
+	if not vehicle.is_inside_tree() or forward.length_squared() < 0.001:
+		return target
+	var origin := vehicle.global_position
+	var left_dir := Vector2(-forward.y, forward.x)
+	var left_clearance := _ray_clearance_from(origin, left_dir, CORRIDOR_PROBE_DISTANCE)
+	var right_clearance := _ray_clearance_from(origin, -left_dir, CORRIDOR_PROBE_DISTANCE)
+	if left_clearance >= 0.98 and right_clearance >= 0.98:
+		return target
+	var left_room := left_clearance * CORRIDOR_PROBE_DISTANCE
+	var right_room := right_clearance * CORRIDOR_PROBE_DISTANCE
+	var center := origin + left_dir * ((right_room - left_room) * 0.5) + forward * 90.0
+	return target.lerp(center, 0.42)
+
+
+func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
+	if not vehicle.is_inside_tree():
+		return desired_direction
+	var avoid := Vector2.ZERO
+	for node: Node in vehicle.get_tree().get_nodes_in_group("track_hazard"):
+		var hazard := node as EnvironmentalHazard
+		if hazard == null or hazard.state == EnvironmentalHazard.HazardState.COOLDOWN:
+			continue
+		var local_hazard := hazard.start_position.lerp(hazard.end_position, hazard.get_travel_progress() if hazard.state == EnvironmentalHazard.HazardState.ACTIVE else 0.5)
+		var offset := hazard.to_global(local_hazard) - vehicle.global_position
+		if offset.length() > HAZARD_AVOID_DISTANCE or offset.dot(forward) < 0.0:
+			continue
+		var away := offset.orthogonal().normalized()
+		if away.dot(desired_direction) < 0.0:
+			away = -away
+		avoid += away * (1.0 - offset.length() / HAZARD_AVOID_DISTANCE)
+	if avoid.length_squared() < 0.001:
+		return desired_direction
+	return desired_direction.lerp(avoid.normalized(), 0.48).normalized()
+
+
+func _leader_progress_deficit() -> float:
+	var mine := race_manager.get_racer_progress(vehicle)
+	var best := mine
+	for racer: Node in vehicle.get_tree().get_nodes_in_group("race_vehicle"):
+		best = maxf(best, race_manager.get_racer_progress(racer as Node2D))
+	return maxf(0.0, best - mine)
+
+
 func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictionary:
-	var plan := {"steer": 0.0, "weight": 0.0, "speed_scale": 1.0}
+	var plan := {"steer": 0.0, "weight": 0.0, "speed_scale": 1.0, "avoid_direction": desired_direction}
 	if not vehicle.is_inside_tree():
 		return plan
-	var feeler_length := clampf(vehicle.speed * 0.6, 140.0, 300.0)
-	var center_clearance := _ray_clearance(desired_direction, feeler_length)
-	if center_clearance >= 0.98:
+	var origin := vehicle.global_position + forward * OBSTACLE_FRONT_OFFSET
+	var feeler_length := clampf(vehicle.speed * 0.75, 160.0, 360.0)
+	var best_clearance := -1.0
+	var best_direction := desired_direction
+	var center_clearance := 1.0
+	var hitting_vehicle := false
+	var wall_normal := Vector2.ZERO
+	for angle: float in OBSTACLE_FEELER_ANGLES:
+		var probe_direction := desired_direction.rotated(angle)
+		var probe := _ray_probe_from(origin, probe_direction, feeler_length, TRACK_COLLISION_MASK | VEHICLE_COLLISION_MASK)
+		var probe_clearance := float(probe["clearance"])
+		if is_zero_approx(angle):
+			center_clearance = probe_clearance
+			hitting_vehicle = bool(probe["is_vehicle"])
+			wall_normal = probe["normal"] as Vector2
+		if probe_clearance > best_clearance:
+			best_clearance = probe_clearance
+			best_direction = probe_direction
+	if center_clearance >= 0.92:
 		return plan
-	var left_direction := desired_direction.rotated(-OBSTACLE_FEELER_ANGLE)
-	var right_direction := desired_direction.rotated(OBSTACLE_FEELER_ANGLE)
-	var left_clearance := _ray_clearance(left_direction, feeler_length)
-	var right_clearance := _ray_clearance(right_direction, feeler_length)
-	var chosen_direction := left_direction if left_clearance > right_clearance else right_direction
-	if is_equal_approx(left_clearance, right_clearance):
-		chosen_direction = left_direction if left_direction.dot(desired_direction) > right_direction.dot(desired_direction) else right_direction
+	if wall_normal.length_squared() > 0.01 and not hitting_vehicle:
+		var slide := Vector2(-wall_normal.y, wall_normal.x)
+		if slide.dot(desired_direction) < 0.0:
+			slide = -slide
+		if slide.dot(forward) < 0.15:
+			slide = forward.slerp(slide, 0.65)
+		best_direction = slide.normalized()
 	var obstruction := 1.0 - center_clearance
-	plan["steer"] = clampf(forward.angle_to(chosen_direction) / OBSTACLE_FEELER_ANGLE, -1.0, 1.0)
-	plan["weight"] = clampf(0.38 + obstruction * 0.52, 0.0, 0.9)
-	plan["speed_scale"] = lerpf(0.72, 0.46, obstruction)
+	plan["avoid_direction"] = best_direction.normalized()
+	plan["steer"] = clampf(forward.angle_to(plan["avoid_direction"] as Vector2) / 0.72, -1.0, 1.0)
+	plan["weight"] = clampf((0.34 if hitting_vehicle else 0.52) + obstruction * 0.5, 0.0, 0.95)
+	plan["speed_scale"] = lerpf(0.9, 0.58, obstruction) if hitting_vehicle else lerpf(0.78, 0.34, obstruction)
 	return plan
 
 
-func _ray_clearance(direction: Vector2, feeler_length: float) -> float:
-	return _ray_clearance_from(vehicle.global_position, direction, feeler_length)
-
-
 func _ray_clearance_from(origin: Vector2, direction: Vector2, feeler_length: float) -> float:
+	return float(_ray_probe_from(origin, direction, feeler_length, TRACK_COLLISION_MASK)["clearance"])
+
+
+func _ray_probe_from(origin: Vector2, direction: Vector2, feeler_length: float, mask: int) -> Dictionary:
 	if feeler_length <= 0.001:
-		return 1.0
+		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
 	var side_offset := direction.orthogonal() * OBSTACLE_FEELER_HALF_WIDTH
-	return minf(
-		_single_ray_clearance(origin, direction, feeler_length),
-		minf(
-			_single_ray_clearance(origin + side_offset, direction, feeler_length),
-			_single_ray_clearance(origin - side_offset, direction, feeler_length)
-		)
-	)
+	var center := _single_ray_probe(origin, direction, feeler_length, mask)
+	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask)
+	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask)
+	var closest := center
+	if float(left["clearance"]) < float(closest["clearance"]):
+		closest = left
+	if float(right["clearance"]) < float(closest["clearance"]):
+		closest = right
+	return closest
 
 
-func _single_ray_clearance(origin: Vector2, direction: Vector2, feeler_length: float) -> float:
+func _single_ray_probe(origin: Vector2, direction: Vector2, feeler_length: float, mask: int) -> Dictionary:
 	var query := PhysicsRayQueryParameters2D.create(
 		origin,
 		origin + direction * feeler_length,
-		TRACK_COLLISION_MASK,
+		mask,
 		[vehicle.get_rid()]
 	)
 	var hit := vehicle.get_world_2d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
-		return 1.0
-	return origin.distance_to(hit["position"]) / feeler_length
+		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
+	var collider: Variant = hit.get("collider")
+	var is_vehicle := collider is Node and (collider as Node).is_in_group("race_vehicle")
+	var hit_normal := (hit.get("normal", Vector2.ZERO) as Vector2).normalized()
+	return {
+		"clearance": origin.distance_to(hit["position"]) / feeler_length,
+		"is_vehicle": is_vehicle,
+		"normal": hit_normal,
+	}
 
 
 func _update_stuck_recovery(delta: float, target_key: String, distance_to_target: float) -> void:
@@ -339,6 +418,8 @@ func _update_stuck_recovery(delta: float, target_key: String, distance_to_target
 		_stuck_time = 0.0
 		return
 	_stuck_time += delta
+	if _stuck_time >= 0.8:
+		_gate_targets.erase(int(target_key.get_slice(":", 0)))
 	if _stuck_time >= STUCK_TIMEOUT:
 		_recover_vehicle()
 
@@ -354,6 +435,7 @@ func _recover_vehicle() -> void:
 	_stuck_target_key = ""
 	_best_checkpoint_distance = INF
 	_smoothed_steer = 0.0
+	_gate_targets.clear()
 	vehicle.set_external_controls(0.0, 0.0, 0.0)
 	var saved_layer := vehicle.collision_layer
 	var saved_mask := vehicle.collision_mask

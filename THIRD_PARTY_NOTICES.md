@@ -55,14 +55,26 @@ SOFTWARE.
 
 ## Original project assets
 
-Pocket Circuit's shipped story, code, graphics, icon, music, and sound effects,
-including the Procedural 2D component above, are Gurisitos Games project
-material. They contain no third-party source media, samples, characters,
-vehicle designs, track designs, logos, or branding.
+Pocket Circuit's shipped story, code, graphics, icon, and music, including the
+Procedural 2D component above, are Gurisitos Games project material. The review
+sound-effects pass additionally uses the CC0 Kenney material below.
 
 The engine's built-in default font is distributed as part of Godot Engine. No
 separate commercial font is bundled with the game.
 
 Production methods and the pre-generated-content disclosure are documented in
-`ASSET_PROVENANCE.md`. If third-party material is introduced in a future build,
-its notice and license must be added here before release.
+`ASSET_PROVENANCE.md`.
+
+## Kenney audio packs
+
+Pocket Circuit's provisional engine and one-shot review effects use edited
+material from Kenney Interface Sounds 1.0, Impact Sounds 1.0, and Sci-Fi Sounds
+1.0. The packs are released under Creative Commons Zero (CC0):
+http://creativecommons.org/publicdomain/zero/1.0/.
+
+Created/distributed by Kenney (www.kenney.nl). The source notices state that the
+content is free to use in personal, educational, and commercial projects, and
+that crediting Kenney is appreciated but not mandatory. The preserved pack
+notices are included at `assets/audio/LICENSE-KENNEY-CC0.txt`; exact source
+files, archive hashes, transformations, and final paths are recorded in
+`ASSET_PROVENANCE.md`.

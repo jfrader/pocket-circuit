@@ -17,8 +17,8 @@
   the current race paused.
 - Versioned local saves with atomic replacement, validated backup recovery,
   corrupt-save fallback, and protection against overwriting newer save formats.
-- Original music and sound effects, persistent volume controls, reduced camera
-  shake, reduced motion, and pause-aware race audio.
+- Original music and licensed CC0 toy-racing sound effects, persistent volume
+  controls, reduced camera shake, reduced motion, and pause-aware race audio.
 - Native Windows x86_64 and Linux x86_64 release exports for offline Steam and
   Steam Deck play.
 
@@ -29,6 +29,27 @@
   full four-car roster, unlock requirements, and focused-machine stats.
 - Driver portraits and race machines now use distinct, deterministic pixel-art
   identities throughout the championship shell and live races.
+- The title and machine bay now use a high-contrast after-hours workbench
+  presentation with one dominant race action and the full four-car roster.
+- The title screen now uses a Pocket Circuit logo, after-hours kitchen backdrop,
+  painted workbench art, and illustrated menu buttons instead of flat type and
+  default Godot chrome.
+- On-track debug labels such as chicane and section names are gone.
+- Race HUD bars use painted metal plates; kitchen asphalt and counter wood use
+  illustrated tiles.
+- Kitchen mugs, fruit, cereal, sponge, utensils, start/finish, and moving
+  hazards now use illustrated toy-scale sprites instead of flat polygons.
+- The race HUD now keeps position, lap, timer, speed, boost, recovery controls,
+  and horizontal racer labels readable without covering the circuit.
+- Vehicle-to-vehicle contact now separates along the physics normal instead of
+  gluing cars together, caps heading only on the first hit, and restores
+  steering as soon as they split.
+- AI opponents now stay in the track corridor, dodge cars and moving hazards,
+  catch up from behind without cheating top speed, and recover heading instead
+  of stalling short of a lap.
+- Engine, countdown, launch, drift, boost, impact, warning, and menu interaction
+  cues now use clearer toy-scale sounds, with the engine spooling into a wider
+  rev range under throttle.
 
 ### Fixed
 

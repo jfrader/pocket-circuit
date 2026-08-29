@@ -2,16 +2,16 @@ extends Node
 
 const MENU_LOOP := preload("res://assets/audio/menu_loop.wav")
 const RACE_LOOP := preload("res://assets/audio/race_loop.wav")
-const ENGINE_LOOP := preload("res://assets/audio/engine_loop.wav")
+const ENGINE_LOOP := preload("res://assets/audio/engine_loop.ogg")
 const SFX_STREAMS := {
-	&"countdown": preload("res://assets/audio/countdown.wav"),
-	&"go": preload("res://assets/audio/go.wav"),
-	&"ui_move": preload("res://assets/audio/ui_move.wav"),
-	&"ui_confirm": preload("res://assets/audio/ui_confirm.wav"),
-	&"drift": preload("res://assets/audio/drift.wav"),
-	&"boost": preload("res://assets/audio/boost.wav"),
-	&"impact": preload("res://assets/audio/impact.wav"),
-	&"hazard_warning": preload("res://assets/audio/hazard_warning.wav"),
+	&"countdown": preload("res://assets/audio/countdown.ogg"),
+	&"go": preload("res://assets/audio/go.ogg"),
+	&"ui_move": preload("res://assets/audio/ui_move.ogg"),
+	&"ui_confirm": preload("res://assets/audio/ui_confirm.ogg"),
+	&"drift": preload("res://assets/audio/drift.ogg"),
+	&"boost": preload("res://assets/audio/boost.ogg"),
+	&"impact": preload("res://assets/audio/impact.ogg"),
+	&"hazard_warning": preload("res://assets/audio/hazard_warning.ogg"),
 }
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
@@ -25,9 +25,10 @@ var _music_context: StringName = &""
 var _local_vehicle: Node
 var _vehicle_max_speed := 680.0
 var _race_paused := false
-var _menu_loop: AudioStreamWAV
-var _race_loop: AudioStreamWAV
-var _engine_loop: AudioStreamWAV
+var _menu_loop: AudioStream
+var _race_loop: AudioStream
+var _engine_loop: AudioStream
+var _engine_rpm := 0.08
 var _headless := false
 
 
@@ -41,8 +42,8 @@ func _ready() -> void:
 	_build_players()
 
 
-func _process(_delta: float) -> void:
-	_update_engine()
+func _process(delta: float) -> void:
+	_update_engine(delta)
 
 
 func _exit_tree() -> void:
@@ -91,6 +92,7 @@ func set_local_vehicle(vehicle: Node) -> void:
 
 func clear_local_vehicle() -> void:
 	_local_vehicle = null
+	_engine_rpm = 0.08
 	if is_instance_valid(_engine_player):
 		_engine_player.stop()
 		_engine_player.volume_db = SILENCE_DB
@@ -162,7 +164,7 @@ func _set_music(context: StringName, stream: AudioStream) -> void:
 		_music_player.play()
 
 
-func _update_engine() -> void:
+func _update_engine(delta: float = 1.0 / 60.0) -> void:
 	if not is_instance_valid(_engine_player):
 		return
 	if not is_instance_valid(_local_vehicle):
@@ -173,11 +175,20 @@ func _update_engine() -> void:
 		_engine_player.play()
 	var speed := maxf(0.0, float(_local_vehicle.get("speed")))
 	var speed_ratio := clampf(speed / _vehicle_max_speed, 0.0, 1.2)
-	_engine_player.pitch_scale = lerpf(0.72, 1.42, minf(speed_ratio, 1.0))
+	var engine_load := 0.0
+	if _local_vehicle.has_method("get_engine_load"):
+		engine_load = clampf(float(_local_vehicle.call("get_engine_load")), 0.0, 1.0)
+	var target_rpm := clampf(speed_ratio * 0.46 + engine_load * 0.82, 0.06, 1.2)
+	if engine_load < 0.12:
+		target_rpm = minf(target_rpm, maxf(speed_ratio * 0.62, 0.08))
+	var spool := 4.8 if target_rpm > _engine_rpm else 2.4
+	_engine_rpm = move_toward(_engine_rpm, target_rpm, spool * maxf(delta, 0.0))
+	var rev := pow(clampf(_engine_rpm, 0.0, 1.0), 0.68)
+	_engine_player.pitch_scale = lerpf(0.58, 1.95, rev)
 	if _race_paused:
 		_engine_player.volume_db = SILENCE_DB
 	else:
-		_engine_player.volume_db = lerpf(-34.0, -9.0, minf(speed_ratio, 1.0))
+		_engine_player.volume_db = lerpf(-24.0, -3.5, rev)
 
 
 func _ensure_bus(bus_name: StringName) -> int:
@@ -190,9 +201,15 @@ func _ensure_bus(bus_name: StringName) -> int:
 	return bus_index
 
 
-func _make_runtime_loop(source: AudioStreamWAV) -> AudioStreamWAV:
-	var looped := source.duplicate() as AudioStreamWAV
-	looped.loop_mode = AudioStreamWAV.LOOP_FORWARD
-	looped.loop_begin = 0
-	looped.loop_end = maxi(0, roundi(looped.get_length() * float(looped.mix_rate)) - 1)
+func _make_runtime_loop(source: AudioStream) -> AudioStream:
+	var looped := source.duplicate() as AudioStream
+	if looped is AudioStreamWAV:
+		var wav := looped as AudioStreamWAV
+		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
+		wav.loop_begin = 0
+		wav.loop_end = maxi(0, roundi(wav.get_length() * float(wav.mix_rate)) - 1)
+	elif looped is AudioStreamOggVorbis:
+		var ogg := looped as AudioStreamOggVorbis
+		ogg.loop = true
+		ogg.loop_offset = 0.0
 	return looped

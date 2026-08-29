@@ -1,7 +1,7 @@
 extends Camera2D
 
-@export var look_ahead_distance: float = 145.0
-@export var follow_smoothing: float = 7.5
+@export var look_ahead_distance: float = 120.0
+@export var follow_smoothing: float = 10.5
 @export var zoom_smoothing: float = 4.5
 @export var slow_zoom: float = 1.12
 @export var fast_zoom: float = 0.72
@@ -26,7 +26,10 @@ func _physics_process(delta: float) -> void:
 	var speed := velocity.length()
 	var look_ahead := Vector2.ZERO
 	if speed > 5.0:
-		look_ahead = velocity.normalized() * look_ahead_distance * clampf(speed / speed_for_max_zoom, 0.0, 1.0)
+		var heading := Vector2.UP.rotated(target_vehicle.rotation)
+		var travel := velocity.normalized()
+		var aim := heading.lerp(travel, 0.35).normalized()
+		look_ahead = aim * look_ahead_distance * clampf(speed / speed_for_max_zoom, 0.0, 1.0)
 
 	_impact_nudge = lerpf(_impact_nudge, 0.0, 1.0 - exp(-13.0 * delta))
 	var nudge := Vector2(3.0, -2.0) * _impact_nudge

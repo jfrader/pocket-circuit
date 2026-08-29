@@ -3,6 +3,10 @@ extends Node2D
 
 const SURFACE_ZONE_SCRIPT := preload("res://scripts/race/surface_zone.gd")
 const HAZARD_SCRIPT := preload("res://scripts/race/environmental_hazard.gd")
+const ASPHALT_TEXTURE := preload("res://assets/textures/imagine/track_asphalt_tile.png")
+const WOOD_TEXTURE := preload("res://assets/textures/imagine/counter_wood_tile.png")
+const PAINT_CAN_TEXTURE := preload("res://assets/textures/imagine/workshop_paint_can.png")
+const KEYCAP_TEXTURE := preload("res://assets/textures/imagine/office_keycap.png")
 
 const INK := Color("172033")
 const PAPER := Color("f2ead7")
@@ -41,8 +45,31 @@ func configure(track_root: Node2D, requested_theme: StringName) -> void:
 			_configure_labels("OFFICE LAST LIGHT", "KEYCAP CHICANE", "PAPER CUT", "CABLE TURN", "←  DESK-MAT STRAIGHT")
 		_:
 			base_surface_name = &"polished counter"
+	_apply_surface_textures()
 	_create_surface_zones()
 	_create_hazard()
+
+
+func _apply_surface_textures() -> void:
+	for path: String in TRACK_POLYGONS:
+		_texture_polygon(path, ASPHALT_TEXTURE)
+	_texture_polygon("Floor", WOOD_TEXTURE)
+	_texture_polygon("CounterHighlight", WOOD_TEXTURE)
+	_texture_polygon("InnerIsland", WOOD_TEXTURE)
+	for sprite_path: String in ["ArtSurfaces/BottomTrack", "ArtSurfaces/RightTrack", "ArtSurfaces/TopTrack", "ArtSurfaces/LeftTrack"]:
+		var sprite := _track.get_node_or_null(sprite_path) as Sprite2D
+		if sprite:
+			sprite.texture = ASPHALT_TEXTURE
+	var counter := _track.get_node_or_null("ArtSurfaces/CounterSurface") as Sprite2D
+	if counter:
+		counter.texture = WOOD_TEXTURE
+
+
+func _texture_polygon(path: String, texture: Texture2D) -> void:
+	var polygon := _track.get_node_or_null(path) as Polygon2D
+	if polygon == null or texture == null:
+		return
+	polygon.texture = texture
 
 
 func _prepare_runtime_variant() -> void:
@@ -50,8 +77,6 @@ func _prepare_runtime_variant() -> void:
 		var container := _track.get_node_or_null(container_name) as CanvasItem
 		if container:
 			container.visible = false
-	for sprite: Node in _track.find_children("*", "Sprite2D", true, false):
-		(sprite as Sprite2D).visible = false
 
 	_show_polygon("Floor", Color("31261f") if theme == &"workshop" else Color("26384f"))
 	_show_polygon("CounterHighlight", Color("49372b") if theme == &"workshop" else Color("365473"))
@@ -83,8 +108,7 @@ func _build_workshop_presentation() -> void:
 	_add_line(art, PackedVector2Array([Vector2(-540, 205), Vector2(540, 205)]), Color(AMBER, 0.45), 5.0)
 	for fastener_position: Vector2 in [Vector2(-430, -90), Vector2(-260, 70), Vector2(360, -70), Vector2(470, 95)]:
 		_add_polygon(art, "Fastener", _regular_polygon(fastener_position, 18.0, 6), Color("c9d0d2"), 2)
-	_add_world_sign(art, Vector2(-170, -105), "BENCH 04\nNIGHT SHIFT", Color(PAPER, 0.92), INK)
-
+	
 
 func _build_office_presentation() -> void:
 	var art := Node2D.new()
@@ -104,8 +128,7 @@ func _build_office_presentation() -> void:
 	_add_polygon(art, "StickyCream", _rect_points(Vector2(420.0, -80.0), Vector2(145.0, 125.0)), Color(PAPER, 0.84), 3)
 	_add_line(art, PackedVector2Array([Vector2(-535, -185), Vector2(-440, -95), Vector2(-330, -165)]), Color("6f91b8"), 11.0)
 	_add_line(art, PackedVector2Array([Vector2(300, 175), Vector2(540, 85)]), Color("d7e1eb"), 18.0)
-	_add_world_sign(art, Vector2(-155, -100), "AFTER HOURS\nDESK CIRCUIT", Color(PAPER, 0.9), INK)
-
+	
 
 func _configure_obstacles(definitions: Dictionary) -> void:
 	for obstacle_name: String in OBSTACLE_NAMES:
@@ -117,17 +140,21 @@ func _configure_obstacles(definitions: Dictionary) -> void:
 		obstacle.rotation = float(data.get("rotation", 0.0))
 		var visual := obstacle.get_node_or_null("Visual") as Polygon2D
 		if visual:
-			visual.visible = true
-			visual.color = data["color"]
+			visual.visible = false
 		var stripe := obstacle.get_node_or_null("Stripe") as Polygon2D
 		if stripe:
-			stripe.visible = true
-			stripe.color = data.get("accent", AMBER)
+			stripe.visible = false
 		for child_name: String in ["Coffee", "Handle", "Scrub"]:
 			var child := obstacle.get_node_or_null(child_name) as CanvasItem
 			if child:
 				child.visible = false
-		_add_obstacle_label(obstacle, String(data["label"]))
+		var sprite := obstacle.get_node_or_null("Sprite") as Sprite2D
+		if sprite:
+			sprite.visible = true
+			if theme == &"workshop" and obstacle_name.begins_with("Mug"):
+				sprite.texture = PAINT_CAN_TEXTURE
+			elif theme == &"office" and obstacle_name.begins_with("Cereal"):
+				sprite.texture = KEYCAP_TEXTURE
 
 
 func _create_surface_zones() -> void:
@@ -135,13 +162,13 @@ func _create_surface_zones() -> void:
 	match theme:
 		&"workshop":
 			definitions = [
-				{"name": &"oil slick", "label": "OIL · LOW GRIP", "grip": 0.45, "speed": 0.92, "color": Color(0.06, 0.08, 0.12, 0.58), "points": PackedVector2Array([Vector2(610, -170), Vector2(860, -170), Vector2(860, 120), Vector2(610, 120)])},
-				{"name": &"sawdust", "label": "SAWDUST · SLOW", "grip": 0.78, "speed": 0.72, "color": Color(0.76, 0.53, 0.24, 0.52), "points": PackedVector2Array([Vector2(-120, 245), Vector2(330, 245), Vector2(330, 490), Vector2(-120, 490)])},
+				{"name": &"oil slick", "label": "", "grip": 0.45, "speed": 0.92, "color": Color(0.06, 0.08, 0.12, 0.58), "points": PackedVector2Array([Vector2(610, -170), Vector2(860, -170), Vector2(860, 120), Vector2(610, 120)])},
+				{"name": &"sawdust", "label": "", "grip": 0.78, "speed": 0.72, "color": Color(0.76, 0.53, 0.24, 0.52), "points": PackedVector2Array([Vector2(-120, 245), Vector2(330, 245), Vector2(330, 490), Vector2(-120, 490)])},
 			]
 		&"office":
 			definitions = [
-				{"name": &"loose paper", "label": "LOOSE PAPER", "grip": 0.84, "speed": 0.78, "color": Color(PAPER, 0.56), "points": PackedVector2Array([Vector2(-520, -490), Vector2(-100, -490), Vector2(-100, -245), Vector2(-520, -245)])},
-				{"name": &"keyboard", "label": "KEYBOARD · ROUGH", "grip": 0.7, "speed": 0.64, "color": Color(0.35, 0.5, 0.67, 0.56), "points": PackedVector2Array([Vector2(610, 120), Vector2(860, 120), Vector2(860, 430), Vector2(610, 430)])},
+				{"name": &"loose paper", "label": "", "grip": 0.84, "speed": 0.78, "color": Color(PAPER, 0.56), "points": PackedVector2Array([Vector2(-520, -490), Vector2(-100, -490), Vector2(-100, -245), Vector2(-520, -245)])},
+				{"name": &"keyboard", "label": "", "grip": 0.7, "speed": 0.64, "color": Color(0.35, 0.5, 0.67, 0.56), "points": PackedVector2Array([Vector2(610, 120), Vector2(860, 120), Vector2(860, 430), Vector2(610, 430)])},
 			]
 		_:
 			definitions = [
@@ -174,19 +201,10 @@ func _create_hazard() -> void:
 	hazard.configure(theme, travel_start, travel_end)
 
 
-func _configure_labels(title: String, chicane: String, shortcut: String, technical: String, speed: String) -> void:
-	var labels := _track.get_node_or_null("Labels")
-	if labels == null:
-		return
-	var text_by_name := {"Title": title, "Opening": "START / FINISH  →", "Chicane": chicane, "Shortcut": shortcut, "Technical": technical, "Speed": speed}
-	for label_name: String in text_by_name:
-		var label := labels.get_node_or_null(label_name) as Label
-		if label:
-			label.visible = true
-			label.text = text_by_name[label_name]
-			label.add_theme_color_override("font_color", CREAM if label_name != "Shortcut" else AMBER)
-			label.add_theme_color_override("font_outline_color", INK)
-			label.add_theme_constant_override("outline_size", 5)
+func _configure_labels(_title: String, _chicane: String, _shortcut: String, _technical: String, _speed: String) -> void:
+	var labels := _track.get_node_or_null("Labels") as CanvasItem
+	if labels:
+		labels.visible = false
 
 
 func _show_polygon(path: String, color: Color) -> void:

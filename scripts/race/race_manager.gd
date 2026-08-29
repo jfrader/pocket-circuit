@@ -288,6 +288,10 @@ func get_racer_position(vehicle: Node2D) -> int:
 	return int(_racers[vehicle]["position"]) if _racers.has(vehicle) else 0
 
 
+func get_racer_progress(vehicle: Node2D) -> float:
+	return float(_racers[vehicle]["progress"]) if _racers.has(vehicle) else 0.0
+
+
 func get_racer_count() -> int:
 	return _registration_order.size()
 

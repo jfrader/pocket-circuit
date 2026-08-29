@@ -36,7 +36,8 @@ offline with no account required.
 - Three difficulty presets that change racing pressure without locking content.
 - Persistent local progress, event replay, volume controls, reduced camera
   shake, and reduced motion.
-- Original stylized top-down art direction, soundtrack, and sound effects.
+- Original stylized top-down art direction and soundtrack, with licensed CC0
+  toy-racing sound effects.
 - Designed for keyboard and controller play with no network connection needed.
 
 ## Controls and platforms

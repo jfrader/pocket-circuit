@@ -79,8 +79,20 @@ func _run_test() -> void:
 	await process_frame
 	await process_frame
 	focus_owner = root.get_viewport().gui_get_focus_owner()
-	if focus_owner == null or focus_owner.get("text") != "CONTINUE CHAMPIONSHIP":
+	if focus_owner == null or focus_owner.get("text") != "RACE  ·  CONTINUE CHAMPIONSHIP":
 		push_error("APP_SHELL_FOCUS_TEST FAIL: returning to another screen should focus a live control")
+		quit(1)
+		return
+	await _tap_action(&"ui_down")
+	focus_owner = root.get_viewport().gui_get_focus_owner()
+	if focus_owner == null or focus_owner.get("text") != "NEW RUN":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Down from the primary action should enter the first action row")
+		quit(1)
+		return
+	await _tap_action(&"ui_down")
+	focus_owner = root.get_viewport().gui_get_focus_owner()
+	if focus_owner == null or focus_owner.get("text") != "OPTIONS":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Down should move between rows instead of snaking across siblings")
 		quit(1)
 		return
 	shell.call("show_quick_race")
