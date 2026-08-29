@@ -17,6 +17,13 @@
   so every baked circuit is playable, plus a circuit roster catalog and test.
 - Brightened generated floor/island textures (desk mat, wood planks, toolbox,
   keyboard) and per-theme furniture edge strips on all room walls.
+- Track archetypes: the circuit generator now rolls one of four personalities
+  per seed — fast (long straights, gentle corners), technical (tight S-curves
+  and chicanes), asymmetric (one dominant side), and switchback (sharp
+  direction changes) — so generated tracks differ in rhythm and silhouette,
+  not just decoration. The circuit roster was re-scanned end-to-end
+  (geometry + AI harness, 31 candidates, 16 robust seeds kept across all four
+  archetypes, 32 tracks total).
 - Wild-racing art pass: removed the circuit markings (white edge lines and
   dashed centerline) so the course reads as painted-on-real-surface plus props
   instead of a marked circuit; added a prop size hierarchy on every island

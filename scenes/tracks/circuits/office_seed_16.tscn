@@ -1,0 +1,1945 @@
+[gd_scene format=3]
+
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/office_deskmat_tile_bright.jpg" id="1_ku2kn"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/track_asphalt_tile_bright.png" id="2_6q1rq"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/office_keyboard_top_bright.jpg" id="3_iwe0f"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/office_edge_bright.png" id="4_nq8ud"]
+[ext_resource type="PackedScene" path="res://scenes/race/checkpoint.tscn" id="5_tvj3p"]
+[ext_resource type="Script" path="res://scripts/race/checkpoint.gd" id="6_5gc71"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/office_keycap.png" id="7_x43nb"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/book_top.png" id="8_vwp5q"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/plank_wood.png" id="9_kyiay"]
+[ext_resource type="Texture2D" path="res://assets/textures/kitchen/ruler_plank.png" id="10_dsi25"]
+[ext_resource type="Texture2D" path="res://assets/textures/kitchen/sponge_wet.png" id="11_ogn2w"]
+[ext_resource type="Texture2D" path="res://assets/textures/kitchen/lime_cartoon.png" id="12_k02lk"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/hazard_office_cable.png" id="13_r78iw"]
+[ext_resource type="Texture2D" path="res://assets/textures/kitchen/apple_cartoon.png" id="14_f218j"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/hazard_workshop_socket.png" id="15_vloy0"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_jfdgn"]
+size = Vector2(2000, 50)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_ym1wl"]
+size = Vector2(2000, 50)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_nw1qr"]
+size = Vector2(50, 1200)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_lx248"]
+size = Vector2(50, 1200)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_p4hsk"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ccjrn"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ymxro"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ivdwn"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_d8jib"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_yptx1"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_biob2"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_argcv"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_omt44"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_50x10"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_23kk7"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ktb4h"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_cxk6f"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_a2dca"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_41qxi"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_um6dm"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_6vjeh"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_8s6yi"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_xivrb"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_l5gcs"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_uks5u"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_6c8a8"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_mf01x"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_mv2yp"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_c3cqs"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_or3a0"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_1rese"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_y85yd"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_k0i0g"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_h4fat"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_qknl8"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_imqen"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_g4hlc"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_6cwxr"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_mka7n"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ps8bq"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_jo34r"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_l12wv"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_t36g6"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_b0pha"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_injan"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_0f8mh"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_6a00h"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ykux0"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_d87sr"]
+radius = 36.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_wlxce"]
+radius = 34.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_pekg3"]
+radius = 34.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_0gdxd"]
+radius = 34.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_k5tas"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_8xdh7"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_upplf"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_sdr4h"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_81dmu"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_gcj86"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_o05fs"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_5hrnt"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_e6egr"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_g3c1v"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_r1gab"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_xoydj"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_8l2gi"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_ee044"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_mtlrp"]
+radius = 30.0
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_fbmnn"]
+radius = 30.0
+
+[node name="OfficeDesk" type="Node2D" unique_id=1222251823]
+
+[node name="Floor" type="Polygon2D" parent="." unique_id=1453364997]
+z_index = -22
+color = Color(0.2901961, 0.41568628, 0.5411765, 1)
+polygon = PackedVector2Array(-1900, -1350, 700, -1350, 700, 350, -1900, 350)
+
+[node name="CounterHighlight" type="Polygon2D" parent="." unique_id=494171994]
+z_index = -21
+color = Color(0.3529412, 0.47843137, 0.6039216, 0.5)
+polygon = PackedVector2Array(-940, -540, 940, -540, 940, 540, -940, 540)
+
+[node name="FloorTiles" type="Node2D" parent="." unique_id=1137291112]
+z_index = -21
+
+[node name="@Sprite2D@2" type="Sprite2D" parent="FloorTiles" unique_id=1287520462]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-383.3333, -287.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@3" type="Sprite2D" parent="FloorTiles" unique_id=2317479]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-383.3333, 137.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@4" type="Sprite2D" parent="FloorTiles" unique_id=702825552]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-383.3333, 562.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@5" type="Sprite2D" parent="FloorTiles" unique_id=1576525419]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-383.3333, 987.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@6" type="Sprite2D" parent="FloorTiles" unique_id=169695872]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(50, -287.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@7" type="Sprite2D" parent="FloorTiles" unique_id=1311071911]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(50, 137.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@8" type="Sprite2D" parent="FloorTiles" unique_id=1956987980]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(50, 562.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@9" type="Sprite2D" parent="FloorTiles" unique_id=1987340409]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(50, 987.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@10" type="Sprite2D" parent="FloorTiles" unique_id=1359342358]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(483.33337, -287.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@11" type="Sprite2D" parent="FloorTiles" unique_id=1698107357]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(483.33337, 137.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@12" type="Sprite2D" parent="FloorTiles" unique_id=1432197968]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(483.33337, 562.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@13" type="Sprite2D" parent="FloorTiles" unique_id=1328070253]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(483.33337, 987.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@14" type="Sprite2D" parent="FloorTiles" unique_id=226851819]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(916.6666, -287.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@15" type="Sprite2D" parent="FloorTiles" unique_id=1629432996]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(916.6666, 137.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@16" type="Sprite2D" parent="FloorTiles" unique_id=1677349399]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(916.6666, 562.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@17" type="Sprite2D" parent="FloorTiles" unique_id=1822470235]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(916.6666, 987.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@18" type="Sprite2D" parent="FloorTiles" unique_id=1199875352]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(1350, -287.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@19" type="Sprite2D" parent="FloorTiles" unique_id=2089495103]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(1350, 137.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@20" type="Sprite2D" parent="FloorTiles" unique_id=2062661931]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(1350, 562.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@21" type="Sprite2D" parent="FloorTiles" unique_id=801383729]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(1350, 987.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@22" type="Sprite2D" parent="FloorTiles" unique_id=304298715]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(1783.3333, -287.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@23" type="Sprite2D" parent="FloorTiles" unique_id=1947125]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(1783.3333, 137.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@24" type="Sprite2D" parent="FloorTiles" unique_id=168112235]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(1783.3333, 562.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="@Sprite2D@25" type="Sprite2D" parent="FloorTiles" unique_id=1072411683]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(1783.3333, 987.5)
+scale = Vector2(0.41471356, 0.40673828)
+texture = ExtResource("1_ku2kn")
+
+[node name="TrackRibbon" type="Polygon2D" parent="." unique_id=1640561]
+z_index = -10
+color = Color(0.15294118, 0.16862746, 0.19215687, 1)
+polygon = PackedVector2Array(-397.12158, -537.72314, -380.1394, -537.2284, -363.61536, -536.5955, -347.5575, -535.89355, -331.97778, -535.1864, -316.89087, -534.5329, -301.87494, -533.9716, -285.9929, -533.4185, -269.4847, -532.7041, -253.13326, -531.87445, -236.9582, -530.9554, -220.95891, -529.97125, -205.13443, -528.94586, -189.48372, -527.9019, -174.00665, -526.8618, -158.70224, -525.847, -143.56992, -524.8781, -128.61012, -523.97534, -143.03392, -274.39175, -159.08405, -275.35992, -174.95831, -276.37604, -190.65836, -277.417, -206.18477, -278.46042, -221.53778, -279.48456, -236.71837, -280.4685, -251.72667, -281.39197, -266.56293, -282.2354, -281.22775, -282.98007, -295.7418, -283.60864, -310.89056, -284.13422, -326.9699, -284.73615, -343.05115, -285.43173, -358.68756, -286.14142, -373.8684, -286.80585, -388.58057, -287.37097, -402.80682, -287.7878, -416.5287, -288.01288, -429.7268, -288.00845, -442.38107, -287.74304, -454.47324, -287.1915, -466.18533, -286.31757, -479.6535, -284.89636, -495.36615, -283.2587, -510.94696, -281.6637, -525.6853, -280.06314, -539.45105, -278.37134, -552.0787, -276.5333, -563.3739, -274.53137, -573.1212, -272.39636, -581.09863, -270.22208, -587.10724, -268.17944, -591.0194, -266.52277, -592.9574, -265.5044, -594.27515, -264.56677, -596.65765, -262.51727, -600.12714, -259.02173, -604.4017, -254.0557, -609.25244, -247.66112, -614.4833, -239.94522, -619.93835, -231.05211, -625.49963, -221.14513, -631.0826, -210.39215, -636.631, -198.95784, -642.111, -186.99942, -647.2055, -175.37303, -651.1133, -165.88385, -654.0819, -157.35028, -656.9144, -147.80626, -659.6244, -137.17906, -662.20526, -125.51661, -664.66956, -112.87839, -667.04895, -99.32703, -669.39276, -84.92434, -671.7667, -69.72699, -674.2522, -53.78646, -676.94543, -37.14633, -679.9684, -19.789803, -683.39124, -2.1045914, -687.04016, 15.137604, -690.68134, 31.546906, -694.17316, 47.117004, -697.3911, 61.817863, -700.226, 75.59383, -702.58765, 88.36719, -704.4086, 100.038155, -705.6518, 110.494385, -706.31934, 119.61975, -706.45984, 127.325806, -706.0032, 135.71918, -704.94745, 147.2627, -703.5081, 160.24533, -701.77264, 172.91179, -699.73944, 184.94943, -697.4415, 196.01236, -694.96497, 205.71803, -692.5279, 213.48666, -695.5141, 213.01627, -700.99066, 211.78937, -702.97626, 211.20581, -701.1412, 212.15208, -696.03766, 215.56549, -690.9281, 220.12979, -688.706, 222.73709, -688.7802, 222.50066, -690.2616, 219.3812, -692.4762, 213.65138, -692.5279, 213.48666, -687.0851, 214.34401, -676.2548, 215.49539, -663.51135, 216.36768, -649.2591, 216.96661, -633.818, 217.36609, -617.42053, 217.6864, -600.6631, 218.0751, -587.08496, 218.50946, -576.6187, 218.43846, -565.81885, 217.91275, -554.032, 216.9505, -541.28046, 215.5839, -527.5896, 213.86816, -512.9825, 211.8797, -497.47406, 209.71436, -481.0707, 207.48662, -463.76935, 205.32915, -445.55954, 203.3941, -426.8814, 201.88422, -409.53397, 200.91899, -393.56647, 200.10657, -377.5458, 199.34619, -361.33417, 198.65579, -344.93436, 198.06152, -328.34894, 197.59029, -311.5798, 197.2698, -294.6295, 197.12878, -277.50073, 197.19664, -260.19568, 197.50375, -242.71796, 198.08139, -224.60246, 198.99014, -205.27295, 200.46487, -185.7676, 202.65453, -167.24075, 205.28177, -149.69681, 208.15092, -133.1162, 211.09262, -117.48738, 213.95947, -102.81037, 216.62445, -89.09595, 218.98096, -76.365105, 220.94391, -64.64548, 222.4516, -53.96254, 223.46835, -42.0959, 224.06839, -26.65004, 224.66713, -9.899063, 225.5163, 5.836769, 226.3435, 20.458313, 226.99585, 33.804565, 227.3547, 45.65822, 227.34274, 55.752663, 226.93997, 63.785683, 226.20874, 67.58238, 225.6173, 65.64882, 228.47174, 64.03308, 230.58214, 65.53755, 229.28949, 69.806366, 226.2696, 72.8902, 224.54166, 72.517944, 224.61127, 69.452896, 225.32591, 67.58238, 225.6173, 69.503075, 222.78186, 74.96175, 213.78494, 81.70578, 201.89876, 89.69157, 187.53426, 99.11059, 171.04199, 110.3795, 152.71585, 124.1576, 132.8496, 141.08875, 112.170525, 158.27396, 94.80078, 172.91373, 81.45421, 187.08969, 69.279396, 201.64444, 57.481766, 216.56726, 46.074516, 231.8489, 35.071503, 247.48029, 24.488174, 263.45242, 14.341347, 279.75735, 4.6487427, 296.38782, -4.5705566, 313.33633, -13.295799, 331.07935, -21.723999, 351.77094, -30.47902, 374.64447, -38.249825, 396.5025, -44.113274, 416.8456, -48.506508, 435.6088, -51.90143, 452.73184, -54.66739, 468.1277, -57.082336, 481.66998, -59.339188, 493.19614, -61.543846, 502.52655, -63.70523, 509.50662, -65.72414, 515.4395, -67.9682, 524.57465, -72.186104, 536.88745, -77.98819, 548.9036, -83.89925, 560.2478, -89.80412, 570.70544, -95.63956, 580.0467, -101.3024, 588.0346, -106.63781, 594.4408, -111.42613, 599.0736, -115.36859, 601.8242, -118.08202, 602.54596, -118.90128, 602.4436, -118.635345, 602.7433, -119.125244, 602.54596, -118.90128, 602.68353, -119.25859, 604.0601, -122.88513, 605.7498, -128.61562, 607.35486, -135.88333, 608.6331, -144.15488, 609.44507, -152.92162, 609.7283, -161.68623, 609.4887, -169.94467, 608.8093, -177.17004, 607.87756, -182.79536, 607.0391, -186.20435, 606.72766, -187.13857, 605.9932, -188.5711, 603.765, -192.23929, 600.1555, -197.2855, 595.391, -203.0604, 589.76117, -209.04929, 583.60187, -214.82736, 577.2936, -220.03625, 571.27625, -224.37122, 569.5805, -225.41876, 570.173, -225.64136, 577.2374, -227.93155, 579.3081, -228.51122, 575.18774, -228.29465, 566.2707, -229.02783, 561.0027, -230.09612, 562.3159, -229.52136, 566.0719, -227.58618, 569.5805, -225.41876, 559.1913, -221.51569, 544.9983, -215.81686, 527.9258, -208.98035, 507.9608, -201.54889, 484.76022, -194.21526, 457.6922, -187.97964, 426.4729, -184.44293, 395.34283, -185.22012, 368.15842, -189.07214, 343.96716, -194.76505, 322.209, -201.5578, 302.68387, -208.82828, 285.16843, -216.09966, 269.4803, -223.0039, 255.50644, -229.2507, 243.21222, -234.61209, 232.63925, -238.92212, 223.88722, -242.09407, 216.37646, -244.32985, 207.04504, -246.42783, 195.18407, -248.80591, 182.72397, -251.0229, 169.88206, -253.04985, 156.66995, -254.90451, 143.09988, -256.60696, 129.18462, -258.17978, 114.93779, -259.64767, 100.37259, -261.03754, 85.50167, -262.37866, 70.3371, -263.7022, 55.24814, -265.01086, 40.92478, -266.19757, 27.003914, -267.1667, 12.807449, -267.99582, -1.6735992, -268.70905, -16.43177, -269.33078, -31.459145, -269.88715, -46.74759, -270.40558, -62.29045, -270.91516, -78.08104, -271.44653, -94.11305, -272.0317, -110.380806, -272.70425, -126.76891, -273.49353, -113.86071, -523.16003, -99.20777, -522.45447, -84.39517, -521.8428, -69.320526, -521.293, -53.991196, -520.7774, -38.41387, -520.26666, -22.594894, -519.7299, -6.5406647, -519.135, 9.74398, -518.4482, 26.253899, -517.6339, 42.98352, -516.65546, 59.91088, -515.4756, 76.34719, -514.11896, 92.00546, -512.7614, 107.60108, -511.39996, 123.48036, -509.96735, 139.63246, -508.42502, 156.04713, -506.7324, 172.71463, -504.8467, 189.62567, -502.7228, 206.77007, -500.31342, 224.13718, -497.56897, 241.71565, -494.43738, 259.6999, -490.81985, 279.9872, -486.1018, 301.76065, -479.65613, 321.98593, -472.41125, 340.14795, -465.054, 356.41092, -457.98264, 370.8811, -451.51624, 383.58835, -445.91156, 394.48447, -441.36356, 403.4515, -437.9889, 410.3307, -435.79593, 414.9866, -434.64722, 415.63654, -434.52634, 418.13626, -435.17426, 426.16666, -437.78967, 437.62415, -442.1018, 451.9686, -447.86313, 468.98987, -454.67596, 488.8225, -462.03528, 511.97534, -469.26297, 539.32764, -475.29364, 571.87976, -478.27274, 608.04, -475.5138, 639.7261, -467.37787, 665.2119, -457.36432, 688.36694, -445.63184, 709.8353, -432.461, 729.9021, -418.05298, 748.73944, -402.52286, 766.4368, -385.9269, 783.0249, -368.26785, 798.48926, -349.48187, 812.76917, -329.41537, 825.7413, -307.78015, 837.16736, -284.0796, 846.19086, -259.04974, 852.5399, -234.17949, 856.6863, -209.68204, 859.00885, -185.42633, 859.728, -161.33086, 858.95996, -137.35402, 856.7437, -113.47711, 853.0498, -89.688225, 847.77203, -65.964035, 840.70123, -42.256523, 831.47284, -18.484299, 819.29004, 5.773842, 803.9464, 29.257034, 786.8778, 50.010674, 769.0592, 67.947754, 750.90356, 83.559494, 732.66473, 97.27912, 714.51276, 109.455475, 696.58203, 120.35829, 678.9977, 130.19241, 661.89215, 139.11108, 645.4132, 147.22765, 629.5479, 154.7073, 611.0964, 163.00748, 588.71686, 171.39552, 566.27985, 178.02916, 545.3207, 182.96185, 525.91785, 186.7139, 508.12415, 189.6975, 492.00955, 192.22784, 477.68033, 194.53311, 465.282, 196.75644, 454.98688, 198.94965, 446.9627, 201.06183, 440.9425, 203.07704, 433.849, 206.17596, 424.2664, 210.74554, 414.2323, 215.91226, 404.259, 221.44206, 394.3746, 227.31876, 384.60736, 233.52443, 374.9852, 240.0398, 365.53473, 246.84476, 356.28244, 253.91771, 347.25473, 261.23553, 338.47678, 268.77448, 330.8266, 275.70294, 326.69876, 279.64865, 324.13318, 282.88214, 319.92407, 289.06494, 314.30832, 298.28168, 307.5382, 310.1836, 299.62338, 324.4219, 290.34833, 340.70474, 279.2624, 358.80035, 265.6396, 378.48407, 248.43866, 399.3855, 226.37111, 420.68585, 199.38568, 440.0667, 171.28453, 454.36453, 144.8007, 463.93365, 119.43591, 470.27832, 95.35527, 474.20746, 72.57827, 476.37314, 51.056335, 477.28445, 30.743042, 477.33597, 11.627602, 476.83984, -6.2514343, 476.0511, -22.79934, 475.18323, -37.859375, 474.4157, -53.49601, 473.80832, -72.27615, 472.79666, -92.266815, 470.92102, -111.24645, 468.49854, -129.23936, 465.73694, -146.27206, 462.81763, -162.3644, 459.89862, -177.5259, 457.11655, -191.75558, 454.58765, -205.04065, 452.40756, -217.36037, 450.65027, -228.71802, 449.36313, -240.26732, 448.49887, -253.06277, 447.86728, -266.5321, 447.42343, -280.2041, 447.182, -294.0759, 447.12817, -308.1436, 447.2462, -322.4035, 447.5196, -336.85196, 447.93085, -351.48468, 448.4617, -366.29776, 449.09302, -381.2879, 449.80487, -396.31088, 450.56903, -409.9317, 451.30896, -422.23807, 452.30396, -435.03223, 453.672, -448.74448, 455.38782, -463.3546, 457.37512, -478.84964, 459.53864, -495.2263, 461.76453, -512.4897, 463.92056, -530.65283, 465.85492, -549.73157, 467.39462, -569.7382, 468.34375, -590.00964, 468.49237, -607.3424, 467.98587, -622.75305, 467.62952, -639.5315, 467.30078, -657.83417, 466.81952, -677.45435, 465.97858, -698.2725, 464.52396, -720.2538, 462.1339, -743.4467, 458.37814, -767.96295, 452.6518, -793.9018, 444.0846, -821.15326, 431.4626, -848.7259, 413.5208, -873.25916, 391.17184, -875, 389.03192, -875, -278.3775, -870.2458, -289.2469, -862.7042, -305.6858, -854.4556, -322.66187, -845.40857, -340.05722, -835.44885, -357.76135, -824.4347, -375.66696, -812.19006, -393.6623, -798.5014, -411.61618, -783.11505, -429.3609, -765.74445, -446.66302, -746.05005, -463.2232, -723.9209, -478.45642, -700.5497, -491.25177, -677.42096, -501.2962, -654.91187, -509.07687, -633.1493, -515.08264, -612.1891, -519.7192, -592.0638, -523.31494, -572.8125, -526.1354, -554.4956, -528.3975, -537.2022, -530.2812, -521.05695, -531.9352, -505.6037, -533.5459, -488.48764, -535.3208, -469.50778, -536.739, -450.75443, -537.6028, -432.43457, -537.9938, -414.55524, -538.00507)
+
+[node name="TrackSurfaceTiles" type="Node2D" parent="." unique_id=420428073]
+z_index = -9
+
+[node name="@Sprite2D@26" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1803436059]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-120.31481, -398.32678)
+rotation = 0.05165572
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@27" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=678263958]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-27.027016, -394.80853)
+rotation = 0.035464387
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@28" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=938020242]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(65.79766, -389.5649)
+rotation = 0.08449669
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@29" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=91275581]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(157.90726, -380.72684)
+rotation = 0.11873769
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@30" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=468398978]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(248.18184, -365.21582)
+rotation = 0.25727165
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@31" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=825335885]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(334.3784, -331.0056)
+rotation = 0.4046311
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@32" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2028421868]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(420.89905, -309.3186)
+rotation = -0.04460574
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@33" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=413695391]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(514.0906, -338.09583)
+rotation = -0.36913154
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@34" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1215665034]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(600.3644, -348.737)
+rotation = 0.32034436
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@35" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=25945517]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(678.099, -297.4881)
+rotation = 0.7848269
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@36" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2012336494]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(726.615, -222.62704)
+rotation = 1.2751254
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@37" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1389672163]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(732.6884, -128.816)
+rotation = 1.6938174
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@38" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1243946789]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(703.34485, -44.934105)
+rotation = 2.206233
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@39" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2095532532]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(633.64374, 12.3593645)
+rotation = 2.61394
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@40" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1229226074]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(549.11176, 52.835693)
+rotation = 2.8191955
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@41" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=667270996]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(456.64456, 71.31584)
+rotation = 2.9725018
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@42" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1654023633]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(368.80136, 98.72488)
+rotation = 2.681847
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@43" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1268715304]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(291.051, 146.45964)
+rotation = 2.5032442
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@44" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=547954456]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(224.14539, 207.86588)
+rotation = 2.2144601
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@45" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=113719390]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(174.38274, 290.7911)
+rotation = 2.1460812
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@46" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1219436979]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(108.659325, 344.27246)
+rotation = 2.8482735
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@47" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=262455872]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(16.042955, 351.91785)
+rotation = -3.1062624
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@48" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=154675656]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-78.45615, 346.6863)
+rotation = -3.0308814
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@49" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1403193655]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-170.7262, 331.3693)
+rotation = -2.9725537
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@50" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1697132144]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-263.3639, 322.4636)
+rotation = -3.1162443
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@51" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=58164282]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-356.40942, 323.55875)
+rotation = 3.1021843
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@52" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1894359267]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-449.4008, 329.50058)
+rotation = 3.0263896
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@53" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=518207294]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-542.3424, 341.4027)
+rotation = 3.047939
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@54" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=447933995]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-636.67474, 342.33344)
+rotation = -3.1187365
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@55" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1401818887]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-734.4768, 332.22058)
+rotation = -2.8703911
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@56" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1356537766]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-798.1743, 282.9815)
+rotation = -2.0758414
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@57" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1091240227]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-825.3254, 191.87802)
+rotation = -1.7231145
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@58" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2065354403]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-830.09357, 98.69431)
+rotation = -1.476255
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@59" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=90360874]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-812.68164, 4.326892)
+rotation = -1.3512775
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@60" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=642374353]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-795.2716, -89.00267)
+rotation = -1.4159732
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@61" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=536084146]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-777.3921, -181.12494)
+rotation = -1.3009852
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@62" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1738163248]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-742.7691, -266.527)
+rotation = -1.1050622
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@63" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1846787763]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-691.6211, -344.1913)
+rotation = -0.8211818
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@64" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1191977622]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-618.00525, -389.64948)
+rotation = -0.2997202
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@65" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=253393848]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-524.0746, -405.97244)
+rotation = -0.105215184
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@66" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=341470880]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-431.0807, -413.00113)
+rotation = -0.010831197
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@67" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=584549047]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-337.51447, -410.30905)
+rotation = 0.044307955
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@68" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1904633681]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-244.34244, -406.17368)
+rotation = 0.059108276
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Sprite2D@69" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2145101410]
+modulate = Color(1.35, 1.35, 1.35, 1)
+texture_filter = 2
+position = Vector2(-151.32698, -400.11902)
+rotation = 0.062096365
+scale = Vector2(0.3, 0.3)
+texture = ExtResource("2_6q1rq")
+
+[node name="@Line2D@70" type="Line2D" parent="." unique_id=409571080]
+z_index = -7
+points = PackedVector2Array(-113.86071, -523.16003, -99.20777, -522.45447, -84.39517, -521.8428, -69.320526, -521.293, -53.991196, -520.7774, -38.41387, -520.26666, -22.59489, -519.7299, -6.5406656, -519.135, 9.743981, -518.4482, 26.253895, -517.6339, 42.98352, -516.65546, 59.910877, -515.4756, 76.34719, -514.11896, 92.00546, -512.7614, 107.60108, -511.39996, 123.48036, -509.96735, 139.63246, -508.42502, 156.04713, -506.7324, 172.71463, -504.8467, 189.62567, -502.7228, 206.77007, -500.31342, 224.13718, -497.56897, 241.71565, -494.43738, 259.6999, -490.81985, 279.9872, -486.1018, 301.76065, -479.65613, 321.98593, -472.41125, 340.14795, -465.054, 356.41092, -457.98264, 370.8811, -451.51624, 383.58835, -445.91156, 394.48447, -441.36356, 403.4515, -437.9889, 410.3307, -435.79593, 414.9866, -434.64722, 416.9239, -434.2869, 415.3252, -434.19427, 414.36212, -434.196, 418.13626, -435.17426, 426.16666, -437.78967, 437.62415, -442.1018, 451.9686, -447.86313, 468.98987, -454.67596, 488.8225, -462.03528, 511.97534, -469.26297, 539.32764, -475.29364, 571.87976, -478.27274, 608.04, -475.5138, 639.7261, -467.37787, 665.2119, -457.36432, 688.36694, -445.63184, 709.8353, -432.461, 729.9021, -418.05298, 748.73944, -402.52286, 766.4368, -385.9269, 783.0249, -368.26785, 798.48926, -349.48187, 812.76917, -329.41537, 825.7413, -307.78015, 837.16736, -284.0796, 846.19086, -259.04974, 852.5399, -234.17949, 856.6863, -209.68204, 859.00885, -185.42633, 859.728, -161.33086, 858.95996, -137.35402, 856.7437, -113.47711, 853.0498, -89.688225, 847.77203, -65.964035, 840.70123, -42.25652, 831.47284, -18.484299, 819.29004, 5.773842, 803.9464, 29.257034, 786.8778, 50.010674, 769.0592, 67.947754, 750.90356, 83.559494, 732.66473, 97.27912, 714.51276, 109.455475, 696.58203, 120.35829, 678.9977, 130.19241, 661.89215, 139.11108, 645.4132, 147.22765, 629.5479, 154.7073, 611.0964, 163.00748, 588.71686, 171.39552, 566.27985, 178.02916, 545.3207, 182.96185, 525.91785, 186.7139, 508.12415, 189.6975, 492.00955, 192.22784, 477.68033, 194.53311, 465.282, 196.75644, 454.98688, 198.94965, 446.9627, 201.06183, 440.9425, 203.07704, 433.849, 206.17596, 424.2664, 210.74554, 414.2323, 215.91226, 404.259, 221.44206, 394.3746, 227.31876, 384.60736, 233.52443, 374.9852, 240.0398, 365.53473, 246.84476, 356.28244, 253.91771, 347.25473, 261.23553, 338.47678, 268.77448, 330.8266, 275.70294, 326.69876, 279.64865, 324.13318, 282.88214, 319.92407, 289.06494, 314.30832, 298.28168, 307.5382, 310.1836, 299.62338, 324.4219, 290.34833, 340.70474, 279.2624, 358.80035, 265.6396, 378.48407, 248.43866, 399.3855, 226.37111, 420.68585, 199.38568, 440.0667, 171.28453, 454.36453, 144.8007, 463.93365, 119.43591, 470.27832, 95.35527, 474.20746, 72.57827, 476.37314, 51.05633, 477.28445, 30.74304, 477.33597, 11.627601, 476.83984, -6.2514358, 476.0511, -22.799335, 475.18323, -37.859375, 474.4157, -53.49601, 473.80832, -72.27615, 472.79666, -92.266815, 470.92102, -111.24645, 468.49854, -129.23936, 465.73694, -146.27206, 462.81763, -162.3644, 459.89862, -177.5259, 457.11655, -191.75558, 454.58765, -205.04065, 452.40756, -217.36037, 450.65027, -228.71802, 449.36313, -240.26732, 448.49887, -253.06277, 447.86728, -266.5321, 447.42343, -280.2041, 447.182, -294.0759, 447.12817, -308.1436, 447.2462, -322.4035, 447.5196, -336.85196, 447.93085, -351.48468, 448.4617, -366.29776, 449.09302, -381.2879, 449.80487, -396.31088, 450.56903, -409.9317, 451.30896, -422.23807, 452.30396, -435.03223, 453.672, -448.74448, 455.38782, -463.3546, 457.37512, -478.84964, 459.53864, -495.2263, 461.76453, -512.4897, 463.92056, -530.65283, 465.85492, -549.73157, 467.39462, -569.7382, 468.34375, -590.00964, 468.49237, -607.3424, 467.98587, -622.75305, 467.62952, -639.5315, 467.30078, -657.83417, 466.81952, -677.45435, 465.97858, -698.2725, 464.52396, -720.2538, 462.1339, -743.4467, 458.37814, -767.96295, 452.6518, -793.9018, 444.0846, -821.15326, 431.4626, -848.7259, 413.5208, -873.25916, 391.17184, -892.61334, 367.3807, -907.5684, 343.46234, -919.1614, 319.90445, -928.2145, 296.8828, -935.33435, 274.4391, -940.9552, 252.5904, -945.3919, 231.37015, -948.8781, 210.84425, -951.5949, 191.1152, -953.68866, 172.31879, -955.3949, 153.14816, -956.4259, 131.4476, -956.0781, 108.6398, -954.53534, 86.89424, -952.1071, 66.19369, -949.0559, 46.493275, -945.60565, 27.751907, -941.94946, 9.941015, -938.2576, -6.945839, -934.68195, -22.893116, -931.3583, -37.859547, -928.40625, -51.780273, -925.8508, -64.976555, -923.49695, -78.52701, -921.15796, -92.99845, -918.7765, -108.27835, -916.2701, -124.31446, -913.54065, -141.06253, -910.47473, -158.48346, -906.94244, -176.54324, -902.79626, -195.2087, -897.86975, -214.44362, -891.97705, -234.20004, -884.95276, -254.30966, -877.45526, -272.76416, -870.2458, -289.2469, -862.7042, -305.6858, -854.4556, -322.66187, -845.40857, -340.05722, -835.44885, -357.76135, -824.4347, -375.66696, -812.19006, -393.6623, -798.5014, -411.61618, -783.11505, -429.3609, -765.74445, -446.66302, -746.05005, -463.2232, -723.9209, -478.45642, -700.5497, -491.25177, -677.42096, -501.2962, -654.91187, -509.07687, -633.1493, -515.08264, -612.1891, -519.7192, -592.0638, -523.31494, -572.8125, -526.1354, -554.4956, -528.3975, -537.2022, -530.2812, -521.05695, -531.9352, -505.6037, -533.5459, -488.48764, -535.3208, -469.50778, -536.739, -450.75443, -537.6028, -432.43457, -537.9938, -414.55524, -538.00507, -397.12158, -537.72314, -380.1394, -537.2284, -363.61536, -536.5955, -347.5575, -535.89355, -331.97778, -535.1864, -316.89087, -534.5329, -301.87494, -533.9716, -285.9929, -533.4185, -269.4847, -532.7041, -253.13326, -531.87445, -236.9582, -530.9554, -220.95891, -529.97125, -205.13443, -528.94586, -189.48372, -527.9019, -174.00665, -526.8618, -158.70224, -525.847, -143.56992, -524.8781, -128.61012, -523.97534)
+closed = true
+width = 8.0
+default_color = Color(0.9490196, 0.91764706, 0.84313726, 0.95)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="CenterlineDashes" type="Line2D" parent="." unique_id=1999186962]
+z_index = -8
+width = 5.0
+default_color = Color(0.9490196, 0.91764706, 0.84313726, 0.8)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="@Line2D@71" type="Line2D" parent="." unique_id=1190071981]
+z_index = -7
+points = PackedVector2Array(-126.76891, -273.49353, -110.380806, -272.70425, -94.11305, -272.0317, -78.08104, -271.44653, -62.29045, -270.91516, -46.74759, -270.40558, -31.45914, -269.88715, -16.431767, -269.33078, -1.6736012, -268.70905, 12.807446, -267.99582, 27.003916, -267.1667, 40.924778, -266.19757, 55.248135, -265.01086, 70.3371, -263.7022, 85.50167, -262.37866, 100.37259, -261.03754, 114.93779, -259.64767, 129.18462, -258.17978, 143.09988, -256.60696, 156.66995, -254.90451, 169.88206, -253.04985, 182.72397, -251.0229, 195.18407, -248.80591, 207.04504, -246.42783, 216.37646, -244.32985, 223.88722, -242.09407, 232.63925, -238.92212, 243.21222, -234.61209, 255.50644, -229.2507, 269.4803, -223.0039, 285.16843, -216.09966, 302.68387, -208.82828, 322.209, -201.5578, 343.96716, -194.76505, 368.15842, -189.07214, 395.34283, -185.22012, 426.4729, -184.44293, 457.6922, -187.97964, 484.76022, -194.21526, 507.9608, -201.54889, 527.9258, -208.98035, 544.9983, -215.81686, 559.1913, -221.51569, 570.173, -225.64136, 577.2374, -227.93155, 579.3081, -228.51122, 575.18774, -228.29465, 566.2707, -229.02783, 561.0027, -230.09612, 562.3159, -229.52136, 566.0719, -227.58618, 571.27625, -224.37122, 577.2936, -220.03625, 583.60187, -214.82736, 589.76117, -209.04929, 595.391, -203.0604, 600.1555, -197.2855, 603.765, -192.23929, 605.9932, -188.5711, 606.72766, -187.13857, 607.0391, -186.20435, 607.87756, -182.79536, 608.8093, -177.17004, 609.4887, -169.94467, 609.7283, -161.68623, 609.44507, -152.92162, 608.6331, -144.15488, 607.35486, -135.88333, 605.7498, -128.61562, 604.0601, -122.88513, 602.68353, -119.25859, 602.4436, -118.635345, 602.7433, -119.125244, 601.8242, -118.08202, 599.0736, -115.36859, 594.4408, -111.42613, 588.0346, -106.63781, 580.0467, -101.3024, 570.70544, -95.63956, 560.2478, -89.80412, 548.9036, -83.89925, 536.88745, -77.98819, 524.57465, -72.186104, 515.4395, -67.9682, 509.50662, -65.72414, 502.52655, -63.70523, 493.19614, -61.543846, 481.66998, -59.339184, 468.1277, -57.082336, 452.73184, -54.66739, 435.6088, -51.90143, 416.8456, -48.506508, 396.5025, -44.113274, 374.64447, -38.249825, 351.77094, -30.47902, 331.07935, -21.723999, 313.33633, -13.295799, 296.38782, -4.5705566, 279.75735, 4.6487427, 263.45242, 14.341347, 247.48029, 24.488174, 231.8489, 35.071503, 216.56726, 46.074516, 201.64444, 57.481766, 187.08969, 69.279396, 172.91373, 81.45421, 158.27396, 94.80078, 141.08875, 112.170525, 124.1576, 132.8496, 110.3795, 152.71585, 99.11059, 171.04199, 89.69157, 187.53426, 81.70578, 201.89876, 74.96175, 213.78494, 69.503075, 222.78186, 65.64882, 228.47174, 64.03308, 230.58214, 65.53755, 229.28949, 69.806366, 226.2696, 72.8902, 224.54166, 72.517944, 224.61127, 69.452896, 225.32591, 63.78568, 226.20874, 55.752663, 226.93997, 45.658215, 227.34274, 33.80456, 227.3547, 20.45831, 226.99585, 5.8367686, 226.3435, -9.899064, 225.5163, -26.650038, 224.66713, -42.0959, 224.06839, -53.96254, 223.46835, -64.64548, 222.4516, -76.365105, 220.94391, -89.09595, 218.98096, -102.81037, 216.62445, -117.48738, 213.95947, -133.1162, 211.09262, -149.69681, 208.15092, -167.24075, 205.28177, -185.7676, 202.65453, -205.27295, 200.46487, -224.60246, 198.99014, -242.71796, 198.08139, -260.19568, 197.50375, -277.50073, 197.19664, -294.6295, 197.12878, -311.5798, 197.2698, -328.34894, 197.59029, -344.93436, 198.06152, -361.33417, 198.65579, -377.5458, 199.34619, -393.56647, 200.10657, -409.53397, 200.91899, -426.8814, 201.88422, -445.55954, 203.3941, -463.76935, 205.32915, -481.0707, 207.48662, -497.47406, 209.71436, -512.9825, 211.8797, -527.5896, 213.86816, -541.28046, 215.5839, -554.032, 216.9505, -565.81885, 217.91275, -576.6187, 218.43846, -587.08496, 218.50946, -600.6631, 218.0751, -617.42053, 217.6864, -633.818, 217.36609, -649.2591, 216.96661, -663.51135, 216.36768, -676.2548, 215.49539, -687.0851, 214.34401, -695.5141, 213.01627, -700.99066, 211.78937, -702.97626, 211.20581, -701.1412, 212.15208, -696.03766, 215.56549, -690.9281, 220.12979, -688.706, 222.73709, -688.7802, 222.50066, -690.2616, 219.3812, -692.4762, 213.65138, -694.96497, 205.71803, -697.4415, 196.01236, -699.73944, 184.94943, -701.77264, 172.91179, -703.5081, 160.24533, -704.94745, 147.2627, -706.0032, 135.71918, -706.45984, 127.325806, -706.31934, 119.61975, -705.6518, 110.494385, -704.4086, 100.038155, -702.58765, 88.36719, -700.226, 75.59383, -697.3911, 61.817863, -694.17316, 47.117004, -690.68134, 31.546902, -687.04016, 15.137601, -683.39124, -2.1045876, -679.9684, -19.789803, -676.94543, -37.14633, -674.2522, -53.78646, -671.7667, -69.72699, -669.39276, -84.92434, -667.04895, -99.32703, -664.66956, -112.87839, -662.20526, -125.51661, -659.6244, -137.17906, -656.9144, -147.80626, -654.0819, -157.35028, -651.1133, -165.88385, -647.2055, -175.37303, -642.111, -186.99942, -636.631, -198.95784, -631.0826, -210.39215, -625.49963, -221.14513, -619.93835, -231.05211, -614.4833, -239.94522, -609.25244, -247.66112, -604.4017, -254.0557, -600.12714, -259.02173, -596.65765, -262.51727, -594.27515, -264.56677, -592.9574, -265.5044, -591.0194, -266.52277, -587.10724, -268.17944, -581.09863, -270.22208, -573.1212, -272.39636, -563.3739, -274.53137, -552.0787, -276.5333, -539.45105, -278.37134, -525.6853, -280.06314, -510.94696, -281.6637, -495.36615, -283.2587, -479.6535, -284.89636, -466.18533, -286.31757, -454.47324, -287.1915, -442.38107, -287.74304, -429.7268, -288.00845, -416.5287, -288.01288, -402.80682, -287.7878, -388.58057, -287.37097, -373.8684, -286.80585, -358.68756, -286.14142, -343.05115, -285.43173, -326.9699, -284.73615, -310.89056, -284.13422, -295.7418, -283.60864, -281.22775, -282.98007, -266.56293, -282.2354, -251.72667, -281.39197, -236.71837, -280.4685, -221.53778, -279.48456, -206.18477, -278.46042, -190.65836, -277.417, -174.95831, -276.37604, -159.08405, -275.35992, -143.03392, -274.39175)
+closed = true
+width = 8.0
+default_color = Color(0.9490196, 0.91764706, 0.84313726, 0.95)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="InnerBarrier" type="StaticBody2D" parent="." unique_id=1379767709]
+collision_layer = 2
+
+[node name="@CollisionPolygon2D@72" type="CollisionPolygon2D" parent="InnerBarrier" unique_id=650603557]
+polygon = PackedVector2Array(-126.25259, -283.4802, -109.93388, -282.69427, -93.724335, -282.02414, -77.73062, -281.4404, -61.95848, -280.90964, -46.41424, -280.40002, -31.10457, -279.88086, -16.036123, -279.32294, -1.2168978, -278.6986, 13.345304, -277.98135, 27.6431, -277.14624, 41.684223, -276.1687, 56.0921, -274.9752, 71.203835, -273.66458, 86.38565, -272.3395, 101.2969, -270.99472, 115.925575, -269.59875, 130.25911, -268.1219, 144.28447, -266.53656, 157.98817, -264.81723, 171.35759, -262.9404, 184.3805, -260.88474, 197.04533, -258.63116, 209.15125, -256.20352, 218.9209, -254.00073, 227.00217, -251.59656, 236.21312, -248.26169, 247.08965, -243.82977, 259.5426, -238.39998, 273.53632, -232.1444, 289.10522, -225.29213, 306.3559, -218.12968, 325.4587, -211.01505, 346.6217, -204.40628, 370.03156, -198.89514, 396.2061, -195.1828, 426.02698, -194.43298, 455.95898, -197.82831, 482.09528, -203.85362, 504.68903, -210.99852, 524.3137, -218.3052, 541.2771, -225.09871, 555.58325, -230.8421, 566.91895, -235.09712, 574.62695, -237.58481, 577.70886, -238.3825, 567.94147, -238.88727, 564.1516, -239.58739, 570.9637, -236.30801, 576.8186, -232.69481, 583.39795, -227.95692, 590.2074, -222.33517, 596.8282, -216.12439, 602.89636, -209.6687, 608.08887, -203.37337, 612.1252, -197.72633, 614.78314, -193.33946, 616.60516, -189.11816, 617.66406, -184.85072, 618.7244, -178.47052, 619.46954, -170.56393, 619.7283, -161.67201, 619.42566, -152.2989, 618.55756, -142.92776, 617.1827, -134.03552, 615.4307, -126.10955, 613.52576, -119.65999, 611.8351, -115.227615, 609.2264, -111.358315, 605.87305, -108.035934, 600.6993, -103.62671, 593.8198, -98.48113, 585.42535, -92.872086, 575.7405, -86.99964, 564.9978, -81.004265, 553.42316, -74.978836, 541.22845, -68.97955, 528.77356, -63.110367, 519.2658, -58.72917, 512.67505, -56.23935, 505.0767, -54.035854, 495.28113, -51.76362, 483.4399, -49.49706, 469.72754, -47.211143, 454.30295, -44.79158, 437.29166, -42.044044, 418.78308, -38.69599, 398.8419, -34.390755, 377.5372, -28.677357, 355.3378, -21.136776, 335.19012, -12.608, 317.77353, -4.3341455, 301.1016, 4.2487564, 284.73743, 13.320476, 268.6893, 22.860443, 252.96536, 32.849625, 237.57436, 43.270233, 222.52596, 54.105324, 207.82996, 65.3392, 193.49629, 76.95764, 179.53625, 88.94702, 165.17606, 102.036865, 148.51315, 118.86965, 132.15662, 138.85089, 118.761284, 158.16982, 107.7185, 176.13158, 98.40543, 192.44023, 90.422485, 206.79968, 83.57721, 218.86174, 77.89345, 228.2226, 73.64845, 234.47223, 71.4093, 237.33427, 74.98954, 234.82149, 71.45222, 235.12401, 65.04846, 236.1287, 56.425686, 236.9173, 45.874138, 237.34041, 33.682102, 237.35396, 20.105082, 236.98961, 5.3532405, 236.3318, -10.415075, 235.50298, -27.098412, 234.65707, -42.551907, 234.05798, -54.695084, 233.44148, -65.75033, 232.39038, -77.76036, 230.8461, -90.70168, 228.8512, -104.54884, 226.47218, -119.28246, 223.79704, -134.89258, 220.93358, -151.37917, 218.00839, -168.75275, 215.16681, -187.03131, 212.57436, -206.21075, 210.4208, -225.22905, 208.97049, -243.13174, 208.07283, -260.44913, 207.50055, -277.60886, 207.19606, -294.60733, 207.12875, -311.44235, 207.26886, -328.1111, 207.58746, -344.61105, 208.05629, -360.9402, 208.64803, -377.0959, 209.33606, -393.07532, 210.0945, -409.00504, 210.905, -426.20343, 211.8612, -444.62668, 213.3505, -462.61987, 215.26286, -479.77765, 217.40266, -496.10928, 219.62079, -511.61716, 221.78606, -526.29504, 223.78403, -540.12885, 225.51736, -553.0968, 226.90668, -565.17535, 227.89203, -576.3435, 228.43468, -587.20197, 228.50877, -600.93024, 228.07153, -617.63385, 227.68413, -634.0465, 227.36348, -649.6021, 226.96072, -664.0691, 226.35211, -677.13556, 225.45653, -688.4118, 224.2556, -697.4314, 222.83075, -703.66956, 221.42386, -706.6133, 220.52097, -702.1452, 223.4837, -698.2213, 226.97147, -699.4176, 223.40213, -701.9057, 216.98064, -704.5797, 208.46687, -707.18207, 198.27548, -709.56555, 186.80626, -711.65686, 174.4291, -713.4316, 161.48013, -714.8971, 148.26494, -715.9788, 136.41634, -716.4585, 127.49068, -716.3097, 119.18055, -715.6071, 109.55038, -714.3166, 98.68437, -712.44635, 86.69223, -710.0412, 73.68015, -707.17346, 59.74279, -703.9365, 44.95449, -700.44135, 29.3693, -696.81287, 13.017715, -693.19183, -4.0916147, -689.8037, -21.597273, -686.8075, -38.80156, -684.1284, -55.35494, -681.6471, -71.26904, -679.2679, -86.49995, -676.9086, -100.996445, -674.5018, -114.70259, -671.99475, -127.55767, -669.35126, -139.50024, -666.5526, -150.47176, -663.5977, -160.42427, -660.46686, -169.42088, -656.4155, -179.26868, -651.2364, -191.08932, -645.6739, -203.22696, -640.0175, -214.88293, -634.296, -225.90161, -628.5588, -236.12048, -622.88135, -245.37408, -617.36993, -253.50116, -612.16565, -260.35812, -607.44666, -265.8353, -603.42114, -269.88312, -600.3461, -272.51303, -595.40063, -275.51193, -590.7198, -277.50412, -584.05115, -279.77628, -575.52234, -282.10382, -565.32654, -284.3389, -553.6781, -286.40457, -540.7855, -288.2819, -526.8377, -289.99652, -511.99716, -291.6084, -496.39377, -293.20575, -480.6915, -294.84235, -467.07742, -296.2777, -455.07462, -297.1734, -442.716, -297.73743, -429.8351, -298.00787, -416.44974, -298.01257, -402.5794, -297.78522, -388.24292, -297.36526, -373.45828, -296.79742, -358.24237, -296.1315, -342.60822, -295.4219, -326.56674, -294.72803, -310.52994, -294.12772, -295.35184, -293.60104, -280.75803, -292.96902, -266.02573, -292.22098, -251.13593, -291.3745, -236.088, -290.4486, -220.88165, -289.463, -205.51672, -288.43808, -189.9923, -287.39478, -174.30807, -286.3549, -158.46349, -285.34064, -142.45697, -284.3751)
+
+[node name="IslandProp" type="Polygon2D" parent="." unique_id=1329618501]
+modulate = Color(1.2, 1.2, 1.2, 1)
+z_index = -9
+texture_filter = 2
+texture = ExtResource("3_iwe0f")
+polygon = PackedVector2Array(-126.25259, -283.4802, -109.93388, -282.69427, -93.724335, -282.02414, -77.73062, -281.4404, -61.95848, -280.90964, -46.41424, -280.40002, -31.10457, -279.88086, -16.036123, -279.32294, -1.2168978, -278.6986, 13.345304, -277.98135, 27.6431, -277.14624, 41.684223, -276.1687, 56.0921, -274.9752, 71.203835, -273.66458, 86.38565, -272.3395, 101.2969, -270.99472, 115.925575, -269.59875, 130.25911, -268.1219, 144.28447, -266.53656, 157.98817, -264.81723, 171.35759, -262.9404, 184.3805, -260.88474, 197.04533, -258.63116, 209.15125, -256.20352, 218.9209, -254.00073, 227.00217, -251.59656, 236.21312, -248.26169, 247.08965, -243.82977, 259.5426, -238.39998, 273.53632, -232.1444, 289.10522, -225.29213, 306.3559, -218.12968, 325.4587, -211.01505, 346.6217, -204.40628, 370.03156, -198.89514, 396.2061, -195.1828, 426.02698, -194.43298, 455.95898, -197.82831, 482.09528, -203.85362, 504.68903, -210.99852, 524.3137, -218.3052, 541.2771, -225.09871, 555.58325, -230.8421, 566.91895, -235.09712, 574.62695, -237.58481, 577.70886, -238.3825, 567.94147, -238.88727, 564.1516, -239.58739, 570.9637, -236.30801, 576.8186, -232.69481, 583.39795, -227.95692, 590.2074, -222.33517, 596.8282, -216.12439, 602.89636, -209.6687, 608.08887, -203.37337, 612.1252, -197.72633, 614.78314, -193.33946, 616.60516, -189.11816, 617.66406, -184.85072, 618.7244, -178.47052, 619.46954, -170.56393, 619.7283, -161.67201, 619.42566, -152.2989, 618.55756, -142.92776, 617.1827, -134.03552, 615.4307, -126.10955, 613.52576, -119.65999, 611.8351, -115.227615, 609.2264, -111.358315, 605.87305, -108.035934, 600.6993, -103.62671, 593.8198, -98.48113, 585.42535, -92.872086, 575.7405, -86.99964, 564.9978, -81.004265, 553.42316, -74.978836, 541.22845, -68.97955, 528.77356, -63.110367, 519.2658, -58.72917, 512.67505, -56.23935, 505.0767, -54.035854, 495.28113, -51.76362, 483.4399, -49.49706, 469.72754, -47.211143, 454.30295, -44.79158, 437.29166, -42.044044, 418.78308, -38.69599, 398.8419, -34.390755, 377.5372, -28.677357, 355.3378, -21.136776, 335.19012, -12.608, 317.77353, -4.3341455, 301.1016, 4.2487564, 284.73743, 13.320476, 268.6893, 22.860443, 252.96536, 32.849625, 237.57436, 43.270233, 222.52596, 54.105324, 207.82996, 65.3392, 193.49629, 76.95764, 179.53625, 88.94702, 165.17606, 102.036865, 148.51315, 118.86965, 132.15662, 138.85089, 118.761284, 158.16982, 107.7185, 176.13158, 98.40543, 192.44023, 90.422485, 206.79968, 83.57721, 218.86174, 77.89345, 228.2226, 73.64845, 234.47223, 71.4093, 237.33427, 74.98954, 234.82149, 71.45222, 235.12401, 65.04846, 236.1287, 56.425686, 236.9173, 45.874138, 237.34041, 33.682102, 237.35396, 20.105082, 236.98961, 5.3532405, 236.3318, -10.415075, 235.50298, -27.098412, 234.65707, -42.551907, 234.05798, -54.695084, 233.44148, -65.75033, 232.39038, -77.76036, 230.8461, -90.70168, 228.8512, -104.54884, 226.47218, -119.28246, 223.79704, -134.89258, 220.93358, -151.37917, 218.00839, -168.75275, 215.16681, -187.03131, 212.57436, -206.21075, 210.4208, -225.22905, 208.97049, -243.13174, 208.07283, -260.44913, 207.50055, -277.60886, 207.19606, -294.60733, 207.12875, -311.44235, 207.26886, -328.1111, 207.58746, -344.61105, 208.05629, -360.9402, 208.64803, -377.0959, 209.33606, -393.07532, 210.0945, -409.00504, 210.905, -426.20343, 211.8612, -444.62668, 213.3505, -462.61987, 215.26286, -479.77765, 217.40266, -496.10928, 219.62079, -511.61716, 221.78606, -526.29504, 223.78403, -540.12885, 225.51736, -553.0968, 226.90668, -565.17535, 227.89203, -576.3435, 228.43468, -587.20197, 228.50877, -600.93024, 228.07153, -617.63385, 227.68413, -634.0465, 227.36348, -649.6021, 226.96072, -664.0691, 226.35211, -677.13556, 225.45653, -688.4118, 224.2556, -697.4314, 222.83075, -703.66956, 221.42386, -706.6133, 220.52097, -702.1452, 223.4837, -698.2213, 226.97147, -699.4176, 223.40213, -701.9057, 216.98064, -704.5797, 208.46687, -707.18207, 198.27548, -709.56555, 186.80626, -711.65686, 174.4291, -713.4316, 161.48013, -714.8971, 148.26494, -715.9788, 136.41634, -716.4585, 127.49068, -716.3097, 119.18055, -715.6071, 109.55038, -714.3166, 98.68437, -712.44635, 86.69223, -710.0412, 73.68015, -707.17346, 59.74279, -703.9365, 44.95449, -700.44135, 29.3693, -696.81287, 13.017715, -693.19183, -4.0916147, -689.8037, -21.597273, -686.8075, -38.80156, -684.1284, -55.35494, -681.6471, -71.26904, -679.2679, -86.49995, -676.9086, -100.996445, -674.5018, -114.70259, -671.99475, -127.55767, -669.35126, -139.50024, -666.5526, -150.47176, -663.5977, -160.42427, -660.46686, -169.42088, -656.4155, -179.26868, -651.2364, -191.08932, -645.6739, -203.22696, -640.0175, -214.88293, -634.296, -225.90161, -628.5588, -236.12048, -622.88135, -245.37408, -617.36993, -253.50116, -612.16565, -260.35812, -607.44666, -265.8353, -603.42114, -269.88312, -600.3461, -272.51303, -595.40063, -275.51193, -590.7198, -277.50412, -584.05115, -279.77628, -575.52234, -282.10382, -565.32654, -284.3389, -553.6781, -286.40457, -540.7855, -288.2819, -526.8377, -289.99652, -511.99716, -291.6084, -496.39377, -293.20575, -480.6915, -294.84235, -467.07742, -296.2777, -455.07462, -297.1734, -442.716, -297.73743, -429.8351, -298.00787, -416.44974, -298.01257, -402.5794, -297.78522, -388.24292, -297.36526, -373.45828, -296.79742, -358.24237, -296.1315, -342.60822, -295.4219, -326.56674, -294.72803, -310.52994, -294.12772, -295.35184, -293.60104, -280.75803, -292.96902, -266.02573, -292.22098, -251.13593, -291.3745, -236.088, -290.4486, -220.88165, -289.463, -205.51672, -288.43808, -189.9923, -287.39478, -174.30807, -286.3549, -158.46349, -285.34064, -142.45697, -284.3751)
+uv = PackedVector2Array(0.44082397, 0.008740316, 0.45322242, 0.010255794, 0.46553794, 0.011548007, 0.47768947, 0.012673626, 0.4896727, 0.013697087, 0.5014827, 0.014679767, 0.5131146, 0.015680866, 0.5245631, 0.0167567, 0.5358223, 0.017960586, 0.5468862, 0.019343657, 0.5577493, 0.020953996, 0.56841725, 0.022838973, 0.57936394, 0.025140407, 0.5908454, 0.027667634, 0.6023801, 0.030222755, 0.6137092, 0.032815892, 0.62482363, 0.035507713, 0.6357138, 0.03835554, 0.6463699, 0.041412503, 0.6567815, 0.044727866, 0.6669392, 0.048346933, 0.67683357, 0.052310843, 0.68645597, 0.056656376, 0.6956537, 0.061337568, 0.70307636, 0.06558517, 0.70921624, 0.07022112, 0.7162145, 0.0766517, 0.7244781, 0.0851977, 0.73393947, 0.095667906, 0.7445715, 0.10773047, 0.7564003, 0.1209436, 0.7695068, 0.13475485, 0.78402054, 0.14847392, 0.80009955, 0.16121751, 0.8178857, 0.17184457, 0.8377723, 0.17900303, 0.8604293, 0.18044889, 0.8831707, 0.17390174, 0.9030283, 0.1622832, 0.9201943, 0.14850578, 0.9351046, 0.1344164, 0.94799286, 0.121316575, 0.95886225, 0.11024166, 0.96747476, 0.10203676, 0.9733311, 0.09723979, 0.9756726, 0.0957016, 0.96825165, 0.094728276, 0.9653722, 0.093378246, 0.97054785, 0.099701814, 0.9749962, 0.10666911, 0.979995, 0.11580511, 0.98516864, 0.12664546, 0.9901989, 0.13862163, 0.9948093, 0.15107006, 0.99875444, 0.16320926, 1.0018212, 0.17409837, 1.0038406, 0.18255751, 1.0052248, 0.19069739, 1.0060294, 0.19892624, 1.006835, 0.2112291, 1.0074011, 0.22647527, 1.0075977, 0.24362144, 1.0073677, 0.26169547, 1.0067083, 0.27976573, 1.0056636, 0.29691252, 1.0043325, 0.31219608, 1.0028852, 0.32463267, 1.0016007, 0.33317956, 0.99961865, 0.3406407, 0.9970709, 0.34704718, 0.99314004, 0.35554945, 0.98791325, 0.3654716, 0.9815354, 0.37628743, 0.9741771, 0.3876112, 0.96601516, 0.399172, 0.9572211, 0.41079077, 0.9479559, 0.4223591, 0.9384931, 0.43367657, 0.93126935, 0.44212478, 0.9262619, 0.44692588, 0.9204889, 0.45117486, 0.91304654, 0.45555636, 0.90404993, 0.45992693, 0.8936317, 0.46433485, 0.8819125, 0.46900046, 0.86898786, 0.47429848, 0.85492563, 0.4807545, 0.8397749, 0.48905623, 0.82358825, 0.5000733, 0.8067218, 0.5146137, 0.7914142, 0.5310596, 0.7781816, 0.547014, 0.7655148, 0.5635643, 0.75308174, 0.5810572, 0.7408889, 0.599453, 0.72894233, 0.618715, 0.7172487, 0.6388089, 0.7058154, 0.65970206, 0.6946498, 0.6813642, 0.6837595, 0.7037679, 0.6731531, 0.72688687, 0.66224265, 0.7521278, 0.6495827, 0.78458625, 0.6371555, 0.8231158, 0.6269781, 0.86036825, 0.61858815, 0.8950037, 0.61151236, 0.92645144, 0.6054471, 0.9541406, 0.6002463, 0.9773997, 0.59592795, 0.99545014, 0.59270275, 1.0075012, 0.5910015, 1.01302, 0.5937216, 1.0081747, 0.5910341, 1.0087581, 0.5861687, 1.0106953, 0.5796174, 1.012216, 0.5716007, 1.0130318, 0.5623375, 1.0130581, 0.5520221, 1.0123554, 0.5408141, 1.0110871, 0.5288338, 1.0094888, 0.5161583, 1.0078577, 0.5044172, 1.0067024, 0.4951912, 1.0055137, 0.48679176, 1.0034868, 0.47766688, 1.000509, 0.46783447, 0.99666226, 0.4573138, 0.99207485, 0.44611964, 0.98691636, 0.43425956, 0.9813948, 0.42173353, 0.9757542, 0.40853363, 0.9702748, 0.3946461, 0.9652758, 0.38007414, 0.96112317, 0.36562464, 0.9583265, 0.3520227, 0.9565956, 0.3388655, 0.9554921, 0.32582805, 0.9549049, 0.31291312, 0.95477515, 0.30012235, 0.9550453, 0.28745794, 0.9556597, 0.27492177, 0.9565637, 0.2625154, 0.9577047, 0.2502408, 0.95903146, 0.2381001, 0.9604939, 0.22599718, 0.9620568, 0.21293037, 0.9639007, 0.19893293, 0.96677244, 0.18526225, 0.97046006, 0.17222628, 0.9745862, 0.15981801, 0.97886336, 0.14803559, 0.9830386, 0.13688378, 0.98689127, 0.12637326, 0.99023366, 0.116520606, 0.99291265, 0.10734369, 0.9948127, 0.09885846, 0.9958591, 0.09060853, 0.99600196, 0.08017821, 0.99515885, 0.06748731, 0.9944118, 0.055017464, 0.9937935, 0.043198787, 0.9930169, 0.03220721, 0.9918433, 0.022279702, 0.99011636, 0.013712352, 0.9878006, 0.006859538, 0.9850531, 0.002119973, 0.9823402, -0.00011658089, 0.98059916, 0.0032781304, 0.9863122, 0.0062593827, 0.9930376, 0.0053504785, 0.9861549, 0.0034600967, 0.9737724, 0.0014284637, 0.95735544, -0.0005487278, 0.9377035, -0.0023596268, 0.91558754, -0.00394854, 0.89172083, -0.005296918, 0.8667515, -0.0064103724, 0.84126884, -0.0072322353, 0.8184213, -0.007596678, 0.8012101, -0.0074836216, 0.78518575, -0.0069498257, 0.76661605, -0.005969322, 0.7456633, -0.0045483704, 0.72253895, -0.002721009, 0.69744796, -0.0005421892, 0.6705727, 0.0019171389, 0.64205664, 0.00457267, 0.6120039, 0.007329479, 0.58047336, 0.01008063, 0.54748166, 0.012654823, 0.51372576, 0.014931258, 0.48055094, 0.01696674, 0.44863126, 0.018851975, 0.4179443, 0.020659627, 0.38857475, 0.022452116, 0.36062133, 0.024280775, 0.33419198, 0.026185533, 0.3094037, 0.02819398, 0.286375, 0.030320305, 0.26521876, 0.032565348, 0.24602744, 0.03494408, 0.22867939, 0.038022157, 0.20969002, 0.04195711, 0.18689643, 0.04618333, 0.16349158, 0.050480872, 0.14101551, 0.05482789, 0.119768344, 0.059186876, 0.10006343, 0.06350041, 0.08221983, 0.067687824, 0.0665485, 0.07164188, 0.0533263, 0.07522723, 0.042764742, 0.078285694, 0.03495938, 0.080621995, 0.029888153, 0.084379435, 0.024105411, 0.0879358, 0.020263901, 0.09300243, 0.015882533, 0.09948236, 0.011394358, 0.10722882, 0.007084489, 0.11607895, 0.0031012772, 0.12587434, -0.00051873317, 0.13647148, -0.0038250322, 0.14774688, -0.006933194, 0.15960187, -0.010013346, 0.17153198, -0.013169173, 0.18187553, -0.015936967, 0.1909949, -0.017664116, 0.2003846, -0.01875172, 0.21017112, -0.019273218, 0.22034092, -0.019282281, 0.23087919, -0.018843874, 0.24177161, -0.018034086, 0.25300452, -0.016939126, 0.2645651, -0.015655033, 0.27644348, -0.01428673, 0.28863132, -0.012948734, 0.30081558, -0.011791161, 0.31234744, -0.010775587, 0.3234354, -0.009556872, 0.33462855, -0.008114423, 0.34594136, -0.0064821937, 0.35737434, -0.0046967864, 0.36892766, -0.002796275, 0.38060147, -0.0008199103, 0.39239645, 0.00119188, 0.40431285, 0.0031970795, 0.41635108, 0.0051528476, 0.42851236, 0.007014697)
+
+[node name="@Line2D@73" type="Line2D" parent="." unique_id=848597361]
+z_index = -8
+points = PackedVector2Array(599.7283, 130.58215, 596.6616, 153.87587, 587.67053, 175.58215, 573.36786, 194.22177, 554.7283, 208.52444, 533.022, 217.51547, 509.72827, 220.58215, -606.45984, 220.58215, -629.75354, 217.51547, -651.45984, 208.52444, -670.0994, 194.22177, -684.4021, 175.58215, -693.3932, 153.87587, -696.45984, 130.58215, -696.45984, -188.01288, -693.3932, -211.3066, -684.4021, -233.01288, -670.0994, -251.6525, -651.45984, -265.95517, -629.75354, -274.9462, -606.45984, -278.01288, 509.72827, -278.01288, 533.022, -274.9462, 554.7283, -265.95517, 573.36786, -251.6525, 587.67053, -233.01288, 596.6616, -211.3066, 599.7283, -188.01288)
+closed = true
+width = 5.0
+default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.85)
+joint_mode = 2
+antialiased = true
+
+[node name="Kerbs" type="Polygon2D" parent="." unique_id=314320248]
+z_index = -7
+polygon = PackedVector2Array(599.7283, 130.58215, 598.62024, 144.66125, 624.5401, 146.70116, 625.64813, 132.62206, 595.32336, 158.39368, 589.9189, 171.4413, 613.93976, 181.39104, 619.34424, 168.34341, 582.5398, 183.48282, 573.36786, 194.22177, 593.1384, 211.10742, 602.31036, 200.36847, 562.62897, 203.39368, 550.5874, 210.77274, 564.17236, 232.9414, 576.2139, 225.56235, 537.5398, 216.17725, 523.8074, 219.4741, 529.87695, 244.75572, 543.6094, 241.45886, 509.72827, 220.58215, -606.45984, 220.58215, -606.45984, 246.58215, 509.72827, 246.58215, -620.53894, 219.4741, -634.27136, 216.17725, -640.34094, 241.45886, -626.6085, 244.75572, -647.319, 210.77274, -659.36053, 203.39368, -672.9455, 225.56235, -660.90393, 232.9414, -670.0994, 194.22177, -679.27136, 183.48282, -699.04193, 200.36847, -689.87, 211.10742, -686.65045, 171.4413, -692.05493, 158.39368, -716.0758, 168.34341, -710.6713, 181.39104, -695.3518, 144.66125, -696.45984, 130.58215, -722.3797, 132.62206, -721.27167, 146.70116, -696.45984, -188.01288, -695.3518, -202.09198, -721.27167, -204.13188, -722.3797, -190.05278, -692.05493, -215.8244, -686.65045, -228.87202, -710.6713, -238.82176, -716.0758, -225.77414, -679.27136, -240.91354, -670.0994, -251.6525, -689.87, -268.53815, -699.04193, -257.7992, -659.36053, -260.8244, -647.319, -268.20346, -660.90393, -290.37213, -672.9455, -282.99307, -634.27136, -273.60797, -620.53894, -276.90485, -626.6085, -302.18646, -640.34094, -298.8896, -606.45984, -278.01288, 509.72827, -278.01288, 509.72827, -304.01288, -606.45984, -304.01288, 523.8074, -276.90485, 537.5398, -273.60797, 543.6094, -298.8896, 529.87695, -302.18646, 550.5874, -268.20346, 562.62897, -260.8244, 576.2139, -282.99307, 564.17236, -290.37213, 573.36786, -251.6525, 582.5398, -240.91354, 602.31036, -257.7992, 593.1384, -268.53815, 589.9189, -228.87202, 595.32336, -215.8244, 619.34424, -225.77414, 613.93976, -238.82176, 598.62024, -202.09198, 599.7283, -188.01288, 625.64813, -190.05278, 624.5401, -204.13188)
+vertex_colors = PackedColorArray(0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.7882353, 0.30980393, 0.21960784, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1, 0.9490196, 0.91764706, 0.84313726, 1)
+
+[node name="TopWall" type="StaticBody2D" parent="." unique_id=1761425344]
+position = Vector2(0, -575)
+collision_layer = 2
+
+[node name="@CollisionShape2D@74" type="CollisionShape2D" parent="TopWall" unique_id=1837877114]
+shape = SubResource("RectangleShape2D_jfdgn")
+
+[node name="Visual" type="Polygon2D" parent="TopWall" unique_id=1812415379]
+color = Color(0.05490196, 0.08235294, 0.14117648, 1)
+polygon = PackedVector2Array(-1000, -25, 1000, -25, 1000, 25, -1000, 25)
+
+[node name="EdgeStrip" type="Sprite2D" parent="TopWall" unique_id=1817196044]
+texture_filter = 2
+position = Vector2(-500, 0)
+scale = Vector2(0.9765625, 0.22727273)
+texture = ExtResource("4_nq8ud")
+
+[node name="@Sprite2D@75" type="Sprite2D" parent="TopWall" unique_id=2116444179]
+texture_filter = 2
+position = Vector2(500, 0)
+scale = Vector2(0.9765625, 0.22727273)
+texture = ExtResource("4_nq8ud")
+
+[node name="BottomWall" type="StaticBody2D" parent="." unique_id=578802254]
+position = Vector2(0, 575)
+collision_layer = 2
+
+[node name="@CollisionShape2D@76" type="CollisionShape2D" parent="BottomWall" unique_id=2084262717]
+shape = SubResource("RectangleShape2D_ym1wl")
+
+[node name="Visual" type="Polygon2D" parent="BottomWall" unique_id=1890707729]
+color = Color(0.05490196, 0.08235294, 0.14117648, 1)
+polygon = PackedVector2Array(-1000, -25, 1000, -25, 1000, 25, -1000, 25)
+
+[node name="EdgeStrip" type="Sprite2D" parent="BottomWall" unique_id=928830468]
+texture_filter = 2
+position = Vector2(-500, 0)
+scale = Vector2(0.9765625, 0.22727273)
+texture = ExtResource("4_nq8ud")
+
+[node name="@Sprite2D@77" type="Sprite2D" parent="BottomWall" unique_id=1618185606]
+texture_filter = 2
+position = Vector2(500, 0)
+scale = Vector2(0.9765625, 0.22727273)
+texture = ExtResource("4_nq8ud")
+
+[node name="LeftWall" type="StaticBody2D" parent="." unique_id=1805768070]
+position = Vector2(-875, 0)
+collision_layer = 2
+
+[node name="@CollisionShape2D@78" type="CollisionShape2D" parent="LeftWall" unique_id=1354238782]
+shape = SubResource("RectangleShape2D_nw1qr")
+
+[node name="Visual" type="Polygon2D" parent="LeftWall" unique_id=861329310]
+color = Color(0.05490196, 0.08235294, 0.14117648, 1)
+polygon = PackedVector2Array(-25, -600, 25, -600, 25, 600, -25, 600)
+
+[node name="EdgeStrip" type="Sprite2D" parent="LeftWall" unique_id=1541287588]
+texture_filter = 2
+position = Vector2(0, -300)
+rotation = 1.5707964
+scale = Vector2(0.5859375, 0.22727273)
+texture = ExtResource("4_nq8ud")
+
+[node name="@Sprite2D@79" type="Sprite2D" parent="LeftWall" unique_id=1243101234]
+texture_filter = 2
+position = Vector2(0, 300)
+rotation = 1.5707964
+scale = Vector2(0.5859375, 0.22727273)
+texture = ExtResource("4_nq8ud")
+
+[node name="RightWall" type="StaticBody2D" parent="." unique_id=1122252141]
+position = Vector2(875, 0)
+collision_layer = 2
+
+[node name="@CollisionShape2D@80" type="CollisionShape2D" parent="RightWall" unique_id=1543317298]
+shape = SubResource("RectangleShape2D_lx248")
+
+[node name="Visual" type="Polygon2D" parent="RightWall" unique_id=1471142173]
+color = Color(0.05490196, 0.08235294, 0.14117648, 1)
+polygon = PackedVector2Array(-25, -600, 25, -600, 25, 600, -25, 600)
+
+[node name="EdgeStrip" type="Sprite2D" parent="RightWall" unique_id=2117424925]
+texture_filter = 2
+position = Vector2(0, -300)
+rotation = 1.5707964
+scale = Vector2(0.5859375, 0.22727273)
+texture = ExtResource("4_nq8ud")
+
+[node name="@Sprite2D@81" type="Sprite2D" parent="RightWall" unique_id=1820574461]
+texture_filter = 2
+position = Vector2(0, 300)
+rotation = 1.5707964
+scale = Vector2(0.5859375, 0.22727273)
+texture = ExtResource("4_nq8ud")
+
+[node name="Checkpoint0Finish" type="Area2D" parent="." unique_id=182880676 groups=["track_checkpoints"] instance=ExtResource("5_tvj3p")]
+visible = false
+position = Vector2(-120.31481, -398.32678)
+rotation = -3.0934718
+collision_layer = 0
+script = ExtResource("6_5gc71")
+is_finish_line = true
+recovery_rotation = 1.6189170962001302
+recovery_offset = 70.0
+
+[node name="Checkpoint1" type="Area2D" parent="." unique_id=1969834784 groups=["track_checkpoints"] instance=ExtResource("5_tvj3p")]
+visible = false
+position = Vector2(369.59937, -317.64935)
+rotation = -2.8375454
+collision_layer = 0
+script = ExtResource("6_5gc71")
+checkpoint_index = 1
+recovery_rotation = 1.874843611997793
+recovery_offset = 70.0
+
+[node name="Checkpoint2" type="Area2D" parent="." unique_id=1060691236 groups=["track_checkpoints"] instance=ExtResource("5_tvj3p")]
+visible = false
+position = Vector2(734.2113, -145.41087)
+rotation = -1.5386992
+collision_layer = 0
+script = ExtResource("6_5gc71")
+checkpoint_index = 2
+recovery_rotation = -3.1094954699205735
+recovery_offset = 70.0
+
+[node name="Checkpoint3" type="Area2D" parent="." unique_id=1531299688 groups=["track_checkpoints"] instance=ExtResource("5_tvj3p")]
+visible = false
+position = Vector2(348.3645, 109.521454)
+rotation = -0.5062143
+collision_layer = 0
+script = ExtResource("6_5gc71")
+checkpoint_index = 3
+recovery_rotation = -2.077010652181915
+recovery_offset = 70.0
+
+[node name="Checkpoint4" type="Area2D" parent="." unique_id=1767459510 groups=["track_checkpoints"] instance=ExtResource("5_tvj3p")]
+visible = false
+position = Vector2(-48.654385, 348.89322)
+rotation = 0.052540947
+collision_layer = 0
+script = ExtResource("6_5gc71")
+checkpoint_index = 4
+recovery_rotation = -1.518255378356244
+recovery_offset = 70.0
+
+[node name="Checkpoint5" type="Area2D" parent="." unique_id=111538055 groups=["track_checkpoints"] instance=ExtResource("5_tvj3p")]
+visible = false
+position = Vector2(-546.79913, 341.76398)
+rotation = -0.08088276
+collision_layer = 0
+script = ExtResource("6_5gc71")
+checkpoint_index = 5
+recovery_rotation = -1.6516790848280614
+recovery_offset = 70.0
+
+[node name="Checkpoint6" type="Area2D" parent="." unique_id=2009991680 groups=["track_checkpoints"] instance=ExtResource("5_tvj3p")]
+visible = false
+position = Vector2(-824.2167, 58.726585)
+rotation = 1.7531655
+collision_layer = 0
+script = ExtResource("6_5gc71")
+checkpoint_index = 6
+recovery_rotation = 0.1823691925784407
+recovery_offset = 70.0
+
+[node name="Checkpoint7" type="Area2D" parent="." unique_id=1716584646 groups=["track_checkpoints"] instance=ExtResource("5_tvj3p")]
+visible = false
+position = Vector2(-731.47186, -287.68542)
+rotation = 2.0829031
+collision_layer = 0
+script = ExtResource("6_5gc71")
+checkpoint_index = 7
+recovery_rotation = 0.512106774659963
+recovery_offset = 70.0
+
+[node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=1132809913]
+z_index = -7
+color = Color(0.9607843, 0.93333334, 0.78431374, 1)
+polygon = PackedVector2Array(-206.63495, -342.70953, -248.24603, -344.8609, -245.14807, -404.78088, -203.53699, -402.62952, -123.41278, -338.4068, -165.02386, -340.55817, -161.9259, -400.47815, -120.31482, -398.32678, -40.190598, -334.10406, -81.80169, -336.25543, -78.70372, -396.1754, -37.09263, -394.02405, -161.9259, -400.47815, -203.53699, -402.62952, -200.43903, -462.5495, -158.82794, -460.39813, -78.70373, -396.1754, -120.31481, -398.32678, -117.21685, -458.24677, -75.60577, -456.0954, 4.518446, -391.87268, -37.092644, -394.02405, -33.994675, -453.94403, 7.616414, -451.79266)
+
+[node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=1195359866]
+z_index = -6
+color = Color(0.050980393, 0.05882353, 0.078431375, 1)
+polygon = PackedVector2Array(-165.02386, -340.55817, -206.63495, -342.70953, -203.53699, -402.62952, -161.9259, -400.47815, -81.80169, -336.25543, -123.41277, -338.4068, -120.31481, -398.32678, -78.70373, -396.1754, 1.4204845, -331.9527, -40.190605, -334.10406, -37.092636, -394.02405, 4.5184536, -391.87268, -203.53699, -402.62952, -245.14807, -404.78088, -242.05011, -464.70087, -200.43903, -462.5495, -120.31482, -398.32678, -161.9259, -400.47815, -158.82794, -460.39813, -117.21686, -458.24677, -37.092636, -394.02405, -78.70373, -396.1754, -75.60576, -456.0954, -33.994667, -453.94403)
+
+[node name="GridForward" type="Node2D" parent="." unique_id=660436424]
+
+[node name="0" type="Node2D" parent="GridForward" unique_id=45680929]
+position = Vector2(-18.12473, -438.1035)
+rotation = 1.622452
+
+[node name="1" type="Node2D" parent="GridForward" unique_id=998700198]
+position = Vector2(-22.771679, -348.22354)
+rotation = 1.622452
+
+[node name="2" type="Node2D" parent="GridForward" unique_id=1176185558]
+position = Vector2(101.71521, -431.90756)
+rotation = 1.622452
+
+[node name="3" type="Node2D" parent="GridForward" unique_id=1452131978]
+position = Vector2(97.06825, -342.02762)
+rotation = 1.622452
+
+[node name="GridReverse" type="Node2D" parent="." unique_id=1860155753]
+
+[node name="0" type="Node2D" parent="GridReverse" unique_id=1534216835]
+position = Vector2(-162.93132, -445.59024)
+rotation = -1.5191406
+
+[node name="1" type="Node2D" parent="GridReverse" unique_id=898008637]
+position = Vector2(-167.57826, -355.7103)
+rotation = -1.5191406
+
+[node name="2" type="Node2D" parent="GridReverse" unique_id=1460315019]
+position = Vector2(-237.83128, -449.46268)
+rotation = -1.5191406
+
+[node name="3" type="Node2D" parent="GridReverse" unique_id=182827498]
+position = Vector2(-242.47823, -359.58273)
+rotation = -1.5191406
+
+[node name="IslandFill" type="StaticBody2D" parent="." unique_id=1223645869]
+position = Vector2(-545.6825, -209.27689)
+rotation = 5.0279913
+collision_layer = 4
+
+[node name="@CollisionShape2D@82" type="CollisionShape2D" parent="IslandFill" unique_id=2034129545]
+shape = SubResource("CircleShape2D_p4hsk")
+
+[node name="@Sprite2D@83" type="Sprite2D" parent="IslandFill" unique_id=842761716]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@84" type="StaticBody2D" parent="." unique_id=1114772446]
+position = Vector2(-464.82904, -212.56885)
+rotation = 2.5574622
+collision_layer = 4
+
+[node name="@CollisionShape2D@85" type="CollisionShape2D" parent="@StaticBody2D@84" unique_id=225086908]
+shape = SubResource("CircleShape2D_ccjrn")
+
+[node name="@Sprite2D@86" type="Sprite2D" parent="@StaticBody2D@84" unique_id=156673052]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@87" type="StaticBody2D" parent="." unique_id=264235749]
+position = Vector2(-367.50302, -197.51497)
+rotation = 1.6778376
+collision_layer = 4
+
+[node name="@CollisionShape2D@88" type="CollisionShape2D" parent="@StaticBody2D@87" unique_id=227614863]
+shape = SubResource("CircleShape2D_ymxro")
+
+[node name="@Sprite2D@89" type="Sprite2D" parent="@StaticBody2D@87" unique_id=1878630296]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@90" type="StaticBody2D" parent="." unique_id=1690858979]
+position = Vector2(-285.3249, -201.08127)
+rotation = 5.912475
+collision_layer = 4
+
+[node name="@CollisionShape2D@91" type="CollisionShape2D" parent="@StaticBody2D@90" unique_id=821980482]
+shape = SubResource("CircleShape2D_ivdwn")
+
+[node name="@Sprite2D@92" type="Sprite2D" parent="@StaticBody2D@90" unique_id=1150327899]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@93" type="StaticBody2D" parent="." unique_id=2037816495]
+position = Vector2(-198.51418, -209.80795)
+rotation = 1.6833427
+collision_layer = 4
+
+[node name="@CollisionShape2D@94" type="CollisionShape2D" parent="@StaticBody2D@93" unique_id=910079244]
+shape = SubResource("CircleShape2D_d8jib")
+
+[node name="@Sprite2D@95" type="Sprite2D" parent="@StaticBody2D@93" unique_id=1787752377]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@96" type="StaticBody2D" parent="." unique_id=679641458]
+position = Vector2(-118.285385, -205.96349)
+rotation = 0.18407552
+collision_layer = 4
+
+[node name="@CollisionShape2D@97" type="CollisionShape2D" parent="@StaticBody2D@96" unique_id=952207138]
+shape = SubResource("CircleShape2D_yptx1")
+
+[node name="@Sprite2D@98" type="Sprite2D" parent="@StaticBody2D@96" unique_id=464412366]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@99" type="StaticBody2D" parent="." unique_id=943729836]
+position = Vector2(-30.399734, -204.27872)
+rotation = 4.1769333
+collision_layer = 4
+
+[node name="@CollisionShape2D@100" type="CollisionShape2D" parent="@StaticBody2D@99" unique_id=935994321]
+shape = SubResource("CircleShape2D_biob2")
+
+[node name="@Sprite2D@101" type="Sprite2D" parent="@StaticBody2D@99" unique_id=1226656182]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@102" type="StaticBody2D" parent="." unique_id=808299793]
+position = Vector2(141.95995, -192.57486)
+rotation = 1.8885983
+collision_layer = 4
+
+[node name="@CollisionShape2D@103" type="CollisionShape2D" parent="@StaticBody2D@102" unique_id=334091108]
+shape = SubResource("CircleShape2D_argcv")
+
+[node name="@Sprite2D@104" type="Sprite2D" parent="@StaticBody2D@102" unique_id=2078270587]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@105" type="StaticBody2D" parent="." unique_id=470574065]
+position = Vector2(-541.9509, -116.81505)
+rotation = 4.761084
+collision_layer = 4
+
+[node name="@CollisionShape2D@106" type="CollisionShape2D" parent="@StaticBody2D@105" unique_id=1445541714]
+shape = SubResource("CircleShape2D_omt44")
+
+[node name="@Sprite2D@107" type="Sprite2D" parent="@StaticBody2D@105" unique_id=62156606]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@108" type="StaticBody2D" parent="." unique_id=1771894027]
+position = Vector2(-449.5383, -115.50396)
+rotation = 2.7799087
+collision_layer = 4
+
+[node name="@CollisionShape2D@109" type="CollisionShape2D" parent="@StaticBody2D@108" unique_id=2017085056]
+shape = SubResource("CircleShape2D_50x10")
+
+[node name="@Sprite2D@110" type="Sprite2D" parent="@StaticBody2D@108" unique_id=1583852521]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@111" type="StaticBody2D" parent="." unique_id=117007622]
+position = Vector2(-365.54507, -120.4475)
+rotation = 1.467219
+collision_layer = 4
+
+[node name="@CollisionShape2D@112" type="CollisionShape2D" parent="@StaticBody2D@111" unique_id=115377536]
+shape = SubResource("CircleShape2D_23kk7")
+
+[node name="@Sprite2D@113" type="Sprite2D" parent="@StaticBody2D@111" unique_id=956006049]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@114" type="StaticBody2D" parent="." unique_id=41826775]
+position = Vector2(-277.64713, -109.433395)
+rotation = 2.1812892
+collision_layer = 4
+
+[node name="@CollisionShape2D@115" type="CollisionShape2D" parent="@StaticBody2D@114" unique_id=492637054]
+shape = SubResource("CircleShape2D_ktb4h")
+
+[node name="@Sprite2D@116" type="Sprite2D" parent="@StaticBody2D@114" unique_id=1626742898]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@117" type="StaticBody2D" parent="." unique_id=1186429991]
+position = Vector2(-208.06377, -123.19873)
+rotation = 2.221516
+collision_layer = 4
+
+[node name="@CollisionShape2D@118" type="CollisionShape2D" parent="@StaticBody2D@117" unique_id=272028812]
+shape = SubResource("CircleShape2D_cxk6f")
+
+[node name="@Sprite2D@119" type="Sprite2D" parent="@StaticBody2D@117" unique_id=1702117465]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@120" type="StaticBody2D" parent="." unique_id=1221036325]
+position = Vector2(-106.60479, -124.5329)
+rotation = 5.78696
+collision_layer = 4
+
+[node name="@CollisionShape2D@121" type="CollisionShape2D" parent="@StaticBody2D@120" unique_id=2024394342]
+shape = SubResource("CircleShape2D_a2dca")
+
+[node name="@Sprite2D@122" type="Sprite2D" parent="@StaticBody2D@120" unique_id=2107815816]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@123" type="StaticBody2D" parent="." unique_id=847226185]
+position = Vector2(-40.34194, -115.33386)
+rotation = 1.0305939
+collision_layer = 4
+
+[node name="@CollisionShape2D@124" type="CollisionShape2D" parent="@StaticBody2D@123" unique_id=1811786273]
+shape = SubResource("CircleShape2D_41qxi")
+
+[node name="@Sprite2D@125" type="Sprite2D" parent="@StaticBody2D@123" unique_id=59076270]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@126" type="StaticBody2D" parent="." unique_id=1320254219]
+position = Vector2(38.65102, -129.69518)
+rotation = 0.5588102
+collision_layer = 4
+
+[node name="@CollisionShape2D@127" type="CollisionShape2D" parent="@StaticBody2D@126" unique_id=46320120]
+shape = SubResource("CircleShape2D_um6dm")
+
+[node name="@Sprite2D@128" type="Sprite2D" parent="@StaticBody2D@126" unique_id=1128396550]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@129" type="StaticBody2D" parent="." unique_id=876576434]
+position = Vector2(131.46776, -114.000534)
+rotation = 5.2592783
+collision_layer = 4
+
+[node name="@CollisionShape2D@130" type="CollisionShape2D" parent="@StaticBody2D@129" unique_id=1242244306]
+shape = SubResource("CircleShape2D_6vjeh")
+
+[node name="@Sprite2D@131" type="Sprite2D" parent="@StaticBody2D@129" unique_id=1537444596]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@132" type="StaticBody2D" parent="." unique_id=503825006]
+position = Vector2(213.05826, -118.11313)
+rotation = 1.9945362
+collision_layer = 4
+
+[node name="@CollisionShape2D@133" type="CollisionShape2D" parent="@StaticBody2D@132" unique_id=1031002173]
+shape = SubResource("CircleShape2D_8s6yi")
+
+[node name="@Sprite2D@134" type="Sprite2D" parent="@StaticBody2D@132" unique_id=474606462]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@135" type="StaticBody2D" parent="." unique_id=980446072]
+position = Vector2(309.1474, -121.65799)
+rotation = 3.0393195
+collision_layer = 4
+
+[node name="@CollisionShape2D@136" type="CollisionShape2D" parent="@StaticBody2D@135" unique_id=328941476]
+shape = SubResource("CircleShape2D_xivrb")
+
+[node name="@Sprite2D@137" type="Sprite2D" parent="@StaticBody2D@135" unique_id=680819614]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@138" type="StaticBody2D" parent="." unique_id=2072928710]
+position = Vector2(375.6259, -115.09866)
+rotation = 3.7873237
+collision_layer = 4
+
+[node name="@CollisionShape2D@139" type="CollisionShape2D" parent="@StaticBody2D@138" unique_id=1387977793]
+shape = SubResource("CircleShape2D_l5gcs")
+
+[node name="@Sprite2D@140" type="Sprite2D" parent="@StaticBody2D@138" unique_id=367706011]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@141" type="StaticBody2D" parent="." unique_id=49769137]
+position = Vector2(-548.33093, -38.220825)
+rotation = 0.52262
+collision_layer = 4
+
+[node name="@CollisionShape2D@142" type="CollisionShape2D" parent="@StaticBody2D@141" unique_id=1968525275]
+shape = SubResource("CircleShape2D_uks5u")
+
+[node name="@Sprite2D@143" type="Sprite2D" parent="@StaticBody2D@141" unique_id=1370125589]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@144" type="StaticBody2D" parent="." unique_id=219840792]
+position = Vector2(-453.13678, -37.592716)
+rotation = 2.2686737
+collision_layer = 4
+
+[node name="@CollisionShape2D@145" type="CollisionShape2D" parent="@StaticBody2D@144" unique_id=488474011]
+shape = SubResource("CircleShape2D_6c8a8")
+
+[node name="@Sprite2D@146" type="Sprite2D" parent="@StaticBody2D@144" unique_id=469574773]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@147" type="StaticBody2D" parent="." unique_id=1622072762]
+position = Vector2(-360.71588, -30.389004)
+rotation = 2.7305129
+collision_layer = 4
+
+[node name="@CollisionShape2D@148" type="CollisionShape2D" parent="@StaticBody2D@147" unique_id=1473583702]
+shape = SubResource("CircleShape2D_mf01x")
+
+[node name="@Sprite2D@149" type="Sprite2D" parent="@StaticBody2D@147" unique_id=1266675484]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@150" type="StaticBody2D" parent="." unique_id=1499209167]
+position = Vector2(-298.03546, -44.234455)
+rotation = 0.89337033
+collision_layer = 4
+
+[node name="@CollisionShape2D@151" type="CollisionShape2D" parent="@StaticBody2D@150" unique_id=594860049]
+shape = SubResource("CircleShape2D_mv2yp")
+
+[node name="@Sprite2D@152" type="Sprite2D" parent="@StaticBody2D@150" unique_id=1487896662]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@153" type="StaticBody2D" parent="." unique_id=761686649]
+position = Vector2(-197.06853, -42.597733)
+rotation = 2.0125408
+collision_layer = 4
+
+[node name="@CollisionShape2D@154" type="CollisionShape2D" parent="@StaticBody2D@153" unique_id=1207375484]
+shape = SubResource("CircleShape2D_c3cqs")
+
+[node name="@Sprite2D@155" type="Sprite2D" parent="@StaticBody2D@153" unique_id=1347757950]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@156" type="StaticBody2D" parent="." unique_id=1603343905]
+position = Vector2(-127.09708, -42.146725)
+rotation = 3.2783668
+collision_layer = 4
+
+[node name="@CollisionShape2D@157" type="CollisionShape2D" parent="@StaticBody2D@156" unique_id=1418661538]
+shape = SubResource("CircleShape2D_or3a0")
+
+[node name="@Sprite2D@158" type="Sprite2D" parent="@StaticBody2D@156" unique_id=347850892]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@159" type="StaticBody2D" parent="." unique_id=1853859189]
+position = Vector2(-31.520302, -46.162987)
+rotation = 1.733849
+collision_layer = 4
+
+[node name="@CollisionShape2D@160" type="CollisionShape2D" parent="@StaticBody2D@159" unique_id=1275805676]
+shape = SubResource("CircleShape2D_1rese")
+
+[node name="@Sprite2D@161" type="Sprite2D" parent="@StaticBody2D@159" unique_id=1400026190]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@162" type="StaticBody2D" parent="." unique_id=505158529]
+position = Vector2(43.399586, -29.810642)
+rotation = 4.258665
+collision_layer = 4
+
+[node name="@CollisionShape2D@163" type="CollisionShape2D" parent="@StaticBody2D@162" unique_id=1589269512]
+shape = SubResource("CircleShape2D_y85yd")
+
+[node name="@Sprite2D@164" type="Sprite2D" parent="@StaticBody2D@162" unique_id=43909700]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@165" type="StaticBody2D" parent="." unique_id=1715439335]
+position = Vector2(132.291, -39.58522)
+rotation = 1.0995872
+collision_layer = 4
+
+[node name="@CollisionShape2D@166" type="CollisionShape2D" parent="@StaticBody2D@165" unique_id=1639746239]
+shape = SubResource("CircleShape2D_k0i0g")
+
+[node name="@Sprite2D@167" type="Sprite2D" parent="@StaticBody2D@165" unique_id=1909966382]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@168" type="StaticBody2D" parent="." unique_id=1517705352]
+position = Vector2(220.24765, -37.948162)
+rotation = 0.28197315
+collision_layer = 4
+
+[node name="@CollisionShape2D@169" type="CollisionShape2D" parent="@StaticBody2D@168" unique_id=828156416]
+shape = SubResource("CircleShape2D_h4fat")
+
+[node name="@Sprite2D@170" type="Sprite2D" parent="@StaticBody2D@168" unique_id=1702920998]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@171" type="StaticBody2D" parent="." unique_id=1306814856]
+position = Vector2(-626.5401, 51.402397)
+rotation = 5.247015
+collision_layer = 4
+
+[node name="@CollisionShape2D@172" type="CollisionShape2D" parent="@StaticBody2D@171" unique_id=125612680]
+shape = SubResource("CircleShape2D_qknl8")
+
+[node name="@Sprite2D@173" type="Sprite2D" parent="@StaticBody2D@171" unique_id=65125095]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@174" type="StaticBody2D" parent="." unique_id=497445112]
+position = Vector2(-542.0498, 59.56446)
+rotation = 0.96304
+collision_layer = 4
+
+[node name="@CollisionShape2D@175" type="CollisionShape2D" parent="@StaticBody2D@174" unique_id=391415674]
+shape = SubResource("CircleShape2D_imqen")
+
+[node name="@Sprite2D@176" type="Sprite2D" parent="@StaticBody2D@174" unique_id=1471411504]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@177" type="StaticBody2D" parent="." unique_id=1461166205]
+position = Vector2(-463.56152, 44.207264)
+rotation = 1.6871463
+collision_layer = 4
+
+[node name="@CollisionShape2D@178" type="CollisionShape2D" parent="@StaticBody2D@177" unique_id=1116741997]
+shape = SubResource("CircleShape2D_g4hlc")
+
+[node name="@Sprite2D@179" type="Sprite2D" parent="@StaticBody2D@177" unique_id=2026742289]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@180" type="StaticBody2D" parent="." unique_id=1507770190]
+position = Vector2(-376.1491, 42.96886)
+rotation = 5.105356
+collision_layer = 4
+
+[node name="@CollisionShape2D@181" type="CollisionShape2D" parent="@StaticBody2D@180" unique_id=2105313062]
+shape = SubResource("CircleShape2D_6cwxr")
+
+[node name="@Sprite2D@182" type="Sprite2D" parent="@StaticBody2D@180" unique_id=1555932093]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@183" type="StaticBody2D" parent="." unique_id=1299385162]
+position = Vector2(-288.59988, 51.294094)
+rotation = 4.7641606
+collision_layer = 4
+
+[node name="@CollisionShape2D@184" type="CollisionShape2D" parent="@StaticBody2D@183" unique_id=1757726184]
+shape = SubResource("CircleShape2D_mka7n")
+
+[node name="@Sprite2D@185" type="Sprite2D" parent="@StaticBody2D@183" unique_id=764738604]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@186" type="StaticBody2D" parent="." unique_id=505376484]
+position = Vector2(-201.54335, 52.39273)
+rotation = 1.9887406
+collision_layer = 4
+
+[node name="@CollisionShape2D@187" type="CollisionShape2D" parent="@StaticBody2D@186" unique_id=895703483]
+shape = SubResource("CircleShape2D_ps8bq")
+
+[node name="@Sprite2D@188" type="Sprite2D" parent="@StaticBody2D@186" unique_id=1333851686]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@189" type="StaticBody2D" parent="." unique_id=237830167]
+position = Vector2(-129.33218, 47.33721)
+rotation = 2.775921
+collision_layer = 4
+
+[node name="@CollisionShape2D@190" type="CollisionShape2D" parent="@StaticBody2D@189" unique_id=514089414]
+shape = SubResource("CircleShape2D_jo34r")
+
+[node name="@Sprite2D@191" type="Sprite2D" parent="@StaticBody2D@189" unique_id=530356963]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@192" type="StaticBody2D" parent="." unique_id=1144412730]
+position = Vector2(-40.542202, 49.789806)
+rotation = 2.0901597
+collision_layer = 4
+
+[node name="@CollisionShape2D@193" type="CollisionShape2D" parent="@StaticBody2D@192" unique_id=709562714]
+shape = SubResource("CircleShape2D_l12wv")
+
+[node name="@Sprite2D@194" type="Sprite2D" parent="@StaticBody2D@192" unique_id=169348491]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@195" type="StaticBody2D" parent="." unique_id=639678113]
+position = Vector2(55.012035, 49.443726)
+rotation = 0.97962767
+collision_layer = 4
+
+[node name="@CollisionShape2D@196" type="CollisionShape2D" parent="@StaticBody2D@195" unique_id=1964252190]
+shape = SubResource("CircleShape2D_t36g6")
+
+[node name="@Sprite2D@197" type="Sprite2D" parent="@StaticBody2D@195" unique_id=890089798]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("9_kyiay")
+
+[node name="@StaticBody2D@198" type="StaticBody2D" parent="." unique_id=738957517]
+position = Vector2(-611.0087, 127.61879)
+rotation = 5.3593965
+collision_layer = 4
+
+[node name="@CollisionShape2D@199" type="CollisionShape2D" parent="@StaticBody2D@198" unique_id=1403528536]
+shape = SubResource("CircleShape2D_b0pha")
+
+[node name="@Sprite2D@200" type="Sprite2D" parent="@StaticBody2D@198" unique_id=793356973]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@201" type="StaticBody2D" parent="." unique_id=331514888]
+position = Vector2(-545.1191, 122.68515)
+rotation = 1.4678243
+collision_layer = 4
+
+[node name="@CollisionShape2D@202" type="CollisionShape2D" parent="@StaticBody2D@201" unique_id=460081382]
+shape = SubResource("CircleShape2D_injan")
+
+[node name="@Sprite2D@203" type="Sprite2D" parent="@StaticBody2D@201" unique_id=900518519]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@204" type="StaticBody2D" parent="." unique_id=587373318]
+position = Vector2(-453.9719, 132.69437)
+rotation = 3.9792786
+collision_layer = 4
+
+[node name="@CollisionShape2D@205" type="CollisionShape2D" parent="@StaticBody2D@204" unique_id=1435385802]
+shape = SubResource("CircleShape2D_0f8mh")
+
+[node name="@Sprite2D@206" type="Sprite2D" parent="@StaticBody2D@204" unique_id=1808511618]
+texture_filter = 2
+scale = Vector2(0.09777778, 0.09777778)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@207" type="StaticBody2D" parent="." unique_id=1253092957]
+position = Vector2(-201.99667, 133.20987)
+rotation = 1.9805486
+collision_layer = 4
+
+[node name="@CollisionShape2D@208" type="CollisionShape2D" parent="@StaticBody2D@207" unique_id=2028839043]
+shape = SubResource("CircleShape2D_6a00h")
+
+[node name="@Sprite2D@209" type="Sprite2D" parent="@StaticBody2D@207" unique_id=1628398502]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="@StaticBody2D@210" type="StaticBody2D" parent="." unique_id=905474588]
+position = Vector2(-124.34717, 127.4684)
+rotation = 5.604974
+collision_layer = 4
+
+[node name="@CollisionShape2D@211" type="CollisionShape2D" parent="@StaticBody2D@210" unique_id=671958366]
+shape = SubResource("CircleShape2D_ykux0")
+
+[node name="@Sprite2D@212" type="Sprite2D" parent="@StaticBody2D@210" unique_id=338603088]
+texture_filter = 2
+scale = Vector2(0.07734375, 0.07734375)
+texture = ExtResource("8_vwp5q")
+
+[node name="@StaticBody2D@213" type="StaticBody2D" parent="." unique_id=665216571]
+position = Vector2(-36.297344, 130.50737)
+rotation = 3.4896634
+collision_layer = 4
+
+[node name="@CollisionShape2D@214" type="CollisionShape2D" parent="@StaticBody2D@213" unique_id=1042420357]
+shape = SubResource("CircleShape2D_d87sr")
+
+[node name="@Sprite2D@215" type="Sprite2D" parent="@StaticBody2D@213" unique_id=376527430]
+texture_filter = 2
+scale = Vector2(0.103125, 0.103125)
+texture = ExtResource("10_dsi25")
+
+[node name="SeedCorridor" type="StaticBody2D" parent="." unique_id=1068712275]
+position = Vector2(-358.57632, 268.60144)
+collision_layer = 2
+
+[node name="@CollisionShape2D@216" type="CollisionShape2D" parent="SeedCorridor" unique_id=1709480483]
+shape = SubResource("CircleShape2D_wlxce")
+
+[node name="Sprite" type="Sprite2D" parent="SeedCorridor" unique_id=1702716407]
+texture_filter = 2
+scale = Vector2(0.1275, 0.1275)
+texture = ExtResource("11_ogn2w")
+
+[node name="@StaticBody2D@217" type="StaticBody2D" parent="." unique_id=1916386920]
+position = Vector2(-563.4713, -456.76144)
+collision_layer = 2
+
+[node name="@CollisionShape2D@218" type="CollisionShape2D" parent="@StaticBody2D@217" unique_id=1038810422]
+shape = SubResource("CircleShape2D_pekg3")
+
+[node name="Sprite" type="Sprite2D" parent="@StaticBody2D@217" unique_id=58395175]
+texture_filter = 2
+scale = Vector2(0.28333333, 0.28333333)
+texture = ExtResource("12_k02lk")
+
+[node name="@StaticBody2D@219" type="StaticBody2D" parent="." unique_id=883436684]
+position = Vector2(591.1268, -293.31738)
+collision_layer = 2
+
+[node name="@CollisionShape2D@220" type="CollisionShape2D" parent="@StaticBody2D@219" unique_id=1176145840]
+shape = SubResource("CircleShape2D_0gdxd")
+
+[node name="Sprite" type="Sprite2D" parent="@StaticBody2D@219" unique_id=58970073]
+texture_filter = 2
+scale = Vector2(0.10074074, 0.10074074)
+texture = ExtResource("7_x43nb")
+
+[node name="ApronProp" type="StaticBody2D" parent="." unique_id=2065909114]
+position = Vector2(214.13391, -518.47864)
+collision_layer = 2
+
+[node name="@CollisionShape2D@221" type="CollisionShape2D" parent="ApronProp" unique_id=1751332615]
+shape = SubResource("CircleShape2D_k5tas")
+
+[node name="@Sprite2D@222" type="Sprite2D" parent="ApronProp" unique_id=1662706191]
+texture_filter = 2
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("12_k02lk")
+
+[node name="@StaticBody2D@223" type="StaticBody2D" parent="." unique_id=918006987]
+position = Vector2(515.9912, 275.07764)
+collision_layer = 2
+
+[node name="@CollisionShape2D@224" type="CollisionShape2D" parent="@StaticBody2D@223" unique_id=1990894176]
+shape = SubResource("CircleShape2D_8xdh7")
+
+[node name="@Sprite2D@225" type="Sprite2D" parent="@StaticBody2D@223" unique_id=1608492533]
+texture_filter = 2
+scale = Vector2(0.08888889, 0.08888889)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@226" type="StaticBody2D" parent="." unique_id=1799527529]
+position = Vector2(449.4391, 523.0437)
+collision_layer = 2
+
+[node name="@CollisionShape2D@227" type="CollisionShape2D" parent="@StaticBody2D@226" unique_id=526452067]
+shape = SubResource("CircleShape2D_upplf")
+
+[node name="@Sprite2D@228" type="Sprite2D" parent="@StaticBody2D@226" unique_id=107269444]
+texture_filter = 2
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("12_k02lk")
+
+[node name="@StaticBody2D@229" type="StaticBody2D" parent="." unique_id=1202324675]
+position = Vector2(642.2617, -472.70392)
+collision_layer = 2
+
+[node name="@CollisionShape2D@230" type="CollisionShape2D" parent="@StaticBody2D@229" unique_id=1693252187]
+shape = SubResource("CircleShape2D_sdr4h")
+
+[node name="@Sprite2D@231" type="Sprite2D" parent="@StaticBody2D@229" unique_id=274542725]
+texture_filter = 2
+scale = Vector2(0.1125, 0.1125)
+texture = ExtResource("11_ogn2w")
+
+[node name="@StaticBody2D@232" type="StaticBody2D" parent="." unique_id=137567294]
+position = Vector2(582.14685, 473.5985)
+collision_layer = 2
+
+[node name="@CollisionShape2D@233" type="CollisionShape2D" parent="@StaticBody2D@232" unique_id=1015460550]
+shape = SubResource("CircleShape2D_81dmu")
+
+[node name="@Sprite2D@234" type="Sprite2D" parent="@StaticBody2D@232" unique_id=572135118]
+texture_filter = 2
+scale = Vector2(0.0703125, 0.0703125)
+texture = ExtResource("13_r78iw")
+
+[node name="@StaticBody2D@235" type="StaticBody2D" parent="." unique_id=524461778]
+position = Vector2(768.9075, 75.72839)
+collision_layer = 2
+
+[node name="@CollisionShape2D@236" type="CollisionShape2D" parent="@StaticBody2D@235" unique_id=1588077842]
+shape = SubResource("CircleShape2D_gcj86")
+
+[node name="@Sprite2D@237" type="Sprite2D" parent="@StaticBody2D@235" unique_id=493145943]
+texture_filter = 2
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("12_k02lk")
+
+[node name="@StaticBody2D@238" type="StaticBody2D" parent="." unique_id=180413275]
+position = Vector2(388.98462, 449.44183)
+collision_layer = 2
+
+[node name="@CollisionShape2D@239" type="CollisionShape2D" parent="@StaticBody2D@238" unique_id=470225757]
+shape = SubResource("CircleShape2D_o05fs")
+
+[node name="@Sprite2D@240" type="Sprite2D" parent="@StaticBody2D@238" unique_id=765030153]
+texture_filter = 2
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("12_k02lk")
+
+[node name="@StaticBody2D@241" type="StaticBody2D" parent="." unique_id=321232063]
+position = Vector2(376.24316, 358.44684)
+collision_layer = 2
+
+[node name="@CollisionShape2D@242" type="CollisionShape2D" parent="@StaticBody2D@241" unique_id=812504716]
+shape = SubResource("CircleShape2D_5hrnt")
+
+[node name="@Sprite2D@243" type="Sprite2D" parent="@StaticBody2D@241" unique_id=819086717]
+texture_filter = 2
+scale = Vector2(0.1125, 0.1125)
+texture = ExtResource("11_ogn2w")
+
+[node name="@StaticBody2D@244" type="StaticBody2D" parent="." unique_id=1656682963]
+position = Vector2(-702.0493, 528.6487)
+collision_layer = 2
+
+[node name="@CollisionShape2D@245" type="CollisionShape2D" parent="@StaticBody2D@244" unique_id=121021630]
+shape = SubResource("CircleShape2D_e6egr")
+
+[node name="@Sprite2D@246" type="Sprite2D" parent="@StaticBody2D@244" unique_id=105769317]
+texture_filter = 2
+scale = Vector2(0.08888889, 0.08888889)
+texture = ExtResource("7_x43nb")
+
+[node name="@StaticBody2D@247" type="StaticBody2D" parent="." unique_id=1559234943]
+position = Vector2(594.44727, 188.45483)
+collision_layer = 2
+
+[node name="@CollisionShape2D@248" type="CollisionShape2D" parent="@StaticBody2D@247" unique_id=646631642]
+shape = SubResource("CircleShape2D_g3c1v")
+
+[node name="@Sprite2D@249" type="Sprite2D" parent="@StaticBody2D@247" unique_id=1838238497]
+texture_filter = 2
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("12_k02lk")
+
+[node name="@StaticBody2D@250" type="StaticBody2D" parent="." unique_id=1477067054]
+position = Vector2(801.772, -421.30246)
+collision_layer = 2
+
+[node name="@CollisionShape2D@251" type="CollisionShape2D" parent="@StaticBody2D@250" unique_id=1584441706]
+shape = SubResource("CircleShape2D_r1gab")
+
+[node name="@Sprite2D@252" type="Sprite2D" parent="@StaticBody2D@250" unique_id=2086544067]
+texture_filter = 2
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("12_k02lk")
+
+[node name="@StaticBody2D@253" type="StaticBody2D" parent="." unique_id=1313842551]
+position = Vector2(721.7574, 163.55788)
+collision_layer = 2
+
+[node name="@CollisionShape2D@254" type="CollisionShape2D" parent="@StaticBody2D@253" unique_id=721434789]
+shape = SubResource("CircleShape2D_xoydj")
+
+[node name="@Sprite2D@255" type="Sprite2D" parent="@StaticBody2D@253" unique_id=962623866]
+texture_filter = 2
+scale = Vector2(0.225, 0.225)
+texture = ExtResource("14_f218j")
+
+[node name="@StaticBody2D@256" type="StaticBody2D" parent="." unique_id=920529694]
+position = Vector2(395.32822, 286.9988)
+collision_layer = 2
+
+[node name="@CollisionShape2D@257" type="CollisionShape2D" parent="@StaticBody2D@256" unique_id=1308321130]
+shape = SubResource("CircleShape2D_8l2gi")
+
+[node name="@Sprite2D@258" type="Sprite2D" parent="@StaticBody2D@256" unique_id=1114266845]
+texture_filter = 2
+scale = Vector2(0.0703125, 0.0703125)
+texture = ExtResource("15_vloy0")
+
+[node name="@StaticBody2D@259" type="StaticBody2D" parent="." unique_id=1221821949]
+position = Vector2(364.1283, 312.88864)
+collision_layer = 2
+
+[node name="@CollisionShape2D@260" type="CollisionShape2D" parent="@StaticBody2D@259" unique_id=1469767285]
+shape = SubResource("CircleShape2D_ee044")
+
+[node name="@Sprite2D@261" type="Sprite2D" parent="@StaticBody2D@259" unique_id=816160821]
+texture_filter = 2
+scale = Vector2(0.1125, 0.1125)
+texture = ExtResource("11_ogn2w")
+
+[node name="@StaticBody2D@262" type="StaticBody2D" parent="." unique_id=85560174]
+position = Vector2(321.21423, 386.00406)
+collision_layer = 2
+
+[node name="@CollisionShape2D@263" type="CollisionShape2D" parent="@StaticBody2D@262" unique_id=916042043]
+shape = SubResource("CircleShape2D_mtlrp")
+
+[node name="@Sprite2D@264" type="Sprite2D" parent="@StaticBody2D@262" unique_id=1332055181]
+texture_filter = 2
+scale = Vector2(0.25, 0.25)
+texture = ExtResource("12_k02lk")
+
+[node name="@StaticBody2D@265" type="StaticBody2D" parent="." unique_id=1062667450]
+position = Vector2(-819.71265, -463.4287)
+collision_layer = 2
+
+[node name="@CollisionShape2D@266" type="CollisionShape2D" parent="@StaticBody2D@265" unique_id=488882288]
+shape = SubResource("CircleShape2D_fbmnn")
+
+[node name="@Sprite2D@267" type="Sprite2D" parent="@StaticBody2D@265" unique_id=567449435]
+texture_filter = 2
+scale = Vector2(0.225, 0.225)
+texture = ExtResource("14_f218j")
+
+[node name="@Polygon2D@268" type="Polygon2D" parent="." unique_id=73669842]
+z_index = -12
+position = Vector2(-460, 46)
+rotation = 0.12
+color = Color(0.95686275, 0.7490196, 0.22745098, 1)
+polygon = PackedVector2Array(-34, -30, 34, -30, 34, 30, -34, 30)
+
+[node name="@Polygon2D@269" type="Polygon2D" parent="." unique_id=1467537299]
+z_index = -12
+position = Vector2(-430, 68)
+rotation = 0.22
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-34, -30, 34, -30, 34, 30, -34, 30)
+
+[node name="@Polygon2D@270" type="Polygon2D" parent="." unique_id=1637700090]
+z_index = -12
+position = Vector2(-404, 54)
+rotation = 0.12
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-34, -30, 34, -30, 34, 30, -34, 30)
+
+[node name="@Polygon2D@271" type="Polygon2D" parent="." unique_id=196103351]
+z_index = -12
+position = Vector2(390, 86)
+rotation = -0.2
+color = Color(0.95686275, 0.7490196, 0.22745098, 1)
+polygon = PackedVector2Array(-34, -30, 34, -30, 34, 30, -34, 30)
+
+[node name="@Polygon2D@272" type="Polygon2D" parent="." unique_id=823952270]
+z_index = -12
+position = Vector2(420, 108)
+rotation = -0.1
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-34, -30, 34, -30, 34, 30, -34, 30)
+
+[node name="@Polygon2D@273" type="Polygon2D" parent="." unique_id=2041560957]
+z_index = -12
+position = Vector2(446, 94)
+rotation = -0.2
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-34, -30, 34, -30, 34, 30, -34, 30)
+
+[node name="PaperSheet" type="Polygon2D" parent="." unique_id=1959208810]
+z_index = -12
+color = Color(0.9490196, 0.91764706, 0.84313726, 0.55)
+polygon = PackedVector2Array(-300, -150, -120, -150, -120, -60, -300, -60)
+
+[node name="@Line2D@274" type="Line2D" parent="." unique_id=1514153215]
+z_index = -12
+points = PackedVector2Array(350, -100, 480, -60, 410, -10, 520, 40)
+width = 9.0
+default_color = Color(0.43529412, 0.5686275, 0.72156864, 1)
+joint_mode = 2
+begin_cap_mode = 2
+end_cap_mode = 2
+antialiased = true
+
+[node name="BannerBlock0" type="Polygon2D" parent="." unique_id=628944808]
+z_index = -8
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-136.86401, -504.32266, -92.922714, -502.0508, -91.78679, -524.0215, -135.72809, -526.29333)
+
+[node name="BannerBlock1" type="Polygon2D" parent="." unique_id=1964324683]
+z_index = -8
+color = Color(0.7882353, 0.30980393, 0.21960784, 1)
+polygon = PackedVector2Array(-135.7281, -526.2933, -91.78679, -524.0214, -90.65086, -545.9921, -134.59218, -548.264)
+
+[node name="BannerBlock2" type="Polygon2D" parent="." unique_id=438735867]
+z_index = -8
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-134.59218, -548.2639, -90.65088, -545.99207, -89.51495, -567.96277, -133.45625, -570.2346)
+
+[node name="BannerBlock3" type="Polygon2D" parent="." unique_id=684221283]
+z_index = -8
+color = Color(0.7882353, 0.30980393, 0.21960784, 1)
+polygon = PackedVector2Array(-133.45625, -570.2346, -89.51495, -567.96277, -88.37903, -589.9335, -132.32033, -592.2053)
+
+[node name="BannerBlock4" type="Polygon2D" parent="." unique_id=718354062]
+z_index = -8
+color = Color(0.9490196, 0.91764706, 0.84313726, 1)
+polygon = PackedVector2Array(-132.32034, -592.20526, -88.37903, -589.9334, -87.2431, -611.9041, -131.18442, -614.17596)
+
+[node name="BannerBlock5" type="Polygon2D" parent="." unique_id=149093854]
+z_index = -8
+color = Color(0.7882353, 0.30980393, 0.21960784, 1)
+polygon = PackedVector2Array(-131.18442, -614.1759, -87.24312, -611.90405, -86.10719, -633.87476, -130.0485, -636.1466)

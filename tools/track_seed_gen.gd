@@ -22,14 +22,56 @@ static func generate_with_retries(seed: int, room_rect: Rect2, params: Dictionar
 	return {"points": PackedVector2Array(), "seed": current}
 
 
+static func archetype_params(seed: int, base: Dictionary) -> Dictionary:
+	# Four track personalities, deterministic from the seed: fast (long straights,
+	# gentle corners), technical (tight and busy), asymmetric (one dominant side),
+	# hairpin (a genuine U-turn).
+	var result := base.duplicate()
+	match posmod(seed, 4):
+		0:
+			result["min_point_distance"] = 250.0
+			result["max_angle_deg"] = 62.0
+			result["min_self_distance"] = 300.0
+			result["point_count"] = 10
+			result["displacement_min"] = 0.04
+			result["displacement_max"] = 0.10
+		1:
+			result["min_point_distance"] = 185.0
+			result["max_angle_deg"] = 82.0
+			result["min_self_distance"] = 268.0
+			result["point_count"] = 15
+			result["displacement_min"] = 0.07
+			result["displacement_max"] = 0.16
+		2:
+			result["min_point_distance"] = 210.0
+			result["max_angle_deg"] = 78.0
+			result["min_self_distance"] = 290.0
+			result["point_count"] = 13
+			result["displacement_min"] = 0.06
+			result["displacement_max"] = 0.14
+			result["side_bias"] = Vector2(-0.6, 0.0) if posmod(seed, 8) < 4 else Vector2(0.6, 0.0)
+		_:
+			result["min_point_distance"] = 200.0
+			result["max_angle_deg"] = 94.0
+			result["min_self_distance"] = 258.0
+			result["point_count"] = 12
+			result["displacement_min"] = 0.08
+			result["displacement_max"] = 0.18
+	return result
+
+
 static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> PackedVector2Array:
+	var profile := archetype_params(seed, params)
 	_rng.seed = seed
-	var margin := float(params.get("margin", 150.0))
-	var min_point_distance := float(params.get("min_point_distance", 200.0))
-	var max_angle_deg := float(params.get("max_angle_deg", 80.0))
-	var min_self_distance := float(params.get("min_self_distance", 300.0))
-	var min_loop_length := float(params.get("min_loop_length", 1900.0))
-	var point_count := int(params.get("point_count", 0))
+	var margin := float(profile.get("margin", 150.0))
+	var min_point_distance := float(profile.get("min_point_distance", 200.0))
+	var max_angle_deg := float(profile.get("max_angle_deg", 80.0))
+	var min_self_distance := float(profile.get("min_self_distance", 300.0))
+	var min_loop_length := float(profile.get("min_loop_length", 1900.0))
+	var point_count := int(profile.get("point_count", 0))
+	var displacement_min := float(profile.get("displacement_min", 0.05))
+	var displacement_max := float(profile.get("displacement_max", 0.16))
+	var side_bias := profile.get("side_bias", Vector2.ZERO) as Vector2
 	var bounds := Rect2(room_rect.position + Vector2(margin, margin), room_rect.size - Vector2(margin, margin) * 2.0)
 
 	# 1. Random spread points, kept apart
@@ -40,6 +82,8 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 		var candidate := Vector2(
 			_rng.randf_range(bounds.position.x, bounds.end.x),
 			_rng.randf_range(bounds.position.y, bounds.end.y))
+		if side_bias != Vector2.ZERO and _rng.randf() < 0.45:
+			candidate.x = bounds.position.x + (bounds.end.x - bounds.position.x) * (0.5 + side_bias.x * _rng.randf_range(0.2, 0.5))
 		var too_close := false
 		for existing: Vector2 in seeds:
 			if existing.distance_to(candidate) < min_point_distance:
@@ -63,7 +107,7 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 		shaped.append(hull[index])
 		var edge := hull[next] - hull[index]
 		var mid := hull[index] + edge * 0.5
-		var displacement := edge.length() * _rng.randf_range(0.05, 0.16)
+		var displacement := edge.length() * _rng.randf_range(displacement_min, displacement_max)
 		var direction := Vector2.RIGHT.rotated(_rng.randf_range(0.0, TAU))
 		var displaced := mid + direction * displacement
 		# Pull displaced midpoints slightly toward the loop centroid for concave notches
@@ -82,10 +126,14 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 			clampf(shaped[index].x, bounds.position.x, bounds.end.x),
 			clampf(shaped[index].y, bounds.position.y, bounds.end.y))
 
-	# 6. Resample the spline into evenly spaced control points, then validate
+	# 6. Resample the spline into evenly spaced control points, clamp the
+	# resampled loop's corners, then validate
 	var even := _resample_arc(shaped, 22)
 	if even.size() < 8:
 		return PackedVector2Array()
+	for iteration in 2:
+		even = _fix_angles(even, deg_to_rad(max_angle_deg))
+		even = _push_apart(even, 130.0)
 	var centerline := _sample_centerline(even)
 	if _polyline_length(centerline) < min_loop_length:
 		return PackedVector2Array()
