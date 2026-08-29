@@ -23,13 +23,13 @@ const LAYOUTS := {
 			Vector2(0, -480), Vector2(300, -470), Vector2(600, -420), Vector2(735, -250),
 			Vector2(735, 0), Vector2(735, 370),
 		],
-		"floor": Color("31261f"),
-		"highlight": Color("49372b"),
-		"island": Color("38332e"),
-		"asphalt": Color("1a1f28"),
-		"apron": Color("241c17"),
+		"floor": Color("7a5a3f"),
+		"highlight": Color("8a6a4f"),
+		"island": Color("4a4038"),
+		"asphalt": Color("4a5a6a"),
+		"apron": Color("5c4638"),
 		"track_texture": "res://assets/textures/imagine/track_asphalt_tile.jpg",
-		"floor_texture": "res://assets/textures/imagine/workshop_planks_tile.jpg",
+		"floor_texture": "",
 		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top.jpg",
 		"prop_label": "Toolbox",
 		"obstacles": {
@@ -62,13 +62,13 @@ const LAYOUTS := {
 			Vector2(0, -480), Vector2(300, -470), Vector2(600, -420), Vector2(735, -250),
 			Vector2(735, 0), Vector2(735, 370),
 		],
-		"floor": Color("26384f"),
-		"highlight": Color("365473"),
-		"island": Color("29435f"),
-		"asphalt": Color("1a1f28"),
-		"apron": Color("16232e"),
+		"floor": Color("4a6a8a"),
+		"highlight": Color("5a7a9a"),
+		"island": Color("3a5a7a"),
+		"asphalt": Color("4a5a6a"),
+		"apron": Color("3a4a5a"),
 		"track_texture": "res://assets/textures/imagine/track_asphalt_tile.jpg",
-		"floor_texture": "res://assets/textures/imagine/office_deskmat_tile.jpg",
+		"floor_texture": "",
 		"prop_texture": "res://assets/textures/imagine/office_keyboard_top.jpg",
 		"prop_label": "Keyboard",
 		"obstacles": {
@@ -161,12 +161,12 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
-	# Floor: themed texture tiles over the room, then the highlight tint
+	# Floor: base fill first, themed texture tiles on top at full brightness
+	_add_polygon(root, "Floor", _rect_points(Vector2(0, 0), Vector2(2000, 1200)), spec["floor"], -22)
+	_add_polygon(root, "CounterHighlight", _rect_points(Vector2(0, 0), Vector2(1880, 1080)), Color(spec["highlight"], 0.5), -21)
 	var floor_texture := String(spec.get("floor_texture", ""))
 	if not floor_texture.is_empty():
 		_add_floor_tiles(root, floor_texture, 4, 3, Vector2(1.0, 1.0))
-	_add_polygon(root, "Floor", _rect_points(Vector2(0, 0), Vector2(2000, 1200)), Color(spec["floor"], 0.35), -20)
-	_add_polygon(root, "CounterHighlight", _rect_points(Vector2(0, 0), Vector2(1880, 1080)), Color(spec["highlight"], 0.25), -19)
 
 	# Painted track ribbon (visual only — no collision)
 	var corridor := PackedVector2Array()
@@ -293,7 +293,7 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		_add_sticky_notes(root, Vector2(420, 100), -0.2)
 		_add_polygon(root, "PaperSheet", PackedVector2Array([
 			Vector2(-300, -150), Vector2(-120, -150), Vector2(-120, -60), Vector2(-300, -60),
-		]), Color("f2ead7", 0.85), -12)
+		]), Color("f2ead7", 0.55), -12)
 		_add_cable_line(root, [Vector2(350, -100), Vector2(480, -60), Vector2(410, -10), Vector2(520, 40)])
 
 	# Start banner above the finish line
@@ -335,6 +335,7 @@ func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: PackedVector
 	if texture:
 		visual.texture = texture
 		visual.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		visual.modulate = Color(1.7, 1.7, 1.7)
 		var uvs := PackedVector2Array()
 		for point: Vector2 in expanded:
 			uvs.append(Vector2(
@@ -363,7 +364,7 @@ func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: PackedVector
 
 	var kerb := Polygon2D.new()
 	kerb.name = "Kerbs"
-	kerb.z_index = -8
+	kerb.z_index = -7
 	var kerb_points := PackedVector2Array()
 	var kerb_colors := PackedColorArray()
 	var kerb_outline := _rounded_rect_points(prop_center, prop_size, radius, 10)
@@ -379,8 +380,8 @@ func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: PackedVector
 			var quad := PackedVector2Array([
 				kerb_outline[index],
 				kerb_outline[next],
-				kerb_outline[next] + outward * 12.0,
-				kerb_outline[index] + outward * 12.0,
+				kerb_outline[next] + outward * 18.0,
+				kerb_outline[index] + outward * 18.0,
 			])
 			var block_color := Color("c94f38") if (index / 2) % 2 == 0 else Color("f2ead7")
 			kerb_points.append_array(quad)
@@ -620,7 +621,7 @@ func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture
 		sprite.position = centerline[index]
 		sprite.rotation = atan2(tangent.y, tangent.x)
 		sprite.scale = scale
-		sprite.modulate = Color(1, 1, 1, 0.92)
+		sprite.modulate = Color(1.6, 1.6, 1.6)
 		tiles.add_child(sprite)
 
 
@@ -641,7 +642,7 @@ func _add_floor_tiles(parent: Node, texture_path: String, columns: int, rows: in
 			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			sprite.position = Vector2(-940.0 + tile_width * (column + 0.5), -540.0 + tile_height * (row + 0.5))
 			sprite.scale = Vector2(tile_width / 940.0, tile_height / 540.0) * scale * 0.96
-			sprite.modulate = Color(1, 1, 1, 0.9)
+			sprite.modulate = Color(1.6, 1.6, 1.6)
 			tiles.add_child(sprite)
 
 
