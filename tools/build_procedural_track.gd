@@ -40,6 +40,14 @@ const LAYOUTS := {
 			"res://assets/textures/kitchen/sponge_wet.png",
 			"res://assets/textures/kitchen/ruler_plank.png",
 		],
+		"island_fill_textures": [
+			"res://assets/textures/imagine/plank_wood.png",
+			"res://assets/textures/imagine/hose_coil.png",
+			"res://assets/textures/imagine/workshop_paint_can.png",
+			"res://assets/textures/imagine/hazard_workshop_socket.png",
+			"res://assets/textures/kitchen/fork_cartoon.png",
+			"res://assets/textures/kitchen/ruler_plank.png",
+		],
 		"island_expansion": 10.0,
 		"obstacles": {
 			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
@@ -88,8 +96,15 @@ const LAYOUTS := {
 			"res://assets/textures/kitchen/sponge_wet.png",
 			"res://assets/textures/kitchen/lime_cartoon.png",
 		],
+		"island_fill_textures": [
+			"res://assets/textures/imagine/book_top.png",
+			"res://assets/textures/imagine/plank_wood.png",
+			"res://assets/textures/imagine/office_keycap.png",
+			"res://assets/textures/kitchen/ruler_plank.png",
+			"res://assets/textures/kitchen/napkin.png",
+		],
 		"island_expansion": 4.0,
-		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.74, 0.74],
+		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.72, 0.74],
 		"obstacles": {
 			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
 			"MugA": {"pos": Vector2(-300, 500), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
@@ -157,6 +172,7 @@ func _run() -> void:
 	_build_scene(root, spec, centerline, edges)
 
 	_mark_owned(root)
+	print("CHILDREN ", str(root.get_children().map(func(child: Node) -> String: return String(child.name))))
 	var packed := PackedScene.new()
 	packed.pack(root)
 	var out_path := OS.get_environment("PC_SCENE_OUT")
@@ -301,6 +317,9 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		start - start_tangent * 120.0 + grid_normal * 45.0,
 	])
 
+	# Dense collidable fill over the whole island interior (books, planks, hose…)
+	_fill_island(root, spec, inner_loop, corridor)
+
 	# Track obstacles (real props with collision)
 	if spec.get("seed_obstacles", false):
 		_scatter_seed_props(root, spec, centerline, corridor, gate_samples)
@@ -336,6 +355,7 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		if not Geometry2D.is_point_in_polygon(prop_position, corridor):
 			_add_prop_with_collision(root, prop_position, 30.0, prop_textures[hardware_index % prop_textures.size()])
 			hardware_index += 1
+
 
 	# Themed dressing on the island prop and around it
 	if _theme == &"workshop":
@@ -609,28 +629,7 @@ func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	for position: Vector2 in corridor_props:
 		_add_obstacle(root, "SeedCorridor", position, 34.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
 
-	# b) island interior: real objects filling the inner area (anti-cut dressing)
-	var island_props := PackedVector2Array()
-	for attempt in 300:
-		var candidate := Vector2(rng.randf_range(-800.0, 800.0), rng.randf_range(-500.0, 500.0))
-		if Geometry2D.is_point_in_polygon(candidate, corridor):
-			continue
-		if not _point_in_loop(candidate, centerline):
-			continue
-		var too_close := false
-		for placed: Vector2 in island_props:
-			if placed.distance_to(candidate) < 110.0:
-				too_close = true
-				break
-		if too_close:
-			continue
-		island_props.append(candidate)
-		if island_props.size() >= 6:
-			break
-	for position: Vector2 in island_props:
-		_add_prop_with_collision(root, position, 34.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
-
-	# c) apron clutter outside the loop
+	# b) apron clutter outside the loop
 	var apron_props := PackedVector2Array()
 	for attempt in 400:
 		var candidate := Vector2(rng.randf_range(-830.0, 830.0), rng.randf_range(-530.0, 530.0))
@@ -652,6 +651,71 @@ func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: PackedVecto
 			break
 	for position: Vector2 in apron_props:
 		_add_prop_with_collision(root, position, 30.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
+
+
+func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector2Array, corridor: PackedVector2Array) -> void:
+	var textures: Array = spec.get("island_fill_textures", [])
+	if textures.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.get("seed", 0))
+	var min_point := Vector2(INF, INF)
+	var max_point := Vector2(-INF, -INF)
+	for point: Vector2 in inner_loop:
+		min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
+		max_point = Vector2(maxf(max_point.x, point.x), maxf(max_point.y, point.y))
+	var pitch := 84.0
+	var radius := 36.0
+	var dbg_total := 0
+	var dbg_in := 0
+	var dbg_corridor := 0
+	var dbg_circle := 0
+	var dbg_ok := 0
+	for row in range(int(ceil((max_point.y - min_point.y) / pitch)) + 1):
+		for column in range(int(ceil((max_point.x - min_point.x) / pitch)) + 1):
+			var center := Vector2(
+				min_point.x + float(column) * pitch + rng.randf_range(-12.0, 12.0),
+				min_point.y + float(row) * pitch + rng.randf_range(-12.0, 12.0))
+			dbg_total += 1
+			if not Geometry2D.is_point_in_polygon(center, inner_loop):
+				dbg_in += 1
+				continue
+			if Geometry2D.is_point_in_polygon(center, corridor):
+				dbg_corridor += 1
+				continue
+			var circle_clear := true
+			for sample in 8:
+				var angle := TAU * float(sample) / 8.0
+				if Geometry2D.is_point_in_polygon(center + Vector2(cos(angle), sin(angle)) * (radius + 24.0), corridor):
+					circle_clear = false
+					break
+			if not circle_clear:
+				dbg_circle += 1
+				continue
+			dbg_ok += 1
+			_add_fill_prop(root, center, radius, String(textures[rng.randi_range(0, textures.size() - 1)]), rng.randf_range(0.0, TAU))
+
+
+func _add_fill_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
+	var prop := StaticBody2D.new()
+	prop.name = "IslandFill"
+	prop.position = position
+	prop.rotation = rotation
+	prop.collision_layer = 4
+	parent.add_child(prop)
+	var shape := CircleShape2D.new()
+	shape.radius = radius
+	var cs := CollisionShape2D.new()
+	cs.shape = shape
+	prop.add_child(cs)
+	var texture := load(texture_path) as Texture2D
+	if texture:
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var longest := maxf(texture.get_width(), texture.get_height())
+		sprite.scale = Vector2.ONE * (radius * 2.2 / maxf(longest, 1.0))
+		prop.add_child(sprite)
 
 
 func _seed_clear_of_gates(point: Vector2, gate_samples: PackedVector2Array) -> bool:

@@ -17,6 +17,10 @@
   so every baked circuit is playable, plus a circuit roster catalog and test.
 - Brightened generated floor/island textures (desk mat, wood planks, toolbox,
   keyboard) and per-theme furniture edge strips on all room walls.
+- Dense collidable island fills: the inner park of every circuit is now packed
+  with real objects (books, wooden planks, hose coils, paint cans, utensils)
+  that physically block shortcut cuts, layered behind the island prop barrier.
+- Three new hand-drawn props (book, wood plank, hose coil) rendered from SVG.
 
 - The complete nine-event Grand Household Circuit, with three story acts,
   persistent standings, unlocks, replayable events, and a championship ending.

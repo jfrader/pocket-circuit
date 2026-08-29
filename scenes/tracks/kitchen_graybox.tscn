@@ -66,6 +66,9 @@ size = Vector2(210, 26)
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_03pr4"]
 size = Vector2(1180, 450)
 
+[sub_resource type="CircleShape2D" id="CircleShape2D_kitchen_fill"]
+radius = 34.0
+
 [node name="KitchenGraybox" type="Node2D" unique_id=126382309 groups=["track"]]
 script = ExtResource("1_03pr4")
 
@@ -740,6 +743,846 @@ closed = true
 width = 30.0
 default_color = Color(0.055, 0.082, 0.141, 1)
 antialiased = true
+
+[node name="IslandFill" type="StaticBody2D" parent="."]
+position = Vector2(-556.586, -183.047)
+rotation = 5.7569
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="IslandFill"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="IslandFill"]
+scale = Vector2(0.11669, 0.11669)
+texture = ExtResource("4_03pr4")
+
+[node name="@IslandFill@1" type="StaticBody2D" parent="."]
+position = Vector2(-460.984, -181.041)
+rotation = 3.1844
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@1"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@1"]
+scale = Vector2(0.09362, 0.09362)
+texture = ExtResource("10_03pr4")
+
+[node name="@IslandFill@2" type="StaticBody2D" parent="."]
+position = Vector2(-378.529, -182.359)
+rotation = 2.2331
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@2"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@2"]
+scale = Vector2(0.09269, 0.09269)
+texture = ExtResource("6_03pr4")
+
+[node name="@IslandFill@3" type="StaticBody2D" parent="."]
+position = Vector2(-304.568, -183.149)
+rotation = 3.4617
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@3"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@3"]
+scale = Vector2(0.08320, 0.08320)
+texture = ExtResource("3_03pr4")
+
+[node name="@IslandFill@4" type="StaticBody2D" parent="."]
+position = Vector2(-206.484, -184.751)
+rotation = 3.6206
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@4"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@4"]
+scale = Vector2(0.07377, 0.07377)
+texture = ExtResource("5_03pr4")
+
+[node name="@IslandFill@5" type="StaticBody2D" parent="."]
+position = Vector2(-137.604, -189.078)
+rotation = 5.0377
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@5"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@5"]
+scale = Vector2(0.11333, 0.11333)
+texture = ExtResource("12_03pr4")
+
+[node name="@IslandFill@6" type="StaticBody2D" parent="."]
+position = Vector2(-54.669, -184.337)
+rotation = 1.0302
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@6"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@6"]
+scale = Vector2(0.09269, 0.09269)
+texture = ExtResource("6_03pr4")
+
+[node name="@IslandFill@7" type="StaticBody2D" parent="."]
+position = Vector2(29.674, -191.907)
+rotation = 1.1239
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@7"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@7"]
+scale = Vector2(0.09456, 0.09456)
+texture = ExtResource("11_03pr4")
+
+[node name="@IslandFill@8" type="StaticBody2D" parent="."]
+position = Vector2(130.983, -192.986)
+rotation = 6.1586
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@8"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@8"]
+scale = Vector2(0.07377, 0.07377)
+texture = ExtResource("5_03pr4")
+
+[node name="@IslandFill@9" type="StaticBody2D" parent="."]
+position = Vector2(200.653, -188.168)
+rotation = 1.0668
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@9"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@9"]
+scale = Vector2(0.08320, 0.08320)
+texture = ExtResource("3_03pr4")
+
+[node name="@IslandFill@10" type="StaticBody2D" parent="."]
+position = Vector2(295.612, -183.201)
+rotation = 2.6998
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@10"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@10"]
+scale = Vector2(0.09269, 0.09269)
+texture = ExtResource("6_03pr4")
+
+[node name="@IslandFill@11" type="StaticBody2D" parent="."]
+position = Vector2(373.922, -178.606)
+rotation = 3.1919
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@11"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@11"]
+scale = Vector2(0.07377, 0.07377)
+texture = ExtResource("5_03pr4")
+
+[node name="@IslandFill@12" type="StaticBody2D" parent="."]
+position = Vector2(453.811, -182.825)
+rotation = 1.6548
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@12"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@12"]
+scale = Vector2(0.08320, 0.08320)
+texture = ExtResource("3_03pr4")
+
+[node name="@IslandFill@13" type="StaticBody2D" parent="."]
+position = Vector2(542.564, -191.484)
+rotation = 4.1970
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@13"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@13"]
+scale = Vector2(0.11333, 0.11333)
+texture = ExtResource("12_03pr4")
+
+[node name="@IslandFill@14" type="StaticBody2D" parent="."]
+position = Vector2(-547.258, -101.248)
+rotation = 4.7221
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@14"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@14"]
+scale = Vector2(0.08637, 0.08637)
+texture = ExtResource("2_03pr4")
+
+[node name="@IslandFill@15" type="StaticBody2D" parent="."]
+position = Vector2(-472.367, -105.291)
+rotation = 1.3558
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@15"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@15"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@16" type="StaticBody2D" parent="."]
+position = Vector2(-387.032, -96.359)
+rotation = 4.7865
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@16"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@16"]
+scale = Vector2(0.07377, 0.07377)
+texture = ExtResource("5_03pr4")
+
+[node name="@IslandFill@17" type="StaticBody2D" parent="."]
+position = Vector2(-303.124, -95.153)
+rotation = 0.7095
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@17"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@17"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@18" type="StaticBody2D" parent="."]
+position = Vector2(-220.664, -92.913)
+rotation = 1.0716
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@18"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@18"]
+scale = Vector2(0.09269, 0.09269)
+texture = ExtResource("6_03pr4")
+
+[node name="@IslandFill@19" type="StaticBody2D" parent="."]
+position = Vector2(-128.911, -96.392)
+rotation = 5.3980
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@19"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@19"]
+scale = Vector2(0.07377, 0.07377)
+texture = ExtResource("5_03pr4")
+
+[node name="@IslandFill@20" type="StaticBody2D" parent="."]
+position = Vector2(-43.211, -101.615)
+rotation = 1.3934
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@20"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@20"]
+scale = Vector2(0.11333, 0.11333)
+texture = ExtResource("12_03pr4")
+
+[node name="@IslandFill@21" type="StaticBody2D" parent="."]
+position = Vector2(43.142, -110.330)
+rotation = 5.3642
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@21"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@21"]
+scale = Vector2(0.09269, 0.09269)
+texture = ExtResource("6_03pr4")
+
+[node name="@IslandFill@22" type="StaticBody2D" parent="."]
+position = Vector2(117.292, -97.697)
+rotation = 4.7319
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@22"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@22"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@23" type="StaticBody2D" parent="."]
+position = Vector2(212.019, -92.230)
+rotation = 4.1829
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@23"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@23"]
+scale = Vector2(0.09167, 0.09167)
+texture = ExtResource("9_03pr4")
+
+[node name="@IslandFill@24" type="StaticBody2D" parent="."]
+position = Vector2(295.047, -109.076)
+rotation = 5.0456
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@24"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@24"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@25" type="StaticBody2D" parent="."]
+position = Vector2(367.113, -110.403)
+rotation = 5.7189
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@25"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@25"]
+scale = Vector2(0.09167, 0.09167)
+texture = ExtResource("9_03pr4")
+
+[node name="@IslandFill@26" type="StaticBody2D" parent="."]
+position = Vector2(464.884, -94.852)
+rotation = 2.6404
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@26"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@26"]
+scale = Vector2(0.09167, 0.09167)
+texture = ExtResource("9_03pr4")
+
+[node name="@IslandFill@27" type="StaticBody2D" parent="."]
+position = Vector2(543.826, -107.883)
+rotation = 0.1734
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@27"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@27"]
+scale = Vector2(0.09456, 0.09456)
+texture = ExtResource("11_03pr4")
+
+[node name="@IslandFill@28" type="StaticBody2D" parent="."]
+position = Vector2(-551.640, -26.951)
+rotation = 2.1183
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@28"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@28"]
+scale = Vector2(0.09269, 0.09269)
+texture = ExtResource("6_03pr4")
+
+[node name="@IslandFill@29" type="StaticBody2D" parent="."]
+position = Vector2(-456.874, -10.569)
+rotation = 3.2024
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@29"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@29"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@30" type="StaticBody2D" parent="."]
+position = Vector2(-384.975, -17.610)
+rotation = 4.5453
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@30"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@30"]
+scale = Vector2(0.11669, 0.11669)
+texture = ExtResource("4_03pr4")
+
+[node name="@IslandFill@31" type="StaticBody2D" parent="."]
+position = Vector2(-288.378, -9.831)
+rotation = 3.1762
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@31"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@31"]
+scale = Vector2(0.09456, 0.09456)
+texture = ExtResource("11_03pr4")
+
+[node name="@IslandFill@32" type="StaticBody2D" parent="."]
+position = Vector2(-220.998, -25.459)
+rotation = 0.4230
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@32"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@32"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@33" type="StaticBody2D" parent="."]
+position = Vector2(-129.927, -14.467)
+rotation = 0.2856
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@33"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@33"]
+scale = Vector2(0.09456, 0.09456)
+texture = ExtResource("11_03pr4")
+
+[node name="@IslandFill@34" type="StaticBody2D" parent="."]
+position = Vector2(-45.497, -19.250)
+rotation = 3.8564
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@34"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@34"]
+scale = Vector2(0.08320, 0.08320)
+texture = ExtResource("3_03pr4")
+
+[node name="@IslandFill@35" type="StaticBody2D" parent="."]
+position = Vector2(35.830, -25.782)
+rotation = 4.3709
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@35"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@35"]
+scale = Vector2(0.08320, 0.08320)
+texture = ExtResource("3_03pr4")
+
+[node name="@IslandFill@36" type="StaticBody2D" parent="."]
+position = Vector2(122.028, -16.845)
+rotation = 5.6979
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@36"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@36"]
+scale = Vector2(0.11333, 0.11333)
+texture = ExtResource("12_03pr4")
+
+[node name="@IslandFill@37" type="StaticBody2D" parent="."]
+position = Vector2(206.643, -16.118)
+rotation = 4.7436
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@37"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@37"]
+scale = Vector2(0.09167, 0.09167)
+texture = ExtResource("9_03pr4")
+
+[node name="@IslandFill@38" type="StaticBody2D" parent="."]
+position = Vector2(289.523, -21.055)
+rotation = 3.6173
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@38"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@38"]
+scale = Vector2(0.11669, 0.11669)
+texture = ExtResource("4_03pr4")
+
+[node name="@IslandFill@39" type="StaticBody2D" parent="."]
+position = Vector2(379.141, -22.557)
+rotation = 0.2924
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@39"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@39"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@40" type="StaticBody2D" parent="."]
+position = Vector2(464.975, -17.235)
+rotation = 0.4172
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@40"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@40"]
+scale = Vector2(0.08320, 0.08320)
+texture = ExtResource("3_03pr4")
+
+[node name="@IslandFill@41" type="StaticBody2D" parent="."]
+position = Vector2(541.718, -20.033)
+rotation = 4.4548
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@41"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@41"]
+scale = Vector2(0.11333, 0.11333)
+texture = ExtResource("12_03pr4")
+
+[node name="@IslandFill@42" type="StaticBody2D" parent="."]
+position = Vector2(-552.696, 66.614)
+rotation = 2.7579
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@42"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@42"]
+scale = Vector2(0.09167, 0.09167)
+texture = ExtResource("9_03pr4")
+
+[node name="@IslandFill@43" type="StaticBody2D" parent="."]
+position = Vector2(-459.584, 71.650)
+rotation = 2.0502
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@43"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@43"]
+scale = Vector2(0.09362, 0.09362)
+texture = ExtResource("10_03pr4")
+
+[node name="@IslandFill@44" type="StaticBody2D" parent="."]
+position = Vector2(-374.263, 59.349)
+rotation = 0.0252
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@44"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@44"]
+scale = Vector2(0.11669, 0.11669)
+texture = ExtResource("4_03pr4")
+
+[node name="@IslandFill@45" type="StaticBody2D" parent="."]
+position = Vector2(-305.223, 71.231)
+rotation = 3.1202
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@45"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@45"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@46" type="StaticBody2D" parent="."]
+position = Vector2(-221.063, 76.079)
+rotation = 4.2581
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@46"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@46"]
+scale = Vector2(0.09456, 0.09456)
+texture = ExtResource("11_03pr4")
+
+[node name="@IslandFill@47" type="StaticBody2D" parent="."]
+position = Vector2(-136.785, 75.314)
+rotation = 1.3815
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@47"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@47"]
+scale = Vector2(0.07377, 0.07377)
+texture = ExtResource("5_03pr4")
+
+[node name="@IslandFill@48" type="StaticBody2D" parent="."]
+position = Vector2(-52.702, 67.022)
+rotation = 0.6670
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@48"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@48"]
+scale = Vector2(0.09167, 0.09167)
+texture = ExtResource("9_03pr4")
+
+[node name="@IslandFill@49" type="StaticBody2D" parent="."]
+position = Vector2(41.012, 66.524)
+rotation = 1.1654
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@49"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@49"]
+scale = Vector2(0.11333, 0.11333)
+texture = ExtResource("12_03pr4")
+
+[node name="@IslandFill@50" type="StaticBody2D" parent="."]
+position = Vector2(130.107, 68.972)
+rotation = 1.6816
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@50"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@50"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@51" type="StaticBody2D" parent="."]
+position = Vector2(210.544, 76.498)
+rotation = 3.6038
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@51"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@51"]
+scale = Vector2(0.08320, 0.08320)
+texture = ExtResource("3_03pr4")
+
+[node name="@IslandFill@52" type="StaticBody2D" parent="."]
+position = Vector2(295.276, 65.726)
+rotation = 1.7469
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@52"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@52"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@53" type="StaticBody2D" parent="."]
+position = Vector2(365.797, 61.045)
+rotation = 2.8539
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@53"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@53"]
+scale = Vector2(0.11333, 0.11333)
+texture = ExtResource("12_03pr4")
+
+[node name="@IslandFill@54" type="StaticBody2D" parent="."]
+position = Vector2(460.456, 61.707)
+rotation = 4.3840
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@54"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@54"]
+scale = Vector2(0.07377, 0.07377)
+texture = ExtResource("5_03pr4")
+
+[node name="@IslandFill@55" type="StaticBody2D" parent="."]
+position = Vector2(547.495, 57.083)
+rotation = 2.6316
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@55"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@55"]
+scale = Vector2(0.05979, 0.05979)
+texture = ExtResource("7_03pr4")
+
+[node name="@IslandFill@56" type="StaticBody2D" parent="."]
+position = Vector2(-553.818, 143.123)
+rotation = 6.1824
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@56"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@56"]
+scale = Vector2(0.09269, 0.09269)
+texture = ExtResource("6_03pr4")
+
+[node name="@IslandFill@57" type="StaticBody2D" parent="."]
+position = Vector2(-456.890, 144.518)
+rotation = 2.2252
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@57"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@57"]
+scale = Vector2(0.07377, 0.07377)
+texture = ExtResource("5_03pr4")
+
+[node name="@IslandFill@58" type="StaticBody2D" parent="."]
+position = Vector2(-380.318, 147.805)
+rotation = 1.8786
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@58"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@58"]
+scale = Vector2(0.09362, 0.09362)
+texture = ExtResource("10_03pr4")
+
+[node name="@IslandFill@59" type="StaticBody2D" parent="."]
+position = Vector2(-296.282, 153.610)
+rotation = 1.4334
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@59"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@59"]
+scale = Vector2(0.05979, 0.05979)
+texture = ExtResource("7_03pr4")
+
+[node name="@IslandFill@60" type="StaticBody2D" parent="."]
+position = Vector2(-209.553, 142.679)
+rotation = 2.4059
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@60"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@60"]
+scale = Vector2(0.11333, 0.11333)
+texture = ExtResource("12_03pr4")
+
+[node name="@IslandFill@61" type="StaticBody2D" parent="."]
+position = Vector2(-130.702, 143.128)
+rotation = 2.9260
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@61"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@61"]
+scale = Vector2(0.08637, 0.08637)
+texture = ExtResource("2_03pr4")
+
+[node name="@IslandFill@62" type="StaticBody2D" parent="."]
+position = Vector2(-36.851, 144.620)
+rotation = 0.4301
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@62"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@62"]
+scale = Vector2(0.09362, 0.09362)
+texture = ExtResource("10_03pr4")
+
+[node name="@IslandFill@63" type="StaticBody2D" parent="."]
+position = Vector2(38.995, 150.987)
+rotation = 0.1838
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@63"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@63"]
+scale = Vector2(0.05979, 0.05979)
+texture = ExtResource("7_03pr4")
+
+[node name="@IslandFill@64" type="StaticBody2D" parent="."]
+position = Vector2(119.344, 155.143)
+rotation = 5.8365
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@64"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@64"]
+scale = Vector2(0.05979, 0.05979)
+texture = ExtResource("7_03pr4")
+
+[node name="@IslandFill@65" type="StaticBody2D" parent="."]
+position = Vector2(212.684, 143.262)
+rotation = 2.4228
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@65"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@65"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@66" type="StaticBody2D" parent="."]
+position = Vector2(297.084, 160.119)
+rotation = 0.4019
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@66"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@66"]
+scale = Vector2(0.05979, 0.05979)
+texture = ExtResource("7_03pr4")
+
+[node name="@IslandFill@67" type="StaticBody2D" parent="."]
+position = Vector2(374.175, 158.427)
+rotation = 1.4312
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@67"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@67"]
+scale = Vector2(0.09167, 0.09167)
+texture = ExtResource("9_03pr4")
+
+[node name="@IslandFill@68" type="StaticBody2D" parent="."]
+position = Vector2(458.772, 142.447)
+rotation = 2.2786
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@68"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@68"]
+scale = Vector2(0.05937, 0.05937)
+texture = ExtResource("8_03pr4")
+
+[node name="@IslandFill@69" type="StaticBody2D" parent="."]
+position = Vector2(538.728, 146.833)
+rotation = 2.6691
+collision_layer = 4
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="@IslandFill@69"]
+shape = SubResource("CircleShape2D_kitchen_fill")
+
+[node name="Sprite2D" type="Sprite2D" parent="@IslandFill@69"]
+scale = Vector2(0.08320, 0.08320)
+texture = ExtResource("3_03pr4")
 
 [node name="InnerCircuitGuardrail" type="Line2D" parent="." unique_id=1776516958]
 z_index = -7
