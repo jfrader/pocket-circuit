@@ -1,6 +1,7 @@
 extends CanvasLayer
 
 const CATALOG := preload("res://data/championship/catalog.gd")
+const CIRCUIT_ROSTER := preload("res://data/circuits/circuit_roster.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const MENU_BACKGROUND := preload("res://assets/ui/imagine/menu_night_kitchen_cartoon.png")
 
@@ -25,6 +26,8 @@ var _event_id := ""
 var _quick_race := false
 var _map_act_number := 1
 var _quick_race_act_number := 1
+var _quick_race_circuit_page := 0
+var _quick_race_circuit_theme := "workshop"
 var _content_tween: Tween
 var _entrance_generation := 0
 var _save_error_back_action := Callable()
@@ -159,6 +162,7 @@ func show_quick_race(requested_act: int = 0) -> void:
 	_event_id = ""
 	_quick_race = true
 	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
 	_configure_stage(&"map")
 	var progress: Dictionary = _app.call("get_save_data")
 	var completed_events: Array = progress.get("completed_events", [])
@@ -198,9 +202,23 @@ func show_quick_race(requested_act: int = 0) -> void:
 			"QuickRace_%s" % event_id
 		)
 	var act_navigation := _add_available_act_navigation(available_acts, _quick_race_act_number, Callable(self, "_show_quick_race_act"))
-	var back_button := _add_button("BACK TO TITLE", Callable(self, "show_title"), CREAM)
-	_complete_focus_row(act_navigation, back_button)
+	var circuit_entries: Array = []
+	for entry: Dictionary in CIRCUIT_ROSTER.entries():
+		if String(entry["theme"]) == _quick_race_circuit_theme:
+			circuit_entries.append(entry)
+	var page_count := maxi(1, ceili(float(circuit_entries.size()) / 8.0))
+	_quick_race_circuit_page = posmod(_quick_race_circuit_page, page_count)
+	_add_section("GENERATED CIRCUITS", "%s · PAGE %d OF %d" % [_quick_race_circuit_theme.to_upper(), _quick_race_circuit_page + 1, page_count])
+	var page_start := _quick_race_circuit_page * 8
+	var page_end := mini(page_start + 8, circuit_entries.size())
+	var circuit_buttons := _add_circuit_buttons(circuit_entries, page_start, page_end)
+	if not circuit_buttons.is_empty():
+		_complete_focus_row(act_navigation, circuit_buttons[0])
+	var circuit_navigation := _add_circuit_navigation(page_count)
+	if circuit_buttons.size() >= 2:
+		_complete_focus_row([circuit_buttons.back(), circuit_buttons[circuit_buttons.size() - 2]], circuit_navigation[0])
 	_footer.text = "EXHIBITION RESULTS DO NOT SAVE  ·  ESC / B  BACK"
+	_grab_first_focus()
 	_focus_first()
 
 
@@ -275,6 +293,7 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	_add_button("BACK", Callable(self, "go_back"), CREAM)
 	_footer.text = "ENTER / A  SELECT     ·     PLAY  RACE     ·     ESC / B  BACK"
 	if selected_button:
+		_grab_button_focus(selected_button)
 		_queue_content_entrance()
 		_grab_button_focus_after_layout(selected_button, _entrance_generation)
 	else:
@@ -562,6 +581,17 @@ func _apply_button_art(button: Button, primary: bool) -> void:
 	button.add_theme_stylebox_override("disabled", _plate(Color("161c24"), Color("2a323c"), 1))
 
 
+func _apply_compact_button_art(button: Button) -> void:
+	for state: String in ["normal", "hover", "pressed", "focus", "disabled"]:
+		var style := button.get_theme_stylebox(state) as StyleBoxFlat
+		var compact := style.duplicate() as StyleBoxFlat
+		compact.content_margin_left = 8.0
+		compact.content_margin_right = 8.0
+		compact.content_margin_top = 4.0
+		compact.content_margin_bottom = 4.0
+		button.add_theme_stylebox_override(state, compact)
+
+
 func _clear_content() -> void:
 	_entrance_generation += 1
 	_save_error_back_action = Callable()
@@ -573,6 +603,7 @@ func _clear_content() -> void:
 	_content.modulate = Color.WHITE
 	_content.add_theme_constant_override("separation", 10)
 	for child: Node in _content.get_children():
+		_content.remove_child(child)
 		child.queue_free()
 
 
@@ -773,6 +804,79 @@ func _add_available_act_navigation(act_numbers: Array[int], act_number: int, cal
 	return focusable_buttons
 
 
+func _add_circuit_buttons(circuit_entries: Array, page_start: int, page_end: int) -> Array[Button]:
+	var buttons: Array[Button] = []
+	var grid := GridContainer.new()
+	grid.columns = 2
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 4)
+	_content.add_child(grid)
+	for entry_index in range(page_start, page_end):
+		var entry: Dictionary = circuit_entries[entry_index]
+		var button := _make_button(
+			"%s · SEED %d" % [String(entry["label"]).to_upper(), int(entry["seed"])],
+			Callable(self, "_start_circuit").bind(entry),
+			BLUE,
+			false,
+			"Circuit_%s_%d" % [String(entry["theme"]), int(entry["seed"])]
+		)
+		button.custom_minimum_size = Vector2(0.0, 30.0)
+		button.add_theme_font_size_override("font_size", 13)
+		_apply_compact_button_art(button)
+		grid.add_child(button)
+		_register_button_focus(button)
+		buttons.append(button)
+	for index in buttons.size():
+		if index % 2 == 1:
+			buttons[index].focus_neighbor_left = buttons[index].get_path_to(buttons[index - 1])
+			buttons[index - 1].focus_neighbor_right = buttons[index - 1].get_path_to(buttons[index])
+		if index >= 2:
+			buttons[index].focus_neighbor_top = buttons[index].get_path_to(buttons[index - 2])
+			buttons[index - 2].focus_neighbor_bottom = buttons[index - 2].get_path_to(buttons[index])
+	return buttons
+
+
+func _add_circuit_navigation(page_count: int) -> Array[Button]:
+	var previous_focus: Button = _button_focus_chain.back() if not _button_focus_chain.is_empty() else null
+	var focusable_buttons: Array[Button] = []
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_content.add_child(row)
+	var previous_page := posmod(_quick_race_circuit_page - 1, page_count)
+	var previous := _make_button("PREV CIRCUITS", Callable(self, "_show_quick_race_circuit_page").bind(previous_page), CREAM)
+	previous.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(previous)
+	focusable_buttons.append(previous)
+	var next_page := posmod(_quick_race_circuit_page + 1, page_count)
+	var next := _make_button("NEXT CIRCUITS", Callable(self, "_show_quick_race_circuit_page").bind(next_page), CREAM)
+	next.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(next)
+	focusable_buttons.append(next)
+	var theme_button_label := "OFFICE CIRCUITS" if _quick_race_circuit_theme == "workshop" else "WORKSHOP CIRCUITS"
+	var theme := _make_button(theme_button_label, Callable(self, "_toggle_quick_race_circuit_theme"), AMBER)
+	theme.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(theme)
+	focusable_buttons.append(theme)
+	var back := _make_button("BACK TO TITLE", Callable(self, "show_title"), CREAM)
+	back.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(back)
+	focusable_buttons.append(back)
+	for button: Button in focusable_buttons:
+		button.custom_minimum_size = Vector2(0.0, 30.0)
+		button.add_theme_font_size_override("font_size", 13)
+		_apply_compact_button_art(button)
+	_register_button_focus(focusable_buttons[0])
+	for button: Button in focusable_buttons.slice(1):
+		if previous_focus:
+			button.focus_neighbor_top = button.get_path_to(previous_focus)
+	for index in focusable_buttons.size():
+		if index > 0:
+			focusable_buttons[index].focus_neighbor_left = focusable_buttons[index].get_path_to(focusable_buttons[index - 1])
+		if index < focusable_buttons.size() - 1:
+			focusable_buttons[index].focus_neighbor_right = focusable_buttons[index].get_path_to(focusable_buttons[index + 1])
+	return focusable_buttons
+
+
 func _complete_focus_row(focusable_buttons: Array[Button], following_button: Button) -> void:
 	for button: Button in focusable_buttons.slice(1):
 		button.focus_neighbor_bottom = button.get_path_to(following_button)
@@ -916,6 +1020,25 @@ func _show_map_act(act_number: int) -> void:
 
 func _show_quick_race_act(act_number: int) -> void:
 	show_quick_race(act_number)
+
+
+func _show_quick_race_circuit_page(page: int) -> void:
+	_quick_race_circuit_page = page
+	show_quick_race()
+
+
+func _toggle_quick_race_circuit_theme() -> void:
+	_quick_race_circuit_theme = "office" if _quick_race_circuit_theme == "workshop" else "workshop"
+	_quick_race_circuit_page = 0
+	show_quick_race()
+
+
+func _start_circuit(entry: Dictionary) -> void:
+	var progress: Dictionary = _app.call("get_save_data")
+	var vehicle_id := String(progress.get("selected_vehicle", "rustbug"))
+	if not vehicle_id in progress.get("unlocked_vehicles", ["rustbug"]):
+		vehicle_id = "rustbug"
+	_app.call("start_circuit_race", StringName(entry["theme"]), int(entry["seed"]), vehicle_id)
 
 
 func _start_with_vehicle(vehicle_id: String) -> void:

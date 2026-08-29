@@ -449,7 +449,7 @@ recovery_offset = 70.0
 
 [node name="CounterSurface" type="Sprite2D" parent="ArtSurfaces" unique_id=832705348]
 z_index = -19
-scale = Vector2(1.953125, 1.171875)
+scale = Vector2(3.125, 1.953125)
 texture = ExtResource("11_jf3u5")
 
 [node name="BottomTrack" type="Sprite2D" parent="ArtSurfaces" unique_id=150604676]

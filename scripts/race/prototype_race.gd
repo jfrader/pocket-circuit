@@ -33,6 +33,7 @@ const RUSTBUG_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
+const CIRCUIT_ROSTER := preload("res://data/circuits/circuit_roster.gd")
 const RACE_HUD_SCRIPT := preload("res://scripts/ui/race_hud.gd")
 const COUNTDOWN_STEP_SECONDS := 0.65
 const FALLBACK_OPPONENTS: Array[String] = ["juniper", "milo", "tess"]
@@ -198,9 +199,16 @@ func _configure_session() -> void:
 func _configure_track_variant() -> void:
 	var event: Dictionary = _session.get("event", {})
 	var requested_theme := StringName(event.get("theme", "kitchen"))
-	if requested_theme != &"kitchen":
-		var scene_path := String(TRACK_SCENES.get(requested_theme, ""))
-		var packed := load(scene_path) as PackedScene if not scene_path.is_empty() else null
+	var scene_path := ""
+	if not String(event.get("circuit", "")).is_empty():
+		scene_path = CIRCUIT_ROSTER.scene_path(requested_theme, int(event.get("seed", 0)))
+	elif requested_theme != &"kitchen":
+		scene_path = String(TRACK_SCENES.get(requested_theme, ""))
+	if not scene_path.is_empty():
+		var track_override := OS.get_environment("PC_TRACK_SCENE")
+		if not track_override.is_empty():
+			scene_path = track_override
+		var packed := load(scene_path) as PackedScene
 		if packed:
 			var embedded := track_root
 			embedded.get_parent().remove_child(embedded)

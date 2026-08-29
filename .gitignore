@@ -27,3 +27,4 @@ __pycache__/
 
 # Local run logs
 /runlogs/
+res://tmp/seed_scan/*

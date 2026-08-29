@@ -26,12 +26,20 @@ const LAYOUTS := {
 		"floor": Color("7a5a3f"),
 		"highlight": Color("8a6a4f"),
 		"island": Color("4a4038"),
-		"asphalt": Color("4a5a6a"),
+		"asphalt": Color("2e2c28"),
 		"apron": Color("5c4638"),
-		"track_texture": "res://assets/textures/imagine/track_asphalt_tile.jpg",
-		"floor_texture": "",
-		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top.jpg",
+		"track_texture": "res://assets/textures/imagine/track_asphalt_tile_bright.png",
+		"floor_texture": "res://assets/textures/imagine/workshop_planks_tile_bright.jpg",
+		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top_bright.jpg",
 		"prop_label": "Toolbox",
+		"edge_texture": "res://assets/textures/imagine/workshop_edge_bright.png",
+		"scatter_textures": [
+			"res://assets/textures/imagine/workshop_paint_can.png",
+			"res://assets/textures/imagine/hazard_workshop_socket.png",
+			"res://assets/textures/kitchen/fork_cartoon.png",
+			"res://assets/textures/kitchen/sponge_wet.png",
+			"res://assets/textures/kitchen/ruler_plank.png",
+		],
 		"island_expansion": 10.0,
 		"obstacles": {
 			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/workshop_paint_can.png"},
@@ -67,12 +75,19 @@ const LAYOUTS := {
 		"floor": Color("4a6a8a"),
 		"highlight": Color("5a7a9a"),
 		"island": Color("3a5a7a"),
-		"asphalt": Color("4a5a6a"),
+		"asphalt": Color("272b31"),
 		"apron": Color("3a4a5a"),
-		"track_texture": "res://assets/textures/imagine/track_asphalt_tile.jpg",
-		"floor_texture": "",
-		"prop_texture": "res://assets/textures/imagine/office_keyboard_top.jpg",
+		"track_texture": "res://assets/textures/imagine/track_asphalt_tile_bright.png",
+		"floor_texture": "res://assets/textures/imagine/office_deskmat_tile_bright.jpg",
+		"prop_texture": "res://assets/textures/imagine/office_keyboard_top_bright.jpg",
 		"prop_label": "Keyboard",
+		"edge_texture": "res://assets/textures/imagine/office_edge_bright.png",
+		"scatter_textures": [
+			"res://assets/textures/imagine/office_keycap.png",
+			"res://assets/textures/imagine/hazard_office_cable.png",
+			"res://assets/textures/kitchen/sponge_wet.png",
+			"res://assets/textures/kitchen/lime_cartoon.png",
+		],
 		"island_expansion": 4.0,
 		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.74, 0.74],
 		"obstacles": {
@@ -99,17 +114,40 @@ const LAYOUTS := {
 }
 
 var _theme: StringName = &"workshop"
+var _seed: int = -1
 
 
 func _init() -> void:
 	var env := OS.get_environment("PC_THEME")
 	if env in [&"workshop", &"office"]:
 		_theme = StringName(env)
+	var seed_env := OS.get_environment("PC_SEED")
+	if not seed_env.is_empty():
+		_seed = int(seed_env)
 	call_deferred("_run")
 
 
 func _run() -> void:
 	var spec: Dictionary = LAYOUTS[_theme]
+	if _seed >= 0:
+		var gen := TrackSeedGen.generate_with_retries(_seed, Rect2(-940, -540, 1880, 1080), {
+			"margin": 150.0,
+			"min_point_distance": 210.0,
+			"max_angle_deg": 80.0,
+			"min_self_distance": 280.0,
+			"min_loop_length": 1900.0,
+		})
+		if gen["points"].is_empty():
+			push_error("could not generate a valid circuit near seed " + str(_seed))
+			quit(1)
+			return
+		spec = spec.duplicate()
+		spec["controls"] = gen["points"]
+		spec["seed_obstacles"] = true
+		spec["seed"] = int(gen["seed"])
+		spec["island_expansion"] = 10.0
+		spec.erase("gate_fractions")
+		print("SEED_USED ", gen["seed"])
 	var root := Node2D.new()
 	root.name = String(spec["root_name"])
 	root.add_to_group("track")
@@ -121,7 +159,10 @@ func _run() -> void:
 	_mark_owned(root)
 	var packed := PackedScene.new()
 	packed.pack(root)
-	print("SAVE ", ResourceSaver.save(packed, String(spec["scene"])))
+	var out_path := OS.get_environment("PC_SCENE_OUT")
+	if out_path.is_empty():
+		out_path = String(spec["scene"])
+	print("SAVE ", ResourceSaver.save(packed, out_path))
 	quit(0)
 
 
@@ -165,12 +206,13 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
-	# Floor: base fill first, themed texture tiles on top at full brightness
-	_add_polygon(root, "Floor", _rect_points(Vector2(0, 0), Vector2(2000, 1200)), spec["floor"], -22)
+	# Floor: base fill extends well past the room so the camera never sees a void,
+	# themed texture tiles on top at full brightness
+	_add_polygon(root, "Floor", _rect_points(Vector2(-600, -500), Vector2(2600, 1700)), spec["floor"], -22)
 	_add_polygon(root, "CounterHighlight", _rect_points(Vector2(0, 0), Vector2(1880, 1080)), Color(spec["highlight"], 0.5), -21)
 	var floor_texture := String(spec.get("floor_texture", ""))
 	if not floor_texture.is_empty():
-		_add_floor_tiles(root, floor_texture, 4, 3, Vector2(1.0, 1.0))
+		_add_floor_tiles(root, floor_texture, Vector2(-600, -500), Vector2(2600, 1700), 6, 4, Vector2(1.0, 1.0))
 
 	# Painted track ribbon (visual only — no collision)
 	var corridor := PackedVector2Array()
@@ -188,19 +230,22 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	if not track_texture.is_empty():
 		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30))
 
-	# Outer painted edge line only (the inner edge belongs to the island prop)
+	# Painted edge lines on BOTH sides of the ribbon so the course reads clearly
 	var outer_loop := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
-	_add_edge_line(root, outer_loop, Color("f2ead7", 0.5))
+	_add_edge_line(root, outer_loop, Color("f2ead7", 0.95))
+	_add_dashed_centerline(root, centerline)
 
 	# The big island PROP: real-world object that blocks the corner cut
 	var inner_loop := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
+	_add_edge_line(root, inner_loop, Color("f2ead7", 0.95))
 	_build_island_prop(root, spec, inner_loop, centerline)
 
 	# Room walls (real furniture edges)
-	_add_wall(root, "TopWall", Vector2(0, -575), Vector2(2000, 50))
-	_add_wall(root, "BottomWall", Vector2(0, 575), Vector2(2000, 50))
-	_add_wall(root, "LeftWall", Vector2(-875, 0), Vector2(50, 1200))
-	_add_wall(root, "RightWall", Vector2(875, 0), Vector2(50, 1200))
+	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
+	_add_wall(root, "TopWall", Vector2(0, -575), Vector2(2000, 50), edge_texture)
+	_add_wall(root, "BottomWall", Vector2(0, 575), Vector2(2000, 50), edge_texture)
+	_add_wall(root, "LeftWall", Vector2(-875, 0), Vector2(50, 1200), edge_texture)
+	_add_wall(root, "RightWall", Vector2(875, 0), Vector2(50, 1200), edge_texture)
 
 	# Checkpoints along the arc, aligned to the tangent. The last lap gate sits
 	# slightly past the corner rejoin so its recovery point stays on a straight.
@@ -209,33 +254,36 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	var total := arc[arc.size() - 1]
 	var start := centerline[0]
 	var start_tangent := (centerline[1] - centerline[centerline.size() - 1]).normalized()
+	var gate_samples := PackedVector2Array()
 	for gate_index in GATE_COUNT:
 		var fraction: float = gate_fractions[gate_index]
 		var sample := _sample_at_arc(centerline, arc, total * fraction)
+		gate_samples.append(sample)
 		var tangent := _tangent_at_arc(centerline, arc, total * fraction)
 		var rotation := atan2(-tangent.y, -tangent.x)
 		var is_finish := gate_index == 0
 		var name := "Checkpoint0Finish" if is_finish else "Checkpoint%d" % gate_index
 		_add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y))
 
-	# Checker strip at the finish gate
+	# Bold checker strip at the finish gate (two alternating rows across the corridor)
 	var finish_normal := start_tangent.rotated(PI * 0.5)
 	var strip_half := Vector2(finish_normal.y, -finish_normal.x) * HALF_WIDTH
-	_add_polygon(root, "StartFinishWhite", PackedVector2Array([
-		start + finish_normal * 17.0 + strip_half,
-		start + finish_normal * 17.0 - strip_half,
-		start - finish_normal * 17.0 - strip_half,
-		start - finish_normal * 17.0 + strip_half,
-	]), Color("f5eec8"), -7)
-	var black_blocks := PackedVector2Array()
-	for block in 4:
-		var block_center := start + strip_half * ((float(block) - 1.5) / 2.0)
-		var block_half := Vector2(finish_normal.y, -finish_normal.x) * 20.0
-		black_blocks.append(block_center + finish_normal * 14.0 + block_half)
-		black_blocks.append(block_center + finish_normal * 14.0 - block_half)
-		black_blocks.append(block_center - finish_normal * 14.0 - block_half)
-		black_blocks.append(block_center - finish_normal * 14.0 + block_half)
-	_add_polygon(root, "StartFinishBlack", black_blocks, Color("0d0f14"), -6)
+	var checker_white := PackedVector2Array()
+	var checker_black := PackedVector2Array()
+	var checker_count := 6
+	var cell_half := Vector2(finish_normal.y, -finish_normal.x) * (HALF_WIDTH / float(checker_count))
+	for row in 2:
+		var row_center := start + finish_normal * (30.0 - float(row) * 60.0)
+		for column in checker_count:
+			var cell_center := row_center + cell_half * (float(column) * 2.0 - float(checker_count - 1))
+			var cell_color := Color("f5eec8") if (column + row) % 2 == 0 else Color("0d0f14")
+			var target: PackedVector2Array = checker_white if (column + row) % 2 == 0 else checker_black
+			target.append(cell_center + finish_normal * 30.0 + cell_half)
+			target.append(cell_center + finish_normal * 30.0 - cell_half)
+			target.append(cell_center - finish_normal * 30.0 - cell_half)
+			target.append(cell_center - finish_normal * 30.0 + cell_half)
+	_add_polygon(root, "StartFinishWhite", checker_white, Color("f5eec8"), -7)
+	_add_polygon(root, "StartFinishBlack", checker_black, Color("0d0f14"), -6)
 
 	# Aligned 2x2 grids past the finish line, on the driving side
 	var grid_normal := finish_normal
@@ -254,15 +302,18 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	])
 
 	# Track obstacles (real props with collision)
-	var obstacles: Dictionary = spec["obstacles"]
-	for obstacle_name: String in obstacles:
-		var data: Dictionary = obstacles[obstacle_name]
-		_add_obstacle(root, obstacle_name, data["pos"], float(data["r"]), String(data["tex"]))
+	if spec.get("seed_obstacles", false):
+		_scatter_seed_props(root, spec, centerline, corridor, gate_samples)
+	else:
+		var obstacles: Dictionary = spec["obstacles"]
+		for obstacle_name: String in obstacles:
+			var data: Dictionary = obstacles[obstacle_name]
+			_add_obstacle(root, obstacle_name, data["pos"], float(data["r"]), String(data["tex"]))
 
-	# Apron furniture: real objects off the racing line, some with collision
-	var apron_props: Array = spec.get("apron_props", [])
-	for prop: Dictionary in apron_props:
-		_add_prop_with_collision(root, prop["pos"], float(prop["r"]), String(prop["tex"]))
+		# Apron furniture: real objects off the racing line, some with collision
+		var apron_props: Array = spec.get("apron_props", [])
+		for prop: Dictionary in apron_props:
+			_add_prop_with_collision(root, prop["pos"], float(prop["r"]), String(prop["tex"]))
 
 	# Loose hardware line along the outer edge of the track wherever it turns
 	# away from the room walls (channels the racing line without invisible walls)
@@ -274,7 +325,7 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		"res://assets/textures/kitchen/sponge_wet.png",
 	]
 	var hardware_index := 0
-	for index in range(24, centerline.size() - 24, 4):
+	for index in range(24, centerline.size() - 24, 6):
 		var tangent := (centerline[(index + 1) % centerline.size()] - centerline[(index - 1 + centerline.size()) % centerline.size()]).normalized()
 		if absf(tangent.x) < 0.45 or absf(tangent.y) < 0.45:
 			continue
@@ -283,7 +334,7 @@ func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		if absf(prop_position.x) > 830.0 or absf(prop_position.y) > 530.0:
 			continue
 		if not Geometry2D.is_point_in_polygon(prop_position, corridor):
-			_add_prop_with_collision(root, prop_position, 26.0, prop_textures[hardware_index % prop_textures.size()])
+			_add_prop_with_collision(root, prop_position, 30.0, prop_textures[hardware_index % prop_textures.size()])
 			hardware_index += 1
 
 	# Themed dressing on the island prop and around it
@@ -339,7 +390,7 @@ func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: PackedVector
 	if texture:
 		visual.texture = texture
 		visual.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		visual.modulate = Color(1.7, 1.7, 1.7)
+		visual.modulate = Color(1.2, 1.2, 1.2)
 		var uvs := PackedVector2Array()
 		for point: Vector2 in expanded:
 			uvs.append(Vector2(
@@ -384,8 +435,8 @@ func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: PackedVector
 			var quad := PackedVector2Array([
 				kerb_outline[index],
 				kerb_outline[next],
-				kerb_outline[next] + outward * 18.0,
-				kerb_outline[index] + outward * 18.0,
+				kerb_outline[next] + outward * 26.0,
+				kerb_outline[index] + outward * 26.0,
 			])
 			var block_color := Color("c94f38") if (index / 2) % 2 == 0 else Color("f2ead7")
 			kerb_points.append_array(quad)
@@ -461,7 +512,7 @@ func _add_polygon(parent: Node, node_name: String, points: PackedVector2Array, c
 	parent.add_child(polygon)
 
 
-func _add_wall(parent: Node, node_name: String, position: Vector2, size: Vector2) -> void:
+func _add_wall(parent: Node, node_name: String, position: Vector2, size: Vector2, edge_texture_path: String) -> void:
 	var wall := StaticBody2D.new()
 	wall.name = node_name
 	wall.position = position
@@ -477,11 +528,11 @@ func _add_wall(parent: Node, node_name: String, position: Vector2, size: Vector2
 	visual.polygon = _rect_points(Vector2.ZERO, size)
 	visual.color = Color("0e1524")
 	wall.add_child(visual)
-	var edge_texture := load("res://assets/textures/kitchen/counter_edge.png") as Texture2D
+	var edge_texture := load(edge_texture_path) as Texture2D
 	if edge_texture:
 		var horizontal := size.x > size.y
 		var edge_length := maxf(size.x, size.y)
-		var tile_count := maxi(1, int(ceil(edge_length / 470.0)))
+		var tile_count := maxi(1, int(ceil(edge_length / 1024.0)))
 		for tile in tile_count:
 			var strip := Sprite2D.new()
 			strip.name = "EdgeStrip"
@@ -490,7 +541,7 @@ func _add_wall(parent: Node, node_name: String, position: Vector2, size: Vector2
 			var offset := (float(tile) - float(tile_count - 1) * 0.5) * (edge_length / float(tile_count))
 			strip.position = Vector2(offset, 0.0) if horizontal else Vector2(0.0, offset)
 			strip.rotation = 0.0 if horizontal else PI * 0.5
-			strip.scale = Vector2(edge_length / (470.0 * float(tile_count)), size.y / 470.0) if horizontal else Vector2(edge_length / (470.0 * float(tile_count)), size.x / 470.0)
+			strip.scale = Vector2(edge_length / (1024.0 * float(tile_count)), size.y / 220.0) if horizontal else Vector2(edge_length / (1024.0 * float(tile_count)), size.x / 220.0)
 			wall.add_child(strip)
 
 
@@ -521,6 +572,104 @@ func _add_grid(parent: Node, node_name: String, rotation: float, positions: Arra
 		marker.position = positions[index]
 		marker.rotation = rotation
 		grid.add_child(marker)
+
+
+func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, corridor: PackedVector2Array, gate_samples: PackedVector2Array) -> void:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.get("seed", 0))
+	var textures: Array = spec.get("scatter_textures", [])
+	if textures.is_empty():
+		return
+	var count := centerline.size()
+
+	var clear_of_gates := Callable(self, "_seed_clear_of_gates").bind(gate_samples)
+
+	# a) corridor slalom: a few props on straights, offset from the racing line
+	var corridor_props := PackedVector2Array()
+	for attempt in 200:
+		var index := rng.randi_range(0, count - 1)
+		var sample := centerline[index]
+		if sample.distance_to(centerline[0]) < 380.0:
+			continue
+		if not clear_of_gates.call(sample):
+			continue
+		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
+		var normal := tangent.rotated(PI * 0.5)
+		var candidate := sample + normal * (55.0 if rng.randf() < 0.5 else -55.0)
+		var too_close := false
+		for placed: Vector2 in corridor_props:
+			if placed.distance_to(candidate) < 240.0:
+				too_close = true
+				break
+		if too_close or not Geometry2D.is_point_in_polygon(candidate, corridor):
+			continue
+		corridor_props.append(candidate)
+		if corridor_props.size() >= 3:
+			break
+	for position: Vector2 in corridor_props:
+		_add_obstacle(root, "SeedCorridor", position, 34.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
+
+	# b) island interior: real objects filling the inner area (anti-cut dressing)
+	var island_props := PackedVector2Array()
+	for attempt in 300:
+		var candidate := Vector2(rng.randf_range(-800.0, 800.0), rng.randf_range(-500.0, 500.0))
+		if Geometry2D.is_point_in_polygon(candidate, corridor):
+			continue
+		if not _point_in_loop(candidate, centerline):
+			continue
+		var too_close := false
+		for placed: Vector2 in island_props:
+			if placed.distance_to(candidate) < 110.0:
+				too_close = true
+				break
+		if too_close:
+			continue
+		island_props.append(candidate)
+		if island_props.size() >= 6:
+			break
+	for position: Vector2 in island_props:
+		_add_prop_with_collision(root, position, 34.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
+
+	# c) apron clutter outside the loop
+	var apron_props := PackedVector2Array()
+	for attempt in 400:
+		var candidate := Vector2(rng.randf_range(-830.0, 830.0), rng.randf_range(-530.0, 530.0))
+		if Geometry2D.is_point_in_polygon(candidate, corridor):
+			continue
+		if _point_in_loop(candidate, centerline):
+			continue
+		if not clear_of_gates.call(candidate):
+			continue
+		var too_close := false
+		for placed: Vector2 in apron_props:
+			if placed.distance_to(candidate) < 90.0:
+				too_close = true
+				break
+		if too_close:
+			continue
+		apron_props.append(candidate)
+		if apron_props.size() >= 10:
+			break
+	for position: Vector2 in apron_props:
+		_add_prop_with_collision(root, position, 30.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
+
+
+func _seed_clear_of_gates(point: Vector2, gate_samples: PackedVector2Array) -> bool:
+	for gate: Vector2 in gate_samples:
+		if point.distance_to(gate) < 160.0:
+			return false
+	return true
+
+
+func _point_in_loop(point: Vector2, loop: PackedVector2Array) -> bool:
+	var inside := false
+	var count := loop.size()
+	for index in count:
+		var a := loop[index]
+		var b := loop[(index + 1) % count]
+		if ((a.y > point.y) != (b.y > point.y)) and (point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x):
+			inside = not inside
+	return inside
 
 
 func _add_obstacle(parent: Node, node_name: String, position: Vector2, radius: float, texture_path: String) -> void:
@@ -609,11 +758,39 @@ func _add_cable_line(parent: Node, points: Array) -> void:
 	parent.add_child(line)
 
 
+func _add_dashed_centerline(parent: Node, centerline: PackedVector2Array) -> void:
+	var line := Line2D.new()
+	line.name = "CenterlineDashes"
+	line.width = 5.0
+	line.default_color = Color("f2ead7", 0.8)
+	line.joint_mode = Line2D.LINE_JOINT_ROUND
+	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	line.end_cap_mode = Line2D.LINE_CAP_ROUND
+	line.antialiased = true
+	line.z_index = -8
+	var count := centerline.size()
+	var dash := 0
+	var dash_length := 34.0
+	var dash_gap := 30.0
+	while dash < count - 2:
+		var start := centerline[dash]
+		var target := centerline[dash + 1]
+		var segment_length := start.distance_to(target)
+		if segment_length <= dash_gap:
+			dash += 1
+			continue
+		line.add_point(start)
+		var ratio := minf(dash_length / segment_length, 1.0)
+		line.add_point(start.lerp(target, ratio))
+		dash += 1
+	parent.add_child(line)
+
+
 func _add_edge_line(parent: Node, points: PackedVector2Array, color: Color) -> void:
 	var line := Line2D.new()
 	line.points = points
 	line.closed = true
-	line.width = 6.0
+	line.width = 8.0
 	line.default_color = color
 	line.joint_mode = Line2D.LINE_JOINT_ROUND
 	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
@@ -640,11 +817,11 @@ func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture
 		sprite.position = centerline[index]
 		sprite.rotation = atan2(tangent.y, tangent.x)
 		sprite.scale = scale
-		sprite.modulate = Color(1.6, 1.6, 1.6)
+		sprite.modulate = Color(1.35, 1.35, 1.35)
 		tiles.add_child(sprite)
 
 
-func _add_floor_tiles(parent: Node, texture_path: String, columns: int, rows: int, scale: Vector2) -> void:
+func _add_floor_tiles(parent: Node, texture_path: String, rect_origin: Vector2, rect_size: Vector2, columns: int, rows: int, scale: Vector2) -> void:
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
@@ -652,16 +829,16 @@ func _add_floor_tiles(parent: Node, texture_path: String, columns: int, rows: in
 	tiles.name = "FloorTiles"
 	tiles.z_index = -21
 	parent.add_child(tiles)
-	var tile_width := 940.0 / float(columns)
-	var tile_height := 540.0 / float(rows)
+	var tile_width := rect_size.x / float(columns)
+	var tile_height := rect_size.y / float(rows)
 	for column in columns:
 		for row in rows:
 			var sprite := Sprite2D.new()
 			sprite.texture = texture
 			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-			sprite.position = Vector2(-940.0 + tile_width * (column + 0.5), -540.0 + tile_height * (row + 0.5))
-			sprite.scale = Vector2(tile_width / 940.0, tile_height / 540.0) * scale * 0.96
-			sprite.modulate = Color(1.6, 1.6, 1.6)
+			sprite.position = rect_origin + Vector2(tile_width * (column + 0.5), tile_height * (row + 0.5))
+			sprite.scale = Vector2(tile_width / 1024.0, tile_height / 1024.0) * scale * 0.98
+			sprite.modulate = Color(1.35, 1.35, 1.35)
 			tiles.add_child(sprite)
 
 

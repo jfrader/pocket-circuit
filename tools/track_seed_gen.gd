@@ -1,0 +1,254 @@
+class_name TrackSeedGen
+## Procedural circuit generation (ported from juangallostra/procedural-tracks +
+## ChrisPHP/ProceduralRacetrack): random points -> convex hull -> displaced
+## midpoints -> angle clamp -> point separation, then the room builder's
+## Catmull-Rom sweep. Every seed is reproducible; bad seeds are rejected
+## (self-overlap, too short, no straight long enough for the grid) and the
+## caller walks to the next seed.
+
+const SAMPLE_COUNT := 260
+const HALF_WIDTH := 125.0
+
+static var _rng := RandomNumberGenerator.new()
+
+
+static func generate_with_retries(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Dictionary:
+	var current := seed
+	for attempt in 40:
+		var points := generate(current, room_rect, params)
+		if not points.is_empty():
+			return {"points": points, "seed": current}
+		current += 1
+	return {"points": PackedVector2Array(), "seed": current}
+
+
+static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> PackedVector2Array:
+	_rng.seed = seed
+	var margin := float(params.get("margin", 150.0))
+	var min_point_distance := float(params.get("min_point_distance", 200.0))
+	var max_angle_deg := float(params.get("max_angle_deg", 80.0))
+	var min_self_distance := float(params.get("min_self_distance", 300.0))
+	var min_loop_length := float(params.get("min_loop_length", 1900.0))
+	var point_count := int(params.get("point_count", 0))
+	var bounds := Rect2(room_rect.position + Vector2(margin, margin), room_rect.size - Vector2(margin, margin) * 2.0)
+
+	# 1. Random spread points, kept apart
+	var seeds := PackedVector2Array()
+	for attempt in 200:
+		if point_count > 0 and seeds.size() >= point_count:
+			break
+		var candidate := Vector2(
+			_rng.randf_range(bounds.position.x, bounds.end.x),
+			_rng.randf_range(bounds.position.y, bounds.end.y))
+		var too_close := false
+		for existing: Vector2 in seeds:
+			if existing.distance_to(candidate) < min_point_distance:
+				too_close = true
+				break
+		if not too_close:
+			seeds.append(candidate)
+	if seeds.size() < 6:
+		return PackedVector2Array()
+
+	# 2. Convex hull (Andrew monotone chain)
+	var hull := _convex_hull(seeds)
+	if hull.size() < 6:
+		return PackedVector2Array()
+
+	# 3. Displaced midpoints on every hull edge (rounded organic outline)
+	var shaped := PackedVector2Array()
+	var count := hull.size()
+	for index in count:
+		var next := (index + 1) % count
+		shaped.append(hull[index])
+		var edge := hull[next] - hull[index]
+		var mid := hull[index] + edge * 0.5
+		var displacement := edge.length() * _rng.randf_range(0.05, 0.16)
+		var direction := Vector2.RIGHT.rotated(_rng.randf_range(0.0, TAU))
+		var displaced := mid + direction * displacement
+		# Pull displaced midpoints slightly toward the loop centroid for concave notches
+		var centroid := _centroid(hull)
+		displaced = displaced.lerp(centroid, 0.15)
+		shaped.append(displaced)
+
+	# 4. Clamp corner angles
+	for iteration in 3:
+		shaped = _fix_angles(shaped, deg_to_rad(max_angle_deg))
+		shaped = _push_apart(shaped, 120.0)
+
+	# 5. Keep inside bounds
+	for index in shaped.size():
+		shaped[index] = Vector2(
+			clampf(shaped[index].x, bounds.position.x, bounds.end.x),
+			clampf(shaped[index].y, bounds.position.y, bounds.end.y))
+
+	# 6. Resample the spline into evenly spaced control points, then validate
+	var even := _resample_arc(shaped, 22)
+	if even.size() < 8:
+		return PackedVector2Array()
+	var centerline := _sample_centerline(even)
+	if _polyline_length(centerline) < min_loop_length:
+		return PackedVector2Array()
+	if not _self_distance_ok(centerline, min_self_distance):
+		return PackedVector2Array()
+
+	# 7. Start at the longest straight (aligned grid + checker on a straight)
+	return _reorder_to_longest_straight(even, centerline)
+
+
+static func _convex_hull(points: PackedVector2Array) -> PackedVector2Array:
+	var ordered: Array[Vector2] = []
+	for point: Vector2 in points:
+		ordered.append(point)
+	ordered.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+		return a.x < b.x if a.x != b.x else a.y < b.y)
+	var lower := PackedVector2Array()
+	for point: Vector2 in ordered:
+		while lower.size() >= 2 and _cross(lower[lower.size() - 2], lower[lower.size() - 1], point) <= 0.0:
+			lower.remove_at(lower.size() - 1)
+		lower.append(point)
+	var upper := PackedVector2Array()
+	for index in range(ordered.size() - 1, -1, -1):
+		var point := ordered[index]
+		while upper.size() >= 2 and _cross(upper[upper.size() - 2], upper[upper.size() - 1], point) <= 0.0:
+			upper.remove_at(upper.size() - 1)
+		upper.append(point)
+	lower.remove_at(lower.size() - 1)
+	upper.remove_at(upper.size() - 1)
+	lower.append_array(upper)
+	return lower
+
+
+static func _cross(o: Vector2, a: Vector2, b: Vector2) -> float:
+	return (a.x - o.x) * (b.y - o.y) - (a.y - o.y) * (b.x - o.x)
+
+
+static func _centroid(points: PackedVector2Array) -> Vector2:
+	var total := Vector2.ZERO
+	for point: Vector2 in points:
+		total += point
+	return total / float(points.size())
+
+
+static func _fix_angles(points: PackedVector2Array, max_angle: float) -> PackedVector2Array:
+	var result := points.duplicate()
+	var count := result.size()
+	for index in count:
+		var prev := result[(index - 1 + count) % count]
+		var next := result[(index + 1) % count]
+		var incoming := (result[index] - prev).normalized()
+		var outgoing := (next - result[index]).normalized()
+		var angle := incoming.angle_to(outgoing)
+		if absf(angle) <= max_angle:
+			continue
+		var clamped := max_angle * signf(angle)
+		result[(index + 1) % count] = result[index] + outgoing.rotated(clamped - angle) * next.distance_to(result[index])
+	return result
+
+
+static func _push_apart(points: PackedVector2Array, min_distance: float) -> PackedVector2Array:
+	var result := points.duplicate()
+	for i in result.size():
+		for j in range(i + 1, result.size()):
+			var delta := result[j] - result[i]
+			var distance := delta.length()
+			if distance > 0.001 and distance < min_distance:
+				var push := delta.normalized() * (min_distance - distance) * 0.5
+				result[i] -= push
+				result[j] += push
+	return result
+
+
+static func _sample_centerline(controls: PackedVector2Array) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for index in SAMPLE_COUNT:
+		points.append(_catmull_rom_closed(controls, float(index) / float(SAMPLE_COUNT)))
+	return points
+
+
+static func _catmull_rom_closed(points: PackedVector2Array, t: float) -> Vector2:
+	var count := points.size()
+	var scaled := t * float(count)
+	var i := int(floor(scaled))
+	var local := scaled - float(i)
+	var p0: Vector2 = points[posmod(i - 1, count)]
+	var p1: Vector2 = points[posmod(i, count)]
+	var p2: Vector2 = points[posmod(i + 1, count)]
+	var p3: Vector2 = points[posmod(i + 2, count)]
+	return 0.5 * (
+		(2.0 * p1)
+		+ (-p0 + p2) * local
+		+ (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * local * local
+		+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * local * local * local
+	)
+
+
+static func _polyline_length(points: PackedVector2Array) -> float:
+	var total := 0.0
+	for index in points.size():
+		total += points[index].distance_to(points[(index + 1) % points.size()])
+	return total
+
+
+static func _self_distance_ok(centerline: PackedVector2Array, min_distance: float) -> bool:
+	var count := centerline.size()
+	for index in count:
+		var point := centerline[index]
+		for offset in range(24, count - 24):
+			var other := centerline[(index + offset) % count]
+			if point.distance_to(other) < min_distance:
+				return false
+	return true
+
+
+static func _resample_arc(controls: PackedVector2Array, target_count: int) -> PackedVector2Array:
+	var dense := PackedVector2Array()
+	var steps := 1600
+	for step in steps:
+		dense.append(_catmull_rom_closed(controls, float(step) / float(steps)))
+	var cumulative := PackedFloat32Array()
+	cumulative.append(0.0)
+	for index in range(1, dense.size()):
+		cumulative.append(cumulative[index - 1] + dense[index - 1].distance_to(dense[index]))
+	var total := cumulative[cumulative.size() - 1]
+	if total < 200.0:
+		return PackedVector2Array()
+	var result := PackedVector2Array()
+	var cursor := 0
+	for point_index in target_count:
+		var target := total * float(point_index) / float(target_count)
+		while cursor < cumulative.size() - 2 and cumulative[cursor + 1] < target:
+			cursor += 1
+		var local := 0.0
+		if cumulative[cursor + 1] > cumulative[cursor]:
+			local = (target - cumulative[cursor]) / (cumulative[cursor + 1] - cumulative[cursor])
+		result.append(dense[cursor].lerp(dense[cursor + 1], clampf(local, 0.0, 1.0)))
+	return result
+
+
+static func _reorder_to_longest_straight(controls: PackedVector2Array, centerline: PackedVector2Array) -> PackedVector2Array:
+	var count := controls.size()
+	var span := 28
+	var sample_span := int(floor(260.0 / float(count)))
+	var best_control := 0
+	var best_straight := -1.0
+	for index in count:
+		var sample_index := int(round(float(index) * 260.0 / float(count))) % centerline.size()
+		var ahead := centerline[(sample_index + span) % centerline.size()]
+		var behind := centerline[(sample_index + centerline.size() - span) % centerline.size()]
+		var chord := behind.distance_to(ahead)
+		if chord < 380.0:
+			continue
+		var path := 0.0
+		for offset in range(1, span * 2 + 1):
+			var from := (sample_index + centerline.size() - span + offset - 1) % centerline.size()
+			var to := (sample_index + centerline.size() - span + offset) % centerline.size()
+			path += centerline[from].distance_to(centerline[to])
+		var straightness := chord / maxf(path, 1.0)
+		if straightness > best_straight:
+			best_straight = straightness
+			best_control = index
+	var result := PackedVector2Array()
+	for index in count:
+		result.append(controls[(best_control + index) % count])
+	return result

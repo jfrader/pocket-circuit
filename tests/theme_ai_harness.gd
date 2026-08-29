@@ -34,7 +34,9 @@ func _run_test() -> void:
 
 
 func _verify_scene_contract() -> bool:
-	var packed := load(String(THEME_SCENES[_theme])) as PackedScene
+	var override := OS.get_environment("PC_TRACK_SCENE")
+	var scene_path := override if not override.is_empty() else String(THEME_SCENES[_theme])
+	var packed := load(scene_path) as PackedScene
 	if not _expect(packed != null, "%s track scene should exist" % _theme):
 		return false
 	var track := packed.instantiate()

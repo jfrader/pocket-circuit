@@ -3,6 +3,20 @@
 ## Unreleased
 
 ### Added
+- A procedural circuit generator (`tools/track_seed_gen.gd`, ported from the
+  juangallostra / ChrisPHP racetrack algorithms): random points, convex hull,
+  displaced midpoints, angle clamping, and an arc-length spline resample —
+  producing organic rounded circuits instead of rectangles. Seeds are
+  validated for self-overlap and grid-straight length and are fully
+  reproducible.
+- Twenty-eight generated circuits baked into `scenes/tracks/circuits/` (fourteen
+  layouts per workshop/office theme), each with painted ribbon, edge lines,
+  dashed centerline, bold two-row checker strip, seeded prop scatter (island
+  fill, corridor slalom, apron clutter) and per-theme furniture surfaces.
+- A "GENERATED CIRCUITS" section in Quick Race (paged, workshop/office themed)
+  so every baked circuit is playable, plus a circuit roster catalog and test.
+- Brightened generated floor/island textures (desk mat, wood planks, toolbox,
+  keyboard) and per-theme furniture edge strips on all room walls.
 
 - The complete nine-event Grand Household Circuit, with three story acts,
   persistent standings, unlocks, replayable events, and a championship ending.

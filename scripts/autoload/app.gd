@@ -190,6 +190,33 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 	get_tree().change_scene_to_file(RACE_SCENE)
 
 
+func start_circuit_race(theme: StringName, seed: int, vehicle_id: String) -> void:
+	var event := {
+		"id": "circuit_%s_%d" % [String(theme), seed],
+		"name": "Circuit %s %d" % [String(theme).capitalize(), seed],
+		"theme": String(theme),
+		"seed": seed,
+		"circuit": "generated",
+		"race_format": "circuit",
+		"reverse": false,
+		"opponent_count": 3,
+		"opponents": ["juniper", "milo", "tess"],
+	}
+	if not vehicle_id in _save_data["unlocked_vehicles"]:
+		vehicle_id = "rustbug"
+	current_race_session = {
+		"mode": "quick",
+		"event_id": event["id"],
+		"event": event,
+		"vehicle_id": vehicle_id,
+		"difficulty": String(_save_data["difficulty"]),
+		"result_committed": false,
+	}
+	if _shell:
+		_shell.visible = false
+	get_tree().change_scene_to_file(RACE_SCENE)
+
+
 func report_race_result(player_position: int, total_time: float, results: Array, player_dnf: bool = false) -> bool:
 	if current_race_session.is_empty():
 		return false
