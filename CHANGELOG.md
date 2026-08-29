@@ -34,12 +34,11 @@
 - The start/finish checker now sits on the left straight behind the starting
   grid, and lap gates span the full drivable corridor, so wide lines and brief
   off-track excursions still count the lap.
-- Kitchen, Workshop, and Office are now three genuinely different course
-  shapes: the kitchen keeps its counter loop; the workshop is an anvil hairpin
-  (bottom straight, two side lanes, and a 180-degree U-turn around a giant
-  anvil peninsula at the top); the office is a big desk triangle (wide bottom
-  straight, right lane, and a long diagonal paper-chute straight back). Each
-  track has its own hazards, surface zones, and boost strips.
+- Kitchen, Workshop, and Office are now three different circuits: the kitchen
+  keeps its counter loop, while the workshop and office are generated from
+  smooth closed splines (a long-straight L-circuit for the workshop, a wide
+  paperclip with a rounded hairpin for the office) with rounded corners,
+  swept-curve corridors, and race-grid-aligned starting lineups.
 - The title and machine bay now use a high-contrast after-hours workbench
   presentation with one dominant race action and the full four-car roster.
 - Title PLAY starts the championship; Quick Race, Options, Credits, and Quit are real buttons under it.

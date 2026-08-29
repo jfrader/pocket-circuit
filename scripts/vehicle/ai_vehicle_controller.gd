@@ -332,6 +332,8 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 	var plan := {"steer": 0.0, "weight": 0.0, "speed_scale": 1.0, "avoid_direction": desired_direction}
 	if not vehicle.is_inside_tree():
 		return plan
+	if vehicle.speed < 60.0:
+		return plan
 	var origin := vehicle.global_position + forward * OBSTACLE_FRONT_OFFSET
 	var feeler_length := clampf(vehicle.speed * 0.75, 160.0, 360.0)
 	var best_clearance := -1.0

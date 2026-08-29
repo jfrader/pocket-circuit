@@ -49,15 +49,15 @@ func _create_surface_zones() -> void:
 	match theme:
 		&"workshop":
 			definitions = [
-				{"name": &"oil slick", "label": "", "grip": 0.45, "speed": 0.92, "color": Color(0.06, 0.08, 0.12, 0.58), "points": PackedVector2Array([Vector2(-860, -170), Vector2(-610, -170), Vector2(-610, 120), Vector2(-860, 120)])},
+				{"name": &"oil slick", "label": "", "grip": 0.45, "speed": 0.92, "color": Color(0.06, 0.08, 0.12, 0.58), "points": PackedVector2Array([Vector2(610, -170), Vector2(860, -170), Vector2(860, 120), Vector2(610, 120)])},
 				{"name": &"sawdust", "label": "", "grip": 0.78, "speed": 0.72, "color": Color(0.76, 0.53, 0.24, 0.52), "points": PackedVector2Array([Vector2(-600, 245), Vector2(-300, 245), Vector2(-300, 490), Vector2(-600, 490)])},
 				{"name": &"spark strip", "label": "", "grip": 1.0, "speed": 1.2, "color": Color(AMBER, 0.16), "points": PackedVector2Array([Vector2(300, 245), Vector2(600, 245), Vector2(600, 490), Vector2(300, 490)])},
 			]
 		&"office":
 			definitions = [
-				{"name": &"loose paper", "label": "", "grip": 0.84, "speed": 0.78, "color": Color(PAPER, 0.4), "points": PackedVector2Array([Vector2(-520, 210), Vector2(-100, 210), Vector2(-100, 530), Vector2(-520, 530)])},
+				{"name": &"loose paper", "label": "", "grip": 0.84, "speed": 0.78, "color": Color(PAPER, 0.4), "points": PackedVector2Array([Vector2(-520, 245), Vector2(-100, 245), Vector2(-100, 490), Vector2(-520, 490)])},
 				{"name": &"keyboard", "label": "", "grip": 0.7, "speed": 0.64, "color": Color(0.35, 0.5, 0.67, 0.56), "points": PackedVector2Array([Vector2(610, 120), Vector2(860, 120), Vector2(860, 430), Vector2(610, 430)])},
-				{"name": &"mail shoot", "label": "", "grip": 1.0, "speed": 1.18, "color": Color(AMBER, 0.16), "points": PackedVector2Array([Vector2(300, 210), Vector2(600, 210), Vector2(600, 530), Vector2(300, 530)])},
+				{"name": &"mail shoot", "label": "", "grip": 1.0, "speed": 1.18, "color": Color(AMBER, 0.16), "points": PackedVector2Array([Vector2(300, 245), Vector2(600, 245), Vector2(600, 490), Vector2(300, 490)])},
 			]
 		_:
 			definitions = [
@@ -77,8 +77,8 @@ func _create_hazard() -> void:
 	var travel_end: Vector2
 	match theme:
 		&"workshop":
-			travel_start = Vector2(-875.0, -40.0)
-			travel_end = Vector2(-595.0, -40.0)
+			travel_start = Vector2(610.0, -40.0)
+			travel_end = Vector2(850.0, -40.0)
 		&"office":
 			travel_start = Vector2(610.0, -40.0)
 			travel_end = Vector2(850.0, -40.0)
