@@ -20,6 +20,9 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- The circuit pool re-derived for the longer layouts: 16 new AI-verified
+  classic circuits per theme (loop lengths ~3.6–4.3k) replace the previous
+  short ones.
 - "One big object" rooms: the central island is now a coherent themed object
   (red tool tray with compartments and tools for the workshop, a keyboard for
   the office, a white plate with a blue inner ring and crumbs for the
