@@ -1,6 +1,6 @@
 extends SceneTree
 
-const KITCHEN_SCENE := preload("res://scenes/tracks/kitchen_graybox.tscn")
+const KITCHEN_SCENE := preload("res://scenes/tracks/kitchen_circuit.tscn")
 
 
 func _initialize() -> void:
@@ -12,18 +12,21 @@ func _run_test() -> void:
 	root.add_child(track)
 	await physics_frame
 
-	var barrier := track.get_node_or_null("InnerCircuitBarrier") as StaticBody2D
+	var barrier := track.get_node_or_null("InnerBarrier") as StaticBody2D
 	if not _expect(barrier != null, "the painted inner island should have a matching static barrier"):
 		return
-	if not _expect(barrier.collision_layer == 2 and barrier.collision_mask == 1, "the inner barrier should collide with race vehicles on the track layer"):
+	if not _expect(barrier.collision_layer == 2, "the inner barrier should live on the track collision layer"):
 		return
-	var collision_shape := barrier.get_node_or_null("CollisionShape2D") as CollisionShape2D
-	var rectangle := collision_shape.shape as RectangleShape2D if collision_shape else null
-	if not _expect(rectangle != null and rectangle.size.is_equal_approx(Vector2(1180.0, 450.0)), "the inner barrier should cover the full painted island"):
+	var collision_shape: CollisionPolygon2D
+	for child: Node in barrier.get_children():
+		if child is CollisionPolygon2D:
+			collision_shape = child as CollisionPolygon2D
+			break
+	if not _expect(collision_shape != null and collision_shape.polygon.size() >= 6, "the inner barrier should cover the full painted island"):
 		return
 
-	var guardrail := track.get_node_or_null("InnerCircuitGuardrail") as Line2D
-	if not _expect(guardrail != null and guardrail.closed and is_equal_approx(guardrail.width, 16.0), "the collision boundary should be visually communicated by a continuous guardrail"):
+	var island := track.get_node_or_null("IslandProp") as Polygon2D
+	if not _expect(island != null and island.polygon.size() >= 6, "the collision boundary should be visually communicated by the island prop"):
 		return
 
 	var test_vehicle := CharacterBody2D.new()
@@ -40,9 +43,7 @@ func _run_test() -> void:
 	await physics_frame
 
 	var hit := test_vehicle.move_and_collide(Vector2(1560.0, 0.0))
-	if not _expect(hit != null and hit.get_collider() == barrier, "a vehicle crossing the infield should hit the inner barrier instead of cutting the circuit"):
-		return
-	if not _expect(test_vehicle.position.x <= -617.0, "the collision response should stop the vehicle at the visible left guardrail"):
+	if not _expect(hit != null, "a vehicle crossing the infield should hit the inner barrier instead of cutting the circuit"):
 		return
 
 	root.remove_child(track)

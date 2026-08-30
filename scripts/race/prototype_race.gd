@@ -60,6 +60,7 @@ const AI_LANE_OFFSETS: Array[float] = [-42.0, 38.0, 6.0]
 const TRACK_SCENES: Dictionary = {
 	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
 	&"office": "res://scenes/tracks/office_desk.tscn",
+	&"kitchen": "res://scenes/tracks/kitchen_circuit.tscn",
 }
 
 @onready var race_manager: RaceManager = $RaceManager
@@ -210,7 +211,7 @@ func _configure_track_variant() -> void:
 		if packed == null:
 			var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed)
 			packed = built["scene"] as PackedScene
-	elif requested_theme != &"kitchen":
+	else:
 		scene_path = String(TRACK_SCENES.get(requested_theme, ""))
 		var track_override := OS.get_environment("PC_TRACK_SCENE")
 		if not track_override.is_empty():

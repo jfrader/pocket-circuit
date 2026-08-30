@@ -1,7 +1,7 @@
 extends SceneTree
 
 const CAMERA_SCRIPT := preload("res://scripts/camera/follow_camera.gd")
-const KITCHEN_SCENE := preload("res://scenes/tracks/kitchen_graybox.tscn")
+const KITCHEN_SCENE := preload("res://scenes/tracks/kitchen_circuit.tscn")
 
 class TestVehicle extends RigidBody2D:
 	var boosting := true
@@ -39,14 +39,7 @@ func _run_test() -> void:
 	var kitchen := KITCHEN_SCENE.instantiate()
 	root.add_child(kitchen)
 	await process_frame
-	var droplet := kitchen.get_node("MicroDressing/Droplet01A") as Sprite2D
-	var resting_scale := droplet.scale
-	kitchen.call("_process", 0.25)
-	if not _expect(droplet.scale.is_equal_approx(resting_scale), "reduced motion should keep decorative droplets at their resting scale"):
-		return
-	app.set("reduced_motion", false)
-	kitchen.call("_process", 0.25)
-	if not _expect(not droplet.scale.is_equal_approx(resting_scale), "decorative droplet motion should remain available when reduced motion is off"):
+	if not _expect(kitchen.get_node_or_null("TrackRibbon") != null, "the generated kitchen should present a painted ribbon"):
 		return
 
 	app.set("reduced_motion", original_reduced_motion)

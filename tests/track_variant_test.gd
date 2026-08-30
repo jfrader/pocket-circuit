@@ -3,7 +3,7 @@ extends SceneTree
 const PRESENTER_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
 const OBSTACLE_NAMES: Array[String] = ["MugA", "MugB", "CerealA", "CerealB", "Sponge", "Fork", "Ruler", "Apple", "Lime", "Cup", "Spoon"]
 const THEME_SCENES: Dictionary = {
-	&"kitchen": "res://scenes/tracks/kitchen_graybox.tscn",
+	&"kitchen": "res://scenes/tracks/kitchen_circuit.tscn",
 	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
 	&"office": "res://scenes/tracks/office_desk.tscn",
 }

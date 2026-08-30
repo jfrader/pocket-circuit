@@ -20,6 +20,11 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- The kitchen moved fully onto the generated-track system: its old
+  hand-made scene (painted strips, amber decoration lines, translucent
+  patches, micro dressing) is retired from gameplay in favour of the builder's
+  kitchen circuit, so every room now shares one visual language and no stray
+  translucent squares remain.
 - Island silhouette clean-up: removed the rounded-rectangle ink outline and
   the inner-vertex fold artifacts (the island surface is now the fold-free
   room-minus-track region while the collision keeps the proven expanded

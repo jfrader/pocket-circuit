@@ -1,9 +1,9 @@
 extends SceneTree
 
-const TRACK_SCENE := preload("res://scenes/tracks/kitchen_graybox.tscn")
+const TRACK_SCENE := preload("res://scenes/tracks/kitchen_circuit.tscn")
 const CHECKPOINT_SCENE := preload("res://scenes/race/checkpoint.tscn")
 const THEME_SCENES: Dictionary = {
-	&"kitchen": "res://scenes/tracks/kitchen_graybox.tscn",
+	&"kitchen": "res://scenes/tracks/kitchen_circuit.tscn",
 	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
 	&"office": "res://scenes/tracks/office_desk.tscn",
 }
@@ -27,9 +27,7 @@ func _run_test() -> void:
 	if not _expect(gate_shape.size.is_equal_approx(Vector2(34.0, 280.0)), "checkpoint gates should span the full drivable corridor"):
 		return
 
-	if not await _test_kitchen_contract():
-		return
-	for theme: StringName in [&"workshop", &"office"]:
+	for theme: StringName in [&"kitchen", &"workshop", &"office"]:
 		if not await _test_theme_gate(theme):
 			return
 	print("FINISH_GATE_COVERAGE_TEST PASS")
