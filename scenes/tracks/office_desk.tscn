@@ -1,7 +1,7 @@
 [gd_scene format=3]
 
-[ext_resource type="Texture2D" path="res://assets/textures/imagine/office_deskmat_tile_bright.jpg" id="1_3yh0c"]
-[ext_resource type="Texture2D" path="res://assets/textures/imagine/track_strip_office.png" id="2_busos"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/floor_pad.png" id="1_3yh0c"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/track_pad.png" id="2_busos"]
 [ext_resource type="Texture2D" path="res://assets/textures/imagine/office_keyboard_top_bright.jpg" id="3_y6gja"]
 [ext_resource type="Texture2D" path="res://assets/textures/imagine/office_edge_bright.png" id="4_168dw"]
 [ext_resource type="PackedScene" path="res://scenes/race/checkpoint.tscn" id="5_ue60i"]

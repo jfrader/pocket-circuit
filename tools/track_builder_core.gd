@@ -32,9 +32,9 @@ const LAYOUTS := {
 		"island": Color("4a4038"),
 		"asphalt": Color("2e2c28"),
 		"apron": Color("3f3830"),
-		"track_texture": "res://assets/textures/kitchen/track_surface.png",
-		"track_tile_modulate": 1.45,
-		"floor_texture": "res://assets/textures/kitchen/counter_surface_bright.png",
+		"track_texture": "res://assets/textures/imagine/track_cloth.png",
+		"track_tile_modulate": 1.0,
+		"floor_texture": "res://assets/textures/imagine/floor_cloth.png",
 		"prop_texture": "res://assets/textures/kitchen/plate_large.png",
 		"prop_label": "Plate",
 		"edge_texture": "res://assets/textures/kitchen/counter_edge.png",
@@ -110,9 +110,9 @@ const LAYOUTS := {
 		"island": Color("4a4038"),
 		"asphalt": Color("2e2c28"),
 		"apron": Color("5c4638"),
-		"track_texture": "res://assets/textures/imagine/track_strip_workshop.png",
-		"track_tile_modulate": 1.15,
-		"floor_texture": "res://assets/textures/imagine/workshop_planks_tile_bright.jpg",
+		"track_texture": "res://assets/textures/imagine/track_wood.png",
+		"track_tile_modulate": 1.0,
+		"floor_texture": "res://assets/textures/imagine/floor_wood.png",
 		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top_bright.jpg",
 		"prop_label": "Toolbox",
 		"edge_texture": "res://assets/textures/imagine/workshop_edge_bright.png",
@@ -205,9 +205,9 @@ const LAYOUTS := {
 		"island": Color("3a5a7a"),
 		"asphalt": Color("272b31"),
 		"apron": Color("3a4a5a"),
-		"track_texture": "res://assets/textures/imagine/track_strip_office.png",
-		"track_tile_modulate": 1.3,
-		"floor_texture": "res://assets/textures/imagine/office_deskmat_tile_bright.jpg",
+		"track_texture": "res://assets/textures/imagine/track_pad.png",
+		"track_tile_modulate": 1.0,
+		"floor_texture": "res://assets/textures/imagine/floor_pad.png",
 		"prop_texture": "res://assets/textures/imagine/office_keyboard_top_bright.jpg",
 		"prop_label": "Keyboard",
 		"edge_texture": "res://assets/textures/imagine/office_edge_bright.png",
@@ -1190,7 +1190,7 @@ static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, 
 		sprite.position = centerline[index]
 		sprite.rotation = atan2(tangent.y, tangent.x)
 		sprite.scale = scale
-		sprite.modulate = Color(modulate_value, modulate_value, modulate_value, 0.62)
+		sprite.modulate = Color(modulate_value, modulate_value, modulate_value, 0.85)
 		tiles.add_child(sprite)
 
 
