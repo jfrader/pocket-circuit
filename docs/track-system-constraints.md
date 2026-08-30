@@ -33,7 +33,7 @@ scenes/tracks/circuits/        baked roster (AI-validated pool)
 - **Never use the hard bounds clamp without the re-separation passes** — it
   piles points on rect corners and folds the spline.
 - Validation: min loop length per archetype, **max loop length** for the
-  switchback (2300–2500), self-distance (corridor half-width 125 + margin),
+  switchback (3200, now enforced), self-distance (corridor half-width 125 + margin),
   whole loop inside the room polygon with margin.
 - Four archetypes (`posmod(seed, 4)`): fast (gentle 62°, long), technical
   (82°, busy), asymmetric (side bias), switchback (84° — **do not exceed
@@ -55,7 +55,7 @@ under ~2700×1500 so the QA wide capture (zoom 0.46) never shows void.
   no kerb blocks, no translucent zone overlays (surface-zone polygons are
   set to Color.TRANSPARENT but keep their gameplay grip/speed modifiers).
 - The corridor = a subtle warm light tint (Color(1, 0.96, 0.88, ~0.17)) +
-  theme wear-strip tiles at ~0.62–0.85 alpha. A distinct colored band was
+  theme wear-strip tiles at 0.85 alpha. A distinct colored band was
   explicitly rejected; a dark tint is invisible on dark floors.
 - Floor surfaces are full-bleed patterns per theme (gingham cloth, desk pad,
   wood planks). Track strips are darker theme variants of the floor.

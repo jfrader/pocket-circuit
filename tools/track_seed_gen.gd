@@ -72,6 +72,7 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 	var max_angle_deg := float(profile.get("max_angle_deg", 80.0))
 	var min_self_distance := float(profile.get("min_self_distance", 300.0))
 	var min_loop_length := float(profile.get("min_loop_length", 1900.0))
+	var max_loop_length := float(profile.get("max_loop_length", 0.0))
 	var point_count := int(profile.get("point_count", 0))
 	var displacement_min := float(profile.get("displacement_min", 0.05)) * float(profile.get("displacement_scale", 1.0))
 	var displacement_max := float(profile.get("displacement_max", 0.16)) * float(profile.get("displacement_scale", 1.0))
@@ -160,7 +161,10 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 			if not _inside_with_margin(check_point, room_polygon, check_margin):
 				return PackedVector2Array()
 	var centerline := _sample_centerline(even)
-	if _polyline_length(centerline) < min_loop_length:
+	var loop_length := _polyline_length(centerline)
+	if loop_length < min_loop_length:
+		return PackedVector2Array()
+	if max_loop_length > 0.0 and loop_length > max_loop_length:
 		return PackedVector2Array()
 	if not _self_distance_ok(centerline, min_self_distance):
 		return PackedVector2Array()

@@ -77,6 +77,8 @@ static var PROP_SHAPES := {
 	"napkin.png": {"shape": "circle", "size": Vector2(38.0, 38.0)},
 	"sponge_wet.png": {"shape": "circle", "size": Vector2(40.0, 40.0)},
 	"kitchen_sponge.png": {"shape": "circle", "size": Vector2(40.0, 40.0)},
+	"wrench.png": {"shape": "rect", "size": Vector2(48.0, 20.0)},
+	"hammer.png": {"shape": "rect", "size": Vector2(50.0, 24.0)},
 	"workshop_paint_can.png": {"shape": "circle", "size": Vector2(52.0, 52.0)},
 	"workshop_toolbox_top_bright.jpg": {"shape": "circle", "size": Vector2(130.0, 130.0)},
 	"office_keyboard_top_bright.jpg": {"shape": "circle", "size": Vector2(130.0, 130.0)},
@@ -159,6 +161,11 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/barrel_wood.png",
 			"res://assets/textures/imagine/plant_small.png",
+		],
+		"corner_giants": [
+			"res://assets/textures/imagine/barrel_wood.png",
+			"res://assets/textures/imagine/workshop_paint_can.png",
+			"res://assets/textures/imagine/hose_coil.png",
 		],
 		"decals": [
 			"res://assets/textures/imagine/crumb_cluster.png",
@@ -248,6 +255,11 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/plant_small.png",
 			"res://assets/textures/kitchen/cup_cartoon.png",
+		],
+		"corner_giants": [
+			"res://assets/textures/imagine/mug_top.png",
+			"res://assets/textures/imagine/teapot_top.png",
+			"res://assets/textures/imagine/vase_top.png",
 		],
 		"decals": [
 			"res://assets/textures/imagine/sawdust_patch.png",
@@ -349,6 +361,11 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/barrel_wood.png",
 			"res://assets/textures/imagine/plant_small.png",
+		],
+		"corner_giants": [
+			"res://assets/textures/imagine/lamp_desk.png",
+			"res://assets/textures/imagine/tape_roll.png",
+			"res://assets/textures/imagine/mug_top.png",
 		],
 		"decals": [
 			"res://assets/textures/imagine/paper_sheet.png",
