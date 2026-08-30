@@ -27,6 +27,9 @@ func _initialize() -> void:
 		{"name": "screw", "body": _screw()},
 		{"name": "coin", "body": _coin()},
 		{"name": "plant_small", "body": _plant_small()},
+		{"name": "lamp_desk", "body": _lamp_desk()},
+		{"name": "track_strip_workshop", "body": _track_strip_workshop()},
+		{"name": "track_strip_office", "body": _track_strip_office()},
 	]
 
 	for asset: Dictionary in assets:
@@ -219,4 +222,61 @@ func _plant_small() -> String:
 <path fill="none" d="M128 132 L91 70 M130 130 L176 59 M130 135 L185 108 M129 127 L123 70"/>
 <path fill="#4d86a6" d="M77 145 H179 L166 215 Q128 230 90 215 Z"/>
 <path fill="#70a9c5" d="M70 135 Q128 122 186 135 L180 157 Q128 170 76 157 Z"/>
+"""
+
+
+func _lamp_desk() -> String:
+	return """
+<circle fill="#ffd95c" fill-opacity="0.16" stroke="none" cx="190" cy="66" r="57"/>
+<circle fill="#ffe98a" fill-opacity="0.25" stroke="none" cx="190" cy="66" r="39"/>
+<circle fill="#b98735" cx="65" cy="184" r="46"/>
+<circle fill="#d8a94b" cx="65" cy="184" r="30" stroke-width="6"/>
+<path fill="none" stroke="#b98735" stroke-width="22" d="M78 157 L117 119 L162 91"/>
+<path fill="none" stroke="#f1c662" stroke-width="8" d="M81 154 L118 120 L158 94"/>
+<circle fill="#d8a94b" cx="117" cy="119" r="16"/>
+<circle fill="#f1c662" cx="117" cy="119" r="6" stroke-width="4"/>
+<path fill="#c8963d" d="M158 43 Q190 26 222 43 L229 82 Q190 105 151 82 Z"/>
+<path fill="#edbd50" d="M169 47 Q190 38 211 47 L216 69 Q190 82 164 69 Z" stroke-width="5"/>
+<path fill="#ffd95c" d="M165 84 Q190 96 215 84 Q208 113 190 125 Q172 113 165 84 Z" stroke-width="6"/>
+"""
+
+
+func _track_strip_workshop() -> String:
+	return """
+<rect fill="#3a3633" stroke="none" x="0" y="0" width="256" height="256"/>
+<g fill="none" stroke-linecap="round">
+<path stroke="#4a4440" stroke-width="5" opacity="0.48" d="M-12 37 C38 30 77 45 132 37 S221 24 268 34"/>
+<path stroke="#2d2a28" stroke-width="4" opacity="0.52" d="M-18 104 C37 113 80 95 137 103 S215 119 270 108"/>
+<path stroke="#504944" stroke-width="3" opacity="0.42" d="M-14 179 C42 164 91 181 147 174 S217 161 268 170"/>
+<path stroke="#302c2a" stroke-width="6" opacity="0.38" d="M-20 228 C37 236 75 218 129 226 S217 241 273 226"/>
+</g>
+<g stroke="none">
+<circle fill="#5a514b" cx="22" cy="70" r="2"/><circle fill="#292624" cx="48" cy="18" r="2"/>
+<circle fill="#514a45" cx="73" cy="139" r="3"/><circle fill="#2c2927" cx="101" cy="61" r="2"/>
+<circle fill="#625850" cx="126" cy="199" r="2"/><circle fill="#292624" cx="154" cy="24" r="3"/>
+<circle fill="#554c46" cx="181" cy="146" r="2"/><circle fill="#272422" cx="210" cy="75" r="2"/>
+<circle fill="#60564e" cx="236" cy="213" r="3"/><circle fill="#2b2826" cx="31" cy="217" r="2"/>
+<circle fill="#4f4843" cx="94" cy="235" r="2"/><circle fill="#282523" cx="225" cy="129" r="3"/>
+</g>
+"""
+
+
+func _track_strip_office() -> String:
+	return """
+<rect fill="#39424d" stroke="none" x="0" y="0" width="256" height="256"/>
+<g fill="none" stroke-linecap="round">
+<path stroke="#46515e" stroke-width="4" opacity="0.34" d="M-12 55 C42 48 80 61 135 54 S220 43 268 52"/>
+<path stroke="#2d3540" stroke-width="4" opacity="0.38" d="M-18 151 C35 160 86 143 141 151 S218 166 270 155"/>
+<path stroke="#4b5663" stroke-width="3" opacity="0.28" d="M-14 224 C42 213 88 229 145 221 S218 210 270 220"/>
+</g>
+<g fill="#637080" stroke="none" opacity="0.38">
+<circle cx="16" cy="16" r="2"/><circle cx="48" cy="16" r="2"/><circle cx="80" cy="16" r="2"/><circle cx="112" cy="16" r="2"/><circle cx="144" cy="16" r="2"/><circle cx="176" cy="16" r="2"/><circle cx="208" cy="16" r="2"/><circle cx="240" cy="16" r="2"/>
+<circle cx="16" cy="48" r="2"/><circle cx="48" cy="48" r="2"/><circle cx="80" cy="48" r="2"/><circle cx="112" cy="48" r="2"/><circle cx="144" cy="48" r="2"/><circle cx="176" cy="48" r="2"/><circle cx="208" cy="48" r="2"/><circle cx="240" cy="48" r="2"/>
+<circle cx="16" cy="80" r="2"/><circle cx="48" cy="80" r="2"/><circle cx="80" cy="80" r="2"/><circle cx="112" cy="80" r="2"/><circle cx="144" cy="80" r="2"/><circle cx="176" cy="80" r="2"/><circle cx="208" cy="80" r="2"/><circle cx="240" cy="80" r="2"/>
+<circle cx="16" cy="112" r="2"/><circle cx="48" cy="112" r="2"/><circle cx="80" cy="112" r="2"/><circle cx="112" cy="112" r="2"/><circle cx="144" cy="112" r="2"/><circle cx="176" cy="112" r="2"/><circle cx="208" cy="112" r="2"/><circle cx="240" cy="112" r="2"/>
+<circle cx="16" cy="144" r="2"/><circle cx="48" cy="144" r="2"/><circle cx="80" cy="144" r="2"/><circle cx="112" cy="144" r="2"/><circle cx="144" cy="144" r="2"/><circle cx="176" cy="144" r="2"/><circle cx="208" cy="144" r="2"/><circle cx="240" cy="144" r="2"/>
+<circle cx="16" cy="176" r="2"/><circle cx="48" cy="176" r="2"/><circle cx="80" cy="176" r="2"/><circle cx="112" cy="176" r="2"/><circle cx="144" cy="176" r="2"/><circle cx="176" cy="176" r="2"/><circle cx="208" cy="176" r="2"/><circle cx="240" cy="176" r="2"/>
+<circle cx="16" cy="208" r="2"/><circle cx="48" cy="208" r="2"/><circle cx="80" cy="208" r="2"/><circle cx="112" cy="208" r="2"/><circle cx="144" cy="208" r="2"/><circle cx="176" cy="208" r="2"/><circle cx="208" cy="208" r="2"/><circle cx="240" cy="208" r="2"/>
+<circle cx="16" cy="240" r="2"/><circle cx="48" cy="240" r="2"/><circle cx="80" cy="240" r="2"/><circle cx="112" cy="240" r="2"/><circle cx="144" cy="240" r="2"/><circle cx="176" cy="240" r="2"/><circle cx="208" cy="240" r="2"/><circle cx="240" cy="240" r="2"/>
+</g>
 """

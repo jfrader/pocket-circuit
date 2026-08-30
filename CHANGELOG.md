@@ -20,6 +20,15 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Object-delimited tracks: all painted edge lines, kerb blocks, and the
+  dashed centerline are gone; the course boundary now reads from the props —
+  a curated island interior (one book, one lamp, one controller-style mix of
+  big/medium items deep in the center, small/tiny near the edges) and a line
+  of long props (rulers, planks, cables) delimiting the outer straights.
+- Theme-matched track surfaces: warm worn asphalt for the workshop, cool
+  rubber-mat grey for the office, and a new desk-lamp prop; fixed a spoon
+  texture reference and a corridor-fold bug that let props stray onto the
+  track (checks now run against the clipped ribbon).
 - L-shaped desk rooms joined the circuit pool (the generator samples the
   L's arm and the notch stays off-track) — five harness-verified L circuits
   per theme, bringing the validated pool to 78 tracks.

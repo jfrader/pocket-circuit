@@ -41,7 +41,7 @@ const LAYOUTS := {
 		"island_expansion": 10.0,
 		"scatter_textures": [
 			"res://assets/textures/kitchen/fork_cartoon.png",
-			"res://assets/textures/kitchen/spoon_cartoon.png",
+			"res://assets/textures/kitchen/spoon_bridge.png",
 			"res://assets/textures/kitchen/cup_cartoon.png",
 			"res://assets/textures/kitchen/lime_cartoon.png",
 			"res://assets/textures/kitchen/apple_cartoon.png",
@@ -49,7 +49,7 @@ const LAYOUTS := {
 		],
 		"island_fill_textures": [
 			"res://assets/textures/kitchen/fork_cartoon.png",
-			"res://assets/textures/kitchen/spoon_cartoon.png",
+			"res://assets/textures/kitchen/spoon_bridge.png",
 			"res://assets/textures/kitchen/cup_cartoon.png",
 			"res://assets/textures/kitchen/mug_blue.png",
 			"res://assets/textures/kitchen/cereal_tower_green.png",
@@ -78,6 +78,16 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/screw.png",
 			"res://assets/textures/imagine/coin.png",
 		],
+		"boundary_long": [
+			"res://assets/textures/kitchen/ruler_plank.png",
+			"res://assets/textures/imagine/plank_wood.png",
+			"res://assets/textures/imagine/hazard_workshop_socket.png",
+		],
+		"boundary_corner": [
+			"res://assets/textures/imagine/flower_pot.png",
+			"res://assets/textures/imagine/barrel_wood.png",
+			"res://assets/textures/imagine/plant_small.png",
+		],
 		"obstacles": {
 			"MugA": {"pos": Vector2(-300, 290), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
 			"MugB": {"pos": Vector2(-60, 500), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_blue.png"},
@@ -100,8 +110,8 @@ const LAYOUTS := {
 		"island": Color("4a4038"),
 		"asphalt": Color("2e2c28"),
 		"apron": Color("5c4638"),
-		"track_texture": "res://assets/textures/imagine/track_asphalt_tile_bright.png",
-		"track_tile_modulate": 1.05,
+		"track_texture": "res://assets/textures/imagine/track_strip_workshop.png",
+		"track_tile_modulate": 1.15,
 		"floor_texture": "res://assets/textures/imagine/workshop_planks_tile_bright.jpg",
 		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top_bright.jpg",
 		"prop_label": "Toolbox",
@@ -131,6 +141,7 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/basketball.png",
 			"res://assets/textures/imagine/soccer_ball.png",
 			"res://assets/textures/imagine/football.png",
+			"res://assets/textures/imagine/lamp_desk.png",
 		],
 		"island_fill_small": [
 			"res://assets/textures/kitchen/apple_cartoon.png",
@@ -147,6 +158,15 @@ const LAYOUTS := {
 			"res://assets/textures/kitchen/napkin.png",
 			"res://assets/textures/imagine/screw.png",
 			"res://assets/textures/imagine/coin.png",
+		],
+		"boundary_long": [
+			"res://assets/textures/kitchen/ruler_plank.png",
+			"res://assets/textures/kitchen/spoon_bridge.png",
+		],
+		"boundary_corner": [
+			"res://assets/textures/imagine/flower_pot.png",
+			"res://assets/textures/imagine/plant_small.png",
+			"res://assets/textures/kitchen/cup_cartoon.png",
 		],
 		"island_expansion": 10.0,
 		"obstacles": {
@@ -185,8 +205,8 @@ const LAYOUTS := {
 		"island": Color("3a5a7a"),
 		"asphalt": Color("272b31"),
 		"apron": Color("3a4a5a"),
-		"track_texture": "res://assets/textures/imagine/track_asphalt_tile_bright.png",
-		"track_tile_modulate": 1.35,
+		"track_texture": "res://assets/textures/imagine/track_strip_office.png",
+		"track_tile_modulate": 1.3,
 		"floor_texture": "res://assets/textures/imagine/office_deskmat_tile_bright.jpg",
 		"prop_texture": "res://assets/textures/imagine/office_keyboard_top_bright.jpg",
 		"prop_label": "Keyboard",
@@ -210,6 +230,7 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/office_keyboard_top_bright.jpg",
 			"res://assets/textures/imagine/barrel_wood.png",
 			"res://assets/textures/imagine/flower_pot.png",
+			"res://assets/textures/imagine/lamp_desk.png",
 		],
 		"island_fill_small": [
 			"res://assets/textures/kitchen/apple_cartoon.png",
@@ -226,6 +247,16 @@ const LAYOUTS := {
 			"res://assets/textures/kitchen/napkin.png",
 			"res://assets/textures/imagine/screw.png",
 			"res://assets/textures/imagine/coin.png",
+		],
+		"boundary_long": [
+			"res://assets/textures/kitchen/ruler_plank.png",
+			"res://assets/textures/imagine/office_keycap.png",
+			"res://assets/textures/imagine/hazard_office_cable.png",
+		],
+		"boundary_corner": [
+			"res://assets/textures/imagine/flower_pot.png",
+			"res://assets/textures/imagine/barrel_wood.png",
+			"res://assets/textures/imagine/plant_small.png",
 		],
 		"island_expansion": 4.0,
 		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.72, 0.74],
@@ -372,14 +403,10 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	if not track_texture.is_empty():
 		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30), float(spec.get("track_tile_modulate", 1.35)))
 
-	# Painted edge lines on BOTH sides of the ribbon so the course reads clearly
+	# No painted delimitation lines: the ribbon, island prop, and placed props
+	# define the course
 	var outer_loop := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
-	_add_edge_line(root, outer_loop, Color("f2ead7", 0.95))
-	_add_dashed_centerline(root, centerline)
-
-	# The big island PROP: real-world object that blocks the corner cut
 	var inner_loop := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
-	_add_edge_line(root, inner_loop, Color("f2ead7", 0.95))
 	_build_island_prop(root, spec, inner_loop, centerline)
 
 	# Room walls (real furniture edges along the room outline)
@@ -451,11 +478,14 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	])
 
 	# Dense collidable fill over the whole island interior (books, planks, hose…)
-	_fill_island(root, spec, inner_loop, corridor)
+	_fill_island(root, spec, inner_loop, clipped)
+
+	# Props delimiting the outer side of the track (long on straights, bulky on corners)
+	_line_boundary_props(root, spec, centerline, outer_loop, clipped, room_polygon)
 
 	# Track obstacles (real props with collision)
 	if spec.get("seed_obstacles", false):
-		_scatter_seed_props(root, spec, centerline, corridor, gate_samples, room_polygon)
+		_scatter_seed_props(root, spec, centerline, clipped, gate_samples, room_polygon)
 	else:
 		var obstacles: Dictionary = spec["obstacles"]
 		for obstacle_name: String in obstacles:
@@ -489,15 +519,6 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 			_add_prop_with_collision(root, prop_position, 30.0, prop_textures[hardware_index % prop_textures.size()])
 			hardware_index += 1
 
-
-	# Themed dressing on the island prop and around it
-	if theme == &"workshop":
-		_add_prop(root, "res://assets/textures/kitchen/fork_cartoon.png", Vector2(90, 120), 0.5, 0.2, -8)
-		_add_prop(root, "res://assets/textures/kitchen/ruler_plank.png", Vector2(300, 80), 0.6, -0.35, -8)
-		_add_prop(root, "res://assets/textures/kitchen/cutting_board.png", Vector2(-260, -120), 0.7, 0.12, -8)
-		_add_prop(root, "res://assets/textures/kitchen/toaster_edge.png", Vector2(-460, -40), 0.65, -0.05, -8)
-
-		_add_cable_line(root, [Vector2(350, -100), Vector2(480, -60), Vector2(410, -10), Vector2(520, 40)])
 
 	# Start banner above the finish line
 	_add_start_banner(root, start, start_tangent, corridor)
@@ -564,36 +585,6 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: Packe
 	ink.antialiased = true
 	ink.z_index = -8
 	root.add_child(ink)
-
-	var kerb := Polygon2D.new()
-	kerb.name = "Kerbs"
-	kerb.z_index = -7
-	var kerb_points := PackedVector2Array()
-	var kerb_colors := PackedColorArray()
-	var kerb_outline := _rounded_rect_points(prop_center, prop_size, radius, 10)
-	var kerb_count := kerb_outline.size()
-	for index in kerb_count:
-		var next := (index + 1) % kerb_count
-		var edge_dir := (kerb_outline[next] - kerb_outline[index]).normalized()
-		var outward := edge_dir.rotated(-PI * 0.5)
-		var probe := prop_center - kerb_outline[index]
-		if probe.dot(outward) > 0.0:
-			outward = -outward
-		if index % 2 == 0:
-			var quad := PackedVector2Array([
-				kerb_outline[index],
-				kerb_outline[next],
-				kerb_outline[next] + outward * 26.0,
-				kerb_outline[index] + outward * 26.0,
-			])
-			var block_color := Color("c94f38") if (index / 2) % 2 == 0 else Color("f2ead7")
-			kerb_points.append_array(quad)
-			for corner in 4:
-				kerb_colors.append(block_color)
-	root.add_child(kerb)
-	kerb.polygon = kerb_points
-	kerb.vertex_colors = kerb_colors
-
 
 static func _rounded_rect_points(center: Vector2, size: Vector2, radius: float, corner_segments: int) -> PackedVector2Array:
 	var half := size * 0.5 - Vector2(radius, radius)
@@ -793,35 +784,122 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 		min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
 		max_point = Vector2(maxf(max_point.x, point.x), maxf(max_point.y, point.y))
 	var pitch := 84.0
-	var radius := 36.0
-	var dbg_total := 0
-	var dbg_in := 0
-	var dbg_corridor := 0
-	var dbg_circle := 0
-	var dbg_ok := 0
+	# Bucket valid cells by how much prop clearance the corridor leaves there:
+	# deep-center cells may host big items, edge cells only small ones.
+	var buckets := {15.0: PackedVector2Array(), 25.0: PackedVector2Array(), 36.0: PackedVector2Array(), 50.0: PackedVector2Array()}
 	for row in range(int(ceil((max_point.y - min_point.y) / pitch)) + 1):
 		for column in range(int(ceil((max_point.x - min_point.x) / pitch)) + 1):
 			var center := Vector2(
 				min_point.x + float(column) * pitch + rng.randf_range(-12.0, 12.0),
 				min_point.y + float(row) * pitch + rng.randf_range(-12.0, 12.0))
-			dbg_total += 1
 			if not Geometry2D.is_point_in_polygon(center, inner_loop):
-				dbg_in += 1
 				continue
 			if Geometry2D.is_point_in_polygon(center, corridor):
-				dbg_corridor += 1
 				continue
-			var circle_clear := true
-			for sample in 8:
-				var angle := TAU * float(sample) / 8.0
-				if Geometry2D.is_point_in_polygon(center + Vector2(cos(angle), sin(angle)) * (radius + 24.0), corridor):
-					circle_clear = false
+			for tier: float in [50.0, 36.0, 25.0, 15.0]:
+				if _cell_clear_of_corridor(center, tier, corridor):
+					buckets[tier].append(center)
 					break
-			if not circle_clear:
-				dbg_circle += 1
+	var placed := {}
+	var used := {}
+	# Pass 1: one of each big and medium item, nearest the island center
+	var centroid := (min_point + max_point) * 0.5
+	for tier: float in [50.0, 36.0]:
+		var pool: Array = spec.get("island_fill_big", []) if tier == 50.0 else spec.get("island_fill_textures", [])
+		var cells: Array[Vector2] = []
+		cells.append_array(buckets[tier])
+		cells.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_to(centroid) < b.distance_to(centroid))
+		for texture in pool:
+			if cells.is_empty():
+				break
+			var cell: Vector2 = cells.pop_back() if false else cells.pop_front()
+			var texture_path := String(texture)
+			if used.get(texture_path, 0) >= 1:
 				continue
-			dbg_ok += 1
-			_add_fill_prop(root, center, radius, String(textures[rng.randi_range(0, textures.size() - 1)]), rng.randf_range(0.0, TAU))
+			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
+			used[texture_path] = used.get(texture_path, 0) + 1
+			placed[cell] = true
+	# Pass 2: remaining cells get small/tiny props, each texture capped at 3
+	var small_pool: Array = spec.get("island_fill_small", [])
+	var tiny_pool: Array = spec.get("island_fill_tiny", [])
+	for tier: float in [25.0, 15.0]:
+		var pool := small_pool if tier == 25.0 else tiny_pool
+		for cell: Vector2 in buckets[tier]:
+			if placed.has(cell):
+				continue
+			var texture_path := String(pool[rng.randi_range(0, pool.size() - 1)]) if not pool.is_empty() else String(textures[0])
+			if used.get(texture_path, 0) >= 3:
+				continue
+			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
+			used[texture_path] = used.get(texture_path, 0) + 1
+
+
+static func _cell_clear_of_corridor(center: Vector2, radius: float, corridor: PackedVector2Array) -> bool:
+	for sample in 8:
+		var angle := TAU * float(sample) / 8.0
+		if Geometry2D.is_point_in_polygon(center + Vector2(cos(angle), sin(angle)) * (radius + 24.0), corridor):
+			return false
+	return true
+
+
+static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, outer_loop: PackedVector2Array, corridor: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+	# Props delimiting the OUTER side of the track: long flat props on straights,
+	# bulky props on corners, placed just outside the painted corridor.
+	var long_pool: Array = spec.get("boundary_long", [])
+	var corner_pool: Array = spec.get("boundary_corner", [])
+	if long_pool.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.get("seed", 0))
+	var count := centerline.size()
+	var index := 0
+	while index < count - 1:
+		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
+		var ahead := centerline[(index + 8) % count] - centerline[(index - 8 + count) % count]
+		var turn := tangent.angle_to(ahead.normalized())
+		var is_corner := absf(turn) > 0.16
+		if is_corner:
+			index += 5
+			continue
+		var position := outer_loop[index] + (outer_loop[index] - centerline[index]).normalized() * 65.0
+		if not Geometry2D.is_point_in_polygon(position, room_polygon):
+			index += 7
+			continue
+		var prop_clear := true
+		for sample in 8:
+			var angle := TAU * float(sample) / 8.0
+			if Geometry2D.is_point_in_polygon(position + Vector2(cos(angle), sin(angle)) * 27.0, corridor):
+				prop_clear = false
+				break
+		if not prop_clear:
+			index += 7
+			continue
+		var texture_path := String(long_pool[rng.randi_range(0, long_pool.size() - 1)])
+		_add_boundary_prop(root, position, 27.0, texture_path, rng.randf_range(0.0, TAU))
+		index += 7
+
+
+static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
+	var prop := StaticBody2D.new()
+	prop.name = "BoundaryProp"
+	prop.position = position
+	prop.rotation = rotation
+	prop.collision_layer = 4
+	parent.add_child(prop)
+	var shape := CircleShape2D.new()
+	shape.radius = radius
+	var cs := CollisionShape2D.new()
+	cs.shape = shape
+	prop.add_child(cs)
+	_add_contact_shadow(prop, radius * 1.15)
+	var texture := load(texture_path) as Texture2D
+	if texture:
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var longest := maxf(texture.get_width(), texture.get_height())
+		sprite.scale = Vector2.ONE * (radius * 2.2 / maxf(longest, 1.0))
+		prop.add_child(sprite)
 
 
 static func _add_fill_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
