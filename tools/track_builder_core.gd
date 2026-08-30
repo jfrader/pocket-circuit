@@ -407,7 +407,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# define the course
 	var outer_loop := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
 	var inner_loop := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
-	_build_island_prop(root, spec, inner_loop, centerline)
+	_build_island_prop(root, spec, inner_loop, room_polygon, clipped, centerline)
 
 	# Room walls (real furniture edges along the room outline)
 	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
@@ -525,20 +525,13 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	_add_start_banner(root, start, start_tangent, corridor)
 
 
-static func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
-	var min_point := Vector2(INF, INF)
-	var max_point := Vector2(-INF, -INF)
-	for point: Vector2 in inner_loop:
-		min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
-		max_point = Vector2(maxf(max_point.x, point.x), maxf(max_point.y, point.y))
-	var radius := 90.0
-
+static func _build_island_prop(root: Node2D, spec: Dictionary, island_polygon: PackedVector2Array, room_polygon: PackedVector2Array, ribbon: PackedVector2Array, centerline: PackedVector2Array) -> void:
 	# Collision: the raw inner loop expanded to the paint edge (no drivable gap)
 	var expanded := PackedVector2Array()
 	var last := Vector2(INF, INF)
-	for index in inner_loop.size():
-		var toward_track := (centerline[index] - inner_loop[index]).normalized()
-		var point := inner_loop[index] + toward_track * float(spec.get("island_expansion", 10.0))
+	for index in island_polygon.size():
+		var toward_track := (centerline[index] - island_polygon[index]).normalized()
+		var point := island_polygon[index] + toward_track * float(spec.get("island_expansion", 10.0))
 		if point.distance_to(last) > 3.0:
 			expanded.append(point)
 			last = point
@@ -550,11 +543,18 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: Packe
 	barrier_collision.polygon = expanded
 	barrier.add_child(barrier_collision)
 
-	# Visual: the prop texture stretched over the island shape
+	# Visual: the room minus the ribbon (fold-free surface, no synthetic outline)
+	var region := _island_region(room_polygon, ribbon, island_polygon)
+	var min_point := Vector2(INF, INF)
+	var max_point := Vector2(-INF, -INF)
+	for point: Vector2 in region:
+		min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
+		max_point = Vector2(maxf(max_point.x, point.x), maxf(max_point.y, point.y))
+
 	var visual := Polygon2D.new()
 	visual.name = "IslandProp"
 	visual.z_index = -9
-	visual.polygon = expanded
+	visual.polygon = region
 	var prop_texture := String(spec.get("prop_texture", ""))
 	var texture := load(prop_texture) as Texture2D if not prop_texture.is_empty() else null
 	if texture:
@@ -562,7 +562,7 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: Packe
 		visual.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		visual.modulate = Color(1.2, 1.2, 1.2)
 		var uvs := PackedVector2Array()
-		for point: Vector2 in expanded:
+		for point: Vector2 in region:
 			uvs.append(Vector2(
 				(point.x - min_point.x) / maxf(max_point.x - min_point.x, 1.0),
 				(point.y - min_point.y) / maxf(max_point.y - min_point.y, 1.0)
@@ -572,20 +572,26 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, inner_loop: Packe
 		visual.color = spec["island"]
 	root.add_child(visual)
 
-	# Clean silhouette: rounded-rect ink outline + kerbs
-	var inset := 10.0
-	var prop_rect := Rect2(min_point + Vector2(inset, inset), (max_point - min_point) - Vector2(inset, inset) * 2.0)
-	var prop_center := prop_rect.get_center()
-	var prop_size := prop_rect.size
-	var ink := Line2D.new()
-	ink.points = _rounded_rect_points(prop_center, prop_size, radius, 6)
-	ink.closed = true
-	ink.width = 5.0
-	ink.default_color = Color("0d0f14", 0.85)
-	ink.joint_mode = Line2D.LINE_JOINT_ROUND
-	ink.antialiased = true
-	ink.z_index = -8
-	root.add_child(ink)
+
+static func _island_region(room_polygon: PackedVector2Array, ribbon: PackedVector2Array, hint_polygon: PackedVector2Array) -> PackedVector2Array:
+	var pieces: Array[PackedVector2Array] = Geometry2D.clip_polygons(room_polygon, ribbon)
+	var best := PackedVector2Array()
+	var best_score := -1.0
+	for piece: PackedVector2Array in pieces:
+		var score := 0.0
+		var hint_overlap := 0.0
+		for sample in 40:
+			var t := float(sample) / 40.0
+			var index := int(t * hint_polygon.size())
+			var hint_point: Vector2 = hint_polygon[index]
+			if Geometry2D.is_point_in_polygon(hint_point, piece):
+				hint_overlap += 1.0
+		score = hint_overlap
+		if score > best_score:
+			best_score = score
+			best = piece
+	return best
+
 
 static func _rounded_rect_points(center: Vector2, size: Vector2, radius: float, corner_segments: int) -> PackedVector2Array:
 	var half := size * 0.5 - Vector2(radius, radius)

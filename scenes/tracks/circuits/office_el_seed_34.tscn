@@ -213,205 +213,205 @@ radius = 30.0
 [sub_resource type="CircleShape2D" id="CircleShape2D_ex6nf"]
 radius = 30.0
 
-[node name="OfficeDesk" type="Node2D" unique_id=1912608490]
+[node name="OfficeDesk" type="Node2D" unique_id=772861629]
 
-[node name="Floor" type="Polygon2D" parent="." unique_id=1337025218]
+[node name="Floor" type="Polygon2D" parent="." unique_id=880636827]
 z_index = -22
 color = Color(0.2901961, 0.41568628, 0.5411765, 1)
 polygon = PackedVector2Array(-1900, -1350, 700, -1350, 700, 350, -1900, 350)
 
-[node name="CounterHighlight" type="Polygon2D" parent="." unique_id=1615490698]
+[node name="CounterHighlight" type="Polygon2D" parent="." unique_id=1621607600]
 z_index = -21
 color = Color(0.3529412, 0.47843137, 0.6039216, 0.5)
 polygon = PackedVector2Array(-1410, -810, -470, -810, -470, -270, -1410, -270)
 
-[node name="FloorTiles" type="Node2D" parent="." unique_id=327150546]
+[node name="FloorTiles" type="Node2D" parent="." unique_id=2061458416]
 z_index = -21
 
-[node name="@Sprite2D@2" type="Sprite2D" parent="FloorTiles" unique_id=1388386011]
+[node name="@Sprite2D@2" type="Sprite2D" parent="FloorTiles" unique_id=1670115442]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(-383.3333, -287.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@3" type="Sprite2D" parent="FloorTiles" unique_id=519275890]
+[node name="@Sprite2D@3" type="Sprite2D" parent="FloorTiles" unique_id=1890459332]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(-383.3333, 137.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@4" type="Sprite2D" parent="FloorTiles" unique_id=1358979955]
+[node name="@Sprite2D@4" type="Sprite2D" parent="FloorTiles" unique_id=2121440135]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(-383.3333, 562.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@5" type="Sprite2D" parent="FloorTiles" unique_id=268625239]
+[node name="@Sprite2D@5" type="Sprite2D" parent="FloorTiles" unique_id=1381995216]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(-383.3333, 987.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@6" type="Sprite2D" parent="FloorTiles" unique_id=2060868076]
+[node name="@Sprite2D@6" type="Sprite2D" parent="FloorTiles" unique_id=288425088]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(50, -287.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@7" type="Sprite2D" parent="FloorTiles" unique_id=695834191]
+[node name="@Sprite2D@7" type="Sprite2D" parent="FloorTiles" unique_id=1279786018]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(50, 137.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@8" type="Sprite2D" parent="FloorTiles" unique_id=664715376]
+[node name="@Sprite2D@8" type="Sprite2D" parent="FloorTiles" unique_id=2006136214]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(50, 562.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@9" type="Sprite2D" parent="FloorTiles" unique_id=915644021]
+[node name="@Sprite2D@9" type="Sprite2D" parent="FloorTiles" unique_id=1115053466]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(50, 987.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@10" type="Sprite2D" parent="FloorTiles" unique_id=1642820622]
+[node name="@Sprite2D@10" type="Sprite2D" parent="FloorTiles" unique_id=2139697769]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(483.33337, -287.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@11" type="Sprite2D" parent="FloorTiles" unique_id=966737626]
+[node name="@Sprite2D@11" type="Sprite2D" parent="FloorTiles" unique_id=1093555834]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(483.33337, 137.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@12" type="Sprite2D" parent="FloorTiles" unique_id=236714836]
+[node name="@Sprite2D@12" type="Sprite2D" parent="FloorTiles" unique_id=1983916644]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(483.33337, 562.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@13" type="Sprite2D" parent="FloorTiles" unique_id=1024158681]
+[node name="@Sprite2D@13" type="Sprite2D" parent="FloorTiles" unique_id=260203421]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(483.33337, 987.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@14" type="Sprite2D" parent="FloorTiles" unique_id=641427397]
+[node name="@Sprite2D@14" type="Sprite2D" parent="FloorTiles" unique_id=516863665]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(916.6666, -287.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@15" type="Sprite2D" parent="FloorTiles" unique_id=976461545]
+[node name="@Sprite2D@15" type="Sprite2D" parent="FloorTiles" unique_id=6922591]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(916.6666, 137.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@16" type="Sprite2D" parent="FloorTiles" unique_id=887567788]
+[node name="@Sprite2D@16" type="Sprite2D" parent="FloorTiles" unique_id=1919651386]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(916.6666, 562.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@17" type="Sprite2D" parent="FloorTiles" unique_id=1306536403]
+[node name="@Sprite2D@17" type="Sprite2D" parent="FloorTiles" unique_id=307745854]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(916.6666, 987.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@18" type="Sprite2D" parent="FloorTiles" unique_id=616644485]
+[node name="@Sprite2D@18" type="Sprite2D" parent="FloorTiles" unique_id=1015302739]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(1350, -287.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@19" type="Sprite2D" parent="FloorTiles" unique_id=701599954]
+[node name="@Sprite2D@19" type="Sprite2D" parent="FloorTiles" unique_id=723156859]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(1350, 137.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@20" type="Sprite2D" parent="FloorTiles" unique_id=1066096077]
+[node name="@Sprite2D@20" type="Sprite2D" parent="FloorTiles" unique_id=442401963]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(1350, 562.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@21" type="Sprite2D" parent="FloorTiles" unique_id=919241382]
+[node name="@Sprite2D@21" type="Sprite2D" parent="FloorTiles" unique_id=2049399189]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(1350, 987.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@22" type="Sprite2D" parent="FloorTiles" unique_id=1545032427]
+[node name="@Sprite2D@22" type="Sprite2D" parent="FloorTiles" unique_id=1902414485]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(1783.3333, -287.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@23" type="Sprite2D" parent="FloorTiles" unique_id=465791070]
+[node name="@Sprite2D@23" type="Sprite2D" parent="FloorTiles" unique_id=944024062]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(1783.3333, 137.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@24" type="Sprite2D" parent="FloorTiles" unique_id=1200928382]
+[node name="@Sprite2D@24" type="Sprite2D" parent="FloorTiles" unique_id=879785142]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(1783.3333, 562.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="@Sprite2D@25" type="Sprite2D" parent="FloorTiles" unique_id=430820992]
+[node name="@Sprite2D@25" type="Sprite2D" parent="FloorTiles" unique_id=87405126]
 modulate = Color(1.35, 1.35, 1.35, 1)
 texture_filter = 2
 position = Vector2(1783.3333, 987.5)
 scale = Vector2(0.41471356, 0.40673828)
 texture = ExtResource("1_ymlmc")
 
-[node name="RoomSurface" type="Polygon2D" parent="." unique_id=2070438656]
+[node name="RoomSurface" type="Polygon2D" parent="." unique_id=1786122118]
 z_index = -20
 texture_filter = 2
 texture = ExtResource("1_ymlmc")
 polygon = PackedVector2Array(-983.2055, -530.152, 290.66653, -525.73303, 284.88782, -28.84293, 983.0794, -30.259329, 992.52893, 525.0965, -987.4701, 527.2184)
 uv = PackedVector2Array(0.008329272, 0, 2.4963605, 0.008630753, 2.485074, 0.97911924, 3.8487296, 0.9763528, 3.8671856, 2.0610323, 0, 2.0651765)
 
-[node name="TrackRibbon" type="Polygon2D" parent="." unique_id=82676678]
+[node name="TrackRibbon" type="Polygon2D" parent="." unique_id=1815685151]
 z_index = -10
 color = Color(0.15294118, 0.16862746, 0.19215687, 1)
 polygon = PackedVector2Array(-532.6279, -507.31647, -514.35767, -505.95395, -496.7979, -503.83698, -480.02496, -501.14618, -464.0137, -498.03387, -448.74387, -494.63373, -434.2049, -491.06476, -420.39893, -487.43558, -407.34106, -483.84637, -395.06314, -480.39133, -383.61456, -477.15936, -371.41595, -473.77377, -355.6198, -469.0512, -338.48425, -462.88504, -323.38135, -456.6696, -310.26453, -450.8117, -299.05298, -445.61136, -289.74286, -441.30457, -287.56863, -440.3423, -281.37695, -444.10785, -268.58542, -451.7002, -252.45401, -460.4418, -232.02747, -469.66867, -205.87933, -478.07507, -172.79076, -483.036, -135.55641, -480.86475, -101.63717, -471.3496, -74.88229, -458.30115, -54.310158, -444.60254, -38.275734, -431.64352, -25.490425, -420.01483, -15.163124, -410.0316, -6.9266815, -401.97073, -4.755501, -399.914, 5.8579865, -400.56305, 20.227676, -401.37567, 37.979294, -401.80408, 59.712135, -400.90564, 86.34685, -396.91498, 118.32283, -386.69186, 152.83853, -366.5532, 180.83707, -339.1681, 198.99214, -311.85013, 210.49342, -286.67728, 217.86354, -263.8401, 222.67976, -243.04413, 225.90427, -223.92404, 228.12784, -206.2404, 229.73311, -189.90916, 230.98358, -174.98927, 232.06537, -161.67114, 233.09747, -150.28056, 234.25204, -140.23154, 235.88512, -128.32146, 237.60904, -114.02524, 239.09189, -99.81535, 240.3534, -85.84191, 241.43015, -72.11026, 242.35696, -58.625214, 243.1669, -45.391396, 243.8912, -32.41388, 244.55948, -19.697662, 245.19955, -7.248169, 245.83752, 4.928383, 246.48512, 16.609703, 247.20221, 27.783424, 248.06287, 39.129974, 249.05022, 51.09748, 250.11118, 63.66794, 251.18463, 76.82644, 252.20149, 90.56386, 253.08444, 104.87644, 253.74722, 119.764656, 254.09357, 135.23123, 254.01624, 151.27885, 253.39711, 167.88977, 252.31747, 182.6598, 251.36313, 194.73425, 250.52945, 207.18332, 249.57118, 221.40137, 248.33508, 237.1121, 246.61073, 254.16446, 244.11038, 272.528, 240.41937, 292.30112, 234.90167, 313.71002, 226.54097, 337.051, 213.73828, 362.44177, 194.1908, 389.2743, 164.44406, 415.84067, 127.66246, 434.80334, 94.09035, 443.39185, 66.5823, 445.83936, 44.04648, 445.4656, 25.2723, 443.9607, 9.56752, 442.20062, -3.246254, 440.69293, -10.547722, 439.96777, -7.308792, 437.23846, -3.895691, 434.60477, -3.8042145, 434.44083, -7.9417953, 436.28418, -15.268875, 438.49753, -19.871735, 439.31512, -18.784325, 439.38556, -12.912453, 439.73294, -10.547722, 439.96777, -13.386398, 442.35983, -21.747955, 449.7503, -32.31916, 459.1117, -45.33754, 470.11993, -61.371727, 482.3853, -81.325424, 495.29562, -106.297844, 507.70724, -136.40273, 517.4408, -167.34224, 521.9874, -195.06703, 521.99036, -219.52744, 519.10876, -240.96986, 514.56824, -259.76755, 509.23135, -276.2984, 503.68158, -290.84045, 498.3261, -303.54175, 493.4698, -314.41714, 489.35397, -323.35187, 486.165, -330.10645, 484.01596, -336.285, 482.46393, -346.18414, 480.425, -358.98035, 477.653, -371.22305, 474.95792, -382.8188, 472.43124, -393.757, 470.13525, -404.01892, 468.12207, -413.5786, 466.43262, -422.4056, 465.09506, -430.46786, 464.12305, -437.7383, 463.5141, -444.20178, 463.2487, -440.39893, 213.27762, -422.4561, 213.98163, -405.27945, 215.3952, -388.86734, 217.35489, -373.20636, 219.71399, -358.27795, 222.34216, -344.06516, 225.12358, -330.55585, 227.95511, -317.74448, 230.74484, -305.63434, 233.41093, -294.14545, 235.901, -279.83542, 238.92041, -261.70007, 243.55692, -243.99127, 249.09561, -228.3814, 254.62466, -214.69939, 259.78827, -202.89886, 264.30414, -193.38861, 267.82416, -187.35828, 262.47186, -176.28355, 252.7167, -162.66252, 241.36809, -145.94809, 228.88382, -125.31648, 215.95798, -99.69369, 203.72969, -69.777855, 194.51236, -40.700447, 190.18428, -15.7788925, 189.40363, 1.106781, 190.20157, 2.024208, 176.56537, 3.0507965, 163.52556, 3.7839508, 153.98795, 4.069725, 146.10909, 4.1039124, 137.50491, 3.8890915, 128.18549, 3.4387512, 118.18128, 2.777359, 107.52278, 1.939415, 96.23835, 0.9683304, 84.351974, -0.08425903, 71.88234, -1.1587448, 58.842384, -2.1874619, 45.24186, -3.067688, 31.556076, -3.7992325, 18.40017, -4.4643326, 5.711525, -5.1035004, -6.7209396, -5.7428665, -18.89225, -6.4067154, -30.796577, -7.117775, -42.427773, -7.8969193, -53.779648, -8.763351, -64.84565, -9.734451, -75.619385, -10.825859, -86.094986, -12.070007, -96.41135, -13.801521, -109.0961, -15.594528, -124.740746, -17.011032, -140.2015, -17.786942, -149.73036, -10.3574295, -149.58463, 6.7937164, -150.17365, 20.572777, -150.99646, 30.80291, -151.59947, 36.89309, -151.80641, 37.802773, -151.86755, 32.16999, -152.85583, 19.114159, -157.21933, 0.9954834, -167.94882, -13.462807, -181.85454, -20.543, -192.24945, -23.093811, -197.58746, -23.346344, -198.13017, -22.586456, -194.62424, -21.48478, -187.88712, -20.340652, -178.61046, -19.245193, -167.33037, -18.170456, -154.44014, -17.786942, -149.73036, -31.070518, -149.99094, -55.78962, -152.64987, -84.40726, -159.47006, -112.54891, -171.048, -135.55765, -184.5906, -153.71878, -198.04367, -168.26881, -210.54738, -174.7757, -216.65991, -163.3495, -223.2977, -152.5068, -229.88255, -144.69316, -234.55804, -140.37082, -236.97513, -140.52899, -237.01437, -146.6279, -235.198, -159.9204, -233.36754, -177.65144, -234.4342, -192.58395, -238.47911, -200.87836, -242.37292, -203.39117, -243.91656, -201.64224, -242.40457, -196.7951, -237.9305, -189.51569, -230.86356, -180.04605, -221.61087, -174.7757, -216.65991, -177.23334, -215.23221, -194.62767, -206.21426, -216.4557, -197.05681, -243.91762, -189.25966, -274.68967, -185.57166, -302.3992, -186.57813, -325.64188, -190.23451, -346.06577, -195.46579, -363.83047, -201.44397, -379.23676, -207.5717, -392.58478, -213.43718, -404.1057, -218.75473, -413.94104, -223.32286, -422.14166, -227.00375, -428.68164, -229.72324, -433.5694, -231.51416, -440.23193, -233.43161, -450.96716, -236.40302, -462.88504, -239.76675, -474.34503, -242.99274, -485.33545, -246.01633, -495.82678, -248.77826, -505.7731, -251.22528, -515.11536, -253.31236, -523.78156, -255.00523, -531.6906, -256.28394, -538.7562, -257.14737, -544.9933, -257.6225, -551.65985, -257.7627, -559.69135, -257.65204, -568.24945, -257.26984, -576.9487, -256.6109, -585.70105, -255.676, -594.4206, -254.47058, -603.0215, -253.00497, -611.41833, -251.29446, -619.52625, -249.35977, -627.2591, -247.22849, -634.5305, -244.93567, -641.4467, -242.45227, -649.0161, -239.39127, -657.51733, -235.73834, -665.8167, -231.93056, -673.64417, -228.06665, -680.86957, -224.20087, -687.3609, -220.40787, -692.989, -216.78615, -697.6369, -213.46193, -701.20953, -210.5925, -703.6531, -208.3635, -704.74677, -207.2196, -704.5655, -207.69183, -704.61096, -207.69052, -705.15, -206.81763, -704.97675, -206.97911, -704.74677, -207.2196, -705.3661, -205.60654, -706.67224, -201.44669, -708.2166, -195.3799, -709.82904, -187.62016, -711.42065, -178.3833, -712.965, -167.8673, -714.4833, -156.23817, -716.03516, -143.62195, -717.7142, -130.10454, -719.4752, -116.97887, -720.92633, -106.18567, -721.96405, -96.664116, -722.8257, -86.79173, -723.52625, -76.55691, -724.0819, -65.96107, -724.5118, -55.007378, -724.83765, -43.699898, -725.08435, -32.043015, -725.27936, -20.040771, -725.4534, -7.697502, -725.63965, 4.980461, -725.8655, 17.564438, -726.0733, 29.638412, -726.219, 41.459724, -726.30646, 53.279037, -726.33527, 65.095505, -726.3049, 76.906136, -726.21454, 88.709785, -726.06384, 100.504654, -725.8521, 112.28866, -725.57886, 124.06067, -725.2435, 135.81825, -724.8417, 147.66534, -724.3347, 161.37117, -724.1225, 177.07077, -724.2809, 192.32164, -724.6106, 206.34883, -724.9408, 219.1106, -725.14276, 230.5003, -725.13184, 240.34955, -724.8794, 248.42972, -724.4358, 254.46179, -723.99207, 257.9301, -724.5116, 256.988, -724.28046, 257.74768, -723.78796, 259.17337, -723.96564, 258.13672, -723.99207, 257.9301, -723.3434, 259.10645, -721.378, 262.239, -718.94666, 265.62997, -716.20447, 269.0021, -713.33826, 272.11722, -712.29333, 273.11862, -708.0899, 272.06546, -698.4707, 269.32962, -687.1066, 265.87463, -674.1865, 261.87268, -659.78094, 257.5286, -643.8421, 253.082, -628.06604, 249.24774, -616.3164, 246.66483, -607.09515, 244.36038, -596.9337, 241.6011, -585.77246, 238.42874, -573.6249, 234.92934, -560.48584, 231.21057, -546.33154, 227.40164, -531.1209, 223.65552, -514.8037, 220.1539, -497.32813, 217.11142, -478.65567, 214.78043, -459.28827, 213.46964, -449.66437, 463.28433, -454.59836, 463.6202, -460.1936, 464.3381, -466.9589, 465.53293, -474.86188, 467.2431, -483.8574, 469.46976, -493.9015, 472.18054, -504.95984, 475.3147, -517.0149, 478.78763, -530.068, 482.4932, -544.1392, 486.30368, -559.1753, 490.04703, -571.725, 492.8164, -580.67194, 494.96945, -589.94293, 497.57578, -601.06165, 500.9391, -613.80743, 504.88763, -628.0785, 509.21487, -643.8908, 513.6818, -661.3831, 517.99884, -680.8248, 521.78284, -702.6062, 524.47754, -727.16315, 525.2317, -754.5533, 522.802, -781.4144, 516.59546, -804.6689, 508.092, -825.3057, 498.0533, -844.10297, 486.73157, -861.304, 474.3965, -877.1143, 461.21875, -891.6915, 447.30313, -905.15015, 432.7078, -917.56494, 417.45474, -928.97736, 401.53192, -939.3966, 384.888, -949.0083, 366.9935, -958.2006, 345.9596, -965.5149, 322.95493, -970.2402, 301.13477, -973.0365, 280.8755, -974.5056, 262.09613, -975.09424, 244.68811, -975.1353, 228.57248, -974.8827, 213.72113, -974.5342, 200.16582, -974.2435, 188.00029, -974.12225, 177.38303, -974.25366, 167.73946, -974.6819, 156.60254, -975.1218, 143.61678, -975.49524, 130.5253, -975.79913, 117.43517, -976.0343, 104.3472, -976.2015, 91.26334, -976.3016, 78.1847, -976.33527, 65.11267, -976.3034, 52.049232, -976.2068, 38.994568, -976.0461, 25.950974, -975.8269, 13.172302, -975.6063, 0.9018631, -975.42755, -11.294632, -975.25055, -23.838287, -975.0404, -36.727707, -974.7593, -49.95948, -974.3665, -63.5299, -973.8185, -77.435616, -973.06885, -91.67292, -972.06824, -106.237274, -970.7647, -121.12234, -969.1049, -136.30876, -967.2621, -150.17009, -965.65546, -162.12181, -964.1477, -174.28455, -962.4922, -187.72783, -960.5805, -202.31404, -958.2704, -217.94577, -955.3818, -234.5656, -951.6861, -252.148, -946.89294, -270.68536, -940.6305, -290.1681, -932.42975, -310.5406, -921.7483, -331.59116, -908.73804, -351.9104, -894.52985, -369.98108, -879.7373, -385.82993, -864.53485, -399.86697, -849.13666, -412.32825, -833.6936, -423.43127, -818.3156, -433.36526, -803.0905, -442.2881, -788.0941, -450.33044, -773.3991, -457.5985, -759.08044, -464.17853, -745.07263, -470.20102, -730.3205, -476.12183, -714.35376, -481.84967, -698.1059, -486.9799, -681.7859, -491.4832, -665.4098, -495.39468, -648.9944, -498.7416, -632.5572, -501.54468, -616.1155, -503.819, -599.6859, -505.57483, -583.28534, -506.81726, -566.92816, -507.54724, -550.3317, -507.75916)
 
-[node name="TrackSurfaceTiles" type="Node2D" parent="." unique_id=6392322]
+[node name="TrackSurfaceTiles" type="Node2D" parent="." unique_id=791581247]
 z_index = -9
 
-[node name="@Sprite2D@26" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1612340295]
+[node name="@Sprite2D@26" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1183371070]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-454.47632, 338.37698)
@@ -419,7 +419,7 @@ rotation = 3.1030874
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@27" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=210333958]
+[node name="@Sprite2D@27" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=203316799]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-527.19366, 351.69556)
@@ -427,7 +427,7 @@ rotation = 2.8720014
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@28" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1572670389]
+[node name="@Sprite2D@28" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=382740767]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-599.8955, 371.03207)
@@ -435,7 +435,7 @@ rotation = 2.9142756
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@29" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=398765688]
+[node name="@Sprite2D@29" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1890257040]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-675.99036, 392.87366)
@@ -443,7 +443,7 @@ rotation = 2.8818865
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@30" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1676298990]
+[node name="@Sprite2D@30" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=677109882]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-745.3602, 396.908)
@@ -451,7 +451,7 @@ rotation = -2.8490024
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@31" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1727849668]
+[node name="@Sprite2D@31" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1311714592]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-802.5149, 359.71017)
@@ -459,7 +459,7 @@ rotation = -2.347236
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@32" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1010301712]
+[node name="@Sprite2D@32" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=905412546]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-841.24054, 301.85364)
@@ -467,7 +467,7 @@ rotation = -1.9314092
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@33" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=484420106]
+[node name="@Sprite2D@33" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=492280795]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-850.13904, 229.53639)
@@ -475,7 +475,7 @@ rotation = -1.563085
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@34" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1468560883]
+[node name="@Sprite2D@34" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1907857883]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-849.7618, 152.13394)
@@ -483,7 +483,7 @@ rotation = -1.6065527
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@35" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=579487908]
+[node name="@Sprite2D@35" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2035206756]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-851.3032, 77.54542)
@@ -491,7 +491,7 @@ rotation = -1.5759107
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@36" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1626633682]
+[node name="@Sprite2D@36" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1102592016]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-850.623, 2.9411633)
@@ -499,7 +499,7 @@ rotation = -1.5544813
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@37" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=483800183]
+[node name="@Sprite2D@37" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=220295743]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-848.9502, -71.69834)
@@ -507,7 +507,7 @@ rotation = -1.5248821
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@38" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=621715469]
+[node name="@Sprite2D@38" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1041692956]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-841.6848, -146.11317)
@@ -515,7 +515,7 @@ rotation = -1.4423746
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@39" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2055504253]
+[node name="@Sprite2D@39" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=835882754]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-829.95135, -223.76395)
@@ -523,7 +523,7 @@ rotation = -1.3417258
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@40" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=480563790]
+[node name="@Sprite2D@40" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1140207514]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-799.7533, -288.4801)
@@ -531,7 +531,7 @@ rotation = -0.86056674
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@41" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=873494654]
+[node name="@Sprite2D@41" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=826779566]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-741.98004, -333.24448)
@@ -539,7 +539,7 @@ rotation = -0.5108097
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@42" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=877268658]
+[node name="@Sprite2D@42" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2071403469]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-674.44214, -363.39267)
@@ -547,7 +547,7 @@ rotation = -0.3249836
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@43" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1412073237]
+[node name="@Sprite2D@43" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2045237844]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-600.90826, -379.7475)
@@ -555,7 +555,7 @@ rotation = -0.121959955
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@44" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=820671301]
+[node name="@Sprite2D@44" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=210684898]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-526.55695, -381.55066)
@@ -563,7 +563,7 @@ rotation = 0.09774956
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@45" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1380385510]
+[node name="@Sprite2D@45" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1130395775]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-452.8672, -366.72595)
@@ -571,7 +571,7 @@ rotation = 0.2627592
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@46" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=260885924]
+[node name="@Sprite2D@46" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=405733060]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-383.58295, -346.30414)
@@ -579,7 +579,7 @@ rotation = 0.36911425
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@47" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=831891261]
+[node name="@Sprite2D@47" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1744803738]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-320.54648, -318.71075)
@@ -587,7 +587,7 @@ rotation = 0.35359418
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@48" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1208216145]
+[node name="@Sprite2D@48" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=140584747]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-258.5704, -314.74857)
@@ -595,7 +595,7 @@ rotation = -0.34364122
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@49" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1734456165]
+[node name="@Sprite2D@49" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1514259080]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-196.41241, -348.70847)
@@ -603,7 +603,7 @@ rotation = -0.46489924
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@50" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=769472159]
+[node name="@Sprite2D@50" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=951073223]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-137.88033, -350.33704)
@@ -611,7 +611,7 @@ rotation = 0.5282054
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@51" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=658048260]
+[node name="@Sprite2D@51" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=569564338]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-84.521065, -303.34454)
@@ -619,7 +619,7 @@ rotation = 0.7341845
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@52" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=860011860]
+[node name="@Sprite2D@52" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=759853400]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-23.752056, -274.77652)
@@ -627,7 +627,7 @@ rotation = 0.05858114
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@53" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=523724800]
+[node name="@Sprite2D@53" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=527060034]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(48.75745, -276.3866)
@@ -635,7 +635,7 @@ rotation = 0.08774999
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@54" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1209799828]
+[node name="@Sprite2D@54" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=274549361]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(93.69981, -242.13237)
@@ -643,7 +643,7 @@ rotation = 1.2064278
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@55" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1555326418]
+[node name="@Sprite2D@55" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=354710398]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(106.40656, -164.7147)
@@ -651,7 +651,7 @@ rotation = 1.4885069
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@56" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=410520381]
+[node name="@Sprite2D@56" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1206637463]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(114.67872, -87.71737)
@@ -659,7 +659,7 @@ rotation = 1.4738606
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@57" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=102080342]
+[node name="@Sprite2D@57" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1482831274]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(119.72799, -13.209302)
@@ -667,7 +667,7 @@ rotation = 1.5188661
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@58" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1203856051]
+[node name="@Sprite2D@58" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1541758280]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(124.48298, 61.48991)
@@ -675,7 +675,7 @@ rotation = 1.4875607
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@59" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=205258742]
+[node name="@Sprite2D@59" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1271221394]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(129.09874, 136.36807)
@@ -683,7 +683,7 @@ rotation = 1.5617014
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@60" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=368391135]
+[node name="@Sprite2D@60" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1301742560]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(124.901276, 212.32317)
@@ -691,7 +691,7 @@ rotation = 1.6434859
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@61" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1226013966]
+[node name="@Sprite2D@61" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1088075881]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(111.385574, 288.42758)
@@ -699,7 +699,7 @@ rotation = 1.9703283
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@62" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1691384399]
+[node name="@Sprite2D@62" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1846395778]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(62.98193, 320.8912)
@@ -707,7 +707,7 @@ rotation = 3.1127858
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@63" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=510062834]
+[node name="@Sprite2D@63" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1234128346]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-17.281609, 314.3946)
@@ -715,7 +715,7 @@ rotation = -3.1295707
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@64" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=708458360]
+[node name="@Sprite2D@64" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1187278642]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-84.98566, 339.30328)
@@ -723,7 +723,7 @@ rotation = 2.4710453
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@65" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1194334224]
+[node name="@Sprite2D@65" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1504827150]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-143.78001, 387.01624)
@@ -731,7 +731,7 @@ rotation = 2.6184134
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@66" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1066369849]
+[node name="@Sprite2D@66" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1986092989]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-210.62509, 393.30737)
@@ -739,7 +739,7 @@ rotation = -2.8963847
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@67" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=312369973]
+[node name="@Sprite2D@67" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=611400237]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-283.67157, 367.6303)
@@ -747,7 +747,7 @@ rotation = -2.8185616
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@68" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=124289549]
+[node name="@Sprite2D@68" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=2141105126]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-356.68732, 350.19318)
@@ -755,7 +755,7 @@ rotation = -2.9309874
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="@Sprite2D@69" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=280321598]
+[node name="@Sprite2D@69" type="Sprite2D" parent="TrackSurfaceTiles" unique_id=1197082751]
 modulate = Color(1.3, 1.3, 1.3, 1)
 texture_filter = 2
 position = Vector2(-430.0972, 338.74786)
@@ -763,150 +763,141 @@ rotation = -3.0804257
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("2_m2jba")
 
-[node name="InnerBarrier" type="StaticBody2D" parent="." unique_id=179968949]
+[node name="InnerBarrier" type="StaticBody2D" parent="." unique_id=1426726713]
 collision_layer = 2
 
-[node name="@CollisionPolygon2D@70" type="CollisionPolygon2D" parent="InnerBarrier" unique_id=1256179842]
+[node name="@CollisionPolygon2D@70" type="CollisionPolygon2D" parent="InnerBarrier" unique_id=25434412]
 polygon = PackedVector2Array(-458.90332, 223.46222, -477.6934, 224.73402, -495.84274, 227.00049, -512.8899, 229.96906, -528.87054, 233.39902, -543.8326, 237.08437, -557.82245, 240.84937, -570.8783, 244.54475, -583.02216, 248.04309, -594.2591, 251.23679, -604.5769, 254.03812, -614.03076, 256.40012, -625.8124, 258.99048, -641.3153, 262.7575, -656.9874, 267.1305, -671.26154, 271.43533, -684.1747, 275.43515, -695.655, 278.92502, -705.5219, 281.7301, -713.4825, 283.722, -719.1232, 284.85834, -712.19037, 286.7955, -717.2307, 282.2292, -720.4724, 279.12466, -723.76227, 275.55032, -726.89136, 271.70297, -729.68195, 267.81073, -731.98553, 264.1377, -733.49146, 261.3882, -734.3798, 255.51834, -734.86444, 248.97638, -735.1303, 240.52309, -735.14246, 230.42319, -734.9385, 218.89502, -734.60754, 206.10152, -734.2794, 192.14879, -734.1225, 177.08327, -734.3315, 161.6259, -734.83527, 148.02283, -735.23865, 136.13019, -735.5755, 124.31925, -735.85, 112.49452, -736.0627, 100.658356, -736.214, 88.81193, -736.30475, 76.957275, -736.33527, 65.09619, -736.30634, 53.229847, -736.2185, 41.361115, -736.0722, 29.490911, -735.86395, 17.388754, -735.6383, 4.8173165, -735.4524, -7.841384, -735.2782, -20.19267, -735.0826, -32.2304, -734.83453, -43.950275, -734.506, -55.348274, -734.07135, -66.42005, -733.50793, -77.161545, -732.7954, -87.56956, -731.9161, -97.64245, -730.85345, -107.390594, -729.3867, -118.30652, -727.63184, -131.38522, -725.95966, -144.84845, -724.4036, -157.49776, -722.8696, -169.24516, -721.2946, -179.9658, -719.6511, -189.49799, -717.9554, -197.65062, -716.28107, -204.21623, -714.7767, -208.989, -713.68005, -211.80579, -710.6965, -215.46216, -707.74255, -218.16348, -703.6969, -221.41658, -698.6172, -225.05196, -692.59906, -228.92616, -685.7584, -232.92436, -678.22217, -236.9572, -670.12, -240.95728, -661.57983, -244.87595, -652.8584, -248.62366, -645.00165, -251.79906, -637.72345, -254.41223, -630.09296, -256.81854, -622.0166, -259.0447, -613.578, -261.05847, -604.8604, -262.83444, -595.94604, -264.35355, -586.9176, -265.6017, -577.8582, -266.56946, -568.8509, -267.25174, -559.98083, -267.64786, -551.60675, -267.76254, -544.49866, -267.61026, -537.7803, -267.09964, -530.2949, -266.18607, -522.0313, -264.85086, -513.0713, -263.10123, -503.49194, -260.9616, -493.3619, -258.46973, -482.73798, -255.6731, -471.6649, -252.62688, -460.17215, -249.39174, -448.27307, -246.03326, -437.4793, -243.0453, -430.45142, -241.01564, -425.07373, -239.04971, -418.19125, -236.19038, -409.79398, -232.42241, -399.9036, -227.829, -388.4711, -222.55188, -375.3641, -216.79138, -360.36777, -210.82532, -343.20367, -205.04747, -323.59302, -200.02237, -301.38672, -196.52673, -275.06638, -195.56456, -245.924, -199.05632, -219.82487, -206.47215, -198.9082, -215.2518, -182.07118, -223.98409, -168.4658, -231.88976, -157.6616, -238.45157, -149.64885, -243.24373, -144.85414, -245.91379, -148.99796, -244.91309, -160.43521, -243.35428, -175.96764, -244.29143, -188.94608, -247.79393, -195.83852, -251.01006, -189.94292, -245.21387, -182.54158, -238.03027, -173.12128, -228.82527, -161.569, -217.97115, -147.45175, -205.83626, -129.99332, -192.89952, -108.05108, -179.97939, -81.35445, -168.99269, -54.15538, -162.51543, -30.48504, -159.97379, -10.459947, -159.5841, 6.3107867, -160.16197, 19.984182, -160.97913, 30.379902, -161.59052, 36.93654, -161.80632, 23.0825, -166.39822, 7.0692053, -175.89299, -5.6908116, -188.14708, -11.761594, -197.03348, -13.750321, -201.15106, -12.775808, -196.56104, -11.589218, -189.3286, -10.401914, -179.71565, -9.28606, -168.23352, -8.204294, -155.2621, -7.0479765, -141.06029, -5.6468477, -125.76234, -3.8793774, -110.341515, -2.151802, -97.68775, -0.888463, -87.2122, 0.21860313, -76.58723, 1.2013187, -65.6855, 2.0761642, -54.512867, 2.8612146, -43.07567, 3.576229, -31.380371, 4.2424955, -19.433111, 4.8830194, -7.2400103, 5.5222216, 5.193137, 6.1862383, 17.861294, 6.914425, 30.958223, 7.788125, 44.54352, 8.810121, 58.053886, 9.881121, 71.05094, 10.934046, 83.52461, 11.909224, 95.461876, 12.754324, 106.84442, 13.42458, 117.649086, 13.883417, 127.848656, 14.103499, 137.41397, 14.067587, 146.31587, 13.768478, 154.54402, 13.021464, 164.29092, 11.997764, 177.29213, 11.06947, 191.09216, 10.204962, 203.97122, 9.288009, 215.74643, 8.254918, 226.1198, 7.1131363, 234.68222, 5.986929, 240.90631, 5.2041597, 244.1467, 7.916051, 239.00266, 14.485808, 230.19536, 28.043274, 218.3696, 45.0633, 209.46497, 56.32225, 206.38219, 59.669594, 205.9389, 56.585556, 205.79338, 48.65959, 205.10292, 37.004272, 203.77405, 22.259422, 202.05208, 4.664746, 200.37747, -15.899111, 199.40291, -39.867294, 200.1495, -67.597496, 204.27176, -96.02361, 213.03188, -120.45599, 224.6973, -140.26599, 237.11266, -156.44836, 249.20291, -169.76767, 260.30243, -180.73386, 269.963, -189.57529, 277.80945, -196.23335, 283.49075, -200.3448, 286.716, -190.87218, 283.70358, -183.69696, 282.54532, -180.01459, 282.46283, -188.38234, 280.09354, -196.39235, 277.37418, -206.41653, 273.665, -218.25308, 269.13553, -231.82283, 264.01382, -247.1657, 258.5784, -264.43634, 253.17528, -282.0934, 248.66216, -296.227, 245.68196, -307.7682, 243.18062, -319.8836, 240.51337, -332.64636, 237.73416, -346.05283, 234.92404, -360.1076, 232.17336, -374.82126, 229.58273, -390.20886, 227.2645, -406.287, 225.34431, -423.06738, 223.96292, -440.55103, 223.27646)
 
-[node name="IslandProp" type="Polygon2D" parent="." unique_id=1367011015]
+[node name="IslandProp" type="Polygon2D" parent="." unique_id=45745342]
 modulate = Color(1.2, 1.2, 1.2, 1)
 z_index = -9
 texture_filter = 2
 texture = ExtResource("3_7jh5i")
-polygon = PackedVector2Array(-458.90332, 223.46222, -477.6934, 224.73402, -495.84274, 227.00049, -512.8899, 229.96906, -528.87054, 233.39902, -543.8326, 237.08437, -557.82245, 240.84937, -570.8783, 244.54475, -583.02216, 248.04309, -594.2591, 251.23679, -604.5769, 254.03812, -614.03076, 256.40012, -625.8124, 258.99048, -641.3153, 262.7575, -656.9874, 267.1305, -671.26154, 271.43533, -684.1747, 275.43515, -695.655, 278.92502, -705.5219, 281.7301, -713.4825, 283.722, -719.1232, 284.85834, -712.19037, 286.7955, -717.2307, 282.2292, -720.4724, 279.12466, -723.76227, 275.55032, -726.89136, 271.70297, -729.68195, 267.81073, -731.98553, 264.1377, -733.49146, 261.3882, -734.3798, 255.51834, -734.86444, 248.97638, -735.1303, 240.52309, -735.14246, 230.42319, -734.9385, 218.89502, -734.60754, 206.10152, -734.2794, 192.14879, -734.1225, 177.08327, -734.3315, 161.6259, -734.83527, 148.02283, -735.23865, 136.13019, -735.5755, 124.31925, -735.85, 112.49452, -736.0627, 100.658356, -736.214, 88.81193, -736.30475, 76.957275, -736.33527, 65.09619, -736.30634, 53.229847, -736.2185, 41.361115, -736.0722, 29.490911, -735.86395, 17.388754, -735.6383, 4.8173165, -735.4524, -7.841384, -735.2782, -20.19267, -735.0826, -32.2304, -734.83453, -43.950275, -734.506, -55.348274, -734.07135, -66.42005, -733.50793, -77.161545, -732.7954, -87.56956, -731.9161, -97.64245, -730.85345, -107.390594, -729.3867, -118.30652, -727.63184, -131.38522, -725.95966, -144.84845, -724.4036, -157.49776, -722.8696, -169.24516, -721.2946, -179.9658, -719.6511, -189.49799, -717.9554, -197.65062, -716.28107, -204.21623, -714.7767, -208.989, -713.68005, -211.80579, -710.6965, -215.46216, -707.74255, -218.16348, -703.6969, -221.41658, -698.6172, -225.05196, -692.59906, -228.92616, -685.7584, -232.92436, -678.22217, -236.9572, -670.12, -240.95728, -661.57983, -244.87595, -652.8584, -248.62366, -645.00165, -251.79906, -637.72345, -254.41223, -630.09296, -256.81854, -622.0166, -259.0447, -613.578, -261.05847, -604.8604, -262.83444, -595.94604, -264.35355, -586.9176, -265.6017, -577.8582, -266.56946, -568.8509, -267.25174, -559.98083, -267.64786, -551.60675, -267.76254, -544.49866, -267.61026, -537.7803, -267.09964, -530.2949, -266.18607, -522.0313, -264.85086, -513.0713, -263.10123, -503.49194, -260.9616, -493.3619, -258.46973, -482.73798, -255.6731, -471.6649, -252.62688, -460.17215, -249.39174, -448.27307, -246.03326, -437.4793, -243.0453, -430.45142, -241.01564, -425.07373, -239.04971, -418.19125, -236.19038, -409.79398, -232.42241, -399.9036, -227.829, -388.4711, -222.55188, -375.3641, -216.79138, -360.36777, -210.82532, -343.20367, -205.04747, -323.59302, -200.02237, -301.38672, -196.52673, -275.06638, -195.56456, -245.924, -199.05632, -219.82487, -206.47215, -198.9082, -215.2518, -182.07118, -223.98409, -168.4658, -231.88976, -157.6616, -238.45157, -149.64885, -243.24373, -144.85414, -245.91379, -148.99796, -244.91309, -160.43521, -243.35428, -175.96764, -244.29143, -188.94608, -247.79393, -195.83852, -251.01006, -189.94292, -245.21387, -182.54158, -238.03027, -173.12128, -228.82527, -161.569, -217.97115, -147.45175, -205.83626, -129.99332, -192.89952, -108.05108, -179.97939, -81.35445, -168.99269, -54.15538, -162.51543, -30.48504, -159.97379, -10.459947, -159.5841, 6.3107867, -160.16197, 19.984182, -160.97913, 30.379902, -161.59052, 36.93654, -161.80632, 23.0825, -166.39822, 7.0692053, -175.89299, -5.6908116, -188.14708, -11.761594, -197.03348, -13.750321, -201.15106, -12.775808, -196.56104, -11.589218, -189.3286, -10.401914, -179.71565, -9.28606, -168.23352, -8.204294, -155.2621, -7.0479765, -141.06029, -5.6468477, -125.76234, -3.8793774, -110.341515, -2.151802, -97.68775, -0.888463, -87.2122, 0.21860313, -76.58723, 1.2013187, -65.6855, 2.0761642, -54.512867, 2.8612146, -43.07567, 3.576229, -31.380371, 4.2424955, -19.433111, 4.8830194, -7.2400103, 5.5222216, 5.193137, 6.1862383, 17.861294, 6.914425, 30.958223, 7.788125, 44.54352, 8.810121, 58.053886, 9.881121, 71.05094, 10.934046, 83.52461, 11.909224, 95.461876, 12.754324, 106.84442, 13.42458, 117.649086, 13.883417, 127.848656, 14.103499, 137.41397, 14.067587, 146.31587, 13.768478, 154.54402, 13.021464, 164.29092, 11.997764, 177.29213, 11.06947, 191.09216, 10.204962, 203.97122, 9.288009, 215.74643, 8.254918, 226.1198, 7.1131363, 234.68222, 5.986929, 240.90631, 5.2041597, 244.1467, 7.916051, 239.00266, 14.485808, 230.19536, 28.043274, 218.3696, 45.0633, 209.46497, 56.32225, 206.38219, 59.669594, 205.9389, 56.585556, 205.79338, 48.65959, 205.10292, 37.004272, 203.77405, 22.259422, 202.05208, 4.664746, 200.37747, -15.899111, 199.40291, -39.867294, 200.1495, -67.597496, 204.27176, -96.02361, 213.03188, -120.45599, 224.6973, -140.26599, 237.11266, -156.44836, 249.20291, -169.76767, 260.30243, -180.73386, 269.963, -189.57529, 277.80945, -196.23335, 283.49075, -200.3448, 286.716, -190.87218, 283.70358, -183.69696, 282.54532, -180.01459, 282.46283, -188.38234, 280.09354, -196.39235, 277.37418, -206.41653, 273.665, -218.25308, 269.13553, -231.82283, 264.01382, -247.1657, 258.5784, -264.43634, 253.17528, -282.0934, 248.66216, -296.227, 245.68196, -307.7682, 243.18062, -319.8836, 240.51337, -332.64636, 237.73416, -346.05283, 234.92404, -360.1076, 232.17336, -374.82126, 229.58273, -390.20886, 227.2645, -406.287, 225.34431, -423.06738, 223.96292, -440.55103, 223.27646)
-uv = PackedVector2Array(0.34036684, 0.8969717, 0.31645226, 0.8993423, 0.29335317, 0.90356684, 0.27165687, 0.90910006, 0.25131792, 0.91549325, 0.2322754, 0.9223625, 0.21447016, 0.92938024, 0.19785368, 0.93626815, 0.18239792, 0.94278884, 0.16809641, 0.9487417, 0.15496469, 0.95396316, 0.14293255, 0.9583658, 0.12793781, 0.9631941, 0.10820687, 0.97021556, 0.0882606, 0.9783665, 0.07009361, 0.9863905, 0.05365875, 0.9938459, 0.039047446, 1.0003507, 0.026489638, 1.0055792, 0.016358035, 1.009292, 0.009178925, 1.01141, 0.018002538, 1.0150208, 0.011587576, 1.0065095, 0.00746179, 1.0007229, 0.003274714, 0.9940605, -0.00070775027, 0.9868893, -0.004259397, 0.9796344, -0.0071912277, 0.97278816, -0.009107848, 0.9676633, -0.010238492, 0.9567222, -0.010855278, 0.94452846, -0.011193656, 0.92877203, -0.011209114, 0.9099465, -0.0109495055, 0.8884587, -0.0105283195, 0.8646125, -0.010110707, 0.8386055, -0.00991099, 0.8105244, -0.010176969, 0.7817129, -0.010818147, 0.7563576, -0.01133154, 0.7341905, -0.01176026, 0.7121757, -0.012109591, 0.6901352, -0.0123803085, 0.66807336, -0.01257288, 0.6459924, -0.012688391, 0.6238961, -0.012727232, 0.6017878, -0.012690411, 0.5796697, -0.012578628, 0.5575472, -0.012392427, 0.5354219, -0.01212738, 0.5128643, -0.0118401935, 0.48943195, -0.011603578, 0.46583694, -0.011381877, 0.44281498, -0.01113291, 0.42037743, -0.010817215, 0.39853233, -0.010399058, 0.3772872, -0.009845893, 0.35665014, -0.009128821, 0.3366287, -0.008221975, 0.31722885, -0.0071028266, 0.29845366, -0.0057504033, 0.28028375, -0.0038836545, 0.25993717, -0.0016501744, 0.23555933, 0.000478048, 0.21046476, 0.0024584436, 0.18688728, 0.004410797, 0.16499089, 0.0064153513, 0.14500831, 0.008507064, 0.12724094, 0.0106652705, 0.11204497, 0.012796212, 0.0998071, 0.01471089, 0.09091098, 0.016106581, 0.085660666, 0.019903855, 0.07884543, 0.023663376, 0.07381034, 0.028812373, 0.06774678, 0.03527744, 0.060970675, 0.04293685, 0.05374941, 0.05164309, 0.046297025, 0.061234653, 0.038780082, 0.07154648, 0.0313242, 0.08241574, 0.024020057, 0.09351571, 0.017034568, 0.10351518, 0.011115831, 0.11277831, 0.006245045, 0.12248982, 0.001759839, 0.13276878, -0.0023895882, 0.14350878, -0.0061431113, 0.15460385, -0.009453404, 0.16594937, -0.012284914, 0.17744009, -0.014611419, 0.18897018, -0.016415229, 0.20043401, -0.017686957, 0.21172313, -0.018425295, 0.22238103, -0.01863906, 0.23142765, -0.018355215, 0.2399783, -0.017403454, 0.24950509, -0.01570061, 0.26002237, -0.013211876, 0.271426, -0.009950673, 0.28361785, -0.0059625655, 0.29651058, -0.00131786, 0.31003192, 0.0038948767, 0.3241249, 0.009572829, 0.33875197, 0.015602915, 0.3538962, 0.02186289, 0.36763367, 0.027432254, 0.3765782, 0.031215414, 0.38342252, 0.034879774, 0.39218202, 0.040209375, 0.40286943, 0.047232635, 0.41545716, 0.055794455, 0.43000755, 0.06563065, 0.44668913, 0.07636785, 0.4657753, 0.0874882, 0.48762044, 0.09825773, 0.5125794, 0.10762419, 0.5408419, 0.11413982, 0.57434034, 0.11593325, 0.6114305, 0.10942484, 0.6446475, 0.095602214, 0.67126864, 0.07923752, 0.6926975, 0.06296112, 0.7100134, 0.048225466, 0.7237641, 0.035994675, 0.7339622, 0.027062403, 0.7400645, 0.022085587, 0.73479056, 0.02395083, 0.7202341, 0.026856344, 0.7004656, 0.025109561, 0.6839477, 0.018581126, 0.6751755, 0.012586478, 0.68267894, 0.023390194, 0.6920988, 0.03677994, 0.7040883, 0.05393746, 0.7187911, 0.07416884, 0.7367585, 0.096787475, 0.7589782, 0.120900705, 0.7869046, 0.144983, 0.820882, 0.16546147, 0.8554989, 0.17753467, 0.8856247, 0.18227212, 0.9111111, 0.18299846, 0.9324556, 0.18192135, 0.949858, 0.18039823, 0.9630889, 0.17925864, 0.9714337, 0.1788564, 0.95380133, 0.17029738, 0.93342084, 0.15259977, 0.9171809, 0.12975895, 0.90945446, 0.113195285, 0.90692335, 0.105520375, 0.90816367, 0.114075884, 0.90967387, 0.12755667, 0.91118497, 0.14547457, 0.9126051, 0.16687651, 0.9139819, 0.19105439, 0.9154536, 0.21752565, 0.9172368, 0.24604002, 0.91948634, 0.27478343, 0.92168504, 0.2983692, 0.92329293, 0.31789497, 0.9247019, 0.3376992, 0.9259527, 0.3580193, 0.9270661, 0.37884435, 0.92806524, 0.40016255, 0.9289753, 0.4219618, 0.9298232, 0.44423074, 0.93063843, 0.46695787, 0.931452, 0.49013245, 0.93229705, 0.51374507, 0.93322384, 0.53815687, 0.9343358, 0.563479, 0.9356366, 0.58866143, 0.9369996, 0.6128871, 0.9383397, 0.6361372, 0.93958086, 0.6583875, 0.9406564, 0.67960376, 0.9415095, 0.699743, 0.94209343, 0.7187543, 0.9423736, 0.7365834, 0.94232786, 0.753176, 0.94194716, 0.7685127, 0.9409964, 0.7866803, 0.9396935, 0.8109137, 0.9385121, 0.83663607, 0.9374118, 0.8606418, 0.9362448, 0.88259, 0.9349299, 0.90192527, 0.93347675, 0.91788507, 0.93204343, 0.92948633, 0.93104714, 0.93552625, 0.93449867, 0.92593807, 0.9428601, 0.9095218, 0.960115, 0.8874794, 0.98177683, 0.87088174, 0.9961063, 0.86513567, 1.0003666, 0.86430943, 0.9964415, 0.86403817, 0.9863539, 0.8627512, 0.9715199, 0.86027426, 0.9527538, 0.8570646, 0.9303606, 0.8539432, 0.9041885, 0.8521267, 0.8736837, 0.85351837, 0.8383908, 0.86120194, 0.80221224, 0.8775302, 0.77111655, 0.8992738, 0.7459039, 0.92241526, 0.72530824, 0.9449507, 0.70835644, 0.9656395, 0.69439954, 0.98364615, 0.68314683, 0.9982714, 0.67467296, 1.008861, 0.6694402, 1.0148727, 0.68149626, 1.0092577, 0.69062835, 1.0070988, 0.695315, 1.006945, 0.68466514, 1.0025288, 0.6744706, 0.99746007, 0.6617126, 0.9905464, 0.64664793, 0.98210377, 0.6293774, 0.97255725, 0.6098502, 0.96242595, 0.58786947, 0.9523549, 0.5653969, 0.9439427, 0.54740876, 0.9383879, 0.53272, 0.93372554, 0.5173004, 0.9287539, 0.50105697, 0.9235737, 0.48399428, 0.9183358, 0.4661064, 0.9132087, 0.44738, 0.90838, 0.42779586, 0.90405893, 0.40733287, 0.9004798, 0.38597605, 0.897905, 0.36372423, 0.89662546)
+polygon = PackedVector2Array(300, -50, 1000, -50, 1000, 550, -1000, 550, -1000, -550, 300, -550)
+uv = PackedVector2Array(0.65, 0.45454547, 1, 0.45454547, 1, 1, 0, 1, 0, 0, 0.65, 0)
 
-[node name="@Line2D@71" type="Line2D" parent="." unique_id=390297814]
-z_index = -8
-points = PackedVector2Array(49.38159, 178.73682, 46.31492, 202.03053, 37.323875, 223.73682, 23.021202, 242.37643, 4.381592, 256.6791, -17.324694, 265.67014, -40.61841, 268.73682, -626.33527, 268.73682, -649.62897, 265.67014, -671.33527, 256.6791, -689.97485, 242.37643, -704.2775, 223.73682, -713.2686, 202.03053, -716.33527, 178.73682, -716.33527, -157.7627, -713.2686, -181.05641, -704.2775, -202.7627, -689.97485, -221.40231, -671.33527, -235.70499, -649.62897, -244.69601, -626.33527, -247.7627, -40.61841, -247.7627, -17.324694, -244.69601, 4.381592, -235.70499, 23.021202, -221.40231, 37.323875, -202.7627, 46.31492, -181.05641, 49.38159, -157.7627)
-closed = true
-width = 5.0
-default_color = Color(0.050980393, 0.05882353, 0.078431375, 0.85)
-joint_mode = 2
-antialiased = true
-
-[node name="Wall0" type="StaticBody2D" parent="." unique_id=546497379]
+[node name="Wall0" type="StaticBody2D" parent="." unique_id=1158359577]
 position = Vector2(-350, -550)
 collision_layer = 2
 
-[node name="@CollisionShape2D@72" type="CollisionShape2D" parent="Wall0" unique_id=1388932654]
+[node name="@CollisionShape2D@71" type="CollisionShape2D" parent="Wall0" unique_id=563488489]
 shape = SubResource("RectangleShape2D_yi6ew")
 
-[node name="Visual" type="Polygon2D" parent="Wall0" unique_id=1056875302]
+[node name="Visual" type="Polygon2D" parent="Wall0" unique_id=1665135246]
 color = Color(0.05490196, 0.08235294, 0.14117648, 1)
 polygon = PackedVector2Array(-680, -25, 680, -25, 680, 25, -680, 25)
 
-[node name="EdgeStrip" type="Sprite2D" parent="Wall0" unique_id=682080007]
+[node name="EdgeStrip" type="Sprite2D" parent="Wall0" unique_id=219072765]
 texture_filter = 2
 position = Vector2(-340, 0)
 scale = Vector2(0.6640625, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="@Sprite2D@73" type="Sprite2D" parent="Wall0" unique_id=1701015918]
+[node name="@Sprite2D@72" type="Sprite2D" parent="Wall0" unique_id=1142133245]
 texture_filter = 2
 position = Vector2(340, 0)
 scale = Vector2(0.6640625, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="Wall1" type="StaticBody2D" parent="." unique_id=467743545]
+[node name="Wall1" type="StaticBody2D" parent="." unique_id=392456796]
 position = Vector2(300, -300)
 rotation = 1.5707964
 collision_layer = 2
 
-[node name="@CollisionShape2D@74" type="CollisionShape2D" parent="Wall1" unique_id=1532072691]
+[node name="@CollisionShape2D@73" type="CollisionShape2D" parent="Wall1" unique_id=879640947]
 shape = SubResource("RectangleShape2D_80asd")
 
-[node name="Visual" type="Polygon2D" parent="Wall1" unique_id=2056551470]
+[node name="Visual" type="Polygon2D" parent="Wall1" unique_id=1612982087]
 color = Color(0.05490196, 0.08235294, 0.14117648, 1)
 polygon = PackedVector2Array(-280, -25, 280, -25, 280, 25, -280, 25)
 
-[node name="EdgeStrip" type="Sprite2D" parent="Wall1" unique_id=1961330461]
+[node name="EdgeStrip" type="Sprite2D" parent="Wall1" unique_id=1655188527]
 texture_filter = 2
 scale = Vector2(0.546875, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="Wall2" type="StaticBody2D" parent="." unique_id=334561905]
+[node name="Wall2" type="StaticBody2D" parent="." unique_id=677484001]
 position = Vector2(650, -50)
 collision_layer = 2
 
-[node name="@CollisionShape2D@75" type="CollisionShape2D" parent="Wall2" unique_id=642400183]
+[node name="@CollisionShape2D@74" type="CollisionShape2D" parent="Wall2" unique_id=37225178]
 shape = SubResource("RectangleShape2D_tqe6s")
 
-[node name="Visual" type="Polygon2D" parent="Wall2" unique_id=946346107]
+[node name="Visual" type="Polygon2D" parent="Wall2" unique_id=1418126458]
 color = Color(0.05490196, 0.08235294, 0.14117648, 1)
 polygon = PackedVector2Array(-380, -25, 380, -25, 380, 25, -380, 25)
 
-[node name="EdgeStrip" type="Sprite2D" parent="Wall2" unique_id=447042407]
+[node name="EdgeStrip" type="Sprite2D" parent="Wall2" unique_id=2068062462]
 texture_filter = 2
 scale = Vector2(0.7421875, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="Wall3" type="StaticBody2D" parent="." unique_id=1303053736]
+[node name="Wall3" type="StaticBody2D" parent="." unique_id=1980597353]
 position = Vector2(1000, 250)
 rotation = 1.5707964
 collision_layer = 2
 
-[node name="@CollisionShape2D@76" type="CollisionShape2D" parent="Wall3" unique_id=1070812998]
+[node name="@CollisionShape2D@75" type="CollisionShape2D" parent="Wall3" unique_id=1470601430]
 shape = SubResource("RectangleShape2D_sxb3i")
 
-[node name="Visual" type="Polygon2D" parent="Wall3" unique_id=1179843682]
+[node name="Visual" type="Polygon2D" parent="Wall3" unique_id=1575912363]
 color = Color(0.05490196, 0.08235294, 0.14117648, 1)
 polygon = PackedVector2Array(-330, -25, 330, -25, 330, 25, -330, 25)
 
-[node name="EdgeStrip" type="Sprite2D" parent="Wall3" unique_id=1566683717]
+[node name="EdgeStrip" type="Sprite2D" parent="Wall3" unique_id=1010771260]
 texture_filter = 2
 scale = Vector2(0.64453125, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="Wall4" type="StaticBody2D" parent="." unique_id=809851705]
+[node name="Wall4" type="StaticBody2D" parent="." unique_id=946161675]
 position = Vector2(0, 550)
 rotation = 3.1415927
 collision_layer = 2
 
-[node name="@CollisionShape2D@77" type="CollisionShape2D" parent="Wall4" unique_id=1212134202]
+[node name="@CollisionShape2D@76" type="CollisionShape2D" parent="Wall4" unique_id=1370385893]
 shape = SubResource("RectangleShape2D_23u1l")
 
-[node name="Visual" type="Polygon2D" parent="Wall4" unique_id=1327909586]
+[node name="Visual" type="Polygon2D" parent="Wall4" unique_id=809987124]
 color = Color(0.05490196, 0.08235294, 0.14117648, 1)
 polygon = PackedVector2Array(-1030, -25, 1030, -25, 1030, 25, -1030, 25)
 
-[node name="EdgeStrip" type="Sprite2D" parent="Wall4" unique_id=870624072]
+[node name="EdgeStrip" type="Sprite2D" parent="Wall4" unique_id=1435578276]
 texture_filter = 2
 position = Vector2(-686.6667, 0)
 scale = Vector2(0.67057294, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="@Sprite2D@78" type="Sprite2D" parent="Wall4" unique_id=1711128461]
+[node name="@Sprite2D@77" type="Sprite2D" parent="Wall4" unique_id=2105581930]
 texture_filter = 2
 scale = Vector2(0.67057294, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="@Sprite2D@79" type="Sprite2D" parent="Wall4" unique_id=845464979]
+[node name="@Sprite2D@78" type="Sprite2D" parent="Wall4" unique_id=1789566659]
 texture_filter = 2
 position = Vector2(686.6667, 0)
 scale = Vector2(0.67057294, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="Wall5" type="StaticBody2D" parent="." unique_id=1520325795]
+[node name="Wall5" type="StaticBody2D" parent="." unique_id=1071714914]
 position = Vector2(-1000, 0)
 rotation = -1.5707964
 collision_layer = 2
 
-[node name="@CollisionShape2D@80" type="CollisionShape2D" parent="Wall5" unique_id=460192178]
+[node name="@CollisionShape2D@79" type="CollisionShape2D" parent="Wall5" unique_id=2023479380]
 shape = SubResource("RectangleShape2D_drnfg")
 
-[node name="Visual" type="Polygon2D" parent="Wall5" unique_id=1305104113]
+[node name="Visual" type="Polygon2D" parent="Wall5" unique_id=1738010189]
 color = Color(0.05490196, 0.08235294, 0.14117648, 1)
 polygon = PackedVector2Array(-580, -25, 580, -25, 580, 25, -580, 25)
 
-[node name="EdgeStrip" type="Sprite2D" parent="Wall5" unique_id=1694267383]
+[node name="EdgeStrip" type="Sprite2D" parent="Wall5" unique_id=478627976]
 texture_filter = 2
 position = Vector2(-290, 0)
 scale = Vector2(0.56640625, 0.22727273)
 texture = ExtResource("4_cd386")
 
-[node name="@Sprite2D@81" type="Sprite2D" parent="Wall5" unique_id=314344026]
+[node name="@Sprite2D@80" type="Sprite2D" parent="Wall5" unique_id=1035243729]
 texture_filter = 2
 position = Vector2(290, 0)
 scale = Vector2(0.56640625, 0.22727273)
@@ -922,7 +913,7 @@ is_finish_line = true
 recovery_rotation = -1.6384531219303775
 recovery_offset = 70.0
 
-[node name="Checkpoint1" type="Area2D" parent="." unique_id=1328173469 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
+[node name="Checkpoint1" type="Area2D" parent="." unique_id=868321710 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
 visible = false
 position = Vector2(-819.85065, 339.31735)
 rotation = 0.9488966
@@ -932,7 +923,7 @@ checkpoint_index = 1
 recovery_rotation = -0.6218997426641979
 recovery_offset = 70.0
 
-[node name="Checkpoint2" type="Area2D" parent="." unique_id=532699294 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
+[node name="Checkpoint2" type="Area2D" parent="." unique_id=1473844351 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
 visible = false
 position = Vector2(-849.7511, -48.468533)
 rotation = 1.5996745
@@ -942,7 +933,7 @@ checkpoint_index = 2
 recovery_rotation = 0.02887816675054215
 recovery_offset = 70.0
 
-[node name="Checkpoint3" type="Area2D" parent="." unique_id=1952291040 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
+[node name="Checkpoint3" type="Area2D" parent="." unique_id=440969904 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
 visible = false
 position = Vector2(-676.04034, -362.81918)
 rotation = 2.7970672
@@ -952,7 +943,7 @@ checkpoint_index = 3
 recovery_rotation = 1.2262707494122878
 recovery_offset = 70.0
 
-[node name="Checkpoint4" type="Area2D" parent="." unique_id=515096462 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
+[node name="Checkpoint4" type="Area2D" parent="." unique_id=807841922 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
 visible = false
 position = Vector2(-294.94095, -311.76788)
 rotation = -2.9828527
@@ -962,7 +953,7 @@ checkpoint_index = 4
 recovery_rotation = 1.7295362704710104
 recovery_offset = 70.0
 
-[node name="Checkpoint5" type="Area2D" parent="." unique_id=2071235033 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
+[node name="Checkpoint5" type="Area2D" parent="." unique_id=1470330419 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
 visible = false
 position = Vector2(60.997143, -274.34692)
 rotation = -2.8412583
@@ -972,7 +963,7 @@ checkpoint_index = 5
 recovery_rotation = 1.871130734967031
 recovery_offset = 70.0
 
-[node name="Checkpoint6" type="Area2D" parent="." unique_id=1649925344 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
+[node name="Checkpoint6" type="Area2D" parent="." unique_id=428991224 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
 visible = false
 position = Vector2(127.68321, 102.176765)
 rotation = -1.6325629
@@ -982,7 +973,7 @@ checkpoint_index = 6
 recovery_rotation = 3.0798261098064232
 recovery_offset = 70.0
 
-[node name="Checkpoint7" type="Area2D" parent="." unique_id=188591167 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
+[node name="Checkpoint7" type="Area2D" parent="." unique_id=1741605485 groups=["track_checkpoints"] instance=ExtResource("5_l2x2p")]
 visible = false
 position = Vector2(29.527004, 318.66043)
 rotation = 0.11246307
@@ -992,999 +983,999 @@ checkpoint_index = 7
 recovery_rotation = -1.4583332536735794
 recovery_offset = 70.0
 
-[node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=1248503053]
+[node name="StartFinishWhite" type="Polygon2D" parent="." unique_id=2135241912]
 z_index = -7
 color = Color(0.9607843, 0.93333334, 0.78431374, 1)
 polygon = PackedVector2Array(-373.51453, 275.21353, -331.87872, 273.60953, -329.56897, 333.56503, -371.20477, 335.16904, -456.78607, 278.42148, -415.15027, 276.81747, -412.8405, 336.77298, -454.47632, 338.37698, -540.05756, 281.62946, -498.42178, 280.02545, -496.1121, 339.98096, -537.74786, 341.58496, -412.84055, 336.773, -371.20474, 335.169, -368.895, 395.1245, -410.5308, 396.72852, -496.11212, 339.981, -454.47632, 338.37698, -452.16656, 398.3325, -493.80237, 399.9365, -579.3836, 343.18893, -537.74786, 341.58493, -535.4382, 401.54044, -577.0739, 403.14444)
 
-[node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=407318197]
+[node name="StartFinishBlack" type="Polygon2D" parent="." unique_id=2052812599]
 z_index = -6
 color = Color(0.050980393, 0.05882353, 0.078431375, 1)
 polygon = PackedVector2Array(-415.1503, 276.8175, -373.5145, 275.2135, -371.20474, 335.169, -412.84055, 336.773, -498.42188, 280.02548, -456.78607, 278.42148, -454.47632, 338.37698, -496.11212, 339.981, -581.69336, 283.23343, -540.0576, 281.62943, -537.7479, 341.58493, -579.38367, 343.18893, -371.20477, 335.16904, -329.56897, 333.56503, -327.25922, 393.52054, -368.89502, 395.12454, -454.47632, 338.37698, -412.8405, 336.77298, -410.53076, 396.7285, -452.16656, 398.3325, -537.74786, 341.58496, -496.1121, 339.98096, -493.8024, 399.93646, -535.4382, 401.54047)
 
-[node name="GridForward" type="Node2D" parent="." unique_id=2115251120]
+[node name="GridForward" type="Node2D" parent="." unique_id=1418152258]
 
-[node name="0" type="Node2D" parent="GridForward" unique_id=567046236]
+[node name="0" type="Node2D" parent="GridForward" unique_id=606448019]
 position = Vector2(-552.6699, 387.19318)
 rotation = -1.6093014
 
-[node name="1" type="Node2D" parent="GridForward" unique_id=1386523561]
+[node name="1" type="Node2D" parent="GridForward" unique_id=1494906823]
 position = Vector2(-556.1345, 297.2599)
 rotation = -1.6093014
 
-[node name="2" type="Node2D" parent="GridForward" unique_id=2078503590]
+[node name="2" type="Node2D" parent="GridForward" unique_id=1372547672]
 position = Vector2(-672.58093, 391.81265)
 rotation = -1.6093014
 
-[node name="3" type="Node2D" parent="GridForward" unique_id=1120845922]
+[node name="3" type="Node2D" parent="GridForward" unique_id=332626086]
 position = Vector2(-676.04553, 301.87936)
 rotation = -1.6093014
 
-[node name="GridReverse" type="Node2D" parent="." unique_id=1186724011]
+[node name="GridReverse" type="Node2D" parent="." unique_id=24132027]
 
-[node name="0" type="Node2D" parent="GridReverse" unique_id=455439905]
+[node name="0" type="Node2D" parent="GridReverse" unique_id=542060582]
 position = Vector2(-407.77737, 381.61133)
 rotation = 1.5322912
 
-[node name="1" type="Node2D" parent="GridReverse" unique_id=1401773066]
+[node name="1" type="Node2D" parent="GridReverse" unique_id=1320007798]
 position = Vector2(-411.24197, 291.67804)
 rotation = 1.5322912
 
-[node name="2" type="Node2D" parent="GridReverse" unique_id=715420058]
+[node name="2" type="Node2D" parent="GridReverse" unique_id=2057832367]
 position = Vector2(-332.83298, 378.72415)
 rotation = 1.5322912
 
-[node name="3" type="Node2D" parent="GridReverse" unique_id=1573351266]
+[node name="3" type="Node2D" parent="GridReverse" unique_id=792306046]
 position = Vector2(-336.29758, 288.79086)
 rotation = 1.5322912
 
-[node name="IslandFill" type="StaticBody2D" parent="." unique_id=1419182351]
+[node name="IslandFill" type="StaticBody2D" parent="." unique_id=1888090368]
 position = Vector2(-303.64905, -11.255684)
 rotation = 2.7518945
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="IslandFill" unique_id=1700589047]
+[node name="ContactShadow" type="Sprite2D" parent="IslandFill" unique_id=337973830]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(1.078125, 1.078125)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@82" type="CollisionShape2D" parent="IslandFill" unique_id=280742205]
+[node name="@CollisionShape2D@81" type="CollisionShape2D" parent="IslandFill" unique_id=2100884957]
 shape = SubResource("CircleShape2D_66wpt")
 
-[node name="@Sprite2D@83" type="Sprite2D" parent="IslandFill" unique_id=188276288]
+[node name="@Sprite2D@82" type="Sprite2D" parent="IslandFill" unique_id=2119502565]
 texture_filter = 2
 scale = Vector2(0.107421875, 0.107421875)
 texture = ExtResource("7_xkibb")
 
-[node name="@StaticBody2D@84" type="StaticBody2D" parent="." unique_id=1137200942]
+[node name="@StaticBody2D@83" type="StaticBody2D" parent="." unique_id=421059672]
 position = Vector2(-378.69135, -11.166731)
 rotation = 3.928411
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@84" unique_id=1484594697]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@83" unique_id=1086091007]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(1.078125, 1.078125)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@85" type="CollisionShape2D" parent="@StaticBody2D@84" unique_id=856391873]
+[node name="@CollisionShape2D@84" type="CollisionShape2D" parent="@StaticBody2D@83" unique_id=1929296616]
 shape = SubResource("CircleShape2D_tk68p")
 
-[node name="@Sprite2D@86" type="Sprite2D" parent="@StaticBody2D@84" unique_id=240762405]
+[node name="@Sprite2D@85" type="Sprite2D" parent="@StaticBody2D@83" unique_id=2027599685]
 texture_filter = 2
 scale = Vector2(0.107421875, 0.107421875)
 texture = ExtResource("3_7jh5i")
 
-[node name="@StaticBody2D@87" type="StaticBody2D" parent="." unique_id=512487630]
+[node name="@StaticBody2D@86" type="StaticBody2D" parent="." unique_id=30851861]
 position = Vector2(-302.9448, 74.6291)
 rotation = 1.3852686
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@87" unique_id=779533551]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@86" unique_id=1084257413]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(1.078125, 1.078125)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@88" type="CollisionShape2D" parent="@StaticBody2D@87" unique_id=949922717]
+[node name="@CollisionShape2D@87" type="CollisionShape2D" parent="@StaticBody2D@86" unique_id=2079458986]
 shape = SubResource("CircleShape2D_lj776")
 
-[node name="@Sprite2D@89" type="Sprite2D" parent="@StaticBody2D@87" unique_id=1887847026]
+[node name="@Sprite2D@88" type="Sprite2D" parent="@StaticBody2D@86" unique_id=1751124849]
 texture_filter = 2
 scale = Vector2(0.4296875, 0.4296875)
 texture = ExtResource("8_u52k1")
 
-[node name="@StaticBody2D@90" type="StaticBody2D" parent="." unique_id=1810077806]
+[node name="@StaticBody2D@89" type="StaticBody2D" parent="." unique_id=2105758266]
 position = Vector2(-379.33966, 87.14551)
 rotation = 1.4721684
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@90" unique_id=3129022]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@89" unique_id=1615803625]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(1.078125, 1.078125)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@91" type="CollisionShape2D" parent="@StaticBody2D@90" unique_id=290389975]
+[node name="@CollisionShape2D@90" type="CollisionShape2D" parent="@StaticBody2D@89" unique_id=519364942]
 shape = SubResource("CircleShape2D_ymanf")
 
-[node name="@Sprite2D@92" type="Sprite2D" parent="@StaticBody2D@90" unique_id=67879473]
+[node name="@Sprite2D@91" type="Sprite2D" parent="@StaticBody2D@89" unique_id=468216757]
 texture_filter = 2
 scale = Vector2(0.4296875, 0.4296875)
 texture = ExtResource("9_3wl20")
 
-[node name="@StaticBody2D@93" type="StaticBody2D" parent="." unique_id=625761523]
+[node name="@StaticBody2D@92" type="StaticBody2D" parent="." unique_id=1043483825]
 position = Vector2(-383.19232, -82.96046)
 rotation = 1.5457236
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@93" unique_id=1644784201]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@92" unique_id=1087546460]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(1.078125, 1.078125)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@94" type="CollisionShape2D" parent="@StaticBody2D@93" unique_id=1998733085]
+[node name="@CollisionShape2D@93" type="CollisionShape2D" parent="@StaticBody2D@92" unique_id=1901698537]
 shape = SubResource("CircleShape2D_2xqia")
 
-[node name="@Sprite2D@95" type="Sprite2D" parent="@StaticBody2D@93" unique_id=889251606]
+[node name="@Sprite2D@94" type="Sprite2D" parent="@StaticBody2D@92" unique_id=1514378583]
 texture_filter = 2
 scale = Vector2(0.4296875, 0.4296875)
 texture = ExtResource("10_ib4xw")
 
-[node name="@StaticBody2D@96" type="StaticBody2D" parent="." unique_id=135233504]
+[node name="@StaticBody2D@95" type="StaticBody2D" parent="." unique_id=1476579312]
 position = Vector2(-148.65141, 156.39781)
 rotation = 1.0245863
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@96" unique_id=1419564660]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@95" unique_id=386919168]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.77625, 0.77625)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@97" type="CollisionShape2D" parent="@StaticBody2D@96" unique_id=1699366615]
+[node name="@CollisionShape2D@96" type="CollisionShape2D" parent="@StaticBody2D@95" unique_id=375355232]
 shape = SubResource("CircleShape2D_vmcyp")
 
-[node name="@Sprite2D@98" type="Sprite2D" parent="@StaticBody2D@96" unique_id=687462937]
+[node name="@Sprite2D@97" type="Sprite2D" parent="@StaticBody2D@95" unique_id=279226737]
 texture_filter = 2
 scale = Vector2(0.07734375, 0.07734375)
 texture = ExtResource("11_11sgg")
 
-[node name="@StaticBody2D@99" type="StaticBody2D" parent="." unique_id=2139967494]
+[node name="@StaticBody2D@98" type="StaticBody2D" parent="." unique_id=733438074]
 position = Vector2(-481.15808, -176.6493)
 rotation = 1.7746613
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@99" unique_id=1806113407]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@98" unique_id=1833019106]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.77625, 0.77625)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@100" type="CollisionShape2D" parent="@StaticBody2D@99" unique_id=631653870]
+[node name="@CollisionShape2D@99" type="CollisionShape2D" parent="@StaticBody2D@98" unique_id=139680539]
 shape = SubResource("CircleShape2D_rp30t")
 
-[node name="@Sprite2D@101" type="Sprite2D" parent="@StaticBody2D@99" unique_id=1847904133]
+[node name="@Sprite2D@100" type="Sprite2D" parent="@StaticBody2D@98" unique_id=23784659]
 texture_filter = 2
 scale = Vector2(0.07734375, 0.07734375)
 texture = ExtResource("12_6k24q")
 
-[node name="@StaticBody2D@102" type="StaticBody2D" parent="." unique_id=1372473815]
+[node name="@StaticBody2D@101" type="StaticBody2D" parent="." unique_id=1017897015]
 position = Vector2(-552.7665, 161.12521)
 rotation = 4.2629056
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@102" unique_id=1636386482]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@101" unique_id=893759994]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.77625, 0.77625)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@103" type="CollisionShape2D" parent="@StaticBody2D@102" unique_id=691797830]
+[node name="@CollisionShape2D@102" type="CollisionShape2D" parent="@StaticBody2D@101" unique_id=1643990851]
 shape = SubResource("CircleShape2D_5r3g8")
 
-[node name="@Sprite2D@104" type="Sprite2D" parent="@StaticBody2D@102" unique_id=2076302168]
+[node name="@Sprite2D@103" type="Sprite2D" parent="@StaticBody2D@101" unique_id=346274815]
 texture_filter = 2
 scale = Vector2(0.09777778, 0.09777778)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@105" type="StaticBody2D" parent="." unique_id=631290314]
+[node name="@StaticBody2D@104" type="StaticBody2D" parent="." unique_id=55062828]
 position = Vector2(-652.72375, 78.123566)
 rotation = 5.945917
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@105" unique_id=685574602]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@104" unique_id=136290324]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.77625, 0.77625)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@106" type="CollisionShape2D" parent="@StaticBody2D@105" unique_id=558920825]
+[node name="@CollisionShape2D@105" type="CollisionShape2D" parent="@StaticBody2D@104" unique_id=323332397]
 shape = SubResource("CircleShape2D_2ykpg")
 
-[node name="@Sprite2D@107" type="Sprite2D" parent="@StaticBody2D@105" unique_id=253376458]
+[node name="@Sprite2D@106" type="Sprite2D" parent="@StaticBody2D@104" unique_id=556110095]
 texture_filter = 2
 scale = Vector2(0.103125, 0.103125)
 texture = ExtResource("14_b1xii")
 
-[node name="@StaticBody2D@108" type="StaticBody2D" parent="." unique_id=1923486382]
+[node name="@StaticBody2D@107" type="StaticBody2D" parent="." unique_id=131088916]
 position = Vector2(-654.02386, 173.68546)
 rotation = 5.9190054
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@108" unique_id=1664906844]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@107" unique_id=229120040]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.77625, 0.77625)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@109" type="CollisionShape2D" parent="@StaticBody2D@108" unique_id=1509218273]
+[node name="@CollisionShape2D@108" type="CollisionShape2D" parent="@StaticBody2D@107" unique_id=1931965208]
 shape = SubResource("CircleShape2D_qvqrq")
 
-[node name="@Sprite2D@110" type="Sprite2D" parent="@StaticBody2D@108" unique_id=842268824]
+[node name="@Sprite2D@109" type="Sprite2D" parent="@StaticBody2D@107" unique_id=1493446482]
 texture_filter = 2
 scale = Vector2(0.309375, 0.309375)
 texture = ExtResource("15_44m5s")
 
-[node name="@StaticBody2D@111" type="StaticBody2D" parent="." unique_id=168579901]
+[node name="@StaticBody2D@110" type="StaticBody2D" parent="." unique_id=1606593511]
 position = Vector2(-642.3252, -182.64568)
 rotation = 0.97806305
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@111" unique_id=226565228]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@110" unique_id=1881127450]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5390625, 0.5390625)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@112" type="CollisionShape2D" parent="@StaticBody2D@111" unique_id=951278066]
+[node name="@CollisionShape2D@111" type="CollisionShape2D" parent="@StaticBody2D@110" unique_id=714012037]
 shape = SubResource("CircleShape2D_aqk28")
 
-[node name="@Sprite2D@113" type="Sprite2D" parent="@StaticBody2D@111" unique_id=1559659214]
+[node name="@Sprite2D@112" type="Sprite2D" parent="@StaticBody2D@110" unique_id=1279263731]
 texture_filter = 2
 scale = Vector2(0.0859375, 0.0859375)
 texture = ExtResource("16_na300")
 
-[node name="@StaticBody2D@114" type="StaticBody2D" parent="." unique_id=172462970]
+[node name="@StaticBody2D@113" type="StaticBody2D" parent="." unique_id=604998872]
 position = Vector2(-49.826736, 87.75171)
 rotation = 4.507197
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@114" unique_id=1851395269]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@113" unique_id=1028456584]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5390625, 0.5390625)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@115" type="CollisionShape2D" parent="@StaticBody2D@114" unique_id=1448872453]
+[node name="@CollisionShape2D@114" type="CollisionShape2D" parent="@StaticBody2D@113" unique_id=971055434]
 shape = SubResource("CircleShape2D_xtic1")
 
-[node name="@Sprite2D@116" type="Sprite2D" parent="@StaticBody2D@114" unique_id=1187746864]
+[node name="@Sprite2D@115" type="Sprite2D" parent="@StaticBody2D@113" unique_id=66899388]
 texture_filter = 2
 scale = Vector2(0.21484375, 0.21484375)
 texture = ExtResource("17_arjj4")
 
-[node name="@StaticBody2D@117" type="StaticBody2D" parent="." unique_id=534955554]
+[node name="@StaticBody2D@116" type="StaticBody2D" parent="." unique_id=1472527019]
 position = Vector2(-396.13068, -174.12126)
 rotation = 2.2580285
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@117" unique_id=1448028658]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@116" unique_id=1460932103]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.3234375, 0.3234375)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@118" type="CollisionShape2D" parent="@StaticBody2D@117" unique_id=415409724]
+[node name="@CollisionShape2D@117" type="CollisionShape2D" parent="@StaticBody2D@116" unique_id=1380547911]
 shape = SubResource("CircleShape2D_a82gu")
 
-[node name="@Sprite2D@119" type="Sprite2D" parent="@StaticBody2D@117" unique_id=1778331506]
+[node name="@Sprite2D@118" type="Sprite2D" parent="@StaticBody2D@116" unique_id=1079003776]
 texture_filter = 2
 scale = Vector2(0.032226563, 0.032226563)
 texture = ExtResource("18_r7pt3")
 
-[node name="@StaticBody2D@120" type="StaticBody2D" parent="." unique_id=63337689]
+[node name="@StaticBody2D@119" type="StaticBody2D" parent="." unique_id=1694906174]
 position = Vector2(-46.45553, -15.547836)
 rotation = 5.89424
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@120" unique_id=843014050]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@119" unique_id=1329302]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.3234375, 0.3234375)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@121" type="CollisionShape2D" parent="@StaticBody2D@120" unique_id=1548218602]
+[node name="@CollisionShape2D@120" type="CollisionShape2D" parent="@StaticBody2D@119" unique_id=2072093162]
 shape = SubResource("CircleShape2D_mfb4c")
 
-[node name="@Sprite2D@122" type="Sprite2D" parent="@StaticBody2D@120" unique_id=1496442074]
+[node name="@Sprite2D@121" type="Sprite2D" parent="@StaticBody2D@119" unique_id=2028742827]
 texture_filter = 2
 scale = Vector2(0.07366072, 0.07366072)
 texture = ExtResource("19_7cn1b")
 
-[node name="@StaticBody2D@123" type="StaticBody2D" parent="." unique_id=1931007462]
+[node name="@StaticBody2D@122" type="StaticBody2D" parent="." unique_id=179145799]
 position = Vector2(-472.50974, 168.76738)
 rotation = 3.5337443
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@123" unique_id=1273744377]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@122" unique_id=1372429673]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.3234375, 0.3234375)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@124" type="CollisionShape2D" parent="@StaticBody2D@123" unique_id=1234657571]
+[node name="@CollisionShape2D@123" type="CollisionShape2D" parent="@StaticBody2D@122" unique_id=335870839]
 shape = SubResource("CircleShape2D_pteje")
 
-[node name="@Sprite2D@125" type="Sprite2D" parent="@StaticBody2D@123" unique_id=1793852178]
+[node name="@Sprite2D@124" type="Sprite2D" parent="@StaticBody2D@122" unique_id=2121594492]
 texture_filter = 2
 scale = Vector2(0.12890625, 0.12890625)
 texture = ExtResource("17_arjj4")
 
-[node name="@StaticBody2D@126" type="StaticBody2D" parent="." unique_id=989820333]
+[node name="@StaticBody2D@125" type="StaticBody2D" parent="." unique_id=1419682882]
 position = Vector2(-392.38635, 173.57983)
 rotation = 0.89200217
 collision_layer = 4
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@126" unique_id=1371998675]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@125" unique_id=163550210]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.3234375, 0.3234375)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@CollisionShape2D@127" type="CollisionShape2D" parent="@StaticBody2D@126" unique_id=275360082]
+[node name="@CollisionShape2D@126" type="CollisionShape2D" parent="@StaticBody2D@125" unique_id=1725776900]
 shape = SubResource("CircleShape2D_hvn2i")
 
-[node name="@Sprite2D@128" type="Sprite2D" parent="@StaticBody2D@126" unique_id=1401183301]
+[node name="@Sprite2D@127" type="Sprite2D" parent="@StaticBody2D@125" unique_id=1147630437]
 texture_filter = 2
 scale = Vector2(0.032226563, 0.032226563)
 texture = ExtResource("18_r7pt3")
 
-[node name="BoundaryProp" type="StaticBody2D" parent="." unique_id=1852600217]
+[node name="BoundaryProp" type="StaticBody2D" parent="." unique_id=91186104]
 position = Vector2(-447.16214, 528.23615)
 rotation = 6.1730146
 collision_layer = 4
 
-[node name="@CollisionShape2D@129" type="CollisionShape2D" parent="BoundaryProp" unique_id=283005236]
+[node name="@CollisionShape2D@128" type="CollisionShape2D" parent="BoundaryProp" unique_id=1793339895]
 shape = SubResource("CircleShape2D_jv53q")
 
-[node name="ContactShadow" type="Sprite2D" parent="BoundaryProp" unique_id=1915980406]
+[node name="ContactShadow" type="Sprite2D" parent="BoundaryProp" unique_id=189675231]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@130" type="Sprite2D" parent="BoundaryProp" unique_id=928132143]
+[node name="@Sprite2D@129" type="Sprite2D" parent="BoundaryProp" unique_id=1950940597]
 texture_filter = 2
 scale = Vector2(0.058007814, 0.058007814)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@131" type="StaticBody2D" parent="." unique_id=2124928010]
+[node name="@StaticBody2D@130" type="StaticBody2D" parent="." unique_id=785750052]
 position = Vector2(-487.10693, 537.8149)
 rotation = 4.8855567
 collision_layer = 4
 
-[node name="@CollisionShape2D@132" type="CollisionShape2D" parent="@StaticBody2D@131" unique_id=2087823277]
+[node name="@CollisionShape2D@131" type="CollisionShape2D" parent="@StaticBody2D@130" unique_id=1979012938]
 shape = SubResource("CircleShape2D_st041")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@131" unique_id=1789950110]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@130" unique_id=880380089]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@133" type="Sprite2D" parent="@StaticBody2D@131" unique_id=230300064]
+[node name="@Sprite2D@132" type="Sprite2D" parent="@StaticBody2D@130" unique_id=1808307945]
 texture_filter = 2
 scale = Vector2(0.07333333, 0.07333333)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@134" type="StaticBody2D" parent="." unique_id=411266667]
+[node name="@StaticBody2D@133" type="StaticBody2D" parent="." unique_id=205389052]
 position = Vector2(-901.12244, 525.7725)
 rotation = 1.4932315
 collision_layer = 4
 
-[node name="@CollisionShape2D@135" type="CollisionShape2D" parent="@StaticBody2D@134" unique_id=866232461]
+[node name="@CollisionShape2D@134" type="CollisionShape2D" parent="@StaticBody2D@133" unique_id=1363487710]
 shape = SubResource("CircleShape2D_e3l7d")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@134" unique_id=1395912636]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@133" unique_id=639923466]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@136" type="Sprite2D" parent="@StaticBody2D@134" unique_id=1240642030]
+[node name="@Sprite2D@135" type="Sprite2D" parent="@StaticBody2D@133" unique_id=841373068]
 texture_filter = 2
 scale = Vector2(0.07333333, 0.07333333)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@137" type="StaticBody2D" parent="." unique_id=518977328]
+[node name="@StaticBody2D@136" type="StaticBody2D" parent="." unique_id=1281840850]
 position = Vector2(-943.81366, -412.36157)
 rotation = 4.5761795
 collision_layer = 4
 
-[node name="@CollisionShape2D@138" type="CollisionShape2D" parent="@StaticBody2D@137" unique_id=1266614025]
+[node name="@CollisionShape2D@137" type="CollisionShape2D" parent="@StaticBody2D@136" unique_id=516468989]
 shape = SubResource("CircleShape2D_cs3nc")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@137" unique_id=885995668]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@136" unique_id=986370286]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@139" type="Sprite2D" parent="@StaticBody2D@137" unique_id=601804310]
+[node name="@Sprite2D@138" type="Sprite2D" parent="@StaticBody2D@136" unique_id=1954406095]
 texture_filter = 2
 scale = Vector2(0.07333333, 0.07333333)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@140" type="StaticBody2D" parent="." unique_id=1322268409]
+[node name="@StaticBody2D@139" type="StaticBody2D" parent="." unique_id=1474601302]
 position = Vector2(-817.85114, -508.11905)
 rotation = 4.906473
 collision_layer = 4
 
-[node name="@CollisionShape2D@141" type="CollisionShape2D" parent="@StaticBody2D@140" unique_id=884645804]
+[node name="@CollisionShape2D@140" type="CollisionShape2D" parent="@StaticBody2D@139" unique_id=1095674929]
 shape = SubResource("CircleShape2D_kmsfk")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@140" unique_id=988767259]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@139" unique_id=2080927475]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@142" type="Sprite2D" parent="@StaticBody2D@140" unique_id=1747468252]
+[node name="@Sprite2D@141" type="Sprite2D" parent="@StaticBody2D@139" unique_id=255734463]
 texture_filter = 2
 scale = Vector2(0.058007814, 0.058007814)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@143" type="StaticBody2D" parent="." unique_id=322110947]
+[node name="@StaticBody2D@142" type="StaticBody2D" parent="." unique_id=1858156800]
 position = Vector2(-335.3529, -530.81085)
 rotation = 5.8708744
 collision_layer = 4
 
-[node name="@CollisionShape2D@144" type="CollisionShape2D" parent="@StaticBody2D@143" unique_id=759524587]
+[node name="@CollisionShape2D@143" type="CollisionShape2D" parent="@StaticBody2D@142" unique_id=1952109373]
 shape = SubResource("CircleShape2D_nwvoj")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@143" unique_id=318560536]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@142" unique_id=669721397]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@145" type="Sprite2D" parent="@StaticBody2D@143" unique_id=1445771464]
+[node name="@Sprite2D@144" type="Sprite2D" parent="@StaticBody2D@142" unique_id=755512338]
 texture_filter = 2
 scale = Vector2(0.07333333, 0.07333333)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@146" type="StaticBody2D" parent="." unique_id=482479349]
+[node name="@StaticBody2D@145" type="StaticBody2D" parent="." unique_id=1640194886]
 position = Vector2(-307.11862, -497.85428)
 rotation = 0.27780676
 collision_layer = 4
 
-[node name="@CollisionShape2D@147" type="CollisionShape2D" parent="@StaticBody2D@146" unique_id=1374642342]
+[node name="@CollisionShape2D@146" type="CollisionShape2D" parent="@StaticBody2D@145" unique_id=1645662309]
 shape = SubResource("CircleShape2D_bsihs")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@146" unique_id=1740970793]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@145" unique_id=1861217335]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@148" type="Sprite2D" parent="@StaticBody2D@146" unique_id=778063277]
+[node name="@Sprite2D@147" type="Sprite2D" parent="@StaticBody2D@145" unique_id=709672557]
 texture_filter = 2
 scale = Vector2(0.07734375, 0.07734375)
 texture = ExtResource("14_b1xii")
 
-[node name="@StaticBody2D@149" type="StaticBody2D" parent="." unique_id=1334741438]
+[node name="@StaticBody2D@148" type="StaticBody2D" parent="." unique_id=1993087033]
 position = Vector2(-77.991, -531.89594)
 rotation = 3.3280635
 collision_layer = 4
 
-[node name="@CollisionShape2D@150" type="CollisionShape2D" parent="@StaticBody2D@149" unique_id=1851835054]
+[node name="@CollisionShape2D@149" type="CollisionShape2D" parent="@StaticBody2D@148" unique_id=310380632]
 shape = SubResource("CircleShape2D_2rc1x")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@149" unique_id=1520343321]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@148" unique_id=701320539]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@151" type="Sprite2D" parent="@StaticBody2D@149" unique_id=1127903264]
+[node name="@Sprite2D@150" type="Sprite2D" parent="@StaticBody2D@148" unique_id=1238608388]
 texture_filter = 2
 scale = Vector2(0.058007814, 0.058007814)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@152" type="StaticBody2D" parent="." unique_id=534421700]
+[node name="@StaticBody2D@151" type="StaticBody2D" parent="." unique_id=1712018824]
 position = Vector2(-4.311139, -463.41498)
 rotation = 4.2957025
 collision_layer = 4
 
-[node name="@CollisionShape2D@153" type="CollisionShape2D" parent="@StaticBody2D@152" unique_id=522467153]
+[node name="@CollisionShape2D@152" type="CollisionShape2D" parent="@StaticBody2D@151" unique_id=155767106]
 shape = SubResource("CircleShape2D_4aff6")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@152" unique_id=747207277]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@151" unique_id=1065641997]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@154" type="Sprite2D" parent="@StaticBody2D@152" unique_id=2079779392]
+[node name="@Sprite2D@153" type="Sprite2D" parent="@StaticBody2D@151" unique_id=2018017343]
 texture_filter = 2
 scale = Vector2(0.07333333, 0.07333333)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@155" type="StaticBody2D" parent="." unique_id=554363855]
+[node name="@StaticBody2D@154" type="StaticBody2D" parent="." unique_id=324012849]
 position = Vector2(256.0713, -342.9463)
 rotation = 5.3049436
 collision_layer = 4
 
-[node name="@CollisionShape2D@156" type="CollisionShape2D" parent="@StaticBody2D@155" unique_id=1740196087]
+[node name="@CollisionShape2D@155" type="CollisionShape2D" parent="@StaticBody2D@154" unique_id=123701733]
 shape = SubResource("CircleShape2D_6q6qo")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@155" unique_id=642532350]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@154" unique_id=1918577634]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@157" type="Sprite2D" parent="@StaticBody2D@155" unique_id=329845887]
+[node name="@Sprite2D@156" type="Sprite2D" parent="@StaticBody2D@154" unique_id=866479076]
 texture_filter = 2
 scale = Vector2(0.07734375, 0.07734375)
 texture = ExtResource("14_b1xii")
 
-[node name="@StaticBody2D@158" type="StaticBody2D" parent="." unique_id=1823860190]
+[node name="@StaticBody2D@157" type="StaticBody2D" parent="." unique_id=483367554]
 position = Vector2(295.7636, -180.33205)
 rotation = 3.500349
 collision_layer = 4
 
-[node name="@CollisionShape2D@159" type="CollisionShape2D" parent="@StaticBody2D@158" unique_id=536253706]
+[node name="@CollisionShape2D@158" type="CollisionShape2D" parent="@StaticBody2D@157" unique_id=681780702]
 shape = SubResource("CircleShape2D_q2sj6")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@158" unique_id=1039650820]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@157" unique_id=1012501875]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@160" type="Sprite2D" parent="@StaticBody2D@158" unique_id=1176697394]
+[node name="@Sprite2D@159" type="Sprite2D" parent="@StaticBody2D@157" unique_id=902256599]
 texture_filter = 2
 scale = Vector2(0.058007814, 0.058007814)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@161" type="StaticBody2D" parent="." unique_id=218726630]
+[node name="@StaticBody2D@160" type="StaticBody2D" parent="." unique_id=1229608406]
 position = Vector2(310.74307, 1.4257205)
 rotation = 3.7419267
 collision_layer = 4
 
-[node name="@CollisionShape2D@162" type="CollisionShape2D" parent="@StaticBody2D@161" unique_id=1044962553]
+[node name="@CollisionShape2D@161" type="CollisionShape2D" parent="@StaticBody2D@160" unique_id=1186241576]
 shape = SubResource("CircleShape2D_et67v")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@161" unique_id=1812495220]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@160" unique_id=747366868]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@163" type="Sprite2D" parent="@StaticBody2D@161" unique_id=1749603878]
+[node name="@Sprite2D@162" type="Sprite2D" parent="@StaticBody2D@160" unique_id=1087582732]
 texture_filter = 2
 scale = Vector2(0.07734375, 0.07734375)
 texture = ExtResource("14_b1xii")
 
-[node name="@StaticBody2D@164" type="StaticBody2D" parent="." unique_id=1558239141]
+[node name="@StaticBody2D@163" type="StaticBody2D" parent="." unique_id=1691111259]
 position = Vector2(317.05176, 86.15454)
 rotation = 1.3034241
 collision_layer = 4
 
-[node name="@CollisionShape2D@165" type="CollisionShape2D" parent="@StaticBody2D@164" unique_id=1272006839]
+[node name="@CollisionShape2D@164" type="CollisionShape2D" parent="@StaticBody2D@163" unique_id=935306755]
 shape = SubResource("CircleShape2D_x556q")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@164" unique_id=116497242]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@163" unique_id=10943280]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@166" type="Sprite2D" parent="@StaticBody2D@164" unique_id=391414439]
+[node name="@Sprite2D@165" type="Sprite2D" parent="@StaticBody2D@163" unique_id=317683445]
 texture_filter = 2
 scale = Vector2(0.058007814, 0.058007814)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@167" type="StaticBody2D" parent="." unique_id=1069371542]
+[node name="@StaticBody2D@166" type="StaticBody2D" parent="." unique_id=35465427]
 position = Vector2(316.19122, 199.45816)
 rotation = 5.445319
 collision_layer = 4
 
-[node name="@CollisionShape2D@168" type="CollisionShape2D" parent="@StaticBody2D@167" unique_id=1240893447]
+[node name="@CollisionShape2D@167" type="CollisionShape2D" parent="@StaticBody2D@166" unique_id=990639804]
 shape = SubResource("CircleShape2D_qhobd")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@167" unique_id=823940555]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@166" unique_id=918466943]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@169" type="Sprite2D" parent="@StaticBody2D@167" unique_id=1058714409]
+[node name="@Sprite2D@168" type="Sprite2D" parent="@StaticBody2D@166" unique_id=389037889]
 texture_filter = 2
 scale = Vector2(0.07333333, 0.07333333)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@170" type="StaticBody2D" parent="." unique_id=170407294]
+[node name="@StaticBody2D@169" type="StaticBody2D" parent="." unique_id=170770221]
 position = Vector2(150.03307, 495.8325)
 rotation = 4.761851
 collision_layer = 4
 
-[node name="@CollisionShape2D@171" type="CollisionShape2D" parent="@StaticBody2D@170" unique_id=576875374]
+[node name="@CollisionShape2D@170" type="CollisionShape2D" parent="@StaticBody2D@169" unique_id=192899978]
 shape = SubResource("CircleShape2D_alpy7")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@170" unique_id=1258816816]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@169" unique_id=412625233]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@172" type="Sprite2D" parent="@StaticBody2D@170" unique_id=1186483539]
+[node name="@Sprite2D@171" type="Sprite2D" parent="@StaticBody2D@169" unique_id=908561109]
 texture_filter = 2
 scale = Vector2(0.058007814, 0.058007814)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@173" type="StaticBody2D" parent="." unique_id=675437190]
+[node name="@StaticBody2D@172" type="StaticBody2D" parent="." unique_id=1342672783]
 position = Vector2(27.78898, 491.24637)
 rotation = 4.176707
 collision_layer = 4
 
-[node name="@CollisionShape2D@174" type="CollisionShape2D" parent="@StaticBody2D@173" unique_id=515831163]
+[node name="@CollisionShape2D@173" type="CollisionShape2D" parent="@StaticBody2D@172" unique_id=1028138000]
 shape = SubResource("CircleShape2D_ryrn6")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@173" unique_id=2073837167]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@172" unique_id=45612689]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@175" type="Sprite2D" parent="@StaticBody2D@173" unique_id=1498400788]
+[node name="@Sprite2D@174" type="Sprite2D" parent="@StaticBody2D@172" unique_id=998670640]
 texture_filter = 2
 scale = Vector2(0.058007814, 0.058007814)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@176" type="StaticBody2D" parent="." unique_id=55531797]
+[node name="@StaticBody2D@175" type="StaticBody2D" parent="." unique_id=31280097]
 position = Vector2(-396.40717, 535.99506)
 rotation = 0.0022249916
 collision_layer = 4
 
-[node name="@CollisionShape2D@177" type="CollisionShape2D" parent="@StaticBody2D@176" unique_id=1061798544]
+[node name="@CollisionShape2D@176" type="CollisionShape2D" parent="@StaticBody2D@175" unique_id=1520212139]
 shape = SubResource("CircleShape2D_7olgv")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@176" unique_id=1656808547]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@175" unique_id=839961446]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.5821875, 0.5821875)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@178" type="Sprite2D" parent="@StaticBody2D@176" unique_id=1644981677]
+[node name="@Sprite2D@177" type="Sprite2D" parent="@StaticBody2D@175" unique_id=1177105798]
 texture_filter = 2
 scale = Vector2(0.058007814, 0.058007814)
 texture = ExtResource("20_2pwd2")
 
-[node name="SeedCorridor" type="StaticBody2D" parent="." unique_id=1555263484]
+[node name="SeedCorridor" type="StaticBody2D" parent="." unique_id=989014147]
 position = Vector2(-735.4987, -209.75533)
 collision_layer = 16
 
-[node name="@CollisionShape2D@179" type="CollisionShape2D" parent="SeedCorridor" unique_id=2075481422]
+[node name="@CollisionShape2D@178" type="CollisionShape2D" parent="SeedCorridor" unique_id=1149027645]
 shape = SubResource("CircleShape2D_mgef7")
 
-[node name="ContactShadow" type="Sprite2D" parent="SeedCorridor" unique_id=753425827]
+[node name="ContactShadow" type="Sprite2D" parent="SeedCorridor" unique_id=881831534]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.733125, 0.733125)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@180" type="Sprite2D" parent="SeedCorridor" unique_id=1705172608]
+[node name="@Sprite2D@179" type="Sprite2D" parent="SeedCorridor" unique_id=836094333]
 texture_filter = 2
 scale = Vector2(0.116875, 0.116875)
 texture = ExtResource("16_na300")
 
-[node name="@StaticBody2D@181" type="StaticBody2D" parent="." unique_id=919106273]
+[node name="@StaticBody2D@180" type="StaticBody2D" parent="." unique_id=1639862518]
 position = Vector2(207.79686, -110.67361)
 collision_layer = 16
 
-[node name="@CollisionShape2D@182" type="CollisionShape2D" parent="@StaticBody2D@181" unique_id=991329448]
+[node name="@CollisionShape2D@181" type="CollisionShape2D" parent="@StaticBody2D@180" unique_id=1520688435]
 shape = SubResource("CircleShape2D_wxmb6")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@181" unique_id=1713337666]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@180" unique_id=911584311]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.733125, 0.733125)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@183" type="Sprite2D" parent="@StaticBody2D@181" unique_id=1019073195]
+[node name="@Sprite2D@182" type="Sprite2D" parent="@StaticBody2D@180" unique_id=121848778]
 texture_filter = 2
 scale = Vector2(0.25972223, 0.25972223)
 texture = ExtResource("21_5tv84")
 
-[node name="@StaticBody2D@184" type="StaticBody2D" parent="." unique_id=409081743]
+[node name="@StaticBody2D@183" type="StaticBody2D" parent="." unique_id=2073437109]
 position = Vector2(-944.26337, 166.97527)
 collision_layer = 16
 
-[node name="@CollisionShape2D@185" type="CollisionShape2D" parent="@StaticBody2D@184" unique_id=1128593608]
+[node name="@CollisionShape2D@184" type="CollisionShape2D" parent="@StaticBody2D@183" unique_id=695164622]
 shape = SubResource("CircleShape2D_cscj4")
 
-[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@184" unique_id=973696832]
+[node name="ContactShadow" type="Sprite2D" parent="@StaticBody2D@183" unique_id=342699117]
 modulate = Color(0.06, 0.05, 0.05, 0.35)
 z_index = -1
 texture_filter = 2
 scale = Vector2(0.733125, 0.733125)
 texture = SubResource("ImageTexture_o4i8s")
 
-[node name="@Sprite2D@186" type="Sprite2D" parent="@StaticBody2D@184" unique_id=1351851308]
+[node name="@Sprite2D@185" type="Sprite2D" parent="@StaticBody2D@183" unique_id=732154198]
 texture_filter = 2
 scale = Vector2(0.09234568, 0.09234568)
 texture = ExtResource("13_xo2mc")
 
-[node name="ApronProp" type="StaticBody2D" parent="." unique_id=360216733]
+[node name="ApronProp" type="StaticBody2D" parent="." unique_id=141404967]
 position = Vector2(273.47412, 0.44525146)
 collision_layer = 2
 
-[node name="@CollisionShape2D@187" type="CollisionShape2D" parent="ApronProp" unique_id=653386051]
+[node name="@CollisionShape2D@186" type="CollisionShape2D" parent="ApronProp" unique_id=425319727]
 shape = SubResource("CircleShape2D_e13sl")
 
-[node name="@Sprite2D@188" type="Sprite2D" parent="ApronProp" unique_id=371945019]
+[node name="@Sprite2D@187" type="Sprite2D" parent="ApronProp" unique_id=454150958]
 texture_filter = 2
 scale = Vector2(0.25, 0.25)
 texture = ExtResource("21_5tv84")
 
-[node name="@StaticBody2D@189" type="StaticBody2D" parent="." unique_id=1865285938]
+[node name="@StaticBody2D@188" type="StaticBody2D" parent="." unique_id=1955002276]
 position = Vector2(695.7958, 223.53296)
 collision_layer = 2
 
-[node name="@CollisionShape2D@190" type="CollisionShape2D" parent="@StaticBody2D@189" unique_id=803909353]
+[node name="@CollisionShape2D@189" type="CollisionShape2D" parent="@StaticBody2D@188" unique_id=1154207536]
 shape = SubResource("CircleShape2D_k331p")
 
-[node name="@Sprite2D@191" type="Sprite2D" parent="@StaticBody2D@189" unique_id=802380512]
+[node name="@Sprite2D@190" type="Sprite2D" parent="@StaticBody2D@188" unique_id=962225175]
 texture_filter = 2
 scale = Vector2(0.1125, 0.1125)
 texture = ExtResource("16_na300")
 
-[node name="@StaticBody2D@192" type="StaticBody2D" parent="." unique_id=1015148844]
+[node name="@StaticBody2D@191" type="StaticBody2D" parent="." unique_id=2059909013]
 position = Vector2(-55.02777, -466.79617)
 collision_layer = 2
 
-[node name="@CollisionShape2D@193" type="CollisionShape2D" parent="@StaticBody2D@192" unique_id=1285906261]
+[node name="@CollisionShape2D@192" type="CollisionShape2D" parent="@StaticBody2D@191" unique_id=1428646126]
 shape = SubResource("CircleShape2D_rgfca")
 
-[node name="@Sprite2D@194" type="Sprite2D" parent="@StaticBody2D@192" unique_id=1779797977]
+[node name="@Sprite2D@193" type="Sprite2D" parent="@StaticBody2D@191" unique_id=273980175]
 texture_filter = 2
 scale = Vector2(0.08888889, 0.08888889)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@195" type="StaticBody2D" parent="." unique_id=392779680]
+[node name="@StaticBody2D@194" type="StaticBody2D" parent="." unique_id=1329922650]
 position = Vector2(255.23584, 315.48053)
 collision_layer = 2
 
-[node name="@CollisionShape2D@196" type="CollisionShape2D" parent="@StaticBody2D@195" unique_id=1412040881]
+[node name="@CollisionShape2D@195" type="CollisionShape2D" parent="@StaticBody2D@194" unique_id=423504823]
 shape = SubResource("CircleShape2D_skj2e")
 
-[node name="@Sprite2D@197" type="Sprite2D" parent="@StaticBody2D@195" unique_id=796584202]
+[node name="@Sprite2D@196" type="Sprite2D" parent="@StaticBody2D@194" unique_id=964827023]
 texture_filter = 2
 scale = Vector2(0.08888889, 0.08888889)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@198" type="StaticBody2D" parent="." unique_id=535815935]
+[node name="@StaticBody2D@197" type="StaticBody2D" parent="." unique_id=813736406]
 position = Vector2(470.48816, -22.605133)
 collision_layer = 2
 
-[node name="@CollisionShape2D@199" type="CollisionShape2D" parent="@StaticBody2D@198" unique_id=1387263730]
+[node name="@CollisionShape2D@198" type="CollisionShape2D" parent="@StaticBody2D@197" unique_id=1666850146]
 shape = SubResource("CircleShape2D_20kuh")
 
-[node name="@Sprite2D@200" type="Sprite2D" parent="@StaticBody2D@198" unique_id=1980054839]
+[node name="@Sprite2D@199" type="Sprite2D" parent="@StaticBody2D@197" unique_id=154899002]
 texture_filter = 2
 scale = Vector2(0.08888889, 0.08888889)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@201" type="StaticBody2D" parent="." unique_id=1934131842]
+[node name="@StaticBody2D@200" type="StaticBody2D" parent="." unique_id=487707901]
 position = Vector2(-401.36298, 495.5515)
 collision_layer = 2
 
-[node name="@CollisionShape2D@202" type="CollisionShape2D" parent="@StaticBody2D@201" unique_id=4280526]
+[node name="@CollisionShape2D@201" type="CollisionShape2D" parent="@StaticBody2D@200" unique_id=1496072970]
 shape = SubResource("CircleShape2D_bu4kf")
 
-[node name="@Sprite2D@203" type="Sprite2D" parent="@StaticBody2D@201" unique_id=1967715064]
+[node name="@Sprite2D@202" type="Sprite2D" parent="@StaticBody2D@200" unique_id=1781391510]
 texture_filter = 2
 scale = Vector2(0.0703125, 0.0703125)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@204" type="StaticBody2D" parent="." unique_id=1332792878]
+[node name="@StaticBody2D@203" type="StaticBody2D" parent="." unique_id=1175986963]
 position = Vector2(544.901, 133.99347)
 collision_layer = 2
 
-[node name="@CollisionShape2D@205" type="CollisionShape2D" parent="@StaticBody2D@204" unique_id=1518056165]
+[node name="@CollisionShape2D@204" type="CollisionShape2D" parent="@StaticBody2D@203" unique_id=1871077821]
 shape = SubResource("CircleShape2D_bda7a")
 
-[node name="@Sprite2D@206" type="Sprite2D" parent="@StaticBody2D@204" unique_id=871432079]
+[node name="@Sprite2D@205" type="Sprite2D" parent="@StaticBody2D@203" unique_id=1471085295]
 texture_filter = 2
 scale = Vector2(0.0703125, 0.0703125)
 texture = ExtResource("20_2pwd2")
 
-[node name="@StaticBody2D@207" type="StaticBody2D" parent="." unique_id=1584197167]
+[node name="@StaticBody2D@206" type="StaticBody2D" parent="." unique_id=714083963]
 position = Vector2(-286.97015, 514.2731)
 collision_layer = 2
 
-[node name="@CollisionShape2D@208" type="CollisionShape2D" parent="@StaticBody2D@207" unique_id=1246032628]
+[node name="@CollisionShape2D@207" type="CollisionShape2D" parent="@StaticBody2D@206" unique_id=1699334702]
 shape = SubResource("CircleShape2D_q60ss")
 
-[node name="@Sprite2D@209" type="Sprite2D" parent="@StaticBody2D@207" unique_id=81206768]
+[node name="@Sprite2D@208" type="Sprite2D" parent="@StaticBody2D@206" unique_id=459804583]
 texture_filter = 2
 scale = Vector2(0.1125, 0.1125)
 texture = ExtResource("16_na300")
 
-[node name="@StaticBody2D@210" type="StaticBody2D" parent="." unique_id=1892334450]
+[node name="@StaticBody2D@209" type="StaticBody2D" parent="." unique_id=104016835]
 position = Vector2(489.9203, 437.94757)
 collision_layer = 2
 
-[node name="@CollisionShape2D@211" type="CollisionShape2D" parent="@StaticBody2D@210" unique_id=2058534927]
+[node name="@CollisionShape2D@210" type="CollisionShape2D" parent="@StaticBody2D@209" unique_id=502011151]
 shape = SubResource("CircleShape2D_3mjl0")
 
-[node name="@Sprite2D@212" type="Sprite2D" parent="@StaticBody2D@210" unique_id=509657397]
+[node name="@Sprite2D@211" type="Sprite2D" parent="@StaticBody2D@209" unique_id=1868223348]
 texture_filter = 2
 scale = Vector2(0.08888889, 0.08888889)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@213" type="StaticBody2D" parent="." unique_id=1690413092]
+[node name="@StaticBody2D@212" type="StaticBody2D" parent="." unique_id=1062159691]
 position = Vector2(88.045654, 485.63916)
 collision_layer = 2
 
-[node name="@CollisionShape2D@214" type="CollisionShape2D" parent="@StaticBody2D@213" unique_id=923813101]
+[node name="@CollisionShape2D@213" type="CollisionShape2D" parent="@StaticBody2D@212" unique_id=463748240]
 shape = SubResource("CircleShape2D_vshr7")
 
-[node name="@Sprite2D@215" type="Sprite2D" parent="@StaticBody2D@213" unique_id=243476365]
+[node name="@Sprite2D@214" type="Sprite2D" parent="@StaticBody2D@212" unique_id=739351952]
 texture_filter = 2
 scale = Vector2(0.08888889, 0.08888889)
 texture = ExtResource("13_xo2mc")
 
-[node name="@StaticBody2D@216" type="StaticBody2D" parent="." unique_id=1263453904]
+[node name="@StaticBody2D@215" type="StaticBody2D" parent="." unique_id=242917538]
 position = Vector2(-927.3622, 482.34033)
 collision_layer = 2
 
-[node name="@CollisionShape2D@217" type="CollisionShape2D" parent="@StaticBody2D@216" unique_id=263658201]
+[node name="@CollisionShape2D@216" type="CollisionShape2D" parent="@StaticBody2D@215" unique_id=357927449]
 shape = SubResource("CircleShape2D_7j7rb")
 
-[node name="@Sprite2D@218" type="Sprite2D" parent="@StaticBody2D@216" unique_id=745916124]
+[node name="@Sprite2D@217" type="Sprite2D" parent="@StaticBody2D@215" unique_id=798318057]
 texture_filter = 2
 scale = Vector2(0.25, 0.25)
 texture = ExtResource("21_5tv84")
 
-[node name="@StaticBody2D@219" type="StaticBody2D" parent="." unique_id=830345311]
+[node name="@StaticBody2D@218" type="StaticBody2D" parent="." unique_id=504642356]
 position = Vector2(-932.4404, -402.58145)
 collision_layer = 2
 
-[node name="@CollisionShape2D@220" type="CollisionShape2D" parent="@StaticBody2D@219" unique_id=380841932]
+[node name="@CollisionShape2D@219" type="CollisionShape2D" parent="@StaticBody2D@218" unique_id=1261921489]
 shape = SubResource("CircleShape2D_1yt5y")
 
-[node name="@Sprite2D@221" type="Sprite2D" parent="@StaticBody2D@219" unique_id=1098409584]
+[node name="@Sprite2D@220" type="Sprite2D" parent="@StaticBody2D@218" unique_id=2063435189]
 texture_filter = 2
 scale = Vector2(0.225, 0.225)
 texture = ExtResource("22_pv58d")
 
-[node name="@StaticBody2D@222" type="StaticBody2D" parent="." unique_id=340671216]
+[node name="@StaticBody2D@221" type="StaticBody2D" parent="." unique_id=1309380017]
 position = Vector2(-827.5347, -485.90552)
 collision_layer = 2
 
-[node name="@CollisionShape2D@223" type="CollisionShape2D" parent="@StaticBody2D@222" unique_id=1092140427]
+[node name="@CollisionShape2D@222" type="CollisionShape2D" parent="@StaticBody2D@221" unique_id=831696379]
 shape = SubResource("CircleShape2D_e521s")
 
-[node name="@Sprite2D@224" type="Sprite2D" parent="@StaticBody2D@222" unique_id=1715875213]
+[node name="@Sprite2D@223" type="Sprite2D" parent="@StaticBody2D@221" unique_id=1520831971]
 texture_filter = 2
 scale = Vector2(0.0703125, 0.0703125)
 texture = ExtResource("23_ingmv")
 
-[node name="@StaticBody2D@225" type="StaticBody2D" parent="." unique_id=928529861]
+[node name="@StaticBody2D@224" type="StaticBody2D" parent="." unique_id=548908715]
 position = Vector2(-49.68309, -501.4868)
 collision_layer = 2
 
-[node name="@CollisionShape2D@226" type="CollisionShape2D" parent="@StaticBody2D@225" unique_id=1917735309]
+[node name="@CollisionShape2D@225" type="CollisionShape2D" parent="@StaticBody2D@224" unique_id=1367292230]
 shape = SubResource("CircleShape2D_apkow")
 
-[node name="@Sprite2D@227" type="Sprite2D" parent="@StaticBody2D@225" unique_id=58260254]
+[node name="@Sprite2D@226" type="Sprite2D" parent="@StaticBody2D@224" unique_id=1904195557]
 texture_filter = 2
 scale = Vector2(0.1125, 0.1125)
 texture = ExtResource("16_na300")
 
-[node name="@StaticBody2D@228" type="StaticBody2D" parent="." unique_id=863260264]
+[node name="@StaticBody2D@227" type="StaticBody2D" parent="." unique_id=30335295]
 position = Vector2(32.725777, -433.2606)
 collision_layer = 2
 
-[node name="@CollisionShape2D@229" type="CollisionShape2D" parent="@StaticBody2D@228" unique_id=592078342]
+[node name="@CollisionShape2D@228" type="CollisionShape2D" parent="@StaticBody2D@227" unique_id=321831114]
 shape = SubResource("CircleShape2D_d44w8")
 
-[node name="@Sprite2D@230" type="Sprite2D" parent="@StaticBody2D@228" unique_id=1293278563]
+[node name="@Sprite2D@229" type="Sprite2D" parent="@StaticBody2D@227" unique_id=55263407]
 texture_filter = 2
 scale = Vector2(0.25, 0.25)
 texture = ExtResource("21_5tv84")
 
-[node name="@StaticBody2D@231" type="StaticBody2D" parent="." unique_id=1869769847]
+[node name="@StaticBody2D@230" type="StaticBody2D" parent="." unique_id=1821082701]
 position = Vector2(23.76197, 476.41257)
 collision_layer = 2
 
-[node name="@CollisionShape2D@232" type="CollisionShape2D" parent="@StaticBody2D@231" unique_id=490595200]
+[node name="@CollisionShape2D@231" type="CollisionShape2D" parent="@StaticBody2D@230" unique_id=1772029036]
 shape = SubResource("CircleShape2D_qsdci")
 
-[node name="@Sprite2D@233" type="Sprite2D" parent="@StaticBody2D@231" unique_id=364195070]
+[node name="@Sprite2D@232" type="Sprite2D" parent="@StaticBody2D@230" unique_id=292484920]
 texture_filter = 2
 scale = Vector2(0.225, 0.225)
 texture = ExtResource("22_pv58d")
 
-[node name="@StaticBody2D@234" type="StaticBody2D" parent="." unique_id=1156834851]
+[node name="@StaticBody2D@233" type="StaticBody2D" parent="." unique_id=100803275]
 position = Vector2(-56.343597, 538.60736)
 collision_layer = 2
 
-[node name="@CollisionShape2D@235" type="CollisionShape2D" parent="@StaticBody2D@234" unique_id=315997796]
+[node name="@CollisionShape2D@234" type="CollisionShape2D" parent="@StaticBody2D@233" unique_id=748226664]
 shape = SubResource("CircleShape2D_ex6nf")
 
-[node name="@Sprite2D@236" type="Sprite2D" parent="@StaticBody2D@234" unique_id=1378097047]
+[node name="@Sprite2D@235" type="Sprite2D" parent="@StaticBody2D@233" unique_id=1825455160]
 texture_filter = 2
 scale = Vector2(0.0703125, 0.0703125)
 texture = ExtResource("23_ingmv")
 
-[node name="BannerBlock0" type="Polygon2D" parent="." unique_id=1479329273]
+[node name="BannerBlock0" type="Polygon2D" parent="." unique_id=496759858]
 z_index = -8
 color = Color(0.9490196, 0.91764706, 0.84313726, 1)
 polygon = PackedVector2Array(-428.4506, 442.45227, -472.418, 444.14606, -471.57108, 466.12976, -427.60367, 464.43597)
 
-[node name="BannerBlock1" type="Polygon2D" parent="." unique_id=1310323504]
+[node name="BannerBlock1" type="Polygon2D" parent="." unique_id=1202612375]
 z_index = -8
 color = Color(0.7882353, 0.30980393, 0.21960784, 1)
 polygon = PackedVector2Array(-427.6037, 464.43597, -471.5711, 466.12976, -470.72418, 488.11346, -426.75677, 486.41968)
 
-[node name="BannerBlock2" type="Polygon2D" parent="." unique_id=593687665]
+[node name="BannerBlock2" type="Polygon2D" parent="." unique_id=1476208840]
 z_index = -8
 color = Color(0.9490196, 0.91764706, 0.84313726, 1)
 polygon = PackedVector2Array(-426.7568, 486.41965, -470.7242, 488.11343, -469.8773, 510.09714, -425.90988, 508.40335)
 
-[node name="BannerBlock3" type="Polygon2D" parent="." unique_id=731374163]
+[node name="BannerBlock3" type="Polygon2D" parent="." unique_id=1045310677]
 z_index = -8
 color = Color(0.7882353, 0.30980393, 0.21960784, 1)
 polygon = PackedVector2Array(-425.90988, 508.4033, -469.8773, 510.09714, -469.03036, 532.0808, -425.06296, 530.38696)
 
-[node name="BannerBlock4" type="Polygon2D" parent="." unique_id=1180427580]
+[node name="BannerBlock4" type="Polygon2D" parent="." unique_id=1065785724]
 z_index = -8
 color = Color(0.9490196, 0.91764706, 0.84313726, 1)
 polygon = PackedVector2Array(-425.063, 530.387, -469.0304, 532.0809, -468.18347, 554.0645, -424.21606, 552.37067)
 
-[node name="BannerBlock5" type="Polygon2D" parent="." unique_id=1535590102]
+[node name="BannerBlock5" type="Polygon2D" parent="." unique_id=816469740]
 z_index = -8
 color = Color(0.7882353, 0.30980393, 0.21960784, 1)
 polygon = PackedVector2Array(-424.2161, 552.3707, -468.1835, 554.0646, -467.33658, 576.0482, -423.36917, 574.3544)

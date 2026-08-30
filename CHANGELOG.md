@@ -20,6 +20,10 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Island silhouette clean-up: removed the rounded-rectangle ink outline and
+  the inner-vertex fold artifacts (the island surface is now the fold-free
+  room-minus-track region while the collision keeps the proven expanded
+  loop); kitchen canonical prop scales corrected after the texture swap.
 - Corridor scatter props moved to a dedicated dodge layer: the AI still
   swerves around them but its racing-line probes no longer treat them as
   walls, restoring driveability across the whole pool (verified 70+ tracks,

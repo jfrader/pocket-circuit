@@ -786,7 +786,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@2"]
-scale = Vector2(0.09269, 0.09269)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("30_nwprop")
 
 [node name="@IslandFill@3" type="StaticBody2D" parent="."]
@@ -822,7 +822,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@5"]
-scale = Vector2(0.11333, 0.11333)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("31_nwprop")
 
 [node name="@IslandFill@6" type="StaticBody2D" parent="."]
@@ -858,7 +858,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@8"]
-scale = Vector2(0.07377, 0.07377)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("32_nwprop")
 
 [node name="@IslandFill@9" type="StaticBody2D" parent="."]
@@ -894,7 +894,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@11"]
-scale = Vector2(0.07377, 0.07377)
+scale = Vector2(0.55000, 0.55000)
 texture = ExtResource("33_nwprop")
 
 [node name="@IslandFill@12" type="StaticBody2D" parent="."]
@@ -930,7 +930,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@14"]
-scale = Vector2(0.08637, 0.08637)
+scale = Vector2(0.34000, 0.34000)
 texture = ExtResource("34_nwprop")
 
 [node name="@IslandFill@15" type="StaticBody2D" parent="."]
@@ -966,7 +966,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@17"]
-scale = Vector2(0.05937, 0.05937)
+scale = Vector2(0.55000, 0.55000)
 texture = ExtResource("35_nwprop")
 
 [node name="@IslandFill@18" type="StaticBody2D" parent="."]
@@ -1002,7 +1002,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@20"]
-scale = Vector2(0.11333, 0.11333)
+scale = Vector2(0.34000, 0.34000)
 texture = ExtResource("36_nwprop")
 
 [node name="@IslandFill@21" type="StaticBody2D" parent="."]
@@ -1038,7 +1038,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@23"]
-scale = Vector2(0.09167, 0.09167)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("37_nwprop")
 
 [node name="@IslandFill@24" type="StaticBody2D" parent="."]
@@ -1074,7 +1074,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@26"]
-scale = Vector2(0.09167, 0.09167)
+scale = Vector2(1.15000, 1.15000)
 texture = ExtResource("38_nwprop")
 
 [node name="@IslandFill@27" type="StaticBody2D" parent="."]
@@ -1110,7 +1110,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@29"]
-scale = Vector2(0.05937, 0.05937)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("30_nwprop")
 
 [node name="@IslandFill@30" type="StaticBody2D" parent="."]
@@ -1146,7 +1146,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@32"]
-scale = Vector2(0.05937, 0.05937)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("31_nwprop")
 
 [node name="@IslandFill@33" type="StaticBody2D" parent="."]
@@ -1182,7 +1182,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@35"]
-scale = Vector2(0.08320, 0.08320)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("32_nwprop")
 
 [node name="@IslandFill@36" type="StaticBody2D" parent="."]
@@ -1218,7 +1218,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@38"]
-scale = Vector2(0.11669, 0.11669)
+scale = Vector2(0.55000, 0.55000)
 texture = ExtResource("33_nwprop")
 
 [node name="@IslandFill@39" type="StaticBody2D" parent="."]
@@ -1254,7 +1254,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@41"]
-scale = Vector2(0.11333, 0.11333)
+scale = Vector2(0.34000, 0.34000)
 texture = ExtResource("34_nwprop")
 
 [node name="@IslandFill@42" type="StaticBody2D" parent="."]
@@ -1290,7 +1290,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@44"]
-scale = Vector2(0.11669, 0.11669)
+scale = Vector2(0.55000, 0.55000)
 texture = ExtResource("35_nwprop")
 
 [node name="@IslandFill@45" type="StaticBody2D" parent="."]
@@ -1326,7 +1326,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@47"]
-scale = Vector2(0.07377, 0.07377)
+scale = Vector2(0.34000, 0.34000)
 texture = ExtResource("36_nwprop")
 
 [node name="@IslandFill@48" type="StaticBody2D" parent="."]
@@ -1362,7 +1362,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@50"]
-scale = Vector2(0.05937, 0.05937)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("37_nwprop")
 
 [node name="@IslandFill@51" type="StaticBody2D" parent="."]
@@ -1398,7 +1398,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@53"]
-scale = Vector2(0.11333, 0.11333)
+scale = Vector2(1.15000, 1.15000)
 texture = ExtResource("38_nwprop")
 
 [node name="@IslandFill@54" type="StaticBody2D" parent="."]
@@ -1434,7 +1434,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@56"]
-scale = Vector2(0.09269, 0.09269)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("30_nwprop")
 
 [node name="@IslandFill@57" type="StaticBody2D" parent="."]
@@ -1470,7 +1470,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@59"]
-scale = Vector2(0.05979, 0.05979)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("31_nwprop")
 
 [node name="@IslandFill@60" type="StaticBody2D" parent="."]
@@ -1506,7 +1506,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@62"]
-scale = Vector2(0.09362, 0.09362)
+scale = Vector2(1.00000, 1.00000)
 texture = ExtResource("32_nwprop")
 
 [node name="@IslandFill@63" type="StaticBody2D" parent="."]
@@ -1542,7 +1542,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@65"]
-scale = Vector2(0.05937, 0.05937)
+scale = Vector2(0.55000, 0.55000)
 texture = ExtResource("33_nwprop")
 
 [node name="@IslandFill@66" type="StaticBody2D" parent="."]
@@ -1578,7 +1578,7 @@ collision_layer = 4
 shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@68"]
-scale = Vector2(0.05937, 0.05937)
+scale = Vector2(0.34000, 0.34000)
 texture = ExtResource("34_nwprop")
 
 [node name="@IslandFill@69" type="StaticBody2D" parent="."]
