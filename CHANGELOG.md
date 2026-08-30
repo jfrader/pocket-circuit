@@ -20,6 +20,10 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Micro Machines scale pass: layered furniture walls (dark base, side face,
+  cream top lip), giant corner set pieces (oversized barrel/paint can/hose in
+  the workshop, mug/teapot/vase in the kitchen, lamp/tape roll in the office),
+  stronger prop grounding shadows, and richer decal scatter.
 - Racing-line AI: every track now bakes an invisible curvature-offset racing
   line the AI follows with lookahead targeting and curvature-limited corner
   speeds (a real racing line instead of gate-to-gate chasing), with a

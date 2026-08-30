@@ -508,6 +508,9 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var island_region := _island_region(room_polygon, clipped, inner_loop)
 	_build_island_prop(root, spec, island_region, inner_loop, centerline)
 
+	# Giant set pieces at the room corners (Micro Machines scale cues)
+	_add_corner_set_pieces(root, spec, room_polygon, clipped)
+
 	# Room walls (real furniture edges along the room outline)
 	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
 	var wall_index := 0
@@ -761,6 +764,10 @@ static func _add_polygon(parent: Node, node_name: String, points: PackedVector2A
 	parent.add_child(polygon)
 
 
+static func spec_wall_side() -> Color:
+	return Color("3a4656")
+
+
 static func _add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String) -> void:
 	var wall := StaticBody2D.new()
 	wall.name = node_name
@@ -778,6 +785,16 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 	visual.polygon = _rect_points(Vector2.ZERO, Vector2(length + 60.0, 50.0))
 	visual.color = Color("0e1524")
 	wall.add_child(visual)
+	var side_face := Polygon2D.new()
+	side_face.name = "SideFace"
+	side_face.polygon = _rect_points(Vector2(0.0, -14.0), Vector2(length + 60.0, 22.0))
+	side_face.color = Color(spec_wall_side())
+	wall.add_child(side_face)
+	var top_lip := Polygon2D.new()
+	top_lip.name = "TopLip"
+	top_lip.polygon = _rect_points(Vector2(0.0, -28.0), Vector2(length + 60.0, 5.0))
+	top_lip.color = Color("e8d9b8", 0.85)
+	wall.add_child(top_lip)
 	var edge_texture := load(edge_texture_path) as Texture2D
 	if edge_texture:
 		var tile_count := maxi(1, int(ceil((length + 60.0) / 1024.0)))
@@ -825,7 +842,7 @@ static func _scatter_decals(root: Node2D, spec: Dictionary, room_polygon: Packed
 	var decals: Array = spec.get("decals", [])
 	if decals.is_empty():
 		return
-	for decal in 18:
+	for decal in 26:
 		var position := Vector2(rng.randf_range(-830.0, 830.0), rng.randf_range(-530.0, 530.0))
 		if not Geometry2D.is_point_in_polygon(position, room_polygon):
 			continue
@@ -839,7 +856,7 @@ static func _scatter_decals(root: Node2D, spec: Dictionary, room_polygon: Packed
 			continue
 		sprite.scale = Vector2.ONE * rng.randf_range(0.5, 1.1)
 		sprite.rotation = rng.randf_range(0.0, TAU)
-		sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.5, 0.85))
+		sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.4, 0.9))
 		sprite.z_index = -15
 		root.add_child(sprite)
 
@@ -1033,6 +1050,55 @@ static func _build_racing_line(root: Node2D, centerline: PackedVector2Array) -> 
 	root.add_child(line)
 
 
+static func _add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: PackedVector2Array, corridor: PackedVector2Array) -> void:
+	var giants: Array = spec.get("corner_giants", [])
+	if giants.is_empty():
+		return
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.get("seed", 0)) * 7 + 3
+	var candidates := PackedVector2Array()
+	var count := room_polygon.size()
+	for index in count:
+		var corner: Vector2 = room_polygon[index]
+		var toward_center := Vector2.ZERO
+		for point: Vector2 in room_polygon:
+			toward_center += point
+		toward_center /= float(count)
+		var inward := (toward_center - corner).normalized()
+		candidates.append(corner + inward * 190.0)
+	var placed := 0
+	for candidate: Vector2 in candidates:
+		if placed >= 3:
+			break
+		if Geometry2D.is_point_in_polygon(candidate, corridor):
+			continue
+		if _distance_to_centerline(candidate, _sample_centerline(spec["controls"])) < 200.0:
+			continue
+		var texture_path := String(giants[placed % giants.size()])
+		var texture := load(texture_path) as Texture2D
+		if texture == null:
+			continue
+		var prop := StaticBody2D.new()
+		prop.name = "CornerGiant"
+		prop.position = candidate
+		prop.rotation = rng.randf_range(0.0, TAU)
+		prop.collision_layer = 4
+		root.add_child(prop)
+		var shape := CircleShape2D.new()
+		shape.radius = 64.0
+		var cs := CollisionShape2D.new()
+		cs.shape = shape
+		prop.add_child(cs)
+		_add_contact_shadow(prop, 84.0)
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var longest := maxf(texture.get_width(), texture.get_height())
+		sprite.scale = Vector2.ONE * (150.0 / maxf(longest, 1.0))
+		prop.add_child(sprite)
+		placed += 1
+
+
 static func _distance_to_centerline(point: Vector2, centerline: PackedVector2Array) -> float:
 	var best := 999999.0
 	for sample: Vector2 in centerline:
@@ -1109,7 +1175,7 @@ static func _add_contact_shadow(parent: Node, radius: float) -> void:
 	shadow.texture = _contact_shadow_texture()
 	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	shadow.scale = Vector2.ONE * (radius * 2.4 / 128.0)
-	shadow.modulate = Color(0.06, 0.05, 0.05, 0.35)
+	shadow.modulate = Color(0.06, 0.05, 0.05, 0.45)
 	shadow.z_index = -1
 	parent.add_child(shadow)
 
