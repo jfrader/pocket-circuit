@@ -259,7 +259,7 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/plant_small.png",
 		],
 		"island_expansion": 4.0,
-		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.79, 0.88],
+		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.72, 0.74],
 		"obstacles": {
 			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
 			"MugA": {"pos": Vector2(-300, 500), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
