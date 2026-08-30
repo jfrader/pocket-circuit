@@ -4,10 +4,14 @@ extends RefCounted
 const CLASSIC_SEEDS: Array[int] = [16, 28, 88, 92, 96, 104, 13, 29, 53, 93, 129, 137, 6, 58, 118, 83]
 const WIDE_SEEDS: Array[int] = [0, 5, 10, 13, 16]
 const TALL_SEEDS: Array[int] = [6, 16, 72, 78, 128]
+const LONG_SEEDS: Array[int] = [5, 10, 16, 36]
+const SQUARE_SEEDS: Array[int] = [5, 10, 16, 36]
 const ROOM_CIRCUITS: Dictionary = {
 	"classic": CLASSIC_SEEDS,
 	"wide": WIDE_SEEDS,
 	"tall": TALL_SEEDS,
+	"long": LONG_SEEDS,
+	"square": SQUARE_SEEDS,
 }
 
 
