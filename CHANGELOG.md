@@ -20,6 +20,10 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Racing-line AI: every track now bakes an invisible curvature-offset racing
+  line the AI follows with lookahead targeting and curvature-limited corner
+  speeds (a real racing line instead of gate-to-gate chasing), with a
+  challenge bump to the club/clockwork paces.
 - Intrinsic prop sizes: every prop now renders at its real-world footprint
   (basketball 56u, mug 34u, strawberry 18u, coin 12u, barrel 92u) instead of
   a uniform cell size, with matching rectangle/circle colliders.

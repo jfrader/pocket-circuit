@@ -37,6 +37,7 @@ var _guide_reached := false
 var _stuck_target_key := ""
 var _best_checkpoint_distance := INF
 var _smoothed_steer := 0.0
+var _racing_line: PackedVector2Array = PackedVector2Array()
 
 
 func configure(
@@ -64,6 +65,12 @@ func _cache_checkpoints() -> void:
 		_track_center += (checkpoint as Node2D).global_position
 	if not _checkpoints_by_index.is_empty():
 		_track_center /= float(_checkpoints_by_index.size())
+	_racing_line = PackedVector2Array()
+	var track := get_tree().get_first_node_in_group("track") if is_inside_tree() else null
+	if track:
+		var racing_line := track.get_node_or_null("RacingLine") as Line2D
+		if racing_line:
+			_racing_line = racing_line.points
 
 
 func _physics_process(delta: float) -> void:
@@ -103,7 +110,10 @@ func _physics_process(delta: float) -> void:
 		)
 
 	var forward := Vector2.UP.rotated(vehicle.rotation)
-	target_position = _pull_into_corridor(target_position, forward)
+	if not _racing_line.is_empty():
+		target_position = _racing_line_target(forward)
+	else:
+		target_position = _pull_into_corridor(target_position, forward)
 	var desired_direction := vehicle.global_position.direction_to(target_position)
 	desired_direction = _avoid_hazards(desired_direction, forward)
 	var obstacle_plan := _obstacle_avoidance(forward, desired_direction)
@@ -123,10 +133,18 @@ func _physics_process(delta: float) -> void:
 		next_turn_severity = _checkpoint_turn_severity(int(next_checkpoint.get("checkpoint_index")))
 	var planned_turn_severity := maxf(turn_severity, next_turn_severity * 0.84)
 	var corner_ratio := clampf(planned_turn_severity / 1.45, 0.0, 1.0)
-	var pace_multiplier := 0.86 if difficulty == "sunday_drive" else (1.12 if difficulty == "clockwork" else 1.06)
+	var pace_multiplier := 0.86 if difficulty == "sunday_drive" else (1.14 if difficulty == "clockwork" else 1.10)
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var handling_pace := clampf(vehicle.stats.steering_rate / 3.75, 0.78, 1.08)
-	var target_speed := effective_max_speed * lerpf(0.94, 0.40, corner_ratio) * pace_multiplier
+	var line_radius := _racing_line_radius(vehicle.global_position)
+	var corner_speed := effective_max_speed
+	if line_radius > 40.0:
+		var corner_constant := 8.6 if difficulty == "sunday_drive" else (11.6 if difficulty == "clockwork" else 10.9)
+		corner_speed = clampf(corner_constant * sqrt(line_radius) * pace_multiplier, effective_max_speed * 0.38, effective_max_speed)
+	var target_speed := minf(
+		effective_max_speed * lerpf(0.94, 0.40, corner_ratio) * pace_multiplier,
+		corner_speed
+	)
 	target_speed *= lerpf(1.0, handling_pace, corner_ratio)
 	target_speed *= float(obstacle_plan["speed_scale"])
 	var heading_error := absf(steering_angle)
@@ -464,3 +482,51 @@ func _recover_vehicle() -> void:
 		vehicle.collision_mask = saved_mask
 		vehicle.modulate.a = 1.0
 	_recovering = false
+
+
+func _nearest_line_index(position: Vector2) -> int:
+	var best := 0
+	var best_distance := INF
+	for index in _racing_line.size():
+		var distance := _racing_line[index].distance_squared_to(position)
+		if distance < best_distance:
+			best_distance = distance
+			best = index
+	return best
+
+
+func _racing_line_target(forward: Vector2) -> Vector2:
+	if _racing_line.is_empty():
+		return vehicle.global_position + forward * 200.0
+	var count := _racing_line.size()
+	var index := _nearest_line_index(vehicle.global_position)
+	var lookahead := 70.0 + vehicle.speed * 0.4
+	var walked := 0.0
+	for step in count:
+		var next := (index + 1) % count
+		var segment := _racing_line[index].distance_to(_racing_line[next])
+		if walked + segment >= lookahead and segment > 0.001:
+			return _racing_line[index].lerp(_racing_line[next], (lookahead - walked) / segment)
+		walked += segment
+		index = next
+	return _racing_line[index]
+
+
+func _racing_line_radius(position: Vector2) -> float:
+	if _racing_line.size() < 20:
+		return 0.0
+	var count := _racing_line.size()
+	var index := _nearest_line_index(position)
+	var a := _racing_line[index]
+	var b := _racing_line[(index + 9) % count]
+	var c := _racing_line[(index + 18) % count]
+	var ab := a.distance_to(b)
+	var bc := b.distance_to(c)
+	var ac := a.distance_to(c)
+	if ab < 0.001 or bc < 0.001 or ac < 0.001:
+		return 0.0
+	var cross := absf((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x))
+	if cross < 0.001:
+		return 0.0
+	var radius := ab * bc * ac / (4.0 * cross)
+	return clampf(radius, 0.0, 1400.0)

@@ -576,6 +576,9 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		start - start_tangent * 120.0 + grid_normal * 45.0,
 	])
 
+	# Racing line the AI follows (curvature-offset ideal path, stored invisibly)
+	_build_racing_line(root, centerline)
+
 	# Dense collidable fill over the whole island interior (books, planks, hose…)
 	_fill_island(root, spec, inner_loop, centerline)
 
@@ -1008,6 +1011,26 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 		var prop_rotation := rng.randf_range(0.0, TAU) if is_corner else tangent.angle()
 		_add_boundary_prop(root, position, radius, texture_path, prop_rotation)
 		index += 7
+
+
+static func _build_racing_line(root: Node2D, centerline: PackedVector2Array) -> void:
+	var count := centerline.size()
+	var line_points := PackedVector2Array()
+	for index in count:
+		var tangent_behind := (centerline[index] - centerline[(index - 12 + count) % count]).normalized()
+		var tangent_ahead := (centerline[(index + 12) % count] - centerline[index]).normalized()
+		var turn := tangent_behind.angle_to(tangent_ahead)
+		var normal := tangent_behind.rotated(PI * 0.5)
+		var inward := normal if turn > 0.0 else -normal
+		var offset := clampf(absf(turn) * 210.0, 0.0, 40.0)
+		line_points.append(centerline[index] + inward * offset)
+	var line := Line2D.new()
+	line.name = "RacingLine"
+	line.points = line_points
+	line.closed = true
+	line.width = 2.0
+	line.visible = false
+	root.add_child(line)
 
 
 static func _distance_to_centerline(point: Vector2, centerline: PackedVector2Array) -> float:
