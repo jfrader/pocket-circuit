@@ -271,11 +271,11 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 				room_params["min_self_distance"] = 252.0
 				room_params["displacement_scale"] = 0.55
 			&"el":
-				room_params["min_self_distance"] = 250.0
+				room_params["min_self_distance"] = 220.0
 				room_params["displacement_scale"] = 0.5
 				room_params["min_loop_length"] = 1500.0
 				room_params["sample_rect"] = Rect2(-1000, -550, 1300, 1100)
-				room_params["room_check_margin"] = 10.0
+				room_params["room_check_margin"] = 2.0
 			&"long":
 				room_params["min_self_distance"] = 280.0
 				room_params["displacement_scale"] = 1.0

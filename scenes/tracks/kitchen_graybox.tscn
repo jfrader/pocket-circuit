@@ -17,6 +17,15 @@
 [ext_resource type="Texture2D" uid="uid://dlywy0e7lsodq" path="res://assets/textures/kitchen/track_surface.png" id="12_16w8u"]
 [ext_resource type="Texture2D" uid="uid://ivv4e62vkuvm" path="res://assets/textures/kitchen/wet_spill.png" id="13_y73v3"]
 [ext_resource type="Texture2D" uid="uid://b35sjchw174x7" path="res://assets/textures/kitchen/counter_edge.png" id="15_dgg4m"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/frying_pan.png" id="30_nwprop"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/watermelon.png" id="31_nwprop"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/plant_small.png" id="32_nwprop"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/strawberry.png" id="33_nwprop"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/coin.png" id="34_nwprop"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/bolt.png" id="35_nwprop"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/screw.png" id="36_nwprop"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/flower_pot.png" id="37_nwprop"]
+[ext_resource type="Texture2D" path="res://assets/textures/imagine/barrel_wood.png" id="38_nwprop"]
 
 [sub_resource type="RectangleShape2D" id="RectangleShape2D_xb7yb"]
 size = Vector2(2000, 50)
@@ -778,7 +787,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@2"]
 scale = Vector2(0.09269, 0.09269)
-texture = ExtResource("6_03pr4")
+texture = ExtResource("30_nwprop")
 
 [node name="@IslandFill@3" type="StaticBody2D" parent="."]
 position = Vector2(-304.568, -183.149)
@@ -814,7 +823,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@5"]
 scale = Vector2(0.11333, 0.11333)
-texture = ExtResource("12_03pr4")
+texture = ExtResource("31_nwprop")
 
 [node name="@IslandFill@6" type="StaticBody2D" parent="."]
 position = Vector2(-54.669, -184.337)
@@ -850,7 +859,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@8"]
 scale = Vector2(0.07377, 0.07377)
-texture = ExtResource("5_03pr4")
+texture = ExtResource("32_nwprop")
 
 [node name="@IslandFill@9" type="StaticBody2D" parent="."]
 position = Vector2(200.653, -188.168)
@@ -886,7 +895,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@11"]
 scale = Vector2(0.07377, 0.07377)
-texture = ExtResource("5_03pr4")
+texture = ExtResource("33_nwprop")
 
 [node name="@IslandFill@12" type="StaticBody2D" parent="."]
 position = Vector2(453.811, -182.825)
@@ -922,7 +931,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@14"]
 scale = Vector2(0.08637, 0.08637)
-texture = ExtResource("2_03pr4")
+texture = ExtResource("34_nwprop")
 
 [node name="@IslandFill@15" type="StaticBody2D" parent="."]
 position = Vector2(-472.367, -105.291)
@@ -958,7 +967,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@17"]
 scale = Vector2(0.05937, 0.05937)
-texture = ExtResource("8_03pr4")
+texture = ExtResource("35_nwprop")
 
 [node name="@IslandFill@18" type="StaticBody2D" parent="."]
 position = Vector2(-220.664, -92.913)
@@ -994,7 +1003,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@20"]
 scale = Vector2(0.11333, 0.11333)
-texture = ExtResource("12_03pr4")
+texture = ExtResource("36_nwprop")
 
 [node name="@IslandFill@21" type="StaticBody2D" parent="."]
 position = Vector2(43.142, -110.330)
@@ -1030,7 +1039,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@23"]
 scale = Vector2(0.09167, 0.09167)
-texture = ExtResource("9_03pr4")
+texture = ExtResource("37_nwprop")
 
 [node name="@IslandFill@24" type="StaticBody2D" parent="."]
 position = Vector2(295.047, -109.076)
@@ -1066,7 +1075,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@26"]
 scale = Vector2(0.09167, 0.09167)
-texture = ExtResource("9_03pr4")
+texture = ExtResource("38_nwprop")
 
 [node name="@IslandFill@27" type="StaticBody2D" parent="."]
 position = Vector2(543.826, -107.883)
@@ -1102,7 +1111,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@29"]
 scale = Vector2(0.05937, 0.05937)
-texture = ExtResource("8_03pr4")
+texture = ExtResource("30_nwprop")
 
 [node name="@IslandFill@30" type="StaticBody2D" parent="."]
 position = Vector2(-384.975, -17.610)
@@ -1138,7 +1147,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@32"]
 scale = Vector2(0.05937, 0.05937)
-texture = ExtResource("8_03pr4")
+texture = ExtResource("31_nwprop")
 
 [node name="@IslandFill@33" type="StaticBody2D" parent="."]
 position = Vector2(-129.927, -14.467)
@@ -1174,7 +1183,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@35"]
 scale = Vector2(0.08320, 0.08320)
-texture = ExtResource("3_03pr4")
+texture = ExtResource("32_nwprop")
 
 [node name="@IslandFill@36" type="StaticBody2D" parent="."]
 position = Vector2(122.028, -16.845)
@@ -1210,7 +1219,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@38"]
 scale = Vector2(0.11669, 0.11669)
-texture = ExtResource("4_03pr4")
+texture = ExtResource("33_nwprop")
 
 [node name="@IslandFill@39" type="StaticBody2D" parent="."]
 position = Vector2(379.141, -22.557)
@@ -1246,7 +1255,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@41"]
 scale = Vector2(0.11333, 0.11333)
-texture = ExtResource("12_03pr4")
+texture = ExtResource("34_nwprop")
 
 [node name="@IslandFill@42" type="StaticBody2D" parent="."]
 position = Vector2(-552.696, 66.614)
@@ -1282,7 +1291,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@44"]
 scale = Vector2(0.11669, 0.11669)
-texture = ExtResource("4_03pr4")
+texture = ExtResource("35_nwprop")
 
 [node name="@IslandFill@45" type="StaticBody2D" parent="."]
 position = Vector2(-305.223, 71.231)
@@ -1318,7 +1327,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@47"]
 scale = Vector2(0.07377, 0.07377)
-texture = ExtResource("5_03pr4")
+texture = ExtResource("36_nwprop")
 
 [node name="@IslandFill@48" type="StaticBody2D" parent="."]
 position = Vector2(-52.702, 67.022)
@@ -1354,7 +1363,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@50"]
 scale = Vector2(0.05937, 0.05937)
-texture = ExtResource("8_03pr4")
+texture = ExtResource("37_nwprop")
 
 [node name="@IslandFill@51" type="StaticBody2D" parent="."]
 position = Vector2(210.544, 76.498)
@@ -1390,7 +1399,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@53"]
 scale = Vector2(0.11333, 0.11333)
-texture = ExtResource("12_03pr4")
+texture = ExtResource("38_nwprop")
 
 [node name="@IslandFill@54" type="StaticBody2D" parent="."]
 position = Vector2(460.456, 61.707)
@@ -1426,7 +1435,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@56"]
 scale = Vector2(0.09269, 0.09269)
-texture = ExtResource("6_03pr4")
+texture = ExtResource("30_nwprop")
 
 [node name="@IslandFill@57" type="StaticBody2D" parent="."]
 position = Vector2(-456.890, 144.518)
@@ -1462,7 +1471,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@59"]
 scale = Vector2(0.05979, 0.05979)
-texture = ExtResource("7_03pr4")
+texture = ExtResource("31_nwprop")
 
 [node name="@IslandFill@60" type="StaticBody2D" parent="."]
 position = Vector2(-209.553, 142.679)
@@ -1498,7 +1507,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@62"]
 scale = Vector2(0.09362, 0.09362)
-texture = ExtResource("10_03pr4")
+texture = ExtResource("32_nwprop")
 
 [node name="@IslandFill@63" type="StaticBody2D" parent="."]
 position = Vector2(38.995, 150.987)
@@ -1534,7 +1543,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@65"]
 scale = Vector2(0.05937, 0.05937)
-texture = ExtResource("8_03pr4")
+texture = ExtResource("33_nwprop")
 
 [node name="@IslandFill@66" type="StaticBody2D" parent="."]
 position = Vector2(297.084, 160.119)
@@ -1570,7 +1579,7 @@ shape = SubResource("CircleShape2D_kitchen_fill")
 
 [node name="Sprite2D" type="Sprite2D" parent="@IslandFill@68"]
 scale = Vector2(0.05937, 0.05937)
-texture = ExtResource("8_03pr4")
+texture = ExtResource("34_nwprop")
 
 [node name="@IslandFill@69" type="StaticBody2D" parent="."]
 position = Vector2(538.728, 146.833)

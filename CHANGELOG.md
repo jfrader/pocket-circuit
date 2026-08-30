@@ -20,6 +20,11 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- L-shaped desk rooms joined the circuit pool (the generator samples the
+  L's arm and the notch stays off-track) — five harness-verified L circuits
+  per theme, bringing the validated pool to 78 tracks.
+- Kitchen island dressing refreshed with the new prop batch (frying pan,
+  watermelon, plant, strawberry, coins, bolts, barrel, flower pot).
 - Soft contact shadows under every island prop so toys read as planted on
   the surface (vision-review verified: no floating props, no artifacts).
 - Random Quick Race and championship seeds now draw from the AI-validated

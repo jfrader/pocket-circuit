@@ -9,7 +9,7 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	var entries: Array = CIRCUIT_ROSTER.entries()
-	if not _expect(entries.size() == 68, "the roster should contain 68 generated circuits (34 per theme)"):
+	if not _expect(entries.size() == 78, "the roster should contain 78 generated circuits (39 per theme)"):
 		return
 	if not _expect(
 		CIRCUIT_ROSTER.scene_path(&"workshop", &"classic", 6) == "res://scenes/tracks/circuits/workshop_seed_6.tscn",
