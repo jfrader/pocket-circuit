@@ -1,9 +1,9 @@
 class_name CircuitRoster
 extends RefCounted
 
-const CLASSIC_SEEDS: Array[int] = [16, 28, 88, 92, 96, 104, 13, 29, 53, 93, 129, 137, 6, 58, 118, 83]
+const CLASSIC_SEEDS: Array[int] = [16, 28, 88, 92, 96, 13, 29, 53, 93, 129, 137, 6, 58, 83]
 const WIDE_SEEDS: Array[int] = [0, 5, 10, 13, 16]
-const TALL_SEEDS: Array[int] = [6, 16, 72, 78, 128]
+const TALL_SEEDS: Array[int] = [6, 16, 72, 78]
 const LONG_SEEDS: Array[int] = [5, 10, 16, 36]
 const SQUARE_SEEDS: Array[int] = [5, 10, 16, 36]
 const EL_SEEDS: Array[int] = [28, 34, 56, 96, 98]

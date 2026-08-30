@@ -13,6 +13,7 @@ const LOOK_AHEAD_DISTANCE := 340.0
 const MAX_LOOK_AHEAD_WEIGHT := 0.38
 const TRACK_COLLISION_MASK := 2
 const VEHICLE_COLLISION_MASK := 1
+const SCATTER_DODGE_MASK := 16
 const OBSTACLE_FEELER_ANGLES: Array[float] = [-0.95, -0.5, 0.0, 0.5, 0.95]
 const OBSTACLE_FRONT_OFFSET := 30.0
 const OBSTACLE_FEELER_HALF_WIDTH := 14.0
@@ -343,7 +344,7 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 	var wall_normal := Vector2.ZERO
 	for angle: float in OBSTACLE_FEELER_ANGLES:
 		var probe_direction := desired_direction.rotated(angle)
-		var probe := _ray_probe_from(origin, probe_direction, feeler_length, TRACK_COLLISION_MASK | VEHICLE_COLLISION_MASK)
+		var probe := _ray_probe_from(origin, probe_direction, feeler_length, TRACK_COLLISION_MASK | VEHICLE_COLLISION_MASK | SCATTER_DODGE_MASK)
 		var probe_clearance := float(probe["clearance"])
 		if is_zero_approx(angle):
 			center_clearance = probe_clearance

@@ -10,7 +10,7 @@ radius = 18.0
 height = 52.0
 
 [node name="Rustbug" type="RigidBody2D" unique_id=1060070526 groups=["player_vehicle"]]
-collision_mask = 6
+collision_mask = 22
 gravity_scale = 0.0
 can_sleep = false
 continuous_cd = 2

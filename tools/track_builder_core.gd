@@ -481,7 +481,8 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	_fill_island(root, spec, inner_loop, clipped)
 
 	# Props delimiting the outer side of the track (long on straights, bulky on corners)
-	_line_boundary_props(root, spec, centerline, outer_loop, clipped, room_polygon)
+	if not OS.get_environment("PC_NO_BOUNDARY") == "1":
+		_line_boundary_props(root, spec, centerline, outer_loop, clipped, room_polygon)
 
 	# Track obstacles (real props with collision)
 	if spec.get("seed_obstacles", false):
@@ -744,7 +745,7 @@ static func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: Pack
 		if corridor_props.size() >= 3:
 			break
 	for position: Vector2 in corridor_props:
-		_add_obstacle(root, "SeedCorridor", position, 34.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
+		_add_scatter_prop(root, position, 34.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
 
 	# b) apron clutter outside the loop
 	var apron_props := PackedVector2Array()
@@ -951,6 +952,28 @@ static func _contact_shadow_texture() -> Texture2D:
 			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, falloff * falloff))
 	_cached_contact_shadow = ImageTexture.create_from_image(image)
 	return _cached_contact_shadow
+
+
+static func _add_scatter_prop(parent: Node, position: Vector2, radius: float, texture_path: String) -> void:
+	var prop := StaticBody2D.new()
+	prop.name = "SeedCorridor"
+	prop.position = position
+	prop.collision_layer = 16
+	parent.add_child(prop)
+	var shape := CircleShape2D.new()
+	shape.radius = radius
+	var cs := CollisionShape2D.new()
+	cs.shape = shape
+	prop.add_child(cs)
+	_add_contact_shadow(prop, radius * 1.15)
+	var texture := load(texture_path) as Texture2D
+	if texture:
+		var sprite := Sprite2D.new()
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var longest := maxf(texture.get_width(), texture.get_height())
+		sprite.scale = Vector2.ONE * (radius * 2.2 / maxf(longest, 1.0))
+		prop.add_child(sprite)
 
 
 static func _seed_clear_of_gates(point: Vector2, gate_samples: PackedVector2Array) -> bool:

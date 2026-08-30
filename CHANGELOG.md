@@ -20,6 +20,10 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Corridor scatter props moved to a dedicated dodge layer: the AI still
+  swerves around them but its racing-line probes no longer treat them as
+  walls, restoring driveability across the whole pool (verified 70+ tracks,
+  pruned three marginal seeds; roster now 72).
 - Object-delimited tracks: all painted edge lines, kerb blocks, and the
   dashed centerline are gone; the course boundary now reads from the props —
   a curated island interior (one book, one lamp, one controller-style mix of
