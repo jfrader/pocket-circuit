@@ -126,6 +126,13 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/salt_shaker.png",
 			"res://assets/textures/imagine/mug_top.png",
 		],
+		"island_fill_huge": [
+			"res://assets/textures/imagine/teapot_top.png",
+			"res://assets/textures/imagine/watermelon.png",
+			"res://assets/textures/imagine/plate_stack.png",
+			"res://assets/textures/imagine/frying_pan.png",
+			"res://assets/textures/imagine/vase_top.png",
+		],
 		"island_fill_big": [
 			"res://assets/textures/imagine/hose_coil.png",
 			"res://assets/textures/kitchen/cutting_board.png",
@@ -218,6 +225,14 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/screwdriver.png",
 			"res://assets/textures/imagine/tape_roll.png",
 			"res://assets/textures/imagine/matchbox.png",
+		],
+		"island_fill_huge": [
+			"res://assets/textures/imagine/barrel_wood.png",
+			"res://assets/textures/imagine/workshop_paint_can.png",
+			"res://assets/textures/imagine/hose_coil.png",
+			"res://assets/textures/imagine/basketball.png",
+			"res://assets/textures/imagine/teapot_top.png",
+			"res://assets/textures/imagine/flower_pot.png",
 		],
 		"island_fill_big": [
 			"res://assets/textures/imagine/hose_coil.png",
@@ -326,6 +341,13 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/crayons.png",
 			"res://assets/textures/imagine/scissors_top.png",
 			"res://assets/textures/imagine/tape_roll.png",
+		],
+		"island_fill_huge": [
+			"res://assets/textures/imagine/barrel_wood.png",
+			"res://assets/textures/imagine/teapot_top.png",
+			"res://assets/textures/imagine/lamp_desk.png",
+			"res://assets/textures/imagine/plate_stack.png",
+			"res://assets/textures/imagine/watermelon.png",
 		],
 		"island_fill_big": [
 			"res://assets/textures/imagine/hose_coil.png",
@@ -1010,10 +1032,26 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 			placed[cell] = true
 		# Keep filling the remaining big cells with repeats so genuinely big
 		# items dominate the island (each texture capped at 3 total).
+		if pool.is_empty():
+			continue
+		var cap := 4 if tier >= 50.0 else 3
+		var fallback_pool: Array = spec.get("island_fill_big", []) if tier >= 50.0 else []
 		while not cells.is_empty():
 			var texture_path := String(pool[rng.randi_range(0, pool.size() - 1)])
-			if used.get(texture_path, 0) >= 3:
-				continue
+			if used.get(texture_path, 0) >= cap:
+				var found := false
+				for candidate: String in pool:
+					if used.get(candidate, 0) < cap:
+						texture_path = candidate
+						found = true
+						break
+				if not found:
+					if fallback_pool.is_empty():
+						break
+					pool = fallback_pool
+					fallback_pool = []
+					cap = 3
+					continue
 			var cell: Vector2 = cells.pop_front()
 			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
 			used[texture_path] = used.get(texture_path, 0) + 1
@@ -1208,6 +1246,8 @@ static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, t
 		sprite.scale = Vector2.ONE * (radius * 2.2 / maxf(longest, 1.0))
 		prop.add_child(sprite)
 
+
+static var fill_prop_calls := 0
 
 static func _add_fill_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
 	var prop := StaticBody2D.new()

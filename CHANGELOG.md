@@ -20,6 +20,11 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Big-prop dominance, for real this time: the huge tier pools were missing
+  from the specs entirely (the earlier claim was wrong), and the repeat loop
+  capped after a handful of placements. Now: six huge prop types per theme,
+  cap-4 repeats with big-pool fallback — 63 fill props per island with the
+  huge items (barrel 140, hose 122, basketball 112) dominating the center.
 - Big-prop dominance: the island fill now keeps filling its huge/big cells
   with repeats (cap 3 per texture) so genuinely big items dominate instead of
   one-of-each, the huge tier's rim margin loosened, several sizes raised
