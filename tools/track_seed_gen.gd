@@ -53,11 +53,14 @@ static func archetype_params(seed: int, base: Dictionary) -> Dictionary:
 			result["side_bias"] = Vector2(-0.6, 0.0) if posmod(seed, 8) < 4 else Vector2(0.6, 0.0)
 		_:
 			result["min_point_distance"] = 200.0
-			result["max_angle_deg"] = 94.0
-			result["min_self_distance"] = 258.0
+			result["max_angle_deg"] = 84.0
+			result["min_self_distance"] = base_self if base_self > 0.0 else 262.0
 			result["point_count"] = 12
 			result["displacement_min"] = 0.08
-			result["displacement_max"] = 0.18
+			result["displacement_max"] = 0.16
+			result["margin"] = 150.0
+			result["min_loop_length"] = 1600.0
+			result["max_loop_length"] = 2500.0
 	return result
 
 
@@ -134,11 +137,14 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 		shaped = _fix_angles(shaped, deg_to_rad(max_angle_deg))
 		shaped = _push_apart(shaped, 120.0)
 
-	# 5. Keep inside bounds
+	# 5. Keep inside bounds, then re-separate (the clamp can pile points onto
+	# the rect corners, which folds the spline)
 	for index in shaped.size():
 		shaped[index] = Vector2(
 			clampf(shaped[index].x, bounds.position.x, bounds.end.x),
 			clampf(shaped[index].y, bounds.position.y, bounds.end.y))
+	for iteration in 2:
+		shaped = _push_apart(shaped, 140.0)
 
 	# 6. Resample the spline into evenly spaced control points, clamp the
 	# resampled loop's corners, then validate

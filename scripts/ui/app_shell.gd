@@ -1025,9 +1025,8 @@ func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 
 
 func _random_quick_race_seed() -> int:
-	var random := RandomNumberGenerator.new()
-	random.randomize()
-	return random.randi_range(0, 99999)
+	var draw: Dictionary = _app.call("random_circuit_seed", _quick_race_theme)
+	return int(draw.get("seed", 0))
 
 
 func _start_quick_race() -> void:

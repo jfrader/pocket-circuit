@@ -17,6 +17,11 @@
   so every baked circuit is playable, plus a circuit roster catalog and test.
 - Brightened generated floor/island textures (desk mat, wood planks, toolbox,
   keyboard) and per-theme furniture edge strips on all room walls.
+- Track length variety per archetype (fast = long circuits, switchback = short)
+  and two more room canvases: a super-wide counter (2600×800) and a big square
+  mat (1500×1500).
+- Random Quick Race and championship seeds now draw from the AI-validated
+  circuit pool by default (typed seeds still generate anything at runtime).
 - Any-seed circuit generation: the track builder is now a runtime library
   (`tools/track_builder_core.gd`), so a race can build an arbitrary seed on
   demand — no pre-baked file required.

@@ -14,6 +14,8 @@ static var ROOM_SHAPES := {
 	"wide": PackedVector2Array([Vector2(-1175, -450), Vector2(1175, -450), Vector2(1175, 450), Vector2(-1175, 450)]),
 	"tall": PackedVector2Array([Vector2(-575, -725), Vector2(575, -725), Vector2(575, 725), Vector2(-575, 725)]),
 	"el": PackedVector2Array([Vector2(-1000, -550), Vector2(300, -550), Vector2(300, -50), Vector2(1000, -50), Vector2(1000, 550), Vector2(-1000, 550)]),
+	"long": PackedVector2Array([Vector2(-1300, -400), Vector2(1300, -400), Vector2(1300, 400), Vector2(-1300, 400)]),
+	"square": PackedVector2Array([Vector2(-750, -750), Vector2(750, -750), Vector2(750, 750), Vector2(-750, 750)]),
 }
 
 const LAYOUTS := {
@@ -269,11 +271,19 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 				room_params["min_self_distance"] = 252.0
 				room_params["displacement_scale"] = 0.55
 			&"el":
-				room_params["min_self_distance"] = 270.0
-				room_params["displacement_scale"] = 0.8
-				room_params["min_loop_length"] = 1600.0
+				room_params["min_self_distance"] = 250.0
+				room_params["displacement_scale"] = 0.5
+				room_params["min_loop_length"] = 1500.0
 				room_params["sample_rect"] = Rect2(-1000, -550, 1300, 1100)
 				room_params["room_check_margin"] = 10.0
+			&"long":
+				room_params["min_self_distance"] = 280.0
+				room_params["displacement_scale"] = 1.0
+				room_params["min_loop_length"] = 2000.0
+			&"square":
+				room_params["min_self_distance"] = 280.0
+				room_params["displacement_scale"] = 1.0
+				room_params["min_loop_length"] = 2200.0
 		var gen := TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
 		if gen["points"].is_empty():
 			push_error("TrackBuilderCore: could not generate a valid circuit near seed " + str(seed))

@@ -3,6 +3,7 @@ extends Node
 const BOOT_SCENE := "res://scenes/boot/boot.tscn"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const CATALOG := preload("res://data/championship/catalog.gd")
+const CIRCUIT_ROSTER := preload("res://data/circuits/circuit_roster.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 const SHELL_SCRIPT := preload("res://scripts/ui/app_shell.gd")
 const AUDIO_DIRECTOR_SCRIPT := preload("res://scripts/audio/audio_director.gd")
@@ -161,15 +162,15 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 	var event := CATALOG.get_event(event_id)
 	if event.is_empty():
 		return
-	if String(event.get("theme", "")) in ["kitchen", "workshop", "office"]:
-		event = event.duplicate(true)
-		var random := RandomNumberGenerator.new()
-		random.randomize()
-		event["circuit"] = "generated"
-		event["room"] = "classic"
-		event["seed"] = random.randi_range(0, 99999)
 	if not quick_race and not CATALOG.is_event_unlocked(event_id, _save_data):
 		return
+	var event_theme := StringName(event.get("theme", "kitchen"))
+	if event_theme in [&"kitchen", &"workshop", &"office"]:
+		var circuit_draw := random_circuit_seed(event_theme)
+		event = event.duplicate()
+		event["circuit"] = "generated"
+		event["room"] = String(circuit_draw.get("room", "classic"))
+		event["seed"] = int(circuit_draw.get("seed", 0))
 	if not vehicle_id in _save_data["unlocked_vehicles"]:
 		vehicle_id = "rustbug"
 	var candidate := _save_data.duplicate(true)
@@ -195,6 +196,18 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 	if _shell:
 		_shell.visible = false
 	get_tree().change_scene_to_file(RACE_SCENE)
+
+
+func random_circuit_seed(theme: StringName) -> Dictionary:
+	var candidates: Array = []
+	for entry: Dictionary in CIRCUIT_ROSTER.entries():
+		if StringName(entry["theme"]) == theme:
+			candidates.append(entry)
+	if not candidates.is_empty():
+		var random := RandomNumberGenerator.new()
+		random.randomize()
+		return candidates[random.randi_range(0, candidates.size() - 1)]
+	return {"theme": String(theme), "room": "classic", "seed": randi() % 100000}
 
 
 func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String) -> void:
