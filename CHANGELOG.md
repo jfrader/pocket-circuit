@@ -20,6 +20,9 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Intrinsic prop sizes: every prop now renders at its real-world footprint
+  (basketball 56u, mug 34u, strawberry 18u, coin 12u, barrel 92u) instead of
+  a uniform cell size, with matching rectangle/circle colliders.
 - "Great look" pass: patterned base surfaces (gingham tablecloth kitchen,
   woven desk pad office, grained wood workshop) with theme worn strips;
   fifteen new depth-shaded props (mugs, bottles, plate stacks, vases,
