@@ -20,6 +20,13 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- "One big object" rooms: the central island is now a coherent themed object
+  (red tool tray with compartments and tools for the workshop, a keyboard for
+  the office, a white plate with a blue inner ring and crumbs for the
+  kitchen); the translucent highlight rectangle is gone and every base fill
+  is theme-neutral. Longer circuits: generator margins tightened and
+  per-archetype minimum lengths raised (~3.6–4.3k loop length, up from
+  ~2.6–3.2k) so straights and corners match the car scale.
 - Micro Machines scale pass: layered furniture walls (dark base, side face,
   cream top lip), giant corner set pieces (oversized barrel/paint can/hose in
   the workshop, mug/teapot/vase in the kitchen, lamp/tape roll in the office),

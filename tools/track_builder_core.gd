@@ -100,7 +100,7 @@ const LAYOUTS := {
 		"track_texture": "res://assets/textures/imagine/track_cloth.png",
 		"track_tile_modulate": 1.0,
 		"floor_texture": "res://assets/textures/imagine/floor_cloth.png",
-		"prop_texture": "res://assets/textures/kitchen/plate_large.png",
+		"prop_texture": "res://assets/textures/imagine/island_plate.png",
 		"prop_label": "Plate",
 		"edge_texture": "res://assets/textures/kitchen/counter_edge.png",
 		"island_expansion": 10.0,
@@ -189,7 +189,7 @@ const LAYOUTS := {
 		"track_texture": "res://assets/textures/imagine/track_wood.png",
 		"track_tile_modulate": 1.0,
 		"floor_texture": "res://assets/textures/imagine/floor_wood.png",
-		"prop_texture": "res://assets/textures/imagine/workshop_toolbox_top_bright.jpg",
+		"prop_texture": "res://assets/textures/imagine/island_tool_tray.png",
 		"prop_label": "Toolbox",
 		"edge_texture": "res://assets/textures/imagine/workshop_edge_bright.png",
 		"scatter_textures": [
@@ -285,15 +285,15 @@ const LAYOUTS := {
 			Vector2(400, -336), Vector2(600, -420), Vector2(735, -300), Vector2(735, 0),
 			Vector2(735, 370),
 		],
-		"floor": Color("4a6a8a"),
-		"highlight": Color("5a7a9a"),
-		"island": Color("3a5a7a"),
+		"floor": Color("5a6170"),
+		"highlight": Color("6a7180"),
+		"island": Color("4a505c"),
 		"asphalt": Color("272b31"),
-		"apron": Color("3a4a5a"),
+		"apron": Color("4a5060"),
 		"track_texture": "res://assets/textures/imagine/track_pad.png",
 		"track_tile_modulate": 1.0,
 		"floor_texture": "res://assets/textures/imagine/floor_pad.png",
-		"prop_texture": "res://assets/textures/imagine/office_keyboard_top_bright.jpg",
+		"prop_texture": "res://assets/textures/imagine/island_keyboard.png",
 		"prop_label": "Keyboard",
 		"edge_texture": "res://assets/textures/imagine/office_edge_bright.png",
 		"scatter_textures": [
@@ -478,7 +478,6 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# themed texture tiles on top at full brightness
 	var floor_texture := String(spec.get("floor_texture", ""))
 	_add_polygon(root, "Floor", _rect_points(Vector2(-600, -500), Vector2(2600, 1700)), spec["floor"], -22)
-	_add_polygon(root, "CounterHighlight", _rect_points(Vector2(-940, -540), Vector2(940, 540)), Color(spec["highlight"], 0.5), -21)
 	if not floor_texture.is_empty():
 		_add_floor_tiles(root, floor_texture, Vector2(-600, -500), Vector2(2600, 1700), 6, 4, Vector2(1.0, 1.0))
 	var room_surface := _expand_loop(room_polygon, 26.0)
@@ -786,8 +785,19 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 	var side_face := Polygon2D.new()
 	side_face.name = "SideFace"
 	side_face.polygon = _rect_points(Vector2(0.0, -14.0), Vector2(length + 60.0, 22.0))
-	side_face.color = Color(spec_wall_side())
+	side_face.color = Color("262e3a")
 	wall.add_child(side_face)
+	var edge_texture_side := load(edge_texture_path) as Texture2D
+	if edge_texture_side:
+		var side_strip := Sprite2D.new()
+		side_strip.name = "SideStrip"
+		side_strip.texture = edge_texture_side
+		side_strip.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		side_strip.position = Vector2(0.0, -14.0)
+		var side_tiles := maxi(1, int(ceil((length + 60.0) / 1024.0)))
+		side_strip.scale = Vector2((length + 60.0) / (1024.0 * float(side_tiles)), 34.0 / 220.0)
+		side_strip.modulate = Color(0.85, 0.85, 0.85)
+		wall.add_child(side_strip)
 	var top_lip := Polygon2D.new()
 	top_lip.name = "TopLip"
 	top_lip.polygon = _rect_points(Vector2(0.0, -28.0), Vector2(length + 60.0, 5.0))
@@ -934,7 +944,7 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 	var pitch := 84.0
 	# Bucket valid cells by how much prop clearance the corridor leaves there:
 	# deep-center cells may host big items, edge cells only small ones.
-	var buckets := {15.0: PackedVector2Array(), 25.0: PackedVector2Array(), 36.0: PackedVector2Array(), 50.0: PackedVector2Array()}
+	var buckets := {15.0: PackedVector2Array(), 25.0: PackedVector2Array(), 36.0: PackedVector2Array(), 50.0: PackedVector2Array(), 72.0: PackedVector2Array()}
 	for row in range(int(ceil((max_point.y - min_point.y) / pitch)) + 1):
 		for column in range(int(ceil((max_point.x - min_point.x) / pitch)) + 1):
 			var center := Vector2(
@@ -945,19 +955,30 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 			var center_distance := _distance_to_centerline(center, centerline)
 			if center_distance < 125.0 + 40.0:
 				continue
-			for tier: float in [50.0, 36.0, 25.0, 15.0]:
+			for tier: float in [72.0, 50.0, 36.0, 25.0, 15.0]:
 				if center_distance >= 125.0 + tier + 40.0:
 					buckets[tier].append(center)
 					break
 	var placed := {}
 	var used := {}
-	# Pass 1: one of each big and medium item, nearest the island center
+	# Pass 1: one of each huge/big/medium item. Huge items anchor the island's
+	# corner apexes (corner-cut blockers); the rest spread from the center.
 	var centroid := (min_point + max_point) * 0.5
-	for tier: float in [50.0, 36.0]:
-		var pool: Array = spec.get("island_fill_big", []) if tier == 50.0 else spec.get("island_fill_textures", [])
+	var apexes := _island_apexes(inner_loop)
+	for tier: float in [72.0, 50.0, 36.0]:
+		var pool: Array = spec.get("island_fill_huge", []) if tier == 72.0 else (spec.get("island_fill_big", []) if tier == 50.0 else spec.get("island_fill_textures", []))
 		var cells: Array[Vector2] = []
 		cells.append_array(buckets[tier])
-		cells.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_to(centroid) < b.distance_to(centroid))
+		if tier == 72.0 and not apexes.is_empty():
+			cells.sort_custom(func(a: Vector2, b: Vector2) -> bool:
+				var a_best := 999999.0
+				var b_best := 999999.0
+				for apex: Vector2 in apexes:
+					a_best = minf(a_best, a.distance_to(apex))
+					b_best = minf(b_best, b.distance_to(apex))
+				return a_best < b_best)
+		else:
+			cells.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_to(centroid) < b.distance_to(centroid))
 		for texture in pool:
 			if cells.is_empty():
 				break
@@ -1092,9 +1113,21 @@ static func _add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon:
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (150.0 / maxf(longest, 1.0))
+		sprite.scale = Vector2.ONE * (190.0 / maxf(longest, 1.0))
 		prop.add_child(sprite)
 		placed += 1
+
+
+static func _island_apexes(inner_loop: PackedVector2Array) -> PackedVector2Array:
+	var apexes := PackedVector2Array()
+	var count := inner_loop.size()
+	for index in count:
+		var behind := (inner_loop[index] - inner_loop[(index - 12 + count) % count]).normalized()
+		var ahead := (inner_loop[(index + 12) % count] - inner_loop[index]).normalized()
+		var turn := behind.angle_to(ahead)
+		if absf(turn) > 0.18 and (apexes.is_empty() or apexes[apexes.size() - 1].distance_to(inner_loop[index]) > 120.0):
+			apexes.append(inner_loop[index])
+	return apexes
 
 
 static func _distance_to_centerline(point: Vector2, centerline: PackedVector2Array) -> float:

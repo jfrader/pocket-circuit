@@ -58,9 +58,9 @@ static func archetype_params(seed: int, base: Dictionary) -> Dictionary:
 			result["point_count"] = 12
 			result["displacement_min"] = 0.08
 			result["displacement_max"] = 0.16
-			result["margin"] = 150.0
-			result["min_loop_length"] = 1600.0
-			result["max_loop_length"] = 2500.0
+			result["margin"] = 130.0
+			result["min_loop_length"] = 2200.0
+			result["max_loop_length"] = 3200.0
 	return result
 
 
