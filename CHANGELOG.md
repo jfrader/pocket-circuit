@@ -20,6 +20,13 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- "Great look" pass: patterned base surfaces (gingham tablecloth kitchen,
+  woven desk pad office, grained wood workshop) with theme worn strips;
+  fifteen new depth-shaded props (mugs, bottles, plate stacks, vases,
+  teapots, staplers, pencils, scissors, keys, tools); surface decals
+  (crumbs, coffee rings, paper sheets, sawdust, oil stains); and real
+  per-shape colliders — rectangles for books, planks and rulers aligned to
+  the track, circles for round props.
 - Seamless racing surfaces: the track ribbon is now a barely-there warm
   light-worn tint (no distinct colored band) with theme wear strips, and all
   translucent surface-zone overlays (oil slick, spark strips, paper patches)

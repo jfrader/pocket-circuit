@@ -18,6 +18,17 @@ static var ROOM_SHAPES := {
 	"square": PackedVector2Array([Vector2(-750, -750), Vector2(750, -750), Vector2(750, 750), Vector2(-750, 750)]),
 }
 
+static var PROP_SHAPES := {
+	"ruler_plank.png": {"shape": "rect", "size": Vector2(96.0, 30.0)},
+	"plank_wood.png": {"shape": "rect", "size": Vector2(90.0, 34.0)},
+	"book_top.png": {"shape": "rect", "size": Vector2(72.0, 54.0)},
+	"remote_control.png": {"shape": "rect", "size": Vector2(64.0, 36.0)},
+	"hazard_office_cable.png": {"shape": "rect", "size": Vector2(84.0, 24.0)},
+	"hazard_workshop_socket.png": {"shape": "rect", "size": Vector2(84.0, 24.0)},
+	"cutting_board.png": {"shape": "rect", "size": Vector2(84.0, 52.0)},
+	"frying_pan.png": {"shape": "circle", "size": Vector2.ZERO},
+}
+
 const LAYOUTS := {
 	&"kitchen": {
 		"scene": "res://scenes/tracks/kitchen_graybox.tscn",
@@ -55,12 +66,18 @@ const LAYOUTS := {
 			"res://assets/textures/kitchen/cereal_tower_green.png",
 			"res://assets/textures/imagine/frying_pan.png",
 			"res://assets/textures/imagine/plant_small.png",
+			"res://assets/textures/imagine/teacup_saucer.png",
+			"res://assets/textures/imagine/salt_shaker.png",
+			"res://assets/textures/imagine/mug_top.png",
 		],
 		"island_fill_big": [
 			"res://assets/textures/imagine/hose_coil.png",
 			"res://assets/textures/kitchen/cutting_board.png",
 			"res://assets/textures/imagine/watermelon.png",
 			"res://assets/textures/imagine/frying_pan.png",
+			"res://assets/textures/imagine/teapot_top.png",
+			"res://assets/textures/imagine/vase_top.png",
+			"res://assets/textures/imagine/plate_stack.png",
 		],
 		"island_fill_small": [
 			"res://assets/textures/kitchen/apple_cartoon.png",
@@ -71,6 +88,7 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/screw.png",
 			"res://assets/textures/imagine/coin.png",
 			"res://assets/textures/imagine/plant_small.png",
+			"res://assets/textures/imagine/keys_ring.png",
 		],
 		"island_fill_tiny": [
 			"res://assets/textures/imagine/paperclip.png",
@@ -87,6 +105,10 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/barrel_wood.png",
 			"res://assets/textures/imagine/plant_small.png",
+		],
+		"decals": [
+			"res://assets/textures/imagine/crumb_cluster.png",
+			"res://assets/textures/imagine/stain_ring.png",
 		],
 		"obstacles": {
 			"MugA": {"pos": Vector2(-300, 290), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
@@ -132,6 +154,9 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/wrench.png",
 			"res://assets/textures/imagine/hammer.png",
 			"res://assets/textures/imagine/remote_control.png",
+			"res://assets/textures/imagine/screwdriver.png",
+			"res://assets/textures/imagine/tape_roll.png",
+			"res://assets/textures/imagine/matchbox.png",
 		],
 		"island_fill_big": [
 			"res://assets/textures/imagine/hose_coil.png",
@@ -142,6 +167,8 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/soccer_ball.png",
 			"res://assets/textures/imagine/football.png",
 			"res://assets/textures/imagine/lamp_desk.png",
+			"res://assets/textures/imagine/bottle_top.png",
+			"res://assets/textures/imagine/teapot_top.png",
 		],
 		"island_fill_small": [
 			"res://assets/textures/kitchen/apple_cartoon.png",
@@ -152,6 +179,7 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/screw.png",
 			"res://assets/textures/imagine/coin.png",
 			"res://assets/textures/imagine/plant_small.png",
+			"res://assets/textures/imagine/keys_ring.png",
 		],
 		"island_fill_tiny": [
 			"res://assets/textures/imagine/paperclip.png",
@@ -167,6 +195,10 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/plant_small.png",
 			"res://assets/textures/kitchen/cup_cartoon.png",
+		],
+		"decals": [
+			"res://assets/textures/imagine/sawdust_patch.png",
+			"res://assets/textures/imagine/oil_stain.png",
 		],
 		"island_expansion": 10.0,
 		"obstacles": {
@@ -224,6 +256,11 @@ const LAYOUTS := {
 			"res://assets/textures/kitchen/ruler_plank.png",
 			"res://assets/textures/imagine/remote_control.png",
 			"res://assets/textures/imagine/plant_small.png",
+			"res://assets/textures/imagine/stapler_top.png",
+			"res://assets/textures/imagine/pencil.png",
+			"res://assets/textures/imagine/crayons.png",
+			"res://assets/textures/imagine/scissors_top.png",
+			"res://assets/textures/imagine/tape_roll.png",
 		],
 		"island_fill_big": [
 			"res://assets/textures/imagine/hose_coil.png",
@@ -231,6 +268,8 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/barrel_wood.png",
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/lamp_desk.png",
+			"res://assets/textures/imagine/mug_top.png",
+			"res://assets/textures/imagine/plate_stack.png",
 		],
 		"island_fill_small": [
 			"res://assets/textures/kitchen/apple_cartoon.png",
@@ -241,6 +280,7 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/screw.png",
 			"res://assets/textures/imagine/coin.png",
 			"res://assets/textures/imagine/plant_small.png",
+			"res://assets/textures/imagine/keys_ring.png",
 		],
 		"island_fill_tiny": [
 			"res://assets/textures/imagine/paperclip.png",
@@ -257,6 +297,10 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/barrel_wood.png",
 			"res://assets/textures/imagine/plant_small.png",
+		],
+		"decals": [
+			"res://assets/textures/imagine/paper_sheet.png",
+			"res://assets/textures/imagine/stain_ring.png",
 		],
 		"island_expansion": 4.0,
 		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.72, 0.74],
@@ -484,6 +528,9 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# Props delimiting the outer side of the track (long on straights, bulky on corners)
 	if not OS.get_environment("PC_NO_BOUNDARY") == "1":
 		_line_boundary_props(root, spec, centerline, outer_loop, clipped, room_polygon)
+	var decal_rng := RandomNumberGenerator.new()
+	decal_rng.seed = int(spec.get("seed", 0)) * 31 + 7
+	_scatter_decals(root, spec, room_polygon, corridor, decal_rng)
 
 	# Track obstacles (real props with collision)
 	if spec.get("seed_obstacles", false):
@@ -717,6 +764,29 @@ static func _add_grid(parent: Node, node_name: String, rotation: float, position
 		grid.add_child(marker)
 
 
+static func _scatter_decals(root: Node2D, spec: Dictionary, room_polygon: PackedVector2Array, corridor: PackedVector2Array, rng: RandomNumberGenerator) -> void:
+	var decals: Array = spec.get("decals", [])
+	if decals.is_empty():
+		return
+	for decal in 18:
+		var position := Vector2(rng.randf_range(-830.0, 830.0), rng.randf_range(-530.0, 530.0))
+		if not Geometry2D.is_point_in_polygon(position, room_polygon):
+			continue
+		if Geometry2D.is_point_in_polygon(position, corridor):
+			continue
+		var sprite := Sprite2D.new()
+		sprite.name = "Decal"
+		sprite.texture = load(String(decals[rng.randi_range(0, decals.size() - 1)])) as Texture2D
+		if sprite.texture == null:
+			sprite.free()
+			continue
+		sprite.scale = Vector2.ONE * rng.randf_range(0.5, 1.1)
+		sprite.rotation = rng.randf_range(0.0, TAU)
+		sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.5, 0.85))
+		sprite.z_index = -15
+		root.add_child(sprite)
+
+
 static func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, corridor: PackedVector2Array, gate_samples: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(spec.get("seed", 0))
@@ -881,7 +951,8 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 			continue
 		var pool := corner_pool if is_corner else long_pool
 		var texture_path := String(pool[rng.randi_range(0, pool.size() - 1)])
-		_add_boundary_prop(root, position, radius, texture_path, rng.randf_range(0.0, TAU))
+		var prop_rotation := rng.randf_range(0.0, TAU) if is_corner else tangent.angle()
+		_add_boundary_prop(root, position, radius, texture_path, prop_rotation)
 		index += 7
 
 
@@ -892,6 +963,22 @@ static func _distance_to_centerline(point: Vector2, centerline: PackedVector2Arr
 	return best
 
 
+static func _add_shape_collision(parent: Node, texture_path: String, scale_radius: float) -> void:
+	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+	if entry.get("shape", "circle") == "rect":
+		var rect := RectangleShape2D.new()
+		rect.size = entry["size"]
+		var rect_cs := CollisionShape2D.new()
+		rect_cs.shape = rect
+		parent.add_child(rect_cs)
+		return
+	var circle := CircleShape2D.new()
+	circle.radius = scale_radius
+	var circle_cs := CollisionShape2D.new()
+	circle_cs.shape = circle
+	parent.add_child(circle_cs)
+
+
 static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
 	var prop := StaticBody2D.new()
 	prop.name = "BoundaryProp"
@@ -899,11 +986,7 @@ static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, t
 	prop.rotation = rotation
 	prop.collision_layer = 16
 	parent.add_child(prop)
-	var shape := CircleShape2D.new()
-	shape.radius = radius
-	var cs := CollisionShape2D.new()
-	cs.shape = shape
-	prop.add_child(cs)
+	_add_shape_collision(prop, texture_path, radius)
 	_add_contact_shadow(prop, radius * 1.15)
 	var texture := load(texture_path) as Texture2D
 	if texture:
@@ -923,11 +1006,7 @@ static func _add_fill_prop(parent: Node, position: Vector2, radius: float, textu
 	prop.collision_layer = 16
 	parent.add_child(prop)
 	_add_contact_shadow(prop, radius * 1.15)
-	var shape := CircleShape2D.new()
-	shape.radius = radius
-	var cs := CollisionShape2D.new()
-	cs.shape = shape
-	prop.add_child(cs)
+	_add_shape_collision(prop, texture_path, radius)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -972,11 +1051,7 @@ static func _add_scatter_prop(parent: Node, position: Vector2, radius: float, te
 	prop.position = position
 	prop.collision_layer = 16
 	parent.add_child(prop)
-	var shape := CircleShape2D.new()
-	shape.radius = radius
-	var cs := CollisionShape2D.new()
-	cs.shape = shape
-	prop.add_child(cs)
+	_add_shape_collision(prop, texture_path, radius)
 	_add_contact_shadow(prop, radius * 1.15)
 	var texture := load(texture_path) as Texture2D
 	if texture:
@@ -1012,11 +1087,7 @@ static func _add_obstacle(parent: Node, node_name: String, position: Vector2, ra
 	obstacle.position = position
 	obstacle.collision_layer = 2
 	parent.add_child(obstacle)
-	var shape := CircleShape2D.new()
-	shape.radius = radius
-	var cs := CollisionShape2D.new()
-	cs.shape = shape
-	obstacle.add_child(cs)
+	_add_shape_collision(obstacle, texture_path, radius)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
