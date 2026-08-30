@@ -38,14 +38,14 @@ static var PROP_SHAPES := {
 	"spoon_bridge.png": {"shape": "rect", "size": Vector2(40.0, 13.0)},
 	"kitchen_spoon.png": {"shape": "rect", "size": Vector2(40.0, 13.0)},
 	"frying_pan.png": {"shape": "circle", "size": Vector2(74.0, 74.0)},
-	"barrel_wood.png": {"shape": "circle", "size": Vector2(120.0, 120.0)},
-	"flower_pot.png": {"shape": "circle", "size": Vector2(88.0, 88.0)},
-	"basketball.png": {"shape": "circle", "size": Vector2(100.0, 100.0)},
+	"barrel_wood.png": {"shape": "circle", "size": Vector2(140.0, 140.0)},
+	"flower_pot.png": {"shape": "circle", "size": Vector2(98.0, 98.0)},
+	"basketball.png": {"shape": "circle", "size": Vector2(112.0, 112.0)},
 	"soccer_ball.png": {"shape": "circle", "size": Vector2(92.0, 92.0)},
 	"football.png": {"shape": "circle", "size": Vector2(96.0, 96.0)},
-	"watermelon.png": {"shape": "circle", "size": Vector2(90.0, 90.0)},
-	"hose_coil.png": {"shape": "circle", "size": Vector2(110.0, 110.0)},
-	"teapot_top.png": {"shape": "circle", "size": Vector2(84.0, 84.0)},
+	"watermelon.png": {"shape": "circle", "size": Vector2(102.0, 102.0)},
+	"hose_coil.png": {"shape": "circle", "size": Vector2(122.0, 122.0)},
+	"teapot_top.png": {"shape": "circle", "size": Vector2(96.0, 96.0)},
 	"mug_top.png": {"shape": "circle", "size": Vector2(44.0, 44.0)},
 	"bottle_top.png": {"shape": "circle", "size": Vector2(42.0, 42.0)},
 	"plate_stack.png": {"shape": "circle", "size": Vector2(64.0, 64.0)},
@@ -973,7 +973,8 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 			if center_distance < 125.0 + 40.0:
 				continue
 			for tier: float in [72.0, 50.0, 36.0, 25.0, 15.0]:
-				if center_distance >= 125.0 + tier + 40.0:
+				var rim := 28.0 if tier >= 50.0 else 40.0
+				if center_distance >= 125.0 + tier + rim:
 					buckets[tier].append(center)
 					break
 	var placed := {}
@@ -996,11 +997,22 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 				return a_best < b_best)
 		else:
 			cells.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_to(centroid) < b.distance_to(centroid))
+		var repeats_used := 0
 		for texture in pool:
 			if cells.is_empty():
 				break
 			var texture_path := String(texture)
 			if used.get(texture_path, 0) >= 1:
+				continue
+			var cell: Vector2 = cells.pop_front()
+			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
+			used[texture_path] = used.get(texture_path, 0) + 1
+			placed[cell] = true
+		# Keep filling the remaining big cells with repeats so genuinely big
+		# items dominate the island (each texture capped at 3 total).
+		while not cells.is_empty():
+			var texture_path := String(pool[rng.randi_range(0, pool.size() - 1)])
+			if used.get(texture_path, 0) >= 3:
 				continue
 			var cell: Vector2 = cells.pop_front()
 			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
@@ -1130,7 +1142,7 @@ static func _add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon:
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (190.0 / maxf(longest, 1.0))
+		sprite.scale = Vector2.ONE * (215.0 / maxf(longest, 1.0))
 		prop.add_child(sprite)
 		placed += 1
 

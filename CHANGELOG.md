@@ -20,6 +20,11 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Big-prop dominance: the island fill now keeps filling its huge/big cells
+  with repeats (cap 3 per texture) so genuinely big items dominate instead of
+  one-of-each, the huge tier's rim margin loosened, several sizes raised
+  (barrel 140, hose 122, basketball 112, watermelon 102, teapot 96), and the
+  corner giants grew to ~215 units.
 - Assessment sweep fixes: the switchback's max loop length is now actually
   enforced, wrench/hammer got their real shapes, the corner-giant pools are
   wired into all three themes, orphan roster scenes removed, and the
