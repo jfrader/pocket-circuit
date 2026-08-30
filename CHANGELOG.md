@@ -20,6 +20,8 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Soft contact shadows under every island prop so toys read as planted on
+  the surface (vision-review verified: no floating props, no artifacts).
 - Random Quick Race and championship seeds now draw from the AI-validated
   circuit pool by default (typed seeds still generate anything at runtime).
 - Any-seed circuit generation: the track builder is now a runtime library

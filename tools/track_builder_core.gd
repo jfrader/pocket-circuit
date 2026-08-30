@@ -831,6 +831,7 @@ static func _add_fill_prop(parent: Node, position: Vector2, radius: float, textu
 	prop.rotation = rotation
 	prop.collision_layer = 4
 	parent.add_child(prop)
+	_add_contact_shadow(prop, radius * 1.15)
 	var shape := CircleShape2D.new()
 	shape.radius = radius
 	var cs := CollisionShape2D.new()
@@ -844,6 +845,34 @@ static func _add_fill_prop(parent: Node, position: Vector2, radius: float, textu
 		var longest := maxf(texture.get_width(), texture.get_height())
 		sprite.scale = Vector2.ONE * (radius * 2.2 / maxf(longest, 1.0))
 		prop.add_child(sprite)
+
+
+static func _add_contact_shadow(parent: Node, radius: float) -> void:
+	var shadow := Sprite2D.new()
+	shadow.name = "ContactShadow"
+	shadow.texture = _contact_shadow_texture()
+	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	shadow.scale = Vector2.ONE * (radius * 2.4 / 128.0)
+	shadow.modulate = Color(0.06, 0.05, 0.05, 0.35)
+	shadow.z_index = -1
+	parent.add_child(shadow)
+
+
+static var _cached_contact_shadow: Texture2D = null
+
+
+static func _contact_shadow_texture() -> Texture2D:
+	if _cached_contact_shadow != null:
+		return _cached_contact_shadow
+	var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
+	for y in 128:
+		for x in 128:
+			var dx := (float(x) - 63.5) / 58.0
+			var dy := (float(y) - 63.5) / 58.0
+			var falloff := clampf(1.0 - (dx * dx + dy * dy), 0.0, 1.0)
+			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, falloff * falloff))
+	_cached_contact_shadow = ImageTexture.create_from_image(image)
+	return _cached_contact_shadow
 
 
 static func _seed_clear_of_gates(point: Vector2, gate_samples: PackedVector2Array) -> bool:
