@@ -20,6 +20,11 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Seamless racing surfaces: the track ribbon is now a barely-there warm
+  light-worn tint (no distinct colored band) with theme wear strips, and all
+  translucent surface-zone overlays (oil slick, spark strips, paper patches)
+  are invisible. Corner/straight prop delimitation stays; the office's
+  hand-tuned canonical track keeps its proven AI-stable build.
 - The kitchen moved fully onto the generated-track system: its old
   hand-made scene (painted strips, amber decoration lines, translucent
   patches, micro dressing) is retired from gameplay in favour of the builder's

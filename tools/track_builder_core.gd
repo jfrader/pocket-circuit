@@ -259,7 +259,7 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/plant_small.png",
 		],
 		"island_expansion": 4.0,
-		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.72, 0.74],
+		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.79, 0.88],
 		"obstacles": {
 			"CerealA": {"pos": Vector2(300, 430), "r": 38.0, "tex": "res://assets/textures/imagine/office_keycap.png"},
 			"MugA": {"pos": Vector2(-300, 500), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
@@ -398,7 +398,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	for piece: PackedVector2Array in clipped_pieces:
 		if piece.size() > clipped.size():
 			clipped = piece
-	_add_polygon(root, "TrackRibbon", clipped, spec["asphalt"], -10)
+	_add_polygon(root, "TrackRibbon", clipped, Color(1.0, 0.96, 0.88, 0.17), -10)
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
 		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30), float(spec.get("track_tile_modulate", 1.35)))
@@ -407,7 +407,8 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# define the course
 	var outer_loop := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
 	var inner_loop := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
-	_build_island_prop(root, spec, inner_loop, room_polygon, clipped, centerline)
+	var island_region := _island_region(room_polygon, clipped, inner_loop)
+	_build_island_prop(root, spec, island_region, inner_loop, centerline)
 
 	# Room walls (real furniture edges along the room outline)
 	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
@@ -478,7 +479,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	])
 
 	# Dense collidable fill over the whole island interior (books, planks, hose…)
-	_fill_island(root, spec, inner_loop, clipped)
+	_fill_island(root, spec, inner_loop, centerline)
 
 	# Props delimiting the outer side of the track (long on straights, bulky on corners)
 	if not OS.get_environment("PC_NO_BOUNDARY") == "1":
@@ -525,13 +526,12 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	_add_start_banner(root, start, start_tangent, corridor)
 
 
-static func _build_island_prop(root: Node2D, spec: Dictionary, island_polygon: PackedVector2Array, room_polygon: PackedVector2Array, ribbon: PackedVector2Array, centerline: PackedVector2Array) -> void:
-	# Collision: the raw inner loop expanded to the paint edge (no drivable gap)
+static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
 	var expanded := PackedVector2Array()
 	var last := Vector2(INF, INF)
-	for index in island_polygon.size():
-		var toward_track := (centerline[index] - island_polygon[index]).normalized()
-		var point := island_polygon[index] + toward_track * float(spec.get("island_expansion", 10.0))
+	for index in inner_loop.size():
+		var toward_track := (centerline[index] - inner_loop[index]).normalized()
+		var point := inner_loop[index] + toward_track * float(spec.get("island_expansion", 10.0))
 		if point.distance_to(last) > 3.0:
 			expanded.append(point)
 			last = point
@@ -543,8 +543,6 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, island_polygon: P
 	barrier_collision.polygon = expanded
 	barrier.add_child(barrier_collision)
 
-	# Visual: the room minus the ribbon (fold-free surface, no synthetic outline)
-	var region := _island_region(room_polygon, ribbon, island_polygon)
 	var min_point := Vector2(INF, INF)
 	var max_point := Vector2(-INF, -INF)
 	for point: Vector2 in region:
@@ -575,18 +573,19 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, island_polygon: P
 
 static func _island_region(room_polygon: PackedVector2Array, ribbon: PackedVector2Array, hint_polygon: PackedVector2Array) -> PackedVector2Array:
 	var pieces: Array[PackedVector2Array] = Geometry2D.clip_polygons(room_polygon, ribbon)
+	var hint_centroid := Vector2.ZERO
+	for point: Vector2 in hint_polygon:
+		hint_centroid += point
+	hint_centroid /= float(hint_polygon.size())
 	var best := PackedVector2Array()
 	var best_score := -1.0
 	for piece: PackedVector2Array in pieces:
 		var score := 0.0
-		var hint_overlap := 0.0
 		for sample in 40:
-			var t := float(sample) / 40.0
-			var index := int(t * hint_polygon.size())
-			var hint_point: Vector2 = hint_polygon[index]
+			var index := int(float(sample) * float(hint_polygon.size()) / 40.0)
+			var hint_point: Vector2 = hint_polygon[index].lerp(hint_centroid, 0.3)
 			if Geometry2D.is_point_in_polygon(hint_point, piece):
-				hint_overlap += 1.0
-		score = hint_overlap
+				score += 1.0
 		if score > best_score:
 			best_score = score
 			best = piece
@@ -779,7 +778,7 @@ static func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: Pack
 		_add_prop_with_collision(root, position, 30.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
 
 
-static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector2Array, corridor: PackedVector2Array) -> void:
+static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
 	var textures: Array = spec.get("island_fill_textures", [])
 	if textures.is_empty():
 		return
@@ -801,10 +800,11 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 				min_point.y + float(row) * pitch + rng.randf_range(-12.0, 12.0))
 			if not Geometry2D.is_point_in_polygon(center, inner_loop):
 				continue
-			if Geometry2D.is_point_in_polygon(center, corridor):
+			var center_distance := _distance_to_centerline(center, centerline)
+			if center_distance < 125.0 + 40.0:
 				continue
 			for tier: float in [50.0, 36.0, 25.0, 15.0]:
-				if _cell_clear_of_corridor(center, tier, corridor):
+				if center_distance >= 125.0 + tier + 40.0:
 					buckets[tier].append(center)
 					break
 	var placed := {}
@@ -819,10 +819,10 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 		for texture in pool:
 			if cells.is_empty():
 				break
-			var cell: Vector2 = cells.pop_back() if false else cells.pop_front()
 			var texture_path := String(texture)
 			if used.get(texture_path, 0) >= 1:
 				continue
+			var cell: Vector2 = cells.pop_front()
 			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
 			used[texture_path] = used.get(texture_path, 0) + 1
 			placed[cell] = true
@@ -844,14 +844,16 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 static func _cell_clear_of_corridor(center: Vector2, radius: float, corridor: PackedVector2Array) -> bool:
 	for sample in 8:
 		var angle := TAU * float(sample) / 8.0
-		if Geometry2D.is_point_in_polygon(center + Vector2(cos(angle), sin(angle)) * (radius + 24.0), corridor):
+		if Geometry2D.is_point_in_polygon(center + Vector2(cos(angle), sin(angle)) * (radius + 40.0), corridor):
 			return false
 	return true
 
 
 static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, outer_loop: PackedVector2Array, corridor: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
 	# Props delimiting the OUTER side of the track: long flat props on straights,
-	# bulky props on corners, placed just outside the painted corridor.
+	# bulky props on corners, placed just outside the painted corridor. The
+	# corridor-band test is distance-to-centerline (polygon membership is
+	# unreliable inside the corridor's fold regions).
 	var long_pool: Array = spec.get("boundary_long", [])
 	var corner_pool: Array = spec.get("boundary_corner", [])
 	if long_pool.is_empty():
@@ -865,25 +867,29 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 		var ahead := centerline[(index + 8) % count] - centerline[(index - 8 + count) % count]
 		var turn := tangent.angle_to(ahead.normalized())
 		var is_corner := absf(turn) > 0.16
-		if is_corner:
-			index += 5
+		var offset := 78.0 if is_corner else 65.0
+		var radius := 34.0 if is_corner else 27.0
+		var position := outer_loop[index] + (outer_loop[index] - centerline[index]).normalized() * offset
+		if position.distance_to(centerline[0]) < 230.0:
+			index += 7
 			continue
-		var position := outer_loop[index] + (outer_loop[index] - centerline[index]).normalized() * 65.0
 		if not Geometry2D.is_point_in_polygon(position, room_polygon):
 			index += 7
 			continue
-		var prop_clear := true
-		for sample in 8:
-			var angle := TAU * float(sample) / 8.0
-			if Geometry2D.is_point_in_polygon(position + Vector2(cos(angle), sin(angle)) * 27.0, corridor):
-				prop_clear = false
-				break
-		if not prop_clear:
+		if _distance_to_centerline(position, centerline) < 150.0:
 			index += 7
 			continue
-		var texture_path := String(long_pool[rng.randi_range(0, long_pool.size() - 1)])
-		_add_boundary_prop(root, position, 27.0, texture_path, rng.randf_range(0.0, TAU))
+		var pool := corner_pool if is_corner else long_pool
+		var texture_path := String(pool[rng.randi_range(0, pool.size() - 1)])
+		_add_boundary_prop(root, position, radius, texture_path, rng.randf_range(0.0, TAU))
 		index += 7
+
+
+static func _distance_to_centerline(point: Vector2, centerline: PackedVector2Array) -> float:
+	var best := 999999.0
+	for sample: Vector2 in centerline:
+		best = minf(best, point.distance_to(sample))
+	return best
 
 
 static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
@@ -891,7 +897,7 @@ static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, t
 	prop.name = "BoundaryProp"
 	prop.position = position
 	prop.rotation = rotation
-	prop.collision_layer = 4
+	prop.collision_layer = 16
 	parent.add_child(prop)
 	var shape := CircleShape2D.new()
 	shape.radius = radius
@@ -914,7 +920,7 @@ static func _add_fill_prop(parent: Node, position: Vector2, radius: float, textu
 	prop.name = "IslandFill"
 	prop.position = position
 	prop.rotation = rotation
-	prop.collision_layer = 4
+	prop.collision_layer = 16
 	parent.add_child(prop)
 	_add_contact_shadow(prop, radius * 1.15)
 	var shape := CircleShape2D.new()
@@ -1184,7 +1190,7 @@ static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, 
 		sprite.position = centerline[index]
 		sprite.rotation = atan2(tangent.y, tangent.x)
 		sprite.scale = scale
-		sprite.modulate = Color(modulate_value, modulate_value, modulate_value)
+		sprite.modulate = Color(modulate_value, modulate_value, modulate_value, 0.62)
 		tiles.add_child(sprite)
 
 
