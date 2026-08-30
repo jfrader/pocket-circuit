@@ -26,7 +26,61 @@ static var PROP_SHAPES := {
 	"hazard_office_cable.png": {"shape": "rect", "size": Vector2(84.0, 24.0)},
 	"hazard_workshop_socket.png": {"shape": "rect", "size": Vector2(84.0, 24.0)},
 	"cutting_board.png": {"shape": "rect", "size": Vector2(84.0, 52.0)},
-	"frying_pan.png": {"shape": "circle", "size": Vector2.ZERO},
+	"screwdriver.png": {"shape": "rect", "size": Vector2(46.0, 18.0)},
+	"stapler_top.png": {"shape": "rect", "size": Vector2(50.0, 28.0)},
+	"pencil.png": {"shape": "rect", "size": Vector2(42.0, 13.0)},
+	"crayons.png": {"shape": "rect", "size": Vector2(36.0, 24.0)},
+	"scissors_top.png": {"shape": "rect", "size": Vector2(44.0, 32.0)},
+	"matchbox.png": {"shape": "rect", "size": Vector2(30.0, 22.0)},
+	"fork_cartoon.png": {"shape": "rect", "size": Vector2(36.0, 12.0)},
+	"spoon_bridge.png": {"shape": "rect", "size": Vector2(32.0, 11.0)},
+	"kitchen_ruler.png": {"shape": "rect", "size": Vector2(96.0, 30.0)},
+	"frying_pan.png": {"shape": "circle", "size": Vector2(64.0, 64.0)},
+	"barrel_wood.png": {"shape": "circle", "size": Vector2(92.0, 92.0)},
+	"flower_pot.png": {"shape": "circle", "size": Vector2(72.0, 72.0)},
+	"basketball.png": {"shape": "circle", "size": Vector2(56.0, 56.0)},
+	"soccer_ball.png": {"shape": "circle", "size": Vector2(52.0, 52.0)},
+	"football.png": {"shape": "circle", "size": Vector2(56.0, 56.0)},
+	"watermelon.png": {"shape": "circle", "size": Vector2(84.0, 84.0)},
+	"hose_coil.png": {"shape": "circle", "size": Vector2(96.0, 96.0)},
+	"teapot_top.png": {"shape": "circle", "size": Vector2(68.0, 68.0)},
+	"mug_top.png": {"shape": "circle", "size": Vector2(38.0, 38.0)},
+	"bottle_top.png": {"shape": "circle", "size": Vector2(32.0, 32.0)},
+	"plate_stack.png": {"shape": "circle", "size": Vector2(60.0, 60.0)},
+	"vase_top.png": {"shape": "circle", "size": Vector2(46.0, 46.0)},
+	"lamp_desk.png": {"shape": "circle", "size": Vector2(52.0, 52.0)},
+	"plant_small.png": {"shape": "circle", "size": Vector2(46.0, 46.0)},
+	"tape_roll.png": {"shape": "circle", "size": Vector2(38.0, 38.0)},
+	"teacup_saucer.png": {"shape": "circle", "size": Vector2(42.0, 42.0)},
+	"salt_shaker.png": {"shape": "circle", "size": Vector2(26.0, 26.0)},
+	"cup_cartoon.png": {"shape": "circle", "size": Vector2(32.0, 32.0)},
+	"kitchen_cup.png": {"shape": "circle", "size": Vector2(32.0, 32.0)},
+	"mug_blue.png": {"shape": "circle", "size": Vector2(34.0, 34.0)},
+	"kitchen_mug_blue.png": {"shape": "circle", "size": Vector2(34.0, 34.0)},
+	"kitchen_mug_hero.png": {"shape": "circle", "size": Vector2(34.0, 34.0)},
+	"cereal_tower_green.png": {"shape": "circle", "size": Vector2(42.0, 42.0)},
+	"kitchen_cereal_green.png": {"shape": "circle", "size": Vector2(42.0, 42.0)},
+	"kitchen_cereal_orange.png": {"shape": "circle", "size": Vector2(42.0, 42.0)},
+	"apple_cartoon.png": {"shape": "circle", "size": Vector2(26.0, 26.0)},
+	"hazard_kitchen_apple.png": {"shape": "circle", "size": Vector2(26.0, 26.0)},
+	"lime_cartoon.png": {"shape": "circle", "size": Vector2(24.0, 24.0)},
+	"kitchen_lime.png": {"shape": "circle", "size": Vector2(24.0, 24.0)},
+	"strawberry.png": {"shape": "circle", "size": Vector2(18.0, 18.0)},
+	"bolt.png": {"shape": "circle", "size": Vector2(22.0, 22.0)},
+	"screw.png": {"shape": "circle", "size": Vector2(16.0, 16.0)},
+	"coin.png": {"shape": "circle", "size": Vector2(12.0, 12.0)},
+	"paperclip.png": {"shape": "circle", "size": Vector2(14.0, 14.0)},
+	"office_keycap.png": {"shape": "circle", "size": Vector2(26.0, 26.0)},
+	"keys_ring.png": {"shape": "circle", "size": Vector2(24.0, 24.0)},
+	"napkin.png": {"shape": "circle", "size": Vector2(32.0, 32.0)},
+	"sponge_wet.png": {"shape": "circle", "size": Vector2(36.0, 36.0)},
+	"kitchen_sponge.png": {"shape": "circle", "size": Vector2(36.0, 36.0)},
+	"kitchen_fork.png": {"shape": "rect", "size": Vector2(36.0, 12.0)},
+	"kitchen_spoon.png": {"shape": "rect", "size": Vector2(32.0, 11.0)},
+	"workshop_paint_can.png": {"shape": "circle", "size": Vector2(40.0, 40.0)},
+	"workshop_toolbox_top_bright.jpg": {"shape": "circle", "size": Vector2(120.0, 120.0)},
+	"office_keyboard_top_bright.jpg": {"shape": "circle", "size": Vector2(120.0, 120.0)},
+	"plate_large.png": {"shape": "circle", "size": Vector2(130.0, 130.0)},
 }
 
 const LAYOUTS := {
@@ -963,6 +1017,14 @@ static func _distance_to_centerline(point: Vector2, centerline: PackedVector2Arr
 	return best
 
 
+static func _prop_visual_size(texture_path: String, fallback_diameter: float) -> float:
+	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+	var size: Vector2 = entry.get("size", Vector2.ZERO)
+	if size.x > 0.0 or size.y > 0.0:
+		return maxf(size.x, size.y)
+	return fallback_diameter
+
+
 static func _add_shape_collision(parent: Node, texture_path: String, scale_radius: float) -> void:
 	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
 	if entry.get("shape", "circle") == "rect":
@@ -1013,7 +1075,8 @@ static func _add_fill_prop(parent: Node, position: Vector2, radius: float, textu
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (radius * 2.2 / maxf(longest, 1.0))
+		var visual := _prop_visual_size(texture_path, radius * 2.2)
+		sprite.scale = Vector2.ONE * (visual / maxf(longest, 1.0))
 		prop.add_child(sprite)
 
 
