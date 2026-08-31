@@ -20,6 +20,11 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Designed island vignettes: each island now hosts one authored scene per
+  theme chosen by seed — a tool project (barrel, paint cans, hose coil,
+  tools, sawdust), a breakfast setting (teapot, mugs, plate stack, utensils,
+  crumbs), a desk scene (lamp, mug, book, remote, pencils, papers) — with a
+  light scatter of tiny items for life, replacing the random prop grid.
 - Big-prop dominance, for real this time: the huge tier pools were missing
   from the specs entirely (the earlier claim was wrong), and the repeat loop
   capped after a handful of placements. Now: six huge prop types per theme,
