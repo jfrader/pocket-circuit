@@ -18,6 +18,79 @@ static var ROOM_SHAPES := {
 	"square": PackedVector2Array([Vector2(-750, -750), Vector2(750, -750), Vector2(750, 750), Vector2(-750, 750)]),
 }
 
+static var ISLAND_VIGNETTES := {
+	&"kitchen": [
+		[
+			{"tex": "res://assets/textures/imagine/teapot_top.png", "pos": Vector2(-0.15, -0.25), "rot": 0.2},
+			{"tex": "res://assets/textures/imagine/mug_top.png", "pos": Vector2(0.35, -0.3), "rot": -0.4},
+			{"tex": "res://assets/textures/kitchen/mug_blue.png", "pos": Vector2(0.55, -0.15), "rot": 0.9},
+			{"tex": "res://assets/textures/imagine/plate_stack.png", "pos": Vector2(-0.45, 0.3), "rot": 0.05},
+			{"tex": "res://assets/textures/kitchen/fork_cartoon.png", "pos": Vector2(-0.28, 0.42), "rot": -0.6},
+			{"tex": "res://assets/textures/kitchen/spoon_bridge.png", "pos": Vector2(-0.1, 0.48), "rot": -0.5},
+			{"tex": "res://assets/textures/imagine/teacup_saucer.png", "pos": Vector2(0.15, -0.45), "rot": 0.3},
+			{"tex": "res://assets/textures/imagine/salt_shaker.png", "pos": Vector2(0.5, 0.35), "rot": 0.1},
+			{"tex": "res://assets/textures/imagine/crumb_cluster.png", "pos": Vector2(-0.3, 0.05), "rot": 0.0, "decal": true},
+			{"tex": "res://assets/textures/imagine/stain_ring.png", "pos": Vector2(0.35, -0.1), "rot": 0.0, "decal": true},
+		],
+		[
+			{"tex": "res://assets/textures/imagine/watermelon.png", "pos": Vector2(0.1, 0.2), "rot": 0.4},
+			{"tex": "res://assets/textures/imagine/vase_top.png", "pos": Vector2(-0.4, -0.25), "rot": 0.0},
+			{"tex": "res://assets/textures/kitchen/mug_hero.png", "pos": Vector2(0.5, -0.3), "rot": -0.2},
+			{"tex": "res://assets/textures/imagine/plate_stack.png", "pos": Vector2(-0.15, 0.35), "rot": -0.1},
+			{"tex": "res://assets/textures/kitchen/spoon_bridge.png", "pos": Vector2(-0.05, 0.45), "rot": -0.8},
+			{"tex": "res://assets/textures/imagine/teacup_saucer.png", "pos": Vector2(0.55, 0.15), "rot": 0.6},
+			{"tex": "res://assets/textures/imagine/crumb_cluster.png", "pos": Vector2(0.2, -0.4), "rot": 0.0, "decal": true},
+			{"tex": "res://assets/textures/imagine/stain_ring.png", "pos": Vector2(-0.45, 0.15), "rot": 0.0, "decal": true},
+		],
+	],
+	&"workshop": [
+		[
+			{"tex": "res://assets/textures/imagine/barrel_wood.png", "pos": Vector2(0.25, 0.15), "rot": 0.1},
+			{"tex": "res://assets/textures/imagine/workshop_paint_can.png", "pos": Vector2(-0.4, -0.2), "rot": -0.3},
+			{"tex": "res://assets/textures/imagine/workshop_paint_can.png", "pos": Vector2(-0.25, -0.4), "rot": 0.5},
+			{"tex": "res://assets/textures/imagine/hose_coil.png", "pos": Vector2(-0.35, 0.35), "rot": -0.2},
+			{"tex": "res://assets/textures/imagine/wrench.png", "pos": Vector2(0.5, -0.35), "rot": 1.2},
+			{"tex": "res://assets/textures/imagine/hammer.png", "pos": Vector2(0.15, -0.45), "rot": -1.0},
+			{"tex": "res://assets/textures/imagine/screwdriver.png", "pos": Vector2(0.55, 0.05), "rot": -0.7},
+			{"tex": "res://assets/textures/imagine/sawdust_patch.png", "pos": Vector2(-0.05, 0.05), "rot": 0.0, "decal": true},
+			{"tex": "res://assets/textures/imagine/oil_stain.png", "pos": Vector2(0.4, 0.4), "rot": 0.0, "decal": true},
+		],
+		[
+			{"tex": "res://assets/textures/imagine/teapot_top.png", "pos": Vector2(-0.3, -0.15), "rot": 0.0},
+			{"tex": "res://assets/textures/imagine/flower_pot.png", "pos": Vector2(0.45, -0.25), "rot": 0.2},
+			{"tex": "res://assets/textures/imagine/basketball.png", "pos": Vector2(0.15, 0.4), "rot": 0.0},
+			{"tex": "res://assets/textures/imagine/workshop_paint_can.png", "pos": Vector2(-0.5, 0.25), "rot": 0.4},
+			{"tex": "res://assets/textures/imagine/hammer.png", "pos": Vector2(0.0, -0.45), "rot": 1.4},
+			{"tex": "res://assets/textures/imagine/screwdriver.png", "pos": Vector2(0.55, 0.3), "rot": -0.4},
+			{"tex": "res://assets/textures/imagine/sawdust_patch.png", "pos": Vector2(0.2, -0.15), "rot": 0.0, "decal": true},
+			{"tex": "res://assets/textures/imagine/oil_stain.png", "pos": Vector2(-0.15, 0.3), "rot": 0.0, "decal": true},
+		],
+	],
+	&"office": [
+		[
+			{"tex": "res://assets/textures/imagine/lamp_desk.png", "pos": Vector2(-0.35, -0.3), "rot": 0.0},
+			{"tex": "res://assets/textures/imagine/mug_top.png", "pos": Vector2(0.3, -0.4), "rot": 0.4},
+			{"tex": "res://assets/textures/imagine/book_top.png", "pos": Vector2(0.5, 0.2), "rot": -0.3},
+			{"tex": "res://assets/textures/imagine/remote_control.png", "pos": Vector2(-0.15, 0.45), "rot": 0.15},
+			{"tex": "res://assets/textures/imagine/pencil.png", "pos": Vector2(0.05, -0.2), "rot": -0.9},
+			{"tex": "res://assets/textures/imagine/stapler_top.png", "pos": Vector2(-0.5, 0.05), "rot": 0.6},
+			{"tex": "res://assets/textures/imagine/paper_sheet.png", "pos": Vector2(0.1, 0.15), "rot": 0.1, "decal": true},
+			{"tex": "res://assets/textures/imagine/stain_ring.png", "pos": Vector2(0.35, 0.35), "rot": 0.0, "decal": true},
+		],
+		[
+			{"tex": "res://assets/textures/imagine/tape_roll.png", "pos": Vector2(0.45, -0.3), "rot": 0.3},
+			{"tex": "res://assets/textures/imagine/plate_stack.png", "pos": Vector2(-0.35, 0.3), "rot": 0.0},
+			{"tex": "res://assets/textures/imagine/bottle_top.png", "pos": Vector2(-0.15, -0.4), "rot": 0.0},
+			{"tex": "res://assets/textures/imagine/mug_top.png", "pos": Vector2(0.2, 0.4), "rot": -0.3},
+			{"tex": "res://assets/textures/imagine/scissors_top.png", "pos": Vector2(0.55, 0.1), "rot": 0.9},
+			{"tex": "res://assets/textures/imagine/pencil.png", "pos": Vector2(-0.5, -0.1), "rot": 0.5},
+			{"tex": "res://assets/textures/imagine/paper_sheet.png", "pos": Vector2(-0.1, 0.05), "rot": -0.15, "decal": true},
+			{"tex": "res://assets/textures/imagine/stain_ring.png", "pos": Vector2(0.4, -0.05), "rot": 0.0, "decal": true},
+		],
+	],
+}
+
+
 static var PROP_SHAPES := {
 	"ruler_plank.png": {"shape": "rect", "size": Vector2(110.0, 34.0)},
 	"kitchen_ruler.png": {"shape": "rect", "size": Vector2(110.0, 34.0)},
@@ -970,105 +1043,67 @@ static func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: Pack
 
 
 static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
-	var textures: Array = spec.get("island_fill_textures", [])
-	if textures.is_empty():
-		return
+	# The island hosts one authored VIGNETTE per theme (a designed scene, not a
+	# random scatter): focal props at hand-authored offsets from the centroid,
+	# plus a scatter of tiny many-items for life. The vignette is chosen by the
+	# seed so it stays procedural but always reads as a scene.
+	var vignettes: Array = []
+	match String(spec.get("root_name", "")):
+		"WorkshopWorkbench":
+			vignettes = ISLAND_VIGNETTES[&"workshop"]
+		"OfficeDesk":
+			vignettes = ISLAND_VIGNETTES[&"office"]
+		_:
+			vignettes = ISLAND_VIGNETTES[&"kitchen"]
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(spec.get("seed", 0))
+	var vignette: Array = vignettes[posmod(int(spec.get("seed", 0)), vignettes.size())]
 	var min_point := Vector2(INF, INF)
 	var max_point := Vector2(-INF, -INF)
 	for point: Vector2 in inner_loop:
-		min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
-		max_point = Vector2(maxf(max_point.x, point.x), maxf(max_point.y, point.y))
-	var pitch := 84.0
-	# Bucket valid cells by how much prop clearance the corridor leaves there:
-	# deep-center cells may host big items, edge cells only small ones.
-	var buckets := {15.0: PackedVector2Array(), 25.0: PackedVector2Array(), 36.0: PackedVector2Array(), 50.0: PackedVector2Array(), 72.0: PackedVector2Array()}
-	for row in range(int(ceil((max_point.y - min_point.y) / pitch)) + 1):
-		for column in range(int(ceil((max_point.x - min_point.x) / pitch)) + 1):
-			var center := Vector2(
-				min_point.x + float(column) * pitch + rng.randf_range(-12.0, 12.0),
-				min_point.y + float(row) * pitch + rng.randf_range(-12.0, 12.0))
-			if not Geometry2D.is_point_in_polygon(center, inner_loop):
-				continue
-			var center_distance := _distance_to_centerline(center, centerline)
-			if center_distance < 125.0 + 40.0:
-				continue
-			for tier: float in [72.0, 50.0, 36.0, 25.0, 15.0]:
-				var rim := 28.0 if tier >= 50.0 else 40.0
-				if center_distance >= 125.0 + tier + rim:
-					buckets[tier].append(center)
-					break
-	var placed := {}
-	var used := {}
-	# Pass 1: one of each huge/big/medium item. Huge items anchor the island's
-	# corner apexes (corner-cut blockers); the rest spread from the center.
+		min_point = min_point.min(point)
+		max_point = max_point.max(point)
 	var centroid := (min_point + max_point) * 0.5
-	var apexes := _island_apexes(inner_loop)
-	for tier: float in [72.0, 50.0, 36.0]:
-		var pool: Array = spec.get("island_fill_huge", []) if tier == 72.0 else (spec.get("island_fill_big", []) if tier == 50.0 else spec.get("island_fill_textures", []))
-		var cells: Array[Vector2] = []
-		cells.append_array(buckets[tier])
-		if tier == 72.0 and not apexes.is_empty():
-			cells.sort_custom(func(a: Vector2, b: Vector2) -> bool:
-				var a_best := 999999.0
-				var b_best := 999999.0
-				for apex: Vector2 in apexes:
-					a_best = minf(a_best, a.distance_to(apex))
-					b_best = minf(b_best, b.distance_to(apex))
-				return a_best < b_best)
-		else:
-			cells.sort_custom(func(a: Vector2, b: Vector2) -> bool: return a.distance_to(centroid) < b.distance_to(centroid))
-		var repeats_used := 0
-		for texture in pool:
-			if cells.is_empty():
-				break
-			var texture_path := String(texture)
-			if used.get(texture_path, 0) >= 1:
-				continue
-			var cell: Vector2 = cells.pop_front()
-			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
-			used[texture_path] = used.get(texture_path, 0) + 1
-			placed[cell] = true
-		# Keep filling the remaining big cells with repeats so genuinely big
-		# items dominate the island (each texture capped at 3 total).
-		if pool.is_empty():
+	var half_extent := (max_point - min_point) * 0.5
+	for entry: Dictionary in vignette:
+		var offset: Vector2 = entry["pos"]
+		var position := centroid + Vector2(offset.x * half_extent.x, offset.y * half_extent.y)
+		if not Geometry2D.is_point_in_polygon(position, inner_loop):
 			continue
-		var cap := 4 if tier >= 50.0 else 3
-		var fallback_pool: Array = spec.get("island_fill_big", []) if tier >= 50.0 else []
-		while not cells.is_empty():
-			var texture_path := String(pool[rng.randi_range(0, pool.size() - 1)])
-			if used.get(texture_path, 0) >= cap:
-				var found := false
-				for candidate: String in pool:
-					if used.get(candidate, 0) < cap:
-						texture_path = candidate
-						found = true
-						break
-				if not found:
-					if fallback_pool.is_empty():
-						break
-					pool = fallback_pool
-					fallback_pool = []
-					cap = 3
-					continue
-			var cell: Vector2 = cells.pop_front()
-			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
-			used[texture_path] = used.get(texture_path, 0) + 1
-			placed[cell] = true
-	# Pass 2: remaining cells get small/tiny props, each texture capped at 3
-	var small_pool: Array = spec.get("island_fill_small", [])
-	var tiny_pool: Array = spec.get("island_fill_tiny", [])
-	for tier: float in [25.0, 15.0]:
-		var pool := small_pool if tier == 25.0 else tiny_pool
-		for cell: Vector2 in buckets[tier]:
-			if placed.has(cell):
+		var center_distance := _distance_to_centerline(position, centerline)
+		if center_distance < 125.0 + 40.0:
+			continue
+		var texture_path := String(entry["tex"])
+		if bool(entry.get("decal", false)):
+			var sprite := Sprite2D.new()
+			sprite.name = "VignetteDecal"
+			sprite.texture = load(texture_path) as Texture2D
+			if sprite.texture == null:
+				sprite.free()
 				continue
-			var texture_path := String(pool[rng.randi_range(0, pool.size() - 1)]) if not pool.is_empty() else String(textures[0])
-			if used.get(texture_path, 0) >= 3:
-				continue
-			_add_fill_prop(root, cell, tier, texture_path, rng.randf_range(0.0, TAU))
-			used[texture_path] = used.get(texture_path, 0) + 1
+			sprite.position = position
+			sprite.rotation = float(entry.get("rot", 0.0))
+			sprite.scale = Vector2.ONE * rng.randf_range(0.7, 1.2)
+			sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.55, 0.8))
+			sprite.z_index = -13
+			root.add_child(sprite)
+			continue
+		var visual := _prop_visual_size(texture_path, 36.0)
+		var radius := minf(visual * 0.5, 52.0)
+		_add_fill_prop(root, position, radius, texture_path, float(entry.get("rot", 0.0)))
+	# Life: a scatter of tiny many-items (paperclips, coins, screws) around the vignette
+	var many_pool: Array = spec.get("island_fill_tiny", [])
+	if many_pool.is_empty():
+		many_pool = ["res://assets/textures/imagine/paperclip.png", "res://assets/textures/imagine/coin.png"]
+	for scatter in 12:
+		var position := centroid + Vector2(rng.randf_range(-0.85, 0.85) * half_extent.x, rng.randf_range(-0.85, 0.85) * half_extent.y)
+		if not Geometry2D.is_point_in_polygon(position, inner_loop):
+			continue
+		if _distance_to_centerline(position, centerline) < 125.0 + 40.0:
+			continue
+		var texture_path := String(many_pool[rng.randi_range(0, many_pool.size() - 1)])
+		var visual := _prop_visual_size(texture_path, 18.0)
+		_add_fill_prop(root, position, minf(visual * 0.5, 20.0), texture_path, rng.randf_range(0.0, TAU))
 
 
 static func _cell_clear_of_corridor(center: Vector2, radius: float, corridor: PackedVector2Array) -> bool:

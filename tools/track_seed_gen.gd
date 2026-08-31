@@ -71,8 +71,13 @@ static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Pa
 	var min_point_distance := float(profile.get("min_point_distance", 200.0))
 	var max_angle_deg := float(profile.get("max_angle_deg", 80.0))
 	var min_self_distance := float(profile.get("min_self_distance", 300.0))
+	var length_roll := float(posmod(seed, 5)) / 4.0
+	profile["min_loop_length"] = lerpf(2500.0, 4200.0, length_roll)
 	var min_loop_length := float(profile.get("min_loop_length", 1900.0))
 	var max_loop_length := float(profile.get("max_loop_length", 0.0))
+	if max_loop_length > 0.0:
+		profile["max_loop_length"] = lerpf(3200.0, 5500.0, length_roll)
+		max_loop_length = profile["max_loop_length"]
 	var point_count := int(profile.get("point_count", 0))
 	var displacement_min := float(profile.get("displacement_min", 0.05)) * float(profile.get("displacement_scale", 1.0))
 	var displacement_max := float(profile.get("displacement_max", 0.16)) * float(profile.get("displacement_scale", 1.0))
