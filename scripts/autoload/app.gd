@@ -3,10 +3,10 @@ extends Node
 const BOOT_SCENE := "res://scenes/boot/boot.tscn"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const CATALOG := preload("res://data/championship/catalog.gd")
-const CIRCUIT_ROSTER := preload("res://data/circuits/circuit_roster.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 const SHELL_SCRIPT := preload("res://scripts/ui/app_shell.gd")
 const AUDIO_DIRECTOR_SCRIPT := preload("res://scripts/audio/audio_director.gd")
+const PROCEDURAL_ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"long", &"square", &"el"]
 
 var current_race_session: Dictionary = {}
 var reduced_camera_shake := false
@@ -199,18 +199,17 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 
 
 func random_circuit_seed(theme: StringName) -> Dictionary:
-	# Every race generates a fresh circuit: a pure random seed, room chosen
-	# by the seed (the canvases stay varied). No curated whitelist.
 	var random := RandomNumberGenerator.new()
 	random.randomize()
 	var seed_value := random.randi_range(0, 999999)
-	var room := "classic"
-	match posmod(seed_value, 5):
-		1: room = "wide"
-		2: room = "tall"
-		3: room = "long"
-		4: room = "square"
-	return {"theme": String(theme), "room": room, "seed": seed_value}
+	return {"theme": String(theme), "room": String(circuit_room_for_seed(seed_value)), "seed": seed_value}
+
+
+func circuit_room_for_seed(seed: int) -> StringName:
+	# Canvas choice is deterministic but uses a mixed stream instead of seed % N,
+	# so it is independent from route family and length selection.
+	var mixed := ((seed * 1103515245 + 12345) ^ (seed << 7)) & 0x7FFFFFFF
+	return PROCEDURAL_ROOMS[posmod(mixed, PROCEDURAL_ROOMS.size())]
 
 
 func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String) -> void:
@@ -502,6 +501,9 @@ func _run_release_smoke() -> void:
 	if race_manager == null:
 		_release_smoke_fail("race manager is missing")
 		return
+	# Keep automated release verification independent from stale host input state.
+	if get_tree().paused:
+		race.call("_set_paused", false)
 	var race_frames_remaining := 900
 	while race_frames_remaining > 0 and not race_manager.is_running:
 		await get_tree().physics_frame

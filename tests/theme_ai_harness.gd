@@ -1,6 +1,7 @@
 extends SceneTree
 
 const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
+const TRACK_BUILDER := preload("res://tools/track_builder_core.gd")
 const CHECKPOINTS_PER_LAP := 8
 const MAX_PHYSICS_FRAMES := 2400
 const MAX_RECOVERIES_PER_LAP := 3
@@ -12,32 +13,49 @@ const THEME_SCENES: Dictionary = {
 }
 
 var _theme: StringName = &"kitchen"
+var _room: StringName = &"classic"
+var _seed := -1
+var _direction: StringName = &"both"
 
 
 func _initialize() -> void:
 	var env_theme := OS.get_environment("PC_THEME")
 	if env_theme in [&"workshop", &"office", &"kitchen"]:
 		_theme = StringName(env_theme)
+	var env_room := OS.get_environment("PC_ROOM")
+	if env_room in [&"classic", &"wide", &"tall", &"long", &"square", &"el"]:
+		_room = StringName(env_room)
+	var env_seed := OS.get_environment("PC_SEED")
+	if env_seed.is_valid_int():
+		_seed = int(env_seed)
+	var env_direction := OS.get_environment("PC_DIRECTION")
+	if env_direction in [&"forward", &"reverse", &"both"]:
+		_direction = StringName(env_direction)
 	call_deferred("_run_test")
 
 
 func _run_test() -> void:
-	print("THEME_AI_HARNESS theme=%s" % _theme)
+	print("THEME_AI_HARNESS track=%s" % _track_label())
 	if not await _verify_scene_contract():
 		return
-	if not await _run_direction(false):
+	if _direction != &"reverse" and not await _run_direction(false):
 		return
-	if not await _run_direction(true):
+	if _direction != &"forward" and not await _run_direction(true):
 		return
-	print("THEME_AI_HARNESS PASS %s" % _theme)
+	print("THEME_AI_HARNESS PASS %s" % _track_label())
 	quit(0)
 
 
 func _verify_scene_contract() -> bool:
 	var override := OS.get_environment("PC_TRACK_SCENE")
-	var scene_path := override if not override.is_empty() else String(THEME_SCENES[_theme])
-	var packed := load(scene_path) as PackedScene
-	if not _expect(packed != null, "%s track scene should exist" % _theme):
+	var packed: PackedScene
+	if _seed >= 0:
+		var built: Dictionary = TRACK_BUILDER.build_packed(_theme, _room, _seed)
+		packed = built.get("scene") as PackedScene
+	else:
+		var scene_path := override if not override.is_empty() else String(THEME_SCENES[_theme])
+		packed = load(scene_path) as PackedScene
+	if not _expect(packed != null, "%s track scene should exist" % _track_label()):
 		return false
 	var track := packed.instantiate()
 	root.add_child(track)
@@ -45,30 +63,30 @@ func _verify_scene_contract() -> bool:
 	for child: Node in track.get_children():
 		if child.is_in_group("track_checkpoints"):
 			checkpoints.append(child as Node2D)
-	if not _expect(checkpoints.size() >= 8, "%s should define a finish line and seven lap checkpoints" % _theme):
+	if not _expect(checkpoints.size() >= 8, "%s should define a finish line and seven lap checkpoints" % _track_label()):
 		return false
 	for obstacle_name: String in OBSTACLE_NAMES:
 		var obstacle := track.get_node_or_null(obstacle_name) as StaticBody2D
 		if obstacle == null:
 			continue
 		for checkpoint: Node2D in checkpoints:
-			if not _expect(obstacle.position.distance_to(checkpoint.position) >= 145.0, "%s obstacle %s should not block checkpoint %s (%.0f)" % [_theme, obstacle_name, checkpoint.name, obstacle.position.distance_to(checkpoint.position)]):
+			if not _expect(obstacle.position.distance_to(checkpoint.position) >= 145.0, "%s obstacle %s should not block checkpoint %s (%.0f)" % [_track_label(), obstacle_name, checkpoint.name, obstacle.position.distance_to(checkpoint.position)]):
 				return false
 	var finish: Area2D
 	for child: Node in track.get_children():
 		if child is Area2D and bool(child.get("is_finish_line")):
 			finish = child as Area2D
 			break
-	if not _expect(finish != null, "%s should define a finish-line checkpoint" % _theme):
+	if not _expect(finish != null, "%s should define a finish-line checkpoint" % _track_label()):
 		return false
 	var shape := (finish.get_node("CollisionShape2D") as CollisionShape2D).shape as RectangleShape2D
-	if not _expect(shape.size.x >= 272.0 or shape.size.y >= 272.0, "%s finish gate should span the corridor" % _theme):
+	if not _expect(shape.size.x >= 272.0 or shape.size.y >= 272.0, "%s finish gate should span the corridor" % _track_label()):
 		return false
 	for container_name: String in ["GridForward", "GridReverse"]:
-		if _theme == &"kitchen":
+		if _seed < 0 and _theme == &"kitchen":
 			continue
 		var container := track.get_node_or_null(container_name) as Node2D
-		if not _expect(container != null and container.get_child_count() == 4, "%s should place four %s spawn markers" % [_theme, container_name]):
+		if not _expect(container != null and container.get_child_count() == 4, "%s should place four %s spawn markers" % [_track_label(), container_name]):
 			return false
 	track.queue_free()
 	await process_frame
@@ -78,7 +96,10 @@ func _verify_scene_contract() -> bool:
 func _run_direction(reverse: bool) -> bool:
 	var direction_label := "reverse" if reverse else "forward"
 	var prototype := PROTOTYPE_SCENE.instantiate()
-	prototype.set("_session", {"event": {"theme": _theme, "reverse": reverse}})
+	var event := {"theme": _theme, "reverse": reverse}
+	if _seed >= 0:
+		event.merge({"circuit": "generated", "room": _room, "seed": _seed})
+	prototype.set("_session", {"event": event})
 	var manager := prototype.get_node("RaceManager") as RaceManager
 	manager.set_reverse_direction(reverse)
 	root.add_child(prototype)
@@ -114,7 +135,7 @@ func _run_direction(reverse: bool) -> bool:
 		print(
 			"THEME_AI_STATE %s %s %s checkpoints=%d expected=%d position=%s speed=%.1f recoveries=%d"
 			% [
-				_theme,
+				_track_label(),
 				direction_label,
 				racer.name,
 				int(checkpoint_counts.get(racer, 0)),
@@ -127,16 +148,16 @@ func _run_direction(reverse: bool) -> bool:
 	for racer: Node2D in ai_vehicles:
 		if not _expect(
 			int(checkpoint_counts.get(racer, 0)) >= CHECKPOINTS_PER_LAP,
-			"%s %s %s should complete a legal lap (checkpoints=%d)" % [_theme, direction_label, racer.name, int(checkpoint_counts.get(racer, 0))]
+			"%s %s %s should complete a legal lap (checkpoints=%d)" % [_track_label(), direction_label, racer.name, int(checkpoint_counts.get(racer, 0))]
 		):
 			return false
 		var controller := _get_ai_controller(racer)
 		if not _expect(
 			controller != null and controller.recovery_count <= MAX_RECOVERIES_PER_LAP,
-			"%s %s %s should not rely on repeated recovery (recoveries=%d)" % [_theme, direction_label, racer.name, controller.recovery_count if controller else -1]
+			"%s %s %s should not rely on repeated recovery (recoveries=%d)" % [_track_label(), direction_label, racer.name, controller.recovery_count if controller else -1]
 		):
 			return false
-	print("THEME_AI_DIRECTION_PASS %s %s frames=%d" % [_theme, direction_label, frame])
+	print("THEME_AI_DIRECTION_PASS %s %s frames=%d" % [_track_label(), direction_label, frame])
 	current_scene = null
 	prototype.queue_free()
 	await process_frame
@@ -161,6 +182,10 @@ func _get_ai_controller(racer: Node) -> AIVehicleController:
 		if child is AIVehicleController:
 			return child as AIVehicleController
 	return null
+
+
+func _track_label() -> String:
+	return "%s/%s/%d" % [_theme, _room, _seed] if _seed >= 0 else String(_theme)
 
 
 func _expect(condition: bool, message: String) -> bool:

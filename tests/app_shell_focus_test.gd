@@ -56,6 +56,15 @@ class TestApp extends Node:
 	func start_race(_event_id: String, _vehicle_id: String, _quick_race: bool) -> void:
 		pass
 
+	func random_circuit_seed(theme: StringName) -> Dictionary:
+		return {"theme": String(theme), "room": "classic", "seed": 24680}
+
+	func circuit_room_for_seed(_seed: int) -> StringName:
+		return &"classic"
+
+	func start_circuit_race(_theme: StringName, _room: StringName, _seed: int, _vehicle_id: String) -> void:
+		pass
+
 
 func _initialize() -> void:
 	call_deferred("_run_test")

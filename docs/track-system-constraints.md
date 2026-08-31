@@ -1,116 +1,160 @@
-# Procedural Track System — Constraints & Conventions
+# Procedural Track System - Constraints and Conventions
 
-Standing reference for anyone adding tracks, rooms, props, textures, or AI
-changes. All values below are load-bearing contracts discovered through
-harness verification — do not change them without re-running the gates listed
-in "Verification". History lives in the CHANGELOG, not here.
+Standing reference for anyone changing generated circuits, room canvases,
+household story kits, surfaces, collision, or racing-line AI. These contracts
+are load-bearing and must be reverified after changes. History belongs in the
+changelog, not here.
 
 ## Architecture
 
+```text
+tools/track_seed_gen.gd          requested seed + room -> deterministic route
+tools/track_builder_core.gd      route + story kit -> runtime PackedScene
+tools/build_procedural_track.gd  optional CLI for saved development snapshots
+scripts/race/prototype_race.gd   builds the requested circuit at race startup
 ```
-tools/track_seed_gen.gd        pure generator: seed → control-point loop
-tools/track_builder_core.gd    runtime+headless builder: loop → full scene
-tools/build_procedural_track.gd thin CLI (env-driven) that saves a .tscn
-scenes/tracks/circuits/        baked roster (AI-validated pool)
-```
 
-- The generator is deterministic: `generate(seed, rect, params)` is pure.
-  Invalid seeds are rejected and `generate_with_retries` walks to the next
-  valid one (max 40). The "used" seed is reported and must be used for
-  anything reproducible.
-- The builder core is **runtime-safe** (no SceneTree/editor deps). The race
-  loads a baked roster scene when it exists and builds the seed live
-  otherwise (`TrackBuilderCore.build_packed`). Any seed must build at
-  runtime.
-- Generation parameters are per-archetype + per-room; the builder's
-  `build_packed` owns the per-room overrides. Keep them together.
+- Generated races do not depend on a baked circuit roster or prebuilt scene
+  pool. Quick Race and championship events build arbitrary seeds live through
+  `TrackBuilderCore.build_packed`.
+- The three authored track scenes remain regression fixtures for their themed
+  collision and AI smoke tests. They are not a whitelist for generated play.
+- The builder is runtime-safe and headless-safe. It does not depend on the
+  editor or the active SceneTree.
 
-## Generator constraints (TrackSeedGen)
+## Seed Identity
 
-- Algorithm: random spread points → convex hull → displaced midpoints →
-  angle clamp → point separation → bounds clamp + re-separation → arc-length
-  resample (22 points) → post-resample angle clamp → validation.
-- **Never use the hard bounds clamp without the re-separation passes** — it
-  piles points on rect corners and folds the spline.
-- Validation: min loop length per archetype, **max loop length** for the
-  switchback (3200, now enforced), self-distance (corridor half-width 125 + margin),
-  whole loop inside the room polygon with margin.
-- Four archetypes (`posmod(seed, 4)`): fast (gentle 62°, long), technical
-  (82°, busy), asymmetric (side bias), switchback (84° — **do not exceed
-  ~84°; sharper turns fold the 125-wide corridor offset and the AI cannot
-  hold the line**). No figure-8/self-crossings: gate ordering breaks in
-  reverse.
+- `TrackSeedGen.generate_with_retries` keeps its historical name, but it never
+  walks to another seed. The requested seed is player-facing identity and is
+  immutable.
+- Family, target length, route variation, story kit, opening landmark, and room
+  canvas use independent deterministic streams. Changing the room must not
+  silently change a seed's selected family.
+- A seed gets up to 12 variants of its selected family. If those do not fit,
+  four deterministic conservative variants are attempted under the same seed
+  and family metadata.
+- Generated roots retain `requested_seed`, `family`, `realization`,
+  `generation_attempt`, `generation_fallback`, `story_id`, `loop_length`,
+  `theme`, and `room_shape` metadata.
 
-## Room canvases (ROOM_SHAPES)
+## Route Geometry
 
-classic 1750×1150 · wide 2350×900 · tall 1150×1450 · long 2600×800 ·
-square 1500×1500 · el (L-shape, loop lives in the left arm).
-Per-room tuning in `build_packed` (self-distance, displacement scale, sample
-rect, check margin) is mandatory for narrow/concave rooms. Rooms must stay
-under ~2700×1500 so the QA wide capture (zoom 0.46) never shows void.
+- Route families are `speed_loop`, `kidney`, `dogbone`, `broad_triangle`,
+  `offset_s`, and `deep_notch`.
+- Family templates are normalized closed silhouettes. They are mirrored,
+  oriented for the room, fitted, uniformly length-scaled, sampled into 24
+  controls, then exposed as a 260-point centerline.
+- The target-length stream spans roughly 2,500 to 5,500 units. A room may cap
+  the realized length when its physical canvas cannot fit the target safely.
+- Corridor half-width is 125 units. Validation reserves the complete 250-unit
+  corridor plus wall clearance, rejects centerline self-intersections, enforces
+  nonlocal self-distance, and keeps the route inside the room polygon.
+- L-shaped rooms use the dedicated `el_safe` realization. The route must occupy
+  both the upper-left arm and the right/lower extension while retaining the
+  seed-selected family metadata.
+- No figure-eight or self-crossing routes: checkpoint order and reverse racing
+  require one simple closed loop.
 
-## Track visuals (the "seamless" language)
+## Room Canvases
 
-- **No painted delimitation anywhere**: no edge lines, no dashed centerline,
-  no kerb blocks, no translucent zone overlays (surface-zone polygons are
-  set to Color.TRANSPARENT but keep their gameplay grip/speed modifiers).
-- The corridor = a subtle warm light tint (Color(1, 0.96, 0.88, ~0.17)) +
-  theme wear-strip tiles at 0.85 alpha. A distinct colored band was
-  explicitly rejected; a dark tint is invisible on dark floors.
-- Floor surfaces are full-bleed patterns per theme (gingham cloth, desk pad,
-  wood planks). Track strips are darker theme variants of the floor.
-- The checker start strip is the only allowed marking.
-- The office canonical (`scenes/tracks/office_desk.tscn`) is a **frozen
-  proven build**: do not regenerate it from the builder (its reverse
-  direction is AI-marginal and only that bake passes reliably).
+| Key | Canvas |
+|---|---|
+| `classic` | 1750 x 1150 rectangle |
+| `wide` | 2350 x 900 rectangle |
+| `tall` | 1150 x 1450 rectangle |
+| `long` | 2600 x 800 rectangle |
+| `square` | 1500 x 1500 rectangle |
+| `el` | 2000 x 1100 L-shaped polygon |
 
-## Props
+`App.circuit_room_for_seed` selects among all six with a mixed deterministic
+stream independent from family and target length.
 
-- Two asset scripts: `tools/gen_prop_assets.gd`, `tools/gen_prop_assets2.gd`
-  (SVG → PNG via `Image.load_svg_from_buffer`, 256px SVG at 4×). All prop
-  PNGs MUST have transparent backgrounds; floor/track tiles are the only
-  opaque assets. **Never put JPGs (toolbox/keyboard photos) in prop pools** —
-  they render as opaque rectangles.
-- `PROP_SHAPES` is the single source of truth for each prop's real-world
-  size (car ≈ 30u): rect entries (books, planks, rulers, tools) and circle
-  entries. Sizes follow real ratios (basketball ≈ 100 ≈ 2.3× a mug 44,
-  coin 12). Sprite scale and collider derive from this map — a prop must
-  never render at its cell's size.
-- Pools per theme: `island_fill_big/_textures/_small/_tiny`, `boundary_long`
-  (straights: rulers/planks/cables, aligned to the tangent), `boundary_corner`
-  (pots/plants — currently only placed ≥78u out; corner pots break the
-  office reverse AI, kept out of the canonical), `corner_giants` (oversized
-  set pieces at room corners), `decals`, `scatter_textures`.
-- Collision layers: 1 vehicles, 2 track/walls/barrier (AI probe mask),
-  layer 3 (value 4) player-collidable scenery the AI's probes ignore,
-  layer 5 (value 16) **dodge layer** — the AI feels and swerves these but
-  its racing-line probes don't read them as walls. Car masks: 22 (1|2|4|16).
-- Island = one big real object (toolbox/keyboard/plate texture) + a curated
-  fill: **one of each** big/medium item deep in the center (no 10-remotes),
-  small/tiny near the edges, rim clearance 40u from the corridor so the AI's
-  inside lines never graze props.
+## Household Stories
 
-## AI (scripts/vehicle/ai_vehicle_controller.gd)
+- `STORY_KITS` is the source of truth for generated dressing. Kitchen,
+  Workshop, and Office each provide four coherent stories.
+- Semantic quantities are literal: `unique` is exactly 1, `few` is 2-3, and
+  `many` is 8-20. A unique asset cannot repeat between the island, opening, and
+  corner landmarks in the same track.
+- Generated dressing is concentrated into authored moments rather than spread
+  as uniform noise: one island focal cluster, one object line, one sparse
+  delimiter, one or two corner landmarks, and one iconic opening landmark.
+- Asset dimensions and collider shapes come from `PROP_SHAPES`. Generated
+  story props must use transparent PNG textures, never opaque JPG rectangles.
+- Trackside placement must remain clear of checkpoint recovery corridors:
+  230 units along the route and 48 units across it, plus the prop radius.
 
-- Follows the baked `RacingLine` node (curvature-offset path, invisible)
-  with speed-dependent lookahead; corner speeds from the turn radius
-  (corner_constant × sqrt(radius), per difficulty). Falls back to
-  gate-chasing when the line node is absent (the frozen office scene).
-- Difficulty constants: sunday 0.86/8.6, club 1.10/10.9, clockwork
-  1.14/11.6. Bumping club above ~1.12 or the corner constant above ~11.5
-  has produced recovery flake in the harness.
-- Constraints that must hold: all three cars complete legal laps forward and
-  reverse with ≤2 stall-recoveries, on every track in the roster and on
-  random runtime seeds sampled from the validated pool.
+## Track Moments
 
-## Verification (run after any change here)
+Generated tracks implement the design contract in `game-design-spec.md` section
+11 as playable geometry and mechanics:
 
-1. `PC_THEME=workshop|office|kitchen` `theme_ai_harness.gd` — 3/3 passes.
-2. `ai_race_smoke_test.gd` — the office-reverse Milo flake is known (~30%);
-   re-run to confirm a pass.
-3. Full `tests/*_test.gd` suite.
-4. Roster changes: rebuild scenes via the CLI, then re-run the harness per
-   seed (parallel batches); prune seeds that fail twice.
-5. Wide captures (`PC_SEED=… --write-movie`, gamma 0.5 / saturation 1.2) +
-   a vision-agent review for any visual change.
-6. Keep `project.godot` release-clean (only the App autoload).
+- `OpeningLandmark`: one household focal prop near the opening sector.
+- `EarlyConflictForward` and `EarlyConflictReverse`: a telegraphed moving
+  hazard crossing the corridor 12-25% into the lap in either direction.
+- `TechnicalSurfaceMoment`: a full-width low-grip or low-speed zone on a
+  separated high-turn section.
+- `ShortcutDecision`: a visibly decaled inside lane that is geometrically
+  shorter and at least 1.06x faster, but has lower grip. The outer lane remains
+  longer and safe for every vehicle build.
+- `SpeedSection`: the unobstructed start/finish straight.
+- `DramaticFinish`: clear forward and reverse run-ups ending at the full-width
+  checker gate.
+
+`generated_moment_indices`, `generated_hazard_paths`, and
+`generated_surfaces` expose these contracts for runtime presentation and tests.
+The generated racing line deliberately takes the safe outer lane through the
+shortcut window; the shortcut remains a player choice rather than an AI trap.
+
+## Visual and Collision Language
+
+- No white edge lines, dashed centerlines, kerbs, painted route borders, or
+  translucent gameplay-zone overlays. Household objects and material changes
+  communicate the course. The checker is the only painted race marking.
+- Generated routes use the themed `TrackSurface` directly and must not add the
+  old `TrackRibbon`, whose triangulation produced artifacts in concave routes.
+- Surface gameplay polygons remain visually transparent. Their themed decals
+  show the technical section and risky shortcut lane.
+- Generated and authored inner barriers use closed `ConcavePolygonShape2D`
+  segment chains on a `StaticBody2D`; do not send a concave island through
+  convex polygon decomposition.
+- Generated roots persist in the `track` group so runtime AI can discover the
+  260-point `RacingLine`.
+- Collision layers remain: vehicles 1, walls/island 2, player-only scenery 4,
+  and AI-dodge scenery 16. The vehicle scene's base mask is 22 (`2 | 4 | 16`),
+  and race setup also enables layer 1 so cars collide with one another.
+
+## AI
+
+- AI follows the invisible curvature-offset `RacingLine` with speed-dependent
+  lookahead and curvature-limited speed.
+- Reverse events traverse the same line in reverse through
+  `RaceManager.is_reverse_direction`; never reverse only checkpoint order.
+- Generated shortcut windows move the AI target to the safe outer lane with a
+  tapered transition. This geometry is safe in both race directions.
+- Current pace/corner constants are Sunday Drive 0.86/8.6, Club Circuit
+  1.10/10.9, and Clockwork 1.14/11.6. Retune only with full forward and reverse
+  harness coverage.
+- Every AI vehicle must complete a legal lap with no more than three recoveries
+  in `theme_ai_harness.gd`.
+
+## Verification
+
+Run after generator, builder, surface, collision, or AI changes:
+
+1. `godot --headless --path . --script res://tests/track_seed_gen_test.gd`
+2. `godot --headless --path . --script res://tests/generated_track_composition_test.gd`
+3. `godot --headless --path . --script res://tests/generated_race_runtime_test.gd`
+4. Representative family/room seeds through `tests/theme_ai_harness.gd` in
+   both directions using `PC_THEME`, `PC_ROOM`, `PC_SEED`, and
+   `PC_DIRECTION=both`.
+5. `godot --headless --path . --script res://tests/ai_race_smoke_test.gd` for
+   the three authored regression tracks.
+6. A broad theme x room x seed construction stress matrix after geometry or
+   composition changes.
+7. Direct runtime captures for all six route families after visual changes.
+8. `tools/build_release.sh <clean-output-directory>` for the authoritative
+   import, complete test suite, scene smokes, native exports, packaged Linux
+   smoke, and PCK inspection.
+
+Keep `project.godot` release-clean with only the `App` autoload committed.

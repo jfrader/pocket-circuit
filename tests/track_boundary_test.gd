@@ -17,12 +17,14 @@ func _run_test() -> void:
 		return
 	if not _expect(barrier.collision_layer == 2, "the inner barrier should live on the track collision layer"):
 		return
-	var collision_shape: CollisionPolygon2D
-	for child: Node in barrier.get_children():
-		if child is CollisionPolygon2D:
-			collision_shape = child as CollisionPolygon2D
-			break
-	if not _expect(collision_shape != null and collision_shape.polygon.size() >= 6, "the inner barrier should cover the full painted island"):
+	var collision_shape := barrier.get_node_or_null("BoundaryCollision") as CollisionShape2D
+	var boundary_polygon: PackedVector2Array = barrier.get_meta("boundary_polygon", PackedVector2Array())
+	if not _expect(
+		collision_shape != null
+		and collision_shape.shape is ConcavePolygonShape2D
+		and boundary_polygon.size() >= 6,
+		"the inner barrier should cover the full painted island"
+	):
 		return
 
 	var island := track.get_node_or_null("IslandProp") as Polygon2D

@@ -25,6 +25,7 @@ var _event_id := ""
 var _quick_race := false
 var _map_act_number := 1
 var _quick_race_theme: StringName = &"workshop"
+var _quick_race_room: StringName = &"classic"
 var _quick_race_seed := -1
 var _content_tween: Tween
 var _entrance_generation := 0
@@ -166,7 +167,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_configure_stage(&"map", "rustbug", "rae", String(_quick_race_theme))
 	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
 	_add_heading("Build a circuit")
-	var room_status := _add_section("PICK A ROOM", "CURRENT · %s" % String(_quick_race_theme).to_upper())
+	var room_status := _add_section("PICK A THEME", "CURRENT · %s" % String(_quick_race_theme).to_upper())
 	var room_themes: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 	var room_buttons: Array[Button] = []
 	var selected_room_button: Button
@@ -185,7 +186,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 		room_buttons[theme_index].pressed.connect(
 			Callable(self, "_select_quick_race_theme").bind(room_themes[theme_index], room_buttons, room_status)
 		)
-	var seed_status := _add_section("CIRCUIT SEED", "SEED %d" % _quick_race_seed)
+	var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
 	var seed_controls := _add_quick_race_seed_controls(seed_status)
 	for room_button: Button in room_buttons:
 		room_button.focus_neighbor_bottom = room_button.get_path_to(seed_controls[0])
@@ -990,6 +991,7 @@ func _show_map_act(act_number: int) -> void:
 func _reset_quick_race_state() -> void:
 	_quick_race = false
 	_quick_race_theme = &"workshop"
+	_quick_race_room = &"classic"
 	_quick_race_seed = -1
 
 
@@ -1020,12 +1022,14 @@ func _commit_quick_race_seed_text(text: String, seed_edit: LineEdit, seed_status
 
 
 func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
+	_quick_race_room = StringName(_app.call("circuit_room_for_seed", _quick_race_seed))
 	seed_edit.text = str(_quick_race_seed)
-	seed_status.text = "SEED %d" % _quick_race_seed
+	seed_status.text = "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()]
 
 
 func _random_quick_race_seed() -> int:
 	var draw: Dictionary = _app.call("random_circuit_seed", _quick_race_theme)
+	_quick_race_room = StringName(draw.get("room", "classic"))
 	return int(draw.get("seed", 0))
 
 
@@ -1034,7 +1038,7 @@ func _start_quick_race() -> void:
 	var vehicle_id := String(progress.get("selected_vehicle", "rustbug"))
 	if not vehicle_id in progress.get("unlocked_vehicles", ["rustbug"]):
 		vehicle_id = "rustbug"
-	_app.call("start_circuit_race", _quick_race_theme, StringName("classic"), _quick_race_seed, vehicle_id)
+	_app.call("start_circuit_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id)
 
 
 func _start_with_vehicle(vehicle_id: String) -> void:

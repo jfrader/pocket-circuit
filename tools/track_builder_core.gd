@@ -8,6 +8,13 @@ const CHECKPOINT_SCENE := "res://scenes/race/checkpoint.tscn"
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
+const RECOVERY_LANE_HALF_LENGTH := 230.0
+const RECOVERY_LANE_HALF_WIDTH := 48.0
+const SHORTCUT_HALF_SPAN := 10
+const SHORTCUT_LANE_OFFSET := 70.0
+const SHORTCUT_LANE_HALF_WIDTH := 26.0
+const SAFE_RACING_LINE_OFFSET := 58.0
+const FINISH_APPROACH_SPAN := 20
 
 static var ROOM_SHAPES := {
 	"classic": PackedVector2Array([Vector2(-875, -575), Vector2(875, -575), Vector2(875, 575), Vector2(-875, 575)]),
@@ -91,6 +98,198 @@ static var ISLAND_VIGNETTES := {
 }
 
 
+## Generated tracks use one complete scene kit.  Unlike the legacy static-track
+## pools below, every asset in a kit belongs to the same household story.
+static var STORY_KITS := {
+	&"kitchen": [
+		{
+			"id": &"breakfast_service",
+			"island": [
+				{"asset": "res://assets/textures/imagine/stove_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/teacup_saucer.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(66, -12)},
+				{"asset": "res://assets/textures/imagine/kitchen_cereal_orange.png", "quantity": &"many", "count": 10, "formation": &"cluster", "offset": Vector2(16, 78)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 10},
+			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_spoon.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/teapot_top.png", "res://assets/textures/imagine/plate_stack.png"],
+			"surfaces": [
+				{"name": &"breakfast crumbs", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/crumb_cluster.png"},
+				{"name": &"tea spill", "grip": 0.56, "speed": 0.88, "decal": "res://assets/textures/kitchen/wet_spill.png"},
+			],
+		},
+		{
+			"id": &"vegetable_prep",
+			"island": [
+				{"asset": "res://assets/textures/kitchen/cutting_board.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-28, 0)},
+				{"asset": "res://assets/textures/imagine/frying_pan.png", "quantity": &"few", "count": 2, "formation": &"arc", "offset": Vector2(70, -22)},
+				{"asset": "res://assets/textures/kitchen/lime_cartoon.png", "quantity": &"many", "count": 12, "formation": &"cluster", "offset": Vector2(12, 78)},
+			],
+			"object_line": {"asset": "res://assets/textures/kitchen/apple_cartoon.png", "count": 12},
+			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/stove_top.png", "res://assets/textures/imagine/watermelon.png"],
+			"surfaces": [
+				{"name": &"prep crumbs", "grip": 0.8, "speed": 0.74, "decal": "res://assets/textures/kitchen/crumb_cluster_02.png"},
+				{"name": &"chopping spill", "grip": 0.6, "speed": 0.86, "decal": "res://assets/textures/kitchen/spill_decal.png"},
+			],
+		},
+		{
+			"id": &"afternoon_tea",
+			"island": [
+				{"asset": "res://assets/textures/imagine/teapot_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-30, -8)},
+				{"asset": "res://assets/textures/imagine/teacup_saucer.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(66, -6)},
+				{"asset": "res://assets/textures/imagine/strawberry.png", "quantity": &"many", "count": 14, "formation": &"arc", "offset": Vector2(4, 74)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/kitchen_spoon.png", "count": 10},
+			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/stove_top.png", "res://assets/textures/imagine/plate_stack.png"],
+			"surfaces": [
+				{"name": &"tea biscuits", "grip": 0.84, "speed": 0.78, "decal": "res://assets/textures/imagine/crumb_cluster.png"},
+				{"name": &"saucer spill", "grip": 0.54, "speed": 0.9, "decal": "res://assets/textures/kitchen/wet_spill.png"},
+			],
+		},
+		{
+			"id": &"counter_cleanup",
+			"island": [
+				{"asset": "res://assets/textures/imagine/plate_stack.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/kitchen/sponge_wet.png", "quantity": &"few", "count": 3, "formation": &"line", "offset": Vector2(62, -12)},
+				{"asset": "res://assets/textures/kitchen/cup_cartoon.png", "quantity": &"many", "count": 8, "formation": &"cluster", "offset": Vector2(8, 78)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 10},
+			"delimiter": {"asset": "res://assets/textures/kitchen/napkin.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/stove_top.png", "res://assets/textures/imagine/teapot_top.png"],
+			"surfaces": [
+				{"name": &"cleanup suds", "grip": 0.62, "speed": 0.82, "decal": "res://assets/textures/kitchen/spill_decal.png"},
+				{"name": &"wipe crumbs", "grip": 0.86, "speed": 0.8, "decal": "res://assets/textures/kitchen/crumb_cluster_01.png"},
+			],
+		},
+	],
+	&"workshop": [
+		{
+			"id": &"carpentry_bench",
+			"island": [
+				{"asset": "res://assets/textures/imagine/island_tool_tray.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/hammer.png", "quantity": &"few", "count": 2, "formation": &"line", "offset": Vector2(70, -8)},
+				{"asset": "res://assets/textures/imagine/screw.png", "quantity": &"many", "count": 16, "formation": &"cluster", "offset": Vector2(8, 76)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/screw.png", "count": 16},
+			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/bucket_stack.png", "res://assets/textures/imagine/barrel_wood.png"],
+			"surfaces": [
+				{"name": &"carpentry sawdust", "grip": 0.76, "speed": 0.7, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
+				{"name": &"bench oil", "grip": 0.46, "speed": 0.9, "decal": "res://assets/textures/imagine/oil_stain.png"},
+			],
+		},
+		{
+			"id": &"paint_station",
+			"island": [
+				{"asset": "res://assets/textures/imagine/bucket_stack.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/workshop_paint_can.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
+				{"asset": "res://assets/textures/imagine/bolt.png", "quantity": &"many", "count": 12, "formation": &"arc", "offset": Vector2(4, 78)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/bolt.png", "count": 14},
+			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/workshop_paint_can.png", "res://assets/textures/imagine/hose_coil.png"],
+			"surfaces": [
+				{"name": &"paint dust", "grip": 0.74, "speed": 0.72, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
+				{"name": &"paint station oil", "grip": 0.44, "speed": 0.88, "decal": "res://assets/textures/imagine/oil_stain.png"},
+			],
+		},
+		{
+			"id": &"repair_job",
+			"island": [
+				{"asset": "res://assets/textures/imagine/island_tool_tray.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/wrench.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
+				{"asset": "res://assets/textures/imagine/screw.png", "quantity": &"many", "count": 14, "formation": &"cluster", "offset": Vector2(4, 78)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/screw.png", "count": 14},
+			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/bucket_stack.png", "res://assets/textures/imagine/hose_coil.png"],
+			"surfaces": [
+				{"name": &"repair oil", "grip": 0.43, "speed": 0.9, "decal": "res://assets/textures/imagine/oil_stain.png"},
+				{"name": &"repair sawdust", "grip": 0.78, "speed": 0.7, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
+			],
+		},
+		{
+			"id": &"garage_sort",
+			"island": [
+				{"asset": "res://assets/textures/imagine/hose_coil.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/bucket_stack.png", "quantity": &"few", "count": 2, "formation": &"arc", "offset": Vector2(72, -8)},
+				{"asset": "res://assets/textures/imagine/bolt.png", "quantity": &"many", "count": 10, "formation": &"cluster", "offset": Vector2(4, 80)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/bolt.png", "count": 12},
+			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/barrel_wood.png", "res://assets/textures/imagine/workshop_paint_can.png"],
+			"surfaces": [
+				{"name": &"garage oil", "grip": 0.42, "speed": 0.88, "decal": "res://assets/textures/imagine/oil_stain.png"},
+				{"name": &"garage dust", "grip": 0.75, "speed": 0.68, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
+			],
+		},
+	],
+	&"office": [
+		{
+			"id": &"dual_workstation",
+			"island": [
+				{"asset": "res://assets/textures/imagine/monitor_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/island_keyboard.png", "quantity": &"few", "count": 2, "formation": &"line", "offset": Vector2(72, -8)},
+				{"asset": "res://assets/textures/imagine/paperclip.png", "quantity": &"many", "count": 16, "formation": &"cluster", "offset": Vector2(4, 78)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/paperclip.png", "count": 16},
+			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/lamp_desk.png", "res://assets/textures/imagine/book_top.png"],
+			"surfaces": [
+				{"name": &"workstation papers", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/paper_sheet.png"},
+				{"name": &"workstation coffee", "grip": 0.6, "speed": 0.86, "decal": "res://assets/textures/imagine/stain_ring.png"},
+			],
+		},
+		{
+			"id": &"mail_sort",
+			"island": [
+				{"asset": "res://assets/textures/imagine/book_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/stapler_top.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
+				{"asset": "res://assets/textures/imagine/paperclip.png", "quantity": &"many", "count": 14, "formation": &"cluster", "offset": Vector2(4, 78)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/paperclip.png", "count": 14},
+			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/monitor_top.png", "res://assets/textures/imagine/tape_roll.png"],
+			"surfaces": [
+				{"name": &"mail papers", "grip": 0.8, "speed": 0.74, "decal": "res://assets/textures/imagine/paper_sheet.png"},
+				{"name": &"mailroom coffee", "grip": 0.58, "speed": 0.86, "decal": "res://assets/textures/imagine/stain_ring.png"},
+			],
+		},
+		{
+			"id": &"sketch_session",
+			"island": [
+				{"asset": "res://assets/textures/imagine/crayons.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/scissors_top.png", "quantity": &"few", "count": 2, "formation": &"arc", "offset": Vector2(70, -8)},
+				{"asset": "res://assets/textures/imagine/pencil.png", "quantity": &"many", "count": 10, "formation": &"arc", "offset": Vector2(4, 80)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/pencil.png", "count": 10},
+			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/monitor_top.png", "res://assets/textures/imagine/lamp_desk.png"],
+			"surfaces": [
+				{"name": &"sketch papers", "grip": 0.83, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
+				{"name": &"sketch coffee", "grip": 0.61, "speed": 0.85, "decal": "res://assets/textures/imagine/stain_ring.png"},
+			],
+		},
+		{
+			"id": &"coffee_break",
+			"island": [
+				{"asset": "res://assets/textures/imagine/mug_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/imagine/book_top.png", "quantity": &"few", "count": 2, "formation": &"line", "offset": Vector2(70, -8)},
+				{"asset": "res://assets/textures/imagine/office_keycap.png", "quantity": &"many", "count": 12, "formation": &"cluster", "offset": Vector2(4, 78)},
+			],
+			"object_line": {"asset": "res://assets/textures/imagine/paperclip.png", "count": 12},
+			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
+			"landmarks": ["res://assets/textures/imagine/monitor_top.png", "res://assets/textures/imagine/lamp_desk.png"],
+			"surfaces": [
+				{"name": &"coffee papers", "grip": 0.81, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
+				{"name": &"coffee ring", "grip": 0.55, "speed": 0.84, "decal": "res://assets/textures/imagine/stain_ring.png"},
+			],
+		},
+	],
+}
+
+
 static var PROP_SHAPES := {
 	"ruler_plank.png": {"shape": "rect", "size": Vector2(110.0, 34.0)},
 	"kitchen_ruler.png": {"shape": "rect", "size": Vector2(110.0, 34.0)},
@@ -153,9 +352,14 @@ static var PROP_SHAPES := {
 	"wrench.png": {"shape": "rect", "size": Vector2(48.0, 20.0)},
 	"hammer.png": {"shape": "rect", "size": Vector2(50.0, 24.0)},
 	"workshop_paint_can.png": {"shape": "circle", "size": Vector2(52.0, 52.0)},
+	"island_tool_tray.png": {"shape": "rect", "size": Vector2(150.0, 150.0)},
+	"island_keyboard.png": {"shape": "rect", "size": Vector2(150.0, 150.0)},
 	"workshop_toolbox_top_bright.jpg": {"shape": "circle", "size": Vector2(130.0, 130.0)},
 	"office_keyboard_top_bright.jpg": {"shape": "circle", "size": Vector2(130.0, 130.0)},
 	"plate_large.png": {"shape": "circle", "size": Vector2(130.0, 130.0)},
+	"stove_top.png": {"shape": "rect", "size": Vector2(190.0, 190.0)},
+	"bucket_stack.png": {"shape": "circle", "size": Vector2(152.0, 152.0)},
+	"monitor_top.png": {"shape": "rect", "size": Vector2(168.0, 126.0)},
 }
 
 const LAYOUTS := {
@@ -501,26 +705,21 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 			"margin": 150.0,
 			"min_point_distance": 210.0,
 			"max_angle_deg": 80.0,
-			"min_self_distance": 280.0,
+			"min_self_distance": 250.0,
 			"min_loop_length": 1900.0,
 			"room_polygon": room_polygon,
+			"room_shape": room_shape,
 		}
 		match room_shape:
 			&"tall":
-				room_params["min_self_distance"] = 252.0
 				room_params["displacement_scale"] = 0.55
 			&"el":
-				room_params["min_self_distance"] = 220.0
 				room_params["displacement_scale"] = 0.5
 				room_params["min_loop_length"] = 1500.0
-				room_params["sample_rect"] = Rect2(-1000, -550, 1300, 1100)
-				room_params["room_check_margin"] = 2.0
 			&"long":
-				room_params["min_self_distance"] = 280.0
 				room_params["displacement_scale"] = 1.0
 				room_params["min_loop_length"] = 2000.0
 			&"square":
-				room_params["min_self_distance"] = 280.0
 				room_params["displacement_scale"] = 1.0
 				room_params["min_loop_length"] = 2200.0
 		var gen := TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
@@ -531,18 +730,40 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 		spec["controls"] = gen["points"]
 		spec["seed_obstacles"] = true
 		spec["seed"] = int(gen["seed"])
+		spec["requested_seed"] = seed
+		spec["family"] = StringName(gen["family"])
+		spec["realization"] = StringName(gen.get("realization", gen["family"]))
+		spec["generation_attempt"] = int(gen.get("attempt", 0))
+		spec["generation_fallback"] = bool(gen.get("fallback", false))
+		spec["loop_length"] = float(gen["length"])
+		var kits: Array = STORY_KITS.get(theme, STORY_KITS[&"kitchen"])
+		var kit_index := posmod(_mix_seed(seed, String(theme)), kits.size())
+		spec["story_kit"] = (kits[kit_index] as Dictionary).duplicate(true)
+		spec["story_id"] = StringName(spec["story_kit"]["id"])
 		spec["island_expansion"] = 10.0
 		spec.erase("gate_fractions")
 		used_seed = int(gen["seed"])
 	var root := Node2D.new()
 	root.name = String(spec["root_name"])
-	root.add_to_group("track")
+	root.add_to_group("track", true)
+	if spec.get("seed_obstacles", false):
+		root.set_meta("generated_track", true)
+		root.set_meta("requested_seed", int(spec["requested_seed"]))
+		root.set_meta("family", StringName(spec["family"]))
+		root.set_meta("realization", StringName(spec["realization"]))
+		root.set_meta("generation_attempt", int(spec["generation_attempt"]))
+		root.set_meta("generation_fallback", bool(spec["generation_fallback"]))
+		root.set_meta("story_id", StringName(spec["story_id"]))
+		root.set_meta("loop_length", float(spec["loop_length"]))
+		root.set_meta("theme", theme)
+		root.set_meta("room_shape", room_shape)
 	var centerline := _sample_centerline(spec["controls"])
 	var edges := _corridor_edges(centerline)
 	_build_scene(root, spec, centerline, edges, room_polygon, theme)
 	_mark_owned(root)
 	var packed := PackedScene.new()
 	packed.pack(root)
+	root.free()
 	return {"scene": packed, "seed": used_seed}
 
 
@@ -605,7 +826,11 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	for piece: PackedVector2Array in clipped_pieces:
 		if piece.size() > clipped.size():
 			clipped = piece
-	_add_polygon(root, "TrackRibbon", clipped, Color(1.0, 0.96, 0.88, 0.17), -10)
+	if not spec.get("seed_obstacles", false):
+		# Canonical tracks retain their authored painted base. Generated tracks use
+		# the themed TrackSurface directly; a translucent annular overlay produces
+		# visible triangulation fans in deep notches and L-shaped routes.
+		_add_polygon(root, "TrackRibbon", clipped, Color(1.0, 0.96, 0.88, 0.17), -10)
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
 		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30), float(spec.get("track_tile_modulate", 1.35)))
@@ -614,11 +839,19 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# define the course
 	var outer_loop := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
 	var inner_loop := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
-	var island_region := _island_region(room_polygon, clipped, inner_loop)
+	if spec.get("seed_obstacles", false):
+		inner_loop = _simple_island_loop(inner_loop)
+	# Generated centerlines are clearance-validated, so their inner offset is the
+	# authoritative island boundary. Boolean subtraction represents the annular
+	# ribbon as nested outer/hole polygons and can otherwise select the whole room
+	# as a solid collision body.
+	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) else _island_region(room_polygon, clipped, inner_loop)
 	_build_island_prop(root, spec, island_region, inner_loop, centerline)
 
-	# Giant set pieces at the room corners (Micro Machines scale cues)
-	_add_corner_set_pieces(root, spec, room_polygon, clipped)
+	# Legacy authored tracks keep their fixed room-corner dressing. Generated
+	# tracks choose landmarks from geometry-aware story moments below.
+	if not spec.get("seed_obstacles", false):
+		_add_corner_set_pieces(root, spec, room_polygon, clipped)
 
 	# Room walls (real furniture edges along the room outline)
 	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
@@ -688,25 +921,27 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		start - start_tangent * 120.0 + grid_normal * 45.0,
 	])
 
-	# Racing line the AI follows (curvature-offset ideal path, stored invisibly)
-	_build_racing_line(root, centerline)
-
-	# Dense collidable fill over the whole island interior (books, planks, hose…)
-	_fill_island(root, spec, inner_loop, centerline)
-
-	# Props delimiting the outer side of the track (long on straights, bulky on corners)
-	if not OS.get_environment("PC_NO_BOUNDARY") == "1":
-		_line_boundary_props(root, spec, centerline, outer_loop, clipped, room_polygon)
-	# A line of paperclips along the longest straight (many-item formation)
-	_add_paperclip_line(root, spec, centerline, outer_loop, room_polygon)
-	var decal_rng := RandomNumberGenerator.new()
-	decal_rng.seed = int(spec.get("seed", 0)) * 31 + 7
-	_scatter_decals(root, spec, room_polygon, corridor, decal_rng)
-
-	# Track obstacles (real props with collision)
+	var generated_moments := {}
 	if spec.get("seed_obstacles", false):
-		_scatter_seed_props(root, spec, centerline, clipped, gate_samples, room_polygon)
+		generated_moments = _analyze_track_moments(centerline, gate_samples)
+
+	# Racing line the AI follows (curvature-offset ideal path, stored invisibly).
+	# Generated AI stays on the safe side of the optional risk shortcut.
+	_build_racing_line(root, centerline, generated_moments)
+
+	if spec.get("seed_obstacles", false):
+		_compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments)
 	else:
+		# Canonical/static tracks retain their authored legacy dressing.
+		_fill_island(root, spec, inner_loop, centerline)
+		if not OS.get_environment("PC_NO_BOUNDARY") == "1":
+			_line_boundary_props(root, spec, centerline, outer_loop, clipped, room_polygon)
+		_add_paperclip_line(root, spec, centerline, outer_loop, room_polygon)
+		var decal_rng := RandomNumberGenerator.new()
+		decal_rng.seed = int(spec.get("seed", 0)) * 31 + 7
+		_scatter_decals(root, spec, room_polygon, corridor, decal_rng)
+
+		# Track obstacles (real props with collision)
 		var obstacles: Dictionary = spec["obstacles"]
 		for obstacle_name: String in obstacles:
 			var data: Dictionary = obstacles[obstacle_name]
@@ -717,27 +952,26 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		for prop: Dictionary in apron_props:
 			_add_prop_with_collision(root, prop["pos"], float(prop["r"]), String(prop["tex"]))
 
-	# Loose hardware line along the outer edge of the track wherever it turns
-	# away from the room walls (channels the racing line without invisible walls)
-	var outer_loop2 := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
-	var prop_textures := [
-		"res://assets/textures/kitchen/lime_cartoon.png",
-		"res://assets/textures/kitchen/apple_cartoon.png",
-		"res://assets/textures/imagine/hazard_workshop_socket.png",
-		"res://assets/textures/kitchen/sponge_wet.png",
-	]
-	var hardware_index := 0
-	for index in range(24, centerline.size() - 24, 6):
-		var tangent := (centerline[(index + 1) % centerline.size()] - centerline[(index - 1 + centerline.size()) % centerline.size()]).normalized()
-		if absf(tangent.x) < 0.45 or absf(tangent.y) < 0.45:
-			continue
-		var outward := (outer_loop2[index] - centerline[index]).normalized()
-		var prop_position := centerline[index] + outward * 175.0
-		if not Geometry2D.is_point_in_polygon(prop_position, room_polygon):
-			continue
-		if not Geometry2D.is_point_in_polygon(prop_position, corridor):
-			_add_prop_with_collision(root, prop_position, 30.0, prop_textures[hardware_index % prop_textures.size()])
-			hardware_index += 1
+		# The old cross-theme hardware edge belongs only to canonical static tracks.
+		var outer_loop2 := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
+		var prop_textures := [
+			"res://assets/textures/kitchen/lime_cartoon.png",
+			"res://assets/textures/kitchen/apple_cartoon.png",
+			"res://assets/textures/imagine/hazard_workshop_socket.png",
+			"res://assets/textures/kitchen/sponge_wet.png",
+		]
+		var hardware_index := 0
+		for index in range(24, centerline.size() - 24, 6):
+			var tangent := (centerline[(index + 1) % centerline.size()] - centerline[(index - 1 + centerline.size()) % centerline.size()]).normalized()
+			if absf(tangent.x) < 0.45 or absf(tangent.y) < 0.45:
+				continue
+			var outward := (outer_loop2[index] - centerline[index]).normalized()
+			var prop_position := centerline[index] + outward * 175.0
+			if not Geometry2D.is_point_in_polygon(prop_position, room_polygon):
+				continue
+			if not Geometry2D.is_point_in_polygon(prop_position, corridor):
+				_add_prop_with_collision(root, prop_position, 30.0, prop_textures[hardware_index % prop_textures.size()])
+				hardware_index += 1
 
 
 	# Start banner above the finish line
@@ -746,20 +980,42 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 
 static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
 	var expanded := PackedVector2Array()
-	var last := Vector2(INF, INF)
-	for index in inner_loop.size():
-		var toward_track := (centerline[index] - inner_loop[index]).normalized()
-		var point := inner_loop[index] + toward_track * float(spec.get("island_expansion", 10.0))
-		if point.distance_to(last) > 3.0:
-			expanded.append(point)
-			last = point
+	if spec.get("seed_obstacles", false):
+		# Geometry2D already returns a simple central polygon. Procedural concave
+		# loops can make a naively offset inner centerline self-intersect, which is
+		# not a valid CollisionPolygon2D; use the clipped island itself instead.
+		expanded = region.duplicate()
+	else:
+		var last := Vector2(INF, INF)
+		for index in inner_loop.size():
+			var toward_track := (centerline[index] - inner_loop[index]).normalized()
+			var point := inner_loop[index] + toward_track * float(spec.get("island_expansion", 10.0))
+			if point.distance_to(last) > 3.0:
+				expanded.append(point)
+				last = point
 	var barrier := StaticBody2D.new()
 	barrier.name = "InnerBarrier"
 	barrier.collision_layer = 2
+	barrier.set_meta("boundary_polygon", expanded)
 	root.add_child(barrier)
-	var barrier_collision := CollisionPolygon2D.new()
-	barrier_collision.polygon = expanded
-	barrier.add_child(barrier_collision)
+	if spec.get("seed_obstacles", false):
+		# A generated inner offset can be concave enough that solid polygon
+		# decomposition fails. A closed concave segment chain is valid on a static
+		# body and still makes the household island a physical boundary.
+		var segments := PackedVector2Array()
+		for index in expanded.size():
+			segments.append(expanded[index])
+			segments.append(expanded[(index + 1) % expanded.size()])
+		var boundary_shape := ConcavePolygonShape2D.new()
+		boundary_shape.segments = segments
+		var boundary_collision := CollisionShape2D.new()
+		boundary_collision.name = "BoundaryCollision"
+		boundary_collision.shape = boundary_shape
+		barrier.add_child(boundary_collision)
+	else:
+		var barrier_collision := CollisionPolygon2D.new()
+		barrier_collision.polygon = expanded
+		barrier.add_child(barrier_collision)
 
 	var min_point := Vector2(INF, INF)
 	var max_point := Vector2(-INF, -INF)
@@ -831,6 +1087,21 @@ static func _polygon_area(points: PackedVector2Array) -> float:
 		var next := (index + 1) % points.size()
 		total += points[index].x * points[next].y - points[next].x * points[index].y
 	return total * 0.5
+
+
+static func _simple_island_loop(points: PackedVector2Array) -> PackedVector2Array:
+	# Normal offsets fold over themselves at concave corners. Running the contour
+	# through Clipper splits those folds into simple polygons; the largest contour
+	# is the central island and the smaller pieces are offset artifacts.
+	var pieces: Array[PackedVector2Array] = Geometry2D.intersect_polygons(points, points)
+	var result := PackedVector2Array()
+	var largest_area := 0.0
+	for piece: PackedVector2Array in pieces:
+		var area := absf(_polygon_area(piece))
+		if piece.size() >= 3 and area > largest_area:
+			result = piece
+			largest_area = area
+	return result if not result.is_empty() else points
 
 
 static func _arc_lengths(centerline: PackedVector2Array) -> PackedFloat32Array:
@@ -1044,6 +1315,1039 @@ static func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: Pack
 		_add_prop_with_collision(root, position, 30.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
 
 
+static func _compose_generated_story(
+		root: Node2D,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		inner_loop: PackedVector2Array,
+		outer_loop: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		moments: Dictionary
+) -> void:
+	var story: Dictionary = spec["story_kit"]
+	var container := Node2D.new()
+	container.name = "GeneratedMoments"
+	container.set_meta("story_id", StringName(story["id"]))
+	root.add_child(container)
+
+	var occupied: Array[Dictionary] = []
+	var opening_index := _build_opening_landmark(
+		container,
+		story,
+		spec,
+		centerline,
+		outer_loop,
+		room_polygon,
+		gate_samples,
+		occupied
+	)
+	var reserved_unique_assets := {}
+	for formation_data: Dictionary in story["island"]:
+		if StringName(formation_data["quantity"]) == &"unique":
+			reserved_unique_assets[String(formation_data["asset"])] = true
+	var opening := container.get_node("OpeningLandmark")
+	if int(opening.get_meta("placed_count", 0)) == 1:
+		reserved_unique_assets[String(opening.get_meta("asset_path", ""))] = true
+	_build_island_story(container, story, spec, centerline, inner_loop, room_polygon, gate_samples, occupied)
+	_build_track_formation(
+		container,
+		"ObjectLine",
+		story["object_line"],
+		&"many",
+		int(moments["longest_straight"]),
+		centerline,
+		outer_loop,
+		room_polygon,
+		gate_samples,
+		occupied
+	)
+	_build_track_formation(
+		container,
+		"SparseDelimiter",
+		story["delimiter"],
+		&"few",
+		int(moments["early_conflict_forward"]),
+		centerline,
+		outer_loop,
+		room_polygon,
+		gate_samples,
+		occupied
+	)
+	_build_corner_landmarks(container, story, spec, moments["corners"], centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
+	_build_generated_surfaces(root, container, story, moments, centerline)
+	_build_finish_moments(container, centerline)
+
+	var hazard_paths := {}
+	for direction: String in ["forward", "reverse"]:
+		var hazard_index := int(moments["early_conflict_%s" % direction])
+		var hazard_path := _crossing_path(centerline, hazard_index, 82.0)
+		var conflict := Node2D.new()
+		conflict.name = "EarlyConflict%s" % direction.capitalize()
+		conflict.position = centerline[hazard_index]
+		conflict.set_meta("moment_kind", &"early_conflict")
+		conflict.set_meta("direction", StringName(direction))
+		conflict.set_meta("centerline_index", hazard_index)
+		conflict.set_meta("lap_fraction", float(moments["early_conflict_%s_fraction" % direction]))
+		conflict.set_meta("path", hazard_path)
+		container.add_child(conflict)
+		hazard_paths[direction] = hazard_path
+	root.set_meta("generated_hazard_paths", hazard_paths)
+	root.set_meta("generated_hazard_path", hazard_paths["forward"])
+	root.set_meta("generated_moment_indices", {
+		"opening": opening_index,
+		"early_conflict_forward": int(moments["early_conflict_forward"]),
+		"early_conflict_reverse": int(moments["early_conflict_reverse"]),
+		"longest_straight": int(moments["longest_straight"]),
+		"second_straight": int(moments["second_straight"]),
+		"corners": moments["corners"],
+		"shortcut": int(moments["shortcut"]),
+		"technical": int(moments["technical"]),
+		"speed": 0,
+		"finish": 0,
+		"hazard": int(moments["early_conflict_forward"]),
+	})
+
+
+static func _analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array) -> Dictionary:
+	var count := centerline.size()
+	var arc_positions := _centerline_arc_positions(centerline)
+	var total_length := arc_positions[arc_positions.size() - 1] + centerline[centerline.size() - 1].distance_to(centerline[0])
+	var conflict_forward := _pick_conflict_candidate(centerline, gate_samples, arc_positions, total_length, 0.14, 0.23)
+	var conflict_reverse := _pick_conflict_candidate(centerline, gate_samples, arc_positions, total_length, 0.77, 0.86)
+	var straight_candidates: Array[Dictionary] = []
+	var corner_candidates: Array[Dictionary] = []
+	for index in range(0, count, 2):
+		var turn := _turn_strength(centerline, index, 9)
+		var chord := centerline[posmod(index + 16, count)].distance_to(centerline[posmod(index - 16, count)])
+		straight_candidates.append({"index": index, "score": chord - turn * 720.0})
+		corner_candidates.append({"index": index, "score": turn})
+	straight_candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["index"]) < int(b["index"]) if is_equal_approx(float(a["score"]), float(b["score"])) else float(a["score"]) > float(b["score"]))
+	corner_candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["index"]) < int(b["index"]) if is_equal_approx(float(a["score"]), float(b["score"])) else float(a["score"]) > float(b["score"]))
+
+	var longest := _pick_straight_candidate(straight_candidates, centerline, gate_samples, [0], 30)
+	var second := _pick_straight_candidate(straight_candidates, centerline, gate_samples, [0, longest], 48)
+	var corners := PackedInt32Array()
+	for candidate: Dictionary in corner_candidates:
+		var index := int(candidate["index"])
+		if _cyclic_index_distance(index, 0, count) < 24:
+			continue
+		if _cyclic_index_distance(index, conflict_forward, count) < 24 or _cyclic_index_distance(index, conflict_reverse, count) < 24:
+			continue
+		var separated := true
+		for chosen: int in corners:
+			if _cyclic_index_distance(index, chosen, count) < 38:
+				separated = false
+				break
+		if not separated:
+			continue
+		corners.append(index)
+		if corners.size() >= 4:
+			break
+	for fallback_fraction: float in [0.25, 0.5, 0.75]:
+		if corners.size() >= 2:
+			break
+		var fallback := int(round(float(count) * fallback_fraction)) % count
+		var separated := _cyclic_index_distance(fallback, conflict_forward, count) >= 24 and _cyclic_index_distance(fallback, conflict_reverse, count) >= 24
+		for chosen: int in corners:
+			if _cyclic_index_distance(fallback, chosen, count) < 38:
+				separated = false
+		if separated:
+			corners.append(fallback)
+	while corners.size() < 2:
+		corners.append(posmod(72 + corners.size() * 96, count))
+
+	var shortcut := int(corners[0])
+	var shortcut_gain := -INF
+	for corner: int in corners:
+		var geometry := _shortcut_lane_geometry(centerline, corner)
+		var gain := float(geometry["safe_length"]) - float(geometry["shortcut_length"])
+		if gain > shortcut_gain:
+			shortcut_gain = gain
+			shortcut = corner
+	var technical := int(corners[0])
+	for corner: int in corners:
+		if corner != shortcut:
+			technical = corner
+			break
+	return {
+		"opening": 0,
+		"early_conflict_forward": conflict_forward,
+		"early_conflict_reverse": conflict_reverse,
+		"early_conflict_forward_fraction": arc_positions[conflict_forward] / maxf(total_length, 1.0),
+		"early_conflict_reverse_fraction": 1.0 - arc_positions[conflict_reverse] / maxf(total_length, 1.0),
+		"longest_straight": longest,
+		"second_straight": second,
+		"corners": corners,
+		"shortcut": shortcut,
+		"technical": technical,
+	}
+
+
+static func _centerline_arc_positions(centerline: PackedVector2Array) -> PackedFloat32Array:
+	var positions := PackedFloat32Array([0.0])
+	for index in range(1, centerline.size()):
+		positions.append(positions[index - 1] + centerline[index - 1].distance_to(centerline[index]))
+	return positions
+
+
+static func _pick_conflict_candidate(
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		arc_positions: PackedFloat32Array,
+		total_length: float,
+		minimum_fraction: float,
+		maximum_fraction: float
+) -> int:
+	var best_index := int(round(float(centerline.size()) * (minimum_fraction + maximum_fraction) * 0.5))
+	var best_score := -INF
+	for index in range(0, centerline.size(), 2):
+		var fraction := arc_positions[index] / maxf(total_length, 1.0)
+		if fraction < minimum_fraction or fraction > maximum_fraction:
+			continue
+		var turn := _turn_strength(centerline, index, 7)
+		var chord := centerline[posmod(index + 10, centerline.size())].distance_to(centerline[posmod(index - 10, centerline.size())])
+		var gate_clearance := INF
+		for gate: Vector2 in gate_samples:
+			gate_clearance = minf(gate_clearance, centerline[index].distance_to(gate))
+		var score := chord - turn * 540.0 + minf(gate_clearance, 180.0) * 0.35
+		if score > best_score or (is_equal_approx(score, best_score) and index < best_index):
+			best_score = score
+			best_index = index
+	return best_index
+
+
+static func _build_opening_landmark(
+		parent: Node2D,
+		story: Dictionary,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		outer_loop: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> int:
+	var opening := Node2D.new()
+	opening.name = "OpeningLandmark"
+	parent.add_child(opening)
+	var assets: Array = story["landmarks"]
+	var asset_index := posmod(_mix_seed(int(spec["requested_seed"]), "opening_asset"), assets.size())
+	var asset_path := String(assets[asset_index])
+	opening.set_meta("asset_path", asset_path)
+	opening.set_meta("semantic_quantity", &"unique")
+	opening.set_meta("requested_count", 1)
+	var base_radius := _asset_radius(asset_path, 64.0)
+	var size_scale := minf(1.0, 72.0 / maxf(base_radius, 1.0))
+	var radius := base_radius * size_scale
+	var preferred := int(round(float(centerline.size()) * 0.11))
+	var selected_index := preferred
+	var placed_count := 0
+	# Search the first quarter of the lap rather than trusting one index; long
+	# landmarks do not fit on the outer side of every narrow-room opening.
+	for index_attempt in 18:
+		var index_offset := (index_attempt + 1) / 2 * 4
+		var index_direction := -1 if index_attempt % 2 == 0 else 1
+		var index := posmod(preferred + index_offset * index_direction, centerline.size())
+		var tangent := _sample_tangent(centerline, index)
+		var outward := (outer_loop[index] - centerline[index]).normalized()
+		for placement_attempt in 12:
+			var side := 1.0 if placement_attempt % 2 == 0 else -1.0
+			var along := tangent * (float(placement_attempt / 4) - 1.0) * 30.0
+			var offset := HALF_WIDTH + radius + 18.0 + float((placement_attempt / 2) % 2) * 12.0
+			var candidate := centerline[index] + outward * side * offset + along
+			if not _inside_polygon_with_radius(candidate, radius, room_polygon):
+				continue
+			if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + radius + 7.0:
+				continue
+			if not _clear_of_points(candidate, gate_samples, 24.0 + radius):
+				continue
+			if not _clear_of_recovery_lanes(candidate, radius, centerline, gate_samples):
+				continue
+			if not _clear_of_occupied(candidate, radius, occupied):
+				continue
+			_add_generated_prop(opening, "Focal", candidate, asset_path, tangent.angle(), &"opening", &"unique", 0, size_scale)
+			occupied.append({"position": candidate, "radius": radius})
+			selected_index = index
+			placed_count = 1
+			break
+		if placed_count == 1:
+			break
+	if placed_count == 0:
+		var exhaustive := _best_trackside_position(preferred, radius, centerline, outer_loop, room_polygon, gate_samples, occupied)
+		if bool(exhaustive["found"]):
+			var candidate: Vector2 = exhaustive["position"]
+			selected_index = int(exhaustive["index"])
+			_add_generated_prop(opening, "Focal", candidate, asset_path, _sample_tangent(centerline, selected_index).angle(), &"opening", &"unique", 0, size_scale)
+			occupied.append({"position": candidate, "radius": radius})
+			placed_count = 1
+	opening.set_meta("centerline_index", selected_index)
+	opening.set_meta("placed_count", placed_count)
+	return selected_index
+
+
+static func _pick_straight_candidate(
+		candidates: Array[Dictionary],
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		excluded: Array,
+		minimum_separation: int
+) -> int:
+	for candidate: Dictionary in candidates:
+		var index := int(candidate["index"])
+		var allowed := true
+		for excluded_index: int in excluded:
+			if _cyclic_index_distance(index, excluded_index, centerline.size()) < minimum_separation:
+				allowed = false
+				break
+		if not allowed or not _clear_of_points(centerline[index], gate_samples, 175.0):
+			continue
+		return index
+	return posmod(minimum_separation * maxi(excluded.size(), 1), centerline.size())
+
+
+static func _turn_strength(centerline: PackedVector2Array, index: int, span: int) -> float:
+	var count := centerline.size()
+	var behind := (centerline[index] - centerline[posmod(index - span, count)]).normalized()
+	var ahead := (centerline[posmod(index + span, count)] - centerline[index]).normalized()
+	return absf(behind.angle_to(ahead))
+
+
+static func _cyclic_index_distance(first: int, second: int, count: int) -> int:
+	var direct := absi(first - second)
+	return mini(direct, count - direct)
+
+
+static func _safe_moment_index(centerline: PackedVector2Array, preferred: int, gate_samples: PackedVector2Array, clearance: float) -> int:
+	var count := centerline.size()
+	for distance in range(0, 31, 2):
+		for direction in [-1, 1]:
+			var index := posmod(preferred + distance * direction, count)
+			if _cyclic_index_distance(index, 0, count) < 26:
+				continue
+			if _clear_of_points(centerline[index], gate_samples, clearance):
+				return index
+	return preferred
+
+
+static func _build_island_story(
+		parent: Node2D,
+		story: Dictionary,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		inner_loop: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> void:
+	var cluster := Node2D.new()
+	cluster.name = "IslandFocalCluster"
+	cluster.set_meta("story_id", StringName(story["id"]))
+	parent.add_child(cluster)
+	var anchor := _island_anchor(inner_loop, centerline)
+	var island_bounds := _polygon_bounds_rect(inner_loop)
+	var scene_angle := -PI * 0.5 if island_bounds.size.x > island_bounds.size.y else 0.0
+	if _mix_seed(int(spec["requested_seed"]), String(story["id"])) % 2 == 1:
+		scene_angle += PI
+	var placement_region := &"island"
+	var focal_data: Dictionary = story["island"][0]
+	var focal_path := String(focal_data["asset"])
+	var focal_base_radius := _asset_radius(focal_path, 24.0)
+	var focal_scale := minf(1.0, 72.0 / maxf(focal_base_radius, 1.0))
+	var focal_radius := focal_base_radius * focal_scale
+	var focal_offset: Vector2 = focal_data.get("offset", Vector2.ZERO)
+	var focal_preferred := anchor + focal_offset.rotated(scene_angle)
+	var island_fit := _best_island_position(focal_preferred, focal_radius, room_polygon, inner_loop, occupied)
+	if not bool(island_fit["found"]):
+		var apron_fit := _best_offtrack_position(focal_preferred, focal_radius, room_polygon, centerline, gate_samples, occupied)
+		if bool(apron_fit["found"]):
+			placement_region = &"apron"
+			anchor += (apron_fit["position"] as Vector2) - focal_preferred
+	cluster.set_meta("placement_region", placement_region)
+	for formation_data: Dictionary in story["island"]:
+		var quantity := StringName(formation_data["quantity"])
+		var requested_count := _bounded_quantity_count(quantity, int(formation_data["count"]))
+		var formation := Node2D.new()
+		formation.name = "Formation%s" % String(quantity).to_pascal_case()
+		formation.set_meta("semantic_quantity", quantity)
+		formation.set_meta("requested_count", requested_count)
+		formation.set_meta("asset_path", String(formation_data["asset"]))
+		cluster.add_child(formation)
+		var asset_path := String(formation_data["asset"])
+		var base_radius := _asset_radius(asset_path, 24.0)
+		var maximum_radius := 72.0 if quantity == &"unique" else (42.0 if quantity == &"few" else 18.0)
+		var size_scale := minf(1.0, maximum_radius / maxf(base_radius, 1.0))
+		var radius := base_radius * size_scale
+		var authored_offset: Vector2 = formation_data.get("offset", Vector2.ZERO)
+		var semantic_spread := 1.45 if quantity == &"many" else (1.65 if quantity == &"few" else 1.0)
+		var target: Vector2 = anchor + (authored_offset * semantic_spread).rotated(scene_angle)
+		var placed_count := 0
+		for item_index in requested_count:
+			var local_offset := _semantic_formation_offset(StringName(formation_data["formation"]), item_index, requested_count, radius)
+			var placed := false
+			var preferred := target + local_offset.rotated(scene_angle)
+			for attempt in 36:
+				var fallback_distance := float((attempt + 3) / 4) * maxf(radius * 0.6, 20.0)
+				var fallback_angle := scene_angle + float(attempt) * 2.399963 + float(item_index) * 0.41
+				var fallback := Vector2.ZERO if attempt == 0 else Vector2.RIGHT.rotated(fallback_angle) * fallback_distance
+				var candidate := preferred + fallback
+				var safe := _placement_is_safe(candidate, radius, room_polygon, inner_loop, occupied) if placement_region == &"island" else _trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied)
+				if not safe:
+					continue
+				_add_generated_prop(formation, "Item%02d" % item_index, candidate, asset_path, scene_angle + float(item_index) * 0.17, placement_region, quantity, item_index, size_scale)
+				occupied.append({"position": candidate, "radius": radius})
+				placed_count += 1
+				placed = true
+				break
+			if not placed:
+				var exhaustive := _best_island_position(preferred, radius, room_polygon, inner_loop, occupied) if placement_region == &"island" else _best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied)
+				if bool(exhaustive["found"]):
+					var candidate: Vector2 = exhaustive["position"]
+					_add_generated_prop(formation, "Item%02d" % item_index, candidate, asset_path, scene_angle + float(item_index) * 0.17, placement_region, quantity, item_index, size_scale)
+					occupied.append({"position": candidate, "radius": radius})
+					placed_count += 1
+					placed = true
+			if not placed and placement_region == &"island":
+				var apron_fit := _best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied)
+				if bool(apron_fit["found"]):
+					var candidate: Vector2 = apron_fit["position"]
+					_add_generated_prop(formation, "Item%02d" % item_index, candidate, asset_path, scene_angle + float(item_index) * 0.17, &"apron", quantity, item_index, size_scale)
+					occupied.append({"position": candidate, "radius": radius})
+					placed_count += 1
+					placed = true
+					cluster.set_meta("placement_region", &"mixed")
+			if not placed and quantity == &"unique":
+				break
+		formation.set_meta("placed_count", placed_count)
+
+
+static func _bounded_quantity_count(quantity: StringName, requested: int) -> int:
+	match quantity:
+		&"unique":
+			return 1
+		&"few":
+			return clampi(requested, 2, 3)
+		&"many":
+			return clampi(requested, 8, 20)
+	return clampi(requested, 1, 20)
+
+
+static func _semantic_formation_offset(formation: StringName, index: int, count: int, radius: float) -> Vector2:
+	var spacing := maxf(radius * 2.0 + 9.0, 25.0)
+	match formation:
+		&"line":
+			return Vector2((float(index) - float(count - 1) * 0.5) * spacing, 0.0)
+		&"arc":
+			var arc_angle := lerpf(-1.05, 1.05, float(index) / maxf(float(count - 1), 1.0))
+			var arc_radius := maxf(54.0, spacing * float(count) * 0.27)
+			return Vector2(cos(arc_angle), sin(arc_angle)) * arc_radius - Vector2(arc_radius * 0.55, 0.0)
+		&"cluster":
+			var columns := ceili(sqrt(float(count)))
+			var row := index / columns
+			var column := index % columns
+			var rows := ceili(float(count) / float(columns))
+			return Vector2(
+				(float(column) - float(columns - 1) * 0.5) * spacing,
+				(float(row) - float(rows - 1) * 0.5) * spacing
+			)
+	return Vector2.ZERO
+
+
+static func _island_anchor(inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> Vector2:
+	var average := Vector2.ZERO
+	var bounds := Rect2(inner_loop[0], Vector2.ZERO)
+	for point: Vector2 in inner_loop:
+		average += point
+		bounds = bounds.expand(point)
+	average /= float(inner_loop.size())
+	if Geometry2D.is_point_in_polygon(average, inner_loop):
+		return average
+	var best := average
+	var best_clearance := -INF
+	for x in 7:
+		for y in 7:
+			var candidate := bounds.position + Vector2(bounds.size.x * (float(x) + 0.5) / 7.0, bounds.size.y * (float(y) + 0.5) / 7.0)
+			if not Geometry2D.is_point_in_polygon(candidate, inner_loop):
+				continue
+			var clearance := _distance_to_centerline(candidate, centerline)
+			if clearance > best_clearance:
+				best_clearance = clearance
+				best = candidate
+	return best
+
+
+static func _polygon_bounds_rect(points: PackedVector2Array) -> Rect2:
+	var bounds := Rect2(points[0], Vector2.ZERO)
+	for point: Vector2 in points:
+		bounds = bounds.expand(point)
+	return bounds
+
+
+static func _build_track_formation(
+		parent: Node2D,
+		node_name: String,
+		data: Dictionary,
+		quantity: StringName,
+		moment_index: int,
+		centerline: PackedVector2Array,
+		outer_loop: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> void:
+	var formation := Node2D.new()
+	formation.name = node_name
+	formation.set_meta("semantic_quantity", quantity)
+	formation.set_meta("centerline_index", moment_index)
+	formation.set_meta("asset_path", String(data["asset"]))
+	parent.add_child(formation)
+	var requested_count := _bounded_quantity_count(quantity, int(data["count"]))
+	formation.set_meta("requested_count", requested_count)
+	var asset_path := String(data["asset"])
+	var radius := _asset_radius(asset_path, 18.0)
+	var sample_step := (5 if radius > 20.0 else (4 if radius > 12.0 else 3)) if quantity == &"many" else maxi(6, ceili((radius * 2.0 + 10.0) / 10.0))
+	var placed_count := 0
+	for item_index in requested_count:
+		var sample_offset := int(round((float(item_index) - float(requested_count - 1) * 0.5) * float(sample_step)))
+		var placed := false
+		for adjustment_attempt in 17:
+			var adjustment_magnitude := (adjustment_attempt + 1) / 2
+			var adjustment_direction := -1 if adjustment_attempt % 2 == 0 else 1
+			var adjustment := 0 if adjustment_attempt == 0 else adjustment_magnitude * adjustment_direction
+			var index := posmod(moment_index + sample_offset + adjustment, centerline.size())
+			var tangent := _sample_tangent(centerline, index)
+			var outward := (outer_loop[index] - centerline[index]).normalized()
+			for attempt in 8:
+				var side := 1.0 if attempt % 2 == 0 else -1.0
+				var direction := outward * side
+				var offset := HALF_WIDTH + radius + 10.0 + float(attempt / 2) * 8.0
+				var candidate := centerline[index] + direction * offset
+				if not _trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
+					continue
+				_add_generated_prop(formation, "Item%02d" % item_index, candidate, asset_path, tangent.angle(), &"trackside", quantity, item_index)
+				occupied.append({"position": candidate, "radius": radius})
+				placed_count += 1
+				placed = true
+				break
+			if placed:
+				break
+		if not placed:
+			var exhaustive := _best_trackside_position(moment_index + sample_offset, radius, centerline, outer_loop, room_polygon, gate_samples, occupied)
+			if bool(exhaustive["found"]):
+				var candidate: Vector2 = exhaustive["position"]
+				var index := int(exhaustive["index"])
+				_add_generated_prop(formation, "Item%02d" % item_index, candidate, asset_path, _sample_tangent(centerline, index).angle(), &"trackside", quantity, item_index)
+				occupied.append({"position": candidate, "radius": radius})
+				placed_count += 1
+				placed = true
+		if not placed:
+			continue
+	formation.set_meta("placed_count", placed_count)
+
+
+static func _build_corner_landmarks(
+		parent: Node2D,
+		story: Dictionary,
+		spec: Dictionary,
+		corner_indices: PackedInt32Array,
+		centerline: PackedVector2Array,
+		outer_loop: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		reserved_unique_assets: Dictionary,
+		occupied: Array[Dictionary]
+) -> void:
+	var landmarks := Node2D.new()
+	landmarks.name = "CornerLandmarks"
+	parent.add_child(landmarks)
+	var assets: Array = story["landmarks"]
+	var asset_start := posmod(_mix_seed(int(spec["requested_seed"]), "landmark_asset"), assets.size())
+	var available_assets: Array[String] = []
+	for asset_offset in assets.size():
+		var asset_path := String(assets[(asset_start + asset_offset) % assets.size()])
+		if not reserved_unique_assets.has(asset_path):
+			available_assets.append(asset_path)
+	var target_count := mini(1 + posmod(_mix_seed(int(spec["requested_seed"]), "landmarks"), 2), available_assets.size())
+	landmarks.set_meta("requested_count", target_count)
+	var placed_count := 0
+	for corner_slot in corner_indices.size():
+		if placed_count >= target_count:
+			break
+		var index := int(corner_indices[corner_slot])
+		var asset_path := available_assets[placed_count]
+		var base_radius := _asset_radius(asset_path, 64.0)
+		var size_scale := minf(1.0, 72.0 / maxf(base_radius, 1.0))
+		var radius := base_radius * size_scale
+		var outward := (outer_loop[index] - centerline[index]).normalized()
+		for attempt in 12:
+			var side := 1.0 if attempt % 2 == 0 else -1.0
+			var along := _sample_tangent(centerline, index) * (float(attempt / 4) - 1.0) * 28.0
+			var offset := HALF_WIDTH + radius + 18.0 + float((attempt / 2) % 2) * 12.0
+			var candidate := centerline[index] + outward * side * offset + along
+			if not _trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
+				continue
+			_add_generated_prop(landmarks, "Landmark%02d" % placed_count, candidate, asset_path, float(corner_slot) * 0.37, &"corner", &"unique", placed_count, size_scale)
+			occupied.append({"position": candidate, "radius": radius})
+			placed_count += 1
+			break
+	while placed_count < target_count:
+		var asset_path := available_assets[placed_count]
+		var base_radius := _asset_radius(asset_path, 64.0)
+		var size_scale := minf(1.0, 72.0 / maxf(base_radius, 1.0))
+		var radius := base_radius * size_scale
+		var preferred_index := int(corner_indices[mini(placed_count, corner_indices.size() - 1)])
+		var exhaustive := _best_trackside_position(preferred_index, radius, centerline, outer_loop, room_polygon, gate_samples, occupied)
+		if not bool(exhaustive["found"]):
+			break
+		var candidate: Vector2 = exhaustive["position"]
+		var index := int(exhaustive["index"])
+		_add_generated_prop(landmarks, "Landmark%02d" % placed_count, candidate, asset_path, _sample_tangent(centerline, index).angle(), &"corner", &"unique", placed_count, size_scale)
+		occupied.append({"position": candidate, "radius": radius})
+		placed_count += 1
+	landmarks.set_meta("placed_count", placed_count)
+
+
+static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictionary, moments: Dictionary, centerline: PackedVector2Array) -> void:
+	var definitions: Array[Dictionary] = []
+	var surfaces: Array = story["surfaces"]
+
+	var shortcut_surface_index := 0 if float((surfaces[0] as Dictionary)["grip"]) <= float((surfaces[1] as Dictionary)["grip"]) else 1
+	var technical_surface_index := 1 - shortcut_surface_index
+	var technical_data: Dictionary = surfaces[technical_surface_index]
+	var technical_index := int(moments["technical"])
+	var technical_polygon := _surface_strip(centerline, technical_index, 6, 92.0)
+	var technical_definition := {
+		"name": StringName(technical_data["name"]),
+		"role": &"technical",
+		"lane": &"full",
+		"grip": float(technical_data["grip"]),
+		"speed": float(technical_data["speed"]),
+		"points": technical_polygon,
+		"decal": String(technical_data["decal"]),
+		"centerline_index": technical_index,
+	}
+	definitions.append(technical_definition)
+	var technical := Node2D.new()
+	technical.name = "TechnicalSurfaceMoment"
+	technical.set_meta("moment_kind", &"technical")
+	technical.set_meta("surface_name", technical_definition["name"])
+	technical.set_meta("grip", technical_definition["grip"])
+	technical.set_meta("speed", technical_definition["speed"])
+	technical.set_meta("polygon", technical_polygon)
+	technical.set_meta("decal_texture", technical_definition["decal"])
+	technical.set_meta("centerline_index", technical_index)
+	parent.add_child(technical)
+	_add_surface_decals(technical, centerline, technical_index, 6, String(technical_data["decal"]))
+
+	var shortcut_data: Dictionary = surfaces[shortcut_surface_index]
+	var shortcut_index := int(moments["shortcut"])
+	var shortcut_geometry := _shortcut_lane_geometry(centerline, shortcut_index)
+	var shortcut_path: PackedVector2Array = shortcut_geometry["shortcut_path"]
+	var safe_path: PackedVector2Array = shortcut_geometry["safe_path"]
+	var shortcut_polygon := _lane_strip(shortcut_path, SHORTCUT_LANE_HALF_WIDTH)
+	var shortcut_definition := {
+		"name": StringName(shortcut_data["name"]),
+		"role": &"shortcut",
+		"lane": &"inside",
+		"grip": float(shortcut_data["grip"]),
+		"speed": maxf(float(shortcut_data["speed"]), 1.06),
+		"points": shortcut_polygon,
+		"decal": String(shortcut_data["decal"]),
+		"centerline_index": shortcut_index,
+		"inside_sign": float(shortcut_geometry["inside_sign"]),
+	}
+	definitions.append(shortcut_definition)
+	var shortcut := Node2D.new()
+	shortcut.name = "ShortcutDecision"
+	shortcut.set_meta("moment_kind", &"shortcut")
+	shortcut.set_meta("surface_name", shortcut_definition["name"])
+	shortcut.set_meta("grip", shortcut_definition["grip"])
+	shortcut.set_meta("speed", shortcut_definition["speed"])
+	shortcut.set_meta("polygon", shortcut_polygon)
+	shortcut.set_meta("decal_texture", shortcut_definition["decal"])
+	shortcut.set_meta("centerline_index", shortcut_index)
+	shortcut.set_meta("inside_sign", shortcut_definition["inside_sign"])
+	shortcut.set_meta("shortcut_path", shortcut_path)
+	shortcut.set_meta("safe_path", safe_path)
+	shortcut.set_meta("shortcut_length", float(shortcut_geometry["shortcut_length"]))
+	shortcut.set_meta("safe_length", float(shortcut_geometry["safe_length"]))
+	parent.add_child(shortcut)
+	_add_surface_decals(shortcut, centerline, shortcut_index, SHORTCUT_HALF_SPAN, String(shortcut_data["decal"]), float(shortcut_geometry["inside_sign"]) * SHORTCUT_LANE_OFFSET)
+	root.set_meta("generated_surfaces", definitions)
+
+
+static func _surface_strip(centerline: PackedVector2Array, center_index: int, half_span: int, half_width: float) -> PackedVector2Array:
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	for offset in range(-half_span, half_span + 1, 2):
+		var index := posmod(center_index + offset, centerline.size())
+		var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
+		left.append(centerline[index] + normal * half_width)
+		right.append(centerline[index] - normal * half_width)
+	var polygon := PackedVector2Array()
+	polygon.append_array(left)
+	for index in range(right.size() - 1, -1, -1):
+		polygon.append(right[index])
+	var hull := Geometry2D.convex_hull(polygon)
+	if hull.size() > 2 and hull[0].is_equal_approx(hull[hull.size() - 1]):
+		hull.resize(hull.size() - 1)
+	return hull
+
+
+static func _add_surface_decals(
+		parent: Node2D,
+		centerline: PackedVector2Array,
+		center_index: int,
+		half_span: int,
+		texture_path: String,
+		lateral_offset: float = 0.0
+) -> void:
+	var texture := load(texture_path) as Texture2D
+	if texture == null:
+		return
+	var decal_count := 4
+	for decal_index in decal_count:
+		var fraction := float(decal_index) / float(decal_count - 1)
+		var offset := int(round(lerpf(float(-half_span), float(half_span), fraction)))
+		var index := posmod(center_index + offset, centerline.size())
+		var sprite := Sprite2D.new()
+		sprite.name = "CenterlineDecal%02d" % decal_index
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
+		sprite.position = centerline[index] + normal * lateral_offset
+		sprite.rotation = _sample_tangent(centerline, index).angle() + float(decal_index % 2) * 0.31
+		var longest := maxf(texture.get_width(), texture.get_height())
+		sprite.scale = Vector2.ONE * (88.0 / maxf(longest, 1.0))
+		sprite.modulate = Color(1.0, 1.0, 1.0, 0.78)
+		sprite.z_index = -6
+		sprite.set_meta("asset_path", texture_path)
+		parent.add_child(sprite)
+
+
+static func _shortcut_lane_geometry(centerline: PackedVector2Array, center_index: int) -> Dictionary:
+	var positive := _offset_section_path(centerline, center_index, SHORTCUT_HALF_SPAN, SHORTCUT_LANE_OFFSET)
+	var negative := _offset_section_path(centerline, center_index, SHORTCUT_HALF_SPAN, -SHORTCUT_LANE_OFFSET)
+	var positive_length := _open_path_length(positive)
+	var negative_length := _open_path_length(negative)
+	if positive_length <= negative_length:
+		return {
+			"inside_sign": 1.0,
+			"shortcut_path": positive,
+			"safe_path": negative,
+			"shortcut_length": positive_length,
+			"safe_length": negative_length,
+		}
+	return {
+		"inside_sign": -1.0,
+		"shortcut_path": negative,
+		"safe_path": positive,
+		"shortcut_length": negative_length,
+		"safe_length": positive_length,
+	}
+
+
+static func _offset_section_path(
+		centerline: PackedVector2Array,
+		center_index: int,
+		half_span: int,
+		lateral_offset: float
+) -> PackedVector2Array:
+	var path := PackedVector2Array()
+	for offset in range(-half_span, half_span + 1):
+		var index := posmod(center_index + offset, centerline.size())
+		var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
+		path.append(centerline[index] + normal * lateral_offset)
+	return path
+
+
+static func _lane_strip(path: PackedVector2Array, half_width: float) -> PackedVector2Array:
+	var left := PackedVector2Array()
+	var right := PackedVector2Array()
+	for index in path.size():
+		var before := path[maxi(index - 1, 0)]
+		var after := path[mini(index + 1, path.size() - 1)]
+		var normal := before.direction_to(after).rotated(PI * 0.5)
+		left.append(path[index] + normal * half_width)
+		right.append(path[index] - normal * half_width)
+	var polygon := PackedVector2Array()
+	polygon.append_array(left)
+	for index in range(right.size() - 1, -1, -1):
+		polygon.append(right[index])
+	var hull := Geometry2D.convex_hull(polygon)
+	if hull.size() > 2 and hull[0].is_equal_approx(hull[hull.size() - 1]):
+		hull.resize(hull.size() - 1)
+	return hull
+
+
+static func _open_path_length(path: PackedVector2Array) -> float:
+	var total := 0.0
+	for index in range(1, path.size()):
+		total += path[index - 1].distance_to(path[index])
+	return total
+
+
+static func _crossing_path(centerline: PackedVector2Array, center_index: int, half_width: float) -> PackedVector2Array:
+	var normal := _sample_tangent(centerline, center_index).rotated(PI * 0.5)
+	return PackedVector2Array([
+		centerline[center_index] - normal * half_width,
+		centerline[center_index] + normal * half_width,
+	])
+
+
+static func _build_finish_moments(parent: Node2D, centerline: PackedVector2Array) -> void:
+	var forward_path := PackedVector2Array()
+	var reverse_path := PackedVector2Array()
+	for offset in range(-FINISH_APPROACH_SPAN, 1):
+		forward_path.append(centerline[posmod(offset, centerline.size())])
+	for offset in range(FINISH_APPROACH_SPAN, -1, -1):
+		reverse_path.append(centerline[posmod(offset, centerline.size())])
+
+	var speed := Node2D.new()
+	speed.name = "SpeedSection"
+	speed.position = centerline[0]
+	speed.set_meta("moment_kind", &"speed")
+	speed.set_meta("centerline_index", 0)
+	speed.set_meta("forward_path", forward_path)
+	speed.set_meta("reverse_path", reverse_path)
+	speed.set_meta("forward_length", _open_path_length(forward_path))
+	speed.set_meta("reverse_length", _open_path_length(reverse_path))
+	speed.set_meta("reserved_clear", true)
+	parent.add_child(speed)
+
+	var finish := Node2D.new()
+	finish.name = "DramaticFinish"
+	finish.position = centerline[0]
+	finish.set_meta("moment_kind", &"finish")
+	finish.set_meta("centerline_index", 0)
+	finish.set_meta("forward_approach", forward_path)
+	finish.set_meta("reverse_approach", reverse_path)
+	finish.set_meta("finish_gate", NodePath("../../Checkpoint0Finish"))
+	finish.set_meta("checker_white", NodePath("../../StartFinishWhite"))
+	finish.set_meta("checker_black", NodePath("../../StartFinishBlack"))
+	parent.add_child(finish)
+
+
+static func _sample_tangent(centerline: PackedVector2Array, index: int) -> Vector2:
+	return (centerline[posmod(index + 1, centerline.size())] - centerline[posmod(index - 1, centerline.size())]).normalized()
+
+
+static func _placement_is_safe(
+		candidate: Vector2,
+		radius: float,
+		room_polygon: PackedVector2Array,
+		allowed_polygon: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> bool:
+	if not _inside_polygon_with_radius(candidate, radius, room_polygon):
+		return false
+	if not _inside_polygon_with_radius(candidate, radius, allowed_polygon):
+		return false
+	return _clear_of_occupied(candidate, radius, occupied)
+
+
+static func _best_island_position(
+		preferred: Vector2,
+		radius: float,
+		room_polygon: PackedVector2Array,
+		island_polygon: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> Dictionary:
+	var bounds := _polygon_bounds_rect(island_polygon)
+	var best_position := Vector2.ZERO
+	var best_score := INF
+	# A deterministic dense scan is the final placement path for strongly
+	# concave islands where an authored local formation lands in a bay or waist.
+	for x in 17:
+		for y in 17:
+			var candidate := bounds.position + Vector2(
+				bounds.size.x * (float(x) + 0.5) / 17.0,
+				bounds.size.y * (float(y) + 0.5) / 17.0
+			)
+			if not _placement_is_safe(candidate, radius, room_polygon, island_polygon, occupied):
+				continue
+			var score := candidate.distance_squared_to(preferred)
+			if score < best_score:
+				best_score = score
+				best_position = candidate
+	return {"found": best_score < INF, "position": best_position}
+
+
+static func _best_offtrack_position(
+		preferred: Vector2,
+		radius: float,
+		room_polygon: PackedVector2Array,
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> Dictionary:
+	var bounds := _polygon_bounds_rect(room_polygon)
+	var best_position := Vector2.ZERO
+	var best_score := INF
+	for x in 25:
+		for y in 17:
+			var candidate := bounds.position + Vector2(
+				bounds.size.x * (float(x) + 0.5) / 25.0,
+				bounds.size.y * (float(y) + 0.5) / 17.0
+			)
+			if not _trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
+				continue
+			var score := candidate.distance_squared_to(preferred)
+			if score < best_score:
+				best_score = score
+				best_position = candidate
+	return {"found": best_score < INF, "position": best_position}
+
+
+static func _trackside_placement_is_safe(
+		candidate: Vector2,
+		radius: float,
+		room_polygon: PackedVector2Array,
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> bool:
+	if not _inside_polygon_with_radius(candidate, radius, room_polygon):
+		return false
+	if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + radius + 7.0:
+		return false
+	if candidate.distance_to(centerline[0]) < 245.0 + radius:
+		return false
+	if not _clear_of_points(candidate, gate_samples, 24.0 + radius):
+		return false
+	if not _clear_of_recovery_lanes(candidate, radius, centerline, gate_samples):
+		return false
+	return _clear_of_occupied(candidate, radius, occupied)
+
+
+static func _best_trackside_position(
+		preferred_index: int,
+		radius: float,
+		centerline: PackedVector2Array,
+		outer_loop: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> Dictionary:
+	var best_position := Vector2.ZERO
+	var best_index := 0
+	var best_score := INF
+	for index in range(0, centerline.size(), 2):
+		var outward := (outer_loop[index] - centerline[index]).normalized()
+		for attempt in 8:
+			var side := 1.0 if attempt % 2 == 0 else -1.0
+			var offset := HALF_WIDTH + radius + 10.0 + float(attempt / 2) * 8.0
+			var candidate := centerline[index] + outward * side * offset
+			if not _trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
+				continue
+			var score := float(_cyclic_index_distance(index, posmod(preferred_index, centerline.size()), centerline.size())) + float(attempt) * 0.01
+			if score < best_score:
+				best_score = score
+				best_position = candidate
+				best_index = index
+	return {"found": best_score < INF, "position": best_position, "index": best_index}
+
+
+static func _inside_polygon_with_radius(point: Vector2, radius: float, polygon: PackedVector2Array) -> bool:
+	if polygon.is_empty() or not Geometry2D.is_point_in_polygon(point, polygon):
+		return false
+	for sample in 8:
+		var test_point := point + Vector2.RIGHT.rotated(TAU * float(sample) / 8.0) * radius
+		if not Geometry2D.is_point_in_polygon(test_point, polygon):
+			return false
+	return true
+
+
+static func _clear_of_points(point: Vector2, points: PackedVector2Array, clearance: float) -> bool:
+	for other: Vector2 in points:
+		if point.distance_to(other) < clearance:
+			return false
+	return true
+
+
+static func _clear_of_recovery_lanes(
+		point: Vector2,
+		radius: float,
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array
+) -> bool:
+	for gate: Vector2 in gate_samples:
+		var nearest_index := 0
+		var nearest_distance := INF
+		for index in centerline.size():
+			var distance := gate.distance_squared_to(centerline[index])
+			if distance < nearest_distance:
+				nearest_distance = distance
+				nearest_index = index
+		var tangent := _sample_tangent(centerline, nearest_index)
+		var lane_from := gate - tangent * RECOVERY_LANE_HALF_LENGTH
+		var lane_to := gate + tangent * RECOVERY_LANE_HALF_LENGTH
+		if _point_to_segment_distance(point, lane_from, lane_to) < RECOVERY_LANE_HALF_WIDTH + radius:
+			return false
+	return true
+
+
+static func _point_to_segment_distance(point: Vector2, from: Vector2, to: Vector2) -> float:
+	var segment := to - from
+	if segment.length_squared() < 0.001:
+		return point.distance_to(from)
+	var fraction := clampf((point - from).dot(segment) / segment.length_squared(), 0.0, 1.0)
+	return point.distance_to(from + segment * fraction)
+
+
+static func _clear_of_occupied(point: Vector2, radius: float, occupied: Array[Dictionary]) -> bool:
+	for entry: Dictionary in occupied:
+		if point.distance_to(entry["position"]) < radius + float(entry["radius"]) + 7.0:
+			return false
+	return true
+
+
+static func _asset_radius(texture_path: String, fallback_radius: float) -> float:
+	return minf(_prop_visual_size(texture_path, fallback_radius * 2.0) * 0.5, 96.0)
+
+
+static func _add_generated_prop(
+		parent: Node2D,
+		node_name: String,
+		position: Vector2,
+		texture_path: String,
+		rotation: float,
+		moment_kind: StringName,
+		quantity: StringName,
+		formation_index: int,
+		size_scale: float = 1.0
+) -> void:
+	var prop := StaticBody2D.new()
+	prop.name = node_name
+	prop.position = position
+	prop.rotation = rotation
+	prop.collision_layer = 16
+	prop.set_meta("asset_path", texture_path)
+	prop.set_meta("moment_kind", moment_kind)
+	prop.set_meta("semantic_quantity", quantity)
+	prop.set_meta("formation_index", formation_index)
+	prop.set_meta("size_scale", size_scale)
+	parent.add_child(prop)
+	var radius := _asset_radius(texture_path, 24.0) * size_scale
+	_add_shape_collision(prop, texture_path, radius, size_scale)
+	_add_contact_shadow(prop, radius * 1.12)
+	var texture := load(texture_path) as Texture2D
+	if texture:
+		var sprite := Sprite2D.new()
+		sprite.name = "Sprite"
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		var longest := maxf(texture.get_width(), texture.get_height())
+		sprite.scale = Vector2.ONE * (_prop_visual_size(texture_path, 48.0) * size_scale / maxf(longest, 1.0))
+		prop.add_child(sprite)
+
+
+static func _mix_seed(seed: int, stream: String) -> int:
+	var value := (seed ^ int(stream.hash()) ^ 0x6D2B79F5) & 0x7FFFFFFF
+	value = ((value ^ (value >> 16)) * 0x45D9F3B) & 0x7FFFFFFF
+	value = ((value ^ (value >> 15)) * 0x45D9F3B) & 0x7FFFFFFF
+	return (value ^ (value >> 16)) & 0x7FFFFFFF
+
+
 static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
 	# The island hosts one authored VIGNETTE per theme (a designed scene, not a
 	# random scatter): focal props at hand-authored offsets from the centroid,
@@ -1153,9 +2457,13 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 		index += 7
 
 
-static func _build_racing_line(root: Node2D, centerline: PackedVector2Array) -> void:
+static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}) -> void:
 	var count := centerline.size()
 	var line_points := PackedVector2Array()
+	var shortcut_index := int(moments.get("shortcut", -1))
+	var shortcut_inside_sign := 0.0
+	if shortcut_index >= 0:
+		shortcut_inside_sign = float(_shortcut_lane_geometry(centerline, shortcut_index)["inside_sign"])
 	for index in count:
 		var tangent_behind := (centerline[index] - centerline[(index - 12 + count) % count]).normalized()
 		var tangent_ahead := (centerline[(index + 12) % count] - centerline[index]).normalized()
@@ -1163,7 +2471,15 @@ static func _build_racing_line(root: Node2D, centerline: PackedVector2Array) -> 
 		var normal := tangent_behind.rotated(PI * 0.5)
 		var inward := normal if turn > 0.0 else -normal
 		var offset := clampf(absf(turn) * 210.0, 0.0, 40.0)
-		line_points.append(centerline[index] + inward * offset)
+		var target := centerline[index] + inward * offset
+		if shortcut_index >= 0:
+			var shortcut_distance := _cyclic_index_distance(index, shortcut_index, count)
+			var taper_span := SHORTCUT_HALF_SPAN + 6
+			if shortcut_distance <= taper_span:
+				var influence := 1.0 - smoothstep(float(SHORTCUT_HALF_SPAN), float(taper_span), float(shortcut_distance))
+				var safe_target := centerline[index] - normal * shortcut_inside_sign * SAFE_RACING_LINE_OFFSET
+				target = target.lerp(safe_target, influence)
+		line_points.append(target)
 	var line := Line2D.new()
 	line.name = "RacingLine"
 	line.points = line_points
@@ -1245,7 +2561,8 @@ static func _add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Pack
 			best_start = index
 	var index := best_start
 	var placed := 0
-	while placed < 18:
+	var attempts := 0
+	while placed < 18 and attempts < count:
 		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
 		var position := outer_loop[index] + (outer_loop[index] - centerline[index]).normalized() * 58.0
 		if Geometry2D.is_point_in_polygon(position, room_polygon) and _distance_to_centerline(position, centerline) >= 165.0:
@@ -1269,6 +2586,7 @@ static func _add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Pack
 				clip.add_child(sprite)
 			placed += 1
 		index = (index + 2) % count
+		attempts += 1
 
 
 static func _distance_to_centerline(point: Vector2, centerline: PackedVector2Array) -> float:
@@ -1286,11 +2604,11 @@ static func _prop_visual_size(texture_path: String, fallback_diameter: float) ->
 	return fallback_diameter
 
 
-static func _add_shape_collision(parent: Node, texture_path: String, scale_radius: float) -> void:
+static func _add_shape_collision(parent: Node, texture_path: String, scale_radius: float, size_scale: float = 1.0) -> void:
 	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
 	if entry.get("shape", "circle") == "rect":
 		var rect := RectangleShape2D.new()
-		rect.size = entry["size"]
+		rect.size = (entry["size"] as Vector2) * size_scale
 		var rect_cs := CollisionShape2D.new()
 		rect_cs.shape = rect
 		parent.add_child(rect_cs)
@@ -1574,21 +2892,24 @@ static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, 
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
-	var count := centerline.size()
-	var tiles := Node2D.new()
-	tiles.name = "TrackSurfaceTiles"
-	tiles.z_index = -9
-	parent.add_child(tiles)
-	for index in range(0, count, 6):
-		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
-		var sprite := Sprite2D.new()
-		sprite.texture = texture
-		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprite.position = centerline[index]
-		sprite.rotation = atan2(tangent.y, tangent.x)
-		sprite.scale = scale
-		sprite.modulate = Color(modulate_value, modulate_value, modulate_value, 0.85)
-		tiles.add_child(sprite)
+	# A single textured ribbon avoids the overlapping square cards that made
+	# every circuit read as the same scalloped chain of floor tiles.
+	var surface := Line2D.new()
+	surface.name = "TrackSurface"
+	surface.points = centerline
+	surface.closed = true
+	surface.width = HALF_WIDTH * 1.82
+	surface.texture = texture
+	surface.texture_mode = Line2D.LINE_TEXTURE_TILE
+	surface.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+	surface.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	surface.default_color = Color(modulate_value, modulate_value, modulate_value, 0.52)
+	surface.joint_mode = Line2D.LINE_JOINT_ROUND
+	surface.begin_cap_mode = Line2D.LINE_CAP_ROUND
+	surface.end_cap_mode = Line2D.LINE_CAP_ROUND
+	surface.antialiased = true
+	surface.z_index = -9
+	parent.add_child(surface)
 
 
 static func _add_floor_tiles(parent: Node, texture_path: String, rect_origin: Vector2, rect_size: Vector2, columns: int, rows: int, scale: Vector2) -> void:

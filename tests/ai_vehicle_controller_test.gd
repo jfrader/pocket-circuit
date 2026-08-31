@@ -45,6 +45,40 @@ func _run_test() -> void:
 	controller.configure(vehicle, manager, 0.0)
 	manager.prepare_race()
 	manager.start_race()
+	controller.set("_racing_line", PackedVector2Array([
+		Vector2.ZERO,
+		Vector2(100.0, 0.0),
+		Vector2(100.0, 100.0),
+		Vector2(0.0, 100.0),
+	]))
+	vehicle.global_position = Vector2.ZERO
+	vehicle.speed = 0.0
+	var forward_line_target := controller.call("_racing_line_target", Vector2.LEFT) as Vector2
+	if not _expect(forward_line_target.x > 60.0 and absf(forward_line_target.y) < 0.01, "forward AI should keep the race direction even when its heading is reversed"):
+		return
+	manager.set_reverse_direction(true)
+	var reverse_line_target := controller.call("_racing_line_target", Vector2.RIGHT) as Vector2
+	if not _expect(reverse_line_target.y > 60.0 and absf(reverse_line_target.x) < 0.01, "reverse AI should follow the racing line in descending order"):
+		return
+	var directional_radius_line := PackedVector2Array()
+	directional_radius_line.resize(37)
+	for index in directional_radius_line.size():
+		directional_radius_line[index] = Vector2(1000.0 + index * 10.0, 1000.0)
+	directional_radius_line[0] = Vector2.ZERO
+	directional_radius_line[9] = Vector2(90.0, 0.0)
+	directional_radius_line[18] = Vector2(180.0, 0.0)
+	directional_radius_line[19] = Vector2(-90.0, 90.0)
+	directional_radius_line[28] = Vector2(0.0, 90.0)
+	controller.set("_racing_line", directional_radius_line)
+	var reverse_line_radius := float(controller.call("_racing_line_radius", Vector2.ZERO))
+	manager.set_reverse_direction(false)
+	var forward_line_radius := float(controller.call("_racing_line_radius", Vector2.ZERO))
+	if not _expect(
+		reverse_line_radius > forward_line_radius + 20.0,
+		"corner speed planning should sample racing-line curvature in the active direction"
+	):
+		return
+	controller.set("_racing_line", PackedVector2Array())
 
 	var corner_guide := controller.call("_checkpoint_entry_guide_position", 3) as Vector2
 	var raw_corner := Vector2(735.0, 360.0)

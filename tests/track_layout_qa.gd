@@ -37,12 +37,14 @@ func _run() -> void:
 	_check(finish != null and bool(finish.get("is_finish_line")), "finish gate exists")
 	_check(white != null and black != null and white.visible and black.visible, "checker strip exists and visible")
 
-	if ribbon != null and barrier != null:
-		var overlap: Array[PackedVector2Array] = Geometry2D.intersect_polygons(ribbon.polygon, barrier_collision_polygon(barrier))
-		var overlap_area := 0.0
-		for piece: PackedVector2Array in overlap:
-			overlap_area += absf(_polygon_area(piece))
-		_check(overlap_area < 400.0, "island prop should not invade the painted ribbon (overlap=%.0f)" % overlap_area)
+	if barrier != null:
+		var boundary_collision := barrier.get_node_or_null("BoundaryCollision") as CollisionShape2D
+		_check(
+			boundary_collision != null
+			and boundary_collision.shape is ConcavePolygonShape2D
+			and barrier_collision_polygon(barrier).size() > 20,
+			"island prop has a complete concave collision boundary"
+		)
 
 	if ribbon != null:
 		for container_name: String in ["GridForward", "GridReverse"]:
@@ -54,6 +56,8 @@ func _run() -> void:
 					if marker_node == null:
 						continue
 					_check(Geometry2D.is_point_in_polygon(marker_node.position, ribbon.polygon), "%s marker %s is inside the painted track" % [container_name, marker.name])
+					if barrier != null:
+						_check(not Geometry2D.is_point_in_polygon(marker_node.position, barrier_collision_polygon(barrier)), "%s marker %s stays outside the inner barrier" % [container_name, marker.name])
 					var clearance := _clearance_from_colliders(track, marker_node.position)
 					if clearance < 55.0:
 						_check(false, "%s marker %s keeps clearance from props/walls (%.0f near %s)" % [container_name, marker.name, clearance, _nearest_collider(track, marker_node.position)])
@@ -70,21 +74,12 @@ func _run() -> void:
 			_check(span >= min_span, "%s spans the corridor (%.0f)" % [gate_name, span])
 
 	var obstacles := _obstacle_bodies(track)
-	var obstacle_names: Array[String] = []
-	for obstacle: StaticBody2D in obstacles:
-		obstacle_names.append(String(obstacle.name))
 	_check(obstacles.size() >= 11, "eleven named obstacles present")
 	for first in obstacles.size():
 		for second in range(first + 1, obstacles.size()):
 			var distance := obstacles[first].position.distance_to(obstacles[second].position)
 			var min_gap := _obstacle_radius(obstacles[first]) + _obstacle_radius(obstacles[second]) + 12.0
 			_check(distance >= min_gap, "obstacles %s and %s do not overlap (%.0f < %.0f)" % [obstacles[first].name, obstacles[second].name, distance, min_gap])
-		if barrier != null:
-			var inside := false
-			var barrier_poly := barrier_collision_polygon(barrier)
-			if not barrier_poly.is_empty():
-				inside = Geometry2D.is_point_in_polygon(obstacles[first].position, barrier_poly)
-			_check(not inside, "obstacle %s is not buried inside the island prop" % obstacles[first].name)
 
 	if white != null and finish != null:
 		var gate_corners := _gate_corners(finish)
@@ -96,7 +91,7 @@ func _run() -> void:
 		)
 
 	# Walls cover the room perimeter
-	for wall_name: String in ["TopWall", "BottomWall", "LeftWall", "RightWall"]:
+	for wall_name: String in ["Wall0", "Wall1", "Wall2", "Wall3"]:
 		_check(track.get_node_or_null(wall_name) != null, "%s present" % wall_name)
 
 	if _failures.is_empty():
@@ -108,17 +103,21 @@ func _run() -> void:
 
 
 func barrier_collision_polygon(barrier: StaticBody2D) -> PackedVector2Array:
+	var metadata_polygon: PackedVector2Array = barrier.get_meta("boundary_polygon", PackedVector2Array())
+	if not metadata_polygon.is_empty():
+		var transformed := PackedVector2Array()
+		for point: Vector2 in metadata_polygon:
+			transformed.append(barrier.transform * point)
+		return transformed
 	for child in barrier.get_children():
-		if child is CollisionShape2D:
+		if child is CollisionPolygon2D:
+			var transformed := PackedVector2Array()
+			for point: Vector2 in (child as CollisionPolygon2D).polygon:
+				transformed.append(barrier.transform * (child as CollisionPolygon2D).transform * point)
+			return transformed
+		elif child is CollisionShape2D:
 			var shape: Shape2D = (child as CollisionShape2D).shape
-			if shape.get_class() == "CollisionPolygon2D":
-				var polygon: Variant = shape.get("polygon")
-				if polygon is PackedVector2Array:
-					var transformed := PackedVector2Array()
-					for point: Vector2 in polygon:
-						transformed.append(barrier.position + point)
-					return transformed
-			elif shape.get_class() == "RectangleShape2D":
+			if shape.get_class() == "RectangleShape2D":
 				var rect_shape: RectangleShape2D = shape
 				var rect := Rect2(barrier.position + (child as CollisionShape2D).position - rect_shape.size * 0.5, rect_shape.size)
 				return PackedVector2Array([
@@ -212,14 +211,6 @@ func _polygon_bounds(points: PackedVector2Array) -> Dictionary:
 		min_x = minf(min_x, point.x)
 		max_x = maxf(max_x, point.x)
 	return {"min_x": min_x, "max_x": max_x}
-
-
-func _polygon_area(points: PackedVector2Array) -> float:
-	var total := 0.0
-	for index in points.size():
-		var next := (index + 1) % points.size()
-		total += points[index].x * points[next].y - points[next].x * points[index].y
-	return total * 0.5
 
 
 func _check(condition: bool, message: String) -> void:

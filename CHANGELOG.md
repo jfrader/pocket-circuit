@@ -3,230 +3,70 @@
 ## Unreleased
 
 ### Added
-- A procedural circuit generator (`tools/track_seed_gen.gd`, ported from the
-  juangallostra / ChrisPHP racetrack algorithms): random points, convex hull,
-  displaced midpoints, angle clamping, and an arc-length spline resample —
-  producing organic rounded circuits instead of rectangles. Seeds are
-  validated for self-overlap and grid-straight length and are fully
-  reproducible.
-- Twenty-eight generated circuits baked into `scenes/tracks/circuits/` (fourteen
-  layouts per workshop/office theme), each with painted ribbon, edge lines,
-  dashed centerline, bold two-row checker strip, seeded prop scatter (island
-  fill, corridor slalom, apron clutter) and per-theme furniture surfaces.
-- A "GENERATED CIRCUITS" section in Quick Race (paged, workshop/office themed)
-  so every baked circuit is playable, plus a circuit roster catalog and test.
-- Brightened generated floor/island textures (desk mat, wood planks, toolbox,
-  keyboard) and per-theme furniture edge strips on all room walls.
-- Track length variety per archetype (fast = long circuits, switchback = short)
-  and two more room canvases: a super-wide counter (2600×800) and a big square
-  mat (1500×1500).
-- Pure procedural races: Quick Race defaults, REROLL, and every championship
-  race now draw a fresh random seed (no curated whitelist); the room canvas is
-  picked from the seed too. The racing-line AI now follows the line in the
-  car's travel direction so reverse races work, and the generator's corner
-  angle and self-distance floors were tightened for universal driveability.
-- Designed island vignettes: each island now hosts one authored scene per
-  theme chosen by seed — a tool project (barrel, paint cans, hose coil,
-  tools, sawdust), a breakfast setting (teapot, mugs, plate stack, utensils,
-  crumbs), a desk scene (lamp, mug, book, remote, pencils, papers) — with a
-  light scatter of tiny items for life, replacing the random prop grid.
-- Big-prop dominance, for real this time: the huge tier pools were missing
-  from the specs entirely (the earlier claim was wrong), and the repeat loop
-  capped after a handful of placements. Now: six huge prop types per theme,
-  cap-4 repeats with big-pool fallback — 63 fill props per island with the
-  huge items (barrel 140, hose 122, basketball 112) dominating the center.
-- Big-prop dominance: the island fill now keeps filling its huge/big cells
-  with repeats (cap 3 per texture) so genuinely big items dominate instead of
-  one-of-each, the huge tier's rim margin loosened, several sizes raised
-  (barrel 140, hose 122, basketball 112, watermelon 102, teapot 96), and the
-  corner giants grew to ~215 units.
-- Assessment sweep fixes: the switchback's max loop length is now actually
-  enforced, wrench/hammer got their real shapes, the corner-giant pools are
-  wired into all three themes, orphan roster scenes removed, and the
-  constraints doc corrected for the drifts the audit found.
-- The circuit pool re-derived for the longer layouts: 16 new AI-verified
-  classic circuits per theme (loop lengths ~3.6–4.3k) replace the previous
-  short ones.
-- "One big object" rooms: the central island is now a coherent themed object
-  (red tool tray with compartments and tools for the workshop, a keyboard for
-  the office, a white plate with a blue inner ring and crumbs for the
-  kitchen); the translucent highlight rectangle is gone and every base fill
-  is theme-neutral. Longer circuits: generator margins tightened and
-  per-archetype minimum lengths raised (~3.6–4.3k loop length, up from
-  ~2.6–3.2k) so straights and corners match the car scale.
-- Micro Machines scale pass: layered furniture walls (dark base, side face,
-  cream top lip), giant corner set pieces (oversized barrel/paint can/hose in
-  the workshop, mug/teapot/vase in the kitchen, lamp/tape roll in the office),
-  stronger prop grounding shadows, and richer decal scatter.
-- Racing-line AI: every track now bakes an invisible curvature-offset racing
-  line the AI follows with lookahead targeting and curvature-limited corner
-  speeds (a real racing line instead of gate-to-gate chasing), with a
-  challenge bump to the club/clockwork paces.
-- Intrinsic prop sizes: every prop now renders at its real-world footprint
-  (basketball 56u, mug 34u, strawberry 18u, coin 12u, barrel 92u) instead of
-  a uniform cell size, with matching rectangle/circle colliders.
-- "Great look" pass: patterned base surfaces (gingham tablecloth kitchen,
-  woven desk pad office, grained wood workshop) with theme worn strips;
-  fifteen new depth-shaded props (mugs, bottles, plate stacks, vases,
-  teapots, staplers, pencils, scissors, keys, tools); surface decals
-  (crumbs, coffee rings, paper sheets, sawdust, oil stains); and real
-  per-shape colliders — rectangles for books, planks and rulers aligned to
-  the track, circles for round props.
-- Seamless racing surfaces: the track ribbon is now a barely-there warm
-  light-worn tint (no distinct colored band) with theme wear strips, and all
-  translucent surface-zone overlays (oil slick, spark strips, paper patches)
-  are invisible. Corner/straight prop delimitation stays; the office's
-  hand-tuned canonical track keeps its proven AI-stable build.
-- The kitchen moved fully onto the generated-track system: its old
-  hand-made scene (painted strips, amber decoration lines, translucent
-  patches, micro dressing) is retired from gameplay in favour of the builder's
-  kitchen circuit, so every room now shares one visual language and no stray
-  translucent squares remain.
-- Island silhouette clean-up: removed the rounded-rectangle ink outline and
-  the inner-vertex fold artifacts (the island surface is now the fold-free
-  room-minus-track region while the collision keeps the proven expanded
-  loop); kitchen canonical prop scales corrected after the texture swap.
-- Corridor scatter props moved to a dedicated dodge layer: the AI still
-  swerves around them but its racing-line probes no longer treat them as
-  walls, restoring driveability across the whole pool (verified 70+ tracks,
-  pruned three marginal seeds; roster now 72).
-- Object-delimited tracks: all painted edge lines, kerb blocks, and the
-  dashed centerline are gone; the course boundary now reads from the props —
-  a curated island interior (one book, one lamp, one controller-style mix of
-  big/medium items deep in the center, small/tiny near the edges) and a line
-  of long props (rulers, planks, cables) delimiting the outer straights.
-- Theme-matched track surfaces: warm worn asphalt for the workshop, cool
-  rubber-mat grey for the office, and a new desk-lamp prop; fixed a spoon
-  texture reference and a corridor-fold bug that let props stray onto the
-  track (checks now run against the clipped ribbon).
-- L-shaped desk rooms joined the circuit pool (the generator samples the
-  L's arm and the notch stays off-track) — five harness-verified L circuits
-  per theme, bringing the validated pool to 78 tracks.
-- Kitchen island dressing refreshed with the new prop batch (frying pan,
-  watermelon, plant, strawberry, coins, bolts, barrel, flower pot).
-- Soft contact shadows under every island prop so toys read as planted on
-  the surface (vision-review verified: no floating props, no artifacts).
-- Random Quick Race and championship seeds now draw from the AI-validated
-  circuit pool by default (typed seeds still generate anything at runtime).
-- Any-seed circuit generation: the track builder is now a runtime library
-  (`tools/track_builder_core.gd`), so a race can build an arbitrary seed on
-  demand — no pre-baked file required.
-- Quick Race redesigned: pick a room (kitchen / workshop / office), the seed
-  defaults to a random value, and any seed can be typed in (with controller
-  step buttons and a reroll); PLAY races it. Generated kitchen circuits are
-  new (counter surface, painted track, big plate island).
-- Championship races now run on a random seed per event, so every race is a
-  fresh circuit.
-- Fifteen new prop sprites (barrel, flower pot, basketball, soccer ball,
-  football, watermelon, frying pan, remote, wrench, hammer, strawberry, bolt,
-  screw, coin, small plant) wired into the island fills at huge/medium/small/
-  tiny sizes, plus corridor obstacles pushed toward the track edges and the
-  office's flat "paper sheet" debug-looking rectangle removed.
-- Room-canvas variety: circuits now live in differently shaped rooms — the
-  classic square bench, a long horizontal counter (~2350×900), and a tall
-  vertical shelf (~1150×1450) — with polygon wall segments, room-shaped
-  surfaces, and corridor clipping to the room outline. The circuit roster
-  grew to 52 tracks (26 per theme: 16 classic, 5 wide, 5 tall).
-- Track archetypes: the circuit generator now rolls one of four personalities
-  per seed — fast (long straights, gentle corners), technical (tight S-curves
-  and chicanes), asymmetric (one dominant side), and switchback (sharp
-  direction changes) — so generated tracks differ in rhythm and silhouette,
-  not just decoration. The circuit roster was re-scanned end-to-end
-  (geometry + AI harness, 31 candidates, 16 robust seeds kept across all four
-  archetypes, 32 tracks total).
-- Wild-racing art pass: removed the circuit markings (white edge lines and
-  dashed centerline) so the course reads as painted-on-real-surface plus props
-  instead of a marked circuit; added a prop size hierarchy on every island
-  (huge hose/toolbox, medium books and planks, small apples and limes, tiny
-  paperclips) and a new hand-drawn paperclip prop; fixed a fuchsia-background
-  cable hazard; per-theme ribbon contrast tuning.
-- Dense collidable island fills: the inner park of every circuit is now packed
-  with real objects (books, wooden planks, hose coils, paint cans, utensils)
-  that physically block shortcut cuts, layered behind the island prop barrier.
-- Three new hand-drawn props (book, wood plank, hose coil) rendered from SVG.
 
 - The complete nine-event Grand Household Circuit, with three story acts,
-  persistent standings, unlocks, replayable events, and a championship ending.
-- Four tuned handling builds and four-racer fields with AI opponents that plan
-  for corners, hold stable racing lines, recover from stalls, and contest rival
-  duels, reverse races, legal checkpoint ranking, and finish order.
-- Kitchen, Workshop, and Office room identities with distinct surfaces, moving
-  hazards, track dressing, and event conditions.
-- The Office circuit rebuilt as a desk-triangle route with a keyboard island,
-  reversing the lap direction and distinct gate fractions so it no longer
-  mirrors the Workshop paperclip.
-- Counter-top edge strips along every room wall, and a big plate and cutting
-  board dressed across the Kitchen island so walls and the island read as
-  real furniture instead of invisible barriers.
-- Fixed-height, controller-safe title, paged championship, briefing, vehicle,
-  settings, credits, pause, results, and ending screens without menu scrolling.
-- A Quick Race circuit picker plus in-race audio and comfort settings that keep
-  the current race paused.
+  recurring rivals, persistent standings, vehicle and event unlocks,
+  replayable races, and a championship ending.
+- Four distinct machines and four-racer fields with legal lap validation,
+  starting grids, countdowns, race position, finish order, results, and
+  championship points.
+- Live generated household circuits for every Quick Race reroll and
+  championship event. Players can choose a theme and seed, while six route
+  silhouettes and six room canvases produce reproducible layouts without a
+  curated circuit list.
+- Designed track moments on generated circuits: an iconic opening, an early
+  crossing hazard in either race direction, a technical surface section, a
+  faster low-grip shortcut beside a safe lane, a speed straight, and a clear
+  checker run to the finish.
+- Kitchen, Workshop, and Office environments with coherent household story
+  scenes, toy-scale props, distinct material behavior, moving hazards, and
+  readable object-delimited courses.
+- Main menu, new and continue flow, championship map, event briefing, machine
+  selection, Quick Race, pause settings, credits, results, and ending screens
+  designed for keyboard and controller use at 1280 x 720.
 - Versioned local saves with atomic replacement, validated backup recovery,
-  corrupt-save fallback, and protection against overwriting newer save formats.
-- Original music and licensed CC0 toy-racing sound effects, persistent volume
-  controls, reduced camera shake, reduced motion, and pause-aware race audio.
-- Native Windows x86_64 and Linux x86_64 release exports for offline Steam and
-  Steam Deck play.
+  corrupt-save fallback, and protection from overwriting newer save formats.
+- Original music, licensed sound effects, persistent volume controls, reduced
+  camera shake, reduced motion, and pause-aware race audio.
+- Native Windows x86_64 and Linux x86_64 offline release exports with Steam
+  Deck-compatible controls.
 
 ### Changed
 
-- Championship screens now pair controller-safe actions with original driver,
-  vehicle, garage, and route illustrations; the garage visibly presents the
-  full four-car roster, unlock requirements, and focused-machine stats.
-- Driver portraits and race machines now use distinct, deterministic pixel-art
-  identities throughout the championship shell and live races, rendered by the
-  refined Procedural 2D avatar and car generators with sharper faces and a
-  wider part catalog.
-- The start/finish checker now sits on the left straight behind the starting
-  grid, and lap gates span the full drivable corridor, so wide lines and brief
-  off-track excursions still count the lap.
-- Kitchen, Workshop, and Office are now three different circuits: the kitchen
-  keeps its counter loop, while the workshop and office are generated from
-  smooth closed splines (a wide bench oval for the workshop, a tall paperclip
-  for the office) with rounded corners, painted surfaces, and race-grid-aligned
-  starting lineups.
-- The generated tracks are painted layouts on real environments: the workshop
-  is a wooden-plank bench with a giant toolbox island and scattered hardware,
-  and the office is a desk mat with a giant keyboard island, sticky notes, and
-  paper clips — the props are the collision, not invisible track walls.
-- The title and machine bay now use a high-contrast after-hours workbench
-  presentation with one dominant race action and the full four-car roster.
-- Title PLAY starts the championship; Quick Race, Options, Credits, and Quit are real buttons under it.
-- Vehicle select previews a machine, then PLAY confirms the race.
-- Title uses a cartoon night-kitchen poster with clean amber and coral action plates; race HUD stays floating clusters.
-- Kitchen mugs, fruit, cereal, sponge, utensils, start/finish, and moving
-  hazards now use illustrated toy-scale sprites instead of flat polygons.
-- The race HUD now keeps position, lap, timer, speed, boost, recovery controls,
-  and horizontal racer labels readable without covering the circuit.
-- Vehicle-to-vehicle contact now separates along the physics normal instead of
-  gluing cars together, caps heading only on the first hit, and restores
-  steering as soon as they split.
-- AI opponents now hold near-top speed on straights, use their boost meter on
-  open stretches, and carry more speed through corners, so club races stay
-  close and clockwork races apply real pressure.
-- AI opponents also stay in the track corridor, dodge cars and moving hazards,
-  catch up from behind without cheating top speed, and recover heading instead
-  of stalling short of a lap.
-- Engine, countdown, launch, drift, boost, impact, warning, and menu interaction
-  cues now use clearer toy-scale sounds, with the engine spooling into a wider
-  rev range under throttle.
+- Quick Race now accepts arbitrary seeds, and championship events draw a fresh
+  seed and deterministic room canvas whenever a race starts.
+- Generated circuits now use six visibly different route families with
+  independent length variation while preserving the exact requested seed in
+  every room shape.
+- Circuit dressing now forms coherent household stories with deliberate focal
+  clusters, object lines, sparse delimiters, landmarks, and themed surface
+  moments instead of uniform random scatter.
+- Course boundaries read from household objects and material changes rather
+  than white edge lines, dashed centerlines, kerbs, or translucent overlays.
+- Racing-line AI now follows generated routes in the active race direction,
+  keeps to the safe lane beside optional shortcuts, plans for corners, dodges
+  traffic and moving hazards, and recovers from stalls.
+- Championship screens pair controller-safe actions with original drivers,
+  machines, garage art, and route illustrations; the garage presents the full
+  roster, unlock requirements, and focused-machine stats.
+- The race HUD keeps position, lap, timer, speed, boost, recovery controls, and
+  horizontal racer labels readable without covering the circuit.
+- Vehicle contact separates along the physics normal and restores steering as
+  cars split, reducing prolonged collision lockups.
 
 ### Fixed
 
-- Debug hazard warnings and on-track section labels no longer appear in races.
-- Menu music now plays a longer melodic loop instead of repeating an alarm-like
-  pulse every half second.
-- Championship map and settings metadata remain readable at the release
-  resolution, keyboard focus stays visible after returning between screens, and
-  completed off-screen events remain reachable without a mouse.
+- Inner island collision follows the complete visible boundary on both
+  generated and authored circuits, preventing cuts through the infield without
+  concave-polygon decomposition failures.
+- Start grids remain outside the island, lap gates span the full drivable
+  corridor, and forward and reverse races use the correct checker order.
 - Failed disk writes no longer advance championship progress, discard an
-  existing championship, or claim that a race result was saved; affected
-  screens now keep Continue blocked and offer an explicit retry.
-- A championship win now remains pending across restarts until the ending is
-  acknowledged, so quitting before Continue cannot permanently skip it.
-- Recovery ghost periods no longer expire while paused, save-error Back returns
-  to its originating screen, and reduced motion also disables decorative track
-  pulses and the boost camera pulse.
-- The full inner circuit now has collision aligned to a continuous visible
-  guardrail, preventing cars from cutting through the painted infield.
+  existing championship, or claim that a result was saved.
+- Championship wins remain pending across restarts until the ending is
+  acknowledged, preventing a quit from permanently skipping the finale.
+- Recovery timers do not expire while paused, keyboard focus remains visible
+  between screens, and completed off-screen events remain reachable without a
+  mouse.
+- Debug surface labels and development-only overlays no longer appear in
+  release races; gameplay hazard telegraphs remain visible.

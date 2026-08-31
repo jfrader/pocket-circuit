@@ -33,7 +33,6 @@ const RUSTBUG_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
-const CIRCUIT_ROSTER := preload("res://data/circuits/circuit_roster.gd")
 const TRACK_BUILDER := preload("res://tools/track_builder_core.gd")
 const RACE_HUD_SCRIPT := preload("res://scripts/ui/race_hud.gd")
 const COUNTDOWN_STEP_SECONDS := 0.65
@@ -98,7 +97,9 @@ var _countdown_active := false
 func _ready() -> void:
 	_create_phase_one_ui()
 	_configure_session()
-	_configure_track_variant()
+	if not _configure_track_variant():
+		call_deferred("_abort_failed_race")
+		return
 	_create_pause_overlay()
 	_configure_racers()
 	race_manager.race_finished.connect(_on_race_finished)
@@ -198,40 +199,51 @@ func _configure_session() -> void:
 			_race_hud.set_context(String(event.get("name", "Household Circuit")), String(vehicle.get("name", "Rustbug")))
 
 
-func _configure_track_variant() -> void:
+func _configure_track_variant() -> bool:
 	var event: Dictionary = _session.get("event", {})
 	var requested_theme := StringName(event.get("theme", "kitchen"))
 	var scene_path := ""
 	var packed: PackedScene = null
-	if not String(event.get("circuit", "")).is_empty():
+	if String(event.get("circuit", "")) == "generated":
 		var circuit_room := StringName(event.get("room", "classic"))
 		var circuit_seed := int(event.get("seed", 0))
-		scene_path = CIRCUIT_ROSTER.scene_path(requested_theme, circuit_room, circuit_seed)
-		packed = load(scene_path) as PackedScene
+		var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed)
+		packed = built.get("scene") as PackedScene
 		if packed == null:
-			var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed)
-			packed = built["scene"] as PackedScene
+			push_error("Could not generate circuit %s/%s/%d" % [requested_theme, circuit_room, circuit_seed])
+			return false
 	else:
 		scene_path = String(TRACK_SCENES.get(requested_theme, ""))
 		var track_override := OS.get_environment("PC_TRACK_SCENE")
 		if not track_override.is_empty():
 			scene_path = track_override
 		packed = load(scene_path) as PackedScene
-	if packed:
-			var embedded := track_root
-			embedded.get_parent().remove_child(embedded)
-			embedded.free()
-			track_root = packed.instantiate() as Node2D
-			track_root.name = "Track"
-			add_child(track_root)
+	if packed == null:
+		push_error("Could not load circuit scene %s" % scene_path)
+		return false
+	var embedded := track_root
+	embedded.get_parent().remove_child(embedded)
+	embedded.free()
+	track_root = packed.instantiate() as Node2D
+	track_root.name = "Track"
+	add_child(track_root)
 	_track_variant_presenter = TRACK_VARIANT_SCRIPT.new() as TrackVariantPresenter
 	track_root.add_child(_track_variant_presenter)
-	_track_variant_presenter.configure(track_root, requested_theme)
+	_track_variant_presenter.configure(track_root, requested_theme, race_manager.is_reverse_direction())
 	var discovered_checkpoints: Array[Node] = []
 	for child: Node in track_root.get_children():
 		if child.is_in_group("track_checkpoints"):
 			discovered_checkpoints.append(child)
 	race_manager.configure_checkpoints(discovered_checkpoints)
+	return true
+
+
+func _abort_failed_race() -> void:
+	set_process(false)
+	set_physics_process(false)
+	var app := get_node_or_null("/root/App")
+	if app and app.has_method("abandon_race"):
+		app.call("abandon_race")
 
 
 func _grid_transforms(reverse: bool) -> Array[Transform2D]:

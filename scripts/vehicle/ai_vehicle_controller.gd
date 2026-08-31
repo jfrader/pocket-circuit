@@ -500,9 +500,7 @@ func _racing_line_target(forward: Vector2) -> Vector2:
 		return vehicle.global_position + forward * 200.0
 	var count := _racing_line.size()
 	var index := _nearest_line_index(vehicle.global_position)
-	var next_probe := _racing_line[(index + 1) % count]
-	var prev_probe := _racing_line[(index + count - 1) % count]
-	var direction := 1 if forward.dot((next_probe - prev_probe).normalized()) > 0.0 else -1
+	var direction := -1 if race_manager.is_reverse_direction() else 1
 	var lookahead := 70.0 + vehicle.speed * 0.4
 	var walked := 0.0
 	for step in count:
@@ -520,9 +518,10 @@ func _racing_line_radius(position: Vector2) -> float:
 		return 0.0
 	var count := _racing_line.size()
 	var index := _nearest_line_index(position)
+	var direction := -1 if race_manager.is_reverse_direction() else 1
 	var a := _racing_line[index]
-	var b := _racing_line[(index + 9) % count]
-	var c := _racing_line[(index + 18) % count]
+	var b := _racing_line[(index + 9 * direction + count) % count]
+	var c := _racing_line[(index + 18 * direction + count) % count]
 	var ab := a.distance_to(b)
 	var bc := b.distance_to(c)
 	var ac := a.distance_to(c)
