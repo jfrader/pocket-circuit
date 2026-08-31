@@ -32,13 +32,13 @@ static func archetype_params(seed: int, base: Dictionary) -> Dictionary:
 		0:
 			result["min_point_distance"] = 250.0
 			result["max_angle_deg"] = 62.0
-			result["min_self_distance"] = base_self if base_self > 0.0 else 300.0
+			result["min_self_distance"] = base_self if base_self > 0.0 else 305.0
 			result["point_count"] = 10
 			result["displacement_min"] = 0.04
 			result["displacement_max"] = 0.10
 		1:
 			result["min_point_distance"] = 185.0
-			result["max_angle_deg"] = 82.0
+			result["max_angle_deg"] = 78.0
 			result["min_self_distance"] = 268.0
 			result["point_count"] = 15
 			result["displacement_min"] = 0.07
@@ -46,15 +46,15 @@ static func archetype_params(seed: int, base: Dictionary) -> Dictionary:
 		2:
 			result["min_point_distance"] = 210.0
 			result["max_angle_deg"] = 78.0
-			result["min_self_distance"] = base_self if base_self > 0.0 else 290.0
+			result["min_self_distance"] = base_self if base_self > 0.0 else 292.0
 			result["point_count"] = 13
 			result["displacement_min"] = 0.06
 			result["displacement_max"] = 0.14
 			result["side_bias"] = Vector2(-0.6, 0.0) if posmod(seed, 8) < 4 else Vector2(0.6, 0.0)
 		_:
 			result["min_point_distance"] = 200.0
-			result["max_angle_deg"] = 84.0
-			result["min_self_distance"] = base_self if base_self > 0.0 else 262.0
+			result["max_angle_deg"] = 78.0
+			result["min_self_distance"] = base_self if base_self > 0.0 else 290.0
 			result["point_count"] = 12
 			result["displacement_min"] = 0.08
 			result["displacement_max"] = 0.16

@@ -20,6 +20,11 @@
 - Track length variety per archetype (fast = long circuits, switchback = short)
   and two more room canvases: a super-wide counter (2600×800) and a big square
   mat (1500×1500).
+- Pure procedural races: Quick Race defaults, REROLL, and every championship
+  race now draw a fresh random seed (no curated whitelist); the room canvas is
+  picked from the seed too. The racing-line AI now follows the line in the
+  car's travel direction so reverse races work, and the generator's corner
+  angle and self-distance floors were tightened for universal driveability.
 - Designed island vignettes: each island now hosts one authored scene per
   theme chosen by seed — a tool project (barrel, paint cans, hose coil,
   tools, sawdust), a breakfast setting (teapot, mugs, plate stack, utensils,

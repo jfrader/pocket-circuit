@@ -500,10 +500,13 @@ func _racing_line_target(forward: Vector2) -> Vector2:
 		return vehicle.global_position + forward * 200.0
 	var count := _racing_line.size()
 	var index := _nearest_line_index(vehicle.global_position)
+	var next_probe := _racing_line[(index + 1) % count]
+	var prev_probe := _racing_line[(index + count - 1) % count]
+	var direction := 1 if forward.dot((next_probe - prev_probe).normalized()) > 0.0 else -1
 	var lookahead := 70.0 + vehicle.speed * 0.4
 	var walked := 0.0
 	for step in count:
-		var next := (index + 1) % count
+		var next := (index + direction + count) % count
 		var segment := _racing_line[index].distance_to(_racing_line[next])
 		if walked + segment >= lookahead and segment > 0.001:
 			return _racing_line[index].lerp(_racing_line[next], (lookahead - walked) / segment)

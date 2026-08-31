@@ -199,15 +199,18 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 
 
 func random_circuit_seed(theme: StringName) -> Dictionary:
-	var candidates: Array = []
-	for entry: Dictionary in CIRCUIT_ROSTER.entries():
-		if StringName(entry["theme"]) == theme:
-			candidates.append(entry)
-	if not candidates.is_empty():
-		var random := RandomNumberGenerator.new()
-		random.randomize()
-		return candidates[random.randi_range(0, candidates.size() - 1)]
-	return {"theme": String(theme), "room": "classic", "seed": randi() % 100000}
+	# Every race generates a fresh circuit: a pure random seed, room chosen
+	# by the seed (the canvases stay varied). No curated whitelist.
+	var random := RandomNumberGenerator.new()
+	random.randomize()
+	var seed_value := random.randi_range(0, 999999)
+	var room := "classic"
+	match posmod(seed_value, 5):
+		1: room = "wide"
+		2: room = "tall"
+		3: room = "long"
+		4: room = "square"
+	return {"theme": String(theme), "room": room, "seed": seed_value}
 
 
 func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String) -> void:

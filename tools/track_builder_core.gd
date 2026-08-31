@@ -697,6 +697,8 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# Props delimiting the outer side of the track (long on straights, bulky on corners)
 	if not OS.get_environment("PC_NO_BOUNDARY") == "1":
 		_line_boundary_props(root, spec, centerline, outer_loop, clipped, room_polygon)
+	# A line of paperclips along the longest straight (many-item formation)
+	_add_paperclip_line(root, spec, centerline, outer_loop, room_polygon)
 	var decal_rng := RandomNumberGenerator.new()
 	decal_rng.seed = int(spec.get("seed", 0)) * 31 + 7
 	_scatter_decals(root, spec, room_polygon, corridor, decal_rng)
@@ -1230,6 +1232,43 @@ static func _island_apexes(inner_loop: PackedVector2Array) -> PackedVector2Array
 		if absf(turn) > 0.18 and (apexes.is_empty() or apexes[apexes.size() - 1].distance_to(inner_loop[index]) > 120.0):
 			apexes.append(inner_loop[index])
 	return apexes
+
+
+static func _add_paperclip_line(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, outer_loop: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+	var count := centerline.size()
+	var best_start := 0
+	var best_straight := -1.0
+	for index in count:
+		var chord := centerline[(index + 20) % count].distance_to(centerline[(index + count - 20) % count])
+		if chord > best_straight:
+			best_straight = chord
+			best_start = index
+	var index := best_start
+	var placed := 0
+	while placed < 18:
+		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
+		var position := outer_loop[index] + (outer_loop[index] - centerline[index]).normalized() * 58.0
+		if Geometry2D.is_point_in_polygon(position, room_polygon) and _distance_to_centerline(position, centerline) >= 165.0:
+			var clip := StaticBody2D.new()
+			clip.name = "PaperclipLine"
+			clip.position = position
+			clip.rotation = tangent.angle()
+			clip.collision_layer = 16
+			root.add_child(clip)
+			var shape := RectangleShape2D.new()
+			shape.size = Vector2(16.0, 7.0)
+			var cs := CollisionShape2D.new()
+			cs.shape = shape
+			clip.add_child(cs)
+			var texture := load("res://assets/textures/imagine/paperclip.png") as Texture2D
+			if texture:
+				var sprite := Sprite2D.new()
+				sprite.texture = texture
+				sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+				sprite.scale = Vector2.ONE * (16.0 / maxf(texture.get_width(), texture.get_height()))
+				clip.add_child(sprite)
+			placed += 1
+		index = (index + 2) % count
 
 
 static func _distance_to_centerline(point: Vector2, centerline: PackedVector2Array) -> float:
