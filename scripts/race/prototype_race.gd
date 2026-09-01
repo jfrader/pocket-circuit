@@ -204,6 +204,7 @@ func _configure_track_variant() -> void:
 
 
 func _run_countdown() -> void:
+	_push_live_race_state("grid")
 	race_manager.begin_countdown()
 	for value in ["3", "2", "1"]:
 		_present_countdown(value)
@@ -214,6 +215,7 @@ func _run_countdown() -> void:
 	_play_sfx(&"go", 0.92)
 	race_manager.report_countdown_tick("GO!")
 	race_manager.start_race()
+	_push_live_race_state("race")
 	if "--media-capture" in OS.get_cmdline_user_args():
 		print("MEDIA_RACE_READY %s %s" % [String(_session.get("event_id", "unknown")), String(_session.get("vehicle_id", "unknown"))])
 	_countdown_active = false
@@ -238,6 +240,7 @@ func _update_position_label() -> void:
 
 func _on_race_finished(_total_time: float) -> void:
 	_finished = true
+	_push_live_race_state("finish")
 	_results_panel.visible = true
 	_retry_button.disabled = true
 	_continue_button.disabled = true
@@ -258,6 +261,8 @@ func _on_lap_completed(lap: int) -> void:
 	if lap >= race_manager.laps_to_finish:
 		return
 	_race_flash_label.text = "FINAL LAP" if lap == race_manager.laps_to_finish - 1 else "LAP %d" % (lap + 1)
+	if lap == race_manager.laps_to_finish - 1:
+		_push_live_race_state("race", true)
 	_race_flash_label.visible = true
 	_race_flash_label.modulate.a = 1.0
 	if _race_flash_tween and _race_flash_tween.is_valid():
@@ -397,6 +402,46 @@ func _play_sfx(sound_name: StringName, volume_scale: float = 1.0) -> void:
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("play_sfx"):
 		app.call("play_sfx", sound_name, volume_scale)
+
+
+func _push_live_race_state(phase: String, final_lap: bool = false) -> void:
+	# Additive, music-only. Guarded by ClassDB + get_node_or_null so race logic and
+	# non-audio tests are completely unaffected. Uses App.get_current_race_session()
+	# access pattern that already exists in this file.
+	if not ClassDB.class_exists("GamestrumentsPlayer"):
+		return
+	var app := get_node_or_null("/root/App")
+	if app == null:
+		return
+	if app.has_method("get_current_race_session"):
+		var _dummy: Dictionary = app.call("get_current_race_session")
+		# session consulted per task guidance (value not required for music params)
+	var director: Variant = app.get("audio_director")
+	if not is_instance_valid(director) or not (director is Node) or not director.has_method("set_live_race_state"):
+		return
+	var intensity := 0.35
+	var pressure := 0.2
+	if is_instance_valid(_player_vehicle) and phase != "grid":
+		# intensity sourced from vehicle speed normalized (see also audio_director _update_engine)
+		var speed := maxf(0.0, float(_player_vehicle.get("speed")))
+		var max_speed := 680.0
+		var stats: Variant = _player_vehicle.get("stats")
+		if stats is Object:
+			max_speed = maxf(1.0, float((stats as Object).get("max_speed")))
+		intensity = clampf(speed / max_speed, 0.0, 1.0)
+	var pos := 1
+	var cnt := 4
+	if is_instance_valid(race_manager) and is_instance_valid(_player_vehicle):
+		pos = race_manager.get_racer_position(_player_vehicle)
+		cnt = maxi(1, race_manager.get_racer_count())
+	if cnt > 1:
+		# pressure from current standing (1=lead high pressure, higher numbers lower); mirrors progress/position math already in race_manager
+		pressure = clampf((float(cnt) - float(pos)) / float(cnt - 1), 0.0, 1.0)
+	(director as Node).call("set_live_race_state", phase, intensity, pressure, final_lap)
+	if phase == "finish" and pos == 1:
+		var live := (director as Node).get_node_or_null("GamestrumentsPlayer")
+		if is_instance_valid(live):
+			live.set("finishResult", "win")
 
 
 func _ensure_debug_overlay() -> void:

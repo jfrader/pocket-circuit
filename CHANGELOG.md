@@ -21,6 +21,9 @@
   shake, reduced motion, and pause-aware race audio.
 - Native Windows x86_64 and Linux x86_64 release exports for offline Steam and
   Steam Deck play.
+- Adaptive music follows race phase when the live engine is loaded (grid on
+  countdown, "race" at start with speed-normalized intensity and standing
+  pressure, final-lap flag, finish+win result).
 
 ### Changed
 

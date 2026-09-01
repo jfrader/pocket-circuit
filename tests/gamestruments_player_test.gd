@@ -21,6 +21,7 @@ func _run_test() -> void:
 	await process_frame
 	player.call("generate", "menu")
 	player.call("set_race_state", "garage", 0.35, 0.2, false)
+	player.call("set_race_state", "race", 0.7, 0.5, false)
 	await process_frame
 	await process_frame
 	if player.get_child_count() < 1:

@@ -146,6 +146,13 @@ func get_sfx_player_count() -> int:
 	return _sfx_players.size()
 
 
+func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool) -> void:
+	# Music-only adaptive state for the live procedural engine.
+	# WAV loop path remains completely unchanged (no calls to _set_music or players here).
+	if _live_music != null and _live_music.has_method("set_race_state"):
+		_live_music.call("set_race_state", phase, intensity, pressure, final_lap)
+
+
 func _bind_live_music() -> void:
 	if not ClassDB.class_exists("GamestrumentsPlayer"):
 		return
