@@ -276,6 +276,9 @@ func _check_island_geometry(track: Node2D, label: String) -> bool:
 
 
 func _check_story_assets(theme: StringName) -> bool:
+	for ground_section: Dictionary in BUILDER.LAYOUTS[theme].get("ground_sections", []):
+		if not _expect(load(String(ground_section["asset"])) is Texture2D, "%s is missing ground section asset %s" % [theme, ground_section["asset"]]):
+			return false
 	for kit: Dictionary in BUILDER.STORY_KITS[theme]:
 		for formation: Dictionary in kit["island"]:
 			if not _expect(load(String(formation["asset"])) is Texture2D, "%s/%s is missing island asset %s" % [theme, kit["id"], formation["asset"]]):
@@ -298,6 +301,7 @@ func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
 		return false
 	var placed_count := int(dressing.get_meta("placed_count", 0))
 	var pocket_count := int(dressing.get_meta("pocket_count", 0))
+	var ground_section_count := int(dressing.get_meta("ground_section_count", 0))
 	var decal_count := int(dressing.get_meta("decal_count", 0))
 	if not _expect(placed_count >= 12 and placed_count <= 18, "%s seed %d should fill safe blank space with a semantic many of 12-18 ambient props (got %d)" % [theme, seed, placed_count]):
 		return false
@@ -310,12 +314,36 @@ func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
 		if not _expect(pocket_placed >= 2 and pocket_placed <= 3, "%s seed %d ambient pockets should preserve the semantic few quantity (got %d)" % [theme, seed, pocket_placed]):
 			return false
 	var details := dressing.get_node_or_null("FloorDetails")
-	if not _expect(details != null and details.get_child_count() == decal_count and decal_count >= 8, "%s seed %d should add at least eight off-track floor details" % [theme, seed]):
+	if not _expect(details != null and details.get_child_count() == decal_count and decal_count >= 12, "%s seed %d should add at least twelve off-track floor details" % [theme, seed]):
 		return false
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
 	var room_shape := StringName(track.get_meta("room_shape", &"classic"))
 	var room_polygon: PackedVector2Array = BUILDER.ROOM_SHAPES[room_shape]
 	var bounds: Rect2 = _points_bounds(room_polygon)
+	var ground := dressing.get_node_or_null("GroundSections")
+	if not _expect(ground != null and ground.get_child_count() == ground_section_count and ground_section_count >= 2 and ground_section_count <= 4, "%s seed %d should add 2-4 broad ground sections (got %d)" % [theme, seed, ground_section_count]):
+		return false
+	var ground_assets := {}
+	var ground_sectors := {}
+	for child: Node in ground.get_children():
+		if not _expect(child is Sprite2D and not child is StaticBody2D, "%s seed %d ground sections should be non-colliding sprites" % [theme, seed]):
+			return false
+		var section := child as Sprite2D
+		var position := section.global_position
+		var asset_path := String(section.get_meta("asset_path", ""))
+		if not _expect(section.texture != null and asset_path.begins_with("res://assets/textures/ground_dressing/%s_" % theme), "%s seed %d ground section should use a theme-specific tracked texture" % [theme, seed]):
+			return false
+		if not _expect(Geometry2D.is_point_in_polygon(position, room_polygon), "%s seed %d ground section should stay inside the room" % [theme, seed]):
+			return false
+		if not _expect(_minimum_point_distance(position, centerline) >= BUILDER.HALF_WIDTH, "%s seed %d ground section center should stay off the racing corridor" % [theme, seed]):
+			return false
+		ground_assets[asset_path] = true
+		var normalized: Vector2 = (position - bounds.position) / bounds.size
+		ground_sectors[Vector2i(clampi(int(normalized.x * 3.0), 0, 2), clampi(int(normalized.y * 2.0), 0, 1))] = true
+	if not _expect(ground_assets.size() == ground_section_count, "%s seed %d ground sections should not repeat assets" % [theme, seed]):
+		return false
+	if not _expect(ground_sectors.size() >= 2, "%s seed %d ground sections should occupy at least two room sectors" % [theme, seed]):
+		return false
 	var assets := {}
 	var sectors := {}
 	var prop_nodes := dressing.find_children("*", "StaticBody2D", true, false)

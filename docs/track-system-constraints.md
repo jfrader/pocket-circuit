@@ -87,9 +87,12 @@ stream independent from family and target length.
   across distinct sectors. Each pocket is a semantic `few`, and the 12-18 prop
   room-level aggregate remains a semantic `many` without becoming uniform
   noise. Story assets marked `unique` are reserved before ambient placement.
-- Floor details add at least eight non-colliding themed decals to large blank
-  areas. Ambient props and decals stay inside the room and outside the protected
-  route corridor.
+- Ground sections add 2-4 broad, theme-specific cloth, paper, cardboard, or
+  desk-pad anchors across distinct room sectors. They are non-colliding
+  `Sprite2D` presentation and never become gameplay surfaces or barriers.
+- Floor details add 12-20 non-colliding themed decals to large blank areas.
+  Ambient props, ground sections, and decals stay inside the room and outside
+  the protected route corridor.
 - Asset dimensions and collider shapes come from `PROP_SHAPES`. Generated
   story props must use transparent PNG textures, never opaque JPG rectangles.
 - Trackside placement must remain clear of checkpoint recovery corridors:

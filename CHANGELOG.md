@@ -39,8 +39,8 @@
   bends, harmonic lobes, and localized chicanes, with wider long-form rooms and
   technical fallbacks that preserve identity without becoming stretched ovals.
 - Circuit dressing now combines coherent household story moments with safe
-  themed prop pockets and floor details that fill blank room sectors without
-  obstructing the racing corridor.
+  themed prop pockets, broad cloth and paper set dressing, and denser floor
+  details that fill blank room sectors without obstructing the racing corridor.
 - Course boundaries read from household objects and material changes rather
   than white edge lines, dashed centerlines, kerbs, or translucent overlays.
 - Racing-line AI now follows generated routes in the active race direction,

@@ -454,6 +454,18 @@ const LAYOUTS := {
 		"decals": [
 			"res://assets/textures/imagine/crumb_cluster.png",
 			"res://assets/textures/imagine/stain_ring.png",
+			"res://assets/textures/kitchen/wet_spill.png",
+			"res://assets/textures/kitchen/spill_decal.png",
+			"res://assets/textures/kitchen/wood_scratch.png",
+			"res://assets/textures/kitchen/water_droplet_01.png",
+			"res://assets/textures/kitchen/water_droplet_02.png",
+			"res://assets/textures/kitchen/cereal_scatter.png",
+		],
+		"ground_sections": [
+			{"asset": "res://assets/textures/ground_dressing/kitchen_tablecloth_patch.png", "size": 330.0, "alpha": 0.92},
+			{"asset": "res://assets/textures/ground_dressing/kitchen_dish_towel_blue.png", "size": 270.0, "alpha": 0.96},
+			{"asset": "res://assets/textures/ground_dressing/kitchen_cleaning_rag_yellow.png", "size": 220.0, "alpha": 0.94},
+			{"asset": "res://assets/textures/ground_dressing/kitchen_oven_mitt_red.png", "size": 205.0, "alpha": 0.96},
 		],
 		"obstacles": {
 			"MugA": {"pos": Vector2(-300, 290), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
@@ -556,6 +568,14 @@ const LAYOUTS := {
 		"decals": [
 			"res://assets/textures/imagine/sawdust_patch.png",
 			"res://assets/textures/imagine/oil_stain.png",
+			"res://assets/textures/imagine/stain_ring.png",
+			"res://assets/textures/kitchen/wood_scratch.png",
+		],
+		"ground_sections": [
+			{"asset": "res://assets/textures/ground_dressing/workshop_dropcloth_patch.png", "size": 340.0, "alpha": 0.90},
+			{"asset": "res://assets/textures/ground_dressing/workshop_shop_rag_red.png", "size": 220.0, "alpha": 0.94},
+			{"asset": "res://assets/textures/ground_dressing/workshop_cardboard_scrap.png", "size": 270.0, "alpha": 0.96},
+			{"asset": "res://assets/textures/ground_dressing/workshop_sandpaper_sheet.png", "size": 210.0, "alpha": 0.95},
 		],
 		"island_expansion": 10.0,
 		"obstacles": {
@@ -669,6 +689,13 @@ const LAYOUTS := {
 		"decals": [
 			"res://assets/textures/imagine/paper_sheet.png",
 			"res://assets/textures/imagine/stain_ring.png",
+			"res://assets/textures/imagine/crumb_cluster.png",
+		],
+		"ground_sections": [
+			{"asset": "res://assets/textures/ground_dressing/office_desk_pad_patch.png", "size": 330.0, "alpha": 0.88},
+			{"asset": "res://assets/textures/ground_dressing/office_envelope_stack.png", "size": 255.0, "alpha": 0.96},
+			{"asset": "res://assets/textures/ground_dressing/office_sticky_notes.png", "size": 220.0, "alpha": 0.96},
+			{"asset": "res://assets/textures/ground_dressing/office_notepad_page.png", "size": 245.0, "alpha": 0.96},
 		],
 		"island_expansion": 4.0,
 		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.72, 0.74],
@@ -1390,7 +1417,7 @@ static func _compose_generated_story(
 		occupied
 	)
 	_build_corner_landmarks(container, story, spec, moments["corners"], centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
-	_build_room_dressing(container, story, spec, centerline, room_polygon, gate_samples, reserved_unique_assets, occupied)
+	_build_room_dressing(container, story, spec, centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
 	_build_generated_surfaces(root, container, story, moments, centerline)
 	_build_finish_moments(container, centerline)
 
@@ -1929,6 +1956,7 @@ static func _build_room_dressing(
 		story: Dictionary,
 		spec: Dictionary,
 		centerline: PackedVector2Array,
+		outer_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		reserved_unique_assets: Dictionary,
@@ -1980,9 +2008,11 @@ static func _build_room_dressing(
 			if not placed:
 				continue
 		pocket.set_meta("placed_count", pocket_placed)
+	var ground_section_count := _build_room_ground_sections(dressing, story, spec, centerline, outer_loop, room_polygon)
 	var decal_count := _build_room_floor_details(dressing, spec, centerline, room_polygon, occupied, rng)
 	dressing.set_meta("placed_count", placed_count)
 	dressing.set_meta("pocket_count", anchors.size())
+	dressing.set_meta("ground_section_count", ground_section_count)
 	dressing.set_meta("decal_count", decal_count)
 
 
@@ -2058,6 +2088,85 @@ static func _room_dressing_anchors(
 	return anchors
 
 
+static func _build_room_ground_sections(
+		parent: Node2D,
+		story: Dictionary,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		outer_loop: PackedVector2Array,
+		room_polygon: PackedVector2Array
+) -> int:
+	var definitions: Array = spec.get("ground_sections", [])
+	if definitions.is_empty():
+		return 0
+	var sections := Node2D.new()
+	sections.name = "GroundSections"
+	sections.set_meta("moment_kind", &"ambient_ground")
+	parent.add_child(sections)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _mix_seed(int(spec["requested_seed"]), "ground_sections:%s" % String(story["id"]))
+	var room_area := absf(_polygon_area(room_polygon))
+	var target_count := clampi(int(round(room_area / 750000.0)), 2, 4)
+	sections.set_meta("requested_count", target_count)
+	var bounds := _polygon_bounds_rect(room_polygon)
+	var placements: Array[Dictionary] = []
+	var occupied_sectors := {}
+	var asset_offset := rng.randi_range(0, definitions.size() - 1)
+	for section_index in target_count:
+		var definition: Dictionary = definitions[(asset_offset + section_index) % definitions.size()]
+		var asset_path := String(definition["asset"])
+		var texture := load(asset_path) as Texture2D
+		if texture == null:
+			continue
+		var base_world_size := float(definition.get("size", 240.0)) * rng.randf_range(0.90, 1.08)
+		var alpha := float(definition.get("alpha", 0.94))
+		for attempt in 520:
+			var size_factor := 1.0 - float(attempt / 180) * 0.08
+			var world_size := base_world_size * maxf(size_factor, 0.82)
+			var footprint_radius := world_size * 0.40
+			var candidate := Vector2(
+				rng.randf_range(bounds.position.x, bounds.end.x),
+				rng.randf_range(bounds.position.y, bounds.end.y)
+			)
+			if Geometry2D.is_point_in_polygon(candidate, outer_loop):
+				continue
+			if not _inside_polygon_with_radius(candidate, minf(footprint_radius * 0.82, 92.0), room_polygon):
+				continue
+			if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + footprint_radius * 0.14:
+				continue
+			var normalized: Vector2 = (candidate - bounds.position) / bounds.size
+			var sector := Vector2i(clampi(int(normalized.x * 3.0), 0, 2), clampi(int(normalized.y * 2.0), 0, 1))
+			if attempt < 300 and occupied_sectors.has(sector):
+				continue
+			var clear := true
+			for placement: Dictionary in placements:
+				if candidate.distance_to(placement["position"]) < (footprint_radius + float(placement["radius"])) * 0.72:
+					clear = false
+					break
+			if not clear:
+				continue
+			var sprite := Sprite2D.new()
+			sprite.name = "Section%02d" % placements.size()
+			sprite.texture = texture
+			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			sprite.position = candidate
+			sprite.rotation = rng.randf_range(-PI, PI)
+			var longest := maxf(texture.get_width(), texture.get_height())
+			sprite.scale = Vector2.ONE * (world_size / maxf(longest, 1.0))
+			sprite.modulate = Color(1.0, 1.0, 1.0, alpha)
+			sprite.z_index = -17
+			sprite.set_meta("asset_path", asset_path)
+			sprite.set_meta("moment_kind", &"ambient_ground")
+			sprite.set_meta("world_size", world_size)
+			sprite.set_meta("footprint_radius", footprint_radius)
+			sections.add_child(sprite)
+			placements.append({"position": candidate, "radius": footprint_radius})
+			occupied_sectors[sector] = true
+			break
+	sections.set_meta("placed_count", placements.size())
+	return placements.size()
+
+
 static func _build_room_floor_details(
 		parent: Node2D,
 		spec: Dictionary,
@@ -2073,7 +2182,7 @@ static func _build_room_floor_details(
 	details.name = "FloorDetails"
 	parent.add_child(details)
 	var bounds := _polygon_bounds_rect(room_polygon)
-	var target_count := clampi(int(round(absf(_polygon_area(room_polygon)) / 150000.0)), 8, 14)
+	var target_count := clampi(int(round(absf(_polygon_area(room_polygon)) / 110000.0)), 12, 20)
 	var positions := PackedVector2Array()
 	for attempt in 420:
 		var candidate := Vector2(
@@ -2084,7 +2193,7 @@ static func _build_room_floor_details(
 			continue
 		if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + 22.0:
 			continue
-		if not _clear_of_points(candidate, positions, 105.0):
+		if not _clear_of_points(candidate, positions, 82.0):
 			continue
 		var texture_path := String(decals[rng.randi_range(0, decals.size() - 1)])
 		var texture := load(texture_path) as Texture2D

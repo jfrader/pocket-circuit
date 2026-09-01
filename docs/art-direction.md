@@ -110,6 +110,18 @@ rooms, route geometry, palette, interface, and story.
 - `kitchen_start_stripe_decal.png`
 - `kitchen_skid_mark.png`
 
+### Ambient Ground Dressing
+
+- Place two to four broad anchors in otherwise empty room sectors, using cloth,
+  paper, cardboard, or desk-pad silhouettes rather than uniform scatter.
+- Kitchen uses a checked tablecloth patch, striped dish towel, yellow cleaning
+  rag, and red oven mitt.
+- Workshop uses a stained drop cloth, red shop rag, cardboard scrap, and
+  sandpaper sheet.
+- Office uses a dark desk pad, envelope stack, sticky notes, and notepad page.
+- These pieces remain lower contrast than hero landmarks, do not collide, and
+  cannot become a substitute for readable track edges.
+
 ### Vehicle And Effects
 
 - `rustbug_hero.png`

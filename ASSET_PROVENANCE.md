@@ -26,7 +26,8 @@ licensed commercial font.
 
 | Paths or content | Production method | Release status |
 |---|---|---|
-| `assets/models/**/*.png`, `assets/textures/**/*.png`, `assets/ui/**/*.png`, `assets/vfx/**/*.png` | Developer-directed, AI-assisted original graphic generation followed by project-specific selection, conversion, sizing, composition, and revision. Designs are fictional and use no third-party source media. | Cleared for this release |
+| `assets/textures/ground_dressing/*.png` | Original project SVG compositions defined in `tools/gen_ground_dressing_assets.gd` and rendered locally to transparent PNGs with Godot's `Image.load_svg_from_buffer`; no external images, brands, or source media. | Cleared for this release |
+| Other `assets/models/**/*.png`, `assets/textures/**/*.png`, `assets/ui/**/*.png`, and `assets/vfx/**/*.png` | Developer-directed, AI-assisted original graphic generation followed by project-specific selection, conversion, sizing, composition, and revision. Designs are fictional and use no third-party source media. | Cleared for this release |
 | `assets/textures/imagine/*.png`, `assets/ui/imagine/*.png` | Grok Imagine 2.0, developer-directed prompts, magenta chroma-key to PNG alpha where needed. Original logo, menu art, HUD plates, track/counter tiles, and toy-scale kitchen/workshop/office sprites. No third-party characters or brands. | Review selection; mix/scale approval pending |
 | `assets/branding/pocket_circuit_icon.svg` | Original project vector artwork assembled from simple geometric shapes and the game's palette. | Cleared for this release |
 | `assets/audio/*.wav` | Synthesized locally from mathematical waveforms and deterministic noise by `tools/generate_audio.gd`; no samples, recordings, or borrowed melodies. Menu and race loops remain temporary pending the project composer's final cues. | Review only |
