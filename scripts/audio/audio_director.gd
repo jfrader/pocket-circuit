@@ -29,6 +29,7 @@ var _menu_loop: AudioStreamWAV
 var _race_loop: AudioStreamWAV
 var _engine_loop: AudioStreamWAV
 var _headless := false
+var _live_music: Node
 
 
 func _ready() -> void:
@@ -39,6 +40,7 @@ func _ready() -> void:
 	_race_loop = _make_runtime_loop(RACE_LOOP)
 	_engine_loop = _make_runtime_loop(ENGINE_LOOP)
 	_build_players()
+	_bind_live_music()
 
 
 func _process(_delta: float) -> void:
@@ -68,12 +70,25 @@ func ensure_buses() -> void:
 
 
 func play_menu_music() -> void:
+	if _play_live("menu", "garage", 0.35, 0.2, false):
+		clear_local_vehicle()
+		set_race_paused(false)
+		return
 	_set_music(&"menu", _menu_loop)
 	clear_local_vehicle()
 	set_race_paused(false)
 
 
 func play_race_music() -> void:
+	var race_seed := "race"
+	var app := get_node_or_null("/root/App")
+	if app != null:
+		var session: Variant = app.get("current_race_session")
+		if session is Dictionary and not (session as Dictionary).is_empty():
+			race_seed = String((session as Dictionary).get("event_id", "race"))
+	if _play_live(race_seed, "race", 0.72, 0.4, false):
+		set_race_paused(false)
+		return
 	_set_music(&"race", _race_loop)
 	set_race_paused(false)
 
@@ -124,6 +139,31 @@ func get_music_context() -> StringName:
 
 func get_sfx_player_count() -> int:
 	return _sfx_players.size()
+
+
+func _bind_live_music() -> void:
+	if not ClassDB.class_exists("GamestrumentsPlayer"):
+		return
+	_live_music = ClassDB.instantiate("GamestrumentsPlayer")
+	_live_music.name = "GamestrumentsPlayer"
+	_live_music.set("project_secret", "guri-pc-dev-salt")
+	_live_music.set("style", "funk")
+	_live_music.set("melody_voice", "pluck")
+	_live_music.set("harmony_voice", "warm")
+	_live_music.set("drive_voice", "pluck")
+	_live_music.set("bass_voice", "bass")
+	add_child(_live_music)
+
+
+func _play_live(seed: String, phase: String, intensity: float, pressure: float, final_lap: bool) -> bool:
+	if _live_music == null or not _live_music.has_method("generate"):
+		return false
+	if is_instance_valid(_music_player):
+		_music_player.stop()
+	_music_context = &"live"
+	_live_music.call("generate", seed)
+	_live_music.call("set_race_state", phase, intensity, pressure, final_lap)
+	return true
 
 
 func _build_players() -> void:

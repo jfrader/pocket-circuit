@@ -17,6 +17,10 @@ export.cfg
 # Godot MCP — local dev tool, do not commit
 addons/godot_mcp/
 
+# Gamestruments GDExtension binary (sync with tools/sync_gamestruments.sh)
+addons/gamestruments/bin/
+addons/gamestruments/*.gdextension
+
 # Editor / OS
 .DS_Store
 Thumbs.db
