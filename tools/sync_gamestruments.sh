@@ -8,6 +8,4 @@ mkdir -p "$BIN"
 cargo build -p gamestruments-godot --manifest-path "$SOURCE/Cargo.toml"
 cp "$SOURCE/crates/godot/gamestruments.gdextension" "$DEST/gamestruments.gdextension"
 cp "$SOURCE/target/debug/libgamestruments_godot.so" "$BIN/libgamestruments_godot.so"
-# Point the copied extension at this project's bin folder.
-sed -i 's|res://bin/|res://addons/gamestruments/bin/|g' "$DEST/gamestruments.gdextension"
 echo "Synced Gamestruments GDExtension into $DEST"

@@ -70,7 +70,7 @@ func ensure_buses() -> void:
 
 
 func play_menu_music() -> void:
-	if _play_live("menu", "garage", 0.35, 0.2, false):
+	if _play_live("menu", "garage", 0.35, 0.2, false, &"menu"):
 		clear_local_vehicle()
 		set_race_paused(false)
 		return
@@ -86,7 +86,7 @@ func play_race_music() -> void:
 		var session: Variant = app.get("current_race_session")
 		if session is Dictionary and not (session as Dictionary).is_empty():
 			race_seed = String((session as Dictionary).get("event_id", "race"))
-	if _play_live(race_seed, "race", 0.72, 0.4, false):
+	if _play_live(race_seed, "race", 0.72, 0.4, false, &"race"):
 		set_race_paused(false)
 		return
 	_set_music(&"race", _race_loop)
@@ -113,8 +113,13 @@ func clear_local_vehicle() -> void:
 
 func set_race_paused(paused: bool) -> void:
 	_race_paused = paused
+	var music_db := PAUSED_MUSIC_DB if paused and _music_context == &"race" else 0.0
 	if is_instance_valid(_music_player):
-		_music_player.volume_db = PAUSED_MUSIC_DB if paused and _music_context == &"race" else 0.0
+		_music_player.volume_db = music_db
+	if is_instance_valid(_live_music):
+		for child in _live_music.get_children():
+			if child is AudioStreamPlayer:
+				(child as AudioStreamPlayer).volume_db = music_db
 	if paused and is_instance_valid(_engine_player):
 		_engine_player.volume_db = SILENCE_DB
 
@@ -155,12 +160,19 @@ func _bind_live_music() -> void:
 	add_child(_live_music)
 
 
-func _play_live(seed: String, phase: String, intensity: float, pressure: float, final_lap: bool) -> bool:
+func _play_live(
+	seed: String,
+	phase: String,
+	intensity: float,
+	pressure: float,
+	final_lap: bool,
+	context: StringName,
+) -> bool:
 	if _live_music == null or not _live_music.has_method("generate"):
 		return false
 	if is_instance_valid(_music_player):
 		_music_player.stop()
-	_music_context = &"live"
+	_music_context = context
 	_live_music.call("generate", seed)
 	_live_music.call("set_race_state", phase, intensity, pressure, final_lap)
 	return true
