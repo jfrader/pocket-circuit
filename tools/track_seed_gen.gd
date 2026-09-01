@@ -23,6 +23,7 @@ const FAMILY_SALT := 0x13579BDF
 const LENGTH_SALT := 0x2468ACE
 const VARIANT_SALT := 0x51A7E3D
 const FALLBACK_SALT := 0x6C8E9CF
+const RHYTHM_SALT := 0x4A71C9D
 
 
 static func generate_with_retries(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Dictionary:
@@ -68,8 +69,8 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var last_reason := "no candidate"
 
 	for attempt in MAX_VARIANTS:
-		var controls := _el_controls(seed, attempt, source_rect, target_length) \
-			if room_shape == &"el" else _family_controls(family, seed, attempt, usable_rect, target_length)
+		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance) \
+			if room_shape == &"el" else _family_controls(family, family, seed, attempt, usable_rect, target_length, min_self_distance)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
@@ -81,11 +82,23 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 		last_reason = String(validation.get("reason", "unknown"))
 		if bool(validation["valid"]):
 			var centerline: PackedVector2Array = validation["centerline"]
+			var ordered_controls := _reorder_to_longest_straight(controls, centerline)
+			var ordered_validation := _validate_controls(
+				ordered_controls,
+				source_rect,
+				room_polygon,
+				room_check_margin,
+				min_self_distance,
+				minimum_length
+			)
+			if not bool(ordered_validation["valid"]):
+				last_reason = "post-order " + String(ordered_validation.get("reason", "unknown"))
+				continue
 			return {
-				"points": _reorder_to_longest_straight(controls, centerline),
+				"points": ordered_controls,
 				"seed": seed,
 				"family": family,
-				"length": float(validation["length"]),
+				"length": float(ordered_validation["length"]),
 				"attempt": attempt,
 				"fallback": false,
 				"realization": &"el_safe" if room_shape == &"el" else family,
@@ -95,8 +108,8 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	# The fallback is deterministic and never changes the requested seed or its
 	# selected family metadata. EL rooms retain their dedicated L-safe route.
 	for fallback_attempt in 4:
-		var controls := _el_controls(seed, MAX_VARIANTS + fallback_attempt, source_rect, target_length) \
-			if room_shape == &"el" else _family_controls(&"conservative", seed, fallback_attempt, usable_rect, target_length)
+		var controls := _el_controls(family, seed, MAX_VARIANTS + fallback_attempt, source_rect, target_length, min_self_distance) \
+			if room_shape == &"el" else _family_controls(&"conservative", family, seed, fallback_attempt, usable_rect, target_length, min_self_distance)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
@@ -108,14 +121,26 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 		last_reason = String(validation.get("reason", "unknown"))
 		if bool(validation["valid"]):
 			var centerline: PackedVector2Array = validation["centerline"]
+			var ordered_controls := _reorder_to_longest_straight(controls, centerline)
+			var ordered_validation := _validate_controls(
+				ordered_controls,
+				source_rect,
+				room_polygon,
+				room_check_margin,
+				min_self_distance,
+				minf(minimum_length, target_length * 0.72)
+			)
+			if not bool(ordered_validation["valid"]):
+				last_reason = "post-order " + String(ordered_validation.get("reason", "unknown"))
+				continue
 			return {
-				"points": _reorder_to_longest_straight(controls, centerline),
+				"points": ordered_controls,
 				"seed": seed,
 				"family": family,
-				"length": float(validation["length"]),
+				"length": float(ordered_validation["length"]),
 				"attempt": MAX_VARIANTS + fallback_attempt,
 				"fallback": true,
-				"realization": &"el_safe" if room_shape == &"el" else &"conservative",
+				"realization": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
 				"fallback_reason": family_reason,
 			}
 	var empty := _empty_result(seed, family)
@@ -142,13 +167,15 @@ static func _generation_rect(room_rect: Rect2, params: Dictionary, room_polygon:
 
 
 static func _family_controls(
-	family: StringName,
+	template_family: StringName,
+	rhythm_family: StringName,
 	seed: int,
 	attempt: int,
 	usable_rect: Rect2,
-	target_length: float
+	target_length: float,
+	min_self_distance: float
 ) -> PackedVector2Array:
-	var anchors := _family_template(family, seed)
+	var anchors := _family_template(template_family, seed)
 	if anchors.is_empty():
 		return PackedVector2Array()
 
@@ -165,6 +192,14 @@ static func _family_controls(
 		point.x *= mirror
 		anchors[index] = point.rotated(orientation)
 	var normalized := _resample_template(anchors, CONTROL_COUNT)
+	normalized = _apply_turn_rhythm(
+		normalized,
+		rhythm_family,
+		seed,
+		attempt,
+		target_length,
+		template_family == &"conservative"
+	)
 
 	var mapped := _map_to_rect(normalized, usable_rect)
 	var full_centerline := _sample_centerline(mapped)
@@ -172,10 +207,14 @@ static func _family_controls(
 	if full_length < 1.0:
 		return PackedVector2Array()
 
-	# Length is a uniform post-fit scale, leaving the explicit silhouette intact.
-	# Retry attempts pull away from walls without mutating family identity.
+	# Keep enough of the full-size candidate to preserve nonlocal clearance. This
+	# lets short length rolls stay within their family instead of collapsing a
+	# waist and falling through to a generic loop.
 	var minimum_scale := maxf(0.62, 285.0 / minf(usable_rect.size.x, usable_rect.size.y))
-	var retry_ceiling := 1.0 - float(attempt) * 0.018
+	var full_clearance := _minimum_branch_distance(full_centerline, min_self_distance)
+	if full_clearance < INF:
+		minimum_scale = maxf(minimum_scale, minf(1.0, min_self_distance / maxf(full_clearance, 1.0)))
+	var retry_ceiling := maxf(minimum_scale, 1.0 - float(attempt) * 0.012)
 	var length_scale := clampf(target_length / full_length, minimum_scale, retry_ceiling)
 	var center := usable_rect.get_center()
 	var slack := usable_rect.size * (1.0 - length_scale) * 0.18
@@ -192,11 +231,12 @@ static func _family_template(family: StringName, seed: int) -> PackedVector2Arra
 	match family:
 		&"speed_loop":
 			return PackedVector2Array([
-				Vector2(-0.92, -0.16), Vector2(-0.82, -0.48), Vector2(-0.55, -0.70),
-				Vector2(-0.12, -0.78), Vector2(0.38, -0.74), Vector2(0.74, -0.55),
-				Vector2(0.92, -0.18), Vector2(0.92, 0.18), Vector2(0.74, 0.55),
-				Vector2(0.38, 0.74), Vector2(-0.12, 0.78), Vector2(-0.55, 0.70),
-				Vector2(-0.82, 0.48), Vector2(-0.92, 0.16),
+				Vector2(-0.96, -0.08), Vector2(-0.88, -0.42), Vector2(-0.68, -0.70),
+				Vector2(-0.42, -0.84), Vector2(-0.16, -0.56), Vector2(0.10, -0.88),
+				Vector2(0.40, -0.62), Vector2(0.70, -0.72), Vector2(0.92, -0.24),
+				Vector2(0.94, 0.10), Vector2(0.78, 0.44), Vector2(0.52, 0.70),
+				Vector2(0.24, 0.56), Vector2(-0.04, 0.88), Vector2(-0.36, 0.66),
+				Vector2(-0.66, 0.58), Vector2(-0.88, 0.32),
 			])
 		&"kidney":
 			return PackedVector2Array([
@@ -218,11 +258,13 @@ static func _family_template(family: StringName, seed: int) -> PackedVector2Arra
 			])
 		&"broad_triangle":
 			return PackedVector2Array([
-				Vector2(0.00, -0.92), Vector2(0.18, -0.82), Vector2(0.36, -0.48),
-				Vector2(0.76, 0.38), Vector2(0.82, 0.62), Vector2(0.64, 0.78),
-				Vector2(0.20, 0.82), Vector2(-0.20, 0.82), Vector2(-0.64, 0.78),
-				Vector2(-0.82, 0.62), Vector2(-0.76, 0.38), Vector2(-0.36, -0.48),
-				Vector2(-0.18, -0.82),
+				Vector2(0.00, -0.94), Vector2(0.15, -0.84), Vector2(0.23, -0.62),
+				Vector2(0.40, -0.48), Vector2(0.47, -0.20), Vector2(0.72, 0.28),
+				Vector2(0.86, 0.54), Vector2(0.72, 0.72), Vector2(0.44, 0.80),
+				Vector2(0.20, 0.68), Vector2(-0.04, 0.84), Vector2(-0.30, 0.70),
+				Vector2(-0.54, 0.80), Vector2(-0.78, 0.64), Vector2(-0.86, 0.44),
+				Vector2(-0.68, 0.16), Vector2(-0.52, -0.20), Vector2(-0.40, -0.50),
+				Vector2(-0.22, -0.64), Vector2(-0.15, -0.84),
 			])
 		&"offset_s":
 			return PackedVector2Array([
@@ -243,13 +285,116 @@ static func _family_template(family: StringName, seed: int) -> PackedVector2Arra
 				Vector2(-0.76, 0.48),
 			])
 		_:
-			var result := PackedVector2Array()
-			var phase := TAU * _hash_unit(seed, FALLBACK_SALT)
-			for index in CONTROL_COUNT:
-				var angle := TAU * float(index) / float(CONTROL_COUNT)
-				var radius := 1.0 + 0.025 * cos(3.0 * angle + phase)
-				result.append(Vector2(cos(angle) * radius, sin(angle) * radius * 0.92))
-			return result
+			# A broad technical perimeter is safer than the concave family shapes,
+			# while staggered top and bottom sectors retain real corner rhythm in
+			# narrow rooms instead of collapsing to the old perturbed circle.
+			return PackedVector2Array([
+				Vector2(-0.96, -0.08), Vector2(-0.88, -0.48), Vector2(-0.68, -0.76),
+				Vector2(-0.46, -0.62), Vector2(-0.22, -0.84), Vector2(0.02, -0.66),
+				Vector2(0.28, -0.82), Vector2(0.54, -0.64), Vector2(0.80, -0.74),
+				Vector2(0.96, -0.36), Vector2(0.90, 0.04), Vector2(0.96, 0.38),
+				Vector2(0.74, 0.74), Vector2(0.48, 0.62), Vector2(0.20, 0.84),
+				Vector2(-0.06, 0.64), Vector2(-0.34, 0.82), Vector2(-0.60, 0.62),
+				Vector2(-0.84, 0.74), Vector2(-0.96, 0.34),
+			])
+
+
+static func _apply_turn_rhythm(
+	points: PackedVector2Array,
+	family: StringName,
+	seed: int,
+	attempt: int,
+	target_length: float,
+	conservative: bool,
+	strength_multiplier: float = 1.0
+) -> PackedVector2Array:
+	if points.size() < 8:
+		return points
+	var attempt_strength := _attempt_rhythm_strength(attempt, conservative)
+	if attempt_strength <= 0.0:
+		return points
+	var family_index := maxi(FAMILY_NAMES.find(family), 0)
+	var rhythm_seed := _hash32(seed ^ RHYTHM_SALT ^ ((family_index + 1) * 0x1F123BB) ^ (attempt * 0x51A7E3D))
+	var phase_broad := TAU * _hash_unit(rhythm_seed, RHYTHM_SALT + 17)
+	var phase_detail := TAU * _hash_unit(rhythm_seed, RHYTHM_SALT + 41)
+	var chicane_center := posmod(_hash32(rhythm_seed ^ (RHYTHM_SALT + 73)), points.size())
+	var quiet_center := posmod(chicane_center + points.size() / 2, points.size())
+	var length_strength := lerpf(0.82, 1.18, clampf(inverse_lerp(2500.0, 5500.0, target_length), 0.0, 1.0))
+	var amplitude := _family_rhythm_strength(family) * attempt_strength * length_strength * strength_multiplier
+	if conservative:
+		amplitude *= 0.78
+
+	var offsets := PackedFloat32Array()
+	var chicane_half_span := 4.5
+	for index in points.size():
+		var angle := TAU * float(index) / float(points.size())
+		var field := sin(angle * 3.0 + phase_broad) * 0.58
+		field += sin(angle * 6.0 + phase_detail) * 0.42
+		var chicane_distance := _signed_cyclic_distance(index, chicane_center, points.size())
+		if absf(chicane_distance) < chicane_half_span:
+			field += sin(PI * chicane_distance / chicane_half_span) * 0.82
+		offsets.append(field * amplitude)
+	# Circular smoothing turns the displacement field into readable corner
+	# sequences instead of spline-scale wiggles.
+	for _pass in 2:
+		var smoothed := PackedFloat32Array()
+		for index in offsets.size():
+			smoothed.append((offsets[posmod(index - 1, offsets.size())] + offsets[index] * 2.0 + offsets[(index + 1) % offsets.size()]) * 0.25)
+		offsets = smoothed
+	var mean := 0.0
+	for offset: float in offsets:
+		mean += offset
+	mean /= float(offsets.size())
+
+	var result := PackedVector2Array()
+	for index in points.size():
+		var tangent := points[posmod(index - 1, points.size())].direction_to(points[(index + 1) % points.size()])
+		var normal := tangent.rotated(PI * 0.5)
+		var quiet_distance := _cyclic_index_distance(index, quiet_center, points.size())
+		var quiet_factor := smoothstep(2.0, 5.0, float(quiet_distance))
+		result.append(points[index] + normal * (offsets[index] - mean) * quiet_factor)
+	return result
+
+
+static func _attempt_rhythm_strength(attempt: int, conservative: bool) -> float:
+	if conservative:
+		match attempt:
+			0:
+				return 0.90
+			1:
+				return 0.60
+			2:
+				return 0.30
+			_:
+				return 0.0
+	return clampf(1.0 - float(attempt) * 0.09, 0.0, 1.0)
+
+
+static func _family_rhythm_strength(family: StringName) -> float:
+	match family:
+		&"speed_loop":
+			return 0.16
+		&"kidney":
+			return 0.16
+		&"dogbone":
+			return 0.15
+		&"broad_triangle":
+			return 0.15
+		&"offset_s":
+			return 0.16
+		&"deep_notch":
+			return 0.16
+	return 0.10
+
+
+static func _signed_cyclic_distance(index: int, center: int, count: int) -> float:
+	var distance := posmod(index - center + count / 2, count) - count / 2
+	return float(distance)
+
+
+static func _cyclic_index_distance(first: int, second: int, count: int) -> int:
+	var direct := absi(first - second)
+	return mini(direct, count - direct)
 
 
 static func _resample_template(anchors: PackedVector2Array, target_count: int) -> PackedVector2Array:
@@ -271,7 +416,14 @@ static func _resample_template(anchors: PackedVector2Array, target_count: int) -
 	return result
 
 
-static func _el_controls(seed: int, attempt: int, source_rect: Rect2, target_length: float) -> PackedVector2Array:
+static func _el_controls(
+	family: StringName,
+	seed: int,
+	attempt: int,
+	source_rect: Rect2,
+	target_length: float,
+	min_self_distance: float
+) -> PackedVector2Array:
 	# This route follows the eroded L footprint instead of pretending the room is
 	# its left rectangle. The rounded elbow stays clear of the concave corner.
 	var anchors := PackedVector2Array([
@@ -283,14 +435,19 @@ static func _el_controls(seed: int, attempt: int, source_rect: Rect2, target_len
 		Vector2(-0.86, -0.28),
 	])
 	var normalized := _resample_template(anchors, CONTROL_COUNT)
+	normalized = _apply_turn_rhythm(normalized, family, seed, attempt, target_length, false, 0.62)
 	var mapped := PackedVector2Array()
 	for point: Vector2 in normalized:
 		mapped.append(source_rect.get_center() + point * source_rect.size * 0.5)
 	var full_length := _polyline_length(_sample_centerline(mapped))
 	if full_length < 1.0:
 		return PackedVector2Array()
-	var retry_ceiling := 1.0 - float(attempt) * 0.008
-	var length_scale := clampf(target_length / full_length, 0.96, retry_ceiling)
+	var minimum_scale := 0.94
+	var full_clearance := _minimum_branch_distance(_sample_centerline(mapped), min_self_distance)
+	if full_clearance < INF:
+		minimum_scale = maxf(minimum_scale, minf(1.0, min_self_distance / maxf(full_clearance, 1.0)))
+	var retry_ceiling := maxf(minimum_scale, 1.0 - float(mini(attempt, MAX_VARIANTS - 1)) * 0.006)
+	var length_scale := clampf(target_length / full_length, minimum_scale, retry_ceiling)
 	var center := source_rect.get_center()
 	var offset_roll := _hash_unit(seed, VARIANT_SALT + 0x6E1) * 2.0 - 1.0
 	var offset := Vector2(offset_roll * source_rect.size.x * (1.0 - length_scale) * 0.03, 0.0)

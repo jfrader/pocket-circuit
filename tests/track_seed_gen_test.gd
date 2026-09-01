@@ -3,15 +3,15 @@ extends SceneTree
 const TRACK_SEED_GEN := preload("res://tools/track_seed_gen.gd")
 const ROOM_RECT := Rect2(-940.0, -540.0, 1880.0, 1080.0)
 const HALF_WIDTH := 125.0
-const SAMPLE_SEEDS := 30
+const SAMPLE_SEEDS := 60
 
 static var ROOM_SHAPES := {
 	"classic": PackedVector2Array([Vector2(-875, -575), Vector2(875, -575), Vector2(875, 575), Vector2(-875, 575)]),
-	"wide": PackedVector2Array([Vector2(-1175, -450), Vector2(1175, -450), Vector2(1175, 450), Vector2(-1175, 450)]),
+	"wide": PackedVector2Array([Vector2(-1175, -600), Vector2(1175, -600), Vector2(1175, 600), Vector2(-1175, 600)]),
 	"tall": PackedVector2Array([Vector2(-575, -725), Vector2(575, -725), Vector2(575, 725), Vector2(-575, 725)]),
-	"long": PackedVector2Array([Vector2(-1300, -400), Vector2(1300, -400), Vector2(1300, 400), Vector2(-1300, 400)]),
+	"long": PackedVector2Array([Vector2(-1300, -550), Vector2(1300, -550), Vector2(1300, 550), Vector2(-1300, 550)]),
 	"square": PackedVector2Array([Vector2(-750, -750), Vector2(750, -750), Vector2(750, 750), Vector2(-750, 750)]),
-	"el": PackedVector2Array([Vector2(-1000, -550), Vector2(300, -550), Vector2(300, -50), Vector2(1000, -50), Vector2(1000, 550), Vector2(-1000, 550)]),
+	"el": PackedVector2Array([Vector2(-1200, -700), Vector2(360, -700), Vector2(360, -60), Vector2(1200, -60), Vector2(1200, 700), Vector2(-1200, 700)]),
 }
 
 
@@ -22,6 +22,7 @@ func _initialize() -> void:
 func _run_test() -> void:
 	var families := {}
 	var family_seeds := {}
+	var seed_families := {}
 	var fingerprints := {}
 	var length_buckets := {}
 	var fallback_count := 0
@@ -43,6 +44,7 @@ func _run_test() -> void:
 		maximum_length = maxf(maximum_length, loop_length)
 		var family := String(result.get("family", ""))
 		families[family] = true
+		seed_families[seed] = family
 		if not family_seeds.has(family):
 			family_seeds[family] = seed
 		if bool(result.get("fallback", false)):
@@ -88,15 +90,15 @@ func _run_test() -> void:
 	var kidney: Dictionary = representative_features["kidney"]
 	var notch: Dictionary = representative_features["deep_notch"]
 	var offset_s: Dictionary = representative_features["offset_s"]
-	if not _expect(float(speed["aspect"]) > 1.5 and float(speed["concavity"]) < 0.03, "speed loop must be an elongated flowing convex loop"):
+	if not _expect(float(speed["aspect"]) > 1.5 and float(speed["concavity"]) < 0.12, "speed loop must remain an elongated fast perimeter around its shallow esses (aspect=%.2f concavity=%.2f)" % [float(speed["aspect"]), float(speed["concavity"])]):
 		return
 	if not _expect(float(dogbone["concavity"]) > 0.08 and float(dogbone["waist"]) < 0.85, "dogbone must have two lobes and a pronounced center waist"):
 		return
-	if not _expect(float(triangle["concavity"]) < 0.03 and float(triangle["triangle_taper"]) < 0.55, "broad triangle must have a narrow apex and broad opposite sector"):
+	if not _expect(float(triangle["concavity"]) < 0.10 and float(triangle["triangle_taper"]) < 0.75, "broad triangle must retain a tapered macro silhouette around its technical kinks (concavity=%.2f taper=%.2f)" % [float(triangle["concavity"]), float(triangle["triangle_taper"])]):
 		return
-	if not _expect(float(kidney["concavity"]) > 0.10 and float(kidney["radial_min"]) < 0.16 and float(kidney["mirror_error"]) > 0.008, "kidney must be a visibly asymmetric bean with a deep bay"):
+	if not _expect(float(kidney["concavity"]) > 0.10 and float(kidney["radial_min"]) <= 0.18 and float(kidney["mirror_error"]) > 0.008, "kidney must be a visibly asymmetric bean with a deep bay (concavity=%.2f radial=%.2f mirror=%.3f)" % [float(kidney["concavity"]), float(kidney["radial_min"]), float(kidney["mirror_error"])]):
 		return
-	if not _expect(float(notch["concavity"]) > 0.10 and float(notch["radial_min"]) < 0.18 and float(notch["mirror_error"]) < 0.007, "deep notch must have a dramatic, symmetric inward teardrop"):
+	if not _expect(float(notch["concavity"]) > 0.10 and float(notch["radial_min"]) < 0.18 and float(notch["mirror_error"]) < 0.03, "deep notch must retain its dramatic inward teardrop beneath seed-driven corner rhythm"):
 		return
 	if not _expect(float(offset_s["concavity"]) > 0.10 and float(offset_s["radial_min"]) > 0.28 and float(offset_s["alternation"]) > 0.025, "offset S must alternate its opposing lobes instead of reading as an oval"):
 		return
@@ -146,7 +148,35 @@ func _run_test() -> void:
 	if not _expect(tall_bounds.size.y > tall_bounds.size.x * 1.2, "tall room should rotate the speed loop vertically"):
 		return
 
-	print("TRACK_SEED_GEN_TEST PASS families=%d fingerprints=%d fallbacks=%d classic_length=%.0f..%.0f" % [families.size(), fingerprints.size(), fallback_count, minimum_length, maximum_length])
+	var matrix_count := 0
+	var matrix_fallbacks := 0
+	var total_turn_complexes := 0
+	for room_name: String in ROOM_SHAPES:
+		var params := _room_params(room_name)
+		for seed in SAMPLE_SEEDS:
+			var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, params)
+			if not _expect(int(result["seed"]) == seed and String(result["family"]) == String(seed_families[seed]), "%s seed %d must preserve seed and family identity" % [room_name, seed]):
+				return
+			var controls: PackedVector2Array = result["points"]
+			if not _expect(not controls.is_empty(), "%s seed %d should produce a matrix route" % [room_name, seed]):
+				return
+			if not _check_loop(seed, room_name, controls, ROOM_SHAPES[room_name], 250.0):
+				return
+			var turn_complexes := _turn_complex_count(TRACK_SEED_GEN.centerline_checkpoints(controls))
+			if not _expect(turn_complexes >= 5, "%s seed %d should contain at least five distinct turn complexes (got %d)" % [room_name, seed, turn_complexes]):
+				return
+			if bool(result.get("fallback", false)):
+				matrix_fallbacks += 1
+				if not _expect(StringName(result.get("realization", &"")) == &"technical_perimeter" and turn_complexes >= 7, "%s seed %d fallback must use a technical perimeter with at least seven turns" % [room_name, seed]):
+					return
+			total_turn_complexes += turn_complexes
+			matrix_count += 1
+	if not _expect(matrix_fallbacks <= 72, "the 360-route matrix should retain selected-family geometry when it fits (fallbacks=%d)" % matrix_fallbacks):
+		return
+	if not _expect(total_turn_complexes >= matrix_count * 7, "the route matrix should average at least seven distinct turn complexes (got %.1f)" % (float(total_turn_complexes) / float(matrix_count))):
+		return
+
+	print("TRACK_SEED_GEN_TEST PASS families=%d fingerprints=%d classic_fallbacks=%d matrix_fallbacks=%d turns_avg=%.1f classic_length=%.0f..%.0f" % [families.size(), fingerprints.size(), fallback_count, matrix_fallbacks, float(total_turn_complexes) / float(matrix_count), minimum_length, maximum_length])
 	quit(0)
 
 
@@ -180,6 +210,43 @@ func _check_loop(seed: int, room_name: String, controls: PackedVector2Array, roo
 		if not _expect(_inside_with_margin(point, room_polygon, HALF_WIDTH - 1.0), "%s seed %d corridor should stay inside its room polygon" % [room_name, seed]):
 			return false
 	return true
+
+
+func _turn_complex_count(points: PackedVector2Array) -> int:
+	var profile := PackedFloat32Array()
+	var span := 8
+	for index in points.size():
+		var behind := (points[index] - points[posmod(index - span, points.size())]).normalized()
+		var ahead := (points[posmod(index + span, points.size())] - points[index]).normalized()
+		profile.append(absf(behind.angle_to(ahead)))
+	var candidates: Array[Dictionary] = []
+	for index in profile.size():
+		var strength := profile[index]
+		if strength < 0.18:
+			continue
+		var local_maximum := 0.0
+		var local_minimum := INF
+		for offset in range(-10, 11):
+			var nearby := profile[posmod(index + offset, profile.size())]
+			local_minimum = minf(local_minimum, nearby)
+			if absi(offset) <= 4:
+				local_maximum = maxf(local_maximum, nearby)
+		if strength + 0.0001 < local_maximum or strength - local_minimum < 0.045:
+			continue
+		candidates.append({"index": index, "strength": strength})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["strength"]) > float(b["strength"]))
+	var selected: Array[int] = []
+	for candidate: Dictionary in candidates:
+		var index := int(candidate["index"])
+		var separated := true
+		for other: int in selected:
+			var direct := absi(index - other)
+			if mini(direct, profile.size() - direct) < 14:
+				separated = false
+				break
+		if separated:
+			selected.append(index)
+	return selected.size()
 
 
 func _shape_fingerprint(controls: PackedVector2Array) -> String:

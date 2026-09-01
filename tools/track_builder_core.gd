@@ -18,10 +18,10 @@ const FINISH_APPROACH_SPAN := 20
 
 static var ROOM_SHAPES := {
 	"classic": PackedVector2Array([Vector2(-875, -575), Vector2(875, -575), Vector2(875, 575), Vector2(-875, 575)]),
-	"wide": PackedVector2Array([Vector2(-1175, -450), Vector2(1175, -450), Vector2(1175, 450), Vector2(-1175, 450)]),
+	"wide": PackedVector2Array([Vector2(-1175, -600), Vector2(1175, -600), Vector2(1175, 600), Vector2(-1175, 600)]),
 	"tall": PackedVector2Array([Vector2(-575, -725), Vector2(575, -725), Vector2(575, 725), Vector2(-575, 725)]),
-	"el": PackedVector2Array([Vector2(-1000, -550), Vector2(300, -550), Vector2(300, -50), Vector2(1000, -50), Vector2(1000, 550), Vector2(-1000, 550)]),
-	"long": PackedVector2Array([Vector2(-1300, -400), Vector2(1300, -400), Vector2(1300, 400), Vector2(-1300, 400)]),
+	"el": PackedVector2Array([Vector2(-1200, -700), Vector2(360, -700), Vector2(360, -60), Vector2(1200, -60), Vector2(1200, 700), Vector2(-1200, 700)]),
+	"long": PackedVector2Array([Vector2(-1300, -550), Vector2(1300, -550), Vector2(1300, 550), Vector2(-1300, 550)]),
 	"square": PackedVector2Array([Vector2(-750, -750), Vector2(750, -750), Vector2(750, 750), Vector2(-750, 750)]),
 }
 
@@ -807,12 +807,16 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
-	# Floor: base fill extends well past the room so the camera never sees a void,
-	# themed texture tiles on top at full brightness
+	# Floor: center the backdrop on the selected room so follow-camera overscan
+	# never exposes an asymmetric black void around wide or L-shaped canvases.
 	var floor_texture := String(spec.get("floor_texture", ""))
-	_add_polygon(root, "Floor", _rect_points(Vector2(-600, -500), Vector2(2600, 1700)), spec["floor"], -22)
+	var room_bounds := _polygon_bounds_rect(room_polygon)
+	var backdrop := room_bounds.grow(760.0)
+	_add_polygon(root, "Floor", _rect_points(backdrop.get_center(), backdrop.size), spec["floor"], -22)
 	if not floor_texture.is_empty():
-		_add_floor_tiles(root, floor_texture, Vector2(-600, -500), Vector2(2600, 1700), 6, 4, Vector2(1.0, 1.0))
+		var floor_columns := maxi(4, int(ceil(backdrop.size.x / 520.0)))
+		var floor_rows := maxi(3, int(ceil(backdrop.size.y / 520.0)))
+		_add_floor_tiles(root, floor_texture, backdrop.position, backdrop.size, floor_columns, floor_rows, Vector2(1.0, 1.0))
 	var room_surface := _expand_loop(room_polygon, 26.0)
 	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20)
 
@@ -905,21 +909,32 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	_add_polygon(root, "StartFinishWhite", checker_white, Color("f5eec8"), -7)
 	_add_polygon(root, "StartFinishBlack", checker_black, Color("0d0f14"), -6)
 
-	# Aligned 2x2 grids past the finish line, on the driving side
-	var grid_normal := finish_normal
-	_add_grid(root, "GridForward", atan2(start_tangent.x, -start_tangent.y), [
-		start + start_tangent * 100.0 - grid_normal * 45.0,
-		start + start_tangent * 100.0 + grid_normal * 45.0,
-		start + start_tangent * 220.0 - grid_normal * 45.0,
-		start + start_tangent * 220.0 + grid_normal * 45.0,
-	])
-	var reverse_rotation := atan2(-start_tangent.x, start_tangent.y)
-	_add_grid(root, "GridReverse", reverse_rotation, [
-		start - start_tangent * 45.0 - grid_normal * 45.0,
-		start - start_tangent * 45.0 + grid_normal * 45.0,
-		start - start_tangent * 120.0 - grid_normal * 45.0,
-		start - start_tangent * 120.0 + grid_normal * 45.0,
-	])
+	# Follow the centerline arc rather than extending one start tangent through a
+	# nearby corner. This keeps every grid slot inside the drivable corridor on
+	# technical layouts in both directions.
+	var forward_positions: Array[Vector2] = []
+	var forward_rotations: Array[float] = []
+	for grid_distance: float in [100.0, 220.0]:
+		var grid_sample := _sample_at_arc(centerline, arc, grid_distance)
+		var grid_tangent := _tangent_at_arc(centerline, arc, grid_distance)
+		var grid_normal := grid_tangent.rotated(PI * 0.5)
+		forward_positions.append(grid_sample - grid_normal * 45.0)
+		forward_positions.append(grid_sample + grid_normal * 45.0)
+		forward_rotations.append(atan2(grid_tangent.x, -grid_tangent.y))
+		forward_rotations.append(atan2(grid_tangent.x, -grid_tangent.y))
+	_add_grid(root, "GridForward", 0.0, forward_positions, forward_rotations)
+	var reverse_positions: Array[Vector2] = []
+	var reverse_rotations: Array[float] = []
+	for grid_distance: float in [45.0, 120.0]:
+		var target_arc := maxf(total - grid_distance, 0.0)
+		var grid_sample := _sample_at_arc(centerline, arc, target_arc)
+		var grid_tangent := _tangent_at_arc(centerline, arc, target_arc)
+		var grid_normal := grid_tangent.rotated(PI * 0.5)
+		reverse_positions.append(grid_sample - grid_normal * 45.0)
+		reverse_positions.append(grid_sample + grid_normal * 45.0)
+		reverse_rotations.append(atan2(-grid_tangent.x, grid_tangent.y))
+		reverse_rotations.append(atan2(-grid_tangent.x, grid_tangent.y))
+	_add_grid(root, "GridReverse", 0.0, reverse_positions, reverse_rotations)
 
 	var generated_moments := {}
 	if spec.get("seed_obstacles", false):
@@ -1219,7 +1234,7 @@ static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation
 	parent.add_child(cp)
 
 
-static func _add_grid(parent: Node, node_name: String, rotation: float, positions: Array) -> void:
+static func _add_grid(parent: Node, node_name: String, rotation: float, positions: Array, rotations: Array = []) -> void:
 	var grid := Node2D.new()
 	grid.name = node_name
 	parent.add_child(grid)
@@ -1227,7 +1242,7 @@ static func _add_grid(parent: Node, node_name: String, rotation: float, position
 		var marker := Node2D.new()
 		marker.name = str(index)
 		marker.position = positions[index]
-		marker.rotation = rotation
+		marker.rotation = float(rotations[index]) if index < rotations.size() else rotation
 		grid.add_child(marker)
 
 
@@ -1375,6 +1390,7 @@ static func _compose_generated_story(
 		occupied
 	)
 	_build_corner_landmarks(container, story, spec, moments["corners"], centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
+	_build_room_dressing(container, story, spec, centerline, room_polygon, gate_samples, reserved_unique_assets, occupied)
 	_build_generated_surfaces(root, container, story, moments, centerline)
 	_build_finish_moments(container, centerline)
 
@@ -1887,6 +1903,7 @@ static func _build_corner_landmarks(
 				continue
 			_add_generated_prop(landmarks, "Landmark%02d" % placed_count, candidate, asset_path, float(corner_slot) * 0.37, &"corner", &"unique", placed_count, size_scale)
 			occupied.append({"position": candidate, "radius": radius})
+			reserved_unique_assets[asset_path] = true
 			placed_count += 1
 			break
 	while placed_count < target_count:
@@ -1902,8 +1919,195 @@ static func _build_corner_landmarks(
 		var index := int(exhaustive["index"])
 		_add_generated_prop(landmarks, "Landmark%02d" % placed_count, candidate, asset_path, _sample_tangent(centerline, index).angle(), &"corner", &"unique", placed_count, size_scale)
 		occupied.append({"position": candidate, "radius": radius})
+		reserved_unique_assets[asset_path] = true
 		placed_count += 1
 	landmarks.set_meta("placed_count", placed_count)
+
+
+static func _build_room_dressing(
+		parent: Node2D,
+		story: Dictionary,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		reserved_unique_assets: Dictionary,
+		occupied: Array[Dictionary]
+) -> void:
+	var dressing := Node2D.new()
+	dressing.name = "RoomDressing"
+	dressing.set_meta("moment_kind", &"ambient")
+	dressing.set_meta("semantic_quantity", &"many")
+	parent.add_child(dressing)
+	var asset_pool := _room_dressing_assets(story, spec, reserved_unique_assets)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _mix_seed(int(spec["requested_seed"]), "room_dressing:%s" % String(story["id"]))
+	var room_area := absf(_polygon_area(room_polygon))
+	var target_pockets := clampi(int(round(room_area / 450000.0)), 4, 6)
+	var target_count := target_pockets * 3
+	dressing.set_meta("requested_count", target_count)
+	var anchors := _room_dressing_anchors(room_polygon, centerline, gate_samples, occupied, target_pockets, rng)
+	var placed_count := 0
+	for pocket_index in anchors.size():
+		var pocket := Node2D.new()
+		pocket.name = "Pocket%02d" % pocket_index
+		pocket.set_meta("semantic_quantity", &"few")
+		dressing.add_child(pocket)
+		var anchor: Vector2 = anchors[pocket_index]
+		var base_angle := rng.randf_range(0.0, TAU)
+		var pocket_count := mini(3, target_count - placed_count)
+		var pocket_placed := 0
+		for item_index in pocket_count:
+			if asset_pool.is_empty():
+				break
+			var asset_path := String(asset_pool[(placed_count + pocket_index * 3) % asset_pool.size()])
+			var base_radius := _asset_radius(asset_path, 24.0)
+			var size_scale := minf(1.0, 16.0 / maxf(base_radius, 1.0)) * rng.randf_range(0.86, 1.0)
+			var radius := base_radius * size_scale
+			var placed := false
+			for attempt in 12:
+				var ring := 30.0 + float(attempt / 6) * 10.0
+				var angle := base_angle + TAU * float(item_index) / float(pocket_count) + TAU * float(attempt % 6) / 18.0
+				var candidate := anchor + Vector2.RIGHT.rotated(angle) * ring
+				if not _trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
+					continue
+				_add_generated_prop(pocket, "Item%02d" % item_index, candidate, asset_path, rng.randf_range(0.0, TAU), &"ambient", &"few", placed_count, size_scale)
+				occupied.append({"position": candidate, "radius": radius})
+				placed_count += 1
+				pocket_placed += 1
+				placed = true
+				break
+			if not placed:
+				continue
+		pocket.set_meta("placed_count", pocket_placed)
+	var decal_count := _build_room_floor_details(dressing, spec, centerline, room_polygon, occupied, rng)
+	dressing.set_meta("placed_count", placed_count)
+	dressing.set_meta("pocket_count", anchors.size())
+	dressing.set_meta("decal_count", decal_count)
+
+
+static func _room_dressing_assets(story: Dictionary, spec: Dictionary, reserved_unique_assets: Dictionary) -> Array[String]:
+	var assets: Array[String] = []
+	for asset_path: String in spec.get("island_fill_textures", []):
+		if not reserved_unique_assets.has(asset_path) and asset_path not in assets:
+			assets.append(asset_path)
+	for formation: Dictionary in story["island"]:
+		var asset_path := String(formation["asset"])
+		if StringName(formation["quantity"]) != &"unique" and asset_path not in assets:
+			assets.append(asset_path)
+	for field: String in ["object_line", "delimiter"]:
+		var asset_path := String(story[field]["asset"])
+		if asset_path not in assets:
+			assets.append(asset_path)
+	return assets
+
+
+static func _room_dressing_anchors(
+		room_polygon: PackedVector2Array,
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary],
+		target_count: int,
+		rng: RandomNumberGenerator
+) -> PackedVector2Array:
+	var bounds := _polygon_bounds_rect(room_polygon)
+	var candidates: Array[Dictionary] = []
+	for x in 17:
+		for y in 11:
+			var candidate := bounds.position + Vector2(
+				bounds.size.x * (float(x) + 0.5) / 17.0,
+				bounds.size.y * (float(y) + 0.5) / 11.0
+			)
+			if not _trackside_placement_is_safe(candidate, 47.0, room_polygon, centerline, gate_samples, occupied):
+				continue
+			var occupied_clearance := 260.0
+			for entry: Dictionary in occupied:
+				occupied_clearance = minf(occupied_clearance, candidate.distance_to(entry["position"]) - float(entry["radius"]))
+			var score := minf(_distance_to_centerline(candidate, centerline), 360.0)
+			score += minf(occupied_clearance, 260.0) * 0.65
+			score += rng.randf_range(0.0, 18.0)
+			candidates.append({
+				"position": candidate,
+				"score": score,
+				"sector": Vector2i(clampi(int(float(x) / 17.0 * 3.0), 0, 2), clampi(int(float(y) / 11.0 * 2.0), 0, 1)),
+			})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["score"]) > float(b["score"]))
+	var anchors := PackedVector2Array()
+	var occupied_sectors := {}
+	# First claim the best blank pocket in each coarse room sector. A second pass
+	# fills any remaining slots without forcing unsafe scenery into tight rooms.
+	for candidate_data: Dictionary in candidates:
+		var sector: Vector2i = candidate_data["sector"]
+		if occupied_sectors.has(sector):
+			continue
+		var candidate: Vector2 = candidate_data["position"]
+		if not _clear_of_points(candidate, anchors, 210.0):
+			continue
+		anchors.append(candidate)
+		occupied_sectors[sector] = true
+		if anchors.size() >= target_count:
+			break
+	if anchors.size() < target_count:
+		for candidate_data: Dictionary in candidates:
+			var candidate: Vector2 = candidate_data["position"]
+			if not _clear_of_points(candidate, anchors, 210.0):
+				continue
+			anchors.append(candidate)
+			if anchors.size() >= target_count:
+				break
+	return anchors
+
+
+static func _build_room_floor_details(
+		parent: Node2D,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		occupied: Array[Dictionary],
+		rng: RandomNumberGenerator
+) -> int:
+	var decals: Array = spec.get("decals", [])
+	if decals.is_empty():
+		return 0
+	var details := Node2D.new()
+	details.name = "FloorDetails"
+	parent.add_child(details)
+	var bounds := _polygon_bounds_rect(room_polygon)
+	var target_count := clampi(int(round(absf(_polygon_area(room_polygon)) / 150000.0)), 8, 14)
+	var positions := PackedVector2Array()
+	for attempt in 420:
+		var candidate := Vector2(
+			rng.randf_range(bounds.position.x, bounds.end.x),
+			rng.randf_range(bounds.position.y, bounds.end.y)
+		)
+		if not _inside_polygon_with_radius(candidate, 22.0, room_polygon):
+			continue
+		if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + 22.0:
+			continue
+		if not _clear_of_points(candidate, positions, 105.0):
+			continue
+		var texture_path := String(decals[rng.randi_range(0, decals.size() - 1)])
+		var texture := load(texture_path) as Texture2D
+		if texture == null:
+			continue
+		var sprite := Sprite2D.new()
+		sprite.name = "Detail%02d" % positions.size()
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sprite.position = candidate
+		sprite.rotation = rng.randf_range(0.0, TAU)
+		var longest := maxf(texture.get_width(), texture.get_height())
+		sprite.scale = Vector2.ONE * (rng.randf_range(58.0, 96.0) / maxf(longest, 1.0))
+		sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.38, 0.72))
+		sprite.z_index = -15
+		sprite.set_meta("asset_path", texture_path)
+		sprite.set_meta("moment_kind", &"ambient_decal")
+		details.add_child(sprite)
+		positions.append(candidate)
+		if positions.size() >= target_count:
+			break
+	details.set_meta("placed_count", positions.size())
+	return positions.size()
 
 
 static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictionary, moments: Dictionary, centerline: PackedVector2Array) -> void:

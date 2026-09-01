@@ -30,9 +30,9 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 - Family, target length, route variation, story kit, opening landmark, and room
   canvas use independent deterministic streams. Changing the room must not
   silently change a seed's selected family.
-- A seed gets up to 12 variants of its selected family. If those do not fit,
-  four deterministic conservative variants are attempted under the same seed
-  and family metadata.
+- A seed gets up to 12 rhythm variants of its selected family. If those do not
+  fit, four deterministic technical-perimeter variants are attempted under the
+  same seed and family metadata.
 - Generated roots retain `requested_seed`, `family`, `realization`,
   `generation_attempt`, `generation_fallback`, `story_id`, `loop_length`,
   `theme`, and `room_shape` metadata.
@@ -42,8 +42,12 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 - Route families are `speed_loop`, `kidney`, `dogbone`, `broad_triangle`,
   `offset_s`, and `deep_notch`.
 - Family templates are normalized closed silhouettes. They are mirrored,
-  oriented for the room, fitted, uniformly length-scaled, sampled into 24
-  controls, then exposed as a 260-point centerline.
+  oriented for the room, deformed with seed-driven harmonic lobes and localized
+  chicanes, fitted, clearance-aware length-scaled, sampled into 24 controls,
+  then exposed as a 260-point centerline.
+- Retry attempts vary deformation phase and strength rather than only shrinking
+  one silhouette. Wide and long rooms use stronger turn rhythm so their routes
+  retain changing-radius character instead of becoming stretched ovals.
 - The target-length stream spans roughly 2,500 to 5,500 units. A room may cap
   the realized length when its physical canvas cannot fit the target safely.
 - Corridor half-width is 125 units. Validation reserves the complete 250-unit
@@ -60,11 +64,11 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 | Key | Canvas |
 |---|---|
 | `classic` | 1750 x 1150 rectangle |
-| `wide` | 2350 x 900 rectangle |
+| `wide` | 2350 x 1200 rectangle |
 | `tall` | 1150 x 1450 rectangle |
-| `long` | 2600 x 800 rectangle |
+| `long` | 2600 x 1100 rectangle |
 | `square` | 1500 x 1500 rectangle |
-| `el` | 2000 x 1100 L-shaped polygon |
+| `el` | 2400 x 1400 L-shaped polygon |
 
 `App.circuit_room_for_seed` selects among all six with a mixed deterministic
 stream independent from family and target length.
@@ -76,9 +80,16 @@ stream independent from family and target length.
 - Semantic quantities are literal: `unique` is exactly 1, `few` is 2-3, and
   `many` is 8-20. A unique asset cannot repeat between the island, opening, and
   corner landmarks in the same track.
-- Generated dressing is concentrated into authored moments rather than spread
-  as uniform noise: one island focal cluster, one object line, one sparse
-  delimiter, one or two corner landmarks, and one iconic opening landmark.
+- Story dressing is concentrated into authored moments: one island focal
+  cluster, one object line, one sparse delimiter, one or two corner landmarks,
+  and one iconic opening landmark.
+- Ambient room dressing uses 4-6 deterministic safe pockets of three props
+  across distinct sectors. Each pocket is a semantic `few`, and the 12-18 prop
+  room-level aggregate remains a semantic `many` without becoming uniform
+  noise. Story assets marked `unique` are reserved before ambient placement.
+- Floor details add at least eight non-colliding themed decals to large blank
+  areas. Ambient props and decals stay inside the room and outside the protected
+  route corridor.
 - Asset dimensions and collider shapes come from `PROP_SHAPES`. Generated
   story props must use transparent PNG textures, never opaque JPG rectangles.
 - Trackside placement must remain clear of checkpoint recovery corridors:
@@ -115,6 +126,8 @@ shortcut window; the shortcut remains a player choice rather than an AI trap.
   old `TrackRibbon`, whose triangulation produced artifacts in concave routes.
 - Surface gameplay polygons remain visually transparent. Their themed decals
   show the technical section and risky shortcut lane.
+- Full-window themed backdrops scale and tile to the selected room bounds so
+  wider canvases do not expose black camera voids.
 - Generated and authored inner barriers use closed `ConcavePolygonShape2D`
   segment chains on a `StaticBody2D`; do not send a concave island through
   convex polygon decomposition.

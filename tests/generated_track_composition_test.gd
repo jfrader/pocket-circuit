@@ -150,6 +150,8 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	var opening := track.get_node_or_null("GeneratedMoments/OpeningLandmark")
 	if not _expect(opening != null and int(opening.get_meta("placed_count", 0)) == 1, "%s should place one iconic opening landmark" % theme):
 		return false
+	if not _check_room_dressing(track, theme, seed):
+		return false
 	var moment_indices: Dictionary = track.get_meta("generated_moment_indices", {})
 	for required_moment: String in ["opening", "early_conflict_forward", "early_conflict_reverse", "shortcut", "technical", "speed", "finish"]:
 		if not _expect(moment_indices.has(required_moment), "%s should expose its %s moment index" % [theme, required_moment]):
@@ -288,6 +290,66 @@ func _check_story_assets(theme: StringName) -> bool:
 			if not _expect(load(String(surface["decal"])) is Texture2D, "%s/%s is missing surface decal %s" % [theme, kit["id"], surface["decal"]]):
 				return false
 	return true
+
+
+func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
+	var dressing := track.get_node_or_null("GeneratedMoments/RoomDressing")
+	if not _expect(dressing != null, "%s seed %d should include ambient room dressing" % [theme, seed]):
+		return false
+	var placed_count := int(dressing.get_meta("placed_count", 0))
+	var pocket_count := int(dressing.get_meta("pocket_count", 0))
+	var decal_count := int(dressing.get_meta("decal_count", 0))
+	if not _expect(placed_count >= 12 and placed_count <= 18, "%s seed %d should fill safe blank space with a semantic many of 12-18 ambient props (got %d)" % [theme, seed, placed_count]):
+		return false
+	if not _expect(pocket_count >= 4 and pocket_count <= 6, "%s seed %d should distribute dressing across 4-6 pockets (got %d)" % [theme, seed, pocket_count]):
+		return false
+	for child: Node in dressing.get_children():
+		if not child.name.begins_with("Pocket"):
+			continue
+		var pocket_placed := int(child.get_meta("placed_count", 0))
+		if not _expect(pocket_placed >= 2 and pocket_placed <= 3, "%s seed %d ambient pockets should preserve the semantic few quantity (got %d)" % [theme, seed, pocket_placed]):
+			return false
+	var details := dressing.get_node_or_null("FloorDetails")
+	if not _expect(details != null and details.get_child_count() == decal_count and decal_count >= 8, "%s seed %d should add at least eight off-track floor details" % [theme, seed]):
+		return false
+	var centerline := (track.get_node("TrackSurface") as Line2D).points
+	var room_shape := StringName(track.get_meta("room_shape", &"classic"))
+	var room_polygon: PackedVector2Array = BUILDER.ROOM_SHAPES[room_shape]
+	var bounds: Rect2 = _points_bounds(room_polygon)
+	var assets := {}
+	var sectors := {}
+	var prop_nodes := dressing.find_children("*", "StaticBody2D", true, false)
+	if not _expect(prop_nodes.size() == placed_count, "%s seed %d dressing metadata should match its physical props" % [theme, seed]):
+		return false
+	for child: Node in prop_nodes:
+		var prop := child as Node2D
+		var position := prop.global_position
+		if not _expect(Geometry2D.is_point_in_polygon(position, room_polygon), "%s seed %d ambient prop should stay inside the room" % [theme, seed]):
+			return false
+		if not _expect(_minimum_point_distance(position, centerline) >= 132.0, "%s seed %d ambient prop should stay outside the racing corridor" % [theme, seed]):
+			return false
+		assets[String(prop.get_meta("asset_path", ""))] = true
+		var normalized: Vector2 = (position - bounds.position) / bounds.size
+		sectors[Vector2i(clampi(int(normalized.x * 3.0), 0, 2), clampi(int(normalized.y * 2.0), 0, 1))] = true
+	if not _expect(assets.size() >= 4, "%s seed %d ambient dressing should use at least four prop assets (got %d)" % [theme, seed, assets.size()]):
+		return false
+	if not _expect(sectors.size() >= 3, "%s seed %d ambient dressing should occupy at least three room sectors (got %d)" % [theme, seed, sectors.size()]):
+		return false
+	return true
+
+
+func _minimum_point_distance(point: Vector2, points: PackedVector2Array) -> float:
+	var minimum := INF
+	for other: Vector2 in points:
+		minimum = minf(minimum, point.distance_to(other))
+	return minimum
+
+
+func _points_bounds(points: PackedVector2Array) -> Rect2:
+	var bounds := Rect2(points[0], Vector2.ZERO)
+	for point: Vector2 in points:
+		bounds = bounds.expand(point)
+	return bounds
 
 
 func _generated_asset_paths(track: Node) -> Array[String]:
