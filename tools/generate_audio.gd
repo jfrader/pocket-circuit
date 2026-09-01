@@ -2,40 +2,15 @@ extends SceneTree
 
 const SAMPLE_RATE := 22050
 const OUTPUT_DIR := "res://assets/audio"
+const MENU_SCORE_PATH := "res://data/music/tiny_torque_level_004.score.json"
+const MENU_SECTION_ID := "grid"
+const MENU_PHRASE_LOOPS := 3
 const TAU_F := TAU
-const MENU_DURATION := 16.0
-const MENU_CHORD_SECONDS := 2.0
-const MENU_NOTE_SECONDS := 0.5
-const MENU_CHORDS := [
-	[57, 60, 64, 69],
-	[53, 57, 60, 65],
-	[48, 55, 60, 64],
-	[55, 59, 62, 67],
-	[50, 53, 57, 62],
-	[52, 57, 60, 64],
-	[53, 57, 60, 65],
-	[55, 59, 62, 67],
-]
-const MENU_BASS_NOTES := [
-	45, 52, 57, 52,
-	41, 48, 53, 48,
-	36, 43, 48, 43,
-	43, 50, 55, 50,
-	38, 45, 50, 45,
-	40, 47, 52, 47,
-	41, 48, 53, 48,
-	43, 50, 55, 50,
-]
-const MENU_MELODY_NOTES := [
-	69, -1, 72, 76,
-	72, 69, -1, 67,
-	67, -1, 72, 76,
-	74, 71, -1, 67,
-	69, -1, 65, 69,
-	71, 72, 76, -1,
-	72, 69, 67, 65,
-	67, 71, 74, -1,
-]
+
+var _menu_events: Array[Dictionary] = []
+var _menu_phrase_seconds := 16.0
+var _menu_duration := 16.0
+var _ticks_per_second := 2160.0
 
 
 func _initialize() -> void:
@@ -44,9 +19,12 @@ func _initialize() -> void:
 		push_error("AUDIO_GENERATOR FAIL: could not create %s: %s" % [OUTPUT_DIR, error_string(directory_error)])
 		quit(1)
 		return
+	if not _load_menu_score():
+		quit(1)
+		return
 
 	var definitions: Array[Dictionary] = [
-		{"name": "menu_loop", "duration": MENU_DURATION, "loop": true, "kind": "menu"},
+		{"name": "menu_loop", "duration": _menu_duration, "loop": true, "kind": "menu"},
 		{"name": "race_loop", "duration": 4.0, "loop": true, "kind": "race"},
 		{"name": "engine_loop", "duration": 0.5, "loop": true, "kind": "engine"},
 		{"name": "countdown", "duration": 0.24, "loop": false, "kind": "countdown"},
@@ -67,6 +45,52 @@ func _initialize() -> void:
 			return
 		print("Generated %s/%s.wav" % [OUTPUT_DIR, definition["name"]])
 	quit(0)
+
+
+func _load_menu_score() -> bool:
+	var raw := FileAccess.get_file_as_string(MENU_SCORE_PATH)
+	if raw.is_empty():
+		push_error("AUDIO_GENERATOR FAIL: missing menu score %s" % MENU_SCORE_PATH)
+		return false
+	var parsed: Variant = JSON.parse_string(raw)
+	if typeof(parsed) != TYPE_DICTIONARY:
+		push_error("AUDIO_GENERATOR FAIL: menu score is not an object")
+		return false
+	var score: Dictionary = parsed
+	var bpm := float(score.get("bpm", 0.0))
+	var ticks_per_beat := float(score.get("ticksPerBeat", 0.0))
+	if bpm <= 0.0 or ticks_per_beat <= 0.0:
+		push_error("AUDIO_GENERATOR FAIL: menu score missing tempo")
+		return false
+	_ticks_per_second = bpm * ticks_per_beat / 60.0
+	var section: Dictionary = {}
+	for candidate: Variant in score.get("sections", []):
+		if typeof(candidate) == TYPE_DICTIONARY and String(candidate.get("id", "")) == MENU_SECTION_ID:
+			section = candidate
+			break
+	if section.is_empty():
+		push_error("AUDIO_GENERATOR FAIL: menu score missing section %s" % MENU_SECTION_ID)
+		return false
+	_menu_phrase_seconds = float(section.get("lengthTicks", 0.0)) / _ticks_per_second
+	if _menu_phrase_seconds <= 0.0:
+		push_error("AUDIO_GENERATOR FAIL: menu phrase has no length")
+		return false
+	_menu_duration = _menu_phrase_seconds * float(MENU_PHRASE_LOOPS)
+	_menu_events.clear()
+	for event_value: Variant in section.get("events", []):
+		if typeof(event_value) != TYPE_DICTIONARY:
+			continue
+		var event: Dictionary = event_value
+		_menu_events.append({
+			"kind": String(event.get("kind", "")),
+			"voice": String(event.get("voice", "")),
+			"role": String(event.get("role", "")),
+			"pitch": int(event.get("pitch", 0)),
+			"velocity": clampf(float(event.get("velocity", 0.5)), 0.05, 1.0),
+			"start": float(event.get("startTick", 0.0)) / _ticks_per_second,
+			"duration": maxf(0.04, float(event.get("durationTicks", 1.0)) / _ticks_per_second),
+		})
+	return not _menu_events.is_empty()
 
 
 func _render_sound(definition: Dictionary) -> Error:
@@ -94,7 +118,7 @@ func _render_sound(definition: Dictionary) -> Error:
 func _sample(kind: String, time: float, duration: float, index: int) -> float:
 	match kind:
 		"menu":
-			return _menu_music(time, duration)
+			return _menu_music(time, duration, index)
 		"race":
 			var drive := _sine(62.0, time) + 0.48 * _sine(124.0, time) + 0.16 * _sine(248.0, time)
 			var motor_gate := 0.52 + 0.48 * cos(TAU_F * 4.0 * time)
@@ -131,46 +155,64 @@ func _sample(kind: String, time: float, duration: float, index: int) -> float:
 	return 0.0
 
 
-func _menu_music(time: float, duration: float) -> float:
-	var chord_position := time / MENU_CHORD_SECONDS
-	var chord_index := posmod(floori(chord_position), MENU_CHORDS.size())
-	var next_chord_index := (chord_index + 1) % MENU_CHORDS.size()
-	var chord_phase := fmod(time, MENU_CHORD_SECONDS) / MENU_CHORD_SECONDS
-	var chord_blend := smoothstep(0.72, 1.0, chord_phase)
-	var current_chord := _menu_chord(MENU_CHORDS[chord_index], time, duration)
-	var next_chord := _menu_chord(MENU_CHORDS[next_chord_index], time, duration)
-	var pad := lerpf(current_chord, next_chord, chord_blend) * 0.085
-
-	var note_index := posmod(floori(time / MENU_NOTE_SECONDS), MENU_BASS_NOTES.size())
-	var note_time := fmod(time, MENU_NOTE_SECONDS)
-	var note_envelope := _attack_release(note_time, MENU_NOTE_SECONDS, 0.025, 0.16)
-	var bass_frequency := _midi_frequency(MENU_BASS_NOTES[note_index])
-	var bass := (_sine(bass_frequency, note_time) + 0.2 * _sine(bass_frequency * 2.0, note_time)) * note_envelope * 0.035
-
-	var melody_note: int = MENU_MELODY_NOTES[note_index]
-	var melody := 0.0
-	if melody_note >= 0:
-		var melody_frequency := _midi_frequency(melody_note)
-		var melody_envelope := _attack_release(note_time, MENU_NOTE_SECONDS, 0.035, 0.14)
-		melody = (_sine(melody_frequency, note_time) + 0.16 * _sine(melody_frequency * 2.0, note_time)) * melody_envelope * 0.052
-	var seam_fade := minf(smoothstep(0.0, 0.008, time), smoothstep(0.0, 0.008, duration - time))
-	return (pad + bass + melody) * seam_fade
+func _menu_music(time: float, duration: float, index: int) -> float:
+	var local := fmod(time, _menu_phrase_seconds)
+	if local < 0.0:
+		local += _menu_phrase_seconds
+	var mix := 0.0
+	for event: Dictionary in _menu_events:
+		mix += _render_menu_event(event, local, index)
+	var seam_fade := minf(smoothstep(0.0, 0.01, time), smoothstep(0.0, 0.01, duration - time))
+	return mix * seam_fade
 
 
-func _menu_chord(chord: Array, time: float, duration: float) -> float:
-	var sample := 0.0
-	for midi_note: int in chord:
-		var frequency := _loop_frequency(_midi_frequency(midi_note), duration)
-		sample += _sine(frequency, time) + 0.14 * _sine(frequency * 2.0, time)
-	return sample / float(chord.size())
+func _render_menu_event(event: Dictionary, time: float, index: int) -> float:
+	var start := float(event["start"])
+	var hold := float(event["duration"])
+	var local := time - start
+	if local < 0.0 or local > hold + 0.09:
+		return 0.0
+	var velocity := float(event["velocity"])
+	var kind := String(event["kind"])
+	var voice := String(event["voice"])
+	if kind == "percussion":
+		return _menu_percussion(voice, local, hold, velocity, index)
+	var frequency := _midi_frequency(int(event["pitch"]))
+	var is_lead := String(event["role"]) == "melody"
+	if voice == "bass":
+		var envelope := _attack_release(local, hold + 0.06, 0.008, 0.05)
+		return (_sine(frequency, local) + 0.22 * _sine(frequency * 2.0, local)) * envelope * velocity * 0.11
+	var attack := 0.006 if is_lead else 0.004
+	var release := 0.05 if is_lead else 0.035
+	var envelope := _attack_release(local, hold + 0.04, attack, release)
+	var gain := 0.07 if is_lead else 0.028
+	return (
+		_sine(frequency, local)
+		+ 0.28 * _sine(frequency * 2.0, local)
+		+ 0.08 * _sine(frequency * 3.0, local)
+	) * envelope * velocity * gain
+
+
+func _menu_percussion(voice: String, local: float, hold: float, velocity: float, index: int) -> float:
+	match voice:
+		"kick":
+			var envelope := exp(-14.0 * local) * minf(1.0, local / 0.004)
+			var frequency := lerpf(148.0, 52.0, clampf(local / 0.09, 0.0, 1.0))
+			return _sine(frequency, local) * envelope * velocity * 0.22
+		"snare":
+			var envelope := _attack_release(local, maxf(hold, 0.08), 0.002, 0.05)
+			return (_noise(index) * 0.78 + _sine(198.0, local) * 0.22) * envelope * velocity * 0.12
+		"hat":
+			var envelope := _attack_release(local, 0.05, 0.001, 0.03)
+			return _noise(index + 17) * envelope * velocity * 0.045
+		"tom":
+			var envelope := exp(-10.0 * local) * minf(1.0, local / 0.005)
+			return _sine(lerpf(160.0, 90.0, clampf(local / 0.12, 0.0, 1.0)), local) * envelope * velocity * 0.14
+	return 0.0
 
 
 func _midi_frequency(midi_note: int) -> float:
 	return 440.0 * pow(2.0, (float(midi_note) - 69.0) / 12.0)
-
-
-func _loop_frequency(frequency: float, duration: float) -> float:
-	return round(frequency * duration) / duration
 
 
 func _sine(frequency: float, time: float) -> float:
