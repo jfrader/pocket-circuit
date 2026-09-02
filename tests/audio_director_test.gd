@@ -37,7 +37,7 @@ func _run_test() -> void:
 		var live_stream := live.get_node_or_null("LiveStream") as AudioStreamPlayer
 		if not _expect(is_instance_valid(live_stream), "GamestrumentsPlayer/LiveStream must exist as AudioStreamPlayer on live path after play_menu_music()"):
 			return
-	var engine_stream := (director.get_node("EnginePlayer") as AudioStreamPlayer).stream as AudioStreamWAV
+	var engine_stream: AudioStream = (director.get_node("EnginePlayer") as AudioStreamPlayer).stream
 	if live == null:
 		var menu_stream := music_player.stream as AudioStreamWAV
 		if not _expect(_loop_spans_stream(menu_stream) and _loop_spans_stream(engine_stream), "menu and engine loops should span decoded samples instead of compressed bytes"):
