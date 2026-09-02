@@ -30,6 +30,9 @@
   camera shake, reduced motion, and pause-aware race audio.
 - Native Windows x86_64 and Linux x86_64 offline release exports with Steam
   Deck-compatible controls.
+- Adaptive music follows race phase when the live engine is loaded (grid on
+  countdown, "race" at start with speed-normalized intensity and standing
+  pressure, final-lap flag, finish+win result).
 
 ### Changed
 
@@ -65,6 +68,11 @@
   full scale and shape, including the missing quadrant of L-shaped rooms.
 - Start grids remain outside the island, lap gates span the full drivable
   corridor, and forward and reverse races use the correct checker order.
+- Menu and shell screens now loop the Tiny Torque Grid catalog take instead of
+  an alarm-like pulse or the previous placeholder arrangement.
+- Championship map and settings metadata remain readable at the release
+  resolution, keyboard focus stays visible after returning between screens, and
+  completed off-screen events remain reachable without a mouse.
 - Failed disk writes no longer advance championship progress, discard an
   existing championship, or claim that a result was saved.
 - Championship wins remain pending across restarts until the ending is

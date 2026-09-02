@@ -30,6 +30,7 @@ var _race_loop: AudioStream
 var _engine_loop: AudioStream
 var _engine_rpm := 0.08
 var _headless := false
+var _live_music: Node
 
 
 func _ready() -> void:
@@ -40,6 +41,7 @@ func _ready() -> void:
 	_race_loop = _make_runtime_loop(RACE_LOOP)
 	_engine_loop = _make_runtime_loop(ENGINE_LOOP)
 	_build_players()
+	_bind_live_music()
 
 
 func _process(delta: float) -> void:
@@ -69,12 +71,25 @@ func ensure_buses() -> void:
 
 
 func play_menu_music() -> void:
+	if _play_live("menu", "garage", 0.35, 0.2, false, &"menu"):
+		clear_local_vehicle()
+		set_race_paused(false)
+		return
 	_set_music(&"menu", _menu_loop)
 	clear_local_vehicle()
 	set_race_paused(false)
 
 
 func play_race_music() -> void:
+	var race_seed := "race"
+	var app := get_node_or_null("/root/App")
+	if app != null:
+		var session: Variant = app.get("current_race_session")
+		if session is Dictionary and not (session as Dictionary).is_empty():
+			race_seed = String((session as Dictionary).get("event_id", "race"))
+	if _play_live(race_seed, "race", 0.72, 0.4, false, &"race"):
+		set_race_paused(false)
+		return
 	_set_music(&"race", _race_loop)
 	set_race_paused(false)
 
@@ -100,8 +115,13 @@ func clear_local_vehicle() -> void:
 
 func set_race_paused(paused: bool) -> void:
 	_race_paused = paused
+	var music_db := PAUSED_MUSIC_DB if paused and _music_context == &"race" else 0.0
 	if is_instance_valid(_music_player):
-		_music_player.volume_db = PAUSED_MUSIC_DB if paused and _music_context == &"race" else 0.0
+		_music_player.volume_db = music_db
+	if is_instance_valid(_live_music):
+		for child in _live_music.get_children():
+			if child is AudioStreamPlayer:
+				(child as AudioStreamPlayer).volume_db = music_db
 	if paused and is_instance_valid(_engine_player):
 		_engine_player.volume_db = SILENCE_DB
 
@@ -126,6 +146,45 @@ func get_music_context() -> StringName:
 
 func get_sfx_player_count() -> int:
 	return _sfx_players.size()
+
+
+func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool) -> void:
+	# Music-only adaptive state for the live procedural engine.
+	# WAV loop path remains completely unchanged (no calls to _set_music or players here).
+	if _live_music != null and _live_music.has_method("set_race_state"):
+		_live_music.call("set_race_state", phase, intensity, pressure, final_lap)
+
+
+func _bind_live_music() -> void:
+	if not ClassDB.class_exists("GamestrumentsPlayer"):
+		return
+	_live_music = ClassDB.instantiate("GamestrumentsPlayer")
+	_live_music.name = "GamestrumentsPlayer"
+	_live_music.set("project_secret", "guri-pc-dev-salt")
+	_live_music.set("style", "funk")
+	_live_music.set("melody_voice", "pluck")
+	_live_music.set("harmony_voice", "warm")
+	_live_music.set("drive_voice", "pluck")
+	_live_music.set("bass_voice", "bass")
+	add_child(_live_music)
+
+
+func _play_live(
+	seed: String,
+	phase: String,
+	intensity: float,
+	pressure: float,
+	final_lap: bool,
+	context: StringName,
+) -> bool:
+	if _live_music == null or not _live_music.has_method("generate"):
+		return false
+	if is_instance_valid(_music_player):
+		_music_player.stop()
+	_music_context = context
+	_live_music.call("generate", seed)
+	_live_music.call("set_race_state", phase, intensity, pressure, final_lap)
+	return true
 
 
 func _build_players() -> void:
