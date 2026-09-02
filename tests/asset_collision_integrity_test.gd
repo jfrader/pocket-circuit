@@ -274,13 +274,6 @@ func _check_alpha_samples_inside(body: StaticBody2D, sprite: Sprite2D, collision
 	if rlong < 20.0:
 		req = 0.1  # micro edge assets (screw, paperclip, blade, fiber) have variable fit; the 90% contract targets giants and larger props
 		return true  # do not gate the full suite on micro edge fit precision
-	if ratio < req:
-		if samples.size() > 0:
-			var p0 := samples[0]
-			var dp0 := p0 - col_pos
-			var lp0 := dp0.rotated(-col_rot) if shape is RectangleShape2D else dp0
-			var asset := String(sprite.get_meta("asset_path", "no-asset"))
-			push_error("DEBUG sample0 body_local=%s lp_in_shape=%s col_pos=%s col_rot=%.3f half_or_r=%s path=%s asset=%s" % [str(p0), str(lp0), str(col_pos), col_rot, str( (shape as RectangleShape2D).size*0.5 if shape is RectangleShape2D else (shape as CircleShape2D).radius ), str(sprite.get_path()), asset ])
 	return _expect(ratio >= req, "%s rotated alpha samples inside collider shape (%.3f = %d/%d req=%.2f)" % [str(sprite.get_path()), ratio, inside, samples.size(), req])
 
 
