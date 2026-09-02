@@ -26,6 +26,7 @@ func _run_test() -> void:
 	var gate_shape := (checkpoint_scene.get_node("CollisionShape2D") as CollisionShape2D).shape as RectangleShape2D
 	if not _expect(gate_shape.size.is_equal_approx(Vector2(34.0, 280.0)), "checkpoint gates should span the full drivable corridor"):
 		return
+	checkpoint_scene.free()
 
 	for theme: StringName in [&"kitchen", &"workshop", &"office"]:
 		if not await _test_theme_gate(theme):
@@ -62,6 +63,7 @@ func _test_kitchen_contract() -> bool:
 		return false
 	track.queue_free()
 	await process_frame
+	await physics_frame
 	return true
 
 
@@ -116,6 +118,7 @@ func _test_theme_gate(theme: StringName) -> bool:
 				return false
 	track.queue_free()
 	await process_frame
+	await physics_frame
 	return true
 
 
