@@ -1,7 +1,7 @@
 extends SceneTree
 
 const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
-const TRACK_BUILDER := preload("res://tools/track_builder_core.gd")
+const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const CHECKPOINTS_PER_LAP := 8
 const MAX_PHYSICS_FRAMES := 2400
 const MAX_RECOVERIES_PER_LAP := 3

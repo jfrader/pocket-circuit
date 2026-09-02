@@ -8,8 +8,8 @@ changelog, not here.
 ## Architecture
 
 ```text
-tools/track_seed_gen.gd          requested seed + room -> deterministic route
-tools/track_builder_core.gd      route + story kit -> runtime PackedScene
+scripts/race/track_seed_gen.gd          requested seed + room -> deterministic route
+scripts/race/track_builder_core.gd      route + story kit -> runtime PackedScene
 tools/build_procedural_track.gd  optional CLI for saved development snapshots
 scripts/race/prototype_race.gd   builds the requested circuit at race startup
 ```
