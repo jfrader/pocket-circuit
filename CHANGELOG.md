@@ -50,9 +50,10 @@
 - Course boundaries read from material changes and sparse household-object runs
   that alternate between both sides, one side, and open visual sectors rather
   than enclosing the track with a repeated fence or painted race lines.
-- Racing-line AI now follows generated routes in the active race direction,
-  keeps to the safe lane beside optional shortcuts, plans for corners, dodges
-  traffic and moving hazards, and recovers from stalls.
+- Racing-line AI now fields genuinely competitive opponents: difficulty changes
+  corner pace, braking, acceleration, and boost strategy; racers anticipate bad
+  surfaces, dodge every collidable course prop, and stay within the player's
+  legal normal and boosted speed limits.
 - Championship screens pair controller-safe actions with original drivers,
   machines, garage art, and route illustrations; the garage presents the full
   roster, unlock requirements, and focused-machine stats.

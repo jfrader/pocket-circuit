@@ -13,13 +13,68 @@ const LOOK_AHEAD_DISTANCE := 340.0
 const MAX_LOOK_AHEAD_WEIGHT := 0.38
 const TRACK_COLLISION_MASK := 2
 const VEHICLE_COLLISION_MASK := 1
+const SCENERY_COLLISION_MASK := 4
 const SCATTER_DODGE_MASK := 16
+const STATIC_OBSTACLE_MASK := TRACK_COLLISION_MASK | SCENERY_COLLISION_MASK | SCATTER_DODGE_MASK
 const OBSTACLE_FEELER_ANGLES: Array[float] = [-0.95, -0.5, 0.0, 0.5, 0.95]
 const OBSTACLE_FRONT_OFFSET := 30.0
 const OBSTACLE_FEELER_HALF_WIDTH := 14.0
 const GATE_TARGET_OFFSETS: Array[float] = [-72.0, -48.0, -24.0, 0.0, 24.0, 48.0, 72.0]
 const CORRIDOR_PROBE_DISTANCE := 150.0
 const HAZARD_AVOID_DISTANCE := 160.0
+const SURFACE_PROBE_ANGLES: Array[float] = [0.0, -0.34, 0.34]
+const SURFACE_PROBE_DISTANCES: Array[float] = [90.0, 170.0, 250.0]
+const MAX_RACING_LINE_RADIUS := 2600.0
+const DIFFICULTY_TUNING: Dictionary = {
+	"sunday_drive": {
+		"pace": 0.94,
+		"corner_constant": 13.0,
+		"corner_floor": 0.48,
+		"sharp_corner_ratio": 0.50,
+		"heading_cap": 0.60,
+		"wrong_way_cap": 0.42,
+		"braking_near": 190.0,
+		"braking_far": 380.0,
+		"brake_response": 72.0,
+		"baseline_power": 1.0,
+		"starting_boost": 0.28,
+		"clean_line_recharge": 0.0,
+		"boost_turn_threshold": 0.24,
+		"boost_radius": 1500.0,
+	},
+	"club_circuit": {
+		"pace": 1.08,
+		"corner_constant": 15.2,
+		"corner_floor": 0.53,
+		"sharp_corner_ratio": 0.59,
+		"heading_cap": 0.67,
+		"wrong_way_cap": 0.48,
+		"braking_near": 165.0,
+		"braking_far": 350.0,
+		"brake_response": 56.0,
+		"baseline_power": 1.06,
+		"starting_boost": 0.58,
+		"clean_line_recharge": 5.0,
+		"boost_turn_threshold": 0.34,
+		"boost_radius": 1150.0,
+	},
+	"clockwork": {
+		"pace": 1.12,
+		"corner_constant": 16.4,
+		"corner_floor": 0.58,
+		"sharp_corner_ratio": 0.64,
+		"heading_cap": 0.72,
+		"wrong_way_cap": 0.52,
+		"braking_near": 145.0,
+		"braking_far": 315.0,
+		"brake_response": 48.0,
+		"baseline_power": 1.15,
+		"starting_boost": 0.78,
+		"clean_line_recharge": 8.0,
+		"boost_turn_threshold": 0.42,
+		"boost_radius": 900.0,
+	},
+}
 
 var vehicle: VehicleController
 var race_manager: RaceManager
@@ -49,7 +104,9 @@ func configure(
 	vehicle = controlled_vehicle
 	race_manager = manager
 	lane_offset = preferred_lane_offset
-	difficulty = difficulty_id
+	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
+	var tuning := _difficulty_tuning()
+	vehicle.boost_amount = vehicle.stats.boost_capacity * float(tuning["starting_boost"])
 	_cache_checkpoints()
 	if not race_manager.race_started.is_connected(_cache_checkpoints):
 		race_manager.race_started.connect(_cache_checkpoints)
@@ -116,6 +173,12 @@ func _physics_process(delta: float) -> void:
 		target_position = _pull_into_corridor(target_position, forward)
 	var desired_direction := vehicle.global_position.direction_to(target_position)
 	desired_direction = _avoid_hazards(desired_direction, forward)
+	var surface_plan := _surface_anticipation(desired_direction)
+	if float(surface_plan["weight"]) > 0.0:
+		desired_direction = desired_direction.lerp(
+			surface_plan["avoid_direction"] as Vector2,
+			float(surface_plan["weight"])
+		).normalized()
 	var obstacle_plan := _obstacle_avoidance(forward, desired_direction)
 	if float(obstacle_plan["weight"]) > 0.35:
 		desired_direction = desired_direction.lerp(
@@ -133,48 +196,75 @@ func _physics_process(delta: float) -> void:
 		next_turn_severity = _checkpoint_turn_severity(int(next_checkpoint.get("checkpoint_index")))
 	var planned_turn_severity := maxf(turn_severity, next_turn_severity * 0.84)
 	var corner_ratio := clampf(planned_turn_severity / 1.45, 0.0, 1.0)
-	var pace_multiplier := 0.86 if difficulty == "sunday_drive" else (1.14 if difficulty == "clockwork" else 1.10)
+	var tuning := _difficulty_tuning()
+	var pace_multiplier := float(tuning["pace"])
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var handling_pace := clampf(vehicle.stats.steering_rate / 3.75, 0.78, 1.08)
 	var line_radius := _racing_line_radius(vehicle.global_position)
 	var corner_speed := effective_max_speed
 	if line_radius > 40.0:
-		var corner_constant := 8.6 if difficulty == "sunday_drive" else (11.6 if difficulty == "clockwork" else 10.9)
-		corner_speed = clampf(corner_constant * sqrt(line_radius) * pace_multiplier, effective_max_speed * 0.38, effective_max_speed)
+		corner_speed = clampf(
+			float(tuning["corner_constant"]) * sqrt(line_radius) * pace_multiplier,
+			effective_max_speed * float(tuning["corner_floor"]),
+			effective_max_speed
+		)
 	var target_speed := minf(
-		effective_max_speed * lerpf(0.94, 0.40, corner_ratio) * pace_multiplier,
+		effective_max_speed * lerpf(0.98, float(tuning["sharp_corner_ratio"]), corner_ratio) * pace_multiplier,
 		corner_speed
 	)
 	target_speed *= lerpf(1.0, handling_pace, corner_ratio)
+	target_speed *= float(surface_plan["speed_scale"])
 	target_speed *= float(obstacle_plan["speed_scale"])
 	var heading_error := absf(steering_angle)
 	if heading_error > 1.05:
-		target_speed = minf(target_speed, effective_max_speed * 0.52)
+		target_speed = minf(target_speed, effective_max_speed * float(tuning["heading_cap"]))
 	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
-		target_speed = minf(target_speed, effective_max_speed * 0.34)
+		target_speed = minf(target_speed, effective_max_speed * float(tuning["wrong_way_cap"]))
 
-	var braking_distance := lerpf(240.0, 500.0, corner_ratio)
-	braking_distance *= 1.12 if difficulty == "sunday_drive" else (0.9 if difficulty == "clockwork" else 1.0)
+	var braking_distance := lerpf(
+		float(tuning["braking_near"]),
+		float(tuning["braking_far"]),
+		corner_ratio
+	)
 	var should_brake := vehicle.speed > target_speed and distance_to_target < braking_distance
 	var throttle := 0.0 if should_brake else 1.0
 	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
 		throttle = 0.42 if not should_brake else 0.0
-	var brake := clampf((vehicle.speed - target_speed) / 90.0, 0.0, 1.0) if should_brake else 0.0
+	var brake := clampf(
+		(vehicle.speed - target_speed) / float(tuning["brake_response"]),
+		0.0,
+		1.0
+	) if should_brake else 0.0
 	var position := race_manager.get_racer_position(vehicle)
-	var baseline_power := 1.0 if difficulty == "sunday_drive" else (1.16 if difficulty == "clockwork" else 1.08)
+	var baseline_power := float(tuning["baseline_power"])
 	var catch_up_power := 0.0
 	if difficulty == "club_circuit":
 		var progress_deficit := _leader_progress_deficit()
-		catch_up_power = minf(0.08, maxf(float(maxi(0, position - 1)) * 0.02, progress_deficit * 0.04))
+		catch_up_power = minf(0.09, maxf(float(maxi(0, position - 1)) * 0.02, progress_deficit * 0.04))
 	vehicle.set_external_power_multiplier(baseline_power + catch_up_power)
 	var boost := (
-		difficulty != "sunday_drive"
-		and absf(steering_angle) < 0.26
-		and turn_severity < 0.45
+		absf(steering_angle) < 0.26
+		and planned_turn_severity < float(tuning["boost_turn_threshold"])
+		and (line_radius <= 0.0 or line_radius >= float(tuning["boost_radius"]))
+		and distance_to_target > braking_distance * 1.25
+		and float(surface_plan["risk"]) < 0.12
+		and float(obstacle_plan["speed_scale"]) > 0.96
 		and not should_brake
 		and vehicle.speed > 180.0
 		and vehicle.boost_amount > 10.0
 	)
+	if (
+		not boost
+		and not should_brake
+		and absf(_smoothed_steer) < 0.16
+		and planned_turn_severity < 0.3
+		and float(surface_plan["risk"]) < 0.12
+		and vehicle.speed > effective_max_speed * 0.55
+	):
+		vehicle.boost_amount = minf(
+			vehicle.stats.boost_capacity,
+			vehicle.boost_amount + float(tuning["clean_line_recharge"]) * delta
+		)
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
 	_update_stuck_recovery(delta, stuck_target_key, distance_to_target)
@@ -347,6 +437,85 @@ func _leader_progress_deficit() -> float:
 	return maxf(0.0, best - mine)
 
 
+func _difficulty_tuning() -> Dictionary:
+	return DIFFICULTY_TUNING.get(difficulty, DIFFICULTY_TUNING["club_circuit"]) as Dictionary
+
+
+func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
+	var plan := {
+		"weight": 0.0,
+		"speed_scale": 1.0,
+		"risk": 0.0,
+		"avoid_direction": desired_direction,
+	}
+	if not vehicle.is_inside_tree():
+		return plan
+	var center_risk := _surface_exposure(desired_direction)
+	plan["risk"] = center_risk
+	plan["speed_scale"] = lerpf(1.0, 0.72, center_risk)
+	if center_risk < 0.12 or not _surface_route_can_avoid(desired_direction):
+		return plan
+	var best_direction := desired_direction
+	var best_risk := center_risk
+	for angle: float in SURFACE_PROBE_ANGLES:
+		if is_zero_approx(angle):
+			continue
+		var candidate := desired_direction.rotated(angle)
+		if _ray_clearance_from(vehicle.global_position, candidate, SURFACE_PROBE_DISTANCES[-1]) < 0.82:
+			continue
+		var candidate_risk := _surface_exposure(candidate)
+		if candidate_risk < best_risk - 0.08:
+			best_risk = candidate_risk
+			best_direction = candidate
+	if best_direction != desired_direction:
+		plan["avoid_direction"] = best_direction
+		plan["weight"] = clampf(0.28 + center_risk * 0.34, 0.0, 0.58)
+		plan["speed_scale"] = lerpf(1.0, 0.82, best_risk)
+	return plan
+
+
+func _surface_exposure(direction: Vector2) -> float:
+	var exposure := 0.0
+	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
+		var zone := node as SurfaceZone
+		if zone == null:
+			continue
+		var zone_risk := _surface_zone_risk(zone)
+		if zone_risk <= 0.0:
+			continue
+		for distance: float in SURFACE_PROBE_DISTANCES:
+			if zone.contains_global_point(vehicle.global_position + direction * distance):
+				exposure = maxf(exposure, zone_risk)
+				break
+	return exposure
+
+
+func _surface_route_can_avoid(direction: Vector2) -> bool:
+	var found_risk := false
+	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
+		var zone := node as SurfaceZone
+		if zone == null:
+			continue
+		var zone_risk := _surface_zone_risk(zone)
+		if zone_risk <= 0.0:
+			continue
+		for distance: float in SURFACE_PROBE_DISTANCES:
+			if not zone.contains_global_point(vehicle.global_position + direction * distance):
+				continue
+			found_risk = true
+			if StringName(zone.get_meta("lane", &"full")) == &"full":
+				return false
+			break
+	return found_risk
+
+
+func _surface_zone_risk(zone: SurfaceZone) -> float:
+	return maxf(
+		clampf((0.72 - zone.grip_multiplier) / 0.4, 0.0, 1.0),
+		clampf((0.84 - zone.speed_multiplier) / 0.4, 0.0, 1.0)
+	)
+
+
 func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictionary:
 	var plan := {"steer": 0.0, "weight": 0.0, "speed_scale": 1.0, "avoid_direction": desired_direction}
 	if not vehicle.is_inside_tree():
@@ -362,7 +531,7 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 	var wall_normal := Vector2.ZERO
 	for angle: float in OBSTACLE_FEELER_ANGLES:
 		var probe_direction := desired_direction.rotated(angle)
-		var probe := _ray_probe_from(origin, probe_direction, feeler_length, TRACK_COLLISION_MASK | VEHICLE_COLLISION_MASK | SCATTER_DODGE_MASK)
+		var probe := _ray_probe_from(origin, probe_direction, feeler_length, STATIC_OBSTACLE_MASK | VEHICLE_COLLISION_MASK)
 		var probe_clearance := float(probe["clearance"])
 		if is_zero_approx(angle):
 			center_clearance = probe_clearance
@@ -389,7 +558,7 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 
 
 func _ray_clearance_from(origin: Vector2, direction: Vector2, feeler_length: float) -> float:
-	return float(_ray_probe_from(origin, direction, feeler_length, TRACK_COLLISION_MASK)["clearance"])
+	return float(_ray_probe_from(origin, direction, feeler_length, STATIC_OBSTACLE_MASK)["clearance"])
 
 
 func _ray_probe_from(origin: Vector2, direction: Vector2, feeler_length: float, mask: int) -> Dictionary:
@@ -531,4 +700,4 @@ func _racing_line_radius(position: Vector2) -> float:
 	if cross < 0.001:
 		return 0.0
 	var radius := ab * bc * ac / (4.0 * cross)
-	return clampf(radius, 0.0, 1400.0)
+	return clampf(radius, 0.0, MAX_RACING_LINE_RADIUS)

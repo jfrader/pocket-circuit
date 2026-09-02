@@ -5,6 +5,11 @@ const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const CHECKPOINTS_PER_LAP := 8
 const MAX_PHYSICS_FRAMES := 2400
 const MAX_RECOVERIES_PER_LAP := 3
+const MAX_LAP_SECONDS: Dictionary = {
+	"sunday_drive": 38.0,
+	"club_circuit": 34.0,
+	"clockwork": 32.0,
+}
 const OBSTACLE_NAMES: Array[String] = ["MugA", "MugB", "CerealA", "CerealB", "Sponge", "Fork", "Ruler", "Apple", "Lime", "Cup", "Spoon"]
 const THEME_SCENES: Dictionary = {
 	&"kitchen": "res://scenes/tracks/kitchen_circuit.tscn",
@@ -16,6 +21,7 @@ var _theme: StringName = &"kitchen"
 var _room: StringName = &"classic"
 var _seed := -1
 var _direction: StringName = &"both"
+var _difficulty := "club_circuit"
 
 
 func _initialize() -> void:
@@ -31,11 +37,14 @@ func _initialize() -> void:
 	var env_direction := OS.get_environment("PC_DIRECTION")
 	if env_direction in [&"forward", &"reverse", &"both"]:
 		_direction = StringName(env_direction)
+	var env_difficulty := OS.get_environment("PC_DIFFICULTY")
+	if MAX_LAP_SECONDS.has(env_difficulty):
+		_difficulty = env_difficulty
 	call_deferred("_run_test")
 
 
 func _run_test() -> void:
-	print("THEME_AI_HARNESS track=%s" % _track_label())
+	print("THEME_AI_HARNESS track=%s difficulty=%s" % [_track_label(), _difficulty])
 	if not await _verify_scene_contract():
 		return
 	if _direction != &"reverse" and not await _run_direction(false):
@@ -99,7 +108,7 @@ func _run_direction(reverse: bool) -> bool:
 	var event := {"theme": _theme, "reverse": reverse}
 	if _seed >= 0:
 		event.merge({"circuit": "generated", "room": _room, "seed": _seed})
-	prototype.set("_session", {"event": event})
+	prototype.set("_session", {"event": event, "difficulty": _difficulty})
 	var manager := prototype.get_node("RaceManager") as RaceManager
 	manager.set_reverse_direction(reverse)
 	root.add_child(prototype)
@@ -115,6 +124,7 @@ func _run_direction(reverse: bool) -> bool:
 	paused = false
 
 	var checkpoint_counts: Dictionary = {}
+	var lap_times: Dictionary = {}
 	var ai_vehicles: Array[Node2D] = []
 	for racer: Node in get_nodes_in_group("race_vehicle"):
 		if racer != player and _has_ai_controller(racer):
@@ -124,6 +134,10 @@ func _run_direction(reverse: bool) -> bool:
 		if checkpoint_counts.has(racer):
 			checkpoint_counts[racer] = int(checkpoint_counts[racer]) + 1
 	)
+	manager.racer_lap_completed.connect(func(racer: Node2D, lap: int) -> void:
+		if lap == 1 and checkpoint_counts.has(racer) and not lap_times.has(racer):
+			lap_times[racer] = float(manager.get_racer_state(racer).get("elapsed", manager.race_time))
+	)
 
 	var frame := 0
 	while frame < MAX_PHYSICS_FRAMES and not _all_completed_lap(ai_vehicles, checkpoint_counts):
@@ -132,6 +146,18 @@ func _run_direction(reverse: bool) -> bool:
 
 	for racer: Node2D in ai_vehicles:
 		var controller := _get_ai_controller(racer)
+		var lap_time := float(lap_times.get(racer, INF))
+		print(
+			"AI_RACE_LAP %s %s difficulty=%s racer=%s lap_seconds=%.3f recoveries=%d"
+			% [
+				_track_label(),
+				direction_label,
+				controller.difficulty if controller else _difficulty,
+				racer.name,
+				lap_time,
+				controller.recovery_count if controller else -1,
+			]
+		)
 		print(
 			"THEME_AI_STATE %s %s %s checkpoints=%d expected=%d position=%s speed=%.1f recoveries=%d"
 			% [
@@ -155,6 +181,20 @@ func _run_direction(reverse: bool) -> bool:
 		if not _expect(
 			controller != null and controller.recovery_count <= MAX_RECOVERIES_PER_LAP,
 			"%s %s %s should not rely on repeated recovery (recoveries=%d)" % [_track_label(), direction_label, racer.name, controller.recovery_count if controller else -1]
+		):
+			return false
+		var max_lap_seconds := float(MAX_LAP_SECONDS[_difficulty])
+		if not _expect(
+			float(lap_times.get(racer, INF)) <= max_lap_seconds,
+			"%s %s %s should meet the %s pace floor (lap=%.3fs, max=%.1fs)"
+			% [
+				_track_label(),
+				direction_label,
+				racer.name,
+				_difficulty,
+				float(lap_times.get(racer, INF)),
+				max_lap_seconds,
+			]
 		):
 			return false
 	print("THEME_AI_DIRECTION_PASS %s %s frames=%d" % [_track_label(), direction_label, frame])

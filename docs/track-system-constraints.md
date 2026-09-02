@@ -178,11 +178,26 @@ an AI trap.
   `RaceManager.is_reverse_direction`; never reverse only checkpoint order.
 - Generated shortcut windows move the AI target to the safe outer lane with a
   tapered transition. This geometry is safe in both race directions.
-- Current pace/corner constants are Sunday Drive 0.86/8.6, Club Circuit
-  1.10/10.9, and Clockwork 1.14/11.6. Retune only with full forward and reverse
-  harness coverage.
+- AI probes walls, traffic, AI-dodge scenery, and player-collision corner giants.
+  It also samples upcoming `SurfaceZone` polygons, pre-slows for low-grip or
+  low-speed material, and only steers around a zone when its lane metadata says
+  an alternate corridor exists.
+- Curvature sampling caps the fitted racing-line radius at 2600 units. Current
+  legal-physics tuning is:
+
+  | Preset | Pace / corner k / floor | Braking near-far / response | Boost start / clean-line recharge | Engine force / catch-up |
+  |---|---|---|---|---|
+  | Sunday Drive | 0.94 / 13.0 / 0.48 | 190-380 / 72 | 28% / none | 1.00x / none |
+  | Club Circuit | 1.08 / 15.2 / 0.53 | 165-350 / 56 | 58% / 5 per second | 1.06x / up to +0.09x |
+  | Clockwork | 1.12 / 16.4 / 0.58 | 145-315 / 48 | 78% / 8 per second | 1.15x / none |
+
+  The external engine-force ceiling is 1.15x; shared physics still caps normal
+  speed at 1.0x and active boost at 1.2x. Retune only with full forward and
+  reverse harness coverage.
 - Every AI vehicle must complete a legal lap with no more than three recoveries
-  in `theme_ai_harness.gd`.
+  in `theme_ai_harness.gd`. The harness also emits `AI_RACE_LAP` telemetry and
+  enforces first-lap ceilings of 38 seconds on Sunday Drive, 34 on Club Circuit,
+  and 32 on Clockwork across its supported authored and generated tracks.
 
 ## Verification
 
@@ -193,7 +208,8 @@ Run after generator, builder, surface, collision, or AI changes:
 3. `godot --headless --path . --script res://tests/generated_race_runtime_test.gd`
 4. Representative family/room seeds through `tests/theme_ai_harness.gd` in
    both directions using `PC_THEME`, `PC_ROOM`, `PC_SEED`, and
-   `PC_DIRECTION=both`.
+   `PC_DIRECTION=both`; set `PC_DIFFICULTY` to `sunday_drive`, `club_circuit`,
+   or `clockwork` when comparing presets.
 5. `godot --headless --path . --script res://tests/ai_race_smoke_test.gd` for
    the three authored regression tracks.
 6. A broad theme x room x seed construction stress matrix after geometry or

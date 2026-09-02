@@ -43,6 +43,8 @@ func _run_test() -> void:
 	manager.configure_checkpoints(checkpoints)
 	manager.register_racer(vehicle, "Test AI", "Rustbug")
 	controller.configure(vehicle, manager, 0.0)
+	if not _expect(is_equal_approx(vehicle.boost_amount, vehicle.stats.boost_capacity * 0.58), "Club Circuit should start with its difficulty-scaled legal boost reserve"):
+		return
 	manager.prepare_race()
 	manager.start_race()
 	controller.set("_racing_line", PackedVector2Array([
@@ -79,6 +81,26 @@ func _run_test() -> void:
 	):
 		return
 	controller.set("_racing_line", PackedVector2Array())
+	var surface_zone := SurfaceZone.new()
+	root.add_child(surface_zone)
+	surface_zone.configure(
+		&"test low grip",
+		PackedVector2Array([
+			Vector2(50.0, -50.0),
+			Vector2(300.0, -50.0),
+			Vector2(300.0, 50.0),
+			Vector2(50.0, 50.0),
+		]),
+		0.45,
+		0.7
+	)
+	var surface_plan := controller.call("_surface_anticipation", Vector2.RIGHT) as Dictionary
+	if not _expect(float(surface_plan["risk"]) > 0.5 and float(surface_plan["speed_scale"]) < 0.9, "AI should anticipate and pre-slow for a low-grip surface"):
+		return
+	if not _expect(is_zero_approx(float(surface_plan["weight"])), "AI should not leave the racing line when a full-width surface has no safe alternate lane"):
+		return
+	root.remove_child(surface_zone)
+	surface_zone.free()
 
 	var corner_guide := controller.call("_checkpoint_entry_guide_position", 3) as Vector2
 	var raw_corner := Vector2(735.0, 360.0)
@@ -98,11 +120,18 @@ func _run_test() -> void:
 	vehicle.linear_velocity = Vector2.RIGHT * 520.0
 	vehicle.speed = 520.0
 	controller.call("_physics_process", 1.0 / 60.0)
-	if not _expect(float(vehicle.get("_external_brake")) > 0.0, "AI should brake before a sharp corner"):
+	if not _expect(is_zero_approx(float(vehicle.get("_external_brake"))), "competitive AI should not brake at the old overly-early marker"):
+		return
+	vehicle.global_position = Vector2(430.0, 360.0)
+	controller.call("_physics_process", 1.0 / 60.0)
+	if not _expect(float(vehicle.get("_external_brake")) > 0.5, "AI should brake later and strongly before a sharp corner"):
 		return
 	if not _expect(not bool(vehicle.get("_external_handbrake")), "AI cornering should remain stable without handbrake spins"):
 		return
 	if not _expect(absf(float(vehicle.get("_external_steer"))) < 0.8, "steering should ramp instead of snapping to full lock"):
+		return
+	vehicle.set_external_power_multiplier(2.0)
+	if not _expect(is_equal_approx(float(vehicle.get("_external_power_multiplier")), 1.15), "AI acceleration should be bounded at the legal 1.15x ceiling"):
 		return
 
 	vehicle.speed = 60.0
