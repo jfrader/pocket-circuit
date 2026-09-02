@@ -44,6 +44,9 @@
 - Circuit dressing now combines coherent household story moments with safe
   themed prop pockets, broad cloth and paper set dressing, and denser floor
   details that fill blank room sectors without obstructing the racing corridor.
+- Generated rooms now surround the course with dense themed micro-details and
+  giant household landmarks, while material patterns and readable grip patches
+  break up flat-looking corridors without adding painted racing lines.
 - Course boundaries read from material changes and sparse household-object runs
   that alternate between both sides, one side, and open visual sectors rather
   than enclosing the track with a repeated fence or painted race lines.
