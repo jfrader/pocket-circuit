@@ -36,7 +36,7 @@ func _capture() -> void:
 	for settle_frame in 20:
 		await process_frame
 	await create_timer(4.2, false).timeout
-	if focus in [&"giant", &"grip"]:
+	if focus in [&"overview", &"giant", &"grip"]:
 		_focus_density_detail(current_scene, focus)
 		for camera_frame in 8:
 			await process_frame
@@ -67,7 +67,13 @@ func _focus_density_detail(race: Node, focus: StringName) -> void:
 	if track == null or camera == null:
 		return
 	var target := Vector2.ZERO
-	if focus == &"giant":
+	if focus == &"overview":
+		var room_bounds: Rect2 = track.get_meta("room_bounds", Rect2())
+		target = room_bounds.get_center()
+		var viewport_size := Vector2(1280.0, 720.0)
+		var fit_zoom := minf(viewport_size.x / room_bounds.size.x, viewport_size.y / room_bounds.size.y) * 0.9
+		camera.zoom = Vector2.ONE * fit_zoom
+	elif focus == &"giant":
 		var giants := track.get_node_or_null("GeneratedMoments/GiantLandmarks")
 		if giants and giants.get_child_count() > 0:
 			target = (giants.get_child(0) as Node2D).global_position
@@ -81,4 +87,5 @@ func _focus_density_detail(race: Node, focus: StringName) -> void:
 	camera.set_physics_process(false)
 	camera.set("target_vehicle", null)
 	camera.global_position = track.to_global(target)
-	camera.zoom = Vector2.ONE * (0.9 if focus == &"giant" else 2.0)
+	if focus != &"overview":
+		camera.zoom = Vector2.ONE * (0.9 if focus == &"giant" else 2.0)

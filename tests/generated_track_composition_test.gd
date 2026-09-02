@@ -58,6 +58,8 @@ func _run_test() -> void:
 		return
 	if not _check_boundary_room_regressions():
 		return
+	if not _check_shadow_helpers():
+		return
 	if not _check_legacy_builder_scale():
 		return
 	print("GENERATED_TRACK_COMPOSITION_TEST PASS builds=%d stories=12 surfaces=24+ density floor60-120 edge60-150 giants1-3" % _built_count)
@@ -97,6 +99,10 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	if not _expect(not String(story_id).is_empty(), "%s should retain story id" % theme):
 		return false
 	seen_story_ids[story_id] = true
+	var void_backdrop := track.get_node_or_null("Floor") as Polygon2D
+	var room_surface := track.get_node_or_null("RoomSurface") as Polygon2D
+	if not _expect(void_backdrop != null and void_backdrop.color.is_equal_approx(Color("111316")) and room_surface != null, "%s should present its textured room as an island over a dark void" % theme):
+		return false
 
 	if not _expect(track.find_children("PaperclipLine", "", true, false).is_empty(), "%s generated track must not use the old global PaperclipLine" % theme):
 		return false
@@ -229,8 +235,13 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	var shortcut := track.get_node_or_null("GeneratedMoments/ShortcutDecision")
 	if not _expect(technical_surface != null and shortcut != null, "%s should expose technical and shortcut moments" % theme):
 		return false
-	if not _expect(technical_surface.get_child_count() == 4 and shortcut.get_child_count() == 4, "%s surfaces should carry readable decal sprites" % theme):
+	if not _expect(technical_surface.get_child_count() == 8 and shortcut.get_child_count() == 8, "%s surfaces should carry one faint tint and seven readable decal sprites" % theme):
 		return false
+	for surface_moment: Node2D in [technical_surface, shortcut]:
+		var tint := surface_moment.get_node_or_null("SurfaceTint") as Polygon2D
+		var decals := surface_moment.find_children("CenterlineDecal*", "Sprite2D", false, false)
+		if not _expect(tint != null and bool(tint.get_meta("visual_only", false)) and tint.color.a >= 0.08 and tint.color.a <= 0.12 and decals.size() == 7, "%s surface visuals should remain a faint polygon under seven themed decals" % theme):
+			return false
 	var shortcut_path: PackedVector2Array = shortcut.get_meta("shortcut_path", PackedVector2Array())
 	var safe_path: PackedVector2Array = shortcut.get_meta("safe_path", PackedVector2Array())
 	var shortcut_polygon: PackedVector2Array = shortcut.get_meta("polygon", PackedVector2Array())
@@ -310,6 +321,27 @@ func _check_legacy_builder_scale() -> bool:
 	return _expect(base_bounds.size == Vector2(1750.0, 1150.0) and generated_bounds.size.is_equal_approx(base_bounds.size * BUILDER.WORLD_SCALE), "negative-seed canonical rooms should stay unscaled while generated rooms use world scale")
 
 
+func _check_shadow_helpers() -> bool:
+	var sample := Node2D.new()
+	BUILDER._add_obstacle(sample, "RectObstacle", Vector2.ZERO, 32.0, "res://assets/textures/kitchen/ruler_plank.png")
+	BUILDER._add_prop_with_collision(sample, Vector2(120.0, 0.0), 28.0, "res://assets/textures/kitchen/apple_cartoon.png")
+	var obstacle := sample.get_node_or_null("RectObstacle") as StaticBody2D
+	var apron := sample.get_node_or_null("ApronProp") as StaticBody2D
+	var obstacle_shadow := obstacle.get_node_or_null("ContactShadow") as Sprite2D if obstacle else null
+	var apron_shadow := apron.get_node_or_null("ContactShadow") as Sprite2D if apron else null
+	var valid := _expect(
+		obstacle_shadow != null
+		and apron_shadow != null
+		and StringName(obstacle_shadow.get_meta("shadow_shape", &"")) == &"rect"
+		and StringName(apron_shadow.get_meta("shadow_shape", &"")) == &"circle"
+		and obstacle_shadow.position.dot(BUILDER.SHADOW_DIRECTION) > 0.0
+		and apron_shadow.position.dot(BUILDER.SHADOW_DIRECTION) > 0.0,
+		"obstacles and apron props should share the shape-aware down-right shadow system"
+	)
+	sample.free()
+	return valid
+
+
 func _check_island_geometry(track: Node2D, label: String) -> bool:
 	var barrier := track.get_node_or_null("InnerBarrier")
 	var boundary_collision := barrier.get_node_or_null("BoundaryCollision") as CollisionShape2D if barrier else null
@@ -352,7 +384,11 @@ func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
 	var expected: Dictionary = BUILDER.LAYOUTS[theme]["generated_boundary"]
 	if not _expect(visuals != null and String(visuals.get_meta("section_asset", "")) == String(expected["section"]) and String(visuals.get_meta("accent_asset", "")) == String(expected["accent"]), "%s outer visuals should use only its theme-specific household kit" % label):
 		return false
-	if not _expect(load(String(expected["section"])) is Texture2D and load(String(expected["accent"])) is Texture2D, "%s boundary textures should be tracked loadable assets" % label):
+	var expected_sections: Array = expected.get("sections", [expected["section"]])
+	for section_asset: String in expected_sections:
+		if not _expect(load(section_asset) is Texture2D, "%s boundary rail should be a tracked loadable asset: %s" % [label, section_asset]):
+			return false
+	if not _expect(load(String(expected["accent"])) is Texture2D and visuals.get_meta("section_assets", []) == expected_sections, "%s boundary textures should expose their complete theme-specific rail kit" % label):
 		return false
 	var sections: Array[Node] = []
 	var accents: Array[Node] = []
@@ -361,7 +397,7 @@ func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
 			sections.append(child)
 		elif child.name.begins_with("CornerAccent"):
 			accents.append(child)
-	if not _expect(sections.size() == int(visuals.get_meta("section_count", 0)) and sections.size() >= 8 and sections.size() <= 32, "%s should use a restrained number of partial boundary sections (count=%d)" % [label, sections.size()]):
+	if not _expect(sections.size() == int(visuals.get_meta("section_count", 0)) and sections.size() >= 24 and sections.size() <= 84, "%s should use extended but still partial boundary sections (count=%d)" % [label, sections.size()]):
 		return false
 	if not _expect(accents.size() == int(visuals.get_meta("accent_count", 0)) and accents.size() in [1, 2], "%s should mark one or two meaningful corner mouths with larger partial sections" % label):
 		return false
@@ -395,11 +431,17 @@ func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
 			actual_both_sided_runs += 1
 		else:
 			actual_one_sided_runs += 1
-	if not _expect(actual_empty_runs == 1 and actual_one_sided_runs == 5 and actual_both_sided_runs == 2, "%s should place exactly one empty boundary run, five one-sided runs, and two both-sided runs" % label):
+	if not _expect(actual_empty_runs == 1 and actual_one_sided_runs == 2 and actual_both_sided_runs == 5, "%s should place exactly one empty boundary run, two one-sided runs, and five both-sided runs" % label):
 		return false
 	if not _expect(int(visuals.get_meta("empty_run_count", 0)) == actual_empty_runs and int(visuals.get_meta("one_sided_run_count", 0)) == actual_one_sided_runs and int(visuals.get_meta("both_sided_run_count", 0)) == actual_both_sided_runs, "%s boundary run counts should describe placed sprites" % label):
 		return false
 	if not _expect(int(visuals.get_meta("outer_section_count", 0)) > 0 and int(visuals.get_meta("inner_section_count", 0)) > 0, "%s partial boundary composition should use both track edges without lining either continuously" % label):
+		return false
+	if not _expect(int(visuals.get_meta("inner_run_count", 0)) == 6 and int(visuals.get_meta("outer_run_count", 0)) == 6, "%s sparse rail accents should cover six of eight sectors on each edge" % label):
+		return false
+	var inner_coverage := float(visuals.get_meta("inner_accent_coverage", 0.0))
+	var outer_coverage := float(visuals.get_meta("outer_accent_coverage", 0.0))
+	if not _expect(inner_coverage >= 0.45 and inner_coverage <= 0.60 and outer_coverage >= 0.45 and outer_coverage <= 0.60, "%s sparse accents should estimate 45-60%% coverage per side (inner %.2f outer %.2f)" % [label, inner_coverage, outer_coverage]):
 		return false
 	var empty_hints := visuals.find_children("EmptyRunHint", "Sprite2D", false, false)
 	if not _expect(empty_hints.size() == 1, "%s should mark its single empty run with one flat worn-floor hint" % label):
@@ -408,9 +450,21 @@ func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
 		var section_distance := _minimum_point_distance(section.position, centerline)
 		if not _expect(section.texture != null and section_distance >= BUILDER.HALF_WIDTH and StringName(section.get_meta("boundary_kind", &"")) == &"partial_section", "%s partial boundary sections should stay outside the 250u drivable corridor (got %.1f)" % [label, section_distance]):
 			return false
+		if not _expect(String(section.get_meta("asset_path", "")) in expected_sections, "%s partial boundary section should come from its theme rail kit" % label):
+			return false
 	for accent: Sprite2D in accents:
 		if not _expect(accent.texture != null and StringName(accent.get_meta("boundary_kind", &"")) == &"corner_mouth_accent", "%s corner accents should expose their semantic boundary role" % label):
 			return false
+	var backing := track.get_node_or_null("ContinuousBoundaryBacking")
+	var inner_barrier := track.get_node_or_null("InnerBarrier")
+	var inner_rim := backing.get_node_or_null("InnerRimBase") as Line2D if backing else null
+	var outer_rim := backing.get_node_or_null("OuterRimBase") as Line2D if backing else null
+	if not _expect(backing != null and inner_rim != null and outer_rim != null, "%s should expose continuous visual backing for both physical edges" % label):
+		return false
+	if not _expect(inner_rim.points == inner_barrier.get_meta("boundary_polygon", PackedVector2Array()) and outer_rim.points == polygon, "%s continuous rims should follow the exact collision contours" % label):
+		return false
+	if not _expect(inner_rim.closed and outer_rim.closed and inner_rim.width >= 8.0 and outer_rim.width >= 8.0 and float(backing.get_meta("inner_coverage", 0.0)) == 1.0 and float(backing.get_meta("outer_coverage", 0.0)) == 1.0, "%s continuous boundary backing should cover 100%% of both edges" % label):
+		return false
 	return true
 
 
@@ -429,6 +483,9 @@ func _check_story_assets(theme: StringName) -> bool:
 			return false
 	for ground_section: Dictionary in BUILDER.LAYOUTS[theme].get("ground_sections", []):
 		if not _expect(load(String(ground_section["asset"])) is Texture2D, "%s is missing ground section asset %s" % [theme, ground_section["asset"]]):
+			return false
+	for boundary_asset: String in BUILDER.LAYOUTS[theme].get("generated_boundary", {}).get("sections", []):
+		if not _expect(load(boundary_asset) is Texture2D, "%s is missing boundary rail asset %s" % [theme, boundary_asset]):
 			return false
 	for kit: Dictionary in BUILDER.STORY_KITS[theme]:
 		for formation: Dictionary in kit["island"]:
@@ -489,7 +546,11 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 				gate_samples.append(checkpoint.position)
 		if not _expect(BUILDER._giant_placement_is_safe(landmark.position, footprint_size, shape_kind, landmark.rotation, room_polygon, centerline, gate_samples, []), "%s giant landmark footprint should stay inside the room and clear of the corridor, walls, and gates" % label):
 			return false
-		if not _expect(landmark.get_node_or_null("ContactShadow") is Sprite2D, "%s giant landmark should carry a grounded contact shadow" % label):
+		var contact_shadow := landmark.get_node_or_null("ContactShadow") as Sprite2D
+		var cast_shadow := landmark.get_node_or_null("CastShadow") as Sprite2D
+		var contact_offset := contact_shadow.global_position - landmark.global_position if contact_shadow else Vector2.ZERO
+		var cast_offset := cast_shadow.global_position - landmark.global_position if cast_shadow else Vector2.ZERO
+		if not _expect(contact_shadow != null and cast_shadow != null and contact_offset.dot(BUILDER.SHADOW_DIRECTION) > 0.0 and cast_offset.dot(BUILDER.SHADOW_DIRECTION) > contact_offset.dot(BUILDER.SHADOW_DIRECTION), "%s giant landmark should carry grounded and elongated down-right shadows" % label):
 			return false
 		var body := landmark.get_node_or_null("GiantBody") as StaticBody2D
 		if body:
@@ -564,6 +625,10 @@ func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
 		if not _expect(_minimum_point_distance(position, centerline) >= 132.0, "%s seed %d ambient prop should stay outside the racing corridor" % [theme, seed]):
 			return false
 		assets[String(prop.get_meta("asset_path", ""))] = true
+		var shadow := prop.get_node_or_null("ContactShadow") as Sprite2D
+		var shadow_offset := shadow.global_position - prop.global_position if shadow else Vector2.ZERO
+		if not _expect(shadow != null and shadow_offset.dot(BUILDER.SHADOW_DIRECTION) > 0.0 and StringName(shadow.get_meta("shadow_shape", &"")) in [&"circle", &"rect"], "%s seed %d ambient prop should use the unified down-right shape-aware shadow" % [theme, seed]):
+			return false
 		var normalized: Vector2 = (position - bounds.position) / bounds.size
 		sectors[Vector2i(clampi(int(normalized.x * 3.0), 0, 2), clampi(int(normalized.y * 2.0), 0, 1))] = true
 	if not _expect(assets.size() >= 4, "%s seed %d ambient dressing should use at least four prop assets (got %d)" % [theme, seed, assets.size()]):
