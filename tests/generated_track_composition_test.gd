@@ -60,7 +60,7 @@ func _run_test() -> void:
 		return
 	if not _check_legacy_builder_scale():
 		return
-	print("GENERATED_TRACK_COMPOSITION_TEST PASS builds=%d stories=12 surfaces=24" % _built_count)
+	print("GENERATED_TRACK_COMPOSITION_TEST PASS builds=%d stories=12 surfaces=24+ density floor60-120 edge60-150 giants1-3" % _built_count)
 	quit(0)
 
 
@@ -156,6 +156,8 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 		return false
 	if not _check_room_dressing(track, theme, seed):
 		return false
+	if not _check_density_systems(track, theme, seed):
+		return false
 	var moment_indices: Dictionary = track.get_meta("generated_moment_indices", {})
 	for required_moment: String in ["opening", "early_conflict_forward", "early_conflict_reverse", "shortcut", "technical", "speed", "finish"]:
 		if not _expect(moment_indices.has(required_moment), "%s should expose its %s moment index" % [theme, required_moment]):
@@ -193,17 +195,36 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	if not _check_outer_boundary(track, theme, seed):
 		return false
 
+	var centerline := (track.get_node("TrackSurface") as Line2D).points
 	var definitions: Variant = track.get_meta("generated_surfaces", null)
-	if not _expect(definitions is Array and (definitions as Array).size() == 2, "%s should define exactly two generated surfaces" % theme):
+	if not _expect(definitions is Array and (definitions as Array).size() >= 6 and (definitions as Array).size() <= 10, "%s should define two designed surfaces plus 4-8 grip patches" % theme):
 		return false
 	var definitions_by_role := {}
+	var patch_definitions: Array[Dictionary] = []
 	for definition: Dictionary in definitions:
 		var polygon: PackedVector2Array = definition.get("points", PackedVector2Array())
 		if not _expect(polygon.size() >= 3 and absf(_polygon_area(polygon)) > 1.0, "%s generated surface polygon should follow a non-empty track section" % theme):
 			return false
 		definitions_by_role[StringName(definition.get("role", &""))] = definition
+		if StringName(definition.get("role", &"")) == &"patch":
+			patch_definitions.append(definition)
 	if not _expect(definitions_by_role.has(&"technical") and definitions_by_role.has(&"shortcut"), "%s should expose technical and shortcut surface roles" % theme):
 		return false
+	if not _expect(patch_definitions.size() >= BUILDER.GRIP_PATCH_MIN_COUNT and patch_definitions.size() <= BUILDER.GRIP_PATCH_MAX_COUNT, "%s should expose 4-8 deterministic grip-patch definitions" % theme):
+		return false
+	var gate_positions := PackedVector2Array()
+	for checkpoint_index in 8:
+		var checkpoint := track.get_node_or_null("Checkpoint0Finish" if checkpoint_index == 0 else "Checkpoint%d" % checkpoint_index) as Node2D
+		if checkpoint:
+			gate_positions.append(checkpoint.position)
+	for patch_definition: Dictionary in patch_definitions:
+		var patch_index := int(patch_definition.get("centerline_index", -1))
+		var patch_polygon: PackedVector2Array = patch_definition.get("points", PackedVector2Array())
+		if not _expect(patch_index >= 0 and _minimum_point_distance(centerline[patch_index], gate_positions) >= 155.0, "%s grip patches should stay clear of start, finish, and checkpoint gates" % theme):
+			return false
+		for point: Vector2 in patch_polygon:
+			if not _expect(_minimum_point_distance(point, centerline) <= BUILDER.HALF_WIDTH, "%s grip patches should remain inside the drivable corridor" % theme):
+				return false
 	var technical_surface := track.get_node_or_null("GeneratedMoments/TechnicalSurfaceMoment")
 	var shortcut := track.get_node_or_null("GeneratedMoments/ShortcutDecision")
 	if not _expect(technical_surface != null and shortcut != null, "%s should expose technical and shortcut moments" % theme):
@@ -231,12 +252,17 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	var presenter := PRESENTER.new() as TrackVariantPresenter
 	track.add_child(presenter)
 	presenter.configure(track, theme, false)
-	if not _expect(presenter.surface_zones.size() == 2, "%s presenter should consume exactly two generated surface definitions" % theme):
+	if not _expect(presenter.surface_zones.size() == (definitions as Array).size(), "%s presenter should create one SurfaceZone per generated surface definition" % theme):
 		return false
+	var presented_patch_count := 0
 	for zone: SurfaceZone in presenter.surface_zones:
 		var collision := zone.get_node_or_null("SurfaceCollision") as CollisionPolygon2D
 		if not _expect(collision != null and not collision.polygon.is_empty(), "%s generated SurfaceZone should have a polygon" % theme):
 			return false
+		if StringName(zone.get_meta("role", &"")) == &"patch":
+			presented_patch_count += 1
+	if not _expect(presented_patch_count == patch_definitions.size(), "%s grip patches should become authoritative runtime SurfaceZones" % theme):
+		return false
 	var forward_hazard_path: PackedVector2Array = hazard_paths["forward"]
 	if not _expect(presenter.hazard.start_position == forward_hazard_path[0] and presenter.hazard.end_position == forward_hazard_path[1] and StringName(presenter.hazard.get_meta("direction", &"")) == &"forward", "%s forward race should use the forward conflict path" % theme):
 		return false
@@ -369,11 +395,14 @@ func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
 			actual_both_sided_runs += 1
 		else:
 			actual_one_sided_runs += 1
-	if not _expect(actual_empty_runs >= 3 and actual_one_sided_runs >= 3 and actual_both_sided_runs == 2, "%s should actually place empty, one-sided, and both-sided boundary runs" % label):
+	if not _expect(actual_empty_runs == 1 and actual_one_sided_runs == 5 and actual_both_sided_runs == 2, "%s should place exactly one empty boundary run, five one-sided runs, and two both-sided runs" % label):
 		return false
 	if not _expect(int(visuals.get_meta("empty_run_count", 0)) == actual_empty_runs and int(visuals.get_meta("one_sided_run_count", 0)) == actual_one_sided_runs and int(visuals.get_meta("both_sided_run_count", 0)) == actual_both_sided_runs, "%s boundary run counts should describe placed sprites" % label):
 		return false
 	if not _expect(int(visuals.get_meta("outer_section_count", 0)) > 0 and int(visuals.get_meta("inner_section_count", 0)) > 0, "%s partial boundary composition should use both track edges without lining either continuously" % label):
+		return false
+	var empty_hints := visuals.find_children("EmptyRunHint", "Sprite2D", false, false)
+	if not _expect(empty_hints.size() == 1, "%s should mark its single empty run with one flat worn-floor hint" % label):
 		return false
 	for section: Sprite2D in sections:
 		var section_distance := _minimum_point_distance(section.position, centerline)
@@ -386,6 +415,18 @@ func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
 
 
 func _check_story_assets(theme: StringName) -> bool:
+	for asset_path: String in BUILDER.LAYOUTS[theme].get("edge_decor", []):
+		if not _expect(load(asset_path) is Texture2D, "%s is missing edge decor asset %s" % [theme, asset_path]):
+			return false
+	for asset_path: String in BUILDER.LAYOUTS[theme].get("giants", []):
+		if not _expect(load(asset_path) is Texture2D, "%s is missing giant landmark asset %s" % [theme, asset_path]):
+			return false
+	for asset_path: String in BUILDER.LAYOUTS[theme].get("corridor_patterns", []):
+		if not _expect(load(asset_path) is Texture2D, "%s is missing corridor pattern asset %s" % [theme, asset_path]):
+			return false
+	for patch: Dictionary in BUILDER.LAYOUTS[theme].get("grip_patches", []):
+		if not _expect(load(String(patch["decal"])) is Texture2D, "%s is missing grip patch asset %s" % [theme, patch["decal"]]):
+			return false
 	for ground_section: Dictionary in BUILDER.LAYOUTS[theme].get("ground_sections", []):
 		if not _expect(load(String(ground_section["asset"])) is Texture2D, "%s is missing ground section asset %s" % [theme, ground_section["asset"]]):
 			return false
@@ -402,6 +443,62 @@ func _check_story_assets(theme: StringName) -> bool:
 		for surface: Dictionary in kit["surfaces"]:
 			if not _expect(load(String(surface["decal"])) is Texture2D, "%s/%s is missing surface decal %s" % [theme, kit["id"], surface["decal"]]):
 				return false
+	return true
+
+
+func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool:
+	var label := "%s seed %d" % [theme, seed]
+	var centerline := (track.get_node("TrackSurface") as Line2D).points
+	var room_shape := StringName(track.get_meta("room_shape", &"classic"))
+	var room_polygon: PackedVector2Array = BUILDER.ROOM_SHAPES[room_shape]
+	var patterns := track.get_node_or_null("CorridorPatterns")
+	if not _expect(patterns != null and int(patterns.get_meta("placed_count", 0)) == 32 and patterns.get_child_count() == 32, "%s should place 32 subtle corridor-pattern sprites" % label):
+		return false
+	for pattern: Sprite2D in patterns.get_children():
+		var distance := _minimum_point_distance(pattern.position, centerline)
+		if not _expect(pattern.texture != null and distance < BUILDER.HALF_WIDTH and pattern.z_index == -8, "%s corridor patterns should stay visual-only inside the road" % label):
+			return false
+
+	var edge_decor := track.get_node_or_null("GeneratedMoments/EdgeApronDecor")
+	var edge_count := int(edge_decor.get_meta("placed_count", 0)) if edge_decor else 0
+	if not _expect(edge_decor != null and edge_count >= 60 and edge_count <= 150 and edge_decor.get_child_count() == edge_count, "%s should place 60-150 non-colliding edge and apron details (got %d)" % [label, edge_count]):
+		return false
+	for decor: Node in edge_decor.get_children():
+		if not _expect(decor is Sprite2D and not decor is CollisionObject2D, "%s edge decor should remain non-colliding Sprite2D presentation" % label):
+			return false
+		var sprite := decor as Sprite2D
+		if not _expect(Geometry2D.is_point_in_polygon(sprite.position, room_polygon) and _minimum_point_distance(sprite.position, centerline) >= BUILDER.HALF_WIDTH + 8.0, "%s edge decor should stay inside the room and outside the drivable corridor" % label):
+			return false
+
+	var giants := track.get_node_or_null("GeneratedMoments/GiantLandmarks")
+	var giant_count := int(giants.get_meta("placed_count", 0)) if giants else 0
+	if not _expect(giants != null and giant_count >= 1 and giant_count <= 3 and giants.get_child_count() == giant_count, "%s should place 1-3 giant landmarks (got %d)" % [label, giant_count]):
+		return false
+	var colliding_giants := 0
+	for landmark: Node2D in giants.get_children():
+		var world_size := float(landmark.get_meta("world_size", 0.0))
+		var footprint_size: Vector2 = landmark.get_meta("footprint_size", Vector2.ZERO)
+		var asset_path := String(landmark.get_meta("asset_path", ""))
+		if not _expect(asset_path.begins_with("res://assets/textures/giant_props/") and world_size >= 300.0 and world_size <= 600.0, "%s giant landmarks should use tracked 300-600u theme assets" % label):
+			return false
+		var shape_kind := StringName(BUILDER.PROP_SHAPES.get(asset_path.get_file(), {}).get("shape", "circle"))
+		var gate_samples := PackedVector2Array()
+		for checkpoint_index in 8:
+			var checkpoint := track.get_node_or_null("Checkpoint0Finish" if checkpoint_index == 0 else "Checkpoint%d" % checkpoint_index) as Node2D
+			if checkpoint:
+				gate_samples.append(checkpoint.position)
+		if not _expect(BUILDER._giant_placement_is_safe(landmark.position, footprint_size, shape_kind, landmark.rotation, room_polygon, centerline, gate_samples, []), "%s giant landmark footprint should stay inside the room and clear of the corridor, walls, and gates" % label):
+			return false
+		if not _expect(landmark.get_node_or_null("ContactShadow") is Sprite2D, "%s giant landmark should carry a grounded contact shadow" % label):
+			return false
+		var body := landmark.get_node_or_null("GiantBody") as StaticBody2D
+		if body:
+			colliding_giants += 1
+			var collision := body.get_child(0) as CollisionShape2D if body.get_child_count() > 0 else null
+			if not _expect(body.collision_layer == (4 | 16) and collision != null and collision.shape != null, "%s colliding giant should expose a valid scenery shape" % label):
+				return false
+	if not _expect(colliding_giants >= 1, "%s should include at least one colliding giant landmark" % label):
+		return false
 	return true
 
 
@@ -424,7 +521,7 @@ func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
 		if not _expect(pocket_placed >= 2 and pocket_placed <= 3, "%s seed %d ambient pockets should preserve the semantic few quantity (got %d)" % [theme, seed, pocket_placed]):
 			return false
 	var details := dressing.get_node_or_null("FloorDetails")
-	if not _expect(details != null and details.get_child_count() == decal_count and decal_count >= 12, "%s seed %d should add at least twelve off-track floor details" % [theme, seed]):
+	if not _expect(details != null and details.get_child_count() == decal_count and decal_count >= 60, "%s seed %d should add 60-120 off-track floor details for visual density (got %d)" % [theme, seed, decal_count]):
 		return false
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
 	var room_shape := StringName(track.get_meta("room_shape", &"classic"))

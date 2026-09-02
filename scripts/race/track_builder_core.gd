@@ -16,6 +16,8 @@ const SHORTCUT_LANE_OFFSET := 70.0
 const SHORTCUT_LANE_HALF_WIDTH := 26.0
 const SAFE_RACING_LINE_OFFSET := 58.0
 const FINISH_APPROACH_SPAN := 20
+const GRIP_PATCH_MIN_COUNT := 4
+const GRIP_PATCH_MAX_COUNT := 8
 
 static var ROOM_SHAPES := {
 	"classic": PackedVector2Array([Vector2(-875, -575) * WORLD_SCALE, Vector2(875, -575) * WORLD_SCALE, Vector2(875, 575) * WORLD_SCALE, Vector2(-875, 575) * WORLD_SCALE]),
@@ -370,6 +372,21 @@ static var PROP_SHAPES := {
 	"stove_top.png": {"shape": "rect", "size": Vector2(190.0, 190.0)},
 	"bucket_stack.png": {"shape": "circle", "size": Vector2(152.0, 152.0)},
 	"monitor_top.png": {"shape": "rect", "size": Vector2(168.0, 126.0)},
+	# Density assets: giants use large scales while edge details stay small.
+	"giant_cereal_box.png": {"shape": "rect", "size": Vector2(180.0, 210.0)},
+	"giant_mug.png": {"shape": "circle", "size": Vector2(130.0, 130.0)},
+	"giant_watermelon.png": {"shape": "circle", "size": Vector2(140.0, 140.0)},
+	"giant_fork.png": {"shape": "rect", "size": Vector2(60.0, 220.0)},
+	"giant_basketball.png": {"shape": "circle", "size": Vector2(140.0, 140.0)},
+	"giant_toolbox.png": {"shape": "rect", "size": Vector2(200.0, 120.0)},
+	"giant_paint_can.png": {"shape": "circle", "size": Vector2(120.0, 120.0)},
+	"giant_keyboard.png": {"shape": "rect", "size": Vector2(220.0, 150.0)},
+	"giant_monitor.png": {"shape": "rect", "size": Vector2(180.0, 130.0)},
+	"giant_paper_stack.png": {"shape": "rect", "size": Vector2(170.0, 120.0)},
+	"giant_pen.png": {"shape": "rect", "size": Vector2(40.0, 210.0)},
+	"crumb_micro_01.png": {"shape": "circle", "size": Vector2(28.0, 28.0)},
+	"screw_small.png": {"shape": "rect", "size": Vector2(22.0, 60.0)},
+	"paperclip_micro.png": {"shape": "rect", "size": Vector2(30.0, 20.0)},
 }
 
 const LAYOUTS := {
@@ -480,6 +497,31 @@ const LAYOUTS := {
 			{"asset": "res://assets/textures/ground_dressing/kitchen_dish_towel_blue.png", "size": 270.0, "alpha": 0.96},
 			{"asset": "res://assets/textures/ground_dressing/kitchen_cleaning_rag_yellow.png", "size": 220.0, "alpha": 0.94},
 			{"asset": "res://assets/textures/ground_dressing/kitchen_oven_mitt_red.png", "size": 205.0, "alpha": 0.96},
+		],
+		"edge_decor": [
+			"res://assets/textures/edge_dressing/crumb_micro_01.png",
+			"res://assets/textures/edge_dressing/crumb_micro_02.png",
+			"res://assets/textures/edge_dressing/fiber_strand.png",
+			"res://assets/textures/edge_dressing/droplet_micro.png",
+			"res://assets/textures/edge_dressing/screw_small.png",
+			"res://assets/textures/edge_dressing/paperclip_micro.png",
+			"res://assets/textures/edge_dressing/wood_grain_faint.png",
+			"res://assets/textures/edge_dressing/cork_bump.png",
+		],
+		"giants": [
+			"res://assets/textures/giant_props/giant_cereal_box.png",
+			"res://assets/textures/giant_props/giant_mug.png",
+			"res://assets/textures/giant_props/giant_watermelon.png",
+			"res://assets/textures/giant_props/giant_fork.png",
+		],
+		"grip_patches": [
+			{"name": &"soapy spill", "grip": 0.58, "speed": 0.85, "decal": "res://assets/textures/grip_patches/soapy_spill.png"},
+			{"name": &"paper scatter", "grip": 0.85, "speed": 0.78, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
+		],
+		"corridor_patterns": [
+			"res://assets/textures/edge_dressing/wood_grain_faint.png",
+			"res://assets/textures/edge_dressing/cork_bump.png",
+			"res://assets/textures/edge_dressing/desk_pad_grid.png",
 		],
 		"obstacles": {
 			"MugA": {"pos": Vector2(-300, 290), "r": 36.0, "tex": "res://assets/textures/imagine/kitchen_mug_hero.png"},
@@ -594,6 +636,30 @@ const LAYOUTS := {
 			{"asset": "res://assets/textures/ground_dressing/workshop_shop_rag_red.png", "size": 220.0, "alpha": 0.94},
 			{"asset": "res://assets/textures/ground_dressing/workshop_cardboard_scrap.png", "size": 270.0, "alpha": 0.96},
 			{"asset": "res://assets/textures/ground_dressing/workshop_sandpaper_sheet.png", "size": 210.0, "alpha": 0.95},
+		],
+		"edge_decor": [
+			"res://assets/textures/edge_dressing/screw_small.png",
+			"res://assets/textures/edge_dressing/pencil_shaving.png",
+			"res://assets/textures/edge_dressing/sawdust_bit.png",
+			"res://assets/textures/edge_dressing/blade_fragment.png",
+			"res://assets/textures/edge_dressing/staple_bit.png",
+			"res://assets/textures/edge_dressing/wood_grain_faint.png",
+			"res://assets/textures/edge_dressing/cork_bump.png",
+		],
+		"giants": [
+			"res://assets/textures/giant_props/giant_basketball.png",
+			"res://assets/textures/giant_props/giant_toolbox.png",
+			"res://assets/textures/giant_props/giant_paint_can.png",
+			"res://assets/textures/giant_props/giant_watermelon.png",
+		],
+		"grip_patches": [
+			{"name": &"bench sawdust", "grip": 0.72, "speed": 0.72, "decal": "res://assets/textures/grip_patches/sawdust_patch.png"},
+			{"name": &"oil slick", "grip": 0.48, "speed": 0.88, "decal": "res://assets/textures/grip_patches/oil_slick_small.png"},
+			{"name": &"paint dust", "grip": 0.78, "speed": 0.74, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
+		],
+		"corridor_patterns": [
+			"res://assets/textures/edge_dressing/wood_grain_faint.png",
+			"res://assets/textures/edge_dressing/cork_bump.png",
 		],
 		"island_expansion": 10.0,
 		"obstacles": {
@@ -718,6 +784,30 @@ const LAYOUTS := {
 			{"asset": "res://assets/textures/ground_dressing/office_envelope_stack.png", "size": 255.0, "alpha": 0.96},
 			{"asset": "res://assets/textures/ground_dressing/office_sticky_notes.png", "size": 220.0, "alpha": 0.96},
 			{"asset": "res://assets/textures/ground_dressing/office_notepad_page.png", "size": 245.0, "alpha": 0.96},
+		],
+		"edge_decor": [
+			"res://assets/textures/edge_dressing/paperclip_micro.png",
+			"res://assets/textures/edge_dressing/staple_bit.png",
+			"res://assets/textures/edge_dressing/fiber_strand.png",
+			"res://assets/textures/edge_dressing/droplet_micro.png",
+			"res://assets/textures/edge_dressing/screw_small.png",
+			"res://assets/textures/edge_dressing/desk_pad_grid.png",
+			"res://assets/textures/edge_dressing/cork_bump.png",
+		],
+		"giants": [
+			"res://assets/textures/giant_props/giant_keyboard.png",
+			"res://assets/textures/giant_props/giant_monitor.png",
+			"res://assets/textures/giant_props/giant_paper_stack.png",
+			"res://assets/textures/giant_props/giant_pen.png",
+		],
+		"grip_patches": [
+			{"name": &"papers", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
+			{"name": &"coffee ring", "grip": 0.55, "speed": 0.85, "decal": "res://assets/textures/grip_patches/coffee_ring.png"},
+			{"name": &"soapy desk", "grip": 0.62, "speed": 0.82, "decal": "res://assets/textures/grip_patches/soapy_spill.png"},
+		],
+		"corridor_patterns": [
+			"res://assets/textures/edge_dressing/desk_pad_grid.png",
+			"res://assets/textures/edge_dressing/wood_grain_faint.png",
 		],
 		"island_expansion": 4.0,
 		"gate_fractions": [0.0, 0.125, 0.25, 0.43, 0.55, 0.67, 0.72, 0.74],
@@ -890,6 +980,9 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
 		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30), float(spec.get("track_tile_modulate", 1.35)))
+
+	if spec.get("seed_obstacles", false):
+		_add_corridor_patterning(root, spec, centerline, room_polygon)
 
 	# No painted delimitation lines: the ribbon, island prop, and placed props
 	# define the course
@@ -1170,7 +1263,7 @@ static func _build_generated_outer_boundary_visuals(
 	# keeps that hierarchy deterministic without reading like a repeating fence.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _mix_seed(int(spec["requested_seed"]), "boundary_runs:%s" % String(spec["story_id"]))
-	var base_modes: Array[StringName] = [&"none", &"outer", &"outer", &"none", &"inner", &"both", &"none", &"both"]
+	var base_modes: Array[StringName] = [&"outer", &"both", &"inner", &"outer", &"both", &"inner", &"outer", &"none"]
 	var mode_offset := rng.randi_range(0, base_modes.size() - 1)
 	var swap_sides := rng.randf() < 0.5
 	var run_modes: Array[StringName] = []
@@ -1182,6 +1275,7 @@ static func _build_generated_outer_boundary_visuals(
 	var empty_runs := 0
 	for run_index in base_modes.size():
 		var planned_mode: StringName = base_modes[(run_index + mode_offset) % base_modes.size()]
+		var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / float(base_modes.size()))) % centerline.size()
 		if swap_sides:
 			if planned_mode == &"outer":
 				planned_mode = &"inner"
@@ -1190,8 +1284,7 @@ static func _build_generated_outer_boundary_visuals(
 		var run_outer_sections := 0
 		var run_inner_sections := 0
 		if planned_mode != &"none":
-			var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / float(base_modes.size()))) % centerline.size()
-			var run_half_span := rng.randi_range(5, 8)
+			var run_half_span := rng.randi_range(4, 5)
 			for sample_offset in range(-run_half_span, run_half_span + 1, 4):
 				var centerline_index := posmod(run_center + sample_offset, centerline.size())
 				if _cyclic_index_distance(centerline_index, 0, centerline.size()) < 14:
@@ -1220,6 +1313,9 @@ static func _build_generated_outer_boundary_visuals(
 		run_modes.append(actual_mode)
 		if actual_mode == &"none":
 			empty_runs += 1
+			# A flat ground hint gives the single open sector texture without
+			# turning it into another barrier run.
+			_add_boundary_worn_hint(container, centerline, outer_boundary if rng.randf() > 0.5 else inner_boundary, run_center, room_polygon)
 		elif actual_mode == &"both":
 			both_sided_runs += 1
 		else:
@@ -1746,6 +1842,7 @@ static func _compose_generated_story(
 	root.add_child(container)
 
 	var occupied: Array[Dictionary] = []
+	_build_giant_landmarks(container, spec, centerline, room_polygon, gate_samples, occupied)
 	var opening_index := _build_opening_landmark(
 		container,
 		story,
@@ -1790,7 +1887,8 @@ static func _compose_generated_story(
 	)
 	_build_corner_landmarks(container, story, spec, moments["corners"], centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
 	_build_room_dressing(container, story, spec, centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
-	_build_generated_surfaces(root, container, story, moments, centerline)
+	_build_edge_and_apron_decor(container, spec, centerline, room_polygon, gate_samples, occupied)
+	_build_generated_surfaces(root, container, story, spec, moments, centerline, gate_samples)
 	_build_finish_moments(container, centerline)
 
 	var hazard_paths := {}
@@ -2388,6 +2486,157 @@ static func _build_room_dressing(
 	dressing.set_meta("decal_count", decal_count)
 
 
+static func _build_edge_and_apron_decor(
+		parent: Node2D,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> void:
+	var decor: Array = spec.get("edge_decor", [])
+	if decor.is_empty():
+		return
+	var container := Node2D.new()
+	container.name = "EdgeApronDecor"
+	container.set_meta("moment_kind", &"edge_decor")
+	parent.add_child(container)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "edge_decor:%s" % String(spec.get("story_id", "")))
+	var target := clampi(70 + int(rng.randf() * 80), 60, 150)
+	var placed := 0
+	var bounds := _polygon_bounds_rect(room_polygon)
+	# Dense along both edges + into apron. Non-colliding, close to corridor.
+	for attempt in 1200:
+		var candidate := Vector2(
+			rng.randf_range(bounds.position.x, bounds.end.x),
+			rng.randf_range(bounds.position.y, bounds.end.y)
+		)
+		var d := _distance_to_centerline(candidate, centerline)
+		if d < HALF_WIDTH + 8.0 or d > HALF_WIDTH + 380.0:
+			continue
+		if not Geometry2D.is_point_in_polygon(candidate, room_polygon):
+			continue
+		if candidate.distance_to(centerline[0]) < 300.0:
+			continue
+		if not _clear_of_points(candidate, gate_samples, 82.0):
+			continue
+		if not _clear_of_recovery_lanes(candidate, 18.0, centerline, gate_samples):
+			continue
+		# small clear from props
+		if not _clear_of_occupied(candidate, 18.0, occupied):
+			continue
+		var tex_path := String(decor[rng.randi() % decor.size()])
+		var tex := load(tex_path) as Texture2D
+		if tex == null:
+			continue
+		var spr := Sprite2D.new()
+		spr.name = "EdgeDecor%03d" % placed
+		spr.texture = tex
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		spr.position = candidate
+		spr.rotation = rng.randf_range(0.0, TAU)
+		var longest := maxf(tex.get_width(), tex.get_height())
+		var sz := rng.randf_range(22.0, 52.0)
+		spr.scale = Vector2.ONE * (sz / maxf(longest, 1.0))
+		spr.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.55, 0.92))
+		spr.z_index = -14
+		spr.set_meta("asset_path", tex_path)
+		spr.set_meta("moment_kind", &"edge_decor")
+		container.add_child(spr)
+		placed += 1
+		if placed >= target:
+			break
+	# Also drop some shadows near existing colliding props (already have _add_contact_shadow in prop add)
+	container.set_meta("placed_count", placed)
+
+
+static func _build_giant_landmarks(
+		parent: Node2D,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		room_polygon: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> void:
+	var giants: Array = spec.get("giants", [])
+	if giants.is_empty():
+		return
+	var container := Node2D.new()
+	container.name = "GiantLandmarks"
+	container.set_meta("moment_kind", &"giant")
+	parent.add_child(container)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "giants:%s" % String(spec.get("story_id", "")))
+	var target := rng.randi_range(1, 3)
+	var placed := 0
+	# Prefer near curves in the outer apron, but scan the complete room for a
+	# safe fallback so compact and concave canvases still receive a landmark.
+	var corners := PackedInt32Array()
+	for i in range(0, centerline.size(), 22):
+		corners.append(i)
+	for gi in target:
+		var tex_path := ""
+		var tex: Texture2D
+		var desired_size := 0.0
+		var world_shape_size := Vector2.ZERO
+		var placement := {}
+		var asset_offset := rng.randi_range(0, giants.size() - 1)
+		var pref_idx := corners[rng.randi() % corners.size()]
+		for asset_attempt in giants.size():
+			tex_path = String(giants[(asset_offset + asset_attempt) % giants.size()])
+			tex = load(tex_path) as Texture2D
+			if tex == null:
+				continue
+			var shape_entry: Dictionary = PROP_SHAPES.get(tex_path.get_file(), {})
+			var shape_size: Vector2 = shape_entry.get("size", Vector2.ONE)
+			desired_size = rng.randf_range(300.0, 600.0) if asset_attempt == 0 else 300.0
+			world_shape_size = shape_size / maxf(shape_size.x, shape_size.y) * desired_size
+			placement = _best_giant_position(pref_idx, world_shape_size, StringName(shape_entry.get("shape", "circle")), room_polygon, centerline, gate_samples, occupied)
+			if bool(placement.get("found", false)):
+				break
+		if not bool(placement.get("found", false)) or tex == null:
+			continue
+		var used_size := Vector2(tex.get_width(), tex.get_height())
+		var image := tex.get_image()
+		if image != null and not image.is_empty():
+			var used_rect := image.get_used_rect()
+			if used_rect.size.x > 0 and used_rect.size.y > 0:
+				used_size = Vector2(used_rect.size)
+		var sprite_scale := desired_size / maxf(used_size.x, used_size.y)
+		var footprint_radius := world_shape_size.length() * 0.5
+		var pos: Vector2 = placement["position"]
+		var is_colliding := placed == 0 or rng.randf() < 0.65
+		var landmark := Node2D.new()
+		landmark.name = "GiantLandmark%02d" % placed
+		landmark.position = pos
+		landmark.rotation = float(placement["rotation"])
+		landmark.z_index = -4
+		landmark.set_meta("asset_path", tex_path)
+		landmark.set_meta("moment_kind", &"giant")
+		landmark.set_meta("world_size", desired_size)
+		landmark.set_meta("footprint_size", world_shape_size)
+		landmark.set_meta("footprint_radius", footprint_radius)
+		landmark.set_meta("colliding", is_colliding)
+		container.add_child(landmark)
+		var spr := Sprite2D.new()
+		spr.name = "Sprite"
+		spr.texture = tex
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		spr.scale = Vector2.ONE * sprite_scale
+		landmark.add_child(spr)
+		_add_contact_shadow(landmark, footprint_radius * 0.85)
+		if is_colliding:
+			var body := StaticBody2D.new()
+			body.name = "GiantBody"
+			body.collision_layer = 4 | 16
+			landmark.add_child(body)
+			_add_giant_collision(body, tex_path, desired_size)
+		occupied.append({"position": pos, "radius": footprint_radius})
+		placed += 1
+	container.set_meta("placed_count", placed)
+
+
 static func _room_dressing_assets(story: Dictionary, spec: Dictionary, reserved_unique_assets: Dictionary) -> Array[String]:
 	var assets: Array[String] = []
 	for asset_path: String in spec.get("island_fill_textures", []):
@@ -2554,18 +2803,18 @@ static func _build_room_floor_details(
 	details.name = "FloorDetails"
 	parent.add_child(details)
 	var bounds := _polygon_bounds_rect(room_polygon)
-	var target_count := clampi(int(round(absf(_polygon_area(room_polygon)) / 110000.0)), 12, 20)
+	var target_count := clampi(int(round(absf(_polygon_area(room_polygon)) / 28000.0)), 60, 120)
 	var positions := PackedVector2Array()
-	for attempt in 420:
+	for attempt in 820:
 		var candidate := Vector2(
 			rng.randf_range(bounds.position.x, bounds.end.x),
 			rng.randf_range(bounds.position.y, bounds.end.y)
 		)
-		if not _inside_polygon_with_radius(candidate, 22.0, room_polygon):
+		if not _inside_polygon_with_radius(candidate, 18.0, room_polygon):
 			continue
-		if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + 22.0:
+		if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + 18.0:
 			continue
-		if not _clear_of_points(candidate, positions, 82.0):
+		if not _clear_of_points(candidate, positions, 46.0):
 			continue
 		var texture_path := String(decals[rng.randi_range(0, decals.size() - 1)])
 		var texture := load(texture_path) as Texture2D
@@ -2578,8 +2827,8 @@ static func _build_room_floor_details(
 		sprite.position = candidate
 		sprite.rotation = rng.randf_range(0.0, TAU)
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (rng.randf_range(58.0, 96.0) / maxf(longest, 1.0))
-		sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.38, 0.72))
+		sprite.scale = Vector2.ONE * (rng.randf_range(32.0, 68.0) / maxf(longest, 1.0))
+		sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.32, 0.68))
 		sprite.z_index = -15
 		sprite.set_meta("asset_path", texture_path)
 		sprite.set_meta("moment_kind", &"ambient_decal")
@@ -2591,7 +2840,7 @@ static func _build_room_floor_details(
 	return positions.size()
 
 
-static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictionary, moments: Dictionary, centerline: PackedVector2Array) -> void:
+static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictionary, spec: Dictionary, moments: Dictionary, centerline: PackedVector2Array, gate_samples: PackedVector2Array) -> void:
 	var definitions: Array[Dictionary] = []
 	var surfaces: Array = story["surfaces"]
 
@@ -2657,6 +2906,57 @@ static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dicti
 	shortcut.set_meta("safe_length", float(shortcut_geometry["safe_length"]))
 	parent.add_child(shortcut)
 	_add_surface_decals(shortcut, centerline, shortcut_index, SHORTCUT_HALF_SPAN, String(shortcut_data["decal"]), float(shortcut_geometry["inside_sign"]) * SHORTCUT_LANE_OFFSET)
+
+	# Additional in-corridor grip patches are data for TrackVariantPresenter,
+	# which creates the authoritative SurfaceZone nodes at runtime. Keep them
+	# separated from gates, the grids, and the two designed surface moments.
+	var extra_patches: Array = spec.get("grip_patches", [])
+	if extra_patches.size() > 0:
+		var patch_rng := RandomNumberGenerator.new()
+		patch_rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "grip_patches:%s" % String(story.get("id", "")))
+		var target_count := patch_rng.randi_range(GRIP_PATCH_MIN_COUNT, GRIP_PATCH_MAX_COUNT)
+		var used_indices := PackedInt32Array([technical_index, shortcut_index])
+		var added := 0
+		for attempt in 240:
+			if added >= target_count:
+				break
+			var pidx_center := patch_rng.randi_range(0, centerline.size() - 1)
+			if _cyclic_index_distance(pidx_center, 0, centerline.size()) < 18:
+				continue
+			var separated := true
+			for used_index: int in used_indices:
+				if _cyclic_index_distance(pidx_center, used_index, centerline.size()) < 16:
+					separated = false
+					break
+			if not separated or not _clear_of_points(centerline[pidx_center], gate_samples, 155.0):
+				continue
+			var data: Dictionary = extra_patches[added % extra_patches.size()]
+			var halfw := 42.0 + patch_rng.randf_range(0, 12)
+			var poly := _surface_strip(centerline, pidx_center, 3, halfw)
+			var patch_node := Node2D.new()
+			patch_node.name = "ExtraGripPatch%d" % added
+			patch_node.set_meta("moment_kind", &"grip_patch")
+			patch_node.set_meta("surface_name", StringName(data["name"]))
+			patch_node.set_meta("grip", float(data["grip"]))
+			patch_node.set_meta("speed", float(data.get("speed", data["grip"])))
+			patch_node.set_meta("polygon", poly)
+			patch_node.set_meta("decal_texture", String(data["decal"]))
+			parent.add_child(patch_node)
+			_add_surface_decals(patch_node, centerline, pidx_center, 3, String(data["decal"]), 0.0)
+			var def := {
+				"name": StringName(data["name"]),
+				"role": &"patch",
+				"lane": &"mixed",
+				"grip": float(data["grip"]),
+				"speed": float(data.get("speed", data["grip"])),
+				"points": poly,
+				"decal": String(data["decal"]),
+				"centerline_index": pidx_center,
+			}
+			definitions.append(def)
+			used_indices.append(pidx_center)
+			added += 1
+		parent.set_meta("grip_patch_count", added)
 	root.set_meta("generated_surfaces", definitions)
 
 
@@ -2881,6 +3181,86 @@ static func _best_offtrack_position(
 				best_score = score
 				best_position = candidate
 	return {"found": best_score < INF, "position": best_position}
+
+
+static func _best_giant_position(
+		preferred_index: int,
+		size: Vector2,
+		shape_kind: StringName,
+		room_polygon: PackedVector2Array,
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> Dictionary:
+	var bounds := _polygon_bounds_rect(room_polygon)
+	var preferred := centerline[preferred_index]
+	var best := {}
+	var best_score := INF
+	for x in 29:
+		for y in 19:
+			var candidate := bounds.position + Vector2(
+				bounds.size.x * (float(x) + 0.5) / 29.0,
+				bounds.size.y * (float(y) + 0.5) / 19.0
+			)
+			var closest: Dictionary = _closest_point_on_loop(candidate, centerline)
+			var centerline_index := int(closest["index"])
+			var tangent_angle := _sample_tangent(centerline, centerline_index).angle()
+			var rotation := tangent_angle if size.x >= size.y else tangent_angle - PI * 0.5
+			if not _giant_placement_is_safe(candidate, size, shape_kind, rotation, room_polygon, centerline, gate_samples, occupied):
+				continue
+			var score := candidate.distance_squared_to(preferred)
+			if score < best_score:
+				best_score = score
+				best = {"found": true, "position": candidate, "rotation": rotation}
+	return best if not best.is_empty() else {"found": false}
+
+
+static func _giant_placement_is_safe(
+		candidate: Vector2,
+		size: Vector2,
+		shape_kind: StringName,
+		rotation: float,
+		room_polygon: PackedVector2Array,
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		occupied: Array[Dictionary]
+) -> bool:
+	var bounding_radius := size.length() * 0.5
+	if not _clear_of_occupied(candidate, bounding_radius, occupied):
+		return false
+	if shape_kind == &"circle":
+		var radius := maxf(size.x, size.y) * 0.5
+		if not _inside_polygon_with_radius(candidate, radius, room_polygon):
+			return false
+		for point: Vector2 in centerline:
+			if candidate.distance_to(point) < HALF_WIDTH + radius + 12.0:
+				return false
+		for gate: Vector2 in gate_samples:
+			if candidate.distance_to(gate) < radius + 82.0:
+				return false
+		return true
+	var half_size := size * 0.5
+	for corner: Vector2 in [
+		Vector2(-half_size.x, -half_size.y),
+		Vector2(half_size.x, -half_size.y),
+		Vector2(half_size.x, half_size.y),
+		Vector2(-half_size.x, half_size.y),
+	]:
+		if not Geometry2D.is_point_in_polygon(candidate + corner.rotated(rotation), room_polygon):
+			return false
+	for point: Vector2 in centerline:
+		if _point_to_oriented_rect_distance(point, candidate, size, rotation) < HALF_WIDTH + 12.0:
+			return false
+	for gate: Vector2 in gate_samples:
+		if _point_to_oriented_rect_distance(gate, candidate, size, rotation) < 82.0:
+			return false
+	return true
+
+
+static func _point_to_oriented_rect_distance(point: Vector2, center: Vector2, size: Vector2, rotation: float) -> float:
+	var local := (point - center).rotated(-rotation)
+	var outside := Vector2(maxf(absf(local.x) - size.x * 0.5, 0.0), maxf(absf(local.y) - size.y * 0.5, 0.0))
+	return outside.length()
 
 
 static func _trackside_placement_is_safe(
@@ -3305,6 +3685,24 @@ static func _add_shape_collision(parent: Node, texture_path: String, scale_radiu
 	parent.add_child(circle_cs)
 
 
+static func _add_giant_collision(parent: Node, texture_path: String, world_size: float) -> void:
+	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+	var source_size: Vector2 = entry.get("size", Vector2.ONE)
+	var longest := maxf(source_size.x, source_size.y)
+	if entry.get("shape", "circle") == "rect":
+		var rect := RectangleShape2D.new()
+		rect.size = source_size / maxf(longest, 1.0) * world_size * 0.72
+		var rect_collision := CollisionShape2D.new()
+		rect_collision.shape = rect
+		parent.add_child(rect_collision)
+		return
+	var circle := CircleShape2D.new()
+	circle.radius = world_size * 0.36
+	var circle_collision := CollisionShape2D.new()
+	circle_collision.shape = circle
+	parent.add_child(circle_collision)
+
+
 static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
 	var prop := StaticBody2D.new()
 	prop.name = "BoundaryProp"
@@ -3632,6 +4030,80 @@ static func _add_start_banner(parent: Node, start: Vector2, tangent: Vector2, co
 			center + tangent * 22.0 + along * 11.0,
 			center - tangent * 22.0 + along * 11.0,
 		]), Color("f2ead7") if block % 2 == 0 else Color("c94f38"), -8)
+
+
+static func _add_corridor_patterning(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+	# Visual-only overlays inside the corridor band to sell theme material
+	# (woodgrain, cork, desk pad) without racing lines or grip changes.
+	var patterns: Array = spec.get("corridor_patterns", [])
+	if patterns.is_empty():
+		return
+	var container := Node2D.new()
+	container.name = "CorridorPatterns"
+	container.z_index = -8
+	root.add_child(container)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "corridor_pattern:%s" % String(spec.get("story_id", "")))
+	var target := 32
+	var placed := 0
+	for attempt in 220:
+		var t := rng.randf()
+		var idx := int(t * centerline.size())
+		var pos := centerline[idx]
+		var normal := _sample_tangent(centerline, idx).rotated(PI * 0.5)
+		var dist := rng.randf_range(18.0, HALF_WIDTH - 32.0)
+		var side := 1 if rng.randf() > 0.5 else -1
+		var candidate := pos + normal * dist * side
+		if not Geometry2D.is_point_in_polygon(candidate, room_polygon):
+			continue
+		var tex_path := String(patterns[rng.randi() % patterns.size()])
+		var tex := load(tex_path) as Texture2D
+		if tex == null:
+			continue
+		var spr := Sprite2D.new()
+		spr.name = "Pattern%02d" % placed
+		spr.texture = tex
+		spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		spr.position = candidate
+		spr.rotation = rng.randf_range(0.0, TAU)
+		var sz := rng.randf_range(36.0, 68.0)
+		var longest := maxf(tex.get_width(), tex.get_height())
+		spr.scale = Vector2.ONE * (sz / maxf(longest, 1.0))
+		spr.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.11, 0.26))
+		spr.z_index = -8
+		spr.set_meta("asset_path", tex_path)
+		spr.set_meta("moment_kind", &"corridor_pattern")
+		container.add_child(spr)
+		placed += 1
+		if placed >= target:
+			break
+	container.set_meta("placed_count", placed)
+
+
+static func _add_boundary_worn_hint(container: Node2D, centerline: PackedVector2Array, boundary: PackedVector2Array, run_center: int, room_polygon: PackedVector2Array) -> void:
+	var tex := load("res://assets/textures/edge_dressing/worn_floor_hint.png") as Texture2D
+	if tex == null:
+		tex = load("res://assets/textures/edge_dressing/shadow_strip.png") as Texture2D
+	if tex == null:
+		return
+	var idx := posmod(run_center + 4, centerline.size())
+	var sample := _closest_point_on_loop(centerline[idx], boundary)
+	var pos: Vector2 = sample["position"]
+	var away := (pos - centerline[idx]).normalized()
+	pos += away * 6.0
+	if not Geometry2D.is_point_in_polygon(pos, room_polygon):
+		pos = sample["position"]
+	var spr := Sprite2D.new()
+	spr.name = "EmptyRunHint"
+	spr.texture = tex
+	spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	spr.position = pos
+	spr.rotation = _sample_tangent(centerline, idx).angle()
+	var sc := 220.0 / maxf(tex.get_width(), 1.0)
+	spr.scale = Vector2.ONE * sc
+	spr.modulate = Color(1.0, 1.0, 1.0, 0.55)
+	spr.z_index = -5
+	container.add_child(spr)
 
 
 static func _mark_owned(root: Node) -> void:
