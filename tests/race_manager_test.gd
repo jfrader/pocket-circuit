@@ -20,6 +20,8 @@ func _initialize() -> void:
 
 
 func _run_test() -> void:
+	if not _check_finish_sensor_required():
+		return
 	var manager := RACE_MANAGER_SCRIPT.new() as RaceManager
 	manager.laps_to_finish = 2
 	var checkpoints: Array = [
@@ -104,6 +106,34 @@ func _pass_lap(manager: RaceManager, checkpoints: Array, racer: Node2D) -> bool:
 	for checkpoint: Area2D in [checkpoints[1], checkpoints[2], checkpoints[0]]:
 		if not _expect(manager.report_checkpoint(checkpoint, racer), "legal checkpoint sequence should be accepted"):
 			return false
+	return true
+
+
+func _check_finish_sensor_required() -> bool:
+	var manager := RACE_MANAGER_SCRIPT.new() as RaceManager
+	manager.laps_to_finish = 1
+	var checkpoints: Array = [
+		TestCheckpoint.new(0, true, Vector2(0.0, 0.0)),
+		TestCheckpoint.new(1, false, Vector2(100.0, 0.0)),
+		TestCheckpoint.new(2, false, Vector2(200.0, 0.0)),
+	]
+	manager.configure_checkpoints(checkpoints)
+	var racer := Node2D.new()
+	manager.register_racer(racer, "Apron Cutter", "Rustbug", true)
+	manager.prepare_race()
+	manager.start_race()
+	if not _expect(manager.report_checkpoint(checkpoints[1], racer) and manager.report_checkpoint(checkpoints[2], racer), "ordered gates before the finish should be accepted"):
+		return false
+	if not _expect(not manager.report_checkpoint(checkpoints[1], racer), "cutting from the finish vicinity directly to the next gate must not substitute for crossing the finish sensor"):
+		return false
+	if not _expect(manager.lap_count == 0 and manager.get_expected_checkpoint(racer) == 0 and not manager.is_racer_finished(racer), "a skipped finish sensor must count no lap and preserve the expected finish gate"):
+		return false
+	if not _expect(manager.report_checkpoint(checkpoints[0], racer) and manager.lap_count == 1, "crossing the expected finish after every ordered gate should complete the legal lap"):
+		return false
+	manager.free()
+	racer.free()
+	for checkpoint: Node in checkpoints:
+		checkpoint.free()
 	return true
 
 

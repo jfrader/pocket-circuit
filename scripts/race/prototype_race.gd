@@ -238,6 +238,7 @@ func _configure_track_variant() -> bool:
 			reset_manager.set("valid_bounds", room_bounds.grow(120.0))
 			reset_manager.set("valid_polygon", track_root.get_meta("room_polygon", PackedVector2Array()))
 			reset_manager.set("valid_polygon_margin", 120.0)
+			reset_manager.set("invalid_polygon", track_root.get_meta("island_invalid_polygon", PackedVector2Array()))
 	_track_variant_presenter = TRACK_VARIANT_SCRIPT.new() as TrackVariantPresenter
 	track_root.add_child(_track_variant_presenter)
 	_track_variant_presenter.configure(track_root, requested_theme, race_manager.is_reverse_direction())

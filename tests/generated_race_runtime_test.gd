@@ -42,25 +42,33 @@ func _run_test() -> void:
 	if not _expect(track.get_node_or_null("TrackSurface") is Line2D and track.get_node_or_null("TrackRibbon") == null, "generated runtime track should use the clean themed surface without the triangulating base ribbon"):
 		return
 	var boundary := track.get_node_or_null("InnerBarrier/BoundaryCollision") as CollisionShape2D
-	if not _expect(boundary != null and boundary.shape is ConcavePolygonShape2D, "generated island should use a physical concave boundary"):
+	if not _expect(boundary != null and boundary.shape is ConcavePolygonShape2D and track.get_node_or_null("InnerBarrier/SideFace") is Line2D and track.get_node_or_null("InnerBarrier/TexturedRim") is Line2D and track.get_node_or_null("InnerBarrier/TopLip") is Line2D, "generated island should use a physical concave boundary backed by a raised visible rim"):
 		return
-	var outer_barrier := track.get_node_or_null("OuterBarrier") as StaticBody2D
-	var outer_collision := outer_barrier.get_node_or_null("BoundaryCollision") as CollisionShape2D if outer_barrier else null
-	if not _expect(outer_barrier != null and outer_barrier.collision_layer == 2 and outer_collision != null and outer_collision.shape is ConcavePolygonShape2D, "generated runtime track should include a continuous outer barrier"):
+	if not _expect(track.get_node_or_null("OuterBarrier") == null and track.get_node_or_null("ContinuousBoundaryBacking") == null, "generated runtime track should leave its room apron open between real colliding assets"):
 		return
 	var reset_manager := race.get_node_or_null("ResetManager")
 	var expected_bounds := (track.get_meta("room_bounds") as Rect2).grow(120.0)
 	var room_polygon: PackedVector2Array = track.get_meta("room_polygon", PackedVector2Array())
-	if not _expect(reset_manager != null and reset_manager.get("valid_bounds") == expected_bounds and reset_manager.get("valid_polygon") == room_polygon, "generated room geometry should propagate to runtime reset validation"):
+	var island_polygon: PackedVector2Array = track.get_meta("island_invalid_polygon", PackedVector2Array())
+	if not _expect(reset_manager != null and reset_manager.get("valid_bounds") == expected_bounds and reset_manager.get("valid_polygon") == room_polygon and reset_manager.get("invalid_polygon") == island_polygon, "generated room and raised-island geometry should propagate to runtime reset validation"):
 		return
 	var missing_quadrant := Vector2(1400.0, -800.0)
 	if not _expect(expected_bounds.has_point(missing_quadrant) and not bool(reset_manager.call("is_position_valid", missing_quadrant)), "L-room recovery should reject its missing upper-right quadrant"):
+		return
+	var island_center := Vector2.ZERO
+	for island_point: Vector2 in island_polygon:
+		island_center += island_point
+	island_center /= maxf(float(island_polygon.size()), 1.0)
+	if not _expect(not island_polygon.is_empty() and not bool(reset_manager.call("is_position_valid", island_center)), "recovery should reject the raised island interior"):
 		return
 	var camera := race.get_node_or_null("FollowCamera2D") as Camera2D
 	var room_bounds: Rect2 = track.get_meta("room_bounds")
 	if not _expect(camera != null and camera.limit_left == floori(room_bounds.position.x) and camera.limit_top == floori(room_bounds.position.y) and camera.limit_right == ceili(room_bounds.end.x) and camera.limit_bottom == ceili(room_bounds.end.y), "generated room bounds should expand the runtime camera limits"):
 		return
-	if not await _probe_outer_barrier(track, outer_barrier):
+	var finish := track.get_node_or_null("Checkpoint0Finish") as Area2D
+	if not _expect(finish != null and float(finish.get_meta("sensor_span", 0.0)) > 300.0 and bool(finish.get_meta("sensor_full_room_cross_section", false)), "runtime finish sensor should span the available room cross-section"):
+		return
+	if not await _probe_open_apron(track):
 		return
 
 	var grid := track.get_node_or_null("GridForward") as Node2D
@@ -94,30 +102,42 @@ func _run_test() -> void:
 	quit(0)
 
 
-func _probe_outer_barrier(track: Node2D, outer_barrier: StaticBody2D) -> bool:
-	var outer_polygon: PackedVector2Array = outer_barrier.get_meta("boundary_polygon", PackedVector2Array())
+func _probe_open_apron(track: Node2D) -> bool:
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
-	if not _expect(not outer_polygon.is_empty() and not centerline.is_empty(), "generated outer barrier probe needs route geometry"):
+	var visuals := track.get_node_or_null("GeneratedOuterBoundaryVisuals")
+	var run_modes: Array = visuals.get_meta("run_modes", []) if visuals else []
+	var open_run := run_modes.find(&"none")
+	if not _expect(open_run >= 0 and not centerline.is_empty(), "open apron probe needs one intentionally empty rail sector"):
 		return false
-	var boundary_point := outer_polygon[0]
-	var track_point := _closest_point_on_loop(boundary_point, centerline)
-	var outward := (boundary_point - track_point).normalized()
-	var probe := CharacterBody2D.new()
-	probe.name = "GeneratedOuterBoundaryProbe"
-	probe.collision_layer = 1
-	probe.collision_mask = 2
-	probe.position = track_point
-	var probe_collision := CollisionShape2D.new()
-	var probe_shape := CircleShape2D.new()
-	probe_shape.radius = 18.0
-	probe_collision.shape = probe_shape
-	probe.add_child(probe_collision)
-	track.add_child(probe)
-	await physics_frame
-	var hit := probe.move_and_collide(outward * 300.0)
-	var hit_outer_barrier := hit != null and hit.get_collider() == outer_barrier
-	probe.queue_free()
-	return _expect(hit_outer_barrier, "a vehicle leaving the generated road should hit the continuous outer barrier")
+	var run_center := int(round((float(open_run) + 0.5) * float(centerline.size()) / 8.0)) % centerline.size()
+	var room_polygon: PackedVector2Array = track.get_meta("room_polygon", PackedVector2Array())
+	var island_polygon: PackedVector2Array = track.get_meta("island_invalid_polygon", PackedVector2Array())
+	for center_offset in range(-12, 13, 3):
+		var index := posmod(run_center + center_offset, centerline.size())
+		var tangent := (centerline[(index + 1) % centerline.size()] - centerline[(index - 1 + centerline.size()) % centerline.size()]).normalized()
+		var normal := tangent.rotated(PI * 0.5)
+		for side: float in [-1.0, 1.0]:
+			var motion := normal * 260.0 * side
+			var target := centerline[index] + motion
+			if not Geometry2D.is_point_in_polygon(target, room_polygon) or Geometry2D.is_point_in_polygon(target, island_polygon):
+				continue
+			var probe := CharacterBody2D.new()
+			probe.name = "OpenApronProbe"
+			probe.collision_layer = 1
+			probe.collision_mask = 2 | 4 | 16
+			probe.position = centerline[index]
+			var probe_collision := CollisionShape2D.new()
+			var probe_shape := CircleShape2D.new()
+			probe_shape.radius = 14.0
+			probe_collision.shape = probe_shape
+			probe.add_child(probe_collision)
+			track.add_child(probe)
+			await physics_frame
+			var hit := probe.move_and_collide(motion)
+			probe.queue_free()
+			if hit == null:
+				return true
+	return _expect(false, "a vehicle should be able to drive from the racing corridor into the open apron without hitting an invisible contour")
 
 
 func _closest_point_on_loop(point: Vector2, loop: PackedVector2Array) -> Vector2:

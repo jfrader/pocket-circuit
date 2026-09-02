@@ -4,7 +4,7 @@ class_name TrackBuilderCore
 ## a room shape, and a seed. Pure runtime code — no SceneTree/editor deps — so
 ## the race can generate any arbitrary seed on demand.
 
-const CHECKPOINT_SCENE := "res://scenes/race/checkpoint.tscn"
+const CHECKPOINT_SCRIPT := preload("res://scripts/race/checkpoint.gd")
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
@@ -18,6 +18,54 @@ const SAFE_RACING_LINE_OFFSET := 58.0
 const FINISH_APPROACH_SPAN := 20
 const GRIP_PATCH_MIN_COUNT := 4
 const GRIP_PATCH_MAX_COUNT := 8
+const ISLAND_SIDE_FACE_WIDTH := 38.0
+const ISLAND_TEXTURED_RIM_WIDTH := 26.0
+const ISLAND_TOP_LIP_WIDTH := 8.0
+const GATE_SENSOR_THICKNESS := 70.0
+const GATE_POST_OFFSET := HALF_WIDTH + 24.0
+const GATE_POST_SIZE := Vector2(42.0, 24.0)
+const SHADOW_CIRCLE_TEXTURE := "res://assets/textures/edge_dressing/shadow_soft_circle.png"
+const SHADOW_RECT_TEXTURE := "res://assets/textures/edge_dressing/shadow_soft_rect.png"
+const SHADOW_DIRECTION := Vector2(0.62, 0.78)
+const SHADOW_TINT := Color("3f2a22", 0.35)
+const GIANT_CAST_SHADOW_TINT := Color("3f2a22", 0.15)
+const COLLISION_SOLID := &"solid"
+const COLLISION_FLAT := &"flat"
+
+## Generated art has one of two explicit physical contracts. PROP_SHAPES is
+## the SOLID asset roster; each entry declares the local footprint used by all
+## ordinary prop constructors. These edge-detail assets are also solid, but use
+## their trimmed alpha bounds because their presentation size varies per seed.
+static var SOLID_EDGE_SHAPES := {
+	"screw_small.png": &"rect",
+	"paperclip_micro.png": &"rect",
+	"cork_bump.png": &"circle",
+	"kitchen_rice_micro.png": &"circle",
+	"kitchen_herb_micro.png": &"circle",
+	"kitchen_sugar_micro.png": &"circle",
+	"pencil_shaving.png": &"rect",
+	"blade_fragment.png": &"rect",
+	"staple_bit.png": &"rect",
+	"workshop_nail_micro.png": &"rect",
+	"workshop_washer_micro.png": &"circle",
+	"workshop_bolt_micro.png": &"circle",
+	"office_binder_clip_micro.png": &"rect",
+	"office_push_pin_micro.png": &"circle",
+	"office_pen_cap_micro.png": &"rect",
+}
+
+## These are painted/material details, not objects. They must stay Sprite2D
+## presentation with no CollisionObject2D ancestor or descendant.
+static var FLAT_EDGE_ASSETS := {
+	"crumb_micro_01.png": true,
+	"crumb_micro_02.png": true,
+	"fiber_strand.png": true,
+	"droplet_micro.png": true,
+	"wood_grain_faint.png": true,
+	"sawdust_bit.png": true,
+	"desk_pad_grid.png": true,
+}
+static var _texture_footprint_cache: Dictionary = {}
 
 static var ROOM_SHAPES := {
 	"classic": PackedVector2Array([Vector2(-875, -575) * WORLD_SCALE, Vector2(875, -575) * WORLD_SCALE, Vector2(875, 575) * WORLD_SCALE, Vector2(-875, 575) * WORLD_SCALE]),
@@ -373,17 +421,23 @@ static var PROP_SHAPES := {
 	"bucket_stack.png": {"shape": "circle", "size": Vector2(152.0, 152.0)},
 	"monitor_top.png": {"shape": "rect", "size": Vector2(168.0, 126.0)},
 	# Density assets: giants use large scales while edge details stay small.
-	"giant_cereal_box.png": {"shape": "rect", "size": Vector2(180.0, 210.0)},
-	"giant_mug.png": {"shape": "circle", "size": Vector2(130.0, 130.0)},
-	"giant_watermelon.png": {"shape": "circle", "size": Vector2(140.0, 140.0)},
-	"giant_fork.png": {"shape": "rect", "size": Vector2(60.0, 220.0)},
-	"giant_basketball.png": {"shape": "circle", "size": Vector2(140.0, 140.0)},
-	"giant_toolbox.png": {"shape": "rect", "size": Vector2(200.0, 120.0)},
-	"giant_paint_can.png": {"shape": "circle", "size": Vector2(120.0, 120.0)},
-	"giant_keyboard.png": {"shape": "rect", "size": Vector2(220.0, 150.0)},
-	"giant_monitor.png": {"shape": "rect", "size": Vector2(180.0, 130.0)},
-	"giant_paper_stack.png": {"shape": "rect", "size": Vector2(170.0, 120.0)},
-	"giant_pen.png": {"shape": "rect", "size": Vector2(40.0, 210.0)},
+	"giant_cereal_box.png": {"solid": true, "shape": "rect", "size": Vector2(180.0, 210.0)},
+	"giant_mug.png": {"solid": true, "shape": "circle", "size": Vector2(130.0, 130.0)},
+	"giant_watermelon.png": {"solid": true, "shape": "circle", "size": Vector2(140.0, 140.0)},
+	"giant_fork.png": {"solid": true, "shape": "rect", "size": Vector2(60.0, 220.0)},
+	"giant_basketball.png": {"solid": true, "shape": "circle", "size": Vector2(140.0, 140.0)},
+	"giant_toolbox.png": {"solid": true, "shape": "rect", "size": Vector2(200.0, 120.0)},
+	"giant_paint_can.png": {"solid": true, "shape": "circle", "size": Vector2(120.0, 120.0)},
+	"giant_keyboard.png": {"solid": true, "shape": "rect", "size": Vector2(220.0, 150.0)},
+	"giant_monitor.png": {"solid": true, "shape": "rect", "size": Vector2(180.0, 130.0)},
+	"giant_paper_stack.png": {"solid": true, "shape": "rect", "size": Vector2(170.0, 120.0)},
+	"giant_pen.png": {"solid": true, "shape": "rect", "size": Vector2(40.0, 210.0)},
+	"giant_toaster.png": {"solid": true, "shape": "rect", "size": Vector2(190.0, 135.0)},
+	"giant_milk_carton.png": {"solid": true, "shape": "rect", "size": Vector2(125.0, 210.0)},
+	"giant_hammer.png": {"solid": true, "shape": "rect", "size": Vector2(205.0, 95.0)},
+	"giant_wrench.png": {"solid": true, "shape": "rect", "size": Vector2(215.0, 72.0)},
+	"giant_stapler.png": {"solid": true, "shape": "rect", "size": Vector2(205.0, 105.0)},
+	"giant_mouse.png": {"solid": true, "shape": "circle", "size": Vector2(150.0, 180.0)},
 	"crumb_micro_01.png": {"shape": "circle", "size": Vector2(28.0, 28.0)},
 	"screw_small.png": {"shape": "rect", "size": Vector2(22.0, 60.0)},
 	"paperclip_micro.png": {"shape": "rect", "size": Vector2(30.0, 20.0)},
@@ -400,6 +454,8 @@ const LAYOUTS := {
 		],
 		"floor": Color("3a332c"),
 		"highlight": Color("4a4238"),
+		"rim_dark": Color("3f2a22"),
+		"rim_highlight": Color("ead6aa", 0.78),
 		"island": Color("4a4038"),
 		"asphalt": Color("2e2c28"),
 		"apron": Color("3f3830"),
@@ -470,6 +526,12 @@ const LAYOUTS := {
 		],
 		"generated_boundary": {
 			"section": "res://assets/textures/track_boundary/kitchen_folded_towel_rail.png",
+			"sections": [
+				"res://assets/textures/track_boundary/kitchen_folded_towel_rail.png",
+				"res://assets/textures/track_boundary/kitchen_spoon_rail.png",
+				"res://assets/textures/track_boundary/kitchen_chopstick_rail.png",
+				"res://assets/textures/track_boundary/kitchen_bread_board_rail.png",
+			],
 			"accent": "res://assets/textures/track_boundary/kitchen_mitt_corner.png",
 		},
 		"boundary_corner": [
@@ -507,16 +569,23 @@ const LAYOUTS := {
 			"res://assets/textures/edge_dressing/paperclip_micro.png",
 			"res://assets/textures/edge_dressing/wood_grain_faint.png",
 			"res://assets/textures/edge_dressing/cork_bump.png",
+			"res://assets/textures/edge_dressing/kitchen_rice_micro.png",
+			"res://assets/textures/edge_dressing/kitchen_herb_micro.png",
+			"res://assets/textures/edge_dressing/kitchen_sugar_micro.png",
 		],
 		"giants": [
 			"res://assets/textures/giant_props/giant_cereal_box.png",
 			"res://assets/textures/giant_props/giant_mug.png",
 			"res://assets/textures/giant_props/giant_watermelon.png",
 			"res://assets/textures/giant_props/giant_fork.png",
+			"res://assets/textures/giant_props/giant_toaster.png",
+			"res://assets/textures/giant_props/giant_milk_carton.png",
 		],
 		"grip_patches": [
 			{"name": &"soapy spill", "grip": 0.58, "speed": 0.85, "decal": "res://assets/textures/grip_patches/soapy_spill.png"},
 			{"name": &"paper scatter", "grip": 0.85, "speed": 0.78, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
+			{"name": &"flour dust", "grip": 0.76, "speed": 0.74, "decal": "res://assets/textures/grip_patches/kitchen_flour_dust.png"},
+			{"name": &"syrup smear", "grip": 0.52, "speed": 0.84, "decal": "res://assets/textures/grip_patches/kitchen_syrup_smear.png"},
 		],
 		"corridor_patterns": [
 			"res://assets/textures/edge_dressing/wood_grain_faint.png",
@@ -542,6 +611,8 @@ const LAYOUTS := {
 		],
 		"floor": Color("7a5a3f"),
 		"highlight": Color("8a6a4f"),
+		"rim_dark": Color("3f2a22"),
+		"rim_highlight": Color("d7b27c", 0.76),
 		"island": Color("4a4038"),
 		"asphalt": Color("2e2c28"),
 		"apron": Color("5c4638"),
@@ -613,6 +684,12 @@ const LAYOUTS := {
 		],
 		"generated_boundary": {
 			"section": "res://assets/textures/track_boundary/workshop_paint_stirrer_rail.png",
+			"sections": [
+				"res://assets/textures/track_boundary/workshop_paint_stirrer_rail.png",
+				"res://assets/textures/track_boundary/workshop_dowel_rail.png",
+				"res://assets/textures/track_boundary/workshop_clamp_rail.png",
+				"res://assets/textures/track_boundary/workshop_ruler_rail.png",
+			],
 			"accent": "res://assets/textures/track_boundary/workshop_tape_corner.png",
 		},
 		"boundary_corner": [
@@ -645,17 +722,24 @@ const LAYOUTS := {
 			"res://assets/textures/edge_dressing/staple_bit.png",
 			"res://assets/textures/edge_dressing/wood_grain_faint.png",
 			"res://assets/textures/edge_dressing/cork_bump.png",
+			"res://assets/textures/edge_dressing/workshop_nail_micro.png",
+			"res://assets/textures/edge_dressing/workshop_washer_micro.png",
+			"res://assets/textures/edge_dressing/workshop_bolt_micro.png",
 		],
 		"giants": [
 			"res://assets/textures/giant_props/giant_basketball.png",
 			"res://assets/textures/giant_props/giant_toolbox.png",
 			"res://assets/textures/giant_props/giant_paint_can.png",
 			"res://assets/textures/giant_props/giant_watermelon.png",
+			"res://assets/textures/giant_props/giant_hammer.png",
+			"res://assets/textures/giant_props/giant_wrench.png",
 		],
 		"grip_patches": [
 			{"name": &"bench sawdust", "grip": 0.72, "speed": 0.72, "decal": "res://assets/textures/grip_patches/sawdust_patch.png"},
 			{"name": &"oil slick", "grip": 0.48, "speed": 0.88, "decal": "res://assets/textures/grip_patches/oil_slick_small.png"},
 			{"name": &"paint dust", "grip": 0.78, "speed": 0.74, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
+			{"name": &"metal filings", "grip": 0.7, "speed": 0.72, "decal": "res://assets/textures/grip_patches/workshop_metal_filings.png"},
+			{"name": &"paint smear", "grip": 0.57, "speed": 0.82, "decal": "res://assets/textures/grip_patches/workshop_paint_smear.png"},
 		],
 		"corridor_patterns": [
 			"res://assets/textures/edge_dressing/wood_grain_faint.png",
@@ -695,6 +779,8 @@ const LAYOUTS := {
 		],
 		"floor": Color("5a6170"),
 		"highlight": Color("6a7180"),
+		"rim_dark": Color("30343d"),
+		"rim_highlight": Color("c4ccd2", 0.74),
 		"island": Color("4a505c"),
 		"asphalt": Color("272b31"),
 		"apron": Color("4a5060"),
@@ -762,6 +848,12 @@ const LAYOUTS := {
 		],
 		"generated_boundary": {
 			"section": "res://assets/textures/track_boundary/office_pencil_rail.png",
+			"sections": [
+				"res://assets/textures/track_boundary/office_pencil_rail.png",
+				"res://assets/textures/track_boundary/office_ruler_rail.png",
+				"res://assets/textures/track_boundary/office_pen_rail.png",
+				"res://assets/textures/track_boundary/office_book_spine_rail.png",
+			],
 			"accent": "res://assets/textures/track_boundary/office_sticky_corner.png",
 		},
 		"boundary_corner": [
@@ -793,17 +885,24 @@ const LAYOUTS := {
 			"res://assets/textures/edge_dressing/screw_small.png",
 			"res://assets/textures/edge_dressing/desk_pad_grid.png",
 			"res://assets/textures/edge_dressing/cork_bump.png",
+			"res://assets/textures/edge_dressing/office_binder_clip_micro.png",
+			"res://assets/textures/edge_dressing/office_push_pin_micro.png",
+			"res://assets/textures/edge_dressing/office_pen_cap_micro.png",
 		],
 		"giants": [
 			"res://assets/textures/giant_props/giant_keyboard.png",
 			"res://assets/textures/giant_props/giant_monitor.png",
 			"res://assets/textures/giant_props/giant_paper_stack.png",
 			"res://assets/textures/giant_props/giant_pen.png",
+			"res://assets/textures/giant_props/giant_stapler.png",
+			"res://assets/textures/giant_props/giant_mouse.png",
 		],
 		"grip_patches": [
 			{"name": &"papers", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
 			{"name": &"coffee ring", "grip": 0.55, "speed": 0.85, "decal": "res://assets/textures/grip_patches/coffee_ring.png"},
 			{"name": &"soapy desk", "grip": 0.62, "speed": 0.82, "decal": "res://assets/textures/grip_patches/soapy_spill.png"},
+			{"name": &"eraser dust", "grip": 0.78, "speed": 0.75, "decal": "res://assets/textures/grip_patches/office_eraser_dust.png"},
+			{"name": &"ink blot", "grip": 0.5, "speed": 0.83, "decal": "res://assets/textures/grip_patches/office_ink_blot.png"},
 		],
 		"corridor_patterns": [
 			"res://assets/textures/edge_dressing/desk_pad_grid.png",
@@ -949,16 +1048,13 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
-	# Floor: center the backdrop on the selected room so follow-camera overscan
-	# never exposes an asymmetric black void around wide or L-shaped canvases.
+	# The room is a raised household surface surrounded by a deliberately dark
+	# overscan void. Floor texture is clipped to the room polygon below instead
+	# of continuing across the 760-unit camera safety ring.
 	var floor_texture := String(spec.get("floor_texture", ""))
 	var room_bounds := _polygon_bounds_rect(room_polygon)
 	var backdrop := room_bounds.grow(760.0)
-	_add_polygon(root, "Floor", _rect_points(backdrop.get_center(), backdrop.size), spec["floor"], -22)
-	if not floor_texture.is_empty():
-		var floor_columns := maxi(4, int(ceil(backdrop.size.x / 520.0)))
-		var floor_rows := maxi(3, int(ceil(backdrop.size.y / 520.0)))
-		_add_floor_tiles(root, floor_texture, backdrop.position, backdrop.size, floor_columns, floor_rows, Vector2(1.0, 1.0))
+	_add_polygon(root, "Floor", _rect_points(backdrop.get_center(), backdrop.size), Color("111316"), -22)
 	var room_surface := _expand_loop(room_polygon, 26.0)
 	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20)
 
@@ -998,8 +1094,6 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# as a solid collision body.
 	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) else _island_region(room_polygon, clipped, inner_loop)
 	_build_island_prop(root, spec, island_region, inner_loop, centerline)
-	if spec.get("seed_obstacles", false):
-		_build_outer_barrier(root, outer_boundary)
 
 	# Legacy authored tracks keep their fixed room-corner dressing. Generated
 	# tracks choose landmarks from geometry-aware story moments below.
@@ -1036,7 +1130,12 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		var rotation := atan2(-tangent.y, -tangent.x)
 		var is_finish := gate_index == 0
 		var name := "Checkpoint0Finish" if is_finish else "Checkpoint%d" % gate_index
-		_add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y))
+		var span_endpoints := PackedVector2Array()
+		if spec.get("seed_obstacles", false):
+			span_endpoints = _gate_span_endpoints(sample, tangent, room_polygon, island_region)
+		_add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y), span_endpoints)
+		if spec.get("seed_obstacles", false):
+			_add_gate_posts(root, spec, sample, tangent, gate_index)
 
 	# Bold checker strip at the finish gate (two alternating rows across the corridor)
 	var finish_normal := start_tangent.rotated(PI * 0.5)
@@ -1057,6 +1156,8 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 			target.append(cell_center - finish_normal * 30.0 + cell_half)
 	_add_polygon(root, "StartFinishWhite", checker_white, Color("f5eec8"), -7)
 	_add_polygon(root, "StartFinishBlack", checker_black, Color("0d0f14"), -6)
+	_mark_flat_visual(root.get_node("StartFinishWhite") as Polygon2D, "", &"checker")
+	_mark_flat_visual(root.get_node("StartFinishBlack") as Polygon2D, "", &"checker")
 
 	# Follow the centerline arc rather than extending one start tangent through a
 	# nearby corner. This keeps every grid slot inside the drivable corridor on
@@ -1161,7 +1262,9 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 	var barrier := StaticBody2D.new()
 	barrier.name = "InnerBarrier"
 	barrier.collision_layer = 2
+	_mark_solid_body(barrier, "", &"raised_island_rim")
 	barrier.set_meta("boundary_polygon", expanded)
+	barrier.set_meta("visible_collision_backing", &"raised_island_rim")
 	root.add_child(barrier)
 	if spec.get("seed_obstacles", false):
 		# A generated inner offset can be concave enough that solid polygon
@@ -1181,6 +1284,9 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 		var barrier_collision := CollisionPolygon2D.new()
 		barrier_collision.polygon = expanded
 		barrier.add_child(barrier_collision)
+	if spec.get("seed_obstacles", false):
+		_build_raised_island_rim(barrier, spec, expanded)
+		root.set_meta("island_invalid_polygon", expanded)
 
 	var min_point := Vector2(INF, INF)
 	var max_point := Vector2(-INF, -INF)
@@ -1208,29 +1314,74 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 	else:
 		visual.color = spec["island"]
 	root.add_child(visual)
+	if spec.get("seed_obstacles", false):
+		_add_island_rim_landmarks(root, spec, expanded, centerline)
 
 
-static func _build_outer_barrier(root: Node2D, boundary: PackedVector2Array) -> void:
-	if boundary.size() < 3:
-		push_error("TrackBuilderCore: generated outer boundary contour is invalid")
+static func _build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, points: PackedVector2Array) -> void:
+	var face := Line2D.new()
+	face.name = "SideFace"
+	face.points = points
+	face.closed = true
+	face.width = ISLAND_SIDE_FACE_WIDTH
+	face.position = SHADOW_DIRECTION * 10.0
+	face.default_color = (spec.get("rim_dark", Color("3f2a22")) as Color).darkened(0.28)
+	face.joint_mode = Line2D.LINE_JOINT_ROUND
+	face.antialiased = true
+	face.z_index = -8
+	face.set_meta("backs_collision", true)
+	parent.add_child(face)
+
+	var textured := Line2D.new()
+	textured.name = "TexturedRim"
+	textured.points = points
+	textured.closed = true
+	textured.width = ISLAND_TEXTURED_RIM_WIDTH
+	textured.default_color = Color(0.9, 0.9, 0.9)
+	textured.joint_mode = Line2D.LINE_JOINT_ROUND
+	textured.antialiased = true
+	textured.z_index = -7
+	var edge_texture_path := String(spec.get("edge_texture", ""))
+	var edge_texture := load(edge_texture_path) as Texture2D if not edge_texture_path.is_empty() else null
+	if edge_texture:
+		textured.texture = edge_texture
+		textured.texture_mode = Line2D.LINE_TEXTURE_TILE
+		textured.set_meta("asset_path", edge_texture_path)
+	textured.set_meta("backs_collision", true)
+	parent.add_child(textured)
+
+	var lip := Line2D.new()
+	lip.name = "TopLip"
+	lip.points = points
+	lip.closed = true
+	lip.width = ISLAND_TOP_LIP_WIDTH
+	lip.default_color = spec.get("rim_highlight", Color("ead6aa", 0.76))
+	lip.joint_mode = Line2D.LINE_JOINT_ROUND
+	lip.antialiased = true
+	lip.z_index = -5
+	lip.set_meta("backs_collision", true)
+	parent.add_child(lip)
+
+
+static func _add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array) -> void:
+	var assets: Array = spec.get("island_fill_textures", [])
+	if assets.is_empty() or boundary.size() < 12:
 		return
-	var barrier := StaticBody2D.new()
-	barrier.name = "OuterBarrier"
-	barrier.collision_layer = 2
-	barrier.set_meta("boundary_polygon", boundary)
-	barrier.set_meta("segment_count", boundary.size())
-	barrier.set_meta("centerline_clearance", HALF_WIDTH)
-	root.add_child(barrier)
-	var segments := PackedVector2Array()
-	for index in boundary.size():
-		segments.append(boundary[index])
-		segments.append(boundary[(index + 1) % boundary.size()])
-	var shape := ConcavePolygonShape2D.new()
-	shape.segments = segments
-	var collision := CollisionShape2D.new()
-	collision.name = "BoundaryCollision"
-	collision.shape = shape
-	barrier.add_child(collision)
+	var container := Node2D.new()
+	container.name = "IslandRimLandmarks"
+	container.set_meta("placed_count", 3)
+	root.add_child(container)
+	var seed := _mix_seed(int(spec.get("requested_seed", spec.get("seed", 0))), "island_rim_landmarks")
+	var offset := posmod(seed, boundary.size())
+	for landmark_index in 3:
+		var boundary_index := posmod(offset + int(round(float(landmark_index) * float(boundary.size()) / 3.0)), boundary.size())
+		var boundary_point := boundary[boundary_index]
+		var center_sample: Vector2 = _closest_point_on_loop(boundary_point, centerline)["position"]
+		var inward := (boundary_point - center_sample).normalized()
+		var position := boundary_point + inward * 22.0
+		var next_point := boundary[(boundary_index + 1) % boundary.size()]
+		var texture_path := String(assets[posmod(seed + landmark_index * 5, assets.size())])
+		_add_generated_prop(container, "Landmark%02d" % landmark_index, position, texture_path, (next_point - boundary_point).angle(), &"island_rim", &"few", landmark_index, 0.72)
 
 
 static func _build_generated_outer_boundary_visuals(
@@ -1244,15 +1395,21 @@ static func _build_generated_outer_boundary_visuals(
 ) -> void:
 	var assets: Dictionary = spec.get("generated_boundary", {})
 	var section_path := String(assets.get("section", ""))
+	var section_paths: Array = assets.get("sections", [section_path])
 	var accent_path := String(assets.get("accent", ""))
-	var section_texture := load(section_path) as Texture2D if not section_path.is_empty() else null
+	var section_textures: Array[Texture2D] = []
+	for candidate_path: String in section_paths:
+		var candidate_texture := load(candidate_path) as Texture2D
+		if candidate_texture:
+			section_textures.append(candidate_texture)
 	var accent_texture := load(accent_path) as Texture2D if not accent_path.is_empty() else null
-	if section_texture == null or accent_texture == null:
+	if section_textures.is_empty() or accent_texture == null:
 		push_error("TrackBuilderCore: generated boundary assets are missing")
 		return
 	var container := Node2D.new()
 	container.name = "GeneratedOuterBoundaryVisuals"
 	container.set_meta("section_asset", section_path)
+	container.set_meta("section_assets", section_paths)
 	container.set_meta("accent_asset", accent_path)
 	container.set_meta("corridor_clearance", HALF_WIDTH)
 	root.add_child(container)
@@ -1263,7 +1420,7 @@ static func _build_generated_outer_boundary_visuals(
 	# keeps that hierarchy deterministic without reading like a repeating fence.
 	var rng := RandomNumberGenerator.new()
 	rng.seed = _mix_seed(int(spec["requested_seed"]), "boundary_runs:%s" % String(spec["story_id"]))
-	var base_modes: Array[StringName] = [&"outer", &"both", &"inner", &"outer", &"both", &"inner", &"outer", &"none"]
+	var base_modes: Array[StringName] = [&"both", &"inner", &"both", &"outer", &"both", &"both", &"both", &"none"]
 	var mode_offset := rng.randi_range(0, base_modes.size() - 1)
 	var swap_sides := rng.randf() < 0.5
 	var run_modes: Array[StringName] = []
@@ -1273,6 +1430,8 @@ static func _build_generated_outer_boundary_visuals(
 	var one_sided_runs := 0
 	var both_sided_runs := 0
 	var empty_runs := 0
+	var outer_runs := 0
+	var inner_runs := 0
 	for run_index in base_modes.size():
 		var planned_mode: StringName = base_modes[(run_index + mode_offset) % base_modes.size()]
 		var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / float(base_modes.size()))) % centerline.size()
@@ -1284,28 +1443,28 @@ static func _build_generated_outer_boundary_visuals(
 		var run_outer_sections := 0
 		var run_inner_sections := 0
 		if planned_mode != &"none":
-			var run_half_span := rng.randi_range(4, 5)
-			for sample_offset in range(-run_half_span, run_half_span + 1, 4):
+			var run_half_span := rng.randi_range(7, 8)
+			for sample_offset in range(-run_half_span, run_half_span + 1, 3):
 				var centerline_index := posmod(run_center + sample_offset, centerline.size())
 				if _cyclic_index_distance(centerline_index, 0, centerline.size()) < 14:
 					continue
 				if planned_mode in [&"outer", &"both"]:
-					if _add_generated_boundary_section(container, section_texture, centerline, outer_boundary, room_polygon, centerline_index, run_index, &"outer", outer_section_count):
+					if _add_generated_boundary_section(container, section_textures, centerline, outer_boundary, room_polygon, centerline_index, run_index, &"outer", outer_section_count):
 						outer_section_count += 1
 						run_outer_sections += 1
 						section_count += 1
 				if planned_mode in [&"inner", &"both"]:
-					if _add_generated_boundary_section(container, section_texture, centerline, inner_boundary, room_polygon, centerline_index, run_index, &"inner", inner_section_count):
+					if _add_generated_boundary_section(container, section_textures, centerline, inner_boundary, room_polygon, centerline_index, run_index, &"inner", inner_section_count):
 						inner_section_count += 1
 						run_inner_sections += 1
 						section_count += 1
 			if planned_mode in [&"outer", &"both"] and run_outer_sections == 0:
-				if _add_generated_boundary_run_fallback(container, section_texture, centerline, outer_boundary, room_polygon, run_center, run_index, &"outer", outer_section_count):
+				if _add_generated_boundary_run_fallback(container, section_textures, centerline, outer_boundary, room_polygon, run_center, run_index, &"outer", outer_section_count):
 					outer_section_count += 1
 					run_outer_sections += 1
 					section_count += 1
 			if planned_mode in [&"inner", &"both"] and run_inner_sections == 0:
-				if _add_generated_boundary_run_fallback(container, section_texture, centerline, inner_boundary, room_polygon, run_center, run_index, &"inner", inner_section_count):
+				if _add_generated_boundary_run_fallback(container, section_textures, centerline, inner_boundary, room_polygon, run_center, run_index, &"inner", inner_section_count):
 					inner_section_count += 1
 					run_inner_sections += 1
 					section_count += 1
@@ -1320,6 +1479,10 @@ static func _build_generated_outer_boundary_visuals(
 			both_sided_runs += 1
 		else:
 			one_sided_runs += 1
+		if actual_mode in [&"outer", &"both"]:
+			outer_runs += 1
+		if actual_mode in [&"inner", &"both"]:
+			inner_runs += 1
 
 	var accent_count := 0
 	var corners: PackedInt32Array = moments.get("corners", PackedInt32Array())
@@ -1342,18 +1505,32 @@ static func _build_generated_outer_boundary_visuals(
 		var nearest_centerline: Vector2 = _closest_point_on_loop(position, centerline)["position"]
 		if position.distance_to(nearest_centerline) < HALF_WIDTH or not Geometry2D.is_point_in_polygon(position, room_polygon):
 			continue
-		var accent := Sprite2D.new()
-		accent.name = "CornerAccent%02d" % accent_count
-		accent.texture = accent_texture
-		accent.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		accent.position = position
-		accent.rotation = tangent.angle()
-		accent.scale = Vector2(160.0 / accent_texture.get_width(), 70.0 / accent_texture.get_height())
-		accent.z_index = -3
-		accent.set_meta("boundary_kind", &"corner_mouth_accent")
-		accent.set_meta("boundary_side", side)
-		accent.set_meta("centerline_index", index)
-		container.add_child(accent)
+		var accent_body := StaticBody2D.new()
+		accent_body.name = "CornerAccent%02d" % accent_count
+		accent_body.position = position
+		accent_body.rotation = tangent.angle()
+		accent_body.collision_layer = 16
+		accent_body.z_index = -3
+		accent_body.set_meta("boundary_kind", &"corner_mouth_accent")
+		accent_body.set_meta("boundary_side", side)
+		accent_body.set_meta("centerline_index", index)
+		_mark_solid_body(accent_body, accent_path, &"boundary_prop")
+		container.add_child(accent_body)
+		var accent_shape := RectangleShape2D.new()
+		accent_shape.size = Vector2(153.6, 67.2)
+		var accent_collision := CollisionShape2D.new()
+		accent_collision.name = "AssetCollision"
+		accent_collision.shape = accent_shape
+		accent_body.add_child(accent_collision)
+		_record_shape_probe_points(accent_body, Vector2.ZERO, accent_shape.size, &"rect")
+		_add_directional_shadow(accent_body, accent_path, 160.0, 1.0, Vector2(160.0, 70.0))
+		var accent_sprite := Sprite2D.new()
+		accent_sprite.name = "Sprite"
+		accent_sprite.texture = accent_texture
+		accent_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		accent_sprite.scale = Vector2(160.0 / accent_texture.get_width(), 70.0 / accent_texture.get_height())
+		_mark_solid_visual(accent_sprite, accent_path, &"boundary_prop")
+		accent_body.add_child(accent_sprite)
 		accent_count += 1
 	container.set_meta("section_count", section_count)
 	container.set_meta("outer_section_count", outer_section_count)
@@ -1363,8 +1540,13 @@ static func _build_generated_outer_boundary_visuals(
 	container.set_meta("one_sided_run_count", one_sided_runs)
 	container.set_meta("both_sided_run_count", both_sided_runs)
 	container.set_meta("empty_run_count", empty_runs)
+	container.set_meta("outer_run_count", outer_runs)
+	container.set_meta("inner_run_count", inner_runs)
+	container.set_meta("outer_accent_coverage", float(outer_runs) / 8.0 * 0.72)
+	container.set_meta("inner_accent_coverage", float(inner_runs) / 8.0 * 0.72)
 	root.set_meta("generated_outer_boundary", {
 		"section_asset": section_path,
+		"section_assets": section_paths,
 		"accent_asset": accent_path,
 		"section_count": section_count,
 		"outer_section_count": outer_section_count,
@@ -1376,7 +1558,7 @@ static func _build_generated_outer_boundary_visuals(
 
 static func _add_generated_boundary_section(
 	container: Node2D,
-	texture: Texture2D,
+	textures: Array[Texture2D],
 	centerline: PackedVector2Array,
 	boundary: PackedVector2Array,
 	room_polygon: PackedVector2Array,
@@ -1385,6 +1567,7 @@ static func _add_generated_boundary_section(
 	side: StringName,
 	side_index: int
 ) -> bool:
+	var texture := textures[posmod(run_index + side_index, textures.size())]
 	var boundary_sample := _closest_point_on_loop(centerline[centerline_index], boundary)
 	var boundary_index := int(boundary_sample["index"])
 	var boundary_position: Vector2 = boundary_sample["position"]
@@ -1398,25 +1581,41 @@ static func _add_generated_boundary_section(
 	var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / 8.0)) % centerline.size()
 	if position.distance_to(nearest_centerline) < HALF_WIDTH or not Geometry2D.is_point_in_polygon(position, room_polygon) or _cyclic_index_distance(int(nearest_centerline_sample["index"]), run_center, centerline.size()) >= centerline.size() / 16:
 		return false
+	var body := StaticBody2D.new()
+	body.name = "%sSection%03d" % [String(side).capitalize(), side_index]
+	body.position = position
+	body.rotation = tangent.angle()
+	body.collision_layer = 16
+	body.z_index = -4
+	body.set_meta("boundary_kind", &"partial_section")
+	body.set_meta("boundary_side", side)
+	body.set_meta("run_index", run_index)
+	body.set_meta("centerline_index", centerline_index)
+	body.set_meta("asset_path", texture.resource_path)
+	body.set_meta("visible_collision_backing", &"rail_sprite")
+	_mark_solid_body(body, texture.resource_path, &"rail")
+	container.add_child(body)
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(151.0, 54.0)
+	var collision := CollisionShape2D.new()
+	collision.name = "RailCollision"
+	collision.shape = shape
+	body.add_child(collision)
+	_record_shape_probe_points(body, Vector2.ZERO, shape.size, &"rect")
+	_add_directional_shadow(body, texture.resource_path, 156.0, 1.0, Vector2(142.0, 38.0))
 	var sprite := Sprite2D.new()
-	sprite.name = "%sSection%03d" % [String(side).capitalize(), side_index]
+	sprite.name = "Sprite"
 	sprite.texture = texture
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	sprite.position = position
-	sprite.rotation = tangent.angle()
-	sprite.scale = Vector2(136.0 / texture.get_width(), 52.0 / texture.get_height())
-	sprite.z_index = -4
-	sprite.set_meta("boundary_kind", &"partial_section")
-	sprite.set_meta("boundary_side", side)
-	sprite.set_meta("run_index", run_index)
-	sprite.set_meta("centerline_index", centerline_index)
-	container.add_child(sprite)
+	sprite.scale = Vector2(156.0 / texture.get_width(), 56.0 / texture.get_height())
+	_mark_solid_visual(sprite, texture.resource_path, &"rail")
+	body.add_child(sprite)
 	return true
 
 
 static func _add_generated_boundary_run_fallback(
 	container: Node2D,
-	texture: Texture2D,
+	textures: Array[Texture2D],
 	centerline: PackedVector2Array,
 	boundary: PackedVector2Array,
 	room_polygon: PackedVector2Array,
@@ -1435,7 +1634,7 @@ static func _add_generated_boundary_run_fallback(
 			var centerline_index := posmod(run_center + distance * direction, centerline.size())
 			if _cyclic_index_distance(centerline_index, 0, centerline.size()) < 14:
 				continue
-			if _add_generated_boundary_section(container, texture, centerline, boundary, room_polygon, centerline_index, run_index, side, side_index):
+			if _add_generated_boundary_section(container, textures, centerline, boundary, room_polygon, centerline_index, run_index, side, side_index):
 				return true
 	return false
 
@@ -1666,16 +1865,19 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 	wall.position = position
 	wall.rotation = rotation
 	wall.collision_layer = 2
+	_mark_solid_body(wall, edge_texture_path, &"room_wall")
 	parent.add_child(wall)
 	var shape := RectangleShape2D.new()
 	shape.size = Vector2(length + 60.0, 50.0)
 	var cs := CollisionShape2D.new()
 	cs.shape = shape
 	wall.add_child(cs)
+	_record_shape_probe_points(wall, Vector2.ZERO, shape.size, &"rect")
 	var visual := Polygon2D.new()
 	visual.name = "Visual"
 	visual.polygon = _rect_points(Vector2.ZERO, Vector2(length + 60.0, 50.0))
 	visual.color = Color("0e1524")
+	_mark_solid_visual(visual, edge_texture_path, &"room_wall")
 	wall.add_child(visual)
 	var side_face := Polygon2D.new()
 	side_face.name = "SideFace"
@@ -1712,20 +1914,110 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 			wall.add_child(strip)
 
 
-static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float) -> void:
-	var cp := (load(CHECKPOINT_SCENE) as PackedScene).instantiate()
+static func _gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:
+	var normal := tangent.rotated(PI * 0.5).normalized()
+	return PackedVector2Array([
+		_nearest_gate_boundary(sample, normal, room_polygon, island_polygon),
+		_nearest_gate_boundary(sample, -normal, room_polygon, island_polygon),
+	])
+
+
+static func _nearest_gate_boundary(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
+	var ray_end := sample + direction * 12000.0
+	var nearest := ray_end
+	var nearest_distance := INF
+	for polygon: PackedVector2Array in [island_polygon, room_polygon]:
+		for edge_index in polygon.size():
+			var intersection: Variant = Geometry2D.segment_intersects_segment(sample, ray_end, polygon[edge_index], polygon[(edge_index + 1) % polygon.size()])
+			if not intersection is Vector2:
+				continue
+			var point := intersection as Vector2
+			var projected := (point - sample).dot(direction)
+			if projected > 0.5 and projected < nearest_distance:
+				nearest = point
+				nearest_distance = projected
+	return nearest
+
+
+static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int) -> void:
+	var container := root.get_node_or_null("GatePosts") as Node2D
+	if container == null:
+		container = Node2D.new()
+		container.name = "GatePosts"
+		container.set_meta("placed_count", 0)
+		root.add_child(container)
+	var boundary_assets: Dictionary = spec.get("generated_boundary", {})
+	var asset_paths: Array = boundary_assets.get("sections", [boundary_assets.get("section", "")])
+	if asset_paths.is_empty():
+		return
+	var normal := tangent.rotated(PI * 0.5).normalized()
+	for side in [-1, 1]:
+		var asset_path := String(asset_paths[posmod(gate_index * 2 + (1 if side > 0 else 0), asset_paths.size())])
+		var texture := load(asset_path) as Texture2D
+		if texture == null:
+			continue
+		var post := StaticBody2D.new()
+		post.name = "Gate%02d%s" % [gate_index, "Right" if side > 0 else "Left"]
+		post.position = sample + normal * GATE_POST_OFFSET * float(side)
+		post.rotation = tangent.angle()
+		post.collision_layer = 16
+		post.z_index = -2
+		post.set_meta("asset_path", asset_path)
+		post.set_meta("gate_index", gate_index)
+		post.set_meta("visible_collision_backing", &"gate_post_sprite")
+		_mark_solid_body(post, asset_path, &"gate_post")
+		container.add_child(post)
+		var shape := RectangleShape2D.new()
+		shape.size = GATE_POST_SIZE * 0.96
+		var collision := CollisionShape2D.new()
+		collision.name = "PostCollision"
+		collision.shape = shape
+		post.add_child(collision)
+		_record_shape_probe_points(post, Vector2.ZERO, shape.size, &"rect")
+		_add_directional_shadow(post, asset_path, GATE_POST_SIZE.x, 1.0, shape.size)
+		var sprite := Sprite2D.new()
+		sprite.name = "Sprite"
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sprite.scale = Vector2(GATE_POST_SIZE.x / texture.get_width(), GATE_POST_SIZE.y / texture.get_height())
+		_mark_solid_visual(sprite, asset_path, &"gate_post")
+		post.add_child(sprite)
+		container.set_meta("placed_count", int(container.get_meta("placed_count", 0)) + 1)
+
+
+static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float, span_endpoints: PackedVector2Array = PackedVector2Array()) -> void:
+	var cp := Area2D.new()
 	cp.name = node_name
 	cp.position = position
 	cp.rotation = rotation
+	cp.visible = false
+	cp.collision_layer = 0
+	cp.set_script(CHECKPOINT_SCRIPT)
+	cp.add_to_group("track_checkpoints", true)
 	cp.set("checkpoint_index", index)
 	cp.set("is_finish_line", is_finish)
 	cp.set("recovery_rotation", recovery_rotation)
 	cp.set("recovery_offset", 70.0)
-	if not is_finish:
-		var collision := cp.get_node("CollisionShape2D") as CollisionShape2D
+	var collision := CollisionShape2D.new()
+	collision.name = "CollisionShape2D"
+	cp.add_child(collision)
+	if span_endpoints.size() == 2:
+		var forgiving := RectangleShape2D.new()
+		forgiving.size = Vector2(GATE_SENSOR_THICKNESS, span_endpoints[0].distance_to(span_endpoints[1]) + 8.0)
+		collision.shape = forgiving
+		var checkpoint_transform := Transform2D(rotation, position)
+		collision.position = checkpoint_transform.affine_inverse() * span_endpoints[0].lerp(span_endpoints[1], 0.5)
+		cp.set_meta("sensor_endpoints", span_endpoints)
+		cp.set_meta("sensor_span", span_endpoints[0].distance_to(span_endpoints[1]))
+		cp.set_meta("sensor_full_room_cross_section", true)
+	elif not is_finish:
 		var forgiving := RectangleShape2D.new()
 		forgiving.size = Vector2(70.0, 300.0)
 		collision.shape = forgiving
+	else:
+		var finish_shape := RectangleShape2D.new()
+		finish_shape.size = Vector2(34.0, 280.0)
+		collision.shape = finish_shape
 	parent.add_child(cp)
 
 
@@ -1751,9 +2043,10 @@ static func _scatter_decals(root: Node2D, spec: Dictionary, room_polygon: Packed
 			continue
 		if Geometry2D.is_point_in_polygon(position, corridor):
 			continue
+		var texture_path := String(decals[rng.randi_range(0, decals.size() - 1)])
 		var sprite := Sprite2D.new()
 		sprite.name = "Decal"
-		sprite.texture = load(String(decals[rng.randi_range(0, decals.size() - 1)])) as Texture2D
+		sprite.texture = load(texture_path) as Texture2D
 		if sprite.texture == null:
 			sprite.free()
 			continue
@@ -1761,6 +2054,7 @@ static func _scatter_decals(root: Node2D, spec: Dictionary, room_polygon: Packed
 		sprite.rotation = rng.randf_range(0.0, TAU)
 		sprite.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.4, 0.9))
 		sprite.z_index = -15
+		_mark_flat_visual(sprite, texture_path, &"floor_decal")
 		root.add_child(sprite)
 
 
@@ -2506,48 +2800,85 @@ static func _build_edge_and_apron_decor(
 	var target := clampi(70 + int(rng.randf() * 80), 60, 150)
 	var placed := 0
 	var bounds := _polygon_bounds_rect(room_polygon)
-	# Dense along both edges + into apron. Non-colliding, close to corridor.
+	# Dense along both edges + into apron. Painted material details stay FLAT;
+	# recognizable hardware becomes small SOLID scenery.
 	for attempt in 1200:
 		var candidate := Vector2(
 			rng.randf_range(bounds.position.x, bounds.end.x),
 			rng.randf_range(bounds.position.y, bounds.end.y)
 		)
 		var d := _distance_to_centerline(candidate, centerline)
-		if d < HALF_WIDTH + 8.0 or d > HALF_WIDTH + 380.0:
+		if d > HALF_WIDTH + 380.0:
 			continue
 		if not Geometry2D.is_point_in_polygon(candidate, room_polygon):
 			continue
 		if candidate.distance_to(centerline[0]) < 300.0:
 			continue
-		if not _clear_of_points(candidate, gate_samples, 82.0):
-			continue
-		if not _clear_of_recovery_lanes(candidate, 18.0, centerline, gate_samples):
-			continue
-		# small clear from props
-		if not _clear_of_occupied(candidate, 18.0, occupied):
-			continue
 		var tex_path := String(decor[rng.randi() % decor.size()])
 		var tex := load(tex_path) as Texture2D
 		if tex == null:
 			continue
-		var spr := Sprite2D.new()
-		spr.name = "EdgeDecor%03d" % placed
-		spr.texture = tex
-		spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		spr.position = candidate
-		spr.rotation = rng.randf_range(0.0, TAU)
 		var longest := maxf(tex.get_width(), tex.get_height())
 		var sz := rng.randf_range(22.0, 52.0)
-		spr.scale = Vector2.ONE * (sz / maxf(longest, 1.0))
-		spr.modulate = Color(1.0, 1.0, 1.0, rng.randf_range(0.55, 0.92))
-		spr.z_index = -14
-		spr.set_meta("asset_path", tex_path)
-		spr.set_meta("moment_kind", &"edge_decor")
-		container.add_child(spr)
+		var sprite_scale := sz / maxf(longest, 1.0)
+		var rotation := rng.randf_range(0.0, TAU)
+		var alpha := rng.randf_range(0.55, 0.92)
+		var is_flat := FLAT_EDGE_ASSETS.has(tex_path.get_file())
+		var shape_kind := StringName(SOLID_EDGE_SHAPES.get(tex_path.get_file(), &""))
+		if not is_flat and shape_kind.is_empty():
+			push_error("TrackBuilderCore: edge object has no explicit SOLID/FLAT contract: %s" % tex_path)
+			continue
+		var visible_footprint := _texture_opaque_rect(tex).size * sprite_scale
+		var clearance_radius := 0.0 if is_flat else (maxf(visible_footprint.x, visible_footprint.y) * 0.5 if shape_kind == &"circle" else visible_footprint.length() * 0.5)
+		if d < HALF_WIDTH + maxf(8.0, clearance_radius + 4.0):
+			continue
+		if clearance_radius > 0.0 and not _inside_polygon_with_radius(candidate, clearance_radius, room_polygon):
+			continue
+		if not _clear_of_points(candidate, gate_samples, 82.0 + clearance_radius):
+			continue
+		if not _clear_of_recovery_lanes(candidate, maxf(18.0, clearance_radius), centerline, gate_samples):
+			continue
+		if not _clear_of_occupied(candidate, maxf(18.0, clearance_radius), occupied):
+			continue
+		if is_flat:
+			var spr := Sprite2D.new()
+			spr.name = "EdgeDecor%03d" % placed
+			spr.texture = tex
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			spr.position = candidate
+			spr.rotation = rotation
+			spr.scale = Vector2.ONE * sprite_scale
+			spr.modulate = Color(1.0, 1.0, 1.0, alpha)
+			spr.z_index = -14
+			spr.set_meta("moment_kind", &"edge_decor")
+			_mark_flat_visual(spr, tex_path, &"floor_detail")
+			container.add_child(spr)
+		else:
+			var body := StaticBody2D.new()
+			body.name = "EdgeDecor%03d" % placed
+			body.position = candidate
+			body.rotation = rotation
+			body.collision_layer = 16
+			body.z_index = -14
+			body.set_meta("moment_kind", &"edge_decor")
+			body.set_meta("placement_clearance_radius", clearance_radius)
+			_mark_solid_body(body, tex_path, &"apron_prop")
+			container.add_child(body)
+			var offset := _add_scaled_texture_collision(body, tex, sprite_scale, shape_kind)
+			_add_directional_shadow(body, tex_path, sz, 1.0, visible_footprint)
+			var spr := Sprite2D.new()
+			spr.name = "Sprite"
+			spr.texture = tex
+			spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+			spr.scale = Vector2.ONE * sprite_scale
+			spr.position = -offset
+			spr.modulate = Color(1.0, 1.0, 1.0, alpha)
+			_mark_solid_visual(spr, tex_path, &"apron_prop")
+			body.add_child(spr)
 		placed += 1
 		if placed >= target:
 			break
-	# Also drop some shadows near existing colliding props (already have _add_contact_shadow in prop add)
+	# Existing colliding props carry unified directional shadows at construction.
 	container.set_meta("placed_count", placed)
 
 
@@ -2580,6 +2911,10 @@ static func _build_giant_landmarks(
 		var tex: Texture2D
 		var desired_size := 0.0
 		var world_shape_size := Vector2.ZERO
+		var used_rect := Rect2()
+		var sprite_scale := 1.0
+		var visual_center_offset := Vector2.ZERO
+		var local_footprint_rotation := 0.0
 		var placement := {}
 		var asset_offset := rng.randi_range(0, giants.size() - 1)
 		var pref_idx := corners[rng.randi() % corners.size()]
@@ -2589,24 +2924,24 @@ static func _build_giant_landmarks(
 			if tex == null:
 				continue
 			var shape_entry: Dictionary = PROP_SHAPES.get(tex_path.get_file(), {})
-			var shape_size: Vector2 = shape_entry.get("size", Vector2.ONE)
+			if not bool(shape_entry.get("solid", false)):
+				push_error("TrackBuilderCore: giant roster contains an asset without a SOLID contract: %s" % tex_path)
+				continue
+			used_rect = _texture_opaque_rect(tex)
+			var footprint := _texture_collision_footprint(tex, StringName(shape_entry.get("shape", &"rect")))
+			var footprint_size: Vector2 = footprint["size"]
 			desired_size = rng.randf_range(300.0, 600.0) if asset_attempt == 0 else 300.0
-			world_shape_size = shape_size / maxf(shape_size.x, shape_size.y) * desired_size
-			placement = _best_giant_position(pref_idx, world_shape_size, StringName(shape_entry.get("shape", "circle")), room_polygon, centerline, gate_samples, occupied)
+			sprite_scale = desired_size / maxf(footprint_size.x, footprint_size.y)
+			visual_center_offset = ((footprint["center"] as Vector2) - Vector2(tex.get_width(), tex.get_height()) * 0.5) * sprite_scale
+			world_shape_size = footprint_size * sprite_scale
+			local_footprint_rotation = float(footprint["rotation"])
+			placement = _best_giant_position(pref_idx, world_shape_size, StringName(shape_entry.get("shape", "circle")), local_footprint_rotation, room_polygon, centerline, gate_samples, occupied)
 			if bool(placement.get("found", false)):
 				break
 		if not bool(placement.get("found", false)) or tex == null:
 			continue
-		var used_size := Vector2(tex.get_width(), tex.get_height())
-		var image := tex.get_image()
-		if image != null and not image.is_empty():
-			var used_rect := image.get_used_rect()
-			if used_rect.size.x > 0 and used_rect.size.y > 0:
-				used_size = Vector2(used_rect.size)
-		var sprite_scale := desired_size / maxf(used_size.x, used_size.y)
 		var footprint_radius := world_shape_size.length() * 0.5
 		var pos: Vector2 = placement["position"]
-		var is_colliding := placed == 0 or rng.randf() < 0.65
 		var landmark := Node2D.new()
 		landmark.name = "GiantLandmark%02d" % placed
 		landmark.position = pos
@@ -2617,21 +2952,26 @@ static func _build_giant_landmarks(
 		landmark.set_meta("world_size", desired_size)
 		landmark.set_meta("footprint_size", world_shape_size)
 		landmark.set_meta("footprint_radius", footprint_radius)
-		landmark.set_meta("colliding", is_colliding)
+		landmark.set_meta("colliding", true)
+		landmark.set_meta("collision_contract", COLLISION_SOLID)
+		landmark.set_meta("visual_opaque_rect", used_rect)
+		landmark.set_meta("footprint_rotation", local_footprint_rotation)
 		container.add_child(landmark)
 		var spr := Sprite2D.new()
 		spr.name = "Sprite"
 		spr.texture = tex
 		spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		spr.position = -visual_center_offset
 		spr.scale = Vector2.ONE * sprite_scale
+		_mark_solid_visual(spr, tex_path, &"giant")
 		landmark.add_child(spr)
-		_add_contact_shadow(landmark, footprint_radius * 0.85)
-		if is_colliding:
-			var body := StaticBody2D.new()
-			body.name = "GiantBody"
-			body.collision_layer = 4 | 16
-			landmark.add_child(body)
-			_add_giant_collision(body, tex_path, desired_size)
+		_add_directional_shadow(landmark, tex_path, desired_size, 1.0, world_shape_size, true, local_footprint_rotation)
+		var body := StaticBody2D.new()
+		body.name = "GiantBody"
+		body.collision_layer = 4 | 16
+		_mark_solid_body(body, tex_path, &"giant")
+		landmark.add_child(body)
+		var _offset := _add_giant_collision(body, tex_path, sprite_scale)
 		occupied.append({"position": pos, "radius": footprint_radius})
 		placed += 1
 	container.set_meta("placed_count", placed)
@@ -2780,6 +3120,7 @@ static func _build_room_ground_sections(
 			sprite.set_meta("moment_kind", &"ambient_ground")
 			sprite.set_meta("world_size", world_size)
 			sprite.set_meta("footprint_radius", footprint_radius)
+			_mark_flat_visual(sprite, asset_path, &"ground_dressing")
 			sections.add_child(sprite)
 			placements.append({"position": candidate, "radius": footprint_radius})
 			occupied_sectors[sector] = true
@@ -2832,6 +3173,7 @@ static func _build_room_floor_details(
 		sprite.z_index = -15
 		sprite.set_meta("asset_path", texture_path)
 		sprite.set_meta("moment_kind", &"ambient_decal")
+		_mark_flat_visual(sprite, texture_path, &"floor_decal")
 		details.add_child(sprite)
 		positions.append(candidate)
 		if positions.size() >= target_count:
@@ -2989,7 +3331,17 @@ static func _add_surface_decals(
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
-	var decal_count := 4
+	var surface_polygon: PackedVector2Array = parent.get_meta("polygon", PackedVector2Array())
+	if surface_polygon.size() >= 3:
+		var tint := Polygon2D.new()
+		tint.name = "SurfaceTint"
+		tint.polygon = surface_polygon
+		tint.color = Color("3f2a22", 0.10)
+		tint.z_index = -7
+		tint.set_meta("visual_only", true)
+		_mark_flat_visual(tint, texture_path, &"surface_tint")
+		parent.add_child(tint)
+	var decal_count := 7
 	for decal_index in decal_count:
 		var fraction := float(decal_index) / float(decal_count - 1)
 		var offset := int(round(lerpf(float(-half_span), float(half_span), fraction)))
@@ -3002,10 +3354,11 @@ static func _add_surface_decals(
 		sprite.position = centerline[index] + normal * lateral_offset
 		sprite.rotation = _sample_tangent(centerline, index).angle() + float(decal_index % 2) * 0.31
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (88.0 / maxf(longest, 1.0))
+		sprite.scale = Vector2.ONE * (104.0 / maxf(longest, 1.0))
 		sprite.modulate = Color(1.0, 1.0, 1.0, 0.78)
 		sprite.z_index = -6
 		sprite.set_meta("asset_path", texture_path)
+		_mark_flat_visual(sprite, texture_path, &"surface_decal")
 		parent.add_child(sprite)
 
 
@@ -3187,6 +3540,7 @@ static func _best_giant_position(
 		preferred_index: int,
 		size: Vector2,
 		shape_kind: StringName,
+		local_footprint_rotation: float,
 		room_polygon: PackedVector2Array,
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
@@ -3205,8 +3559,8 @@ static func _best_giant_position(
 			var closest: Dictionary = _closest_point_on_loop(candidate, centerline)
 			var centerline_index := int(closest["index"])
 			var tangent_angle := _sample_tangent(centerline, centerline_index).angle()
-			var rotation := tangent_angle if size.x >= size.y else tangent_angle - PI * 0.5
-			if not _giant_placement_is_safe(candidate, size, shape_kind, rotation, room_polygon, centerline, gate_samples, occupied):
+			var rotation := tangent_angle - local_footprint_rotation if size.x >= size.y else tangent_angle - PI * 0.5 - local_footprint_rotation
+			if not _giant_placement_is_safe(candidate, size, shape_kind, rotation + local_footprint_rotation, room_polygon, centerline, gate_samples, occupied):
 				continue
 			var score := candidate.distance_squared_to(preferred)
 			if score < best_score:
@@ -3386,23 +3740,27 @@ static func _add_generated_prop(
 	prop.position = position
 	prop.rotation = rotation
 	prop.collision_layer = 16
-	prop.set_meta("asset_path", texture_path)
+	_mark_solid_body(prop, texture_path, moment_kind)
 	prop.set_meta("moment_kind", moment_kind)
 	prop.set_meta("semantic_quantity", quantity)
 	prop.set_meta("formation_index", formation_index)
 	prop.set_meta("size_scale", size_scale)
 	parent.add_child(prop)
 	var radius := _asset_radius(texture_path, 24.0) * size_scale
-	_add_shape_collision(prop, texture_path, radius, size_scale)
-	_add_contact_shadow(prop, radius * 1.12)
+	_add_directional_shadow(prop, texture_path, radius * 2.0, size_scale)
 	var texture := load(texture_path) as Texture2D
 	if texture:
+		var longest := maxf(texture.get_width(), texture.get_height())
+		var sprite_scale := _prop_visual_size(texture_path, 48.0) * size_scale / maxf(longest, 1.0)
+		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+		var offset := _add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
 		var sprite := Sprite2D.new()
 		sprite.name = "Sprite"
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (_prop_visual_size(texture_path, 48.0) * size_scale / maxf(longest, 1.0))
+		sprite.scale = Vector2.ONE * sprite_scale
+		sprite.position = -offset
+		_mark_solid_visual(sprite, texture_path, moment_kind)
 		prop.add_child(sprite)
 
 
@@ -3587,18 +3945,19 @@ static func _add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon:
 		prop.position = candidate
 		prop.rotation = rng.randf_range(0.0, TAU)
 		prop.collision_layer = 4
+		_mark_solid_body(prop, texture_path, &"corner_giant")
 		root.add_child(prop)
-		var shape := CircleShape2D.new()
-		shape.radius = 64.0
-		var cs := CollisionShape2D.new()
-		cs.shape = shape
-		prop.add_child(cs)
-		_add_contact_shadow(prop, 84.0)
+		_add_directional_shadow(prop, texture_path, 168.0, 1.0, Vector2(168.0, 168.0), true)
 		var sprite := Sprite2D.new()
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (215.0 / maxf(longest, 1.0))
+		var sprite_scale := 215.0 / maxf(longest, 1.0)
+		sprite.scale = Vector2.ONE * sprite_scale
+		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+		var offset := _add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
+		sprite.position = -offset
+		_mark_solid_visual(sprite, texture_path, &"corner_giant")
 		prop.add_child(sprite)
 		placed += 1
 
@@ -3636,18 +3995,21 @@ static func _add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Pack
 			clip.position = position
 			clip.rotation = tangent.angle()
 			clip.collision_layer = 16
+			_mark_solid_body(clip, "res://assets/textures/imagine/paperclip.png", &"boundary_prop")
 			root.add_child(clip)
 			var shape := RectangleShape2D.new()
 			shape.size = Vector2(16.0, 7.0)
 			var cs := CollisionShape2D.new()
 			cs.shape = shape
 			clip.add_child(cs)
+			_record_shape_probe_points(clip, Vector2.ZERO, shape.size, &"rect")
 			var texture := load("res://assets/textures/imagine/paperclip.png") as Texture2D
 			if texture:
 				var sprite := Sprite2D.new()
 				sprite.texture = texture
 				sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 				sprite.scale = Vector2.ONE * (16.0 / maxf(texture.get_width(), texture.get_height()))
+				_mark_solid_visual(sprite, "res://assets/textures/imagine/paperclip.png", &"boundary_prop")
 				clip.add_child(sprite)
 			placed += 1
 		index = (index + 2) % count
@@ -3669,38 +4031,215 @@ static func _prop_visual_size(texture_path: String, fallback_diameter: float) ->
 	return fallback_diameter
 
 
-static func _add_shape_collision(parent: Node, texture_path: String, scale_radius: float, size_scale: float = 1.0) -> void:
-	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
-	if entry.get("shape", "circle") == "rect":
-		var rect := RectangleShape2D.new()
-		rect.size = (entry["size"] as Vector2) * size_scale
-		var rect_cs := CollisionShape2D.new()
-		rect_cs.shape = rect
-		parent.add_child(rect_cs)
-		return
-	var circle := CircleShape2D.new()
-	circle.radius = scale_radius
-	var circle_cs := CollisionShape2D.new()
-	circle_cs.shape = circle
-	parent.add_child(circle_cs)
+static func _mark_solid_body(body: CollisionObject2D, texture_path: String, solid_class: StringName) -> void:
+	body.set_meta("collision_contract", COLLISION_SOLID)
+	body.set_meta("solid_class", solid_class)
+	if not texture_path.is_empty():
+		body.set_meta("asset_path", texture_path)
 
 
-static func _add_giant_collision(parent: Node, texture_path: String, world_size: float) -> void:
+static func _mark_solid_visual(visual: CanvasItem, texture_path: String, solid_class: StringName) -> void:
+	visual.set_meta("collision_contract", COLLISION_SOLID)
+	visual.set_meta("solid_class", solid_class)
+	if not texture_path.is_empty():
+		visual.set_meta("asset_path", texture_path)
+
+
+static func _mark_flat_visual(visual: CanvasItem, texture_path: String, flat_class: StringName) -> void:
+	visual.set_meta("collision_contract", COLLISION_FLAT)
+	visual.set_meta("flat_class", flat_class)
+	if not texture_path.is_empty():
+		visual.set_meta("asset_path", texture_path)
+
+
+static func _texture_opaque_rect(texture: Texture2D) -> Rect2:
+	var image := texture.get_image()
+	if image != null and not image.is_empty():
+		var used := image.get_used_rect()
+		if used.size.x > 0 and used.size.y > 0:
+			return Rect2(Vector2(used.position), Vector2(used.size))
+	return Rect2(Vector2.ZERO, Vector2(texture.get_width(), texture.get_height()))
+
+
+static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringName) -> Dictionary:
+	var cache_key := "%s:%s" % [texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id()), shape_kind]
+	if _texture_footprint_cache.has(cache_key):
+		return _texture_footprint_cache[cache_key]
+	var used := _texture_opaque_rect(texture)
+	var fallback := {"center": used.get_center(), "size": used.size, "rotation": 0.0}
+	if shape_kind == &"circle":
+		_texture_footprint_cache[cache_key] = fallback
+		return fallback
+	var image := texture.get_image()
+	if image == null or image.is_empty():
+		_texture_footprint_cache[cache_key] = fallback
+		return fallback
+	# Gather the first and last opaque pixel on sampled rows and columns. This
+	# keeps diagonal silhouettes tight without scanning every interior pixel or
+	# paying the fit cost again for repeated props.
+	var points := PackedVector2Array()
+	var scan_step := maxi(1, int(ceil(maxf(used.size.x, used.size.y) / 192.0)))
+	var left := int(used.position.x)
+	var top := int(used.position.y)
+	var right := int(used.end.x)
+	var bottom := int(used.end.y)
+	for y in range(top, bottom, scan_step):
+		var first_x := -1
+		var last_x := -1
+		for x in range(left, right):
+			if image.get_pixel(x, y).a > 0.05:
+				if first_x < 0:
+					first_x = x
+				last_x = x
+		if first_x >= 0:
+			points.append(Vector2(first_x + 0.5, y + 0.5))
+			points.append(Vector2(last_x + 0.5, y + 0.5))
+	for x in range(left, right, scan_step):
+		var first_y := -1
+		var last_y := -1
+		for y in range(top, bottom):
+			if image.get_pixel(x, y).a > 0.05:
+				if first_y < 0:
+					first_y = y
+				last_y = y
+		if first_y >= 0:
+			points.append(Vector2(x + 0.5, first_y + 0.5))
+			points.append(Vector2(x + 0.5, last_y + 0.5))
+	if points.size() < 3:
+		_texture_footprint_cache[cache_key] = fallback
+		return fallback
+	# Use principal axis (covariance) of border points for robust long-axis
+	# orientation. Finishes the cached alpha-derived oriented footprint so that
+	# for rotated sprites the rect aligns with alpha even for paperclip/screw
+	# style and diagonal giants.
+	var sum := Vector2.ZERO
+	var n := 0
+	for pt: Vector2 in points:
+		sum += pt
+		n += 1
+	var mean := sum / maxf(n, 1.0)
+	var cxx := 0.0
+	var cxy := 0.0
+	var cyy := 0.0
+	for pt: Vector2 in points:
+		var d := pt - mean
+		cxx += d.x * d.x
+		cxy += d.x * d.y
+		cyy += d.y * d.y
+	cxx /= maxf(n, 1)
+	cxy /= maxf(n, 1)
+	cyy /= maxf(n, 1)
+	var best_rotation := 0.5 * atan2(2.0 * cxy, cxx - cyy)
+	# consider both orientations from PCA, pick by largest extent on one axis (robust long)
+	var cands := [best_rotation, best_rotation + PI * 0.5]
+	var best_max_extent := -1.0
+	for c in cands:
+		var angle := float(c)
+		var axis_x := Vector2(cos(angle), sin(angle))
+		var axis_y := axis_x.rotated(PI * 0.5)
+		var min_x := INF
+		var max_x := -INF
+		var min_y := INF
+		var max_y := -INF
+		for point: Vector2 in points:
+			var px := point.dot(axis_x)
+			var py := point.dot(axis_y)
+			min_x = minf(min_x, px)
+			max_x = maxf(max_x, px)
+			min_y = minf(min_y, py)
+			max_y = maxf(max_y, py)
+		var ex := maxf(max_x - min_x, max_y - min_y)
+		if ex > best_max_extent:
+			best_max_extent = ex
+			best_rotation = angle
+	var best_axis_x := Vector2(cos(best_rotation), sin(best_rotation))
+	var best_axis_y := best_axis_x.rotated(PI * 0.5)
+	# Refine exact min/max proj using dense scan (step=1) over all opaque to guarantee
+	# every alpha pixel (incl diagonal/elongated) is enclosed by the returned rect.
+	# This finishes the oriented footprint for rotated sprites (intrinsic orient + body rot compose).
+	var min_projection := Vector2(INF, INF)
+	var max_projection := Vector2(-INF, -INF)
+	for y in range(top, bottom):
+		for x in range(left, right):
+			if image.get_pixel(x, y).a > 0.05:
+				var pt := Vector2(x + 0.5, y + 0.5)
+				var pr := Vector2(pt.dot(best_axis_x), pt.dot(best_axis_y))
+				min_projection = min_projection.min(pr)
+				max_projection = max_projection.max(pr)
+	var padding := 1.0
+	var center_projection := (min_projection + max_projection) * 0.5
+	var result := {
+		"center": best_axis_x * center_projection.x + best_axis_y * center_projection.y,
+		"size": max_projection - min_projection + Vector2.ONE * padding * 2.0,
+		"rotation": best_rotation,
+	}
+	# Canonicalize so longer axis on size.x; equivalent rect (rot +90, dims swap).
+	var sz: Vector2 = result["size"]
+	if sz.x < sz.y:
+		result["size"] = Vector2(sz.y, sz.x)
+		result["rotation"] = float(result["rotation"]) + PI * 0.5
+	_texture_footprint_cache[cache_key] = result
+	return result
+
+
+static func _record_shape_probe_points(parent: Node, center: Vector2, size: Vector2, shape_kind: StringName, rotation: float = 0.0) -> void:
+	var probes := PackedVector2Array([center])
+	if shape_kind == &"circle":
+		var radius := size.x * 0.5
+		probes.append(center + Vector2(radius * 0.86, 0.0))
+		probes.append(center - Vector2(radius * 0.86, 0.0))
+	elif size.x >= size.y:
+		probes.append(center + Vector2(size.x * 0.44, 0.0).rotated(rotation))
+		probes.append(center - Vector2(size.x * 0.44, 0.0).rotated(rotation))
+	else:
+		probes.append(center + Vector2(0.0, size.y * 0.44).rotated(rotation))
+		probes.append(center - Vector2(0.0, size.y * 0.44).rotated(rotation))
+	parent.set_meta("collision_probe_points", probes)
+	parent.set_meta("collision_footprint_size", size)
+	parent.set_meta("collision_shape_kind", shape_kind)
+	parent.set_meta("collision_footprint_rotation", rotation)
+
+
+static func _add_scaled_texture_collision(parent: Node, texture: Texture2D, sprite_scale: float, shape_kind: StringName) -> Vector2:
+	var footprint := _texture_collision_footprint(texture, shape_kind)
+	var footprint_center: Vector2 = footprint["center"]
+	var footprint_size: Vector2 = footprint["size"]
+	var canvas_size := Vector2(texture.get_width(), texture.get_height())
+	var visual_center_offset := (footprint_center - canvas_size * 0.5) * sprite_scale
+	if shape_kind == &"circle":
+		var circle := CircleShape2D.new()
+		# Ninety-eight percent of the visible major-axis radius: large enough to
+		# stop a vehicle at the silhouette edge without becoming an oversized blob.
+		circle.radius = maxf(footprint_size.x, footprint_size.y) * sprite_scale * 0.5
+		var circle_collision := CollisionShape2D.new()
+		circle_collision.name = "AssetCollision"
+		circle_collision.shape = circle
+		parent.add_child(circle_collision)
+		_record_shape_probe_points(parent, Vector2.ZERO, Vector2.ONE * circle.radius * 2.0, &"circle")
+		return visual_center_offset
+	var rect := RectangleShape2D.new()
+	# The local rectangle follows the texture's alpha-fitted orientation instead
+	# of creating invisible AABB corners around diagonal tools and utensils.
+	rect.size = footprint_size * sprite_scale * 1.0
+	var rect_collision := CollisionShape2D.new()
+	rect_collision.name = "AssetCollision"
+	rect_collision.rotation = float(footprint["rotation"])
+	rect_collision.shape = rect
+	parent.add_child(rect_collision)
+	_record_shape_probe_points(parent, Vector2.ZERO, rect.size, &"rect", rect_collision.rotation)
+	return visual_center_offset
+
+
+static func _add_giant_collision(parent: Node, texture_path: String, sprite_scale: float) -> Vector2:
 	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
-	var source_size: Vector2 = entry.get("size", Vector2.ONE)
-	var longest := maxf(source_size.x, source_size.y)
-	if entry.get("shape", "circle") == "rect":
-		var rect := RectangleShape2D.new()
-		rect.size = source_size / maxf(longest, 1.0) * world_size * 0.72
-		var rect_collision := CollisionShape2D.new()
-		rect_collision.shape = rect
-		parent.add_child(rect_collision)
-		return
-	var circle := CircleShape2D.new()
-	circle.radius = world_size * 0.36
-	var circle_collision := CollisionShape2D.new()
-	circle_collision.shape = circle
-	parent.add_child(circle_collision)
+	if not bool(entry.get("solid", false)):
+		push_error("TrackBuilderCore: giant asset is missing an explicit SOLID contract: %s" % texture_path)
+		return Vector2.ZERO
+	var texture := load(texture_path) as Texture2D
+	if texture == null:
+		push_error("TrackBuilderCore: giant collision texture is missing: %s" % texture_path)
+		return Vector2.ZERO
+	return _add_scaled_texture_collision(parent, texture, sprite_scale, StringName(entry.get("shape", &"rect")))
 
 
 static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
@@ -3709,16 +4248,21 @@ static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, t
 	prop.position = position
 	prop.rotation = rotation
 	prop.collision_layer = 16
+	_mark_solid_body(prop, texture_path, &"boundary_prop")
 	parent.add_child(prop)
-	_add_shape_collision(prop, texture_path, radius)
-	_add_contact_shadow(prop, radius * 1.15)
+	_add_directional_shadow(prop, texture_path, radius * 2.2)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (radius * 2.2 / maxf(longest, 1.0))
+		var sprite_scale := radius * 2.2 / maxf(longest, 1.0)
+		sprite.scale = Vector2.ONE * sprite_scale
+		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+		var offset := _add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
+		sprite.position = -offset
+		_mark_solid_visual(sprite, texture_path, &"boundary_prop")
 		prop.add_child(sprite)
 
 
@@ -3730,9 +4274,9 @@ static func _add_fill_prop(parent: Node, position: Vector2, radius: float, textu
 	prop.position = position
 	prop.rotation = rotation
 	prop.collision_layer = 16
+	_mark_solid_body(prop, texture_path, &"island_prop")
 	parent.add_child(prop)
-	_add_contact_shadow(prop, radius * 1.15)
-	_add_shape_collision(prop, texture_path, radius)
+	_add_directional_shadow(prop, texture_path, radius * 2.2)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -3740,36 +4284,68 @@ static func _add_fill_prop(parent: Node, position: Vector2, radius: float, textu
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
 		var visual := _prop_visual_size(texture_path, radius * 2.2)
-		sprite.scale = Vector2.ONE * (visual / maxf(longest, 1.0))
+		var sprite_scale := visual / maxf(longest, 1.0)
+		sprite.scale = Vector2.ONE * sprite_scale
+		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+		var offset := _add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
+		sprite.position = -offset
+		_mark_solid_visual(sprite, texture_path, &"island_prop")
 		prop.add_child(sprite)
 
 
-static func _add_contact_shadow(parent: Node, radius: float) -> void:
-	var shadow := Sprite2D.new()
-	shadow.name = "ContactShadow"
-	shadow.texture = _contact_shadow_texture()
-	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	shadow.scale = Vector2.ONE * (radius * 2.4 / 128.0)
-	shadow.modulate = Color(0.06, 0.05, 0.05, 0.45)
-	shadow.z_index = -1
-	parent.add_child(shadow)
-
-
-static var _cached_contact_shadow: Texture2D = null
-
-
-static func _contact_shadow_texture() -> Texture2D:
-	if _cached_contact_shadow != null:
-		return _cached_contact_shadow
-	var image := Image.create(128, 128, false, Image.FORMAT_RGBA8)
-	for y in 128:
-		for x in 128:
-			var dx := (float(x) - 63.5) / 58.0
-			var dy := (float(y) - 63.5) / 58.0
-			var falloff := clampf(1.0 - (dx * dx + dy * dy), 0.0, 1.0)
-			image.set_pixel(x, y, Color(1.0, 1.0, 1.0, falloff * falloff))
-	_cached_contact_shadow = ImageTexture.create_from_image(image)
-	return _cached_contact_shadow
+static func _add_directional_shadow(
+		parent: Node2D,
+		texture_path: String,
+		fallback_diameter: float,
+		size_scale: float = 1.0,
+		footprint_override: Vector2 = Vector2.ZERO,
+		add_cast_shadow: bool = false,
+		footprint_rotation: float = 0.0
+) -> void:
+	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+	var shape_kind := StringName(entry.get("shape", "circle"))
+	var footprint: Vector2 = footprint_override
+	if footprint.is_zero_approx():
+		footprint = (entry.get("size", Vector2.ONE * fallback_diameter) as Vector2) * size_scale
+	if footprint.x <= 0.0 or footprint.y <= 0.0:
+		footprint = Vector2.ONE * fallback_diameter
+	var shadow_path := SHADOW_RECT_TEXTURE if shape_kind == &"rect" else SHADOW_CIRCLE_TEXTURE
+	var shadow_texture := load(shadow_path) as Texture2D
+	if shadow_texture == null:
+		push_error("TrackBuilderCore: directional shadow asset is missing: %s" % shadow_path)
+		return
+	var longest := maxf(footprint.x, footprint.y)
+	var local_light_direction := SHADOW_DIRECTION.rotated(-parent.rotation).normalized()
+	var contact := Sprite2D.new()
+	contact.name = "ContactShadow"
+	contact.texture = shadow_texture
+	contact.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	contact.position = local_light_direction * longest * 0.10
+	contact.rotation = footprint_rotation
+	contact.scale = Vector2(footprint.x * 1.08 / shadow_texture.get_width(), footprint.y * 1.08 / shadow_texture.get_height())
+	contact.modulate = SHADOW_TINT
+	contact.z_index = -2
+	contact.set_meta("shadow_shape", shape_kind)
+	contact.set_meta("light_direction", SHADOW_DIRECTION)
+	_mark_flat_visual(contact, shadow_path, &"shadow")
+	parent.add_child(contact)
+	if not add_cast_shadow:
+		return
+	var cast_texture := load(SHADOW_RECT_TEXTURE) as Texture2D
+	if cast_texture == null:
+		return
+	var cast := Sprite2D.new()
+	cast.name = "CastShadow"
+	cast.texture = cast_texture
+	cast.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	cast.position = local_light_direction * longest * 0.34
+	cast.rotation = SHADOW_DIRECTION.angle() - parent.rotation
+	cast.scale = Vector2(longest * 0.56 / cast_texture.get_width(), minf(footprint.x, footprint.y) * 0.66 / cast_texture.get_height())
+	cast.modulate = GIANT_CAST_SHADOW_TINT
+	cast.z_index = -3
+	cast.set_meta("light_direction", SHADOW_DIRECTION)
+	_mark_flat_visual(cast, SHADOW_RECT_TEXTURE, &"shadow")
+	parent.add_child(cast)
 
 
 static func _add_scatter_prop(parent: Node, position: Vector2, radius: float, texture_path: String) -> void:
@@ -3777,16 +4353,21 @@ static func _add_scatter_prop(parent: Node, position: Vector2, radius: float, te
 	prop.name = "SeedCorridor"
 	prop.position = position
 	prop.collision_layer = 16
+	_mark_solid_body(prop, texture_path, &"obstacle")
 	parent.add_child(prop)
-	_add_shape_collision(prop, texture_path, radius)
-	_add_contact_shadow(prop, radius * 1.15)
+	_add_directional_shadow(prop, texture_path, radius * 2.2)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (radius * 2.2 / maxf(longest, 1.0))
+		var sprite_scale := radius * 2.2 / maxf(longest, 1.0)
+		sprite.scale = Vector2.ONE * sprite_scale
+		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+		var offset := _add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
+		sprite.position = -offset
+		_mark_solid_visual(sprite, texture_path, &"obstacle")
 		prop.add_child(sprite)
 
 
@@ -3813,8 +4394,9 @@ static func _add_obstacle(parent: Node, node_name: String, position: Vector2, ra
 	obstacle.name = node_name
 	obstacle.position = position
 	obstacle.collision_layer = 2
+	_mark_solid_body(obstacle, texture_path, &"obstacle")
 	parent.add_child(obstacle)
-	_add_shape_collision(obstacle, texture_path, radius)
+	_add_directional_shadow(obstacle, texture_path, radius * 2.4)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -3822,7 +4404,12 @@ static func _add_obstacle(parent: Node, node_name: String, position: Vector2, ra
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (radius * 2.4 / maxf(longest, 1.0))
+		var sprite_scale := radius * 2.4 / maxf(longest, 1.0)
+		sprite.scale = Vector2.ONE * sprite_scale
+		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+		var offset := _add_scaled_texture_collision(obstacle, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
+		sprite.position = -offset
+		_mark_solid_visual(sprite, texture_path, &"obstacle")
 		obstacle.add_child(sprite)
 
 
@@ -3831,19 +4418,21 @@ static func _add_prop_with_collision(parent: Node, position: Vector2, radius: fl
 	prop.name = "ApronProp"
 	prop.position = position
 	prop.collision_layer = 2
+	_mark_solid_body(prop, texture_path, &"apron_prop")
 	parent.add_child(prop)
-	var shape := CircleShape2D.new()
-	shape.radius = radius
-	var cs := CollisionShape2D.new()
-	cs.shape = shape
-	prop.add_child(cs)
+	_add_directional_shadow(prop, texture_path, radius * 2.4)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (radius * 2.4 / maxf(longest, 1.0))
+		var sprite_scale := radius * 2.4 / maxf(longest, 1.0)
+		sprite.scale = Vector2.ONE * sprite_scale
+		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
+		var offset := _add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
+		sprite.position = -offset
+		_mark_solid_visual(sprite, texture_path, &"apron_prop")
 		prop.add_child(sprite)
 
 
@@ -3908,6 +4497,7 @@ static func _add_textured_polygon(parent: Node, node_name: String, points: Packe
 		visual.uv = uvs
 	else:
 		visual.color = fallback_color
+	_mark_flat_visual(visual, texture_path, &"ground_surface")
 	parent.add_child(visual)
 
 
@@ -3992,28 +4582,8 @@ static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, 
 	surface.end_cap_mode = Line2D.LINE_CAP_ROUND
 	surface.antialiased = true
 	surface.z_index = -9
+	_mark_flat_visual(surface, texture_path, &"track_surface")
 	parent.add_child(surface)
-
-
-static func _add_floor_tiles(parent: Node, texture_path: String, rect_origin: Vector2, rect_size: Vector2, columns: int, rows: int, scale: Vector2) -> void:
-	var texture := load(texture_path) as Texture2D
-	if texture == null:
-		return
-	var tiles := Node2D.new()
-	tiles.name = "FloorTiles"
-	tiles.z_index = -21
-	parent.add_child(tiles)
-	var tile_width := rect_size.x / float(columns)
-	var tile_height := rect_size.y / float(rows)
-	for column in columns:
-		for row in rows:
-			var sprite := Sprite2D.new()
-			sprite.texture = texture
-			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-			sprite.position = rect_origin + Vector2(tile_width * (column + 0.5), tile_height * (row + 0.5))
-			sprite.scale = Vector2(tile_width / 1024.0, tile_height / 1024.0) * scale * 0.98
-			sprite.modulate = Color(1.35, 1.35, 1.35)
-			tiles.add_child(sprite)
 
 
 static func _add_start_banner(parent: Node, start: Vector2, tangent: Vector2, corridor: PackedVector2Array) -> void:
@@ -4073,6 +4643,7 @@ static func _add_corridor_patterning(root: Node2D, spec: Dictionary, centerline:
 		spr.z_index = -8
 		spr.set_meta("asset_path", tex_path)
 		spr.set_meta("moment_kind", &"corridor_pattern")
+		_mark_flat_visual(spr, tex_path, &"corridor_pattern")
 		container.add_child(spr)
 		placed += 1
 		if placed >= target:
@@ -4103,6 +4674,7 @@ static func _add_boundary_worn_hint(container: Node2D, centerline: PackedVector2
 	spr.scale = Vector2.ONE * sc
 	spr.modulate = Color(1.0, 1.0, 1.0, 0.55)
 	spr.z_index = -5
+	_mark_flat_visual(spr, tex.resource_path, &"worn_hint")
 	container.add_child(spr)
 
 

@@ -47,9 +47,14 @@
 - Generated rooms now surround the course with dense themed micro-details and
   giant household landmarks, while material patterns and readable grip patches
   break up flat-looking corridors without adding painted racing lines.
-- Course boundaries read from material changes and sparse household-object runs
-  that alternate between both sides, one side, and open visual sectors rather
-  than enclosing the track with a repeated fence or painted race lines.
+- Course boundaries now come only from real household assets. Players can leave
+  the racing line and drive across open room aprons wherever no visible prop or
+  rail blocks the way, while the central island reads as a raised solid object.
+- Full-room ordered checkpoint sensors protect legal laps when players explore
+  wide apron routes; small themed posts mark the corridor-sized checker gates.
+- Props, obstacles, and giant landmarks now share shape-matched warm shadows in
+  one down-right light direction, with longer cast shadows grounding the largest
+  objects. Room perimeter walls now overlook a dark void instead of extra floor.
 - Racing-line AI now fields genuinely competitive opponents: difficulty changes
   corner pace, braking, acceleration, and boost strategy; racers anticipate bad
   surfaces, dodge every collidable course prop, and stay within the player's
@@ -64,14 +69,16 @@
 
 ### Fixed
 
-- Generated circuits now have continuous round-joined collision on both course
-  edges, preventing apron and infield cuts even where themed barrier props are
-  intentionally absent. Authored island collision still follows its complete
-  visible boundary without concave-polygon decomposition failures.
+- Every solid generated object now stops cars across its visible footprint,
+  including giant hammers, wrenches, utensils, desk props, and boundary accents;
+  only ground-painted art remains drive-over.
+- Generated circuits no longer stop cars against invisible corridor walls.
+  Every generated collider is backed by a visible prop, rail, raised-island
+  rim, gate post, hazard, giant landmark, or room wall.
 - The race camera and out-of-bounds recovery now follow each generated room's
   full scale and shape, including the missing quadrant of L-shaped rooms.
-- Start grids remain outside the island, lap gates span the full drivable
-  corridor, and forward and reverse races use the correct checker order.
+- Start grids remain outside the island, lap gates span the full available room
+  cross-section, and forward and reverse races use the correct checker order.
 - Menu and shell screens now loop the Tiny Torque Grid catalog take instead of
   an alarm-like pulse or the previous placeholder arrangement.
 - Championship map and settings metadata remain readable at the release

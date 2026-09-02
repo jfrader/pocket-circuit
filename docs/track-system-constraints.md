@@ -52,8 +52,10 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   length stream spans roughly 4,375 to 9,625 world units; elongated room
   perimeters can realize longer loops when required by their silhouette.
 - Corridor half-width is 125 units. Validation reserves the complete 250-unit
-  corridor plus wall clearance, rejects centerline self-intersections, enforces
-  nonlocal self-distance, and keeps the route inside the room polygon.
+  nominal racing corridor for route fitting and prop placement, rejects
+  centerline self-intersections, enforces nonlocal self-distance, and keeps the
+  route inside the room polygon. That geometric corridor is not a collision
+  tube: the surrounding room apron remains drivable.
 - Every accepted route has at least two distinct 450-unit setup-straight
   regions. Turn rhythm is limited to a small set of broad complexes rather than
   spline-scale wiggles, and validation rejects driveable chords that replace a
@@ -99,14 +101,19 @@ their original unscaled canvases.
   desk-pad anchors across distinct room sectors. They are non-colliding
   `Sprite2D` presentation and never become gameplay surfaces or barriers.
 - Floor details add 60-120 small non-colliding themed decals to large blank
-  areas. Another 60-150 non-colliding micro sprites dress the corridor edges
-  and apron. Ambient props, ground sections, and both detail layers stay inside
-  the room and outside the protected route corridor and recovery lanes.
+  areas. Another 60-150 micro details dress the corridor edges and apron:
+  painted crumbs, fibers, droplets, grain, and sawdust stay flat, while visible
+  hardware such as screws, clips, pins, and washers uses small footprint-matched
+  scenery collision. Ambient props, ground sections, and both detail layers stay
+  inside the room and outside the protected route corridor and recovery lanes.
 - Every generated room places 1-3 giant household landmarks at 300-600 world
-  units. At least one has scenery collision on layers 4 and 16; every footprint
-  remains inside the room and clear of the corridor, gates, and other props.
-- Asset dimensions and collider shapes come from `PROP_SHAPES`. Generated
-  story props must use transparent PNG textures, never opaque JPG rectangles.
+  units. Every giant has scenery collision on layers 4 and 16; its collider uses
+  at least 90% of the trimmed visible footprint and remains inside the room and
+  clear of the corridor, gates, and other props.
+- Asset dimensions and collider kinds come from the explicit SOLID roster in
+  `PROP_SHAPES`; giant placement and collision use each texture's trimmed alpha
+  footprint. Generated story props must use transparent PNG textures, never
+  opaque JPG rectangles.
 - Trackside placement must remain clear of checkpoint recovery corridors:
   230 units along the route and 48 units across it, plus the prop radius.
 
@@ -128,8 +135,9 @@ Generated tracks implement the design contract in `game-design-spec.md` section
   every gate and the two designed surface moments. `TrackVariantPresenter`
   remains the only creator of authoritative runtime `SurfaceZone` nodes.
 - `SpeedSection`: the unobstructed start/finish straight.
-- `DramaticFinish`: clear forward and reverse run-ups ending at the full-width
-  checker gate.
+- `DramaticFinish`: clear forward and reverse run-ups ending at the checker.
+  Its visible paint stays on the nominal corridor while its invisible ordered
+  sensor reaches the real room/island boundaries.
 
 `generated_moment_indices`, `generated_hazard_paths`, and
 `generated_surfaces` expose these contracts for runtime presentation and tests.
@@ -150,25 +158,52 @@ an AI trap.
 - Generated corridors carry exactly 32 low-alpha, non-colliding material marks
   so wood, cork, and desk-pad roads do not read as flat color. These marks are
   visual texture, not racing lines or gameplay zones.
-- Full-window themed backdrops scale and tile to the selected room bounds so
-  wider canvases do not expose black camera voids.
-- Generated inner and outer barriers are continuous closed
-  `ConcavePolygonShape2D` segment chains on layer 2. Both contours come from the
-  same round-joined 125-unit corridor offset so collision cannot bridge the
-  course or leave a driveable apron across a corner. Authored inner barriers use
-  the same segment-chain collision type; do not send concave islands through
-  convex polygon decomposition.
-- Themed boundary art is deliberately partial. Eight deterministic sectors
-  produce exactly one open run, five one-sided runs distributed across both
-  edges, and two both-sided runs. The open run receives one flat worn-floor
-  hint rather than a barrier. Kitchen uses folded towel rails and mitts,
-  Workshop uses paint stirrers and tape, and Office uses pencils and sticky
-  notes. Never tile these assets around the full course.
+- The themed floor texture is clipped to the room surface. A 760-unit #111316
+  overscan ring beyond the fully backed room walls deliberately reads as void,
+  including around wide and L-shaped canvases.
+- Generated tracks have no continuous inner/outer corridor collision and no
+  contour bevel along open stretches. Players may leave the nominal racing
+  corridor and drive across the room apron wherever no real visible asset is
+  present. Collision belongs only to visible household props, rail sections,
+  hazards, giants, the raised island, gate posts, and room perimeter walls.
+- Generated collision-bearing visuals declare `SOLID` metadata, while audited
+  drive-over dressing declares `FLAT`. `SOLID` means the owning `StaticBody2D`
+  is on a vehicle-visible layer (`2`, `4`, or
+  `16`) and its circle, local rotated rectangle, or composed shape covers the
+  visible center and ends. Circular colliders reach at least 90% of the visible
+  radius; rectangular coverage reaches at least 90% of the trimmed sprite AABB.
+  `FLAT` means presentation only and never owns collision: floor decals, broad
+  cloth/paper/cardboard ground sections, corridor material patterns, surface
+  tints and grip decals, worn-floor hints, shadows, and checker paint. Solid
+  objects must never use a sprite-only placement path.
+- The island is one visibly raised solid object. Its closed layer-2
+  `ConcavePolygonShape2D` segment chain follows the same points as a dark
+  side-face, tiled theme edge, and warm top lip. Two to four small visible
+  colliding props sit just inside that rim for scale. The interior is invalid
+  recovery space; do not send the concave island through convex decomposition.
+- Themed course rails are deliberately partial real assets. Eight deterministic
+  sectors produce exactly one open run, two one-sided runs, and five both-sided
+  runs. Each side receives colliding rail assets in six sectors, while the open
+  run receives only one flat non-colliding worn-floor hint. Kitchen mixes towel,
+  spoon, chopstick, and bread-board rails; Workshop mixes paint stirrer, dowel,
+  clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
+  Their corner accents are solid boundary props too. An empty run means open
+  drivable apron, never hidden collision.
+- Every ordered checkpoint `Area2D` spans the complete available room
+  cross-section at its station: the first raised-island or room-wall boundary
+  hit in each normal direction. The checkpoint recovery anchor remains on the
+  racing line, and the checker/banner remain corridor-sized visual landmarks.
+  Two small colliding themed posts mark the nominal corridor ends without
+  blocking the racing line.
+- All physical scenery uses the same upper-left key light: soft warm contact
+  shadows offset down-right by 8-12% of the footprint, rectangular or circular
+  to match the prop. Giants add a faint elongated down-right cast shadow.
 - Generated roots persist in the `track` group so runtime AI can discover the
   260-point `RacingLine`.
-- Collision layers remain: vehicles 1, walls/island 2, player-only scenery 4,
-  and AI-dodge scenery 16. The vehicle scene's base mask is 22 (`2 | 4 | 16`),
-  and race setup also enables layer 1 so cars collide with one another.
+- Collision layers remain: vehicles 1, room walls/raised island 2, player-only
+  scenery 4, and visible AI-dodge scenery such as rails/posts/props 16. The
+  vehicle scene's base mask is 22 (`2 | 4 | 16`), and race setup also enables
+  layer 1 so cars collide with one another.
 
 ## AI
 
@@ -204,18 +239,19 @@ an AI trap.
 Run after generator, builder, surface, collision, or AI changes:
 
 1. `godot --headless --path . --script res://tests/track_seed_gen_test.gd`
-2. `godot --headless --path . --script res://tests/generated_track_composition_test.gd`
-3. `godot --headless --path . --script res://tests/generated_race_runtime_test.gd`
-4. Representative family/room seeds through `tests/theme_ai_harness.gd` in
+2. `godot --headless --path . --script res://tests/asset_collision_integrity_test.gd`
+3. `godot --headless --path . --script res://tests/generated_track_composition_test.gd`
+4. `godot --headless --path . --script res://tests/generated_race_runtime_test.gd`
+5. Representative family/room seeds through `tests/theme_ai_harness.gd` in
    both directions using `PC_THEME`, `PC_ROOM`, `PC_SEED`, and
    `PC_DIRECTION=both`; set `PC_DIFFICULTY` to `sunday_drive`, `club_circuit`,
    or `clockwork` when comparing presets.
-5. `godot --headless --path . --script res://tests/ai_race_smoke_test.gd` for
+6. `godot --headless --path . --script res://tests/ai_race_smoke_test.gd` for
    the three authored regression tracks.
-6. A broad theme x room x seed construction stress matrix after geometry or
+7. A broad theme x room x seed construction stress matrix after geometry or
    composition changes.
-7. Direct runtime captures for all six route families after visual changes.
-8. `tools/build_release.sh <clean-output-directory>` for the authoritative
+8. Direct runtime captures for all six route families after visual changes.
+9. `tools/build_release.sh <clean-output-directory>` for the authoritative
    import, complete test suite, scene smokes, native exports, packaged Linux
    smoke, and PCK inspection.
 

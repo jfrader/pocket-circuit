@@ -3,6 +3,7 @@ extends Node
 @export var valid_bounds: Rect2 = Rect2(-1020.0, -620.0, 2040.0, 1240.0)
 @export var valid_polygon := PackedVector2Array()
 @export var valid_polygon_margin := 0.0
+@export var invalid_polygon := PackedVector2Array()
 @export var ghost_duration: float = 1.5
 @export var stuck_timeout: float = 2.4
 
@@ -37,13 +38,18 @@ func _physics_process(delta: float) -> void:
 
 func is_position_valid(position: Vector2) -> bool:
 	if valid_polygon.is_empty():
-		return valid_bounds.has_point(position)
-	if Geometry2D.is_point_in_polygon(position, valid_polygon):
-		return true
-	for index in valid_polygon.size():
-		if _point_segment_distance(position, valid_polygon[index], valid_polygon[(index + 1) % valid_polygon.size()]) <= valid_polygon_margin:
-			return true
-	return false
+		return valid_bounds.has_point(position) and not _is_inside_invalid_polygon(position)
+	var inside_room := Geometry2D.is_point_in_polygon(position, valid_polygon)
+	if not inside_room:
+		for index in valid_polygon.size():
+			if _point_segment_distance(position, valid_polygon[index], valid_polygon[(index + 1) % valid_polygon.size()]) <= valid_polygon_margin:
+				inside_room = true
+				break
+	return inside_room and not _is_inside_invalid_polygon(position)
+
+
+func _is_inside_invalid_polygon(position: Vector2) -> bool:
+	return not invalid_polygon.is_empty() and Geometry2D.is_point_in_polygon(position, invalid_polygon)
 
 
 func _point_segment_distance(point: Vector2, from: Vector2, to: Vector2) -> float:
