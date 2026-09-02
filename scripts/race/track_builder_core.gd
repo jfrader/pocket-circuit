@@ -4,7 +4,7 @@ class_name TrackBuilderCore
 ## a room shape, and a seed. Pure runtime code — no SceneTree/editor deps — so
 ## the race can generate any arbitrary seed on demand.
 
-const CHECKPOINT_SCENE := "res://scenes/race/checkpoint.tscn"
+const CHECKPOINT_SCRIPT := preload("res://scripts/race/checkpoint.gd")
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
@@ -18,8 +18,12 @@ const SAFE_RACING_LINE_OFFSET := 58.0
 const FINISH_APPROACH_SPAN := 20
 const GRIP_PATCH_MIN_COUNT := 4
 const GRIP_PATCH_MAX_COUNT := 8
-const BOUNDARY_RIM_BASE_WIDTH := 18.0
-const BOUNDARY_RIM_HIGHLIGHT_WIDTH := 7.0
+const ISLAND_SIDE_FACE_WIDTH := 38.0
+const ISLAND_TEXTURED_RIM_WIDTH := 26.0
+const ISLAND_TOP_LIP_WIDTH := 8.0
+const GATE_SENSOR_THICKNESS := 70.0
+const GATE_POST_OFFSET := HALF_WIDTH + 24.0
+const GATE_POST_SIZE := Vector2(42.0, 24.0)
 const SHADOW_CIRCLE_TEXTURE := "res://assets/textures/edge_dressing/shadow_soft_circle.png"
 const SHADOW_RECT_TEXTURE := "res://assets/textures/edge_dressing/shadow_soft_rect.png"
 const SHADOW_DIRECTION := Vector2(0.62, 0.78)
@@ -1053,9 +1057,6 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# as a solid collision body.
 	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) else _island_region(room_polygon, clipped, inner_loop)
 	_build_island_prop(root, spec, island_region, inner_loop, centerline)
-	if spec.get("seed_obstacles", false):
-		_build_outer_barrier(root, outer_boundary)
-		_build_continuous_boundary_backing(root, spec)
 
 	# Legacy authored tracks keep their fixed room-corner dressing. Generated
 	# tracks choose landmarks from geometry-aware story moments below.
@@ -1092,7 +1093,12 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		var rotation := atan2(-tangent.y, -tangent.x)
 		var is_finish := gate_index == 0
 		var name := "Checkpoint0Finish" if is_finish else "Checkpoint%d" % gate_index
-		_add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y))
+		var span_endpoints := PackedVector2Array()
+		if spec.get("seed_obstacles", false):
+			span_endpoints = _gate_span_endpoints(sample, tangent, room_polygon, island_region)
+		_add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y), span_endpoints)
+		if spec.get("seed_obstacles", false):
+			_add_gate_posts(root, spec, sample, tangent, gate_index)
 
 	# Bold checker strip at the finish gate (two alternating rows across the corridor)
 	var finish_normal := start_tangent.rotated(PI * 0.5)
@@ -1218,6 +1224,7 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 	barrier.name = "InnerBarrier"
 	barrier.collision_layer = 2
 	barrier.set_meta("boundary_polygon", expanded)
+	barrier.set_meta("visible_collision_backing", &"raised_island_rim")
 	root.add_child(barrier)
 	if spec.get("seed_obstacles", false):
 		# A generated inner offset can be concave enough that solid polygon
@@ -1237,6 +1244,9 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 		var barrier_collision := CollisionPolygon2D.new()
 		barrier_collision.polygon = expanded
 		barrier.add_child(barrier_collision)
+	if spec.get("seed_obstacles", false):
+		_build_raised_island_rim(barrier, spec, expanded)
+		root.set_meta("island_invalid_polygon", expanded)
 
 	var min_point := Vector2(INF, INF)
 	var max_point := Vector2(-INF, -INF)
@@ -1264,81 +1274,74 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 	else:
 		visual.color = spec["island"]
 	root.add_child(visual)
+	if spec.get("seed_obstacles", false):
+		_add_island_rim_landmarks(root, spec, expanded, centerline)
 
 
-static func _build_outer_barrier(root: Node2D, boundary: PackedVector2Array) -> void:
-	if boundary.size() < 3:
-		push_error("TrackBuilderCore: generated outer boundary contour is invalid")
-		return
-	var barrier := StaticBody2D.new()
-	barrier.name = "OuterBarrier"
-	barrier.collision_layer = 2
-	barrier.set_meta("boundary_polygon", boundary)
-	barrier.set_meta("segment_count", boundary.size())
-	barrier.set_meta("centerline_clearance", HALF_WIDTH)
-	root.add_child(barrier)
-	var segments := PackedVector2Array()
-	for index in boundary.size():
-		segments.append(boundary[index])
-		segments.append(boundary[(index + 1) % boundary.size()])
-	var shape := ConcavePolygonShape2D.new()
-	shape.segments = segments
-	var collision := CollisionShape2D.new()
-	collision.name = "BoundaryCollision"
-	collision.shape = shape
-	barrier.add_child(collision)
+static func _build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, points: PackedVector2Array) -> void:
+	var face := Line2D.new()
+	face.name = "SideFace"
+	face.points = points
+	face.closed = true
+	face.width = ISLAND_SIDE_FACE_WIDTH
+	face.position = SHADOW_DIRECTION * 10.0
+	face.default_color = (spec.get("rim_dark", Color("3f2a22")) as Color).darkened(0.28)
+	face.joint_mode = Line2D.LINE_JOINT_ROUND
+	face.antialiased = true
+	face.z_index = -8
+	face.set_meta("backs_collision", true)
+	parent.add_child(face)
+
+	var textured := Line2D.new()
+	textured.name = "TexturedRim"
+	textured.points = points
+	textured.closed = true
+	textured.width = ISLAND_TEXTURED_RIM_WIDTH
+	textured.default_color = Color(0.9, 0.9, 0.9)
+	textured.joint_mode = Line2D.LINE_JOINT_ROUND
+	textured.antialiased = true
+	textured.z_index = -7
+	var edge_texture_path := String(spec.get("edge_texture", ""))
+	var edge_texture := load(edge_texture_path) as Texture2D if not edge_texture_path.is_empty() else null
+	if edge_texture:
+		textured.texture = edge_texture
+		textured.texture_mode = Line2D.LINE_TEXTURE_TILE
+		textured.set_meta("asset_path", edge_texture_path)
+	textured.set_meta("backs_collision", true)
+	parent.add_child(textured)
+
+	var lip := Line2D.new()
+	lip.name = "TopLip"
+	lip.points = points
+	lip.closed = true
+	lip.width = ISLAND_TOP_LIP_WIDTH
+	lip.default_color = spec.get("rim_highlight", Color("ead6aa", 0.76))
+	lip.joint_mode = Line2D.LINE_JOINT_ROUND
+	lip.antialiased = true
+	lip.z_index = -5
+	lip.set_meta("backs_collision", true)
+	parent.add_child(lip)
 
 
-static func _build_continuous_boundary_backing(root: Node2D, spec: Dictionary) -> void:
-	var inner_barrier := root.get_node_or_null("InnerBarrier") as StaticBody2D
-	var outer_barrier := root.get_node_or_null("OuterBarrier") as StaticBody2D
-	if inner_barrier == null or outer_barrier == null:
-		push_error("TrackBuilderCore: generated boundary backing requires both physical barriers")
-		return
-	var inner_points: PackedVector2Array = inner_barrier.get_meta("boundary_polygon", PackedVector2Array())
-	var outer_points: PackedVector2Array = outer_barrier.get_meta("boundary_polygon", PackedVector2Array())
-	if inner_points.size() < 3 or outer_points.size() < 3:
-		push_error("TrackBuilderCore: generated boundary backing contours are invalid")
+static func _add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array) -> void:
+	var assets: Array = spec.get("island_fill_textures", [])
+	if assets.is_empty() or boundary.size() < 12:
 		return
 	var container := Node2D.new()
-	container.name = "ContinuousBoundaryBacking"
-	container.set_meta("inner_coverage", 1.0)
-	container.set_meta("outer_coverage", 1.0)
-	container.set_meta("visual_only", true)
+	container.name = "IslandRimLandmarks"
+	container.set_meta("placed_count", 3)
 	root.add_child(container)
-	_add_boundary_rim_lines(container, "Inner", inner_points, spec)
-	_add_boundary_rim_lines(container, "Outer", outer_points, spec)
-
-
-static func _add_boundary_rim_lines(parent: Node2D, side_name: String, points: PackedVector2Array, spec: Dictionary) -> void:
-	var base := Line2D.new()
-	base.name = "%sRimBase" % side_name
-	base.points = points
-	base.closed = true
-	base.width = BOUNDARY_RIM_BASE_WIDTH
-	base.default_color = spec.get("rim_dark", Color("3f2a22"))
-	base.joint_mode = Line2D.LINE_JOINT_ROUND
-	base.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	base.end_cap_mode = Line2D.LINE_CAP_ROUND
-	base.antialiased = true
-	base.z_index = -7
-	base.set_meta("boundary_side", StringName(side_name.to_lower()))
-	base.set_meta("boundary_points", points)
-	parent.add_child(base)
-	var highlight := Line2D.new()
-	highlight.name = "%sRimHighlight" % side_name
-	highlight.points = points
-	highlight.closed = true
-	highlight.width = BOUNDARY_RIM_HIGHLIGHT_WIDTH
-	highlight.default_color = spec.get("rim_highlight", Color("ead6aa", 0.76))
-	highlight.joint_mode = Line2D.LINE_JOINT_ROUND
-	highlight.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	highlight.end_cap_mode = Line2D.LINE_CAP_ROUND
-	highlight.antialiased = true
-	highlight.z_index = -6
-	highlight.set_meta("boundary_side", StringName(side_name.to_lower()))
-	highlight.set_meta("boundary_points", points)
-	parent.add_child(highlight)
+	var seed := _mix_seed(int(spec.get("requested_seed", spec.get("seed", 0))), "island_rim_landmarks")
+	var offset := posmod(seed, boundary.size())
+	for landmark_index in 3:
+		var boundary_index := posmod(offset + int(round(float(landmark_index) * float(boundary.size()) / 3.0)), boundary.size())
+		var boundary_point := boundary[boundary_index]
+		var center_sample: Vector2 = _closest_point_on_loop(boundary_point, centerline)["position"]
+		var inward := (boundary_point - center_sample).normalized()
+		var position := boundary_point + inward * 22.0
+		var next_point := boundary[(boundary_index + 1) % boundary.size()]
+		var texture_path := String(assets[posmod(seed + landmark_index * 5, assets.size())])
+		_add_generated_prop(container, "Landmark%02d" % landmark_index, position, texture_path, (next_point - boundary_point).angle(), &"island_rim", &"few", landmark_index, 0.72)
 
 
 static func _build_generated_outer_boundary_visuals(
@@ -1524,20 +1527,32 @@ static func _add_generated_boundary_section(
 	var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / 8.0)) % centerline.size()
 	if position.distance_to(nearest_centerline) < HALF_WIDTH or not Geometry2D.is_point_in_polygon(position, room_polygon) or _cyclic_index_distance(int(nearest_centerline_sample["index"]), run_center, centerline.size()) >= centerline.size() / 16:
 		return false
+	var body := StaticBody2D.new()
+	body.name = "%sSection%03d" % [String(side).capitalize(), side_index]
+	body.position = position
+	body.rotation = tangent.angle()
+	body.collision_layer = 16
+	body.z_index = -4
+	body.set_meta("boundary_kind", &"partial_section")
+	body.set_meta("boundary_side", side)
+	body.set_meta("run_index", run_index)
+	body.set_meta("centerline_index", centerline_index)
+	body.set_meta("asset_path", texture.resource_path)
+	body.set_meta("visible_collision_backing", &"rail_sprite")
+	container.add_child(body)
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(142.0, 38.0)
+	var collision := CollisionShape2D.new()
+	collision.name = "RailCollision"
+	collision.shape = shape
+	body.add_child(collision)
+	_add_directional_shadow(body, texture.resource_path, 156.0, 1.0, Vector2(142.0, 38.0))
 	var sprite := Sprite2D.new()
-	sprite.name = "%sSection%03d" % [String(side).capitalize(), side_index]
+	sprite.name = "Sprite"
 	sprite.texture = texture
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	sprite.position = position
-	sprite.rotation = tangent.angle()
 	sprite.scale = Vector2(156.0 / texture.get_width(), 56.0 / texture.get_height())
-	sprite.z_index = -4
-	sprite.set_meta("boundary_kind", &"partial_section")
-	sprite.set_meta("boundary_side", side)
-	sprite.set_meta("run_index", run_index)
-	sprite.set_meta("centerline_index", centerline_index)
-	sprite.set_meta("asset_path", texture.resource_path)
-	container.add_child(sprite)
+	body.add_child(sprite)
 	return true
 
 
@@ -1839,20 +1854,107 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 			wall.add_child(strip)
 
 
-static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float) -> void:
-	var cp := (load(CHECKPOINT_SCENE) as PackedScene).instantiate()
+static func _gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:
+	var normal := tangent.rotated(PI * 0.5).normalized()
+	return PackedVector2Array([
+		_nearest_gate_boundary(sample, normal, room_polygon, island_polygon),
+		_nearest_gate_boundary(sample, -normal, room_polygon, island_polygon),
+	])
+
+
+static func _nearest_gate_boundary(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
+	var ray_end := sample + direction * 12000.0
+	var nearest := ray_end
+	var nearest_distance := INF
+	for polygon: PackedVector2Array in [island_polygon, room_polygon]:
+		for edge_index in polygon.size():
+			var intersection: Variant = Geometry2D.segment_intersects_segment(sample, ray_end, polygon[edge_index], polygon[(edge_index + 1) % polygon.size()])
+			if not intersection is Vector2:
+				continue
+			var point := intersection as Vector2
+			var projected := (point - sample).dot(direction)
+			if projected > 0.5 and projected < nearest_distance:
+				nearest = point
+				nearest_distance = projected
+	return nearest
+
+
+static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int) -> void:
+	var container := root.get_node_or_null("GatePosts") as Node2D
+	if container == null:
+		container = Node2D.new()
+		container.name = "GatePosts"
+		container.set_meta("placed_count", 0)
+		root.add_child(container)
+	var boundary_assets: Dictionary = spec.get("generated_boundary", {})
+	var asset_paths: Array = boundary_assets.get("sections", [boundary_assets.get("section", "")])
+	if asset_paths.is_empty():
+		return
+	var normal := tangent.rotated(PI * 0.5).normalized()
+	for side in [-1, 1]:
+		var asset_path := String(asset_paths[posmod(gate_index * 2 + (1 if side > 0 else 0), asset_paths.size())])
+		var texture := load(asset_path) as Texture2D
+		if texture == null:
+			continue
+		var post := StaticBody2D.new()
+		post.name = "Gate%02d%s" % [gate_index, "Right" if side > 0 else "Left"]
+		post.position = sample + normal * GATE_POST_OFFSET * float(side)
+		post.rotation = tangent.angle()
+		post.collision_layer = 16
+		post.z_index = -2
+		post.set_meta("asset_path", asset_path)
+		post.set_meta("gate_index", gate_index)
+		post.set_meta("visible_collision_backing", &"gate_post_sprite")
+		container.add_child(post)
+		var shape := RectangleShape2D.new()
+		shape.size = GATE_POST_SIZE * Vector2(0.82, 0.72)
+		var collision := CollisionShape2D.new()
+		collision.name = "PostCollision"
+		collision.shape = shape
+		post.add_child(collision)
+		_add_directional_shadow(post, asset_path, GATE_POST_SIZE.x, 1.0, shape.size)
+		var sprite := Sprite2D.new()
+		sprite.name = "Sprite"
+		sprite.texture = texture
+		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		sprite.scale = Vector2(GATE_POST_SIZE.x / texture.get_width(), GATE_POST_SIZE.y / texture.get_height())
+		post.add_child(sprite)
+		container.set_meta("placed_count", int(container.get_meta("placed_count", 0)) + 1)
+
+
+static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float, span_endpoints: PackedVector2Array = PackedVector2Array()) -> void:
+	var cp := Area2D.new()
 	cp.name = node_name
 	cp.position = position
 	cp.rotation = rotation
+	cp.visible = false
+	cp.collision_layer = 0
+	cp.set_script(CHECKPOINT_SCRIPT)
+	cp.add_to_group("track_checkpoints", true)
 	cp.set("checkpoint_index", index)
 	cp.set("is_finish_line", is_finish)
 	cp.set("recovery_rotation", recovery_rotation)
 	cp.set("recovery_offset", 70.0)
-	if not is_finish:
-		var collision := cp.get_node("CollisionShape2D") as CollisionShape2D
+	var collision := CollisionShape2D.new()
+	collision.name = "CollisionShape2D"
+	cp.add_child(collision)
+	if span_endpoints.size() == 2:
+		var forgiving := RectangleShape2D.new()
+		forgiving.size = Vector2(GATE_SENSOR_THICKNESS, span_endpoints[0].distance_to(span_endpoints[1]) + 8.0)
+		collision.shape = forgiving
+		var checkpoint_transform := Transform2D(rotation, position)
+		collision.position = checkpoint_transform.affine_inverse() * span_endpoints[0].lerp(span_endpoints[1], 0.5)
+		cp.set_meta("sensor_endpoints", span_endpoints)
+		cp.set_meta("sensor_span", span_endpoints[0].distance_to(span_endpoints[1]))
+		cp.set_meta("sensor_full_room_cross_section", true)
+	elif not is_finish:
 		var forgiving := RectangleShape2D.new()
 		forgiving.size = Vector2(70.0, 300.0)
 		collision.shape = forgiving
+	else:
+		var finish_shape := RectangleShape2D.new()
+		finish_shape.size = Vector2(34.0, 280.0)
+		collision.shape = finish_shape
 	parent.add_child(cp)
 
 

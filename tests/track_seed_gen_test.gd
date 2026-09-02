@@ -170,7 +170,7 @@ func _run_test() -> void:
 			if not _expect(not bool((gameplay.get("complex_bypass", {}) as Dictionary).get("found", false)), "%s seed %d must resist a straight chord replacing a whole complex" % [room_name, seed]):
 				return
 			var physical_bypass := _physical_complex_bypass(TRACK_SEED_GEN.centerline_checkpoints(controls))
-			if not _expect(not bool(physical_bypass.get("found", false)), "%s seed %d hard boundaries must block a %.0fu route-to-chord bypass (arc=%.0f chord=%.0f samples=%d->%d)" % [room_name, seed, float(physical_bypass.get("saving", 0.0)), float(physical_bypass.get("arc", 0.0)), float(physical_bypass.get("chord", 0.0)), int(physical_bypass.get("start", -1)), int(physical_bypass.get("finish", -1))]):
+			if not _expect(not bool(physical_bypass.get("found", false)), "%s seed %d route geometry must reject a %.0fu route-to-chord bypass (arc=%.0f chord=%.0f samples=%d->%d)" % [room_name, seed, float(physical_bypass.get("saving", 0.0)), float(physical_bypass.get("arc", 0.0)), float(physical_bypass.get("chord", 0.0)), int(physical_bypass.get("start", -1)), int(physical_bypass.get("finish", -1))]):
 				return
 			total_setup_straight_regions += setup_straight_regions
 			minimum_setup_straight_regions = mini(minimum_setup_straight_regions, setup_straight_regions)

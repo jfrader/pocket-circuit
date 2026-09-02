@@ -12,6 +12,8 @@ const SIGNATURE_ASSETS := {
 }
 
 var _built_count := 0
+var _minimum_gate_span := INF
+var _maximum_gate_span := 0.0
 
 
 func _initialize() -> void:
@@ -62,7 +64,7 @@ func _run_test() -> void:
 		return
 	if not _check_legacy_builder_scale():
 		return
-	print("GENERATED_TRACK_COMPOSITION_TEST PASS builds=%d stories=12 surfaces=24+ density floor60-120 edge60-150 giants1-3" % _built_count)
+	print("GENERATED_TRACK_COMPOSITION_TEST PASS builds=%d stories=12 surfaces=24+ gate_spans=%.1f..%.1f density floor60-120 edge60-150 giants1-3" % [_built_count, _minimum_gate_span, _maximum_gate_span])
 	quit(0)
 
 
@@ -198,7 +200,11 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 		return false
 	if not _check_island_geometry(track, "%s seed %d" % [theme, seed]):
 		return false
-	if not _check_outer_boundary(track, theme, seed):
+	if not _check_open_boundary_assets(track, theme, seed):
+		return false
+	if not _check_full_width_gates(track, "%s seed %d" % [theme, seed]):
+		return false
+	if not _check_visible_collision_backing(track, "%s seed %d" % [theme, seed]):
 		return false
 
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
@@ -308,7 +314,7 @@ func _check_boundary_room_regressions() -> bool:
 			return false
 		var track := (built["scene"] as PackedScene).instantiate() as Node2D
 		_built_count += 1
-		var valid := _check_outer_boundary(track, sample["theme"], sample["seed"])
+		var valid := _check_open_boundary_assets(track, sample["theme"], sample["seed"])
 		track.free()
 		if not valid:
 			return false
@@ -352,6 +358,21 @@ func _check_island_geometry(track: Node2D, label: String) -> bool:
 		return false
 	if not _expect(not _has_self_intersection(island_polygon), "%s island collision should be a simple polygon" % label):
 		return false
+	if not _expect(track.get_meta("island_invalid_polygon", PackedVector2Array()) == island_polygon, "%s recovery should reject the same polygon enclosed by the raised island" % label):
+		return false
+	var side_face := barrier.get_node_or_null("SideFace") as Line2D
+	var textured_rim := barrier.get_node_or_null("TexturedRim") as Line2D
+	var top_lip := barrier.get_node_or_null("TopLip") as Line2D
+	if not _expect(side_face != null and textured_rim != null and top_lip != null and side_face.closed and textured_rim.closed and top_lip.closed, "%s island collision should be backed by a closed raised side face, textured rim, and top lip" % label):
+		return false
+	if not _expect(side_face.points == island_polygon and textured_rim.points == island_polygon and top_lip.points == island_polygon and textured_rim.texture != null, "%s raised island visuals should follow the exact physical contour" % label):
+		return false
+	var rim_landmarks := track.get_node_or_null("IslandRimLandmarks")
+	if not _expect(rim_landmarks != null and int(rim_landmarks.get_meta("placed_count", 0)) == 3 and rim_landmarks.get_child_count() == 3, "%s raised island should carry three colliding edge landmarks for scale" % label):
+		return false
+	for landmark: StaticBody2D in rim_landmarks.get_children():
+		if not _expect(landmark.collision_layer == 16 and landmark.get_node_or_null("Sprite") is Sprite2D and landmark.find_children("*", "CollisionShape2D", true, false).size() == 1, "%s island edge landmark should be one visible colliding asset" % label):
+			return false
 	for grid_name in ["GridForward", "GridReverse"]:
 		var grid := track.get_node_or_null(grid_name)
 		if not _expect(grid != null and grid.get_child_count() == 4, "%s should build %s" % [label, grid_name]):
@@ -362,55 +383,44 @@ func _check_island_geometry(track: Node2D, label: String) -> bool:
 	return true
 
 
-func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
+func _check_open_boundary_assets(track: Node2D, theme: StringName, seed: int) -> bool:
 	var label := "%s seed %d" % [theme, seed]
-	var barrier := track.get_node_or_null("OuterBarrier") as StaticBody2D
-	var collision := barrier.get_node_or_null("BoundaryCollision") as CollisionShape2D if barrier else null
-	if not _expect(barrier != null and barrier.collision_layer == 2 and collision != null and collision.shape is ConcavePolygonShape2D, "%s should have one continuous layer-2 outer barrier" % label):
-		return false
-	var polygon: PackedVector2Array = barrier.get_meta("boundary_polygon", PackedVector2Array())
-	var segments: PackedVector2Array = (collision.shape as ConcavePolygonShape2D).segments
-	if not _expect(polygon.size() > 20 and segments.size() == polygon.size() * 2, "%s outer barrier should be a closed segment chain" % label):
-		return false
-	if not _expect(not _has_self_intersection(polygon), "%s outer barrier contour should be simple and contain no cross-track bridge" % label):
+	if not _expect(track.get_node_or_null("OuterBarrier") == null and track.get_node_or_null("ContinuousBoundaryBacking") == null, "%s open apron must not contain a continuous outer collider or contour rim" % label):
 		return false
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
-	for index in range(0, polygon.size(), maxi(1, polygon.size() / 36)):
-		var distance := _minimum_point_distance(polygon[index], centerline)
-		if not _expect(distance >= 78.0 and distance <= 178.0, "%s outer contour sample should hug the 125u corridor edge (got %.1f)" % [label, distance]):
-			return false
-
 	var visuals := track.get_node_or_null("GeneratedOuterBoundaryVisuals")
 	var expected: Dictionary = BUILDER.LAYOUTS[theme]["generated_boundary"]
-	if not _expect(visuals != null and String(visuals.get_meta("section_asset", "")) == String(expected["section"]) and String(visuals.get_meta("accent_asset", "")) == String(expected["accent"]), "%s outer visuals should use only its theme-specific household kit" % label):
+	if not _expect(visuals != null and String(visuals.get_meta("section_asset", "")) == String(expected["section"]) and String(visuals.get_meta("accent_asset", "")) == String(expected["accent"]), "%s sparse boundary assets should use only their theme-specific kit" % label):
 		return false
 	var expected_sections: Array = expected.get("sections", [expected["section"]])
 	for section_asset: String in expected_sections:
 		if not _expect(load(section_asset) is Texture2D, "%s boundary rail should be a tracked loadable asset: %s" % [label, section_asset]):
 			return false
-	if not _expect(load(String(expected["accent"])) is Texture2D and visuals.get_meta("section_assets", []) == expected_sections, "%s boundary textures should expose their complete theme-specific rail kit" % label):
-		return false
-	var sections: Array[Node] = []
-	var accents: Array[Node] = []
+	var sections: Array[StaticBody2D] = []
+	var accents: Array[Sprite2D] = []
 	for child: Node in visuals.get_children():
-		if child.name.contains("Section"):
-			sections.append(child)
-		elif child.name.begins_with("CornerAccent"):
-			accents.append(child)
-	if not _expect(sections.size() == int(visuals.get_meta("section_count", 0)) and sections.size() >= 24 and sections.size() <= 84, "%s should use extended but still partial boundary sections (count=%d)" % [label, sections.size()]):
+		if child.name.contains("Section") and child is StaticBody2D:
+			sections.append(child as StaticBody2D)
+		elif child.name.begins_with("CornerAccent") and child is Sprite2D:
+			accents.append(child as Sprite2D)
+	if not _expect(sections.size() == int(visuals.get_meta("section_count", 0)) and sections.size() >= 24 and sections.size() <= 84, "%s should retain extended but partial real-asset rail sections (count=%d)" % [label, sections.size()]):
 		return false
-	if not _expect(accents.size() == int(visuals.get_meta("accent_count", 0)) and accents.size() in [1, 2], "%s should mark one or two meaningful corner mouths with larger partial sections" % label):
+	if not _expect(accents.size() == int(visuals.get_meta("accent_count", 0)) and accents.size() in [1, 2], "%s should retain one or two visual corner-mouth accents" % label):
 		return false
 	var run_modes: Array = visuals.get_meta("run_modes", [])
 	var sides_by_run := {}
-	for section: Sprite2D in sections:
+	for section: StaticBody2D in sections:
 		var run_index := int(section.get_meta("run_index", -1))
-		if not _expect(run_index >= 0 and run_index < 8, "%s partial boundary section should identify its authored run" % label):
-			return false
 		var centerline_index := int(section.get_meta("centerline_index", -1))
 		var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / 8.0)) % centerline.size()
 		var positioned_index := int(BUILDER._closest_point_on_loop(section.position, centerline)["index"])
-		if not _expect(centerline_index >= 0 and BUILDER._cyclic_index_distance(centerline_index, run_center, centerline.size()) < centerline.size() / 16 and BUILDER._cyclic_index_distance(positioned_index, run_center, centerline.size()) < centerline.size() / 16, "%s run %d section should stay inside its assigned visual sector" % [label, run_index]):
+		if not _expect(run_index in range(8) and centerline_index >= 0 and BUILDER._cyclic_index_distance(centerline_index, run_center, centerline.size()) < centerline.size() / 16 and BUILDER._cyclic_index_distance(positioned_index, run_center, centerline.size()) < centerline.size() / 16, "%s rail section should stay inside its assigned visual sector" % label):
+			return false
+		var sprite := section.get_node_or_null("Sprite") as Sprite2D
+		var collision := section.get_node_or_null("RailCollision") as CollisionShape2D
+		if not _expect(section.collision_layer == 16 and sprite != null and sprite.texture != null and collision != null and collision.shape is RectangleShape2D, "%s every colliding rail must be a footprint-matched visible asset" % label):
+			return false
+		if not _expect(_minimum_point_distance(section.position, centerline) >= BUILDER.HALF_WIDTH and String(section.get_meta("asset_path", "")) in expected_sections, "%s real rail should stay outside the nominal corridor and use the themed kit" % label):
 			return false
 		var sides: Dictionary = sides_by_run.get(run_index, {})
 		sides[StringName(section.get_meta("boundary_side", &""))] = true
@@ -418,12 +428,12 @@ func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
 	var actual_empty_runs := 0
 	var actual_one_sided_runs := 0
 	var actual_both_sided_runs := 0
-	if not _expect(run_modes.size() == 8, "%s should expose eight boundary run results" % label):
+	if not _expect(run_modes.size() == 8, "%s should expose eight authored boundary sectors" % label):
 		return false
 	for run_index in 8:
 		var sides: Dictionary = sides_by_run.get(run_index, {})
 		var actual_mode := &"both" if sides.has(&"outer") and sides.has(&"inner") else (&"outer" if sides.has(&"outer") else (&"inner" if sides.has(&"inner") else &"none"))
-		if not _expect(StringName(run_modes[run_index]) == actual_mode, "%s run %d metadata should match its placed sections" % [label, run_index]):
+		if not _expect(StringName(run_modes[run_index]) == actual_mode, "%s run %d metadata should match its placed real assets" % [label, run_index]):
 			return false
 		if actual_mode == &"none":
 			actual_empty_runs += 1
@@ -431,41 +441,151 @@ func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
 			actual_both_sided_runs += 1
 		else:
 			actual_one_sided_runs += 1
-	if not _expect(actual_empty_runs == 1 and actual_one_sided_runs == 2 and actual_both_sided_runs == 5, "%s should place exactly one empty boundary run, two one-sided runs, and five both-sided runs" % label):
+	if not _expect(actual_empty_runs == 1 and actual_one_sided_runs == 2 and actual_both_sided_runs == 5, "%s should retain one open sector, two one-sided sectors, and five both-sided sectors" % label):
 		return false
-	if not _expect(int(visuals.get_meta("empty_run_count", 0)) == actual_empty_runs and int(visuals.get_meta("one_sided_run_count", 0)) == actual_one_sided_runs and int(visuals.get_meta("both_sided_run_count", 0)) == actual_both_sided_runs, "%s boundary run counts should describe placed sprites" % label):
+	if not _expect(int(visuals.get_meta("inner_run_count", 0)) == 6 and int(visuals.get_meta("outer_run_count", 0)) == 6, "%s sparse rails should occupy six of eight sectors per side without becoming a tube" % label):
 		return false
-	if not _expect(int(visuals.get_meta("outer_section_count", 0)) > 0 and int(visuals.get_meta("inner_section_count", 0)) > 0, "%s partial boundary composition should use both track edges without lining either continuously" % label):
+	if not _expect(visuals.find_children("EmptyRunHint", "Sprite2D", false, false).size() == 1, "%s should mark its open sector with one flat worn-floor hint" % label):
 		return false
-	if not _expect(int(visuals.get_meta("inner_run_count", 0)) == 6 and int(visuals.get_meta("outer_run_count", 0)) == 6, "%s sparse rail accents should cover six of eight sectors on each edge" % label):
-		return false
-	var inner_coverage := float(visuals.get_meta("inner_accent_coverage", 0.0))
-	var outer_coverage := float(visuals.get_meta("outer_accent_coverage", 0.0))
-	if not _expect(inner_coverage >= 0.45 and inner_coverage <= 0.60 and outer_coverage >= 0.45 and outer_coverage <= 0.60, "%s sparse accents should estimate 45-60%% coverage per side (inner %.2f outer %.2f)" % [label, inner_coverage, outer_coverage]):
-		return false
-	var empty_hints := visuals.find_children("EmptyRunHint", "Sprite2D", false, false)
-	if not _expect(empty_hints.size() == 1, "%s should mark its single empty run with one flat worn-floor hint" % label):
-		return false
-	for section: Sprite2D in sections:
-		var section_distance := _minimum_point_distance(section.position, centerline)
-		if not _expect(section.texture != null and section_distance >= BUILDER.HALF_WIDTH and StringName(section.get_meta("boundary_kind", &"")) == &"partial_section", "%s partial boundary sections should stay outside the 250u drivable corridor (got %.1f)" % [label, section_distance]):
-			return false
-		if not _expect(String(section.get_meta("asset_path", "")) in expected_sections, "%s partial boundary section should come from its theme rail kit" % label):
-			return false
 	for accent: Sprite2D in accents:
-		if not _expect(accent.texture != null and StringName(accent.get_meta("boundary_kind", &"")) == &"corner_mouth_accent", "%s corner accents should expose their semantic boundary role" % label):
+		if not _expect(accent.texture != null and StringName(accent.get_meta("boundary_kind", &"")) == &"corner_mouth_accent", "%s corner accents should remain readable non-colliding art" % label):
 			return false
-	var backing := track.get_node_or_null("ContinuousBoundaryBacking")
-	var inner_barrier := track.get_node_or_null("InnerBarrier")
-	var inner_rim := backing.get_node_or_null("InnerRimBase") as Line2D if backing else null
-	var outer_rim := backing.get_node_or_null("OuterRimBase") as Line2D if backing else null
-	if not _expect(backing != null and inner_rim != null and outer_rim != null, "%s should expose continuous visual backing for both physical edges" % label):
+	return _expect(_has_clear_open_apron_path(track, visuals, centerline), "%s open sector should expose a collider-free path from the racing corridor into the room apron" % label)
+
+
+func _has_clear_open_apron_path(track: Node2D, visuals: Node, centerline: PackedVector2Array) -> bool:
+	var run_modes: Array = visuals.get_meta("run_modes", [])
+	var open_run := run_modes.find(&"none")
+	if open_run < 0:
 		return false
-	if not _expect(inner_rim.points == inner_barrier.get_meta("boundary_polygon", PackedVector2Array()) and outer_rim.points == polygon, "%s continuous rims should follow the exact collision contours" % label):
+	var run_center := int(round((float(open_run) + 0.5) * float(centerline.size()) / 8.0)) % centerline.size()
+	var room_polygon: PackedVector2Array = track.get_meta("room_polygon", PackedVector2Array())
+	var island_polygon: PackedVector2Array = track.get_meta("island_invalid_polygon", PackedVector2Array())
+	for center_offset in range(-12, 13, 3):
+		var center_index := posmod(run_center + center_offset, centerline.size())
+		var tangent: Vector2 = (centerline[(center_index + 1) % centerline.size()] - centerline[(center_index - 1 + centerline.size()) % centerline.size()]).normalized()
+		var normal: Vector2 = tangent.rotated(PI * 0.5)
+		for side: float in [-1.0, 1.0]:
+			for distance: float in [210.0, 280.0, 360.0]:
+				var target: Vector2 = centerline[center_index] + normal * distance * side
+				if not Geometry2D.is_point_in_polygon(target, room_polygon) or Geometry2D.is_point_in_polygon(target, island_polygon):
+					continue
+				var clear_path := true
+				for step in 7:
+					var sample := centerline[center_index].lerp(target, float(step + 1) / 7.0)
+					if not _point_clear_of_static_colliders(track, sample, 16.0):
+						clear_path = false
+						break
+				if clear_path:
+					return true
+	return false
+
+
+func _check_full_width_gates(track: Node2D, label: String) -> bool:
+	var room_polygon: PackedVector2Array = track.get_meta("room_polygon", PackedVector2Array())
+	var island_polygon: PackedVector2Array = track.get_meta("island_invalid_polygon", PackedVector2Array())
+	var minimum_span := INF
+	var maximum_span := 0.0
+	for gate_index in BUILDER.GATE_COUNT:
+		var checkpoint := track.get_node_or_null("Checkpoint0Finish" if gate_index == 0 else "Checkpoint%d" % gate_index) as Area2D
+		if not _expect(checkpoint != null and bool(checkpoint.get_meta("sensor_full_room_cross_section", false)), "%s gate %d should declare a full-room sensor" % [label, gate_index]):
+			return false
+		var endpoints: PackedVector2Array = checkpoint.get_meta("sensor_endpoints", PackedVector2Array())
+		var span := float(checkpoint.get_meta("sensor_span", 0.0))
+		var collision := checkpoint.get_node_or_null("CollisionShape2D") as CollisionShape2D
+		var shape := collision.shape as RectangleShape2D if collision else null
+		if not _expect(endpoints.size() == 2 and shape != null and span > BUILDER.HALF_WIDTH * 2.0 and shape.size.y >= span, "%s gate %d sensor should exceed the old corridor-only span (endpoints=%d span=%.1f shape=%s)" % [label, gate_index, endpoints.size(), span, shape.size if shape else Vector2.ZERO]):
+			return false
+		for endpoint: Vector2 in endpoints:
+			var boundary_distance := minf(_distance_to_polygon_edge(endpoint, room_polygon), _distance_to_polygon_edge(endpoint, island_polygon))
+			if not _expect(boundary_distance <= 1.5, "%s gate %d endpoint should terminate on a real room wall or raised island rim (%.2f)" % [label, gate_index, boundary_distance]):
+				return false
+		var local_a := collision.position + Vector2(0.0, -shape.size.y * 0.5)
+		var local_b := collision.position + Vector2(0.0, shape.size.y * 0.5)
+		var world_a := checkpoint.transform * local_a
+		var world_b := checkpoint.transform * local_b
+		if not _expect(minf(world_a.distance_to(endpoints[0]), world_a.distance_to(endpoints[1])) <= 5.0 and minf(world_b.distance_to(endpoints[0]), world_b.distance_to(endpoints[1])) <= 5.0, "%s gate %d collision rectangle should physically reach both recorded boundaries" % [label, gate_index]):
+			return false
+		minimum_span = minf(minimum_span, span)
+		maximum_span = maxf(maximum_span, span)
+	var posts := track.get_node_or_null("GatePosts")
+	if not _expect(posts != null and int(posts.get_meta("placed_count", 0)) == BUILDER.GATE_COUNT * 2 and posts.get_child_count() == BUILDER.GATE_COUNT * 2, "%s should place two visible colliding posts at every nominal corridor gate" % label):
 		return false
-	if not _expect(inner_rim.closed and outer_rim.closed and inner_rim.width >= 8.0 and outer_rim.width >= 8.0 and float(backing.get_meta("inner_coverage", 0.0)) == 1.0 and float(backing.get_meta("outer_coverage", 0.0)) == 1.0, "%s continuous boundary backing should cover 100%% of both edges" % label):
-		return false
+	for post: StaticBody2D in posts.get_children():
+		var sprite := post.get_node_or_null("Sprite") as Sprite2D
+		var collision := post.get_node_or_null("PostCollision") as CollisionShape2D
+		var checkpoint := track.get_node_or_null("Checkpoint0Finish" if int(post.get_meta("gate_index", -1)) == 0 else "Checkpoint%d" % int(post.get_meta("gate_index", -1))) as Node2D
+		if not _expect(sprite != null and sprite.texture != null and collision != null and post.collision_layer == 16 and absf(post.position.distance_to(checkpoint.position) - BUILDER.GATE_POST_OFFSET) < 1.0, "%s gate post should be a visible collider just outside the racing line" % label):
+			return false
+	track.set_meta("tested_gate_span_range", Vector2(minimum_span, maximum_span))
+	_minimum_gate_span = minf(_minimum_gate_span, minimum_span)
+	_maximum_gate_span = maxf(_maximum_gate_span, maximum_span)
 	return true
+
+
+func _check_visible_collision_backing(track: Node2D, label: String) -> bool:
+	for node: Node in track.find_children("*", "StaticBody2D", true, false):
+		var body := node as StaticBody2D
+		if body.find_children("*", "CollisionShape2D", true, false).is_empty() and body.find_children("*", "CollisionPolygon2D", true, false).is_empty():
+			continue
+		if not _expect(_static_body_has_visible_backing(body), "%s collider %s must sit within a visible sprite, wall, or raised rim" % [label, str(track.get_path_to(body))]):
+			return false
+	return true
+
+
+func _static_body_has_visible_backing(body: StaticBody2D) -> bool:
+	for descendant: Node in body.find_children("*", "", true, false):
+		if descendant is Sprite2D and descendant.name not in [&"ContactShadow", &"CastShadow"] and (descendant as Sprite2D).texture != null:
+			return true
+		if descendant is Polygon2D or descendant is Line2D:
+			return true
+	var shared_visual := body.get_parent().get_node_or_null("Sprite") as Sprite2D if body.get_parent() else null
+	if body.position.is_zero_approx() and shared_visual != null and shared_visual.texture != null:
+		return true
+	return false
+
+
+func _point_clear_of_static_colliders(track: Node2D, point: Vector2, clearance: float) -> bool:
+	var world_point := track.to_global(point)
+	for node: Node in track.find_children("*", "StaticBody2D", true, false):
+		var body := node as StaticBody2D
+		for collision_node: Node in body.get_children():
+			if collision_node is CollisionShape2D:
+				var collision := collision_node as CollisionShape2D
+				var local_point := collision.to_local(world_point)
+				if collision.shape is CircleShape2D and local_point.length() <= (collision.shape as CircleShape2D).radius + clearance:
+					return false
+				if collision.shape is RectangleShape2D:
+					var half := (collision.shape as RectangleShape2D).size * 0.5 + Vector2.ONE * clearance
+					if absf(local_point.x) <= half.x and absf(local_point.y) <= half.y:
+						return false
+				if collision.shape is ConcavePolygonShape2D:
+					var segments: PackedVector2Array = (collision.shape as ConcavePolygonShape2D).segments
+					for segment_index in range(0, segments.size(), 2):
+						if _point_to_segment_distance(local_point, segments[segment_index], segments[segment_index + 1]) <= clearance:
+							return false
+			elif collision_node is CollisionPolygon2D:
+				var polygon_node := collision_node as CollisionPolygon2D
+				if Geometry2D.is_point_in_polygon(polygon_node.to_local(world_point), polygon_node.polygon):
+					return false
+	return true
+
+
+func _distance_to_polygon_edge(point: Vector2, polygon: PackedVector2Array) -> float:
+	if polygon.is_empty():
+		return INF
+	var nearest := INF
+	for index in polygon.size():
+		nearest = minf(nearest, _point_to_segment_distance(point, polygon[index], polygon[(index + 1) % polygon.size()]))
+	return nearest
+
+
+func _point_to_segment_distance(point: Vector2, from: Vector2, to: Vector2) -> float:
+	var segment := to - from
+	if segment.length_squared() < 0.001:
+		return point.distance_to(from)
+	var fraction := clampf((point - from).dot(segment) / segment.length_squared(), 0.0, 1.0)
+	return point.distance_to(from + segment * fraction)
 
 
 func _check_story_assets(theme: StringName) -> bool:

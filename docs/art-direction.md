@@ -55,11 +55,15 @@ rooms, route geometry, palette, interface, and story.
   objects retain rectangular footprints, and giants add a faint longer cast.
 - Track edges are broad, rounded, and slightly hand-drawn rather than perfect
   vector radii. Track value contrast must remain clear at speed.
-- The full inner island remains visually solid. Every generated inner and outer
-  collision contour has a thin continuous themed raised lip, while larger
-  household rail props remain selected accents. An open accent run never looks
-  like open floor or missing collision.
-- Traversable shortcuts are explicit authored lanes, never gaps in physics.
+- The full inner island is a visibly raised solid feature: a dark side face,
+  textured theme edge, warm top lip, and small edge landmarks communicate the
+  exact physical rim from every approach.
+- The room apron is open Micro Machines-style diorama space. No invisible
+  corridor wall sits under bare floor; collision is reserved for real visible
+  household assets, the raised island, and room walls.
+- Traversable shortcuts include authored surface lanes and player-discovered
+  apron routes. Ordered full-room gate sensors, not hidden walls, protect lap
+  integrity.
 - Kitchen props are oversized, friendly, and readable from directly above.
   Details are broad shapes, not thin linework.
 - Micro details such as crumbs, fibers, droplets, scratches, and wood grain use
@@ -167,14 +171,19 @@ fibers, hardware, worn-floor hints, and subtle material patterning, and from
   both-sided rail moments, two one-sided runs, and one open accent sector marked
   only by a flat worn-floor hint. Each side receives accents in six of eight
   sectors (about 54% visual coverage), never a repeated full fence.
-- A subtle continuous bevel underlays both collision contours at 100% coverage.
-  Kitchen accents mix folded towel, spoon, chopstick, and bread-board rails;
-  Workshop mixes paint stirrer, dowel, clamp, and ruler rails; Office mixes
-  pencil, ruler, pen, and book-spine rails. Corner mitt, tape, and sticky-note
-  accents remain rare.
-- Partial rail sprites sit over the continuous boundary bevel. The bevel is
-  theme-colored and physically placed at the material edge, so it reads as a
-  raised object lip rather than a painted racing stripe.
+- Partial rail sprites are the physical boundary wherever they appear; their
+  colliders fit inside their visible footprints. Kitchen mixes folded towel,
+  spoon, chopstick, and bread-board rails; Workshop mixes paint stirrer, dowel,
+  clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
+  Corner mitt, tape, and sticky-note accents remain rare and may be visual-only.
+- Bare floor between those assets is intentionally open and drivable. Never add
+  a continuous outer collider, invisible corridor edge, or visual bevel that
+  implies one.
+- The only continuous generated rim belongs to the raised island object. Room
+  perimeter walls remain visible furniture edges with dark void beyond them.
+- Checkpoint paint and banners stay across the nominal corridor. Small themed
+  colliding posts mark those corridor ends, while the invisible sensor extends
+  from the raised island or room wall to the opposite real boundary.
 - Keep corner accents larger and rarer than straight sections. Avoid even
   spacing, mirrored walls, or enough repeated pieces to read as a stadium rail.
 

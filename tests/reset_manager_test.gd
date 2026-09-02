@@ -29,6 +29,10 @@ func _run_test() -> void:
 	root.add_child(reset_manager)
 	reset_manager.set("_vehicle", vehicle)
 	reset_manager.set("_race_manager", race_manager)
+	reset_manager.valid_polygon = PackedVector2Array([Vector2(-100, -100), Vector2(100, -100), Vector2(100, 100), Vector2(-100, 100)])
+	reset_manager.invalid_polygon = PackedVector2Array([Vector2(-20, -20), Vector2(20, -20), Vector2(20, 20), Vector2(-20, 20)])
+	if not _expect(reset_manager.is_position_valid(Vector2(60, 0)) and not reset_manager.is_position_valid(Vector2.ZERO), "recovery bounds should allow the room apron while rejecting the raised island interior"):
+		return
 	if not _expect(not bool(reset_manager.call("_can_recover")), "recovery should be disabled while the race is stopped"):
 		return
 	race_manager.is_running = true
