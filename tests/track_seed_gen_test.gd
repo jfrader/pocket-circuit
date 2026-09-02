@@ -1,7 +1,7 @@
 extends SceneTree
 
-const TRACK_SEED_GEN := preload("res://tools/track_seed_gen.gd")
-const TRACK_BUILDER := preload("res://tools/track_builder_core.gd")
+const TRACK_SEED_GEN := preload("res://scripts/race/track_seed_gen.gd")
+const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const ROOM_RECT := Rect2(-940.0, -540.0, 1880.0, 1080.0)
 const HALF_WIDTH := 125.0
 const SAMPLE_SEEDS := 60

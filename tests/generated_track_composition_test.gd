@@ -1,6 +1,6 @@
 extends SceneTree
 
-const BUILDER := preload("res://tools/track_builder_core.gd")
+const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const PRESENTER := preload("res://scripts/presentation/track_variant_presenter.gd")
 
 const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
