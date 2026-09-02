@@ -4,6 +4,7 @@ const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
 const CHECKPOINTS_PER_LAP := 8
 const MAX_PHYSICS_FRAMES := 2400
 const MAX_RECOVERIES_PER_LAP := 3
+const MAX_CLUB_LAP_SECONDS := 34.0
 const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 
 
@@ -42,6 +43,7 @@ func _run_direction(theme: StringName, reverse: bool) -> bool:
 	paused = false
 
 	var checkpoint_counts: Dictionary = {}
+	var lap_times: Dictionary = {}
 	var ai_vehicles: Array[Node2D] = []
 	for racer: Node in get_nodes_in_group("race_vehicle"):
 		if racer != player and _has_ai_controller(racer):
@@ -50,6 +52,10 @@ func _run_direction(theme: StringName, reverse: bool) -> bool:
 	manager.racer_checkpoint_passed.connect(func(racer: Node2D, _checkpoint_index: int) -> void:
 		if checkpoint_counts.has(racer):
 			checkpoint_counts[racer] = int(checkpoint_counts[racer]) + 1
+	)
+	manager.racer_lap_completed.connect(func(racer: Node2D, lap: int) -> void:
+		if lap == 1 and checkpoint_counts.has(racer) and not lap_times.has(racer):
+			lap_times[racer] = float(manager.get_racer_state(racer).get("elapsed", manager.race_time))
 	)
 
 	var frame := 0
@@ -61,6 +67,18 @@ func _run_direction(theme: StringName, reverse: bool) -> bool:
 		return false
 	for racer: Node2D in ai_vehicles:
 		var controller := _get_ai_controller(racer)
+		var lap_time := float(lap_times.get(racer, INF))
+		print(
+			"AI_RACE_LAP %s %s difficulty=%s racer=%s lap_seconds=%.3f recoveries=%d"
+			% [
+				theme,
+				direction_label,
+				controller.difficulty if controller else "missing",
+				racer.name,
+				lap_time,
+				controller.recovery_count if controller else -1,
+			]
+		)
 		print(
 			"AI_RACE_STATE %s %s %s checkpoints=%d expected=%d position=%s speed=%.1f recoveries=%d recovering=%s stuck=%.2f"
 			% [
@@ -86,6 +104,12 @@ func _run_direction(theme: StringName, reverse: bool) -> bool:
 		if not _expect(
 			controller != null and controller.recovery_count <= MAX_RECOVERIES_PER_LAP,
 			"%s %s %s should not rely on repeated recovery (recoveries=%d)" % [theme, direction_label, racer.name, controller.recovery_count if controller else -1]
+		):
+			return false
+		if not _expect(
+			float(lap_times.get(racer, INF)) <= MAX_CLUB_LAP_SECONDS,
+			"%s %s %s should meet the Club Circuit pace floor (lap=%.3fs, max=%.1fs)"
+			% [theme, direction_label, racer.name, float(lap_times.get(racer, INF)), MAX_CLUB_LAP_SECONDS]
 		):
 			return false
 	print("AI_RACE_DIRECTION_PASS %s %s frames=%d checkpoints=%s" % [theme, direction_label, frame, str(checkpoint_counts.values())])

@@ -21,6 +21,7 @@ func configure(
 	collision_mask = 1
 	monitoring = true
 	monitorable = false
+	add_to_group("surface_zone")
 
 	var collision := CollisionPolygon2D.new()
 	collision.name = "SurfaceCollision"
@@ -69,6 +70,11 @@ func _on_body_exited(body: Node2D) -> void:
 func _clear_body(body: Node2D) -> void:
 	if body.has_method("clear_surface_modifier"):
 		body.call("clear_surface_modifier", get_instance_id())
+
+
+func contains_global_point(point: Vector2) -> bool:
+	var collision := get_node_or_null("SurfaceCollision") as CollisionPolygon2D
+	return collision != null and Geometry2D.is_point_in_polygon(to_local(point), collision.polygon)
 
 
 func _polygon_center(points: PackedVector2Array) -> Vector2:

@@ -5,6 +5,7 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const CONTACT_RELEASE_GRACE := 0.12
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
+const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
 
 enum ControlMode { PLAYER, EXTERNAL }
 
@@ -120,7 +121,9 @@ func set_external_controls(
 
 
 func set_external_power_multiplier(multiplier: float) -> void:
-	_external_power_multiplier = clampf(multiplier, 1.0, 1.08)
+	# External racers may accelerate up to 15% harder, but the shared speed
+	# limiter below still enforces the same 1.0x/1.2x normal/boosted caps.
+	_external_power_multiplier = clampf(multiplier, 1.0, MAX_EXTERNAL_POWER_MULTIPLIER)
 
 
 func configure_identity(driver_name: String, racer_vehicle_name: String, vehicle_id: String = "") -> void:
