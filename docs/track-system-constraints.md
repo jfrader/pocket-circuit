@@ -150,20 +150,30 @@ an AI trap.
 - Generated corridors carry exactly 32 low-alpha, non-colliding material marks
   so wood, cork, and desk-pad roads do not read as flat color. These marks are
   visual texture, not racing lines or gameplay zones.
-- Full-window themed backdrops scale and tile to the selected room bounds so
-  wider canvases do not expose black camera voids.
+- The themed floor texture is clipped to the room surface. A 760-unit #111316
+  overscan ring beyond the fully backed room walls deliberately reads as void,
+  including around wide and L-shaped canvases.
 - Generated inner and outer barriers are continuous closed
   `ConcavePolygonShape2D` segment chains on layer 2. Both contours come from the
   same round-joined 125-unit corridor offset so collision cannot bridge the
   course or leave a driveable apron across a corner. Authored inner barriers use
   the same segment-chain collision type; do not send concave islands through
   convex polygon decomposition.
+- Both physical contours have matching closed `Line2D` backing at 100% visual
+  coverage: an 18-unit themed dark bevel under a 7-unit warm highlight. These
+  visual-only lips follow the barrier metadata point-for-point at z -7/-6 and
+  are boundary objects, never painted racing lines.
 - Themed boundary art is deliberately partial. Eight deterministic sectors
-  produce exactly one open run, five one-sided runs distributed across both
-  edges, and two both-sided runs. The open run receives one flat worn-floor
-  hint rather than a barrier. Kitchen uses folded towel rails and mitts,
-  Workshop uses paint stirrers and tape, and Office uses pencils and sticky
-  notes. Never tile these assets around the full course.
+  produce exactly one open accent run, two one-sided runs, and five both-sided
+  runs. Each edge therefore receives rail accents in six sectors, an estimated
+  54% coverage, while the continuous lip supplies the collision read between
+  accents. The open run receives one flat worn-floor hint. Kitchen mixes towel,
+  spoon, chopstick, and bread-board rails; Workshop mixes paint stirrer, dowel,
+  clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
+  Never tile rail sprites around the full course.
+- All physical scenery uses the same upper-left key light: soft warm contact
+  shadows offset down-right by 8-12% of the footprint, rectangular or circular
+  to match the prop. Giants add a faint elongated down-right cast shadow.
 - Generated roots persist in the `track` group so runtime AI can discover the
   260-point `RacingLine`.
 - Collision layers remain: vehicles 1, walls/island 2, player-only scenery 4,

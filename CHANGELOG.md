@@ -50,6 +50,13 @@
 - Course boundaries read from material changes and sparse household-object runs
   that alternate between both sides, one side, and open visual sectors rather
   than enclosing the track with a repeated fence or painted race lines.
+- Every colliding course edge now has a subtle continuous raised lip, so cars no
+  longer stop against visually open floor. Denser mixed household rail accents,
+  new themed micro-details, grip marks, and giant silhouettes add variety
+  without turning the circuit into a repeating fence.
+- Props, obstacles, and giant landmarks now share shape-matched warm shadows in
+  one down-right light direction, with longer cast shadows grounding the largest
+  objects. Room perimeter walls now overlook a dark void instead of extra floor.
 - Racing-line AI now fields genuinely competitive opponents: difficulty changes
   corner pace, braking, acceleration, and boost strategy; racers anticipate bad
   surfaces, dodge every collidable course prop, and stay within the player's
