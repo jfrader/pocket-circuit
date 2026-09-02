@@ -10,10 +10,16 @@ config_version=5
 
 [application]
 
-config/name="Pocket Circuit Online"
-config/description="Tiny racing, huge world, endless garage. A top-down 2D arcade racer where tiny vehicles race through oversized everyday environments."
+config/name="Pocket Circuit"
+config/description="Tiny racing. Big stakes. Win the Grand Household Circuit before sunrise in this complete offline arcade championship."
+config/version="1.0.0"
 run/main_scene="res://scenes/boot/boot.tscn"
 config/features=PackedStringArray("4.7")
+config/icon="res://assets/branding/pocket_circuit_icon.svg"
+
+[autoload]
+
+App="*res://scripts/autoload/app.gd"
 
 [display]
 
@@ -23,7 +29,7 @@ window/stretch/mode="canvas_items"
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/godot_mcp/plugin.cfg")
+enabled=PackedStringArray("res://addons/release_export/plugin.cfg")
 
 [input]
 
@@ -78,6 +84,12 @@ look_back={
 "events": [Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":-1,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":67,"physical_keycode":0,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
 , Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":-1,"button_index":10,"pressure":0.0,"pressed":false,"script":null)
 ]
+}
+pause={
+"deadzone": 0.5,
+"events": Array[InputEvent]([Object(InputEventKey,"resource_local_to_scene":false,"resource_name":"","device":16,"window_id":0,"alt_pressed":false,"shift_pressed":false,"ctrl_pressed":false,"meta_pressed":false,"pressed":false,"keycode":0,"physical_keycode":4194305,"key_label":0,"unicode":0,"location":0,"echo":false,"script":null)
+, Object(InputEventJoypadButton,"resource_local_to_scene":false,"resource_name":"","device":0,"button_index":6,"pressure":0.0,"pressed":false,"script":null)
+])
 }
 
 [rendering]

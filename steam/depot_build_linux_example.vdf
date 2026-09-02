@@ -1,0 +1,12 @@
+"DepotBuildConfig"
+{
+    "DepotID"    "<LINUX_DEPOT_ID>"
+    "ContentRoot" "<CONTENT_ROOT>/linux"
+
+    "FileMapping"
+    {
+        "LocalPath" "*"
+        "DepotPath" "."
+        "recursive" "1"
+    }
+}

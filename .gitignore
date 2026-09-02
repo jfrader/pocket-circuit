@@ -6,22 +6,29 @@
 .uid
 
 # Godot export / build artifacts
+/builds/
 *.pck
 *.x86_64
 *.exe
 *.dmg
 *.app
 export.cfg
-export_presets.cfg
 
 # Godot MCP — local dev tool, do not commit
 addons/godot_mcp/
+
+# Gamestruments GDExtension binary (sync with tools/sync_gamestruments.sh)
+addons/gamestruments/bin/
+addons/gamestruments/*.gdextension
 
 # Editor / OS
 .DS_Store
 Thumbs.db
 *.tmp
 *.log
+__pycache__/
+*.pyc
 
 # Local run logs
 /runlogs/
+/tmp/

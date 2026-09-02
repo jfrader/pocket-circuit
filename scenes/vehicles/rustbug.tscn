@@ -1,0 +1,94 @@
+[gd_scene format=3 uid="uid://dg3wsgfax1t31"]
+
+[ext_resource type="Script" uid="uid://b1621ao3hm2ec" path="res://scripts/vehicle/vehicle_controller.gd" id="1_vsirl"]
+[ext_resource type="Texture2D" uid="uid://kwh4pao5gqcs" path="res://assets/models/vehicles/rustbug_hero.png" id="2_llb7f"]
+[ext_resource type="Texture2D" uid="uid://lmqal0f7yrfn" path="res://assets/models/vehicles/rustbug_shadow.png" id="3_8y0m5"]
+[ext_resource type="Script" uid="uid://fmjxpkxu3212" path="res://scripts/vehicle/vehicle_vfx.gd" id="4_1xam0"]
+
+[sub_resource type="CapsuleShape2D" id="CapsuleShape2D_vsirl"]
+radius = 18.0
+height = 52.0
+
+[node name="Rustbug" type="RigidBody2D" unique_id=1060070526 groups=["player_vehicle"]]
+collision_mask = 22
+gravity_scale = 0.0
+can_sleep = false
+continuous_cd = 2
+contact_monitor = true
+max_contacts_reported = 8
+script = ExtResource("1_vsirl")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=462720012]
+shape = SubResource("CapsuleShape2D_vsirl")
+
+[node name="VisualRoot" type="Node2D" parent="." unique_id=1180616441]
+
+[node name="Shadow" type="Polygon2D" parent="VisualRoot" unique_id=2147182020]
+visible = false
+position = Vector2(3, 5)
+color = Color(0.08, 0.07, 0.09, 0.5)
+polygon = PackedVector2Array(-23, 24, -25, 8, -20, -21, -12, -31, 12, -31, 20, -21, 25, 8, 23, 24)
+
+[node name="RearLeftWheel" type="Polygon2D" parent="VisualRoot" unique_id=1031740085]
+visible = false
+color = Color(0.06, 0.07, 0.09, 1)
+polygon = PackedVector2Array(-28, 6, -20, 6, -20, 22, -28, 22)
+
+[node name="RearRightWheel" type="Polygon2D" parent="VisualRoot" unique_id=1238968371]
+visible = false
+color = Color(0.06, 0.07, 0.09, 1)
+polygon = PackedVector2Array(20, 6, 28, 6, 28, 22, 20, 22)
+
+[node name="FrontLeftWheel" type="Polygon2D" parent="VisualRoot" unique_id=1276401206]
+visible = false
+color = Color(0.06, 0.07, 0.09, 1)
+polygon = PackedVector2Array(-27, -22, -19, -22, -19, -7, -27, -7)
+
+[node name="FrontRightWheel" type="Polygon2D" parent="VisualRoot" unique_id=241024418]
+visible = false
+color = Color(0.06, 0.07, 0.09, 1)
+polygon = PackedVector2Array(19, -22, 27, -22, 27, -7, 19, -7)
+
+[node name="Body" type="Polygon2D" parent="VisualRoot" unique_id=1902567890]
+visible = false
+color = Color(0.92, 0.27, 0.12, 1)
+polygon = PackedVector2Array(-22, 24, -24, 10, -20, -20, -12, -31, 12, -31, 20, -20, 24, 10, 22, 24)
+
+[node name="HoodStripe" type="Polygon2D" parent="VisualRoot" unique_id=1438105861]
+visible = false
+color = Color(1, 0.72, 0.18, 1)
+polygon = PackedVector2Array(-4, -31, 5, -31, 6, -10, -5, -10)
+
+[node name="Windshield" type="Polygon2D" parent="VisualRoot" unique_id=417136460]
+visible = false
+color = Color(0.23, 0.58, 0.66, 1)
+polygon = PackedVector2Array(-14, -11, 14, -11, 16, 2, -16, 2)
+
+[node name="RearDeck" type="Polygon2D" parent="VisualRoot" unique_id=322195910]
+visible = false
+color = Color(0.55, 0.12, 0.08, 1)
+polygon = PackedVector2Array(-17, 7, 17, 7, 18, 19, -18, 19)
+
+[node name="LeftHeadlight" type="Polygon2D" parent="VisualRoot" unique_id=337114700]
+visible = false
+color = Color(1, 0.94, 0.58, 1)
+polygon = PackedVector2Array(-14, -29, -7, -31, -7, -26, -13, -24)
+
+[node name="RightHeadlight" type="Polygon2D" parent="VisualRoot" unique_id=400460571]
+visible = false
+color = Color(1, 0.94, 0.58, 1)
+polygon = PackedVector2Array(7, -31, 14, -29, 13, -24, 7, -26)
+
+[node name="CarSprite" type="Sprite2D" parent="VisualRoot" unique_id=47377684]
+scale = Vector2(0.09, 0.09)
+texture = ExtResource("2_llb7f")
+
+[node name="ShadowSprite" type="Sprite2D" parent="VisualRoot" unique_id=90864945]
+modulate = Color(1, 1, 1, 0.72)
+z_index = -1
+position = Vector2(3, 5)
+scale = Vector2(0.09, 0.09)
+texture = ExtResource("3_8y0m5")
+
+[node name="VFX" type="Node2D" parent="." unique_id=843684054]
+script = ExtResource("4_1xam0")

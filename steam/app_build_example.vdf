@@ -1,0 +1,15 @@
+"appbuild"
+{
+    "appid"        "<STEAM_APP_ID>"
+    "desc"         "Pocket Circuit 1.0.0 release candidate"
+    "buildoutput"  "<CONTENT_ROOT>/steam-output"
+    "contentroot"  "<CONTENT_ROOT>"
+    "setlive"      ""
+    "preview"      "1"
+
+    "depots"
+    {
+        "<WINDOWS_DEPOT_ID>" "<WINDOWS_DEPOT_CONFIG>"
+        "<LINUX_DEPOT_ID>"   "<LINUX_DEPOT_CONFIG>"
+    }
+}

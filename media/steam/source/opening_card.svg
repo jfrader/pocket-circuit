@@ -1,0 +1,93 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="1080" viewBox="0 0 1920 1080">
+
+    <defs>
+      <linearGradient id="night" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0" stop-color="#111827"/>
+        <stop offset="0.56" stop-color="#19243B"/>
+        <stop offset="1" stop-color="#273855"/>
+      </linearGradient>
+      <linearGradient id="titleFade" x1="0" y1="0" x2="1" y2="0">
+        <stop offset="0" stop-color="#111827" stop-opacity="0.98"/>
+        <stop offset="0.68" stop-color="#111827" stop-opacity="0.72"/>
+        <stop offset="1" stop-color="#111827" stop-opacity="0"/>
+      </linearGradient>
+      <linearGradient id="titleFadeVertical" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0" stop-color="#FFFFFF"/>
+        <stop offset="0.68" stop-color="#FFFFFF"/>
+        <stop offset="1" stop-color="#000000"/>
+      </linearGradient>
+      <mask id="titleMask"><rect width="100%" height="100%" fill="url(#titleFadeVertical)"/></mask>
+      <radialGradient id="sun" cx="50%" cy="50%" r="50%">
+        <stop offset="0" stop-color="#FFE7A0" stop-opacity="0.95"/>
+        <stop offset="0.55" stop-color="#F4BF3A" stop-opacity="0.55"/>
+        <stop offset="1" stop-color="#F4BF3A" stop-opacity="0"/>
+      </radialGradient>
+      <filter id="shadow" x="-60%" y="-60%" width="220%" height="220%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="10"/>
+        <feOffset dx="0" dy="12" result="offsetblur"/>
+        <feComponentTransfer><feFuncA type="linear" slope="0.45"/></feComponentTransfer>
+        <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+      </filter>
+      <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+        <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#FFFFFF" stroke-opacity="0.035" stroke-width="2"/>
+      </pattern>
+    </defs>
+
+    <rect width="1920" height="1080" fill="url(#night)"/>
+    <rect width="1920" height="1080" fill="url(#grid)"/>
+    <circle cx="1612.8" cy="21.6" r="594.0" fill="url(#sun)"/>
+    <path d="M -153.6 777.6 C 307.2 410.4, 806.4 1004.4, 1171.2 626.4 S 1536.0 172.8, 2073.6 367.2" fill="none" stroke="#0B1220" stroke-width="345.6" stroke-linecap="round"/>
+    <path d="M -153.6 777.6 C 307.2 410.4, 806.4 1004.4, 1171.2 626.4 S 1536.0 172.8, 2073.6 367.2" fill="none" stroke="#F4E8D0" stroke-width="270.0" stroke-linecap="round"/>
+    <path d="M -153.6 777.6 C 307.2 410.4, 806.4 1004.4, 1171.2 626.4 S 1536.0 172.8, 2073.6 367.2" fill="none" stroke="#E96B4C" stroke-width="19.4" stroke-dasharray="59.4 48.6" stroke-linecap="round"/>
+
+    <g opacity="0.95">
+      <circle cx="1459.2" cy="216.0" r="140.4" fill="#E8DFCF" stroke="#55A8C9" stroke-width="19.4"/>
+      <circle cx="1459.2" cy="216.0" r="98.3" fill="#27344A"/>
+      <path d="M 1565.9 152.8 Q 1690.9 216.0 1565.9 279.2" fill="none" stroke="#E8DFCF" stroke-width="54.0" stroke-linecap="round"/>
+      <g transform="translate(1459.2 810.0) rotate(-9)">
+        <rect x="-259.2" y="-102.6" width="518.4" height="205.2" rx="19.4" fill="#D9DDE4" stroke="#7A8595" stroke-width="13.0"/>
+        <g fill="#5D687A">
+          <rect x="-205.2" y="-59.4" width="70.2" height="54.0" rx="4"/>
+          <rect x="-102.6" y="-59.4" width="70.2" height="54.0" rx="4"/>
+          <rect x="0" y="-59.4" width="70.2" height="54.0" rx="4"/>
+          <rect x="102.6" y="-59.4" width="70.2" height="54.0" rx="4"/>
+        </g>
+      </g>
+      <g transform="translate(249.6 842.4) rotate(16)">
+        <rect x="-226.8" y="-54.0" width="453.6" height="108.0" rx="16.2" fill="#F4BF3A"/>
+        <g stroke="#111827" stroke-width="8.6">
+          <path d="M -172.8 -54.0 V 10.8"/>
+          <path d="M -86.4 -54.0 V 21.6"/>
+          <path d="M 0 -54.0 V 10.8"/>
+          <path d="M 86.4 -54.0 V 21.6"/>
+        </g>
+      </g>
+    </g>
+
+
+    <g transform="translate(1017.6 723.6) rotate(-63.0)" filter="url(#shadow)">
+      <g opacity="0.5" stroke="#FFF8E8" stroke-width="13.3" stroke-linecap="round">
+        <path d="M -60.5 226.6 L -103.7 438.6"/>
+        <path d="M 60.5 226.6 L 103.7 438.6"/>
+      </g>
+      <rect x="-133.9" y="-124.3" width="51.8" height="153.5" rx="21.6" fill="#11151F"/>
+      <rect x="82.1" y="-124.3" width="51.8" height="153.5" rx="21.6" fill="#11151F"/>
+      <rect x="-133.9" y="47.5" width="51.8" height="153.5" rx="21.6" fill="#11151F"/>
+      <rect x="82.1" y="47.5" width="51.8" height="153.5" rx="21.6" fill="#11151F"/>
+      <path d="M -90.7 168.1 Q -108.0 0 -54.0 -175.5 Q 0 -255.9 54.0 -175.5 Q 108.0 0 90.7 168.1 Q 0 237.6 -90.7 168.1 Z" fill="#E96B4C" stroke="#FFF8E8" stroke-width="11.6"/>
+      <path d="M -58.3 -80.4 Q 0 -153.5 58.3 -80.4 L 43.2 29.2 L -43.2 29.2 Z" fill="#55A8C9" stroke="#111827" stroke-width="8.3"/>
+      <rect x="-11.9" y="-204.7" width="23.8" height="383.8" rx="10.8" fill="#F4BF3A"/>
+      <circle cx="-51.8" cy="-175.5" r="17.3" fill="#FFF8E8"/>
+      <circle cx="51.8" cy="-175.5" r="17.3" fill="#FFF8E8"/>
+    </g>
+
+    <rect x="0" y="0" width="1420.8" height="388.8" fill="url(#titleFade)" mask="url(#titleMask)"/>
+
+        <g transform="translate(105.6 205.2)">
+          <rect x="0" y="-85.5" width="21.4" height="21.4" rx="4.2" fill="#F4BF3A" transform="rotate(45 10.7 -74.8)"/>
+          <text x="32.1" y="0" fill="#FFF8E8" stroke="#111827" stroke-width="4.2" paint-order="stroke" font-family="DejaVu Sans, sans-serif" font-size="118.8" font-weight="900" letter-spacing="2.1">POCKET / CIRCUIT</text>
+        </g>
+
+    <text x="115.2" y="972.0" fill="#FFF8E8" font-family="DejaVu Sans, sans-serif" font-size="41.0" font-weight="700" letter-spacing="8.6">TINY RACING. BIG STAKES.</text>
+    <rect x="0" y="0" width="1920" height="1080" fill="none" stroke="#F4BF3A" stroke-width="13.0"/>
+    </svg>

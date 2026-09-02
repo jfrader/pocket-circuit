@@ -1,0 +1,126 @@
+extends SceneTree
+
+const BOOT_SCENE := preload("res://scenes/boot/boot.tscn")
+const RACE_SCENE := preload("res://scenes/race/prototype_race.tscn")
+
+
+func _initialize() -> void:
+	call_deferred("_run_test")
+
+
+func _run_test() -> void:
+	var app := root.get_node_or_null("App")
+	if not _expect(app != null, "App autoload should be available"):
+		return
+	var boot := BOOT_SCENE.instantiate()
+	root.add_child(boot)
+	current_scene = boot
+	await _wait_frames(3)
+	var shell := app.get("_shell") as CanvasLayer
+	if not _expect(shell != null and String(shell.get("_screen")) == "title", "boot should focus the controller-safe title screen"):
+		return
+	await _tap_joypad_button(0)
+	if not _expect(String(shell.get("_screen")) == "map", "gamepad A should activate the focused New Championship button"):
+		return
+	await _tap_joypad_button(1)
+	if not _expect(String(shell.get("_screen")) == "title", "gamepad B should navigate back from the championship map"):
+		return
+	await _tap_joypad_button(12)
+	await _tap_joypad_button(14)
+	var focused_title_action := root.get_viewport().gui_get_focus_owner() as Button
+	if not _expect(focused_title_action != null and focused_title_action.text == "QUICK RACE", "controller navigation should focus Quick Race before it is accepted"):
+		return
+	await _tap_joypad_button(0)
+	await _wait_until(func() -> bool: return String(shell.get("_screen")) == "quick_race", 30)
+	if not _expect(bool(shell.get("_quick_race")), "gamepad A should open the Quick Race builder"):
+		return
+	await _wait_until(func() -> bool: return root.get_viewport().gui_get_focus_owner() != null, 30)
+	await _tap_action(&"ui_down")
+	await _tap_action(&"ui_down")
+	await _wait_until(func() -> bool:
+		var focused := root.get_viewport().gui_get_focus_owner() as Button
+		return focused != null and focused.text == "PLAY"
+	, 30)
+	var focused_play_action := root.get_viewport().gui_get_focus_owner() as Button
+	if not _expect(focused_play_action != null and focused_play_action.text == "PLAY", "controller navigation should reach PLAY in Quick Race"):
+		return
+	await _tap_joypad_button(0)
+	await _wait_until(func() -> bool: return current_scene != null and current_scene.scene_file_path == RACE_SCENE.resource_path, 60)
+	var race := current_scene
+	var session: Dictionary = app.call("get_current_race_session")
+	if not _expect(
+			race != null
+			and race.scene_file_path == RACE_SCENE.resource_path
+			and String(session.get("mode", "")) == "quick"
+			and String(session.get("event_id", "")).begins_with("circuit_")
+			and String(session.get("event", {}).get("circuit", "")) == "generated",
+			"accepting PLAY should load a generated Quick Race and keep the tree alive"
+	):
+		return
+	await _wait_until(func() -> bool: return race.get("_pause_overlay") != null and bool(race.get("_countdown_active")), 60)
+	await _tap_joypad_button(6)
+	var pause_overlay := race.get("_pause_overlay") as Control
+	if not _expect(paused and pause_overlay.visible, "gamepad Start should pause during the countdown"):
+		return
+	await _tap_joypad_button(12)
+	await _tap_joypad_button(0)
+	var settings_panel := race.get("_pause_settings_panel") as Control
+	var menu_panel := race.get("_pause_menu_panel") as Control
+	if not _expect(paused and settings_panel.visible and not menu_panel.visible, "pause Settings should open without resuming the race"):
+		return
+	await _tap_joypad_button(1)
+	if not _expect(paused and not settings_panel.visible and menu_panel.visible, "gamepad B should return from race Settings to the pause menu"):
+		return
+	await _tap_joypad_button(1)
+	if not _expect(not paused and not pause_overlay.visible, "gamepad B should resume from the pause menu"):
+		return
+	root.remove_child(race)
+	race.free()
+	current_scene = null
+	print("CONTROLLER_FLOW_TEST PASS")
+	quit(0)
+
+
+func _tap_action(action: StringName) -> void:
+	var event := InputEventAction.new()
+	event.action = action
+	event.pressed = true
+	Input.parse_input_event(event)
+	await process_frame
+	event = event.duplicate()
+	event.pressed = false
+	Input.parse_input_event(event)
+	await process_frame
+
+
+func _tap_joypad_button(button_index: int) -> void:
+	var event := InputEventJoypadButton.new()
+	event.button_index = button_index
+	event.pressed = true
+	Input.parse_input_event(event)
+	await process_frame
+	event = event.duplicate()
+	event.pressed = false
+	Input.parse_input_event(event)
+	await process_frame
+
+
+func _wait_frames(count: int) -> void:
+	for frame in count:
+		await process_frame
+
+
+func _wait_until(condition: Callable, max_frames: int) -> void:
+	for frame in max_frames:
+		if bool(condition.call()):
+			return
+		await process_frame
+
+
+func _expect(condition: bool, message: String) -> bool:
+	if condition:
+		return true
+	paused = false
+	push_error("CONTROLLER_FLOW_TEST FAIL: " + message)
+	quit(1)
+	return false
