@@ -67,11 +67,14 @@ rooms, route geometry, palette, interface, and story.
 - Kitchen props are oversized, friendly, and readable from directly above.
   Details are broad shapes, not thin linework.
 - Micro details such as crumbs, fibers, droplets, scratches, and wood grain use
-  low contrast and never compete with the racing line.
+  low contrast and never compete with the racing line. These painted/material
+  marks remain flat; recognizable loose hardware is physical even at micro scale.
 - One to three giant landmarks per generated room establish the tiny-car scale.
   Their 300-600-unit silhouettes use broad color masses, footprint-matched
-  contact shadows, longer down-right cast shadows, and enough breathing room to
-  remain readable without covering the corridor.
+  contact shadows, longer down-right cast shadows, full trimmed-footprint
+  collision, and enough breathing room to remain readable without covering the
+  corridor. If an object reads raised or solid, its center and extremities must
+  stop a car; only art that reads painted onto the ground may be drive-over.
 
 ## Track Composition
 
@@ -100,8 +103,9 @@ rooms, route geometry, palette, interface, and story.
   corridor. Decals communicate the surface before handling changes, and they
   stay clear of the start, finish, checkpoints, and designed surface moments.
 - Giant landmarks use Kitchen food and utensils, Workshop sports and tool
-  silhouettes, or Office desk objects. At least one is physical scenery while
-  every placement stays clear of route and checkpoint safety space.
+  silhouettes, or Office desk objects. Every giant is physical scenery with a
+  collider covering its visible center and ends, while every placement stays
+  clear of route and checkpoint safety space.
 
 ## Asset Plan
 
@@ -175,7 +179,7 @@ fibers, hardware, worn-floor hints, and subtle material patterning, and from
   colliders fit inside their visible footprints. Kitchen mixes folded towel,
   spoon, chopstick, and bread-board rails; Workshop mixes paint stirrer, dowel,
   clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
-  Corner mitt, tape, and sticky-note accents remain rare and may be visual-only.
+  Corner mitt, tape, and sticky-note accents remain rare, visible physical props.
 - Bare floor between those assets is intentionally open and drivable. Never add
   a continuous outer collider, invisible corridor edge, or visual bevel that
   implies one.

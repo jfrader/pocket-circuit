@@ -101,14 +101,19 @@ their original unscaled canvases.
   desk-pad anchors across distinct room sectors. They are non-colliding
   `Sprite2D` presentation and never become gameplay surfaces or barriers.
 - Floor details add 60-120 small non-colliding themed decals to large blank
-  areas. Another 60-150 non-colliding micro sprites dress the corridor edges
-  and apron. Ambient props, ground sections, and both detail layers stay inside
-  the room and outside the protected route corridor and recovery lanes.
+  areas. Another 60-150 micro details dress the corridor edges and apron:
+  painted crumbs, fibers, droplets, grain, and sawdust stay flat, while visible
+  hardware such as screws, clips, pins, and washers uses small footprint-matched
+  scenery collision. Ambient props, ground sections, and both detail layers stay
+  inside the room and outside the protected route corridor and recovery lanes.
 - Every generated room places 1-3 giant household landmarks at 300-600 world
-  units. At least one has scenery collision on layers 4 and 16; every footprint
-  remains inside the room and clear of the corridor, gates, and other props.
-- Asset dimensions and collider shapes come from `PROP_SHAPES`. Generated
-  story props must use transparent PNG textures, never opaque JPG rectangles.
+  units. Every giant has scenery collision on layers 4 and 16; its collider uses
+  at least 90% of the trimmed visible footprint and remains inside the room and
+  clear of the corridor, gates, and other props.
+- Asset dimensions and collider kinds come from the explicit SOLID roster in
+  `PROP_SHAPES`; giant placement and collision use each texture's trimmed alpha
+  footprint. Generated story props must use transparent PNG textures, never
+  opaque JPG rectangles.
 - Trackside placement must remain clear of checkpoint recovery corridors:
   230 units along the route and 48 units across it, plus the prop radius.
 
@@ -161,6 +166,16 @@ an AI trap.
   corridor and drive across the room apron wherever no real visible asset is
   present. Collision belongs only to visible household props, rail sections,
   hazards, giants, the raised island, gate posts, and room perimeter walls.
+- Generated collision-bearing visuals declare `SOLID` metadata, while audited
+  drive-over dressing declares `FLAT`. `SOLID` means the owning `StaticBody2D`
+  is on a vehicle-visible layer (`2`, `4`, or
+  `16`) and its circle, local rotated rectangle, or composed shape covers the
+  visible center and ends. Circular colliders reach at least 90% of the visible
+  radius; rectangular coverage reaches at least 90% of the trimmed sprite AABB.
+  `FLAT` means presentation only and never owns collision: floor decals, broad
+  cloth/paper/cardboard ground sections, corridor material patterns, surface
+  tints and grip decals, worn-floor hints, shadows, and checker paint. Solid
+  objects must never use a sprite-only placement path.
 - The island is one visibly raised solid object. Its closed layer-2
   `ConcavePolygonShape2D` segment chain follows the same points as a dark
   side-face, tiled theme edge, and warm top lip. Two to four small visible
@@ -172,7 +187,8 @@ an AI trap.
   run receives only one flat non-colliding worn-floor hint. Kitchen mixes towel,
   spoon, chopstick, and bread-board rails; Workshop mixes paint stirrer, dowel,
   clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
-  An empty run means open drivable apron, never hidden collision.
+  Their corner accents are solid boundary props too. An empty run means open
+  drivable apron, never hidden collision.
 - Every ordered checkpoint `Area2D` spans the complete available room
   cross-section at its station: the first raised-island or room-wall boundary
   hit in each normal direction. The checkpoint recovery anchor remains on the
@@ -223,18 +239,19 @@ an AI trap.
 Run after generator, builder, surface, collision, or AI changes:
 
 1. `godot --headless --path . --script res://tests/track_seed_gen_test.gd`
-2. `godot --headless --path . --script res://tests/generated_track_composition_test.gd`
-3. `godot --headless --path . --script res://tests/generated_race_runtime_test.gd`
-4. Representative family/room seeds through `tests/theme_ai_harness.gd` in
+2. `godot --headless --path . --script res://tests/asset_collision_integrity_test.gd`
+3. `godot --headless --path . --script res://tests/generated_track_composition_test.gd`
+4. `godot --headless --path . --script res://tests/generated_race_runtime_test.gd`
+5. Representative family/room seeds through `tests/theme_ai_harness.gd` in
    both directions using `PC_THEME`, `PC_ROOM`, `PC_SEED`, and
    `PC_DIRECTION=both`; set `PC_DIFFICULTY` to `sunday_drive`, `club_circuit`,
    or `clockwork` when comparing presets.
-5. `godot --headless --path . --script res://tests/ai_race_smoke_test.gd` for
+6. `godot --headless --path . --script res://tests/ai_race_smoke_test.gd` for
    the three authored regression tracks.
-6. A broad theme x room x seed construction stress matrix after geometry or
+7. A broad theme x room x seed construction stress matrix after geometry or
    composition changes.
-7. Direct runtime captures for all six route families after visual changes.
-8. `tools/build_release.sh <clean-output-directory>` for the authoritative
+8. Direct runtime captures for all six route families after visual changes.
+9. `tools/build_release.sh <clean-output-directory>` for the authoritative
    import, complete test suite, scene smokes, native exports, packaged Linux
    smoke, and PCK inspection.
 

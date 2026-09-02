@@ -69,6 +69,9 @@
 
 ### Fixed
 
+- Every solid generated object now stops cars across its visible footprint,
+  including giant hammers, wrenches, utensils, desk props, and boundary accents;
+  only ground-painted art remains drive-over.
 - Generated circuits no longer stop cars against invisible corridor walls.
   Every generated collider is backed by a visible prop, rail, raised-island
   rim, gate post, hazard, giant landmark, or room wall.

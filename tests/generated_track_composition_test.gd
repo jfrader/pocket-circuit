@@ -397,12 +397,12 @@ func _check_open_boundary_assets(track: Node2D, theme: StringName, seed: int) ->
 		if not _expect(load(section_asset) is Texture2D, "%s boundary rail should be a tracked loadable asset: %s" % [label, section_asset]):
 			return false
 	var sections: Array[StaticBody2D] = []
-	var accents: Array[Sprite2D] = []
+	var accents: Array[StaticBody2D] = []
 	for child: Node in visuals.get_children():
 		if child.name.contains("Section") and child is StaticBody2D:
 			sections.append(child as StaticBody2D)
-		elif child.name.begins_with("CornerAccent") and child is Sprite2D:
-			accents.append(child as Sprite2D)
+		elif child.name.begins_with("CornerAccent") and child is StaticBody2D:
+			accents.append(child as StaticBody2D)
 	if not _expect(sections.size() == int(visuals.get_meta("section_count", 0)) and sections.size() >= 24 and sections.size() <= 84, "%s should retain extended but partial real-asset rail sections (count=%d)" % [label, sections.size()]):
 		return false
 	if not _expect(accents.size() == int(visuals.get_meta("accent_count", 0)) and accents.size() in [1, 2], "%s should retain one or two visual corner-mouth accents" % label):
@@ -447,8 +447,10 @@ func _check_open_boundary_assets(track: Node2D, theme: StringName, seed: int) ->
 		return false
 	if not _expect(visuals.find_children("EmptyRunHint", "Sprite2D", false, false).size() == 1, "%s should mark its open sector with one flat worn-floor hint" % label):
 		return false
-	for accent: Sprite2D in accents:
-		if not _expect(accent.texture != null and StringName(accent.get_meta("boundary_kind", &"")) == &"corner_mouth_accent", "%s corner accents should remain readable non-colliding art" % label):
+	for accent: StaticBody2D in accents:
+		var sprite := accent.get_node_or_null("Sprite") as Sprite2D
+		var collision := accent.get_node_or_null("AssetCollision") as CollisionShape2D
+		if not _expect(sprite != null and sprite.texture != null and collision != null and accent.collision_layer == 16 and StringName(accent.get_meta("boundary_kind", &"")) == &"corner_mouth_accent" and StringName(accent.get_meta("collision_contract", &"")) == BUILDER.COLLISION_SOLID, "%s physical corner accents should be footprint-matched visible boundary props" % label):
 			return false
 	return _expect(_has_clear_open_apron_path(track, visuals, centerline), "%s open sector should expose a collider-free path from the racing corridor into the room apron" % label)
 
@@ -540,7 +542,7 @@ func _static_body_has_visible_backing(body: StaticBody2D) -> bool:
 		if descendant is Polygon2D or descendant is Line2D:
 			return true
 	var shared_visual := body.get_parent().get_node_or_null("Sprite") as Sprite2D if body.get_parent() else null
-	if body.position.is_zero_approx() and shared_visual != null and shared_visual.texture != null:
+	if shared_visual != null and shared_visual.texture != null and StringName(shared_visual.get_meta("collision_contract", &"")) == BUILDER.COLLISION_SOLID and String(shared_visual.get_meta("asset_path", "")) == String(body.get_meta("asset_path", "")):
 		return true
 	return false
 
@@ -638,13 +640,22 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 
 	var edge_decor := track.get_node_or_null("GeneratedMoments/EdgeApronDecor")
 	var edge_count := int(edge_decor.get_meta("placed_count", 0)) if edge_decor else 0
-	if not _expect(edge_decor != null and edge_count >= 60 and edge_count <= 150 and edge_decor.get_child_count() == edge_count, "%s should place 60-150 non-colliding edge and apron details (got %d)" % [label, edge_count]):
+	if not _expect(edge_decor != null and edge_count >= 60 and edge_count <= 150 and edge_decor.get_child_count() == edge_count, "%s should place 60-150 classified edge and apron details (got %d)" % [label, edge_count]):
 		return false
 	for decor: Node in edge_decor.get_children():
-		if not _expect(decor is Sprite2D and not decor is CollisionObject2D, "%s edge decor should remain non-colliding Sprite2D presentation" % label):
-			return false
-		var sprite := decor as Sprite2D
-		if not _expect(Geometry2D.is_point_in_polygon(sprite.position, room_polygon) and _minimum_point_distance(sprite.position, centerline) >= BUILDER.HALF_WIDTH + 8.0, "%s edge decor should stay inside the room and outside the drivable corridor" % label):
+		var sprite := decor as Sprite2D if decor is Sprite2D else decor.get_node_or_null("Sprite") as Sprite2D
+		var contract := StringName(decor.get_meta("collision_contract", &""))
+		if decor is StaticBody2D:
+			if not _expect(contract == BUILDER.COLLISION_SOLID and not decor.find_children("*", "CollisionShape2D", true, false).is_empty(), "%s solid-looking edge objects should carry physical scenery collision" % label):
+				return false
+			var clearance_radius := float(decor.get_meta("placement_clearance_radius", 0.0))
+			if not _expect(clearance_radius > 0.0 and _minimum_point_distance((decor as Node2D).position, centerline) >= BUILDER.HALF_WIDTH + clearance_radius + 4.0 and BUILDER._inside_polygon_with_radius((decor as Node2D).position, clearance_radius, room_polygon), "%s solid edge object footprint should stay outside the corridor and inside the room" % label):
+				return false
+		else:
+			if not _expect(decor is Sprite2D and contract == BUILDER.COLLISION_FLAT and not decor is CollisionObject2D, "%s painted edge details should remain explicitly FLAT presentation" % label):
+				return false
+		var decor_position := (decor as Node2D).position
+		if not _expect(sprite != null and Geometry2D.is_point_in_polygon(decor_position, room_polygon) and _minimum_point_distance(decor_position, centerline) >= BUILDER.HALF_WIDTH + 8.0, "%s edge decor should stay inside the room and outside the drivable corridor" % label):
 			return false
 
 	var giants := track.get_node_or_null("GeneratedMoments/GiantLandmarks")
@@ -664,7 +675,8 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 			var checkpoint := track.get_node_or_null("Checkpoint0Finish" if checkpoint_index == 0 else "Checkpoint%d" % checkpoint_index) as Node2D
 			if checkpoint:
 				gate_samples.append(checkpoint.position)
-		if not _expect(BUILDER._giant_placement_is_safe(landmark.position, footprint_size, shape_kind, landmark.rotation, room_polygon, centerline, gate_samples, []), "%s giant landmark footprint should stay inside the room and clear of the corridor, walls, and gates" % label):
+		var footprint_rotation := float(landmark.get_meta("footprint_rotation", 0.0))
+		if not _expect(BUILDER._giant_placement_is_safe(landmark.position, footprint_size, shape_kind, landmark.rotation + footprint_rotation, room_polygon, centerline, gate_samples, []), "%s giant landmark footprint should stay inside the room and clear of the corridor, walls, and gates" % label):
 			return false
 		var contact_shadow := landmark.get_node_or_null("ContactShadow") as Sprite2D
 		var cast_shadow := landmark.get_node_or_null("CastShadow") as Sprite2D
@@ -676,9 +688,9 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 		if body:
 			colliding_giants += 1
 			var collision := body.get_child(0) as CollisionShape2D if body.get_child_count() > 0 else null
-			if not _expect(body.collision_layer == (4 | 16) and collision != null and collision.shape != null, "%s colliding giant should expose a valid scenery shape" % label):
+			if not _expect(body.collision_layer == (4 | 16) and StringName(body.get_meta("collision_contract", &"")) == BUILDER.COLLISION_SOLID and collision != null and collision.shape != null, "%s colliding giant should expose a valid SOLID scenery shape" % label):
 				return false
-	if not _expect(colliding_giants >= 1, "%s should include at least one colliding giant landmark" % label):
+	if not _expect(colliding_giants == giant_count, "%s every giant landmark should be SOLID physical scenery" % label):
 		return false
 	return true
 
