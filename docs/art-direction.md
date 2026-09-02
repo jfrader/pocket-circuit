@@ -2,9 +2,9 @@
 
 ## Visual Thesis
 
-A hand-illustrated Saturday-morning cartoon kitchen counter where chunky toy
-cars race through oversized friendly objects under soft cel-shaded light,
-with a readable dark track, strong inked silhouettes, warm materials, and
+A hand-illustrated Saturday-morning cartoon household where chunky toy cars
+race through oversized friendly objects under soft cel-shaded light, with a
+readable material track, strong inked silhouettes, warm surfaces, and dense
 small details that sell the miniature scale.
 
 This is a top-down 2D game. Visuals must read while rotating at speed and at
@@ -61,6 +61,9 @@ rooms, route geometry, palette, interface, and story.
   Details are broad shapes, not thin linework.
 - Micro details such as crumbs, fibers, droplets, scratches, and wood grain use
   low contrast and never compete with the racing line.
+- One to three giant landmarks per generated room establish the tiny-car scale.
+  Their 300-600-unit silhouettes use broad color masses, contact shadows, and
+  enough breathing room to remain readable without covering the corridor.
 
 ## Track Composition
 
@@ -73,6 +76,22 @@ rooms, route geometry, palette, interface, and story.
 - Left technical: ruler and spoon create long graphic directional forms.
 - Fruit cluster: apple and lime add color and scale detail.
 - The outer counter edge reads as a dangerous drop into the dark kitchen void.
+
+### Generated Room Density
+
+- Generated rooms layer density by scale: 1-3 giant household landmarks,
+  authored story clusters, 2-4 broad ground anchors, 60-120 low-contrast floor
+  details, and 60-150 tiny non-colliding edge/apron details.
+- Edge details sit close enough to both sides of the corridor to prevent empty
+  floor bands, but remain outside the drivable area and recovery lanes.
+- Thirty-two faint material marks break up each generated corridor. They read
+  as wood grain, cork, or desk-pad texture rather than painted racing lines.
+- Four to eight readable grip patches add themed material changes inside the
+  corridor. Decals communicate the surface before handling changes, and they
+  stay clear of the start, finish, checkpoints, and designed surface moments.
+- Giant landmarks use Kitchen food and utensils, Workshop sports and tool
+  silhouettes, or Office desk objects. At least one is physical scenery while
+  every placement stays clear of route and checkpoint safety space.
 
 ## Asset Plan
 
@@ -112,6 +131,18 @@ rooms, route geometry, palette, interface, and story.
 - `kitchen_start_stripe_decal.png`
 - `kitchen_skid_mark.png`
 
+Generated tracks also draw from `assets/textures/edge_dressing/` for crumbs,
+fibers, hardware, worn-floor hints, and subtle material patterning, and from
+`assets/textures/grip_patches/` for readable surface decals.
+
+### Generated Giant Landmarks
+
+- Kitchen: cereal box, mug, watermelon, and fork.
+- Workshop: basketball, toolbox, paint can, and watermelon.
+- Office: keyboard, monitor, paper stack, and pen.
+- These original top-down sprites live in `assets/textures/giant_props/` and
+  are rendered at 300-600 world units rather than ordinary prop scale.
+
 ### Ambient Ground Dressing
 
 - Place two to four broad anchors in otherwise empty room sectors, using cloth,
@@ -126,9 +157,10 @@ rooms, route geometry, palette, interface, and story.
 
 ### Generated Course Boundaries
 
-- Preserve negative space: a generated lap mixes short both-sided barrier
-  moments, one-sided runs, and several sectors with no barrier props at all.
-  Never wrap a repeated fence around the complete inner or outer edge.
+- Preserve controlled negative space: each generated lap has two short
+  both-sided barrier moments, five one-sided runs, and one open visual sector
+  marked only by a flat worn-floor hint. Never wrap a repeated fence around the
+  complete inner or outer edge.
 - Kitchen boundary runs use folded blue towel rails with occasional oven-mitt
   accents. Workshop uses paint-stirrer rails with tape-roll accents. Office uses
   yellow pencil rails with sticky-note accents.

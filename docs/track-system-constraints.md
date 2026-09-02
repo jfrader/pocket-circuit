@@ -98,9 +98,13 @@ their original unscaled canvases.
 - Ground sections add 2-4 broad, theme-specific cloth, paper, cardboard, or
   desk-pad anchors across distinct room sectors. They are non-colliding
   `Sprite2D` presentation and never become gameplay surfaces or barriers.
-- Floor details add 12-20 non-colliding themed decals to large blank areas.
-  Ambient props, ground sections, and decals stay inside the room and outside
-  the protected route corridor.
+- Floor details add 60-120 small non-colliding themed decals to large blank
+  areas. Another 60-150 non-colliding micro sprites dress the corridor edges
+  and apron. Ambient props, ground sections, and both detail layers stay inside
+  the room and outside the protected route corridor and recovery lanes.
+- Every generated room places 1-3 giant household landmarks at 300-600 world
+  units. At least one has scenery collision on layers 4 and 16; every footprint
+  remains inside the room and clear of the corridor, gates, and other props.
 - Asset dimensions and collider shapes come from `PROP_SHAPES`. Generated
   story props must use transparent PNG textures, never opaque JPG rectangles.
 - Trackside placement must remain clear of checkpoint recovery corridors:
@@ -119,14 +123,20 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 - `ShortcutDecision`: a visibly decaled inside lane that is geometrically
   shorter and at least 1.06x faster, but has lower grip. The outer lane remains
   longer and safe for every vehicle build.
+- Four to eight additional `patch` surface definitions add deterministic
+  themed grip and speed changes. They remain inside the corridor and clear of
+  every gate and the two designed surface moments. `TrackVariantPresenter`
+  remains the only creator of authoritative runtime `SurfaceZone` nodes.
 - `SpeedSection`: the unobstructed start/finish straight.
 - `DramaticFinish`: clear forward and reverse run-ups ending at the full-width
   checker gate.
 
 `generated_moment_indices`, `generated_hazard_paths`, and
 `generated_surfaces` expose these contracts for runtime presentation and tests.
-The generated racing line deliberately takes the safe outer lane through the
-shortcut window; the shortcut remains a player choice rather than an AI trap.
+The surface array contains the technical moment, shortcut, and 4-8 grip
+patches. The generated racing line deliberately takes the safe outer lane
+through the shortcut window; the shortcut remains a player choice rather than
+an AI trap.
 
 ## Visual and Collision Language
 
@@ -136,7 +146,10 @@ shortcut window; the shortcut remains a player choice rather than an AI trap.
 - Generated routes use the themed `TrackSurface` directly and must not add the
   old `TrackRibbon`, whose triangulation produced artifacts in concave routes.
 - Surface gameplay polygons remain visually transparent. Their themed decals
-  show the technical section and risky shortcut lane.
+  show the technical section, risky shortcut lane, and extra grip patches.
+- Generated corridors carry exactly 32 low-alpha, non-colliding material marks
+  so wood, cork, and desk-pad roads do not read as flat color. These marks are
+  visual texture, not racing lines or gameplay zones.
 - Full-window themed backdrops scale and tile to the selected room bounds so
   wider canvases do not expose black camera voids.
 - Generated inner and outer barriers are continuous closed
@@ -146,10 +159,11 @@ shortcut window; the shortcut remains a player choice rather than an AI trap.
   the same segment-chain collision type; do not send concave islands through
   convex polygon decomposition.
 - Themed boundary art is deliberately partial. Eight deterministic sectors
-  produce at least three empty runs, at least three one-sided runs distributed
-  across both edges, and exactly two both-sided runs. Kitchen uses folded towel
-  rails and mitts, Workshop uses paint stirrers and tape, and Office uses pencils
-  and sticky notes. Never tile these assets around the full course.
+  produce exactly one open run, five one-sided runs distributed across both
+  edges, and two both-sided runs. The open run receives one flat worn-floor
+  hint rather than a barrier. Kitchen uses folded towel rails and mitts,
+  Workshop uses paint stirrers and tape, and Office uses pencils and sticky
+  notes. Never tile these assets around the full course.
 - Generated roots persist in the `track` group so runtime AI can discover the
   260-point `RacingLine`.
 - Collision layers remain: vehicles 1, walls/island 2, player-only scenery 4,
