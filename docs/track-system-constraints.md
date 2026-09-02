@@ -42,17 +42,22 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 - Route families are `speed_loop`, `kidney`, `dogbone`, `broad_triangle`,
   `offset_s`, and `deep_notch`.
 - Family templates are normalized closed silhouettes. They are mirrored,
-  oriented for the room, deformed with seed-driven harmonic lobes and localized
-  chicanes, fitted, clearance-aware length-scaled, sampled into 24 controls,
-  then exposed as a 260-point centerline.
+  oriented for the room, deformed with broad low-frequency turn rhythm, fitted,
+  clearance-aware length-scaled, sampled into 24 controls, then exposed as a
+  260-point centerline.
 - Retry attempts vary deformation phase and strength rather than only shrinking
   one silhouette. Wide and long rooms use stronger turn rhythm so their routes
   retain changing-radius character instead of becoming stretched ovals.
-- The target-length stream spans roughly 2,500 to 5,500 units. A room may cap
-  the realized length when its physical canvas cannot fit the target safely.
+- Generated route and room dimensions use `WORLD_SCALE = 1.75`. The target
+  length stream spans roughly 4,375 to 9,625 world units; elongated room
+  perimeters can realize longer loops when required by their silhouette.
 - Corridor half-width is 125 units. Validation reserves the complete 250-unit
   corridor plus wall clearance, rejects centerline self-intersections, enforces
   nonlocal self-distance, and keeps the route inside the room polygon.
+- Every accepted route has at least two distinct 450-unit setup-straight
+  regions. Turn rhythm is limited to a small set of broad complexes rather than
+  spline-scale wiggles, and validation rejects driveable chords that replace a
+  complete complex.
 - L-shaped rooms use the dedicated `el_safe` realization. The route must occupy
   both the upper-left arm and the right/lower extension while retaining the
   seed-selected family metadata.
@@ -61,17 +66,20 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 
 ## Room Canvases
 
-| Key | Canvas |
-|---|---|
-| `classic` | 1750 x 1150 rectangle |
-| `wide` | 2350 x 1200 rectangle |
-| `tall` | 1150 x 1450 rectangle |
-| `long` | 2600 x 1100 rectangle |
-| `square` | 1500 x 1500 rectangle |
-| `el` | 2400 x 1400 L-shaped polygon |
+| Key | Authored fixture | Generated canvas |
+|---|---|---|
+| `classic` | 1750 x 1150 | 3062.5 x 2012.5 |
+| `wide` | 2350 x 1200 | 4112.5 x 2100 |
+| `tall` | 1150 x 1450 | 2012.5 x 2537.5 |
+| `long` | 2600 x 1100 | 4550 x 1925 |
+| `square` | 1500 x 1500 | 2625 x 2625 |
+| `el` | 2400 x 1400 L shape | 4200 x 2450 L shape |
 
 `App.circuit_room_for_seed` selects among all six with a mixed deterministic
-stream independent from family and target length.
+stream independent from family and target length. Generated room bounds drive
+the runtime camera limits, while polygon-aware recovery preserves concave room
+shapes with a 120-unit edge tolerance. Negative-seed authored snapshots retain
+their original unscaled canvases.
 
 ## Household Stories
 
@@ -131,9 +139,17 @@ shortcut window; the shortcut remains a player choice rather than an AI trap.
   show the technical section and risky shortcut lane.
 - Full-window themed backdrops scale and tile to the selected room bounds so
   wider canvases do not expose black camera voids.
-- Generated and authored inner barriers use closed `ConcavePolygonShape2D`
-  segment chains on a `StaticBody2D`; do not send a concave island through
+- Generated inner and outer barriers are continuous closed
+  `ConcavePolygonShape2D` segment chains on layer 2. Both contours come from the
+  same round-joined 125-unit corridor offset so collision cannot bridge the
+  course or leave a driveable apron across a corner. Authored inner barriers use
+  the same segment-chain collision type; do not send concave islands through
   convex polygon decomposition.
+- Themed boundary art is deliberately partial. Eight deterministic sectors
+  produce at least three empty runs, at least three one-sided runs distributed
+  across both edges, and exactly two both-sided runs. Kitchen uses folded towel
+  rails and mitts, Workshop uses paint stirrers and tape, and Office uses pencils
+  and sticky notes. Never tile these assets around the full course.
 - Generated roots persist in the `track` group so runtime AI can discover the
   260-point `RacingLine`.
 - Collision layers remain: vehicles 1, walls/island 2, player-only scenery 4,

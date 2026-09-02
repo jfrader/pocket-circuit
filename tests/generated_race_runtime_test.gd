@@ -1,7 +1,7 @@
 extends SceneTree
 
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
-const REQUESTED_SEED := 5
+const REQUESTED_SEED := 8
 
 
 func _initialize() -> void:
@@ -12,7 +12,7 @@ func _run_test() -> void:
 	var app := root.get_node_or_null("App")
 	if not _expect(app != null, "App autoload should be available"):
 		return
-	app.call("start_circuit_race", &"workshop", &"square", REQUESTED_SEED, "rustbug")
+	app.call("start_circuit_race", &"office", &"el", REQUESTED_SEED, "rustbug")
 	var transition_frames := 300
 	while transition_frames > 0 and (current_scene == null or current_scene.scene_file_path != RACE_SCENE):
 		await process_frame
@@ -20,10 +20,10 @@ func _run_test() -> void:
 	if not _expect(current_scene != null and current_scene.scene_file_path == RACE_SCENE, "Quick Race should transition through App into the race scene"):
 		return
 	var session: Dictionary = app.call("get_current_race_session")
-	if not _expect(String(session.get("mode", "")) == "quick" and String(session.get("event_id", "")) == "circuit_workshop_square_5", "App should retain the generated Quick Race session"):
+	if not _expect(String(session.get("mode", "")) == "quick" and String(session.get("event_id", "")) == "circuit_office_el_8", "App should retain the generated Quick Race session"):
 		return
 	var event: Dictionary = session.get("event", {})
-	if not _expect(String(event.get("theme", "")) == "workshop" and String(event.get("room", "")) == "square" and int(event.get("seed", -1)) == REQUESTED_SEED, "App should preserve the requested generated circuit identity"):
+	if not _expect(String(event.get("theme", "")) == "office" and String(event.get("room", "")) == "el" and int(event.get("seed", -1)) == REQUESTED_SEED, "App should preserve the requested generated circuit identity"):
 		return
 	var race := current_scene
 	await process_frame
@@ -33,7 +33,7 @@ func _run_test() -> void:
 		return
 	if not _expect(bool(track.get_meta("generated_track", false)) and int(track.get_meta("requested_seed", -1)) == REQUESTED_SEED, "runtime track should retain the requested generated identity"):
 		return
-	if not _expect(StringName(track.get_meta("theme", &"")) == &"workshop" and StringName(track.get_meta("room_shape", &"")) == &"square", "runtime track should retain the requested theme and room"):
+	if not _expect(StringName(track.get_meta("theme", &"")) == &"office" and StringName(track.get_meta("room_shape", &"")) == &"el", "runtime track should retain the requested theme and room"):
 		return
 	if not _expect(track.is_in_group("track"), "runtime generated track should retain its persistent track group"):
 		return
@@ -43,6 +43,24 @@ func _run_test() -> void:
 		return
 	var boundary := track.get_node_or_null("InnerBarrier/BoundaryCollision") as CollisionShape2D
 	if not _expect(boundary != null and boundary.shape is ConcavePolygonShape2D, "generated island should use a physical concave boundary"):
+		return
+	var outer_barrier := track.get_node_or_null("OuterBarrier") as StaticBody2D
+	var outer_collision := outer_barrier.get_node_or_null("BoundaryCollision") as CollisionShape2D if outer_barrier else null
+	if not _expect(outer_barrier != null and outer_barrier.collision_layer == 2 and outer_collision != null and outer_collision.shape is ConcavePolygonShape2D, "generated runtime track should include a continuous outer barrier"):
+		return
+	var reset_manager := race.get_node_or_null("ResetManager")
+	var expected_bounds := (track.get_meta("room_bounds") as Rect2).grow(120.0)
+	var room_polygon: PackedVector2Array = track.get_meta("room_polygon", PackedVector2Array())
+	if not _expect(reset_manager != null and reset_manager.get("valid_bounds") == expected_bounds and reset_manager.get("valid_polygon") == room_polygon, "generated room geometry should propagate to runtime reset validation"):
+		return
+	var missing_quadrant := Vector2(1400.0, -800.0)
+	if not _expect(expected_bounds.has_point(missing_quadrant) and not bool(reset_manager.call("is_position_valid", missing_quadrant)), "L-room recovery should reject its missing upper-right quadrant"):
+		return
+	var camera := race.get_node_or_null("FollowCamera2D") as Camera2D
+	var room_bounds: Rect2 = track.get_meta("room_bounds")
+	if not _expect(camera != null and camera.limit_left == floori(room_bounds.position.x) and camera.limit_top == floori(room_bounds.position.y) and camera.limit_right == ceili(room_bounds.end.x) and camera.limit_bottom == ceili(room_bounds.end.y), "generated room bounds should expand the runtime camera limits"):
+		return
+	if not await _probe_outer_barrier(track, outer_barrier):
 		return
 
 	var grid := track.get_node_or_null("GridForward") as Node2D
@@ -74,6 +92,48 @@ func _run_test() -> void:
 	app.current_race_session.clear()
 	print("GENERATED_RACE_RUNTIME_TEST PASS seed=%d family=%s" % [REQUESTED_SEED, track.get_meta("family", "")])
 	quit(0)
+
+
+func _probe_outer_barrier(track: Node2D, outer_barrier: StaticBody2D) -> bool:
+	var outer_polygon: PackedVector2Array = outer_barrier.get_meta("boundary_polygon", PackedVector2Array())
+	var centerline := (track.get_node("TrackSurface") as Line2D).points
+	if not _expect(not outer_polygon.is_empty() and not centerline.is_empty(), "generated outer barrier probe needs route geometry"):
+		return false
+	var boundary_point := outer_polygon[0]
+	var track_point := _closest_point_on_loop(boundary_point, centerline)
+	var outward := (boundary_point - track_point).normalized()
+	var probe := CharacterBody2D.new()
+	probe.name = "GeneratedOuterBoundaryProbe"
+	probe.collision_layer = 1
+	probe.collision_mask = 2
+	probe.position = track_point
+	var probe_collision := CollisionShape2D.new()
+	var probe_shape := CircleShape2D.new()
+	probe_shape.radius = 18.0
+	probe_collision.shape = probe_shape
+	probe.add_child(probe_collision)
+	track.add_child(probe)
+	await physics_frame
+	var hit := probe.move_and_collide(outward * 300.0)
+	var hit_outer_barrier := hit != null and hit.get_collider() == outer_barrier
+	probe.queue_free()
+	return _expect(hit_outer_barrier, "a vehicle leaving the generated road should hit the continuous outer barrier")
+
+
+func _closest_point_on_loop(point: Vector2, loop: PackedVector2Array) -> Vector2:
+	var result := loop[0]
+	var nearest_distance := INF
+	for index in loop.size():
+		var from := loop[index]
+		var to := loop[(index + 1) % loop.size()]
+		var segment := to - from
+		var fraction := clampf((point - from).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
+		var candidate := from + segment * fraction
+		var distance := point.distance_squared_to(candidate)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			result = candidate
+	return result
 
 
 func _expect(condition: bool, message: String) -> bool:

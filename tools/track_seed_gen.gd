@@ -9,6 +9,13 @@ const HALF_WIDTH := 125.0
 const CORRIDOR_CLEARANCE := HALF_WIDTH + 10.0
 const SPLINE_GUARD := 12.0
 const MAX_VARIANTS := 12
+const WORLD_SCALE := 1.75
+const MIN_SETUP_DISTANCE := 450.0
+const SETUP_STRAIGHTNESS := 0.985
+const BYPASS_MIN_ARC := 500.0
+const BYPASS_MAX_ARC := 3000.0
+const BYPASS_MIN_SAVING := 220.0
+const BYPASS_MIN_RATIO := 1.40
 
 const FAMILY_NAMES: Array[StringName] = [
 	&"speed_loop",
@@ -40,11 +47,25 @@ static func centerline_checkpoints(controls: PackedVector2Array) -> PackedVector
 	return _sample_centerline(controls)
 
 
+static func gameplay_metrics(controls: PackedVector2Array) -> Dictionary:
+	var centerline := _sample_centerline(controls)
+	if centerline.is_empty():
+		return {}
+	var bypass := _best_complex_bypass(centerline)
+	var setup_straight_count := _setup_straight_count(centerline)
+	return {
+		"length": _polyline_length(centerline),
+		"has_setup_straight": setup_straight_count > 0,
+		"setup_straight_count": setup_straight_count,
+		"complex_bypass": bypass,
+	}
+
+
 static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) -> Dictionary:
 	var family_index := posmod(_hash32(seed ^ FAMILY_SALT), FAMILY_NAMES.size())
 	var family: StringName = FAMILY_NAMES[family_index]
 	var length_roll := _hash_unit(seed, LENGTH_SALT)
-	var target_length := lerpf(2500.0, 5500.0, length_roll)
+	var target_length := lerpf(2500.0, 5500.0, length_roll) * WORLD_SCALE
 	var configured_max := float(params.get("max_loop_length", 0.0))
 	if configured_max > 0.0:
 		target_length = minf(target_length, configured_max)
@@ -65,7 +86,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var physical_self_distance := maxf(HALF_WIDTH * 2.0, minf(usable_rect.size.x, usable_rect.size.y) * 0.55)
 	var min_self_distance := minf(requested_self_distance, physical_self_distance)
 	var room_check_margin := maxf(float(params.get("room_check_margin", 0.0)), CORRIDOR_CLEARANCE)
-	var minimum_length := float(params.get("min_loop_length", 1900.0))
+	var minimum_length := float(params.get("min_loop_length", 1900.0 * WORLD_SCALE))
 	var last_reason := "no candidate"
 
 	for attempt in MAX_VARIANTS:
@@ -192,6 +213,7 @@ static func _family_controls(
 		point.x *= mirror
 		anchors[index] = point.rotated(orientation)
 	var normalized := _resample_template(anchors, CONTROL_COUNT)
+	normalized = _smooth_controls(normalized, 1 if template_family in [&"kidney", &"deep_notch"] else 2)
 	normalized = _apply_turn_rhythm(
 		normalized,
 		rhythm_family,
@@ -317,26 +339,29 @@ static func _apply_turn_rhythm(
 	var rhythm_seed := _hash32(seed ^ RHYTHM_SALT ^ ((family_index + 1) * 0x1F123BB) ^ (attempt * 0x51A7E3D))
 	var phase_broad := TAU * _hash_unit(rhythm_seed, RHYTHM_SALT + 17)
 	var phase_detail := TAU * _hash_unit(rhythm_seed, RHYTHM_SALT + 41)
-	var chicane_center := posmod(_hash32(rhythm_seed ^ (RHYTHM_SALT + 73)), points.size())
-	var quiet_center := posmod(chicane_center + points.size() / 2, points.size())
-	var length_strength := lerpf(0.82, 1.18, clampf(inverse_lerp(2500.0, 5500.0, target_length), 0.0, 1.0))
+	var broad_center := posmod(_hash32(rhythm_seed ^ (RHYTHM_SALT + 73)), points.size())
+	var quiet_center := posmod(broad_center + points.size() / 2, points.size())
+	var length_strength := lerpf(0.82, 1.18, clampf(inverse_lerp(2500.0 * WORLD_SCALE, 5500.0 * WORLD_SCALE, target_length), 0.0, 1.0))
 	var amplitude := _family_rhythm_strength(family) * attempt_strength * length_strength * strength_multiplier
 	if conservative:
 		amplitude *= 0.78
 
 	var offsets := PackedFloat32Array()
-	var chicane_half_span := 4.5
 	for index in points.size():
 		var angle := TAU * float(index) / float(points.size())
-		var field := sin(angle * 3.0 + phase_broad) * 0.58
-		field += sin(angle * 6.0 + phase_detail) * 0.42
-		var chicane_distance := _signed_cyclic_distance(index, chicane_center, points.size())
-		if absf(chicane_distance) < chicane_half_span:
-			field += sin(PI * chicane_distance / chicane_half_span) * 0.82
+		# Two broad harmonics create a few room-scale complexes.  The previous
+		# k=3/k=6 field and localized chicane produced direction changes only a
+		# corridor-width apart after fitting, which looked technical but could be
+		# bypassed by one straight chord.
+		var field := sin(angle * 2.0 + phase_broad) * 0.72
+		field += sin(angle * 3.0 + phase_detail) * 0.28
+		var broad_distance := _signed_cyclic_distance(index, broad_center, points.size())
+		if absf(broad_distance) < 5.5:
+			field += sin(PI * broad_distance / 5.5) * 0.24
 		offsets.append(field * amplitude)
 	# Circular smoothing turns the displacement field into readable corner
 	# sequences instead of spline-scale wiggles.
-	for _pass in 2:
+	for _pass in 4:
 		var smoothed := PackedFloat32Array()
 		for index in offsets.size():
 			smoothed.append((offsets[posmod(index - 1, offsets.size())] + offsets[index] * 2.0 + offsets[(index + 1) % offsets.size()]) * 0.25)
@@ -351,8 +376,22 @@ static func _apply_turn_rhythm(
 		var tangent := points[posmod(index - 1, points.size())].direction_to(points[(index + 1) % points.size()])
 		var normal := tangent.rotated(PI * 0.5)
 		var quiet_distance := _cyclic_index_distance(index, quiet_center, points.size())
-		var quiet_factor := smoothstep(2.0, 5.0, float(quiet_distance))
+		var quiet_factor := smoothstep(3.0, 6.0, float(quiet_distance))
 		result.append(points[index] + normal * (offsets[index] - mean) * quiet_factor)
+	return result
+
+
+static func _smooth_controls(points: PackedVector2Array, passes: int) -> PackedVector2Array:
+	var result := points.duplicate()
+	for _pass in passes:
+		var smoothed := PackedVector2Array()
+		for index in result.size():
+			smoothed.append(
+				result[posmod(index - 1, result.size())] * 0.125
+				+ result[index] * 0.75
+				+ result[(index + 1) % result.size()] * 0.125
+			)
+		result = smoothed
 	return result
 
 
@@ -486,6 +525,9 @@ static func _validate_controls(
 	var branch_clearance := _minimum_branch_distance(centerline, min_self_distance)
 	if branch_clearance < min_self_distance:
 		return {"valid": false, "reason": "self distance %.1f < %.1f" % [branch_clearance, min_self_distance]}
+	var corridor_boundaries := _corridor_boundary_loops(centerline)
+	if corridor_boundaries.is_empty():
+		return {"valid": false, "reason": "corridor offset did not produce valid inner and outer contours"}
 	for point: Vector2 in centerline:
 		if not source_rect.has_point(point):
 			return {"valid": false, "reason": "outside source rect"}
@@ -494,7 +536,154 @@ static func _validate_controls(
 	var loop_length := _polyline_length(centerline)
 	if loop_length < minimum_length:
 		return {"valid": false, "reason": "below minimum length"}
+	var setup_straight_count := _setup_straight_count(centerline)
+	if setup_straight_count < 2:
+		return {"valid": false, "reason": "only %d setup straight region(s)" % setup_straight_count}
+	var bypass := _best_complex_bypass(centerline)
+	if bool(bypass.get("found", false)):
+		return {
+			"valid": false,
+			"reason": "driveable chord saves %.0fu over %.0fu" % [float(bypass["saving"]), float(bypass["arc"])],
+		}
 	return {"valid": true, "centerline": centerline, "length": loop_length}
+
+
+static func _corridor_boundary_loops(centerline: PackedVector2Array) -> Dictionary:
+	var centerline_area := absf(_polygon_area(centerline))
+	var inner := PackedVector2Array()
+	var outer := PackedVector2Array()
+	var inner_area := 0.0
+	var outer_area := 0.0
+	var contours: Array[PackedVector2Array] = Geometry2D.offset_polyline(
+		centerline,
+		HALF_WIDTH,
+		Geometry2D.JOIN_ROUND,
+		Geometry2D.END_JOINED
+	)
+	for contour: PackedVector2Array in contours:
+		var resolved: Array[PackedVector2Array] = Geometry2D.intersect_polygons(contour, contour)
+		var pieces: Array[PackedVector2Array] = resolved if not resolved.is_empty() else [contour]
+		for piece: PackedVector2Array in pieces:
+			var cleaned := _deduplicate_loop(piece)
+			if cleaned.size() < 3 or _has_self_intersection(cleaned) or not _boundary_loop_hugs_centerline(cleaned, centerline):
+				continue
+			var area := absf(_polygon_area(cleaned))
+			if area > centerline_area and area > outer_area:
+				outer = cleaned
+				outer_area = area
+			elif area < centerline_area and area > inner_area:
+				inner = cleaned
+				inner_area = area
+	if inner.is_empty() or outer.is_empty():
+		return {}
+	return {"inner": inner, "outer": outer}
+
+
+static func _boundary_loop_hugs_centerline(loop: PackedVector2Array, centerline: PackedVector2Array) -> bool:
+	for index in loop.size():
+		var from := loop[index]
+		var to := loop[(index + 1) % loop.size()]
+		for fraction: float in [0.0, 0.5]:
+			var sample := from.lerp(to, fraction)
+			var nearest := INF
+			for center_index in centerline.size():
+				nearest = minf(nearest, _point_segment_distance(sample, centerline[center_index], centerline[(center_index + 1) % centerline.size()]))
+			if nearest < HALF_WIDTH * 0.62 or nearest > HALF_WIDTH * 1.42:
+				return false
+	return true
+
+
+static func _deduplicate_loop(points: PackedVector2Array) -> PackedVector2Array:
+	var result := PackedVector2Array()
+	for point: Vector2 in points:
+		if result.is_empty() or point.distance_squared_to(result[result.size() - 1]) > 0.01:
+			result.append(point)
+	if result.size() > 1 and result[0].distance_squared_to(result[result.size() - 1]) <= 0.01:
+		result.remove_at(result.size() - 1)
+	return result
+
+
+static func _polygon_area(points: PackedVector2Array) -> float:
+	var total := 0.0
+	for index in points.size():
+		total += points[index].cross(points[(index + 1) % points.size()])
+	return total * 0.5
+
+
+static func _setup_straight_count(centerline: PackedVector2Array) -> int:
+	var count := centerline.size()
+	var straight_starts := PackedByteArray()
+	for start in count:
+		straight_starts.append(1 if _straight_window_length(centerline, start) >= MIN_SETUP_DISTANCE else 0)
+	var straight_start_count := straight_starts.count(1)
+	if straight_start_count == 0:
+		return 0
+	if straight_start_count == count:
+		return 1
+	var regions := 0
+	for index in count:
+		if straight_starts[index] == 1 and straight_starts[posmod(index - 1, count)] == 0:
+			regions += 1
+	return regions
+
+
+static func _straight_window_length(centerline: PackedVector2Array, start: int) -> float:
+	var traveled := 0.0
+	var longest := 0.0
+	for step in range(1, centerline.size() / 2):
+		traveled += centerline[(start + step - 1) % centerline.size()].distance_to(centerline[(start + step) % centerline.size()])
+		var chord := centerline[start].distance_to(centerline[(start + step) % centerline.size()])
+		if chord / maxf(traveled, 1.0) >= SETUP_STRAIGHTNESS:
+			longest = traveled
+		elif traveled >= MIN_SETUP_DISTANCE:
+			break
+	return longest
+
+
+static func _best_complex_bypass(centerline: PackedVector2Array) -> Dictionary:
+	var best := {"found": false, "saving": 0.0}
+	var count := centerline.size()
+	var drive_radius := HALF_WIDTH - 22.0
+	for start in range(0, count, 3):
+		var route_arc := 0.0
+		for step in range(1, count / 2):
+			route_arc += centerline[(start + step - 1) % count].distance_to(centerline[(start + step) % count])
+			if route_arc < BYPASS_MIN_ARC or step % 3 != 0:
+				continue
+			if route_arc > BYPASS_MAX_ARC:
+				break
+			var finish := (start + step) % count
+			var chord := centerline[start].distance_to(centerline[finish])
+			var saving := route_arc - chord
+			if chord < 1.0 or saving < BYPASS_MIN_SAVING or route_arc / chord < BYPASS_MIN_RATIO:
+				continue
+			if not _chord_inside_corridor(centerline[start], centerline[finish], centerline, drive_radius):
+				continue
+			if saving > float(best["saving"]):
+				best = {
+					"found": true,
+					"saving": saving,
+					"ratio": route_arc / chord,
+					"arc": route_arc,
+					"chord": chord,
+				}
+	return best
+
+
+static func _chord_inside_corridor(
+	from: Vector2,
+	to: Vector2,
+	centerline: PackedVector2Array,
+	drive_radius: float
+) -> bool:
+	for sample in range(1, 20):
+		var point := from.lerp(to, float(sample) / 20.0)
+		var nearest := INF
+		for index in centerline.size():
+			nearest = minf(nearest, _point_segment_distance(point, centerline[index], centerline[(index + 1) % centerline.size()]))
+		if nearest > drive_radius:
+			return false
+	return true
 
 
 static func _inside_with_margin(point: Vector2, polygon: PackedVector2Array, margin: float) -> bool:
@@ -590,24 +779,9 @@ static func _has_self_intersection(points: PackedVector2Array) -> bool:
 			var second_next := (second + 1) % count
 			if first == second or first_next == second or second_next == first:
 				continue
-			if _segments_intersect(points[first], points[first_next], points[second], points[second_next]):
+			if Geometry2D.segment_intersects_segment(points[first], points[first_next], points[second], points[second_next]) != null:
 				return true
 	return false
-
-
-static func _segments_intersect(a: Vector2, b: Vector2, c: Vector2, d: Vector2) -> bool:
-	var ab_c := _cross(a, b, c)
-	var ab_d := _cross(a, b, d)
-	var cd_a := _cross(c, d, a)
-	var cd_b := _cross(c, d, b)
-	if ((ab_c > 0.0 and ab_d < 0.0) or (ab_c < 0.0 and ab_d > 0.0)) \
-	and ((cd_a > 0.0 and cd_b < 0.0) or (cd_a < 0.0 and cd_b > 0.0)):
-		return true
-	return false
-
-
-static func _cross(origin: Vector2, a: Vector2, b: Vector2) -> float:
-	return (a.x - origin.x) * (b.y - origin.y) - (a.y - origin.y) * (b.x - origin.x)
 
 
 static func _reorder_to_longest_straight(controls: PackedVector2Array, centerline: PackedVector2Array) -> PackedVector2Array:

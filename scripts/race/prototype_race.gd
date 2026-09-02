@@ -227,6 +227,17 @@ func _configure_track_variant() -> bool:
 	track_root = packed.instantiate() as Node2D
 	track_root.name = "Track"
 	add_child(track_root)
+	if track_root.has_meta("room_bounds"):
+		var room_bounds: Rect2 = track_root.get_meta("room_bounds")
+		camera.limit_left = floori(room_bounds.position.x)
+		camera.limit_top = floori(room_bounds.position.y)
+		camera.limit_right = ceili(room_bounds.end.x)
+		camera.limit_bottom = ceili(room_bounds.end.y)
+		var reset_manager := get_node_or_null("ResetManager")
+		if reset_manager != null:
+			reset_manager.set("valid_bounds", room_bounds.grow(120.0))
+			reset_manager.set("valid_polygon", track_root.get_meta("room_polygon", PackedVector2Array()))
+			reset_manager.set("valid_polygon_margin", 120.0)
 	_track_variant_presenter = TRACK_VARIANT_SCRIPT.new() as TrackVariantPresenter
 	track_root.add_child(_track_variant_presenter)
 	_track_variant_presenter.configure(track_root, requested_theme, race_manager.is_reverse_direction())

@@ -1,6 +1,8 @@
 extends Node
 
 @export var valid_bounds: Rect2 = Rect2(-1020.0, -620.0, 2040.0, 1240.0)
+@export var valid_polygon := PackedVector2Array()
+@export var valid_polygon_margin := 0.0
 @export var ghost_duration: float = 1.5
 @export var stuck_timeout: float = 2.4
 
@@ -20,7 +22,7 @@ func _physics_process(delta: float) -> void:
 	if not _can_recover():
 		_stuck_time = 0.0
 		return
-	if Input.is_action_just_pressed("reset") or not valid_bounds.has_point(_vehicle.global_position):
+	if Input.is_action_just_pressed("reset") or not is_position_valid(_vehicle.global_position):
 		recover_vehicle()
 		return
 
@@ -31,6 +33,25 @@ func _physics_process(delta: float) -> void:
 			recover_vehicle()
 	else:
 		_stuck_time = 0.0
+
+
+func is_position_valid(position: Vector2) -> bool:
+	if valid_polygon.is_empty():
+		return valid_bounds.has_point(position)
+	if Geometry2D.is_point_in_polygon(position, valid_polygon):
+		return true
+	for index in valid_polygon.size():
+		if _point_segment_distance(position, valid_polygon[index], valid_polygon[(index + 1) % valid_polygon.size()]) <= valid_polygon_margin:
+			return true
+	return false
+
+
+func _point_segment_distance(point: Vector2, from: Vector2, to: Vector2) -> float:
+	var segment := to - from
+	if segment.length_squared() < 0.001:
+		return point.distance_to(from)
+	var fraction := clampf((point - from).dot(segment) / segment.length_squared(), 0.0, 1.0)
+	return point.distance_to(from + segment * fraction)
 
 
 func _find_dependencies() -> void:

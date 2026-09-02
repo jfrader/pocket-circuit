@@ -35,14 +35,15 @@
 
 - Quick Race now accepts arbitrary seeds, and championship events draw a fresh
   seed and deterministic room canvas whenever a race starts.
-- Generated circuits now give six route families seed-driven changing-radius
-  bends, harmonic lobes, and localized chicanes, with wider long-form rooms and
-  technical fallbacks that preserve identity without becoming stretched ovals.
+- Generated circuits now use larger 1.75x room canvases, longer absolute laps,
+  and fewer broad corner complexes separated by multiple setup straights. Route
+  validation rejects direct chords that replace an entire corner sequence.
 - Circuit dressing now combines coherent household story moments with safe
   themed prop pockets, broad cloth and paper set dressing, and denser floor
   details that fill blank room sectors without obstructing the racing corridor.
-- Course boundaries read from household objects and material changes rather
-  than white edge lines, dashed centerlines, kerbs, or translucent overlays.
+- Course boundaries read from material changes and sparse household-object runs
+  that alternate between both sides, one side, and open visual sectors rather
+  than enclosing the track with a repeated fence or painted race lines.
 - Racing-line AI now follows generated routes in the active race direction,
   keeps to the safe lane beside optional shortcuts, plans for corners, dodges
   traffic and moving hazards, and recovers from stalls.
@@ -56,9 +57,12 @@
 
 ### Fixed
 
-- Inner island collision follows the complete visible boundary on both
-  generated and authored circuits, preventing cuts through the infield without
-  concave-polygon decomposition failures.
+- Generated circuits now have continuous round-joined collision on both course
+  edges, preventing apron and infield cuts even where themed barrier props are
+  intentionally absent. Authored island collision still follows its complete
+  visible boundary without concave-polygon decomposition failures.
+- The race camera and out-of-bounds recovery now follow each generated room's
+  full scale and shape, including the missing quadrant of L-shaped rooms.
 - Start grids remain outside the island, lap gates span the full drivable
   corridor, and forward and reverse races use the correct checker order.
 - Failed disk writes no longer advance championship progress, discard an

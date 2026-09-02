@@ -8,6 +8,7 @@ const CHECKPOINT_SCENE := "res://scenes/race/checkpoint.tscn"
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
+const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
 const RECOVERY_LANE_HALF_LENGTH := 230.0
 const RECOVERY_LANE_HALF_WIDTH := 48.0
 const SHORTCUT_HALF_SPAN := 10
@@ -17,6 +18,15 @@ const SAFE_RACING_LINE_OFFSET := 58.0
 const FINISH_APPROACH_SPAN := 20
 
 static var ROOM_SHAPES := {
+	"classic": PackedVector2Array([Vector2(-875, -575) * WORLD_SCALE, Vector2(875, -575) * WORLD_SCALE, Vector2(875, 575) * WORLD_SCALE, Vector2(-875, 575) * WORLD_SCALE]),
+	"wide": PackedVector2Array([Vector2(-1175, -600) * WORLD_SCALE, Vector2(1175, -600) * WORLD_SCALE, Vector2(1175, 600) * WORLD_SCALE, Vector2(-1175, 600) * WORLD_SCALE]),
+	"tall": PackedVector2Array([Vector2(-575, -725) * WORLD_SCALE, Vector2(575, -725) * WORLD_SCALE, Vector2(575, 725) * WORLD_SCALE, Vector2(-575, 725) * WORLD_SCALE]),
+	"el": PackedVector2Array([Vector2(-1200, -700) * WORLD_SCALE, Vector2(360, -700) * WORLD_SCALE, Vector2(360, -60) * WORLD_SCALE, Vector2(1200, -60) * WORLD_SCALE, Vector2(1200, 700) * WORLD_SCALE, Vector2(-1200, 700) * WORLD_SCALE]),
+	"long": PackedVector2Array([Vector2(-1300, -550) * WORLD_SCALE, Vector2(1300, -550) * WORLD_SCALE, Vector2(1300, 550) * WORLD_SCALE, Vector2(-1300, 550) * WORLD_SCALE]),
+	"square": PackedVector2Array([Vector2(-750, -750) * WORLD_SCALE, Vector2(750, -750) * WORLD_SCALE, Vector2(750, 750) * WORLD_SCALE, Vector2(-750, 750) * WORLD_SCALE]),
+}
+
+static var BASE_ROOM_SHAPES := {
 	"classic": PackedVector2Array([Vector2(-875, -575), Vector2(875, -575), Vector2(875, 575), Vector2(-875, 575)]),
 	"wide": PackedVector2Array([Vector2(-1175, -600), Vector2(1175, -600), Vector2(1175, 600), Vector2(-1175, 600)]),
 	"tall": PackedVector2Array([Vector2(-575, -725), Vector2(575, -725), Vector2(575, 725), Vector2(-575, 725)]),
@@ -441,6 +451,10 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/plank_wood.png",
 			"res://assets/textures/imagine/hazard_workshop_socket.png",
 		],
+		"generated_boundary": {
+			"section": "res://assets/textures/track_boundary/kitchen_folded_towel_rail.png",
+			"accent": "res://assets/textures/track_boundary/kitchen_mitt_corner.png",
+		},
 		"boundary_corner": [
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/barrel_wood.png",
@@ -555,6 +569,10 @@ const LAYOUTS := {
 			"res://assets/textures/kitchen/ruler_plank.png",
 			"res://assets/textures/kitchen/spoon_bridge.png",
 		],
+		"generated_boundary": {
+			"section": "res://assets/textures/track_boundary/workshop_paint_stirrer_rail.png",
+			"accent": "res://assets/textures/track_boundary/workshop_tape_corner.png",
+		},
 		"boundary_corner": [
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/plant_small.png",
@@ -676,6 +694,10 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/office_keycap.png",
 			"res://assets/textures/imagine/hazard_office_cable.png",
 		],
+		"generated_boundary": {
+			"section": "res://assets/textures/track_boundary/office_pencil_rail.png",
+			"accent": "res://assets/textures/track_boundary/office_sticky_corner.png",
+		},
 		"boundary_corner": [
 			"res://assets/textures/imagine/flower_pot.png",
 			"res://assets/textures/imagine/barrel_wood.png",
@@ -725,15 +747,15 @@ const LAYOUTS := {
 
 static func build_packed(theme: StringName, room_shape: StringName, seed: int) -> Dictionary:
 	var spec: Dictionary = LAYOUTS[theme]
-	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape]
+	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape] if seed >= 0 else BASE_ROOM_SHAPES[room_shape]
 	var used_seed := seed
 	if seed >= 0:
 		var room_params := {
-			"margin": 150.0,
+			"margin": 190.0,
 			"min_point_distance": 210.0,
 			"max_angle_deg": 80.0,
-			"min_self_distance": 250.0,
-			"min_loop_length": 1900.0,
+			"min_self_distance": 320.0,
+			"min_loop_length": 1900.0 * WORLD_SCALE,
 			"room_polygon": room_polygon,
 			"room_shape": room_shape,
 		}
@@ -742,13 +764,13 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 				room_params["displacement_scale"] = 0.55
 			&"el":
 				room_params["displacement_scale"] = 0.5
-				room_params["min_loop_length"] = 1500.0
+				room_params["min_loop_length"] = 1500.0 * WORLD_SCALE
 			&"long":
 				room_params["displacement_scale"] = 1.0
-				room_params["min_loop_length"] = 2000.0
+				room_params["min_loop_length"] = 2000.0 * WORLD_SCALE
 			&"square":
 				room_params["displacement_scale"] = 1.0
-				room_params["min_loop_length"] = 2200.0
+				room_params["min_loop_length"] = 2200.0 * WORLD_SCALE
 		var gen := TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
 		if gen["points"].is_empty():
 			push_error("TrackBuilderCore: could not generate a valid circuit near seed " + str(seed))
@@ -784,6 +806,9 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 		root.set_meta("loop_length", float(spec["loop_length"]))
 		root.set_meta("theme", theme)
 		root.set_meta("room_shape", room_shape)
+		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
+		root.set_meta("room_polygon", room_polygon)
+		root.set_meta("world_scale", WORLD_SCALE)
 	var centerline := _sample_centerline(spec["controls"])
 	var edges := _corridor_edges(centerline)
 	_build_scene(root, spec, centerline, edges, room_polygon, theme)
@@ -870,14 +895,18 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# define the course
 	var outer_loop := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
 	var inner_loop := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
+	var outer_boundary := outer_loop
 	if spec.get("seed_obstacles", false):
-		inner_loop = _simple_island_loop(inner_loop)
+		inner_loop = _simple_inner_boundary_loop(inner_loop, centerline)
+		outer_boundary = _simple_boundary_loop(outer_loop, centerline)
 	# Generated centerlines are clearance-validated, so their inner offset is the
 	# authoritative island boundary. Boolean subtraction represents the annular
 	# ribbon as nested outer/hole polygons and can otherwise select the whole room
 	# as a solid collision body.
 	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) else _island_region(room_polygon, clipped, inner_loop)
 	_build_island_prop(root, spec, island_region, inner_loop, centerline)
+	if spec.get("seed_obstacles", false):
+		_build_outer_barrier(root, outer_boundary)
 
 	# Legacy authored tracks keep their fixed room-corner dressing. Generated
 	# tracks choose landmarks from geometry-aware story moments below.
@@ -972,6 +1001,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	_build_racing_line(root, centerline, generated_moments)
 
 	if spec.get("seed_obstacles", false):
+		_build_generated_outer_boundary_visuals(root, spec, centerline, inner_loop, outer_boundary, room_polygon, generated_moments)
 		_compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments)
 	else:
 		# Canonical/static tracks retain their authored legacy dressing.
@@ -1087,6 +1117,272 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 	root.add_child(visual)
 
 
+static func _build_outer_barrier(root: Node2D, boundary: PackedVector2Array) -> void:
+	if boundary.size() < 3:
+		push_error("TrackBuilderCore: generated outer boundary contour is invalid")
+		return
+	var barrier := StaticBody2D.new()
+	barrier.name = "OuterBarrier"
+	barrier.collision_layer = 2
+	barrier.set_meta("boundary_polygon", boundary)
+	barrier.set_meta("segment_count", boundary.size())
+	barrier.set_meta("centerline_clearance", HALF_WIDTH)
+	root.add_child(barrier)
+	var segments := PackedVector2Array()
+	for index in boundary.size():
+		segments.append(boundary[index])
+		segments.append(boundary[(index + 1) % boundary.size()])
+	var shape := ConcavePolygonShape2D.new()
+	shape.segments = segments
+	var collision := CollisionShape2D.new()
+	collision.name = "BoundaryCollision"
+	collision.shape = shape
+	barrier.add_child(collision)
+
+
+static func _build_generated_outer_boundary_visuals(
+	root: Node2D,
+	spec: Dictionary,
+	centerline: PackedVector2Array,
+	inner_boundary: PackedVector2Array,
+	outer_boundary: PackedVector2Array,
+	room_polygon: PackedVector2Array,
+	moments: Dictionary
+) -> void:
+	var assets: Dictionary = spec.get("generated_boundary", {})
+	var section_path := String(assets.get("section", ""))
+	var accent_path := String(assets.get("accent", ""))
+	var section_texture := load(section_path) as Texture2D if not section_path.is_empty() else null
+	var accent_texture := load(accent_path) as Texture2D if not accent_path.is_empty() else null
+	if section_texture == null or accent_texture == null:
+		push_error("TrackBuilderCore: generated boundary assets are missing")
+		return
+	var container := Node2D.new()
+	container.name = "GeneratedOuterBoundaryVisuals"
+	container.set_meta("section_asset", section_path)
+	container.set_meta("accent_asset", accent_path)
+	container.set_meta("corridor_clearance", HALF_WIDTH)
+	root.add_child(container)
+
+	# Compose sparse runs instead of lining the whole course. Every seed gets
+	# stretches with no furniture, one-sided stretches on each edge, and a small
+	# number of both-sided moments. Rotating and mirroring the authored pattern
+	# keeps that hierarchy deterministic without reading like a repeating fence.
+	var rng := RandomNumberGenerator.new()
+	rng.seed = _mix_seed(int(spec["requested_seed"]), "boundary_runs:%s" % String(spec["story_id"]))
+	var base_modes: Array[StringName] = [&"none", &"outer", &"outer", &"none", &"inner", &"both", &"none", &"both"]
+	var mode_offset := rng.randi_range(0, base_modes.size() - 1)
+	var swap_sides := rng.randf() < 0.5
+	var run_modes: Array[StringName] = []
+	var section_count := 0
+	var outer_section_count := 0
+	var inner_section_count := 0
+	var one_sided_runs := 0
+	var both_sided_runs := 0
+	var empty_runs := 0
+	for run_index in base_modes.size():
+		var planned_mode: StringName = base_modes[(run_index + mode_offset) % base_modes.size()]
+		if swap_sides:
+			if planned_mode == &"outer":
+				planned_mode = &"inner"
+			elif planned_mode == &"inner":
+				planned_mode = &"outer"
+		var run_outer_sections := 0
+		var run_inner_sections := 0
+		if planned_mode != &"none":
+			var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / float(base_modes.size()))) % centerline.size()
+			var run_half_span := rng.randi_range(5, 8)
+			for sample_offset in range(-run_half_span, run_half_span + 1, 4):
+				var centerline_index := posmod(run_center + sample_offset, centerline.size())
+				if _cyclic_index_distance(centerline_index, 0, centerline.size()) < 14:
+					continue
+				if planned_mode in [&"outer", &"both"]:
+					if _add_generated_boundary_section(container, section_texture, centerline, outer_boundary, room_polygon, centerline_index, run_index, &"outer", outer_section_count):
+						outer_section_count += 1
+						run_outer_sections += 1
+						section_count += 1
+				if planned_mode in [&"inner", &"both"]:
+					if _add_generated_boundary_section(container, section_texture, centerline, inner_boundary, room_polygon, centerline_index, run_index, &"inner", inner_section_count):
+						inner_section_count += 1
+						run_inner_sections += 1
+						section_count += 1
+			if planned_mode in [&"outer", &"both"] and run_outer_sections == 0:
+				if _add_generated_boundary_run_fallback(container, section_texture, centerline, outer_boundary, room_polygon, run_center, run_index, &"outer", outer_section_count):
+					outer_section_count += 1
+					run_outer_sections += 1
+					section_count += 1
+			if planned_mode in [&"inner", &"both"] and run_inner_sections == 0:
+				if _add_generated_boundary_run_fallback(container, section_texture, centerline, inner_boundary, room_polygon, run_center, run_index, &"inner", inner_section_count):
+					inner_section_count += 1
+					run_inner_sections += 1
+					section_count += 1
+		var actual_mode := &"both" if run_outer_sections > 0 and run_inner_sections > 0 else (&"outer" if run_outer_sections > 0 else (&"inner" if run_inner_sections > 0 else &"none"))
+		run_modes.append(actual_mode)
+		if actual_mode == &"none":
+			empty_runs += 1
+		elif actual_mode == &"both":
+			both_sided_runs += 1
+		else:
+			one_sided_runs += 1
+
+	var accent_count := 0
+	var corners: PackedInt32Array = moments.get("corners", PackedInt32Array())
+	for slot in range(corners.size() - 1, -1, -1):
+		if accent_count >= 2 or slot % 2 != 0:
+			continue
+		var index := int(corners[slot])
+		if _cyclic_index_distance(index, 0, centerline.size()) < 18:
+			continue
+		var side := &"outer" if (slot + mode_offset) % 3 != 0 else &"inner"
+		var boundary := outer_boundary if side == &"outer" else inner_boundary
+		var boundary_sample := _closest_point_on_loop(centerline[index], boundary)
+		var boundary_index := int(boundary_sample["index"])
+		var boundary_position: Vector2 = boundary_sample["position"]
+		var tangent := (boundary[(boundary_index + 1) % boundary.size()] - boundary[boundary_index]).normalized()
+		var away_from_track := (boundary_position - centerline[index]).normalized()
+		var position := boundary_position + away_from_track * 8.0
+		position = _push_outside_corridor(position, centerline, away_from_track)
+		position = _pull_inside_room(position, centerline, room_polygon)
+		var nearest_centerline: Vector2 = _closest_point_on_loop(position, centerline)["position"]
+		if position.distance_to(nearest_centerline) < HALF_WIDTH or not Geometry2D.is_point_in_polygon(position, room_polygon):
+			continue
+		var accent := Sprite2D.new()
+		accent.name = "CornerAccent%02d" % accent_count
+		accent.texture = accent_texture
+		accent.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+		accent.position = position
+		accent.rotation = tangent.angle()
+		accent.scale = Vector2(160.0 / accent_texture.get_width(), 70.0 / accent_texture.get_height())
+		accent.z_index = -3
+		accent.set_meta("boundary_kind", &"corner_mouth_accent")
+		accent.set_meta("boundary_side", side)
+		accent.set_meta("centerline_index", index)
+		container.add_child(accent)
+		accent_count += 1
+	container.set_meta("section_count", section_count)
+	container.set_meta("outer_section_count", outer_section_count)
+	container.set_meta("inner_section_count", inner_section_count)
+	container.set_meta("accent_count", accent_count)
+	container.set_meta("run_modes", run_modes)
+	container.set_meta("one_sided_run_count", one_sided_runs)
+	container.set_meta("both_sided_run_count", both_sided_runs)
+	container.set_meta("empty_run_count", empty_runs)
+	root.set_meta("generated_outer_boundary", {
+		"section_asset": section_path,
+		"accent_asset": accent_path,
+		"section_count": section_count,
+		"outer_section_count": outer_section_count,
+		"inner_section_count": inner_section_count,
+		"accent_count": accent_count,
+		"run_modes": run_modes,
+	})
+
+
+static func _add_generated_boundary_section(
+	container: Node2D,
+	texture: Texture2D,
+	centerline: PackedVector2Array,
+	boundary: PackedVector2Array,
+	room_polygon: PackedVector2Array,
+	centerline_index: int,
+	run_index: int,
+	side: StringName,
+	side_index: int
+) -> bool:
+	var boundary_sample := _closest_point_on_loop(centerline[centerline_index], boundary)
+	var boundary_index := int(boundary_sample["index"])
+	var boundary_position: Vector2 = boundary_sample["position"]
+	var tangent := (boundary[(boundary_index + 1) % boundary.size()] - boundary[boundary_index]).normalized()
+	var away_from_track := (boundary_position - centerline[centerline_index]).normalized()
+	var position := boundary_position + away_from_track * 8.0
+	position = _push_outside_corridor(position, centerline, away_from_track)
+	position = _pull_inside_room(position, centerline, room_polygon)
+	var nearest_centerline_sample := _closest_point_on_loop(position, centerline)
+	var nearest_centerline: Vector2 = nearest_centerline_sample["position"]
+	var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / 8.0)) % centerline.size()
+	if position.distance_to(nearest_centerline) < HALF_WIDTH or not Geometry2D.is_point_in_polygon(position, room_polygon) or _cyclic_index_distance(int(nearest_centerline_sample["index"]), run_center, centerline.size()) >= centerline.size() / 16:
+		return false
+	var sprite := Sprite2D.new()
+	sprite.name = "%sSection%03d" % [String(side).capitalize(), side_index]
+	sprite.texture = texture
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.position = position
+	sprite.rotation = tangent.angle()
+	sprite.scale = Vector2(136.0 / texture.get_width(), 52.0 / texture.get_height())
+	sprite.z_index = -4
+	sprite.set_meta("boundary_kind", &"partial_section")
+	sprite.set_meta("boundary_side", side)
+	sprite.set_meta("run_index", run_index)
+	sprite.set_meta("centerline_index", centerline_index)
+	container.add_child(sprite)
+	return true
+
+
+static func _add_generated_boundary_run_fallback(
+	container: Node2D,
+	texture: Texture2D,
+	centerline: PackedVector2Array,
+	boundary: PackedVector2Array,
+	room_polygon: PackedVector2Array,
+	run_center: int,
+	run_index: int,
+	side: StringName,
+	side_index: int
+) -> bool:
+	# The primary samples preserve authored spacing. Search nearest-first only when
+	# a required side had no valid room/corridor placement at those samples.
+	var sector_half_span := maxi(1, centerline.size() / 16 - 1)
+	for distance in range(0, sector_half_span + 1):
+		for direction in [-1, 1]:
+			if distance == 0 and direction < 0:
+				continue
+			var centerline_index := posmod(run_center + distance * direction, centerline.size())
+			if _cyclic_index_distance(centerline_index, 0, centerline.size()) < 14:
+				continue
+			if _add_generated_boundary_section(container, texture, centerline, boundary, room_polygon, centerline_index, run_index, side, side_index):
+				return true
+	return false
+
+
+static func _push_outside_corridor(position: Vector2, centerline: PackedVector2Array, fallback_direction: Vector2) -> Vector2:
+	var nearest: Vector2 = _closest_point_on_loop(position, centerline)["position"]
+	var direction := (position - nearest).normalized()
+	if direction.is_zero_approx():
+		direction = fallback_direction
+	var clearance := position.distance_to(nearest)
+	return position + direction * maxf(HALF_WIDTH + 8.0 - clearance, 0.0)
+
+
+static func _pull_inside_room(position: Vector2, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> Vector2:
+	if Geometry2D.is_point_in_polygon(position, room_polygon):
+		return position
+	var nearest: Vector2 = _closest_point_on_loop(position, centerline)["position"]
+	var offset := position - nearest
+	var direction := offset.normalized()
+	for clearance in range(int(floor(offset.length())), int(HALF_WIDTH) - 1, -2):
+		var candidate := nearest + direction * float(clearance)
+		var candidate_nearest: Vector2 = _closest_point_on_loop(candidate, centerline)["position"]
+		if Geometry2D.is_point_in_polygon(candidate, room_polygon) and candidate.distance_to(candidate_nearest) >= HALF_WIDTH:
+			return candidate
+	return position
+
+
+static func _closest_point_on_loop(point: Vector2, loop: PackedVector2Array) -> Dictionary:
+	var result := {"index": 0, "position": loop[0]}
+	var nearest_distance := INF
+	for index in loop.size():
+		var from := loop[index]
+		var to := loop[(index + 1) % loop.size()]
+		var segment := to - from
+		var fraction := clampf((point - from).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
+		var candidate := from + segment * fraction
+		var distance := point.distance_squared_to(candidate)
+		if distance < nearest_distance:
+			nearest_distance = distance
+			result = {"index": index, "position": candidate}
+	return result
+
+
 static func _island_region(room_polygon: PackedVector2Array, ribbon: PackedVector2Array, hint_polygon: PackedVector2Array) -> PackedVector2Array:
 	var pieces: Array[PackedVector2Array] = Geometry2D.clip_polygons(room_polygon, ribbon)
 	var hint_centroid := Vector2.ZERO
@@ -1144,6 +1440,82 @@ static func _simple_island_loop(points: PackedVector2Array) -> PackedVector2Arra
 			result = piece
 			largest_area = area
 	return result if not result.is_empty() else points
+
+
+static func _simple_boundary_loop(points: PackedVector2Array, centerline: PackedVector2Array) -> PackedVector2Array:
+	return _simple_corridor_boundary_loop(points, centerline, true)
+
+
+static func _simple_inner_boundary_loop(points: PackedVector2Array, centerline: PackedVector2Array) -> PackedVector2Array:
+	return _simple_corridor_boundary_loop(points, centerline, false)
+
+
+static func _simple_corridor_boundary_loop(_points: PackedVector2Array, centerline: PackedVector2Array, select_outer: bool) -> PackedVector2Array:
+	# Build the joined stroke through Clipper rather than trusting raw vertex
+	# normals. A closed polyline yields simple contours on both sides; comparing
+	# them with centerline area selects the matching physical road edge.
+	var stroke_contours: Array[PackedVector2Array] = Geometry2D.offset_polyline(
+		centerline,
+		HALF_WIDTH,
+		Geometry2D.JOIN_ROUND,
+		Geometry2D.END_JOINED
+	)
+	var pieces: Array[PackedVector2Array] = []
+	for contour: PackedVector2Array in stroke_contours:
+		var resolved: Array[PackedVector2Array] = Geometry2D.intersect_polygons(contour, contour)
+		pieces.append_array(resolved if not resolved.is_empty() else [contour])
+	var centerline_area := absf(_polygon_area(centerline))
+	var result := PackedVector2Array()
+	var largest_area := 0.0
+	for piece: PackedVector2Array in pieces:
+		var cleaned := _deduplicate_loop(piece)
+		if cleaned.size() < 3 or _has_self_intersection(cleaned):
+			continue
+		var area := absf(_polygon_area(cleaned))
+		if (area > centerline_area) != select_outer:
+			continue
+		if not _loop_hugs_centerline(cleaned, centerline):
+			continue
+		if area > largest_area:
+			result = cleaned
+			largest_area = area
+	return result
+
+
+static func _deduplicate_loop(points: PackedVector2Array) -> PackedVector2Array:
+	var result := PackedVector2Array()
+	for point: Vector2 in points:
+		if result.is_empty() or point.distance_squared_to(result[result.size() - 1]) > 0.01:
+			result.append(point)
+	if result.size() > 1 and result[0].distance_squared_to(result[result.size() - 1]) <= 0.01:
+		result.remove_at(result.size() - 1)
+	return result
+
+
+static func _has_self_intersection(points: PackedVector2Array) -> bool:
+	for first in points.size():
+		var first_next := (first + 1) % points.size()
+		for second in range(first + 1, points.size()):
+			var second_next := (second + 1) % points.size()
+			if first_next == second or second_next == first:
+				continue
+			if Geometry2D.segment_intersects_segment(points[first], points[first_next], points[second], points[second_next]) != null:
+				return true
+	return false
+
+
+static func _loop_hugs_centerline(loop: PackedVector2Array, centerline: PackedVector2Array) -> bool:
+	for index in loop.size():
+		var from := loop[index]
+		var to := loop[(index + 1) % loop.size()]
+		for fraction: float in [0.0, 0.5]:
+			var sample := from.lerp(to, fraction)
+			var nearest := INF
+			for center_index in centerline.size():
+				nearest = minf(nearest, _point_to_segment_distance(sample, centerline[center_index], centerline[(center_index + 1) % centerline.size()]))
+			if nearest < HALF_WIDTH * 0.62 or nearest > HALF_WIDTH * 1.42:
+				return false
+	return true
 
 
 static func _arc_lengths(centerline: PackedVector2Array) -> PackedFloat32Array:

@@ -56,6 +56,10 @@ func _run_test() -> void:
 			return
 	if not _check_wide_triangle_regression():
 		return
+	if not _check_boundary_room_regressions():
+		return
+	if not _check_legacy_builder_scale():
+		return
 	print("GENERATED_TRACK_COMPOSITION_TEST PASS builds=%d stories=12 surfaces=24" % _built_count)
 	quit(0)
 
@@ -186,6 +190,8 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 		return false
 	if not _check_island_geometry(track, "%s seed %d" % [theme, seed]):
 		return false
+	if not _check_outer_boundary(track, theme, seed):
+		return false
 
 	var definitions: Variant = track.get_meta("generated_surfaces", null)
 	if not _expect(definitions is Array and (definitions as Array).size() == 2, "%s should define exactly two generated surfaces" % theme):
@@ -255,6 +261,29 @@ func _check_wide_triangle_regression() -> bool:
 	return valid
 
 
+func _check_boundary_room_regressions() -> bool:
+	for sample: Dictionary in [
+		{"theme": &"kitchen", "room": &"long", "seed": 3},
+		{"theme": &"office", "room": &"el", "seed": 8},
+	]:
+		var built: Dictionary = BUILDER.build_packed(sample["theme"], sample["room"], sample["seed"])
+		if not _expect(built.get("scene") is PackedScene, "%s/%s/%d should build its boundary regression track" % [sample["theme"], sample["room"], sample["seed"]]):
+			return false
+		var track := (built["scene"] as PackedScene).instantiate() as Node2D
+		_built_count += 1
+		var valid := _check_outer_boundary(track, sample["theme"], sample["seed"])
+		track.free()
+		if not valid:
+			return false
+	return true
+
+
+func _check_legacy_builder_scale() -> bool:
+	var base_bounds := _points_bounds(BUILDER.BASE_ROOM_SHAPES["classic"])
+	var generated_bounds := _points_bounds(BUILDER.ROOM_SHAPES["classic"])
+	return _expect(base_bounds.size == Vector2(1750.0, 1150.0) and generated_bounds.size.is_equal_approx(base_bounds.size * BUILDER.WORLD_SCALE), "negative-seed canonical rooms should stay unscaled while generated rooms use world scale")
+
+
 func _check_island_geometry(track: Node2D, label: String) -> bool:
 	var barrier := track.get_node_or_null("InnerBarrier")
 	var boundary_collision := barrier.get_node_or_null("BoundaryCollision") as CollisionShape2D if barrier else null
@@ -272,6 +301,87 @@ func _check_island_geometry(track: Node2D, label: String) -> bool:
 		for marker: Node2D in grid.get_children():
 			if not _expect(not Geometry2D.is_point_in_polygon(marker.position, island_polygon), "%s %s marker should not overlap the island collision" % [label, grid_name]):
 				return false
+	return true
+
+
+func _check_outer_boundary(track: Node2D, theme: StringName, seed: int) -> bool:
+	var label := "%s seed %d" % [theme, seed]
+	var barrier := track.get_node_or_null("OuterBarrier") as StaticBody2D
+	var collision := barrier.get_node_or_null("BoundaryCollision") as CollisionShape2D if barrier else null
+	if not _expect(barrier != null and barrier.collision_layer == 2 and collision != null and collision.shape is ConcavePolygonShape2D, "%s should have one continuous layer-2 outer barrier" % label):
+		return false
+	var polygon: PackedVector2Array = barrier.get_meta("boundary_polygon", PackedVector2Array())
+	var segments: PackedVector2Array = (collision.shape as ConcavePolygonShape2D).segments
+	if not _expect(polygon.size() > 20 and segments.size() == polygon.size() * 2, "%s outer barrier should be a closed segment chain" % label):
+		return false
+	if not _expect(not _has_self_intersection(polygon), "%s outer barrier contour should be simple and contain no cross-track bridge" % label):
+		return false
+	var centerline := (track.get_node("TrackSurface") as Line2D).points
+	for index in range(0, polygon.size(), maxi(1, polygon.size() / 36)):
+		var distance := _minimum_point_distance(polygon[index], centerline)
+		if not _expect(distance >= 78.0 and distance <= 178.0, "%s outer contour sample should hug the 125u corridor edge (got %.1f)" % [label, distance]):
+			return false
+
+	var visuals := track.get_node_or_null("GeneratedOuterBoundaryVisuals")
+	var expected: Dictionary = BUILDER.LAYOUTS[theme]["generated_boundary"]
+	if not _expect(visuals != null and String(visuals.get_meta("section_asset", "")) == String(expected["section"]) and String(visuals.get_meta("accent_asset", "")) == String(expected["accent"]), "%s outer visuals should use only its theme-specific household kit" % label):
+		return false
+	if not _expect(load(String(expected["section"])) is Texture2D and load(String(expected["accent"])) is Texture2D, "%s boundary textures should be tracked loadable assets" % label):
+		return false
+	var sections: Array[Node] = []
+	var accents: Array[Node] = []
+	for child: Node in visuals.get_children():
+		if child.name.contains("Section"):
+			sections.append(child)
+		elif child.name.begins_with("CornerAccent"):
+			accents.append(child)
+	if not _expect(sections.size() == int(visuals.get_meta("section_count", 0)) and sections.size() >= 8 and sections.size() <= 32, "%s should use a restrained number of partial boundary sections (count=%d)" % [label, sections.size()]):
+		return false
+	if not _expect(accents.size() == int(visuals.get_meta("accent_count", 0)) and accents.size() in [1, 2], "%s should mark one or two meaningful corner mouths with larger partial sections" % label):
+		return false
+	var run_modes: Array = visuals.get_meta("run_modes", [])
+	var sides_by_run := {}
+	for section: Sprite2D in sections:
+		var run_index := int(section.get_meta("run_index", -1))
+		if not _expect(run_index >= 0 and run_index < 8, "%s partial boundary section should identify its authored run" % label):
+			return false
+		var centerline_index := int(section.get_meta("centerline_index", -1))
+		var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / 8.0)) % centerline.size()
+		var positioned_index := int(BUILDER._closest_point_on_loop(section.position, centerline)["index"])
+		if not _expect(centerline_index >= 0 and BUILDER._cyclic_index_distance(centerline_index, run_center, centerline.size()) < centerline.size() / 16 and BUILDER._cyclic_index_distance(positioned_index, run_center, centerline.size()) < centerline.size() / 16, "%s run %d section should stay inside its assigned visual sector" % [label, run_index]):
+			return false
+		var sides: Dictionary = sides_by_run.get(run_index, {})
+		sides[StringName(section.get_meta("boundary_side", &""))] = true
+		sides_by_run[run_index] = sides
+	var actual_empty_runs := 0
+	var actual_one_sided_runs := 0
+	var actual_both_sided_runs := 0
+	if not _expect(run_modes.size() == 8, "%s should expose eight boundary run results" % label):
+		return false
+	for run_index in 8:
+		var sides: Dictionary = sides_by_run.get(run_index, {})
+		var actual_mode := &"both" if sides.has(&"outer") and sides.has(&"inner") else (&"outer" if sides.has(&"outer") else (&"inner" if sides.has(&"inner") else &"none"))
+		if not _expect(StringName(run_modes[run_index]) == actual_mode, "%s run %d metadata should match its placed sections" % [label, run_index]):
+			return false
+		if actual_mode == &"none":
+			actual_empty_runs += 1
+		elif actual_mode == &"both":
+			actual_both_sided_runs += 1
+		else:
+			actual_one_sided_runs += 1
+	if not _expect(actual_empty_runs >= 3 and actual_one_sided_runs >= 3 and actual_both_sided_runs == 2, "%s should actually place empty, one-sided, and both-sided boundary runs" % label):
+		return false
+	if not _expect(int(visuals.get_meta("empty_run_count", 0)) == actual_empty_runs and int(visuals.get_meta("one_sided_run_count", 0)) == actual_one_sided_runs and int(visuals.get_meta("both_sided_run_count", 0)) == actual_both_sided_runs, "%s boundary run counts should describe placed sprites" % label):
+		return false
+	if not _expect(int(visuals.get_meta("outer_section_count", 0)) > 0 and int(visuals.get_meta("inner_section_count", 0)) > 0, "%s partial boundary composition should use both track edges without lining either continuously" % label):
+		return false
+	for section: Sprite2D in sections:
+		var section_distance := _minimum_point_distance(section.position, centerline)
+		if not _expect(section.texture != null and section_distance >= BUILDER.HALF_WIDTH and StringName(section.get_meta("boundary_kind", &"")) == &"partial_section", "%s partial boundary sections should stay outside the 250u drivable corridor (got %.1f)" % [label, section_distance]):
+			return false
+	for accent: Sprite2D in accents:
+		if not _expect(accent.texture != null and StringName(accent.get_meta("boundary_kind", &"")) == &"corner_mouth_accent", "%s corner accents should expose their semantic boundary role" % label):
+			return false
 	return true
 
 

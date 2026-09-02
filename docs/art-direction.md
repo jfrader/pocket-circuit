@@ -53,8 +53,10 @@ rooms, route geometry, palette, interface, and story.
   white. Shadows offset down and right with a warm dark-brown tint.
 - Track edges are broad, rounded, and slightly hand-drawn rather than perfect
   vector radii. Track value contrast must remain clear at speed.
-- The full inner island is solid and outlined by a continuous amber guardrail.
-  Traversable shortcuts are explicit authored openings, never missing physics.
+- The full inner island remains visually solid. Generated hard boundaries are
+  continuous in physics, while household barrier props appear only in selected
+  short runs; an empty visual run never means missing collision.
+- Traversable shortcuts are explicit authored lanes, never gaps in physics.
 - Kitchen props are oversized, friendly, and readable from directly above.
   Details are broad shapes, not thin linework.
 - Micro details such as crumbs, fibers, droplets, scratches, and wood grain use
@@ -121,6 +123,20 @@ rooms, route geometry, palette, interface, and story.
 - Office uses a dark desk pad, envelope stack, sticky notes, and notepad page.
 - These pieces remain lower contrast than hero landmarks, do not collide, and
   cannot become a substitute for readable track edges.
+
+### Generated Course Boundaries
+
+- Preserve negative space: a generated lap mixes short both-sided barrier
+  moments, one-sided runs, and several sectors with no barrier props at all.
+  Never wrap a repeated fence around the complete inner or outer edge.
+- Kitchen boundary runs use folded blue towel rails with occasional oven-mitt
+  accents. Workshop uses paint-stirrer rails with tape-roll accents. Office uses
+  yellow pencil rails with sticky-note accents.
+- Partial boundary sprites straddle the material edge as visual cues. The track
+  surface remains readable through value and texture where props are absent;
+  continuous collision underneath prevents a visual gap from becoming a cut.
+- Keep corner accents larger and rarer than straight sections. Avoid even
+  spacing, mirrored walls, or enough repeated pieces to read as a stadium rail.
 
 ### Vehicle And Effects
 

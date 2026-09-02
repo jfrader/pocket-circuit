@@ -1,18 +1,16 @@
 extends SceneTree
 
 const TRACK_SEED_GEN := preload("res://tools/track_seed_gen.gd")
+const TRACK_BUILDER := preload("res://tools/track_builder_core.gd")
 const ROOM_RECT := Rect2(-940.0, -540.0, 1880.0, 1080.0)
 const HALF_WIDTH := 125.0
 const SAMPLE_SEEDS := 60
+const PHYSICAL_BYPASS_MIN_ARC := 900.0
+const PHYSICAL_BYPASS_MAX_ARC := 3000.0
+const PHYSICAL_BYPASS_MIN_SAVING := 450.0
+const PHYSICAL_BYPASS_MIN_RATIO := 1.65
 
-static var ROOM_SHAPES := {
-	"classic": PackedVector2Array([Vector2(-875, -575), Vector2(875, -575), Vector2(875, 575), Vector2(-875, 575)]),
-	"wide": PackedVector2Array([Vector2(-1175, -600), Vector2(1175, -600), Vector2(1175, 600), Vector2(-1175, 600)]),
-	"tall": PackedVector2Array([Vector2(-575, -725), Vector2(575, -725), Vector2(575, 725), Vector2(-575, 725)]),
-	"long": PackedVector2Array([Vector2(-1300, -550), Vector2(1300, -550), Vector2(1300, 550), Vector2(-1300, 550)]),
-	"square": PackedVector2Array([Vector2(-750, -750), Vector2(750, -750), Vector2(750, 750), Vector2(-750, 750)]),
-	"el": PackedVector2Array([Vector2(-1200, -700), Vector2(360, -700), Vector2(360, -60), Vector2(1200, -60), Vector2(1200, 700), Vector2(-1200, 700)]),
-}
+static var ROOM_SHAPES := TRACK_BUILDER.ROOM_SHAPES
 
 
 func _initialize() -> void:
@@ -36,7 +34,7 @@ func _run_test() -> void:
 		var controls: PackedVector2Array = result["points"]
 		if not _expect(not controls.is_empty(), "classic seed %d should generate a loop (%s)" % [seed, result.get("reason", "unknown")]):
 			return
-		if not _expect(float(result.get("length", 0.0)) >= 1900.0, "classic seed %d should report a useful loop length" % seed):
+		if not _expect(float(result.get("length", 0.0)) >= 1900.0 * TRACK_SEED_GEN.WORLD_SCALE, "classic seed %d should report a world-scaled loop length" % seed):
 			return
 		var loop_length := float(result["length"])
 		length_buckets[int(round(loop_length / 250.0))] = true
@@ -50,7 +48,7 @@ func _run_test() -> void:
 		if bool(result.get("fallback", false)):
 			fallback_count += 1
 		fingerprints[_shape_fingerprint(controls)] = true
-		if not _check_loop(seed, "classic", controls, ROOM_SHAPES["classic"], 250.0):
+		if not _check_loop(seed, "classic", controls, ROOM_SHAPES["classic"], 320.0):
 			return
 		if seed < 8:
 			var repeated: Dictionary = TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, classic_params)
@@ -65,9 +63,9 @@ func _run_test() -> void:
 		return
 	if not _expect(length_buckets.size() >= 4, "independent length rolls should produce varied loop lengths (got %d buckets)" % length_buckets.size()):
 		return
-	if not _expect(minimum_length >= 2450.0 and maximum_length >= 4500.0 and maximum_length <= 5600.0, "classic length stream should span roughly 2.5k-5.5k (got %.0f..%.0f)" % [minimum_length, maximum_length]):
+	if not _expect(minimum_length >= 4200.0 and maximum_length >= 7600.0 and maximum_length <= 9800.0, "classic length stream should span the scaled 4.2k-9.8k world range (got %.0f..%.0f)" % [minimum_length, maximum_length]):
 		return
-	if not _expect(fallback_count <= 3, "classic seeds should normally retain their selected family (fallbacks=%d)" % fallback_count):
+	if not _expect(fallback_count <= 10, "classic seeds should usually retain their selected family while rejecting complex-bypass variants (fallbacks=%d)" % fallback_count):
 		return
 
 	var representative_seeds := {
@@ -76,7 +74,7 @@ func _run_test() -> void:
 		"broad_triangle": 2,
 		"kidney": 3,
 		"deep_notch": 5,
-		"offset_s": 8,
+		"offset_s": 11,
 	}
 	var representative_features := {}
 	for family_name: String in representative_seeds:
@@ -125,7 +123,7 @@ func _run_test() -> void:
 			var repeated: Dictionary = TRACK_SEED_GEN.generate_with_retries(room_seed, ROOM_RECT, params)
 			if not _expect(repeated["points"] == controls and repeated["family"] == result["family"], "%s/%s must be exactly deterministic" % [room_name, expected_family]):
 				return
-			if not _check_loop(room_seed, room_name, controls, ROOM_SHAPES[room_name], 250.0):
+			if not _check_loop(room_seed, room_name, controls, ROOM_SHAPES[room_name], 320.0):
 				return
 			if room_name == "el":
 				var centerline: PackedVector2Array = TRACK_SEED_GEN.centerline_checkpoints(controls)
@@ -151,6 +149,9 @@ func _run_test() -> void:
 	var matrix_count := 0
 	var matrix_fallbacks := 0
 	var total_turn_complexes := 0
+	var total_setup_straight_regions := 0
+	var minimum_setup_straight_regions := 999
+	var maximum_setup_straight_regions := 0
 	for room_name: String in ROOM_SHAPES:
 		var params := _room_params(room_name)
 		for seed in SAMPLE_SEEDS:
@@ -160,41 +161,53 @@ func _run_test() -> void:
 			var controls: PackedVector2Array = result["points"]
 			if not _expect(not controls.is_empty(), "%s seed %d should produce a matrix route" % [room_name, seed]):
 				return
-			if not _check_loop(seed, room_name, controls, ROOM_SHAPES[room_name], 250.0):
+			if not _check_loop(seed, room_name, controls, ROOM_SHAPES[room_name], 320.0):
 				return
-			var turn_complexes := _turn_complex_count(TRACK_SEED_GEN.centerline_checkpoints(controls))
-			if not _expect(turn_complexes >= 5, "%s seed %d should contain at least five distinct turn complexes (got %d)" % [room_name, seed, turn_complexes]):
+			var gameplay: Dictionary = TRACK_SEED_GEN.gameplay_metrics(controls)
+			var setup_straight_regions := int(gameplay.get("setup_straight_count", 0))
+			if not _expect(setup_straight_regions >= 2, "%s seed %d needs at least two distinct %.0fu setup straights (got %d)" % [room_name, seed, TRACK_SEED_GEN.MIN_SETUP_DISTANCE, setup_straight_regions]):
+				return
+			if not _expect(not bool((gameplay.get("complex_bypass", {}) as Dictionary).get("found", false)), "%s seed %d must resist a straight chord replacing a whole complex" % [room_name, seed]):
+				return
+			var physical_bypass := _physical_complex_bypass(TRACK_SEED_GEN.centerline_checkpoints(controls))
+			if not _expect(not bool(physical_bypass.get("found", false)), "%s seed %d hard boundaries must block a %.0fu route-to-chord bypass (arc=%.0f chord=%.0f samples=%d->%d)" % [room_name, seed, float(physical_bypass.get("saving", 0.0)), float(physical_bypass.get("arc", 0.0)), float(physical_bypass.get("chord", 0.0)), int(physical_bypass.get("start", -1)), int(physical_bypass.get("finish", -1))]):
+				return
+			total_setup_straight_regions += setup_straight_regions
+			minimum_setup_straight_regions = mini(minimum_setup_straight_regions, setup_straight_regions)
+			maximum_setup_straight_regions = maxi(maximum_setup_straight_regions, setup_straight_regions)
+			var turn_complexes := _broad_turn_complex_count(TRACK_SEED_GEN.centerline_checkpoints(controls))
+			if not _expect(turn_complexes >= 1 and turn_complexes <= 10, "%s seed %d should contain a bounded set of broad setup-separated complexes (got %d)" % [room_name, seed, turn_complexes]):
 				return
 			if bool(result.get("fallback", false)):
 				matrix_fallbacks += 1
-				if not _expect(StringName(result.get("realization", &"")) == &"technical_perimeter" and turn_complexes >= 7, "%s seed %d fallback must use a technical perimeter with at least seven turns" % [room_name, seed]):
+				if not _expect(StringName(result.get("realization", &"")) == &"technical_perimeter", "%s seed %d fallback must report its conservative perimeter realization" % [room_name, seed]):
 					return
 			total_turn_complexes += turn_complexes
 			matrix_count += 1
 	if not _expect(matrix_fallbacks <= 72, "the 360-route matrix should retain selected-family geometry when it fits (fallbacks=%d)" % matrix_fallbacks):
 		return
-	if not _expect(total_turn_complexes >= matrix_count * 7, "the route matrix should average at least seven distinct turn complexes (got %.1f)" % (float(total_turn_complexes) / float(matrix_count))):
+	if not _expect(total_turn_complexes <= matrix_count * 6, "the route matrix should average no more than six broad complexes (got %.1f)" % (float(total_turn_complexes) / float(matrix_count))):
 		return
 
-	print("TRACK_SEED_GEN_TEST PASS families=%d fingerprints=%d classic_fallbacks=%d matrix_fallbacks=%d turns_avg=%.1f classic_length=%.0f..%.0f" % [families.size(), fingerprints.size(), fallback_count, matrix_fallbacks, float(total_turn_complexes) / float(matrix_count), minimum_length, maximum_length])
+	print("TRACK_SEED_GEN_TEST PASS families=%d fingerprints=%d classic_fallbacks=%d matrix_fallbacks=%d broad_complexes_avg=%.1f setup_regions=%d..%d avg=%.1f classic_length=%.0f..%.0f" % [families.size(), fingerprints.size(), fallback_count, matrix_fallbacks, float(total_turn_complexes) / float(matrix_count), minimum_setup_straight_regions, maximum_setup_straight_regions, float(total_setup_straight_regions) / float(matrix_count), minimum_length, maximum_length])
 	quit(0)
 
 
 func _room_params(room_name: String) -> Dictionary:
 	var params := {
-		"margin": 150.0,
-		"min_self_distance": 250.0,
-		"min_loop_length": 1900.0,
+		"margin": 190.0,
+		"min_self_distance": 320.0,
+		"min_loop_length": 1900.0 * TRACK_SEED_GEN.WORLD_SCALE,
 		"room_polygon": ROOM_SHAPES[room_name],
 		"room_shape": StringName(room_name),
 	}
 	match room_name:
 		"el":
-			params["min_loop_length"] = 1500.0
+			params["min_loop_length"] = 1500.0 * TRACK_SEED_GEN.WORLD_SCALE
 		"long":
-			params["min_loop_length"] = 2000.0
+			params["min_loop_length"] = 2000.0 * TRACK_SEED_GEN.WORLD_SCALE
 		"square":
-			params["min_loop_length"] = 2200.0
+			params["min_loop_length"] = 2200.0 * TRACK_SEED_GEN.WORLD_SCALE
 	return params
 
 
@@ -212,7 +225,7 @@ func _check_loop(seed: int, room_name: String, controls: PackedVector2Array, roo
 	return true
 
 
-func _turn_complex_count(points: PackedVector2Array) -> int:
+func _broad_turn_complex_count(points: PackedVector2Array) -> int:
 	var profile := PackedFloat32Array()
 	var span := 8
 	for index in points.size():
@@ -246,7 +259,68 @@ func _turn_complex_count(points: PackedVector2Array) -> int:
 				break
 		if separated:
 			selected.append(index)
-	return selected.size()
+	if selected.is_empty():
+		return 0
+	selected.sort()
+	var arc := PackedFloat32Array([0.0])
+	for index in points.size():
+		arc.append(arc[index] + points[index].distance_to(points[(index + 1) % points.size()]))
+	var separated_gaps := 0
+	for index in selected.size():
+		var first := selected[index]
+		var second := selected[(index + 1) % selected.size()]
+		var gap := arc[second] - arc[first] if second > first else arc[arc.size() - 1] - arc[first] + arc[second]
+		# Peak centers need the 450u setup run plus room for both corner mouths.
+		if gap >= TRACK_SEED_GEN.MIN_SETUP_DISTANCE + 200.0:
+			separated_gaps += 1
+	return maxi(separated_gaps, 1)
+
+
+func _physical_complex_bypass(centerline: PackedVector2Array) -> Dictionary:
+	var edges: Dictionary = TRACK_BUILDER._corridor_edges(centerline)
+	var left: PackedVector2Array = edges["left"]
+	var right: PackedVector2Array = edges["right"]
+	var outer_raw := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
+	var inner_raw := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
+	var outer_boundary: PackedVector2Array = TRACK_BUILDER._simple_boundary_loop(outer_raw, centerline)
+	var inner_boundary: PackedVector2Array = TRACK_BUILDER._simple_inner_boundary_loop(inner_raw, centerline)
+	for start in range(0, centerline.size(), 3):
+		var route_arc := 0.0
+		for step in range(1, centerline.size() / 2):
+			route_arc += centerline[(start + step - 1) % centerline.size()].distance_to(centerline[(start + step) % centerline.size()])
+			if route_arc < PHYSICAL_BYPASS_MIN_ARC or step % 3 != 0:
+				continue
+			if route_arc > PHYSICAL_BYPASS_MAX_ARC:
+				break
+			var finish := (start + step) % centerline.size()
+			var chord := centerline[start].distance_to(centerline[finish])
+			var saving := route_arc - chord
+			if chord < 1.0:
+				continue
+			var ratio := route_arc / chord
+			var egregious_bypass := saving >= PHYSICAL_BYPASS_MIN_SAVING and ratio >= PHYSICAL_BYPASS_MIN_RATIO
+			var unvalidated_long_bypass := route_arc > TRACK_SEED_GEN.BYPASS_MAX_ARC and saving >= TRACK_SEED_GEN.BYPASS_MIN_SAVING and ratio >= TRACK_SEED_GEN.BYPASS_MIN_RATIO
+			if not egregious_bypass and not unvalidated_long_bypass:
+				continue
+			if _segment_touches_loop(centerline[start], centerline[finish], outer_boundary, 22.0) or _segment_touches_loop(centerline[start], centerline[finish], inner_boundary, 22.0):
+				continue
+			return {"found": true, "saving": saving, "arc": route_arc, "chord": chord, "start": start, "finish": finish}
+	return {"found": false, "saving": 0.0}
+
+
+func _segment_touches_loop(from: Vector2, to: Vector2, loop: PackedVector2Array, clearance: float) -> bool:
+	for index in loop.size():
+		var boundary_from := loop[index]
+		var boundary_to := loop[(index + 1) % loop.size()]
+		if Geometry2D.segment_intersects_segment(from, to, boundary_from, boundary_to) != null:
+			return true
+		var distance := minf(
+			minf(_point_segment_distance(from, boundary_from, boundary_to), _point_segment_distance(to, boundary_from, boundary_to)),
+			minf(_point_segment_distance(boundary_from, from, to), _point_segment_distance(boundary_to, from, to))
+		)
+		if distance <= clearance:
+			return true
+	return false
 
 
 func _shape_fingerprint(controls: PackedVector2Array) -> String:
