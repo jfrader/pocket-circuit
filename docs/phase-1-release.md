@@ -169,12 +169,17 @@ rewards or content access.
 
 | Preset | AI behavior |
 |---|---|
-| Sunday Drive | Earlier braking and no catch-up power |
-| Club Circuit | Intended baseline, modest bounded catch-up |
-| Clockwork | Later braking, cleaner lines, no speed beyond legal boost cap |
+| Sunday Drive | Conservative corner floor, earlier braking, limited opening boost, and no catch-up power |
+| Club Circuit | Competitive baseline with later braking, clean-line boost recovery, and modest bounded catch-up |
+| Clockwork | Highest legal corner pace, strongest boost economy, and maximum legal acceleration without catch-up |
 
 Catch-up never teleports a racer, alters checkpoints, or raises the vehicle
-beyond its legal boosted speed. The player receives no hidden handling penalty.
+beyond its legal boosted speed. AI engine force is capped at 1.15x while the
+shared vehicle controller still enforces the same 1.0x normal and 1.2x boosted
+top-speed limits for every racer. AI cannot handbrake-drift, so Club Circuit and
+Clockwork recover a small amount of boost only while holding a clean, fast line;
+the meter still uses the player capacity, drain, and boosted-speed cap. The
+player receives no hidden handling penalty.
 
 ## Release Gates
 
