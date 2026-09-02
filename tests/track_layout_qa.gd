@@ -96,7 +96,10 @@ func _run() -> void:
 
 	if _failures.is_empty():
 		print("TRACK_LAYOUT_QA PASS %s" % _theme)
+		track.queue_free()
+		await physics_frame
 		quit(0)
+		return
 	for failure: String in _failures:
 		push_error("TRACK_LAYOUT_QA FAIL: " + failure)
 	quit(1)
