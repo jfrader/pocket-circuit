@@ -14,10 +14,14 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	Engine.time_scale = 1.0
+	var theme_only := StringName(OS.get_environment("PC_THEME_ONLY"))
+	var direction_only := OS.get_environment("PC_DIRECTION")
 	for theme: StringName in THEMES:
-		if not await _run_direction(theme, false):
+		if theme_only != &"" and theme != theme_only:
+			continue
+		if direction_only != "reverse" and not await _run_direction(theme, false):
 			return
-		if not await _run_direction(theme, true):
+		if direction_only != "forward" and not await _run_direction(theme, true):
 			return
 	Engine.time_scale = 1.0
 	print("AI_RACE_SMOKE_TEST PASS all_themes")
@@ -80,7 +84,7 @@ func _run_direction(theme: StringName, reverse: bool) -> bool:
 			]
 		)
 		print(
-			"AI_RACE_STATE %s %s %s checkpoints=%d expected=%d position=%s speed=%.1f recoveries=%d recovering=%s stuck=%.2f"
+			"AI_RACE_STATE %s %s %s checkpoints=%d expected=%d position=%s speed=%.1f recoveries=%d escapes=%d recovering=%s stuck=%.2f route_stall=%.2f off_route=%.2f wrong_way=%.2f"
 			% [
 				theme,
 				direction_label,
@@ -90,8 +94,12 @@ func _run_direction(theme: StringName, reverse: bool) -> bool:
 				str(racer.global_position.round()),
 				float(racer.get("speed")),
 				controller.recovery_count if controller else -1,
+				controller.static_escape_attempt_count if controller else -1,
 				str(controller.get("_recovering")) if controller else "missing",
 				float(controller.get("_stuck_time")) if controller else -1.0,
+				float(controller.get("_no_progress_time")) if controller else -1.0,
+				float(controller.get("_off_route_time")) if controller else -1.0,
+				float(controller.get("_wrong_way_progress_time")) if controller else -1.0,
 			]
 		)
 	for racer: Node2D in ai_vehicles:

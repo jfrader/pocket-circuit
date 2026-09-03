@@ -882,6 +882,10 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 		if probe_clearance > best_clearance:
 			best_clearance = probe_clearance
 			best_direction = probe_direction
+	if vehicle.has_static_contact and vehicle.speed <= STATIC_ESCAPE_MAX_SPEED:
+		center_clearance = 0.0
+		hitting_vehicle = false
+		wall_normal = vehicle.static_contact_normal
 	if center_clearance >= 0.92:
 		return plan
 	if wall_normal.length_squared() > 0.01 and not hitting_vehicle:
