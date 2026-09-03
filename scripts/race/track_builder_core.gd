@@ -427,7 +427,7 @@ static var PROP_SHAPES := {
 	"giant_fork.png": {"solid": true, "shape": "rect", "size": Vector2(60.0, 220.0)},
 	"giant_basketball.png": {"solid": true, "shape": "circle", "size": Vector2(140.0, 140.0)},
 	"giant_toolbox.png": {"solid": true, "shape": "rect", "size": Vector2(200.0, 120.0)},
-	"giant_paint_can.png": {"solid": true, "shape": "circle", "size": Vector2(120.0, 120.0)},
+	"giant_paint_can.png": {"solid": true, "shape": "rect", "size": Vector2(120.0, 120.0)},
 	"giant_keyboard.png": {"solid": true, "shape": "rect", "size": Vector2(220.0, 150.0)},
 	"giant_monitor.png": {"solid": true, "shape": "rect", "size": Vector2(180.0, 130.0)},
 	"giant_paper_stack.png": {"solid": true, "shape": "rect", "size": Vector2(170.0, 120.0)},
