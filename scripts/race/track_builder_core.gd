@@ -31,6 +31,7 @@ const SHADOW_TINT := Color("3f2a22", 0.35)
 const GIANT_CAST_SHADOW_TINT := Color("3f2a22", 0.15)
 const COLLISION_SOLID := &"solid"
 const COLLISION_FLAT := &"flat"
+const COLLISION_ALPHA_THRESHOLD := 0.08
 const ORIENTED_FOOTPRINT_MIN_ANISOTROPY := 1.35
 
 ## Generated asset contract (authoritative across every constructor below):
@@ -70,6 +71,8 @@ static var FLAT_EDGE_ASSETS := {
 	"desk_pad_grid.png": true,
 }
 static var _texture_footprint_cache: Dictionary = {}
+static var _texture_hull_cache: Dictionary = {}
+static var _texture_opaque_rect_cache: Dictionary = {}
 
 ## Exceptions to the broad PROP_SHAPES presentation categories. These assets
 ## are visibly elongated or rectangular even though older placement data used a
@@ -77,15 +80,35 @@ static var _texture_footprint_cache: Dictionary = {}
 static var ASSET_FOOTPRINT_OVERRIDES := {
 	"watermelon.png": {"kind": &"capsule", "no_rotation": true},
 	"giant_watermelon.png": {"kind": &"capsule", "no_rotation": true},
-	"giant_mug.png": {"kind": &"capsule", "no_rotation": true},
-	"giant_mouse.png": {"kind": &"capsule", "no_rotation": true},
-	"mug_top.png": {"kind": &"rect", "no_rotation": true},
-	"mug_blue.png": {"kind": &"rect", "no_rotation": true},
-	"kitchen_mug_blue.png": {"kind": &"rect", "no_rotation": true},
-	"kitchen_mug_hero.png": {"kind": &"rect", "no_rotation": true},
+	"giant_mug.png": {"kind": &"convex", "no_rotation": true},
+	"giant_fork.png": {"kind": &"convex", "no_rotation": true},
+	"giant_toaster.png": {"kind": &"convex", "no_rotation": true},
+	"giant_milk_carton.png": {"kind": &"convex", "no_rotation": true},
+	"giant_toolbox.png": {"kind": &"convex", "no_rotation": true},
+	"giant_paint_can.png": {"kind": &"convex", "no_rotation": true},
+	"giant_keyboard.png": {"kind": &"convex", "no_rotation": true},
+	"giant_monitor.png": {"kind": &"convex", "no_rotation": true},
+	"giant_paper_stack.png": {"kind": &"convex", "no_rotation": true},
+	"giant_pen.png": {"kind": &"convex", "no_rotation": true},
+	"giant_hammer.png": {"kind": &"convex", "no_rotation": true},
+	"giant_wrench.png": {"kind": &"convex", "no_rotation": true},
+	"giant_stapler.png": {"kind": &"convex", "no_rotation": true},
+	"giant_mouse.png": {"kind": &"convex", "no_rotation": true},
+	"bucket_stack.png": {"kind": &"convex", "no_rotation": true},
+	"monitor_top.png": {"kind": &"convex", "no_rotation": true},
+	"mug_top.png": {"kind": &"convex", "no_rotation": true},
+	"mug_blue.png": {"kind": &"convex", "no_rotation": true},
+	"kitchen_mug_blue.png": {"kind": &"convex", "no_rotation": true},
+	"kitchen_mug_hero.png": {"kind": &"convex", "no_rotation": true},
+	"cereal_tower_green.png": {"kind": &"rect", "no_rotation": true},
+	"kitchen_cereal_green.png": {"kind": &"rect", "no_rotation": true},
+	"kitchen_cereal_orange.png": {"kind": &"rect", "no_rotation": true},
+	"office_keycap.png": {"kind": &"rect", "no_rotation": true},
 	"sponge_wet.png": {"kind": &"rect", "no_rotation": true},
 	"kitchen_sponge.png": {"kind": &"rect", "no_rotation": true},
 	"napkin.png": {"kind": &"rect", "no_rotation": true},
+	"hazard_workshop_socket.png": {"kind": &"convex", "no_rotation": true},
+	"hazard_office_cable.png": {"kind": &"convex", "no_rotation": true},
 	"workshop_toolbox_top_bright.jpg": {"kind": &"rect", "no_rotation": true},
 	"office_keyboard_top_bright.jpg": {"kind": &"rect", "no_rotation": true},
 	"stove_top.png": {"kind": &"rect", "no_rotation": true},
@@ -1441,9 +1464,9 @@ static func _build_generated_outer_boundary_visuals(
 		_mark_solid_body(accent_body, accent_path, &"boundary_prop")
 		container.add_child(accent_body)
 		var accent_scale := Vector2(160.0 / accent_texture.get_width(), 70.0 / accent_texture.get_height())
-		var accent_footprint := _texture_collision_footprint(accent_texture, &"rect", true)
+		var accent_footprint := _texture_collision_footprint(accent_texture, &"convex", true)
 		var accent_size: Vector2 = (accent_footprint["size"] as Vector2) * accent_scale + Vector2.ONE * 2.0
-		var accent_offset := _add_texture_collision(accent_body, accent_texture, accent_scale, &"rect", true, 2.0)
+		var accent_offset := _add_texture_collision(accent_body, accent_texture, accent_scale, &"convex", true, 2.0)
 		_add_directional_shadow(accent_body, accent_path, 160.0, 1.0, accent_size)
 		var accent_sprite := Sprite2D.new()
 		accent_sprite.name = "Sprite"
@@ -1518,9 +1541,9 @@ static func _add_generated_boundary_section(
 	_mark_solid_body(body, texture.resource_path, &"rail")
 	container.add_child(body)
 	var sprite_scale := Vector2(156.0 / texture.get_width(), 56.0 / texture.get_height())
-	var footprint := _texture_collision_footprint(texture, &"rect", true)
-	var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale + Vector2.ONE * 2.0
-	var offset := _add_texture_collision(body, texture, sprite_scale, &"rect", true, 2.0)
+	var footprint := _texture_collision_footprint(texture, &"convex", true)
+	var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale
+	var offset := _add_texture_collision(body, texture, sprite_scale, &"convex", true, 0.0)
 	(body.get_node("AssetCollision") as CollisionShape2D).name = "RailCollision"
 	_add_directional_shadow(body, texture.resource_path, 156.0, 1.0, footprint_size)
 	var sprite := Sprite2D.new()
@@ -1897,9 +1920,9 @@ static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tan
 		_mark_solid_body(post, asset_path, &"gate_post")
 		container.add_child(post)
 		var sprite_scale := Vector2(GATE_POST_SIZE.x / texture.get_width(), GATE_POST_SIZE.y / texture.get_height())
-		var footprint := _texture_collision_footprint(texture, &"rect", true)
+		var footprint := _texture_collision_footprint(texture, &"convex", true)
 		var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale + Vector2.ONE * 2.0
-		var offset := _add_texture_collision(post, texture, sprite_scale, &"rect", true, 2.0)
+		var offset := _add_texture_collision(post, texture, sprite_scale, &"convex", true, 2.0)
 		(post.get_node("AssetCollision") as CollisionShape2D).name = "PostCollision"
 		_add_directional_shadow(post, asset_path, GATE_POST_SIZE.x, 1.0, footprint_size)
 		var sprite := Sprite2D.new()
@@ -2783,6 +2806,7 @@ static func _build_giant_landmarks(
 		var visual_center_offset := Vector2.ZERO
 		var local_footprint_rotation := 0.0
 		var placement := {}
+		var footprint := {}
 		var asset_offset := rng.randi_range(0, giants.size() - 1)
 		var pref_idx := corners[rng.randi() % corners.size()]
 		for asset_attempt in giants.size():
@@ -2795,7 +2819,7 @@ static func _build_giant_landmarks(
 				push_error("TrackBuilderCore: giant roster contains an asset without a SOLID contract: %s" % tex_path)
 				continue
 			used_rect = _texture_opaque_rect(tex)
-			var footprint := _texture_collision_footprint(tex, StringName(shape_entry.get("shape", &"rect")))
+			footprint = _texture_collision_footprint(tex, StringName(shape_entry.get("shape", &"rect")))
 			var footprint_size: Vector2 = footprint["size"]
 			desired_size = rng.randf_range(300.0, 600.0) if asset_attempt == 0 else 300.0
 			sprite_scale = desired_size / maxf(footprint_size.x, footprint_size.y)
@@ -2818,6 +2842,7 @@ static func _build_giant_landmarks(
 		landmark.set_meta("moment_kind", &"giant")
 		landmark.set_meta("world_size", desired_size)
 		landmark.set_meta("footprint_size", world_shape_size)
+		landmark.set_meta("footprint_kind", StringName(footprint["kind"]))
 		landmark.set_meta("footprint_radius", footprint_radius)
 		landmark.set_meta("colliding", true)
 		landmark.set_meta("collision_contract", COLLISION_SOLID)
@@ -3912,12 +3937,27 @@ static func _mark_flat_visual(visual: CanvasItem, texture_path: String, flat_cla
 
 
 static func _texture_opaque_rect(texture: Texture2D) -> Rect2:
+	var cache_key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
+	if _texture_opaque_rect_cache.has(cache_key):
+		return _texture_opaque_rect_cache[cache_key]
 	var image := texture.get_image()
 	if image != null and not image.is_empty():
 		var used := image.get_used_rect()
 		if used.size.x > 0 and used.size.y > 0:
-			return Rect2(Vector2(used.position), Vector2(used.size))
-	return Rect2(Vector2.ZERO, Vector2(texture.get_width(), texture.get_height()))
+			var minimum := Vector2i(used.end)
+			var maximum := Vector2i(used.position - Vector2i.ONE)
+			for y in range(used.position.y, used.end.y):
+				for x in range(used.position.x, used.end.x):
+					if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
+						minimum = minimum.min(Vector2i(x, y))
+						maximum = maximum.max(Vector2i(x, y))
+			if maximum.x >= minimum.x and maximum.y >= minimum.y:
+				var alpha_rect := Rect2(Vector2(minimum), Vector2(maximum - minimum + Vector2i.ONE))
+				_texture_opaque_rect_cache[cache_key] = alpha_rect
+				return alpha_rect
+	var fallback := Rect2(Vector2.ZERO, Vector2(texture.get_width(), texture.get_height()))
+	_texture_opaque_rect_cache[cache_key] = fallback
+	return fallback
 
 
 static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringName, force_axis_aligned: bool = false) -> Dictionary:
@@ -3930,6 +3970,10 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 	var used := _texture_opaque_rect(texture)
 	var fallback := {"center": used.get_center(), "size": used.size, "rotation": 0.0, "kind": resolved_kind}
 	if resolved_kind == &"circle":
+		var circle_result := _balanced_circle_texture_footprint(texture, used)
+		_texture_footprint_cache[cache_key] = circle_result
+		return circle_result
+	if resolved_kind == &"convex":
 		_texture_footprint_cache[cache_key] = fallback
 		return fallback
 	if no_rotation:
@@ -3953,7 +3997,7 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 		var first_x := -1
 		var last_x := -1
 		for x in range(left, right):
-			if image.get_pixel(x, y).a > 0.05:
+			if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
 				if first_x < 0:
 					first_x = x
 				last_x = x
@@ -3964,7 +4008,7 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 		var first_y := -1
 		var last_y := -1
 		for y in range(top, bottom):
-			if image.get_pixel(x, y).a > 0.05:
+			if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
 				if first_y < 0:
 					first_y = y
 				last_y = y
@@ -4027,12 +4071,11 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 	var max_projection := Vector2(-INF, -INF)
 	for y in range(top, bottom):
 		for x in range(left, right):
-			if image.get_pixel(x, y).a > 0.05:
+			if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
 				var pt := Vector2(x + 0.5, y + 0.5)
 				var pr := Vector2(pt.dot(best_axis_x), pt.dot(best_axis_y))
 				min_projection = min_projection.min(pr)
 				max_projection = max_projection.max(pr)
-	var padding := 1.0
 	var center_projection := (min_projection + max_projection) * 0.5
 	var fitted_size := max_projection - min_projection
 	var anisotropy := maxf(fitted_size.x, fitted_size.y) / maxf(minf(fitted_size.x, fitted_size.y), 0.001)
@@ -4042,7 +4085,9 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 		return low_anisotropy_result
 	var result := {
 		"center": best_axis_x * center_projection.x + best_axis_y * center_projection.y,
-		"size": fitted_size + Vector2.ONE * padding * 2.0,
+		# A slight symmetric inset balances rounded silhouette corners against
+		# cardinal support while staying within the six-unit contact contract.
+		"size": fitted_size * 0.98,
 		"rotation": best_rotation,
 		"kind": resolved_kind,
 	}
@@ -4058,10 +4103,54 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 static func _axis_aligned_texture_footprint(used: Rect2, shape_kind: StringName) -> Dictionary:
 	return {
 		"center": used.get_center(),
-		"size": used.size + Vector2.ONE * 2.0,
+		"size": used.size * 0.98,
 		"rotation": 0.0,
 		"kind": shape_kind,
 	}
+
+
+static func _texture_convex_hull(texture: Texture2D) -> PackedVector2Array:
+	var cache_key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
+	if _texture_hull_cache.has(cache_key):
+		return _texture_hull_cache[cache_key]
+	var image := texture.get_image()
+	var points := PackedVector2Array()
+	if image != null and not image.is_empty():
+		var used := image.get_used_rect()
+		for y in range(used.position.y, used.end.y):
+			var first_x := -1
+			var last_x := -1
+			for x in range(used.position.x, used.end.x):
+				if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
+					if first_x < 0:
+						first_x = x
+					last_x = x
+			if first_x >= 0:
+				points.append(Vector2(first_x + 0.5, y + 0.5))
+				points.append(Vector2(last_x + 0.5, y + 0.5))
+	var hull := Geometry2D.convex_hull(points) if points.size() >= 3 else points
+	if hull.size() > 1 and hull[0].is_equal_approx(hull[hull.size() - 1]):
+		hull.remove_at(hull.size() - 1)
+	_texture_hull_cache[cache_key] = hull
+	return hull
+
+
+static func _balanced_circle_texture_footprint(texture: Texture2D, used: Rect2) -> Dictionary:
+	var center := used.get_center()
+	var hull := _texture_convex_hull(texture)
+	if hull.is_empty():
+		return {"center": center, "size": used.size, "rotation": 0.0, "kind": &"circle"}
+	var minimum_support := INF
+	var maximum_support := -INF
+	for direction_index in 8:
+		var direction := Vector2.RIGHT.rotated(TAU * float(direction_index) / 8.0)
+		var support := -INF
+		for point: Vector2 in hull:
+			support = maxf(support, (point - center).dot(direction))
+		minimum_support = minf(minimum_support, support)
+		maximum_support = maxf(maximum_support, support)
+	var radius := (minimum_support + maximum_support) * 0.5
+	return {"center": center, "size": Vector2.ONE * radius * 2.0, "rotation": 0.0, "kind": &"circle"}
 
 
 static func _record_shape_probe_points(parent: Node, center: Vector2, size: Vector2, shape_kind: StringName, rotation: float = 0.0) -> void:
@@ -4080,6 +4169,28 @@ static func _record_shape_probe_points(parent: Node, center: Vector2, size: Vect
 	parent.set_meta("collision_footprint_size", size)
 	parent.set_meta("collision_shape_kind", shape_kind)
 	parent.set_meta("collision_footprint_rotation", rotation)
+
+
+static func _record_convex_probe_points(parent: Node, points: PackedVector2Array) -> void:
+	var bounds := Rect2(points[0], Vector2.ZERO)
+	for point: Vector2 in points:
+		bounds = bounds.expand(point)
+	var axis := Vector2.RIGHT if bounds.size.x >= bounds.size.y else Vector2.DOWN
+	var minimum_point := points[0]
+	var maximum_point := points[0]
+	for point: Vector2 in points:
+		if point.dot(axis) < minimum_point.dot(axis):
+			minimum_point = point
+		if point.dot(axis) > maximum_point.dot(axis):
+			maximum_point = point
+	parent.set_meta("collision_probe_points", PackedVector2Array([
+		Vector2.ZERO,
+		minimum_point.lerp(Vector2.ZERO, 0.14),
+		maximum_point.lerp(Vector2.ZERO, 0.14),
+	]))
+	parent.set_meta("collision_footprint_size", bounds.size)
+	parent.set_meta("collision_shape_kind", &"convex")
+	parent.set_meta("collision_footprint_rotation", 0.0)
 
 
 static func _add_scaled_texture_collision(parent: Node, texture: Texture2D, sprite_scale: float, shape_kind: StringName) -> Vector2:
@@ -4119,6 +4230,19 @@ static func _add_texture_collision(
 		capsule_collision.shape = capsule
 		parent.add_child(capsule_collision)
 		_record_shape_probe_points(parent, Vector2.ZERO, footprint_size, &"capsule", float(footprint["rotation"]))
+		return visual_center_offset
+	if resolved_kind == &"convex":
+		var hull := _texture_convex_hull(texture)
+		var scaled_hull := PackedVector2Array()
+		for point: Vector2 in hull:
+			scaled_hull.append((point - footprint_center) * sprite_scale)
+		var convex := ConvexPolygonShape2D.new()
+		convex.points = scaled_hull
+		var convex_collision := CollisionShape2D.new()
+		convex_collision.name = "AssetCollision"
+		convex_collision.shape = convex
+		parent.add_child(convex_collision)
+		_record_convex_probe_points(parent, scaled_hull)
 		return visual_center_offset
 	var rect := RectangleShape2D.new()
 	# The local rectangle follows the texture's alpha-fitted orientation instead
@@ -4216,6 +4340,7 @@ static func _add_directional_shadow(
 	if shadow_texture == null:
 		push_error("TrackBuilderCore: directional shadow asset is missing: %s" % shadow_path)
 		return
+	var visual_shadow_kind := &"circle" if shape_kind == &"circle" else &"rect"
 	var longest := maxf(footprint.x, footprint.y)
 	var local_light_direction := SHADOW_DIRECTION.rotated(-parent.rotation).normalized()
 	var contact := Sprite2D.new()
@@ -4227,7 +4352,7 @@ static func _add_directional_shadow(
 	contact.scale = Vector2(footprint.x * 1.08 / shadow_texture.get_width(), footprint.y * 1.08 / shadow_texture.get_height())
 	contact.modulate = SHADOW_TINT
 	contact.z_index = -2
-	contact.set_meta("shadow_shape", shape_kind)
+	contact.set_meta("shadow_shape", visual_shadow_kind)
 	contact.set_meta("light_direction", SHADOW_DIRECTION)
 	_mark_flat_visual(contact, shadow_path, &"shadow")
 	parent.add_child(contact)
