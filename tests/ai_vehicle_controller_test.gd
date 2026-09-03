@@ -159,6 +159,7 @@ func _run_test() -> void:
 	traffic_leader.add_to_group("race_vehicle")
 	traffic_leader.collision_layer = 1
 	root.add_child(traffic_leader)
+	manager.register_racer(traffic_leader, "Parked AI", "Rustbug")
 	vehicle.global_position = Vector2.ZERO
 	vehicle.rotation = 0.0
 	vehicle.speed = 420.0
@@ -213,6 +214,21 @@ func _run_test() -> void:
 		return
 	if not _expect(float(blocked_plan["speed_scale"]) >= 0.8, "a blocked pass should trail lightly instead of braking to the old train-forming pace"):
 		return
+	vehicle.speed = 20.0
+	var low_speed_plan := controller.call("_obstacle_avoidance", Vector2.UP, Vector2.UP) as Dictionary
+	if not _expect(float(low_speed_plan["weight"]) >= 0.68, "low-speed AI should still commit to steering away from a close obstacle"):
+		return
+	blocker.position = Vector2(0.0, -58.0)
+	await physics_frame
+	var contact_plan := controller.call("_obstacle_avoidance", Vector2.UP, Vector2.UP) as Dictionary
+	if not _expect(bool(contact_plan["static_contact"]), "a near static collider should expose a contact-normal escape plan"):
+		return
+	for _step in 7:
+		controller.call("_update_static_escape", 0.1, contact_plan, false)
+	if not _expect(controller.static_escape_attempt_count == 1 and float(vehicle.get("_external_brake")) > 0.9, "sustained static contact should reverse before recovery"):
+		return
+	controller.set("_escape_time_remaining", 0.0)
+	controller.set("_static_contact_time", 0.0)
 
 	root.remove_child(blocker)
 	blocker.free()
@@ -232,10 +248,46 @@ func _run_test() -> void:
 	controller.call("_apply_drafting_recharge", 1.0, draft_plan, false)
 	if not _expect(is_equal_approx(vehicle.boost_amount, 14.0), "drafting should recharge only the existing boost meter"):
 		return
+	manager.start_race()
+	manager.report_checkpoint(checkpoints[1], vehicle)
+	manager.report_checkpoint(checkpoints[2], vehicle)
+	manager.laps_to_finish = 1
+	for checkpoint_index in range(1, checkpoints.size()):
+		if not _expect(manager.report_checkpoint(checkpoints[checkpoint_index], traffic_leader), "parked-racer fixture should advance through checkpoint %d (expected=%d)" % [checkpoint_index, manager.get_expected_checkpoint(traffic_leader)]):
+			return
+	if not _expect(manager.report_checkpoint(checkpoints[0], traffic_leader), "parked-racer fixture should complete at the finish gate"):
+		return
+	var finished_leader := controller.call("_nearest_vehicle_ahead", Vector2.UP) as Dictionary
+	if not _expect(finished_leader.is_empty(), "finished and DNF racers should not remain stationary traffic targets"):
+		return
 	root.remove_child(traffic_leader)
 	traffic_leader.free()
 
+	controller.set("_racing_line", PackedVector2Array([
+		Vector2(-100.0, -100.0),
+		Vector2(100.0, -100.0),
+		Vector2(100.0, 100.0),
+		Vector2(-100.0, 100.0),
+	]))
+	controller.call("_reset_route_watchdog")
+	controller.set("_last_recovery_time", Time.get_ticks_msec())
+	controller.set("_overtake_hold_remaining", 1.0)
+	controller.set("_overtake_offset", 52.0)
+	vehicle.global_position = Vector2(700.0, 700.0)
+	vehicle.speed = 300.0
+	for _step in 14:
+		controller.call("_update_route_watchdog", 0.1, manager.get_expected_checkpoint(vehicle))
+	if not _expect(bool(controller.get("_recovering")) and controller.recovery_count == 1, "a severe off-route AI should recover at speed even during the normal cooldown"):
+		return
+	if not _expect(vehicle.global_position.distance_to(manager.get_last_recovery_transform(vehicle).origin) < 1.0, "off-route recovery should return the AI to its last legal gate"):
+		return
+	if not _expect(is_zero_approx(float(controller.get("_overtake_hold_remaining"))) and is_zero_approx(float(controller.get("_overtake_offset"))), "recovery should clear stale overtake hold and offset state"):
+		return
+	await create_timer(1.05).timeout
+
 	manager.start_race()
+	controller.set("_racing_line", PackedVector2Array())
+	controller.set("_last_recovery_time", 0)
 	vehicle.global_position = Vector2(430.0, 360.0)
 	vehicle.rotation = PI * 0.5
 	vehicle.speed = 60.0
@@ -247,7 +299,7 @@ func _run_test() -> void:
 	controller.set("_stuck_time", 0.0)
 	for _step in 8:
 		controller.call("_physics_process", 0.5)
-	if not _expect(bool(controller.get("_recovering")), "AI should recover when it makes no positional progress even if reported speed is nonzero"):
+	if not _expect(bool(controller.get("_recovering")), "AI should recover after two seconds without route progress even if reported speed is nonzero"):
 		return
 	if not _expect(not bool(controller.get("_guide_reached")), "recovery should require the safe corner guide again"):
 		return

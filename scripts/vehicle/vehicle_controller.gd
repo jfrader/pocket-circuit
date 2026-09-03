@@ -42,6 +42,8 @@ var _contact_elapsed := 0.0
 var _contact_pair_last_seen: Dictionary = {}
 var _last_output_velocity := Vector2.ZERO
 var last_collision_response: Dictionary = {}
+var has_static_contact := false
+var static_contact_normal := Vector2.ZERO
 var _racer_tag: Label
 var _racer_tag_offset := Vector2(-45.0, -64.0)
 
@@ -347,21 +349,31 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	var intended_forward := Vector2.UP.rotated(state.transform.get_rotation())
 	var strongest_contact: Dictionary = {}
 	var strongest_score := -1.0
+	var strongest_static_score := -1.0
 	var seen_pairs: Dictionary = {}
+	has_static_contact = false
+	static_contact_normal = Vector2.ZERO
 
 	for contact_index in state.get_contact_count():
 		var collider := state.get_contact_collider_object(contact_index)
-		if not collider is Node or collider == self or not (collider as Node).is_in_group("race_vehicle"):
+		if not collider is Node or collider == self:
+			continue
+		var world_normal := state.get_contact_local_normal(contact_index).normalized()
+		var impulse := state.get_contact_impulse(contact_index)
+		if not (collider as Node).is_in_group("race_vehicle"):
+			var static_score := impulse.length()
+			if static_score > strongest_static_score:
+				strongest_static_score = static_score
+				has_static_contact = true
+				static_contact_normal = world_normal
 			continue
 		if not collider.has_method("collision_snapshot"):
 			continue
 		var collider_id := collider.get_instance_id()
 		seen_pairs[collider_id] = true
-		var world_normal := state.get_contact_local_normal(contact_index).normalized()
 		var own_contact_velocity := state.get_contact_local_velocity_at_position(contact_index)
 		var collider_velocity := state.get_contact_collider_velocity_at_position(contact_index)
 		var relative_velocity := own_contact_velocity - collider_velocity
-		var impulse := state.get_contact_impulse(contact_index)
 		var score := maxf(0.0, -relative_velocity.dot(world_normal)) + impulse.length() / maxf(mass, 0.01)
 		if score <= strongest_score:
 			continue

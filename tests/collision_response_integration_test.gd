@@ -18,6 +18,9 @@ func _run_test() -> void:
 	if not await _test_no_contact_trajectory(world):
 		return
 	await _clear_world(world)
+	if not await _test_static_contact_signal(world):
+		return
+	await _clear_world(world)
 	if not await _test_rear_contact_and_release_agency(world):
 		return
 	await _clear_world(world)
@@ -118,6 +121,29 @@ func _test_no_contact_trajectory(world: Node2D) -> bool:
 	if not _expect(velocity_error <= 0.001 and offset_error <= 0.001, "no-contact twins diverged from the same production trajectory"):
 		return false
 	if not _expect((first.get("last_collision_response") as Dictionary).is_empty() and (second.get("last_collision_response") as Dictionary).is_empty(), "no-contact vehicle entered collision policy"):
+		return false
+	return true
+
+
+func _test_static_contact_signal(world: Node2D) -> bool:
+	var wall := StaticBody2D.new()
+	wall.position = Vector2(500.0, 250.0)
+	wall.collision_layer = 2
+	var wall_collision := CollisionShape2D.new()
+	var wall_shape := RectangleShape2D.new()
+	wall_shape.size = Vector2(240.0, 24.0)
+	wall_collision.shape = wall_shape
+	wall.add_child(wall_collision)
+	world.add_child(wall)
+	var vehicle := _spawn_vehicle(world, "StaticContact", Vector2(500.0, 310.0), Vector2.UP * 180.0)
+	var observed_contact := false
+	var observed_normal := Vector2.ZERO
+	for _frame in 45:
+		await physics_frame
+		if bool(vehicle.get("has_static_contact")):
+			observed_contact = true
+			observed_normal = vehicle.get("static_contact_normal") as Vector2
+	if not _expect(observed_contact and observed_normal.length() > 0.9, "vehicle should expose the current static collision normal for AI escape planning"):
 		return false
 	return true
 

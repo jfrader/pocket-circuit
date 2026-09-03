@@ -104,12 +104,16 @@ their original unscaled canvases.
   areas. Another 60-150 micro details dress the corridor edges and apron:
   painted crumbs, fibers, droplets, grain, and sawdust stay flat, while visible
   hardware such as screws, clips, pins, and washers uses small footprint-matched
-  scenery collision. Ambient props, ground sections, and both detail layers stay
+  scenery collision. Every collision-bearing trackside footprint stays at least
+  36 units beyond the 125-unit corridor edge; flat dressing may use the narrower
+  visual margin. Ambient props, ground sections, and both detail layers stay
   inside the room and outside the protected route corridor and recovery lanes.
 - Every generated room places 1-3 giant household landmarks at 300-600 world
   units. Every giant has scenery collision on layers 4 and 16; its collider uses
   at least 90% of the trimmed visible footprint and remains inside the room and
-  clear of the corridor, gates, and other props.
+  clear of the corridor, gates, and other props. Giant placement additionally
+  rejects any intersection with a 22-unit swept vehicle hull around the
+  committed safe and shortcut racing lines.
 - Asset dimensions and collider kinds come from the explicit SOLID roster in
   `PROP_SHAPES`; giant placement and collision use each texture's trimmed alpha
   footprint. Generated story props must use transparent PNG textures, never
@@ -183,13 +187,15 @@ line.
   colliding props sit just inside that rim for scale. The interior is invalid
   recovery space; do not send the concave island through convex decomposition.
 - Themed course rails are deliberately partial real assets. Eight deterministic
-  sectors produce exactly one open run, two one-sided runs, and five both-sided
-  runs. Each side receives colliding rail assets in six sectors, while the open
-  run receives only one flat non-colliding worn-floor hint. Kitchen mixes towel,
-  spoon, chopstick, and bread-board rails; Workshop mixes paint stirrer, dowel,
-  clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
-  Their corner accents are solid boundary props too. An empty run means open
-  drivable apron, never hidden collision.
+  sectors retain exactly one open run, at least four both-sided runs, and two or
+  three one-sided runs. Each edge remains represented in at least five sectors;
+  a physically tight edge may move one requested run to the opposite safe side
+  rather than violate the 36-unit apron clearance. The open run receives only
+  one flat non-colliding worn-floor hint. Kitchen mixes towel, spoon, chopstick,
+  and bread-board rails; Workshop mixes paint stirrer, dowel, clamp, and ruler
+  rails; Office mixes pencil, ruler, pen, and book-spine rails. Rail and corner-
+  accent colliders validate their complete oriented footprint, not only their
+  center. An empty run means open drivable apron, never hidden collision.
 - Every ordered checkpoint `Area2D` spans the complete available room
   cross-section at its station: the first raised-island or room-wall boundary
   hit in each normal direction. The checkpoint recovery anchor remains on the
@@ -228,6 +234,17 @@ line.
   It also samples upcoming `SurfaceZone` polygons, pre-slows for low-grip or
   low-speed material, and only steers around a zone when its lane metadata says
   an alternate corridor exists.
+- Obstacle probes remain active at low speed with a 72-unit minimum feeler and a
+  committed steer-away response. Sustained low-speed contact with static scenery
+  triggers a brief reverse-and-steer escape before checkpoint recovery.
+- Stuck detection uses checkpoint and racing-line arc progress rather than raw
+  speed. No progress for 2 seconds, wrong-way progress for 0.75 seconds, or more
+  than 1.25 seconds off-route can recover the car; a severe 420-unit route miss
+  may bypass the normal recovery cooldown. Recovery clears any active overtake
+  hold so the car resumes from the legal line.
+- Finished and DNF AI stop driving, leave traffic planning, and disable their
+  collision layer and mask for the rest of the race. Race setup restores the
+  original vehicle collision contract before the next start.
 - Juniper, Milo, Tess, and Cass use data-driven personalities for braking,
   corner pace, line commitment, boost timing, shortcut confidence, and passing
   aggression. All personality values are clamped to narrow legal ranges and
@@ -254,6 +271,10 @@ line.
   least one position exchange and deliberate pass attempt, no more than three
   recoveries per racer, and a slowest/fastest finish-time ratio no greater than
   1.80.
+- `ai_recovery_scenarios_test.gd` pins a sustained giant-contact jam and a
+  finished car parked on the racing line. The jammed AI must exercise escape or
+  recovery and finish legally; the trailing AI must ignore and pass through the
+  ghosted finisher without a DNF.
 
 ## Verification
 
@@ -271,10 +292,12 @@ Run after generator, builder, surface, collision, or AI changes:
    the three authored regression tracks.
 7. `godot --headless --path . --script res://tests/ai_field_spread_test.gd` for
    three-lap four-AI overtaking and field-spread coverage.
-8. A broad theme x room x seed construction stress matrix after geometry or
+8. `godot --headless --path . --script res://tests/ai_recovery_scenarios_test.gd`
+   for sustained giant-contact and parked-finisher regressions.
+9. A broad theme x room x seed construction stress matrix after geometry or
    composition changes.
-9. Direct runtime captures for all six route families after visual changes.
-10. `tools/build_release.sh <clean-output-directory>` for the authoritative
+10. Direct runtime captures for all six route families after visual changes.
+11. `tools/build_release.sh <clean-output-directory>` for the authoritative
    import, complete test suite, scene smokes, native exports, packaged Linux
    smoke, and PCK inspection.
 
