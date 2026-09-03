@@ -127,9 +127,14 @@ func _run_direction(reverse: bool) -> bool:
 	var lap_times: Dictionary = {}
 	var ai_vehicles: Array[Node2D] = []
 	for racer: Node in get_nodes_in_group("race_vehicle"):
-		if racer != player and _has_ai_controller(racer):
+		if racer != player:
 			ai_vehicles.append(racer as Node2D)
-			checkpoint_counts[racer] = 0
+	if not _expect(ai_vehicles.size() == 3, "%s %s prototype should create a full three-opponent field" % [_track_label(), direction_label]):
+		return false
+	for racer: Node2D in ai_vehicles:
+		if not _expect(_has_ai_controller(racer), "%s %s %s should have an AIVehicleController before simulation" % [_track_label(), direction_label, racer.name]):
+			return false
+		checkpoint_counts[racer] = 0
 	manager.racer_checkpoint_passed.connect(func(racer: Node2D, _checkpoint_index: int) -> void:
 		if checkpoint_counts.has(racer):
 			checkpoint_counts[racer] = int(checkpoint_counts[racer]) + 1
