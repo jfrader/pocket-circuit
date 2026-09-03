@@ -265,6 +265,13 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	var shortcut_index := int(shortcut.get_meta("centerline_index", -1))
 	if not _expect(racing_line != null and shortcut_index >= 0 and not Geometry2D.is_point_in_polygon(racing_line.points[shortcut_index], shortcut_polygon), "%s generated AI line should take the safe lane around the optional shortcut" % theme):
 		return false
+	var max_apex_offset := 0.0
+	for line_index in centerline.size():
+		if BUILDER._cyclic_index_distance(line_index, shortcut_index, centerline.size()) <= BUILDER.SHORTCUT_HALF_SPAN + 6:
+			continue
+		max_apex_offset = maxf(max_apex_offset, racing_line.points[line_index].distance_to(centerline[line_index]))
+	if not _expect(max_apex_offset > 42.0 and max_apex_offset <= BUILDER.APEX_MAX_INWARD_OFFSET + 0.5, "%s racing line should use a bounded sharp-corner apex beyond the old 40-unit cut" % theme):
+		return false
 
 	var presenter := PRESENTER.new() as TrackVariantPresenter
 	track.add_child(presenter)
