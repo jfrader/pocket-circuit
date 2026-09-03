@@ -12,3 +12,4 @@ keeps presentation ratings separate from simulation units.
 | 4.2 Tires/steering | Tires and steering |
 | 4.3 Brake/drift | Brakes and drift |
 | 4.4 Boost/durability | Boost and durability |
+Note: v1 is not the default.
