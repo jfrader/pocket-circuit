@@ -1,21 +1,11 @@
 extends SceneTree
 
-const TRACK_SCENE := preload("res://scenes/tracks/kitchen_circuit.tscn")
 const CHECKPOINT_SCENE := preload("res://scenes/race/checkpoint.tscn")
 const THEME_SCENES: Dictionary = {
 	&"kitchen": "res://scenes/tracks/kitchen_circuit.tscn",
 	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
 	&"office": "res://scenes/tracks/office_desk.tscn",
 }
-
-const FINISH_CENTER := Vector2(-735.0, 240.0)
-const GRID_TRANSFORMS: Array[Transform2D] = [
-	Transform2D(PI * 0.5, Vector2(-600.0, 315.0)),
-	Transform2D(PI * 0.5, Vector2(-630.0, 410.0)),
-	Transform2D(PI * 0.5, Vector2(-660.0, 315.0)),
-	Transform2D(PI * 0.5, Vector2(-690.0, 410.0)),
-]
-
 
 func _initialize() -> void:
 	call_deferred("_run_test")
@@ -33,38 +23,6 @@ func _run_test() -> void:
 			return
 	print("FINISH_GATE_COVERAGE_TEST PASS")
 	quit(0)
-
-
-func _test_kitchen_contract() -> bool:
-	var track := TRACK_SCENE.instantiate()
-	root.add_child(track)
-	var finish := track.get_node("Checkpoint0Finish") as Area2D
-	var corners := _gate_corners(finish)
-	if not _expect(
-		finish.position.is_equal_approx(FINISH_CENTER),
-		"the kitchen finish gate should sit on the left straight behind the start grid"
-	):
-		return false
-	if not _expect(
-		corners["min_x"] <= -874.0
-		and corners["max_x"] >= -596.0
-		and corners["min_y"] <= 224.0
-		and corners["max_y"] >= 256.0,
-		"the kitchen finish gate should reach edge to edge of the drivable corridor (%.0f..%.0f x %.0f..%.0f)" % [corners["min_x"], corners["max_x"], corners["min_y"], corners["max_y"]]
-	):
-		return false
-	for grid_transform: Transform2D in GRID_TRANSFORMS:
-		var grid_origin := grid_transform.origin
-		if not _expect(grid_origin.y >= corners["max_y"] + 20.0, "the kitchen start grid should sit past the finish gate in driving order (grid=%s gate_bottom=%.0f)" % [str(grid_origin), corners["max_y"]]):
-			return false
-	if not _expect(track.get_node_or_null("Labels") == null, "debug track labels should be removed"):
-		return false
-	if not _expect(track.get_node_or_null("ArtSurfaces/StartFinish") == null, "the misplaced illustrated start/finish sprite should be removed"):
-		return false
-	track.queue_free()
-	await process_frame
-	await physics_frame
-	return true
 
 
 func _test_theme_gate(theme: StringName) -> bool:

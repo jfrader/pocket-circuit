@@ -3,6 +3,7 @@ extends SceneTree
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const VEHICLE_SCENERY_MASK := 2 | 4 | 16
 const COVERAGE_MINIMUM := 0.90
+const MAX_ALPHA_SAMPLES := 96
 const SAMPLES: Array[Dictionary] = [
 	{"theme": &"kitchen", "room": &"classic", "seed": 0},
 	{"theme": &"kitchen", "room": &"wide", "seed": 9},
@@ -226,20 +227,22 @@ func _check_alpha_samples_inside(body: StaticBody2D, sprite: Sprite2D, collision
 		return true
 	var used := image.get_used_rect()
 	var canvas_half := Vector2(texture.get_width(), texture.get_height()) * 0.5
-	var samples: PackedVector2Array = []
+	var candidates: PackedVector2Array = []
 	var step := maxi(4, int(ceil(maxf(used.size.x, used.size.y) / 16.0)))
 	for yy in range(used.position.y, used.end.y, step):
 		for xx in range(used.position.x, used.end.x, step):
 			if image.get_pixel(xx, yy).a > 0.08:
 				var tex_local := Vector2(xx + 0.5, yy + 0.5) - canvas_half
-				# sprite may carry position offset + its parent body may be rotated
-				var world := sprite.to_global(tex_local * sprite.scale)
-				var body_local := body.to_local(world)
-				samples.append(body_local)
-				if samples.size() >= 48:
-					break
-		if samples.size() >= 48:
-			break
+				# to_global applies the sprite's scale, rotation, and offset once.
+				candidates.append(body.to_local(sprite.to_global(tex_local)))
+	var samples := candidates
+	if candidates.size() > MAX_ALPHA_SAMPLES:
+		# Keep the cap while selecting evenly across the complete row-major
+		# silhouette instead of biasing coverage toward its first scan rows.
+		samples = PackedVector2Array()
+		for sample_index in MAX_ALPHA_SAMPLES:
+			var candidate_index := int(round(float(sample_index) * float(candidates.size() - 1) / float(MAX_ALPHA_SAMPLES - 1)))
+			samples.append(candidates[candidate_index])
 	if samples.is_empty():
 		return _expect(false, "%s produced no alpha samples for coverage" % str(sprite.get_path()))
 	var shape := collision.shape
@@ -255,12 +258,8 @@ func _check_alpha_samples_inside(body: StaticBody2D, sprite: Sprite2D, collision
 			var half := (shape as RectangleShape2D).size * 0.5
 			var dp := p - col_pos
 			var lp := dp.rotated(-col_rot)
-			var tol := 2.0 + maxf(half.x, half.y) * 0.1
-			# Use bounding radius of the rect for sample contain (guarantees for
-			# current fit on micro; for proper oriented rects the points will
-			# still satisfy as they are within the footprint radius).
-			var r := maxf(half.x, half.y)
-			hit = dp.length() <= r * 1.02 + tol
+			var tolerance := 2.0 + maxf(half.x, half.y) * 0.1
+			hit = absf(lp.x) <= half.x * 1.02 + tolerance and absf(lp.y) <= half.y * 1.02 + tolerance
 		if hit:
 			inside += 1
 	var ratio := float(inside) / float(samples.size())
@@ -273,7 +272,6 @@ func _check_alpha_samples_inside(body: StaticBody2D, sprite: Sprite2D, collision
 		rlong = (shape as CircleShape2D).radius
 	if rlong < 20.0:
 		req = 0.1  # micro edge assets (screw, paperclip, blade, fiber) have variable fit; the 90% contract targets giants and larger props
-		return true  # do not gate the full suite on micro edge fit precision
 	return _expect(ratio >= req, "%s rotated alpha samples inside collider shape (%.3f = %d/%d req=%.2f)" % [str(sprite.get_path()), ratio, inside, samples.size(), req])
 
 

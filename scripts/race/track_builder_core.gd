@@ -32,10 +32,13 @@ const GIANT_CAST_SHADOW_TINT := Color("3f2a22", 0.15)
 const COLLISION_SOLID := &"solid"
 const COLLISION_FLAT := &"flat"
 
-## Generated art has one of two explicit physical contracts. PROP_SHAPES is
-## the SOLID asset roster; each entry declares the local footprint used by all
-## ordinary prop constructors. These edge-detail assets are also solid, but use
-## their trimmed alpha bounds because their presentation size varies per seed.
+## Generated asset contract (authoritative across every constructor below):
+## - PROP_SHAPES contains ordinary SOLID props. `shape` is `circle` or `rect`,
+##   and `size` is the intended visual size before constructor scaling.
+## - SOLID_EDGE_SHAPES contains SOLID edge details whose `shape` footprint is
+##   fitted from trimmed alpha because their presentation size varies per seed.
+## - FLAT_EDGE_ASSETS contains painted/material details and must never collide.
+## The collision_contract metadata on generated nodes mirrors these registries.
 static var SOLID_EDGE_SHAPES := {
 	"screw_small.png": &"rect",
 	"paperclip_micro.png": &"rect",
@@ -427,7 +430,7 @@ static var PROP_SHAPES := {
 	"giant_fork.png": {"solid": true, "shape": "rect", "size": Vector2(60.0, 220.0)},
 	"giant_basketball.png": {"solid": true, "shape": "circle", "size": Vector2(140.0, 140.0)},
 	"giant_toolbox.png": {"solid": true, "shape": "rect", "size": Vector2(200.0, 120.0)},
-	"giant_paint_can.png": {"solid": true, "shape": "circle", "size": Vector2(120.0, 120.0)},
+	"giant_paint_can.png": {"solid": true, "shape": "rect", "size": Vector2(120.0, 120.0)},
 	"giant_keyboard.png": {"solid": true, "shape": "rect", "size": Vector2(220.0, 150.0)},
 	"giant_monitor.png": {"solid": true, "shape": "rect", "size": Vector2(180.0, 130.0)},
 	"giant_paper_stack.png": {"solid": true, "shape": "rect", "size": Vector2(170.0, 120.0)},
@@ -438,7 +441,6 @@ static var PROP_SHAPES := {
 	"giant_wrench.png": {"solid": true, "shape": "rect", "size": Vector2(215.0, 72.0)},
 	"giant_stapler.png": {"solid": true, "shape": "rect", "size": Vector2(205.0, 105.0)},
 	"giant_mouse.png": {"solid": true, "shape": "circle", "size": Vector2(150.0, 180.0)},
-	"crumb_micro_01.png": {"shape": "circle", "size": Vector2(28.0, 28.0)},
 	"screw_small.png": {"shape": "rect", "size": Vector2(22.0, 60.0)},
 	"paperclip_micro.png": {"shape": "rect", "size": Vector2(30.0, 20.0)},
 }
@@ -466,14 +468,6 @@ const LAYOUTS := {
 		"prop_label": "Plate",
 		"edge_texture": "res://assets/textures/kitchen/counter_edge.png",
 		"island_expansion": 10.0,
-		"scatter_textures": [
-			"res://assets/textures/kitchen/fork_cartoon.png",
-			"res://assets/textures/kitchen/spoon_bridge.png",
-			"res://assets/textures/kitchen/cup_cartoon.png",
-			"res://assets/textures/kitchen/lime_cartoon.png",
-			"res://assets/textures/kitchen/apple_cartoon.png",
-			"res://assets/textures/kitchen/sponge_wet.png",
-		],
 		"island_fill_textures": [
 			"res://assets/textures/kitchen/fork_cartoon.png",
 			"res://assets/textures/kitchen/spoon_bridge.png",
@@ -485,33 +479,6 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/teacup_saucer.png",
 			"res://assets/textures/imagine/salt_shaker.png",
 			"res://assets/textures/imagine/mug_top.png",
-		],
-		"island_fill_huge": [
-			"res://assets/textures/imagine/teapot_top.png",
-			"res://assets/textures/imagine/watermelon.png",
-			"res://assets/textures/imagine/plate_stack.png",
-			"res://assets/textures/imagine/frying_pan.png",
-			"res://assets/textures/imagine/vase_top.png",
-		],
-		"island_fill_big": [
-			"res://assets/textures/imagine/hose_coil.png",
-			"res://assets/textures/kitchen/cutting_board.png",
-			"res://assets/textures/imagine/watermelon.png",
-			"res://assets/textures/imagine/frying_pan.png",
-			"res://assets/textures/imagine/teapot_top.png",
-			"res://assets/textures/imagine/vase_top.png",
-			"res://assets/textures/imagine/plate_stack.png",
-		],
-		"island_fill_small": [
-			"res://assets/textures/kitchen/apple_cartoon.png",
-			"res://assets/textures/kitchen/lime_cartoon.png",
-			"res://assets/textures/kitchen/sponge_wet.png",
-			"res://assets/textures/imagine/strawberry.png",
-			"res://assets/textures/imagine/bolt.png",
-			"res://assets/textures/imagine/screw.png",
-			"res://assets/textures/imagine/coin.png",
-			"res://assets/textures/imagine/plant_small.png",
-			"res://assets/textures/imagine/keys_ring.png",
 		],
 		"island_fill_tiny": [
 			"res://assets/textures/imagine/paperclip.png",
@@ -622,13 +589,6 @@ const LAYOUTS := {
 		"prop_texture": "res://assets/textures/imagine/island_tool_tray.png",
 		"prop_label": "Toolbox",
 		"edge_texture": "res://assets/textures/imagine/workshop_edge_bright.png",
-		"scatter_textures": [
-			"res://assets/textures/imagine/workshop_paint_can.png",
-			"res://assets/textures/imagine/hazard_workshop_socket.png",
-			"res://assets/textures/kitchen/fork_cartoon.png",
-			"res://assets/textures/kitchen/sponge_wet.png",
-			"res://assets/textures/kitchen/ruler_plank.png",
-		],
 		"island_fill_textures": [
 			"res://assets/textures/imagine/plank_wood.png",
 			"res://assets/textures/imagine/workshop_paint_can.png",
@@ -641,36 +601,6 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/screwdriver.png",
 			"res://assets/textures/imagine/tape_roll.png",
 			"res://assets/textures/imagine/matchbox.png",
-		],
-		"island_fill_huge": [
-			"res://assets/textures/imagine/barrel_wood.png",
-			"res://assets/textures/imagine/workshop_paint_can.png",
-			"res://assets/textures/imagine/hose_coil.png",
-			"res://assets/textures/imagine/basketball.png",
-			"res://assets/textures/imagine/teapot_top.png",
-			"res://assets/textures/imagine/flower_pot.png",
-		],
-		"island_fill_big": [
-			"res://assets/textures/imagine/hose_coil.png",
-			"res://assets/textures/imagine/barrel_wood.png",
-			"res://assets/textures/imagine/flower_pot.png",
-			"res://assets/textures/imagine/basketball.png",
-			"res://assets/textures/imagine/soccer_ball.png",
-			"res://assets/textures/imagine/football.png",
-			"res://assets/textures/imagine/lamp_desk.png",
-			"res://assets/textures/imagine/bottle_top.png",
-			"res://assets/textures/imagine/teapot_top.png",
-		],
-		"island_fill_small": [
-			"res://assets/textures/kitchen/apple_cartoon.png",
-			"res://assets/textures/kitchen/lime_cartoon.png",
-			"res://assets/textures/kitchen/sponge_wet.png",
-			"res://assets/textures/imagine/strawberry.png",
-			"res://assets/textures/imagine/bolt.png",
-			"res://assets/textures/imagine/screw.png",
-			"res://assets/textures/imagine/coin.png",
-			"res://assets/textures/imagine/plant_small.png",
-			"res://assets/textures/imagine/keys_ring.png",
 		],
 		"island_fill_tiny": [
 			"res://assets/textures/imagine/paperclip.png",
@@ -790,12 +720,6 @@ const LAYOUTS := {
 		"prop_texture": "res://assets/textures/imagine/island_keyboard.png",
 		"prop_label": "Keyboard",
 		"edge_texture": "res://assets/textures/imagine/office_edge_bright.png",
-		"scatter_textures": [
-			"res://assets/textures/imagine/office_keycap.png",
-			"res://assets/textures/imagine/hazard_office_cable.png",
-			"res://assets/textures/kitchen/sponge_wet.png",
-			"res://assets/textures/kitchen/lime_cartoon.png",
-		],
 		"island_fill_textures": [
 			"res://assets/textures/imagine/book_top.png",
 			"res://assets/textures/imagine/plank_wood.png",
@@ -808,32 +732,6 @@ const LAYOUTS := {
 			"res://assets/textures/imagine/crayons.png",
 			"res://assets/textures/imagine/scissors_top.png",
 			"res://assets/textures/imagine/tape_roll.png",
-		],
-		"island_fill_huge": [
-			"res://assets/textures/imagine/barrel_wood.png",
-			"res://assets/textures/imagine/teapot_top.png",
-			"res://assets/textures/imagine/lamp_desk.png",
-			"res://assets/textures/imagine/plate_stack.png",
-			"res://assets/textures/imagine/watermelon.png",
-		],
-		"island_fill_big": [
-			"res://assets/textures/imagine/hose_coil.png",
-			"res://assets/textures/imagine/barrel_wood.png",
-			"res://assets/textures/imagine/flower_pot.png",
-			"res://assets/textures/imagine/lamp_desk.png",
-			"res://assets/textures/imagine/mug_top.png",
-			"res://assets/textures/imagine/plate_stack.png",
-		],
-		"island_fill_small": [
-			"res://assets/textures/kitchen/apple_cartoon.png",
-			"res://assets/textures/kitchen/lime_cartoon.png",
-			"res://assets/textures/kitchen/sponge_wet.png",
-			"res://assets/textures/imagine/strawberry.png",
-			"res://assets/textures/imagine/bolt.png",
-			"res://assets/textures/imagine/screw.png",
-			"res://assets/textures/imagine/coin.png",
-			"res://assets/textures/imagine/plant_small.png",
-			"res://assets/textures/imagine/keys_ring.png",
 		],
 		"island_fill_tiny": [
 			"res://assets/textures/imagine/paperclip.png",
@@ -1855,10 +1753,6 @@ static func _add_polygon(parent: Node, node_name: String, points: PackedVector2A
 	parent.add_child(polygon)
 
 
-static func spec_wall_side() -> Color:
-	return Color("3a4656")
-
-
 static func _add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String) -> void:
 	var wall := StaticBody2D.new()
 	wall.name = node_name
@@ -2056,67 +1950,6 @@ static func _scatter_decals(root: Node2D, spec: Dictionary, room_polygon: Packed
 		sprite.z_index = -15
 		_mark_flat_visual(sprite, texture_path, &"floor_decal")
 		root.add_child(sprite)
-
-
-static func _scatter_seed_props(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, corridor: PackedVector2Array, gate_samples: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(spec.get("seed", 0))
-	var textures: Array = spec.get("scatter_textures", [])
-	if textures.is_empty():
-		return
-	var count := centerline.size()
-
-	var clear_of_gates := _seed_clear_of_gates.bind(gate_samples)
-
-	# a) corridor slalom: a few props on straights, offset from the racing line
-	var corridor_props := PackedVector2Array()
-	for attempt in 200:
-		var index := rng.randi_range(0, count - 1)
-		var sample := centerline[index]
-		if sample.distance_to(centerline[0]) < 380.0:
-			continue
-		if not clear_of_gates.call(sample):
-			continue
-		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
-		var normal := tangent.rotated(PI * 0.5)
-		var candidate := sample + normal * (95.0 if rng.randf() < 0.5 else -95.0)
-		var too_close := false
-		for placed: Vector2 in corridor_props:
-			if placed.distance_to(candidate) < 240.0:
-				too_close = true
-				break
-		if too_close or not Geometry2D.is_point_in_polygon(candidate, corridor):
-			continue
-		corridor_props.append(candidate)
-		if corridor_props.size() >= 3:
-			break
-	for position: Vector2 in corridor_props:
-		_add_scatter_prop(root, position, 34.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
-
-	# b) apron clutter outside the loop
-	var apron_props := PackedVector2Array()
-	for attempt in 400:
-		var candidate := Vector2(rng.randf_range(-830.0, 830.0), rng.randf_range(-530.0, 530.0))
-		if not Geometry2D.is_point_in_polygon(candidate, room_polygon):
-			continue
-		if Geometry2D.is_point_in_polygon(candidate, corridor):
-			continue
-		if _point_in_loop(candidate, centerline):
-			continue
-		if not clear_of_gates.call(candidate):
-			continue
-		var too_close := false
-		for placed: Vector2 in apron_props:
-			if placed.distance_to(candidate) < 90.0:
-				too_close = true
-				break
-		if too_close:
-			continue
-		apron_props.append(candidate)
-		if apron_props.size() >= 10:
-			break
-	for position: Vector2 in apron_props:
-		_add_prop_with_collision(root, position, 30.0, String(textures[rng.randi_range(0, textures.size() - 1)]))
 
 
 static func _compose_generated_story(
@@ -3835,14 +3668,6 @@ static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVecto
 		_add_fill_prop(root, position, minf(visual * 0.5, 20.0), texture_path, rng.randf_range(0.0, TAU))
 
 
-static func _cell_clear_of_corridor(center: Vector2, radius: float, corridor: PackedVector2Array) -> bool:
-	for sample in 8:
-		var angle := TAU * float(sample) / 8.0
-		if Geometry2D.is_point_in_polygon(center + Vector2(cos(angle), sin(angle)) * (radius + 40.0), corridor):
-			return false
-	return true
-
-
 static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, outer_loop: PackedVector2Array, corridor: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
 	# Props delimiting the OUTER side of the track: long flat props on straights,
 	# bulky props on corners, placed just outside the painted corridor. The
@@ -4266,8 +4091,6 @@ static func _add_boundary_prop(parent: Node, position: Vector2, radius: float, t
 		prop.add_child(sprite)
 
 
-static var fill_prop_calls := 0
-
 static func _add_fill_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
 	var prop := StaticBody2D.new()
 	prop.name = "IslandFill"
@@ -4348,47 +4171,6 @@ static func _add_directional_shadow(
 	parent.add_child(cast)
 
 
-static func _add_scatter_prop(parent: Node, position: Vector2, radius: float, texture_path: String) -> void:
-	var prop := StaticBody2D.new()
-	prop.name = "SeedCorridor"
-	prop.position = position
-	prop.collision_layer = 16
-	_mark_solid_body(prop, texture_path, &"obstacle")
-	parent.add_child(prop)
-	_add_directional_shadow(prop, texture_path, radius * 2.2)
-	var texture := load(texture_path) as Texture2D
-	if texture:
-		var sprite := Sprite2D.new()
-		sprite.texture = texture
-		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		var longest := maxf(texture.get_width(), texture.get_height())
-		var sprite_scale := radius * 2.2 / maxf(longest, 1.0)
-		sprite.scale = Vector2.ONE * sprite_scale
-		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
-		var offset := _add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
-		sprite.position = -offset
-		_mark_solid_visual(sprite, texture_path, &"obstacle")
-		prop.add_child(sprite)
-
-
-static func _seed_clear_of_gates(point: Vector2, gate_samples: PackedVector2Array) -> bool:
-	for gate: Vector2 in gate_samples:
-		if point.distance_to(gate) < 160.0:
-			return false
-	return true
-
-
-static func _point_in_loop(point: Vector2, loop: PackedVector2Array) -> bool:
-	var inside := false
-	var count := loop.size()
-	for index in count:
-		var a := loop[index]
-		var b := loop[(index + 1) % count]
-		if ((a.y > point.y) != (b.y > point.y)) and (point.x < (b.x - a.x) * (point.y - a.y) / (b.y - a.y) + a.x):
-			inside = not inside
-	return inside
-
-
 static func _add_obstacle(parent: Node, node_name: String, position: Vector2, radius: float, texture_path: String) -> void:
 	var obstacle := StaticBody2D.new()
 	obstacle.name = node_name
@@ -4436,49 +4218,6 @@ static func _add_prop_with_collision(parent: Node, position: Vector2, radius: fl
 		prop.add_child(sprite)
 
 
-static func _add_prop(parent: Node, texture_path: String, position: Vector2, scale: float, rotation: float, z: int) -> void:
-	var texture := load(texture_path) as Texture2D
-	if texture == null:
-		return
-	var sprite := Sprite2D.new()
-	sprite.texture = texture
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	sprite.position = position
-	sprite.rotation = rotation
-	sprite.scale = Vector2.ONE * scale
-	sprite.z_index = z
-	parent.add_child(sprite)
-
-
-static func _add_sticky_notes(parent: Node, center: Vector2, rotation: float) -> void:
-	for offset: Vector2 in [Vector2(-30, -14), Vector2(0, 8), Vector2(26, -6)]:
-		var note := Polygon2D.new()
-		note.polygon = PackedVector2Array([
-			Vector2(-34, -30), Vector2(34, -30), Vector2(34, 30), Vector2(-34, 30),
-		])
-		note.color = Color("f4bf3a") if offset.x < 0.0 else Color("f2ead7")
-		note.position = center + offset
-		note.rotation = rotation + (0.1 if offset.x == 0.0 else 0.0)
-		note.z_index = -12
-		parent.add_child(note)
-
-
-static func _add_cable_line(parent: Node, points: Array) -> void:
-	var line := Line2D.new()
-	var packed := PackedVector2Array()
-	for point: Vector2 in points:
-		packed.append(point)
-	line.points = packed
-	line.width = 9.0
-	line.default_color = Color("6f91b8")
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	line.antialiased = true
-	line.z_index = -12
-	parent.add_child(line)
-
-
 static func _add_textured_polygon(parent: Node, node_name: String, points: PackedVector2Array, texture_path: String, fallback_color: Color, z: int) -> void:
 	var visual := Polygon2D.new()
 	visual.name = node_name
@@ -4517,48 +4256,6 @@ static func _expand_loop(points: PackedVector2Array, distance: float) -> PackedV
 			normal = -normal
 		result.append(points[index] + normal * distance)
 	return result
-
-
-static func _add_dashed_centerline(parent: Node, centerline: PackedVector2Array) -> void:
-	var line := Line2D.new()
-	line.name = "CenterlineDashes"
-	line.width = 5.0
-	line.default_color = Color("f2ead7", 0.8)
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	line.antialiased = true
-	line.z_index = -8
-	var count := centerline.size()
-	var dash := 0
-	var dash_length := 34.0
-	var dash_gap := 30.0
-	while dash < count - 2:
-		var start := centerline[dash]
-		var target := centerline[dash + 1]
-		var segment_length := start.distance_to(target)
-		if segment_length <= dash_gap:
-			dash += 1
-			continue
-		line.add_point(start)
-		var ratio := minf(dash_length / segment_length, 1.0)
-		line.add_point(start.lerp(target, ratio))
-		dash += 1
-	parent.add_child(line)
-
-
-static func _add_edge_line(parent: Node, points: PackedVector2Array, color: Color) -> void:
-	var line := Line2D.new()
-	line.points = points
-	line.closed = true
-	line.width = 8.0
-	line.default_color = color
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.begin_cap_mode = Line2D.LINE_CAP_ROUND
-	line.end_cap_mode = Line2D.LINE_CAP_ROUND
-	line.antialiased = true
-	line.z_index = -7
-	parent.add_child(line)
 
 
 static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, scale: Vector2, modulate_value: float = 1.35) -> void:

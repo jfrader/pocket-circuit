@@ -63,7 +63,7 @@ func _physics_process(delta: float) -> void:
 	if is_instance_valid(_racer_tag):
 		_racer_tag.global_position = global_position + _racer_tag_offset
 	_read_input()
-	_update_debug_state()
+	_update_motion_state()
 	_apply_drive_forces(delta)
 	_apply_lateral_grip()
 	_apply_steering(delta)
@@ -327,7 +327,7 @@ func _update_boost(delta: float) -> void:
 		boost_amount = minf(stats.boost_capacity, boost_amount + stats.boost_recharge * delta)
 
 
-func _update_debug_state() -> void:
+func _update_motion_state() -> void:
 	speed = linear_velocity.length()
 	if speed > 2.0:
 		var forward := Vector2.UP.rotated(rotation)

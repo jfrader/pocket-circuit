@@ -81,15 +81,13 @@
   cross-section, and forward and reverse races use the correct checker order.
 - Menu and shell screens now loop the Tiny Torque Grid catalog take instead of
   an alarm-like pulse or the previous placeholder arrangement.
-- Championship map and settings metadata remain readable at the release
-  resolution, keyboard focus stays visible after returning between screens, and
-  completed off-screen events remain reachable without a mouse.
+- Recovery timers do not expire while paused, championship map and settings
+  metadata remain readable at the release resolution, keyboard focus stays
+  visible between screens, and completed off-screen events remain reachable
+  without a mouse.
 - Failed disk writes no longer advance championship progress, discard an
   existing championship, or claim that a result was saved.
 - Championship wins remain pending across restarts until the ending is
   acknowledged, preventing a quit from permanently skipping the finale.
-- Recovery timers do not expire while paused, keyboard focus remains visible
-  between screens, and completed off-screen events remain reachable without a
-  mouse.
 - Debug surface labels and development-only overlays no longer appear in
   release races; gameplay hazard telegraphs remain visible.

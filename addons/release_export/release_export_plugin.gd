@@ -17,6 +17,8 @@ func _get_customization_configuration_hash() -> int:
 	return hash(CACHE_VERSION)
 
 
+# The source race keeps developer telemetry, while release presets exclude its
+# script. Strip the owning scene subtree so exported builds contain neither.
 func _customize_scene(scene: Node, path: String) -> Node:
 	if path != RACE_SCENE:
 		return null

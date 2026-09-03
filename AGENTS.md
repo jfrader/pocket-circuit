@@ -118,3 +118,11 @@ Godot MCP.
 - Skills: `godot-dev`, `repo-onboarding`, `linear-workflow`, `github`,
   `changelog`, `frontend-design` (visual direction).
 - Design spec: `docs/game-design-spec.md`.
+
+## Agent hygiene: never leave tracked changes uncommitted
+
+Commit early and often in small logical units; never leave tracked edits uncommitted at the end of a task or session handoff.
+- When approaching the session step limit or any interruption risk, commit green-but-uncommitted work immediately with a clear message.
+- Before reporting a task complete, the worktree must be clean: `git status --porcelain` empty (only explicitly-scoped untracked scratch allowed, noted in the report).
+- Any change made after the final commit (debug removal, formatting, test tweak) is a new commit — never a silent dirty tree.
+- At session start in an existing worktree, check `git status` first; commit or explicitly report pre-existing dirt before editing further.

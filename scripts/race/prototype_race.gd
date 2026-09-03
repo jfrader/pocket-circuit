@@ -537,9 +537,6 @@ func _create_phase_one_ui() -> void:
 	var hud := $HUD as CanvasLayer
 	hud_label.visible = false
 	controls_label.visible = false
-	var legacy_art := hud.get_node_or_null("RaceHUDArt") as CanvasItem
-	if legacy_art:
-		legacy_art.visible = false
 	_race_hud = RACE_HUD_SCRIPT.new() as RaceHUD
 	_race_hud.name = "RaceHUD"
 	hud.add_child(_race_hud)
