@@ -82,11 +82,18 @@ func recover_vehicle() -> void:
 	_vehicle.angular_velocity = 0.0
 	if _vehicle.has_method("reset_surface_modifiers"):
 		_vehicle.call("reset_surface_modifiers")
+	if _vehicle.has_method("reset_dynamics_state"):
+		_vehicle.call("reset_dynamics_state")
 	_vehicle.collision_layer = 0
 	_vehicle.collision_mask = 0
 	_vehicle.modulate.a = 0.45
 	_vehicle.freeze = false
-	_vehicle.linear_velocity = recovery_forward * 55.0
+	
+	var eff_max := 650.0
+	if _vehicle.has_method("get_effective_max_speed"):
+		eff_max = _vehicle.call("get_effective_max_speed")
+	_vehicle.linear_velocity = recovery_forward * clampf(eff_max * 0.10, 55.0, 75.0)
+	
 	if "boost_amount" in _vehicle:
 		_vehicle.boost_amount *= 0.5
 
