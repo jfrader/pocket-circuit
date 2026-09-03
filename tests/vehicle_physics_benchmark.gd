@@ -24,25 +24,62 @@ func _run_benchmark() -> void:
 	_world.name = "VehiclePhysicsBenchmark"
 	root.add_child(_world)
 	current_scene = _world
+	
+	var surfaces := [1.0, 0.78, 0.58, 0.45]
+	var versions := [0, 1]
+	
 	for vehicle_id: String in VEHICLE_IDS:
-		var stats := CATALOG.create_vehicle_stats(vehicle_id)
-		_apply_requested_model_version(stats)
-		await _benchmark_acceleration(vehicle_id, stats)
-		await _benchmark_braking(vehicle_id, stats)
-		await _benchmark_skidpad(vehicle_id, stats)
-		await _benchmark_drift(vehicle_id, stats)
+		for version in versions:
+			for surf in surfaces:
+				var stats := CATALOG.create_vehicle_stats(vehicle_id)
+				stats.physics_model_version = version
+				
+				await _benchmark_acceleration(vehicle_id, stats, surf)
+				await _benchmark_braking(vehicle_id, stats, surf)
+				await _benchmark_skidpad(vehicle_id, stats, surf, 300.0)
+				await _benchmark_skidpad(vehicle_id, stats, surf, 500.0)
+				await _benchmark_drift(vehicle_id, stats, surf)
+	
 	_world.queue_free()
 	await process_frame
 	print("VEHICLE_PHYSICS_BENCHMARK PASS")
 	quit(0)
 
 
-func _benchmark_acceleration(vehicle_id: String, stats: VehicleStats) -> void:
-	var vehicle := await _spawn_vehicle(stats)
+func _spawn_vehicle(stats: VehicleStats, surf: float) -> RigidBody2D:
+	var vehicle := VEHICLE_SCRIPT.new()
+	vehicle.stats = stats
+	vehicle.surface_speed_multiplier = surf
+	vehicle.surface_grip_multiplier = surf
+	vehicle.set_player_controlled(false)
+	_world.add_child(vehicle)
+	vehicle.rotation = 0.0
+	vehicle.position = Vector2.ZERO
+	vehicle.linear_velocity = Vector2.ZERO
+	vehicle.angular_velocity = 0.0
+	await physics_frame
+	return vehicle
+
+
+func _remove_vehicle(vehicle: RigidBody2D) -> void:
+	vehicle.queue_free()
+	await physics_frame
+
+
+func _emit_row(vehicle_id: String, stats: VehicleStats, surf: float, scenario: String, metrics: Dictionary) -> void:
+	for metric: String in metrics:
+		var value = metrics[metric]
+		var val_str = "%.3f" % float(value) if value is float else str(value)
+		print("VEHICLE_DYNAMICS,%s,%d,%.2f,%s,%s,%s" % [vehicle_id, stats.physics_model_version, surf, scenario, metric, val_str])
+
+
+func _benchmark_acceleration(vehicle_id: String, stats: VehicleStats, surf: float) -> void:
+	var vehicle := await _spawn_vehicle(stats, surf)
 	vehicle.set_external_controls(1.0, 0.0, 0.0)
 	var zero_to_400 := -1.0
 	var zero_to_95_percent := -1.0
-	var target_95 := stats.max_speed * 0.95
+	var eff_max: float = vehicle.get_effective_max_speed()
+	var target_95: float = eff_max * 0.95
 	for frame: int in ACCEL_FRAMES:
 		await physics_frame
 		var elapsed := float(frame + 1) * DELTA
@@ -51,137 +88,88 @@ func _benchmark_acceleration(vehicle_id: String, stats: VehicleStats) -> void:
 			zero_to_400 = elapsed
 		if zero_to_95_percent < 0.0 and forward_speed >= target_95:
 			zero_to_95_percent = elapsed
-	_emit_row(vehicle_id, stats, "straight_accel", {
-		"stable_speed_wu_s": vehicle.linear_velocity.dot(Vector2.UP),
-		"zero_to_400_s": zero_to_400,
-		"zero_to_95_percent_s": zero_to_95_percent,
+	
+	vehicle.set_external_controls(0.0, 0.0, 0.0)
+	
+	_emit_row(vehicle_id, stats, surf, "launch", {
+		"0->400": zero_to_400,
+		"0->95%": zero_to_95_percent,
+	})
+	_emit_row(vehicle_id, stats, surf, "coast", {
+		"top_speed": vehicle.linear_velocity.dot(Vector2.UP),
 	})
 	await _remove_vehicle(vehicle)
 
 
-func _benchmark_braking(vehicle_id: String, stats: VehicleStats) -> void:
-	var vehicle := await _spawn_vehicle(stats)
+func _benchmark_braking(vehicle_id: String, stats: VehicleStats, surf: float) -> void:
+	var vehicle := await _spawn_vehicle(stats, surf)
 	vehicle.linear_velocity = Vector2.UP * 500.0
 	vehicle.set_external_controls(0.0, 1.0, 0.0)
 	var start_position := vehicle.position
 	var stop_seconds := 0.0
+	var stop_dist := -1.0
 	for frame: int in PHYSICS_HZ * 5:
 		await physics_frame
 		stop_seconds = float(frame + 1) * DELTA
-		if vehicle.linear_velocity.dot(Vector2.UP) <= 0.0:
+		if vehicle.linear_velocity.dot(Vector2.UP) <= 1.0:
+			stop_dist = vehicle.position.distance_to(start_position)
 			break
-	_emit_row(vehicle_id, stats, "brake_500_to_0", {
-		"distance_wu": vehicle.position.distance_to(start_position),
-		"stop_seconds": stop_seconds,
+	_emit_row(vehicle_id, stats, surf, "brake", {
+		"500->0": stop_dist if stop_dist >= 0 else vehicle.position.distance_to(start_position),
 	})
 	await _remove_vehicle(vehicle)
 
 
-func _benchmark_skidpad(vehicle_id: String, stats: VehicleStats) -> void:
-	var vehicle := await _spawn_vehicle(stats)
-	vehicle.linear_velocity = Vector2.UP * 300.0
+func _benchmark_skidpad(vehicle_id: String, stats: VehicleStats, surf: float, target_speed: float) -> void:
+	var vehicle := await _spawn_vehicle(stats, surf)
+	vehicle.linear_velocity = Vector2.UP * target_speed
 	vehicle.set_external_controls(1.0, 0.0, 1.0)
-	for _frame: int in SKIDPAD_WARMUP_FRAMES:
-		await physics_frame
-	var radius_sum := 0.0
-	var lateral_g_sum := 0.0
-	var slip_sum := 0.0
+	var min_radius := INF
+	var total_lat_accel := 0.0
 	var samples := 0
-	var previous_velocity := vehicle.linear_velocity
-	for _frame: int in SKIDPAD_SAMPLE_FRAMES:
+	for frame: int in SKIDPAD_WARMUP_FRAMES + SKIDPAD_SAMPLE_FRAMES:
 		await physics_frame
-		var velocity := vehicle.linear_velocity
-		var path_yaw_rate := absf(previous_velocity.angle_to(velocity)) / DELTA
-		if velocity.length() > 1.0 and path_yaw_rate > 0.001:
-			radius_sum += velocity.length() / path_yaw_rate
-			lateral_g_sum += velocity.length() * path_yaw_rate / 980.0
-			slip_sum += absf(vehicle.slip_angle)
-			samples += 1
-		previous_velocity = velocity
-	_emit_row(vehicle_id, stats, "skidpad_300", {
-		"lateral_g_eq": lateral_g_sum / maxf(float(samples), 1.0),
-		"radius_wu": radius_sum / maxf(float(samples), 1.0),
-		"slip_deg": slip_sum / maxf(float(samples), 1.0),
+		if frame >= SKIDPAD_WARMUP_FRAMES:
+			var speed := vehicle.linear_velocity.length()
+			var yaw_rate := absf(vehicle.angular_velocity)
+			if yaw_rate > 0.01:
+				min_radius = minf(min_radius, speed / yaw_rate)
+				total_lat_accel += (speed * yaw_rate) / 980.0
+				samples += 1
+	var avg_g := total_lat_accel / float(maxi(1, samples))
+	_emit_row(vehicle_id, stats, surf, "skidpad@%d" % int(target_speed), {
+		"min_radius": min_radius if min_radius != INF else -1.0,
+		"lat_g": avg_g,
 	})
 	await _remove_vehicle(vehicle)
 
 
-func _benchmark_drift(vehicle_id: String, stats: VehicleStats) -> void:
-	var vehicle := await _spawn_vehicle(stats)
-	vehicle.linear_velocity = Vector2.UP * 300.0
+func _benchmark_drift(vehicle_id: String, stats: VehicleStats, surf: float) -> void:
+	var vehicle := await _spawn_vehicle(stats, surf)
+	vehicle.linear_velocity = Vector2.UP * 450.0
 	vehicle.set_external_controls(1.0, 0.0, 1.0, true)
-	var slip_sum := 0.0
 	var max_slip := 0.0
-	var samples := 0
 	for frame: int in DRIFT_WARMUP_FRAMES + DRIFT_SAMPLE_FRAMES:
 		await physics_frame
-		if frame < DRIFT_WARMUP_FRAMES or not vehicle.is_drifting:
-			continue
-		var absolute_slip := absf(vehicle.slip_angle)
-		slip_sum += absolute_slip
-		max_slip = maxf(max_slip, absolute_slip)
-		samples += 1
-	_emit_row(vehicle_id, stats, "handbrake_drift", {
-		"max_slip_deg": max_slip,
-		"slip_deg": slip_sum / maxf(float(samples), 1.0),
+		if frame >= DRIFT_WARMUP_FRAMES:
+			max_slip = maxf(max_slip, absf(vehicle.slip_angle))
+	_emit_row(vehicle_id, stats, surf, "handbrake-drift", {
+		"max_slip": max_slip,
 	})
+	
+	vehicle.set_external_controls(1.0, 0.0, 0.0, false, true)
+	if "boost_amount" in vehicle:
+		vehicle.boost_amount = vehicle.get_boost_capacity()
+	for frame: int in 10:
+		await physics_frame
+	
+	var active = false
+	if vehicle.has_method("is_boost_active"):
+		active = vehicle.call("is_boost_active")
+	
+	_emit_row(vehicle_id, stats, surf, "boost", {
+		"active": active,
+	})
+	
 	await _remove_vehicle(vehicle)
 
-
-func _spawn_vehicle(stats: VehicleStats) -> VehicleController:
-	var vehicle := VEHICLE_SCRIPT.new() as VehicleController
-	vehicle.name = "BenchmarkVehicle"
-	vehicle.control_mode = VehicleController.ControlMode.EXTERNAL
-	vehicle.stats = stats
-	vehicle.collision_layer = 0
-	vehicle.collision_mask = 0
-	vehicle.can_sleep = false
-	_world.add_child(vehicle)
-	await physics_frame
-	vehicle.position = Vector2.ZERO
-	vehicle.rotation = 0.0
-	vehicle.linear_velocity = Vector2.ZERO
-	vehicle.angular_velocity = 0.0
-	return vehicle
-
-
-func _remove_vehicle(vehicle: VehicleController) -> void:
-	vehicle.queue_free()
-	await physics_frame
-
-
-func _emit_row(vehicle_id: String, stats: VehicleStats, scenario: String, metrics: Dictionary) -> void:
-	var row := {
-		"vehicle_id": vehicle_id,
-		"physics_model_version": _model_version(stats),
-		"scenario": scenario,
-		"metrics": _rounded_metrics(metrics),
-	}
-	print("VEHICLE_DYNAMICS " + JSON.stringify(row))
-
-
-func _rounded_metrics(metrics: Dictionary) -> Dictionary:
-	var rounded := {}
-	for key: String in metrics:
-		rounded[key] = snappedf(float(metrics[key]), 0.0001)
-	return rounded
-
-
-func _apply_requested_model_version(stats: VehicleStats) -> void:
-	var requested := OS.get_environment("PC_PHYSICS_MODEL_VERSION")
-	if requested.is_empty() or not _has_property(stats, &"physics_model_version"):
-		return
-	stats.set("physics_model_version", clampi(requested.to_int(), 0, 1))
-
-
-func _model_version(stats: VehicleStats) -> int:
-	if _has_property(stats, &"physics_model_version"):
-		return int(stats.get("physics_model_version"))
-	return 0
-
-
-func _has_property(object: Object, property_name: StringName) -> bool:
-	for property: Dictionary in object.get_property_list():
-		if StringName(property.get("name", &"")) == property_name:
-			return true
-	return false

@@ -68,7 +68,7 @@ func _run_test() -> void:
 		str(drift_seen),
 		max_slip,
 	])
-	if drift_seen and max_slip > 5.0:
+	if drift_seen and max_slip > 12.0:
 		print("DRIFT_TEST PASS")
 		quit(0)
 	else:
