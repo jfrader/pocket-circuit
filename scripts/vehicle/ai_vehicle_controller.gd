@@ -25,6 +25,18 @@ const HAZARD_AVOID_DISTANCE := 160.0
 const SURFACE_PROBE_ANGLES: Array[float] = [0.0, -0.34, 0.34]
 const SURFACE_PROBE_DISTANCES: Array[float] = [90.0, 170.0, 250.0]
 const MAX_RACING_LINE_RADIUS := 2600.0
+const OVERTAKE_REACH := 260.0
+const OVERTAKE_LATERAL_REACH := 58.0
+const OVERTAKE_LINE_OFFSET := 52.0
+const OVERTAKE_MERGE_DISTANCE := 82.0
+const OVERTAKE_CLEAR_DISTANCE := 220.0
+const OVERTAKE_HOLD_TIME := 2.1
+const OVERTAKE_COOLDOWN := 0.8
+const OVERTAKE_STRAIGHT_RADIUS := 1050.0
+const DRAFT_MIN_DISTANCE := 54.0
+const DRAFT_MAX_DISTANCE := 185.0
+const DRAFT_LATERAL_WIDTH := 34.0
+const DRAFT_RECHARGE_PER_SECOND := 4.0
 const DIFFICULTY_TUNING: Dictionary = {
 	"sunday_drive": {
 		"pace": 0.94,
@@ -81,6 +93,7 @@ var race_manager: RaceManager
 var lane_offset: float = 0.0
 var difficulty: String = "club_circuit"
 var recovery_count := 0
+var overtake_attempt_count := 0
 
 var _checkpoints_by_index: Dictionary = {}
 var _stuck_time: float = 0.0
@@ -92,6 +105,10 @@ var _stuck_target_key := ""
 var _best_checkpoint_distance := INF
 var _smoothed_steer := 0.0
 var _racing_line: PackedVector2Array = PackedVector2Array()
+var _overtake_offset := 0.0
+var _overtake_hold_remaining := 0.0
+var _overtake_cooldown_remaining := 0.0
+var _overtake_target_id := 0
 
 
 func configure(
@@ -165,10 +182,13 @@ func _physics_process(delta: float) -> void:
 		)
 
 	var forward := Vector2.UP.rotated(vehicle.rotation)
+	var line_radius := _racing_line_radius(vehicle.global_position)
 	if not _racing_line.is_empty():
 		target_position = _racing_line_target(forward)
 	else:
 		target_position = _pull_into_corridor(target_position, forward)
+	var traffic_plan := _traffic_plan(delta, forward, target_position, line_radius)
+	target_position = traffic_plan["target_position"] as Vector2
 	var desired_direction := vehicle.global_position.direction_to(target_position)
 	desired_direction = _avoid_hazards(desired_direction, forward)
 	var surface_plan := _surface_anticipation(desired_direction)
@@ -198,7 +218,6 @@ func _physics_process(delta: float) -> void:
 	var pace_multiplier := float(tuning["pace"])
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var handling_pace := clampf(vehicle.stats.steering_rate / 3.75, 0.78, 1.08)
-	var line_radius := _racing_line_radius(vehicle.global_position)
 	var corner_speed := effective_max_speed
 	if line_radius > 40.0:
 		corner_speed = clampf(
@@ -213,6 +232,7 @@ func _physics_process(delta: float) -> void:
 	target_speed *= lerpf(1.0, handling_pace, corner_ratio)
 	target_speed *= float(surface_plan["speed_scale"])
 	target_speed *= float(obstacle_plan["speed_scale"])
+	target_speed *= float(traffic_plan["speed_scale"])
 	var heading_error := absf(steering_angle)
 	if heading_error > 1.05:
 		target_speed = minf(target_speed, effective_max_speed * float(tuning["heading_cap"]))
@@ -240,6 +260,7 @@ func _physics_process(delta: float) -> void:
 		var progress_deficit := _leader_progress_deficit()
 		catch_up_power = minf(0.09, maxf(float(maxi(0, position - 1)) * 0.02, progress_deficit * 0.04))
 	vehicle.set_external_power_multiplier(baseline_power + catch_up_power)
+	_apply_drafting_recharge(delta, traffic_plan, should_brake)
 	var boost := (
 		absf(steering_angle) < 0.26
 		and planned_turn_severity < float(tuning["boost_turn_threshold"])
@@ -435,6 +456,159 @@ func _leader_progress_deficit() -> float:
 	return maxf(0.0, best - mine)
 
 
+func _traffic_plan(
+		delta: float,
+		forward: Vector2,
+		line_target: Vector2,
+		line_radius: float
+) -> Dictionary:
+	_overtake_cooldown_remaining = maxf(0.0, _overtake_cooldown_remaining - delta)
+	_overtake_hold_remaining = maxf(0.0, _overtake_hold_remaining - delta)
+	var plan := {
+		"target_position": line_target,
+		"speed_scale": 1.0,
+		"passing": false,
+		"drafting": false,
+	}
+	if not vehicle.is_inside_tree() or forward.length_squared() < 0.001:
+		return plan
+
+	var leader_info := _nearest_vehicle_ahead(forward)
+	var leader := leader_info.get("vehicle") as VehicleController
+	var is_straight := line_radius <= 0.0 or line_radius >= OVERTAKE_STRAIGHT_RADIUS
+	if _overtake_hold_remaining > 0.0 and _overtake_target_id != 0 and is_straight:
+		var side := signf(_overtake_offset)
+		if _overtake_side_clear(forward, side, leader):
+			plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
+			plan["passing"] = true
+			return plan
+		_cancel_overtake()
+
+	if leader == null:
+		_overtake_offset = move_toward(_overtake_offset, 0.0, OVERTAKE_LINE_OFFSET * delta * 2.5)
+		if not is_zero_approx(_overtake_offset):
+			plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
+		return plan
+
+	var distance := float(leader_info["distance"])
+	var lateral_distance := absf(float(leader_info["lateral_distance"]))
+	plan["drafting"] = (
+		is_straight
+		and distance >= DRAFT_MIN_DISTANCE
+		and distance <= DRAFT_MAX_DISTANCE
+		and lateral_distance <= DRAFT_LATERAL_WIDTH
+	)
+	var leader_is_slower := leader.speed + 22.0 < vehicle.speed or leader.speed < vehicle.get_effective_max_speed() * 0.76
+	if is_straight and leader_is_slower and _overtake_cooldown_remaining <= 0.0:
+		var selected_side := _select_overtake_side(forward, leader)
+		if not is_zero_approx(selected_side):
+			_overtake_offset = selected_side * OVERTAKE_LINE_OFFSET
+			_overtake_hold_remaining = OVERTAKE_HOLD_TIME
+			_overtake_target_id = leader.get_instance_id()
+			overtake_attempt_count += 1
+			plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
+			plan["passing"] = true
+			return plan
+
+	# A blocked pass remains a controlled tow rather than the former heavy brake.
+	plan["speed_scale"] = 0.84
+	return plan
+
+
+func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
+	var nearest: VehicleController
+	var nearest_distance := INF
+	var nearest_lateral := 0.0
+	var lateral_axis := forward.orthogonal()
+	for node: Node in vehicle.get_tree().get_nodes_in_group("race_vehicle"):
+		var candidate := node as VehicleController
+		if candidate == null or candidate == vehicle:
+			continue
+		var separation := candidate.global_position - vehicle.global_position
+		var distance_ahead := separation.dot(forward)
+		var lateral_distance := separation.dot(lateral_axis)
+		if distance_ahead < 28.0 or distance_ahead > OVERTAKE_REACH:
+			continue
+		if absf(lateral_distance) > OVERTAKE_LATERAL_REACH:
+			continue
+		if distance_ahead < nearest_distance:
+			nearest = candidate
+			nearest_distance = distance_ahead
+			nearest_lateral = lateral_distance
+	if nearest == null:
+		return {}
+	return {
+		"vehicle": nearest,
+		"distance": nearest_distance,
+		"lateral_distance": nearest_lateral,
+	}
+
+
+func _select_overtake_side(forward: Vector2, leader: VehicleController) -> float:
+	var best_side := 0.0
+	var best_score := -INF
+	for side: float in [-1.0, 1.0]:
+		var score := _overtake_side_score(forward, side, leader)
+		if score > best_score:
+			best_score = score
+			best_side = side
+	return best_side if best_score >= 0.92 else 0.0
+
+
+func _overtake_side_clear(forward: Vector2, side: float, leader: VehicleController) -> bool:
+	return _overtake_side_score(forward, side, leader) >= 0.88
+
+
+func _overtake_side_score(forward: Vector2, side: float, leader: VehicleController) -> float:
+	if is_zero_approx(side):
+		return -INF
+	var origin := vehicle.global_position + forward * OBSTACLE_FRONT_OFFSET
+	var lateral := forward.orthogonal() * side
+	var merge_end := origin + forward * OVERTAKE_MERGE_DISTANCE + lateral * OVERTAKE_LINE_OFFSET
+	var merge_vector := merge_end - origin
+	var excluded: Array[RID] = []
+	if is_instance_valid(leader):
+		excluded.append(leader.get_rid())
+	var side_clearance := float(_ray_probe_from(
+		origin,
+		lateral,
+		OVERTAKE_LINE_OFFSET,
+		STATIC_OBSTACLE_MASK | VEHICLE_COLLISION_MASK,
+		excluded
+	)["clearance"])
+	var merge_clearance := float(_ray_probe_from(
+		origin,
+		merge_vector.normalized(),
+		merge_vector.length(),
+		STATIC_OBSTACLE_MASK | VEHICLE_COLLISION_MASK,
+		excluded
+	)["clearance"])
+	var lane_origin := origin + lateral * OVERTAKE_LINE_OFFSET
+	var lane_clearance := float(_ray_probe_from(
+		lane_origin,
+		forward,
+		OVERTAKE_CLEAR_DISTANCE,
+		STATIC_OBSTACLE_MASK | VEHICLE_COLLISION_MASK
+	)["clearance"])
+	return minf(side_clearance, minf(merge_clearance, lane_clearance))
+
+
+func _cancel_overtake() -> void:
+	_overtake_hold_remaining = 0.0
+	_overtake_target_id = 0
+	_overtake_cooldown_remaining = OVERTAKE_COOLDOWN
+	_overtake_offset = 0.0
+
+
+func _apply_drafting_recharge(delta: float, traffic_plan: Dictionary, should_brake: bool) -> void:
+	if should_brake or not bool(traffic_plan.get("drafting", false)):
+		return
+	vehicle.boost_amount = minf(
+		vehicle.stats.boost_capacity,
+		vehicle.boost_amount + DRAFT_RECHARGE_PER_SECOND * delta
+	)
+
+
 func _difficulty_tuning() -> Dictionary:
 	return DIFFICULTY_TUNING.get(difficulty, DIFFICULTY_TUNING["club_circuit"]) as Dictionary
 
@@ -550,7 +724,9 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 	var obstruction := 1.0 - center_clearance
 	plan["avoid_direction"] = best_direction.normalized()
 	plan["weight"] = clampf((0.34 if hitting_vehicle else 0.52) + obstruction * 0.5, 0.0, 0.95)
-	plan["speed_scale"] = lerpf(0.9, 0.58, obstruction) if hitting_vehicle else lerpf(0.78, 0.34, obstruction)
+	# Traffic pace is planned by _traffic_plan; obstacle avoidance still chooses
+	# a safe direction without multiplying it into a permanent slow train.
+	plan["speed_scale"] = 1.0 if hitting_vehicle else lerpf(0.78, 0.34, obstruction)
 	return plan
 
 
@@ -558,13 +734,19 @@ func _ray_clearance_from(origin: Vector2, direction: Vector2, feeler_length: flo
 	return float(_ray_probe_from(origin, direction, feeler_length, STATIC_OBSTACLE_MASK)["clearance"])
 
 
-func _ray_probe_from(origin: Vector2, direction: Vector2, feeler_length: float, mask: int) -> Dictionary:
+func _ray_probe_from(
+		origin: Vector2,
+		direction: Vector2,
+		feeler_length: float,
+		mask: int,
+		excluded_rids: Array[RID] = []
+) -> Dictionary:
 	if feeler_length <= 0.001:
 		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
 	var side_offset := direction.orthogonal() * OBSTACLE_FEELER_HALF_WIDTH
-	var center := _single_ray_probe(origin, direction, feeler_length, mask)
-	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask)
-	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask)
+	var center := _single_ray_probe(origin, direction, feeler_length, mask, excluded_rids)
+	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask, excluded_rids)
+	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask, excluded_rids)
 	var closest := center
 	if float(left["clearance"]) < float(closest["clearance"]):
 		closest = left
@@ -573,12 +755,20 @@ func _ray_probe_from(origin: Vector2, direction: Vector2, feeler_length: float, 
 	return closest
 
 
-func _single_ray_probe(origin: Vector2, direction: Vector2, feeler_length: float, mask: int) -> Dictionary:
+func _single_ray_probe(
+		origin: Vector2,
+		direction: Vector2,
+		feeler_length: float,
+		mask: int,
+		excluded_rids: Array[RID] = []
+) -> Dictionary:
+	var query_excludes: Array[RID] = [vehicle.get_rid()]
+	query_excludes.append_array(excluded_rids)
 	var query := PhysicsRayQueryParameters2D.create(
 		origin,
 		origin + direction * feeler_length,
 		mask,
-		[vehicle.get_rid()]
+		query_excludes
 	)
 	var hit := vehicle.get_world_2d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():

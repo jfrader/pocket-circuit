@@ -134,11 +134,85 @@ func _run_test() -> void:
 	if not _expect(is_equal_approx(float(vehicle.get("_external_power_multiplier")), 1.15), "AI acceleration should be bounded at the legal 1.15x ceiling"):
 		return
 
+	var traffic_leader := VehicleController.new()
+	traffic_leader.add_to_group("race_vehicle")
+	traffic_leader.collision_layer = 1
+	root.add_child(traffic_leader)
+	vehicle.global_position = Vector2.ZERO
+	vehicle.rotation = 0.0
+	vehicle.speed = 420.0
+	traffic_leader.global_position = Vector2(0.0, -105.0)
+	traffic_leader.speed = 180.0
+	var pass_plan := controller.call(
+		"_traffic_plan",
+		1.0 / 60.0,
+		Vector2.UP,
+		Vector2(0.0, -220.0),
+		1800.0
+	) as Dictionary
+	if not _expect(bool(pass_plan["passing"]), "a faster AI should choose a clear adjacent lane instead of joining a train"):
+		return
+	if not _expect(absf(float((pass_plan["target_position"] as Vector2).x)) >= 50.0, "a pass should create enough lateral separation to clear the slower car"):
+		return
+	if not _expect(controller.overtake_attempt_count == 1, "a new clear pass should be exposed for race telemetry"):
+		return
+
+	var blocker := StaticBody2D.new()
+	blocker.collision_layer = 2
+	blocker.position = Vector2(0.0, -105.0)
+	var blocker_shape := CollisionShape2D.new()
+	var blocker_rectangle := RectangleShape2D.new()
+	blocker_rectangle.size = Vector2(220.0, 42.0)
+	blocker_shape.shape = blocker_rectangle
+	blocker.add_child(blocker_shape)
+	root.add_child(blocker)
+	await physics_frame
+	controller.call("_cancel_overtake")
+	controller.set("_overtake_cooldown_remaining", 0.0)
+	var blocked_plan := controller.call(
+		"_traffic_plan",
+		1.0 / 60.0,
+		Vector2.UP,
+		Vector2(0.0, -220.0),
+		1800.0
+	) as Dictionary
+	if not _expect(not bool(blocked_plan["passing"]), "AI should reject both passing lanes when a static obstacle blocks the required travel"):
+		return
+	if not _expect(float(blocked_plan["speed_scale"]) >= 0.8, "a blocked pass should trail lightly instead of braking to the old train-forming pace"):
+		return
+
+	root.remove_child(blocker)
+	blocker.free()
+	await physics_frame
+	traffic_leader.speed = 410.0
+	controller.set("_overtake_cooldown_remaining", 0.0)
+	var draft_plan := controller.call(
+		"_traffic_plan",
+		1.0 / 60.0,
+		Vector2.UP,
+		Vector2(0.0, -220.0),
+		1800.0
+	) as Dictionary
+	if not _expect(bool(draft_plan["drafting"]), "an aligned close follower should enter the legal drafting window on a straight"):
+		return
+	vehicle.boost_amount = 10.0
+	controller.call("_apply_drafting_recharge", 1.0, draft_plan, false)
+	if not _expect(is_equal_approx(vehicle.boost_amount, 14.0), "drafting should recharge only the existing boost meter"):
+		return
+	root.remove_child(traffic_leader)
+	traffic_leader.free()
+
+	manager.start_race()
+	vehicle.global_position = Vector2(430.0, 360.0)
+	vehicle.rotation = PI * 0.5
 	vehicle.speed = 60.0
 	vehicle.linear_velocity = Vector2.ZERO
 	controller.set("_guide_checkpoint_index", 3)
 	controller.set("_guide_reached", true)
-	for _step in 6:
+	controller.set("_stuck_target_key", "")
+	controller.set("_best_checkpoint_distance", INF)
+	controller.set("_stuck_time", 0.0)
+	for _step in 8:
 		controller.call("_physics_process", 0.5)
 	if not _expect(bool(controller.get("_recovering")), "AI should recover when it makes no positional progress even if reported speed is nonzero"):
 		return
