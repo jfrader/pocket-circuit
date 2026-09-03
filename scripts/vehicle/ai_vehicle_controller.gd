@@ -37,7 +37,7 @@ const OVERTAKE_STRAIGHT_RADIUS := 1050.0
 const DRAFT_MIN_DISTANCE := 54.0
 const DRAFT_MAX_DISTANCE := 185.0
 const DRAFT_LATERAL_WIDTH := 34.0
-const DRAFT_RECHARGE_PER_SECOND := 4.0
+const DRAFT_RECHARGE_MULTIPLIER := 0.40
 const OFF_ROUTE_DISTANCE := 250.0
 const SEVERE_OFF_ROUTE_DISTANCE := 420.0
 const OFF_ROUTE_TIMEOUT := 1.25
@@ -94,7 +94,7 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"brake_response": 56.0,
 		"baseline_power": 1.06,
 		"starting_boost": 0.58,
-		"clean_line_recharge": 5.0,
+		"clean_line_recharge": 0.50,
 		"boost_turn_threshold": 0.34,
 		"boost_radius": 1150.0,
 	},
@@ -110,7 +110,7 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"brake_response": 48.0,
 		"baseline_power": 1.15,
 		"starting_boost": 0.78,
-		"clean_line_recharge": 8.0,
+		"clean_line_recharge": 0.80,
 		"boost_turn_threshold": 0.42,
 		"boost_radius": 900.0,
 	},
@@ -172,8 +172,8 @@ func configure(
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
-	vehicle.add_boost(
-
+	vehicle.boost_amount = minf(
+		vehicle.get_boost_capacity(),
 		vehicle.get_boost_capacity()
 		* float(tuning["starting_boost"])
 		* float(personality["boost_eagerness"])
@@ -329,11 +329,12 @@ func _physics_process(delta: float) -> void:
 				effective_max_speed
 			)
 
-	var target_speed := minf(
+	var target_speed := corner_speed if vehicle.stats.physics_model_version == 1 else minf(
 		effective_max_speed * lerpf(0.98, float(tuning["sharp_corner_ratio"]), corner_ratio) * pace_multiplier,
 		corner_speed
 	)
-	target_speed *= lerpf(1.0, handling_pace, corner_ratio)
+	if vehicle.stats.physics_model_version == 0:
+		target_speed *= lerpf(1.0, handling_pace, corner_ratio)
 	target_speed *= float(surface_plan["speed_scale"])
 	target_speed *= float(obstacle_plan["speed_scale"])
 	target_speed *= float(traffic_plan["speed_scale"])
@@ -347,9 +348,9 @@ func _physics_process(delta: float) -> void:
 	if vehicle.stats.physics_model_version == 1:
 		var surface_grip := float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
 		var combined_grip := vehicle.surface_grip_multiplier * surface_grip
-		var eff_brake_accel := VehicleDynamics.get_effective_brake_accel(vehicle.stats, combined_grip)
-		var reaction_margin := 15.0
-		braking_distance = VehicleDynamics.get_braking_distance(vehicle.speed, target_speed, eff_brake_accel) + reaction_margin
+		var reaction_seconds := 0.34 if difficulty == "sunday_drive" else (0.15 if difficulty == "clockwork" else 0.22)
+		var reaction_margin := vehicle.speed * reaction_seconds
+		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, combined_grip) + reaction_margin
 		braking_distance *= float(personality["brake_timing"])
 	else:
 		braking_distance = lerpf(
@@ -395,8 +396,8 @@ func _physics_process(delta: float) -> void:
 		and vehicle.speed > effective_max_speed * 0.55
 	):
 		vehicle.add_boost(
-
-			float(tuning["clean_line_recharge"]) * delta, "clean-line"
+			vehicle.stats.boost_recharge * float(tuning["clean_line_recharge"]) * delta,
+			"clean-line",
 		)
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
@@ -744,10 +745,7 @@ func _cancel_overtake() -> void:
 func _apply_drafting_recharge(delta: float, traffic_plan: Dictionary, should_brake: bool) -> void:
 	if should_brake or not bool(traffic_plan.get("drafting", false)):
 		return
-	vehicle.add_boost(
-
-		DRAFT_RECHARGE_PER_SECOND * delta, "drafting"
-	)
+	vehicle.add_boost(vehicle.stats.boost_recharge * DRAFT_RECHARGE_MULTIPLIER * delta, "drafting")
 
 
 func _difficulty_tuning() -> Dictionary:
@@ -775,8 +773,15 @@ func _shortcut_route_is_suitable(track: Node) -> bool:
 			continue
 		if not bool(definition.get("ai_path_clear", false)):
 			return false
-		var combined_grip := float(definition.get("grip", 0.0)) * vehicle.stats.grip
 		var preference := float(personality["shortcut_preference"])
+		if vehicle.stats.physics_model_version == 1:
+			var shortcut_grip := float(definition.get("grip", 0.0))
+			var dry_corner := vehicle.get_safe_corner_speed(300.0, 1.0)
+			var shortcut_corner := vehicle.get_safe_corner_speed(300.0, shortcut_grip)
+			var retained_corner_speed := shortcut_corner / maxf(dry_corner, 0.001)
+			var minimum_retention := (0.64 if difficulty == "clockwork" else 0.70) / preference
+			return retained_corner_speed >= minimum_retention and float(definition.get("speed", 0.0)) >= 1.0
+		var combined_grip := float(definition.get("grip", 0.0)) * vehicle.stats.grip
 		var minimum_grip := (0.34 if difficulty == "clockwork" else 0.38) / preference
 		return combined_grip >= minimum_grip and float(definition.get("speed", 0.0)) >= 1.0
 	return false
@@ -786,6 +791,7 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 	var plan := {
 		"weight": 0.0,
 		"speed_scale": 1.0,
+		"grip_scale": 1.0,
 		"risk": 0.0,
 		"avoid_direction": desired_direction,
 	}
@@ -794,13 +800,26 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 	var shortcut_zone := _upcoming_shortcut_zone(desired_direction)
 	if shortcut_zone != null:
 		var shortcut_risk := _surface_zone_risk(shortcut_zone)
-		var combined_grip := vehicle.stats.grip * shortcut_zone.grip_multiplier
 		plan["risk"] = shortcut_risk
-		plan["speed_scale"] = clampf(0.74 + combined_grip * 0.32, 0.78, 0.94)
+		plan["grip_scale"] = shortcut_zone.grip_multiplier
+		if vehicle.stats.physics_model_version == 1:
+			plan["speed_scale"] = minf(
+				shortcut_zone.speed_multiplier,
+				sqrt(maxf(shortcut_zone.grip_multiplier, 0.01)),
+			)
+		else:
+			var combined_grip := vehicle.stats.grip * shortcut_zone.grip_multiplier
+			plan["speed_scale"] = clampf(0.74 + combined_grip * 0.32, 0.78, 0.94)
 		return plan
-	var center_risk := _surface_exposure(desired_direction)
+	var center_model := _surface_model(desired_direction)
+	var center_risk := float(center_model["risk"])
 	plan["risk"] = center_risk
-	plan["speed_scale"] = lerpf(1.0, 0.72, center_risk)
+	plan["grip_scale"] = float(center_model["grip"])
+	plan["speed_scale"] = (
+		minf(float(center_model["speed"]), sqrt(maxf(float(center_model["grip"]), 0.01)))
+		if vehicle.stats.physics_model_version == 1
+		else lerpf(1.0, 0.72, center_risk)
+	)
 	if center_risk < 0.12 or not _surface_route_can_avoid(desired_direction):
 		return plan
 	var best_direction := desired_direction
@@ -820,6 +839,22 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 		plan["weight"] = clampf(0.28 + center_risk * 0.34, 0.0, 0.58)
 		plan["speed_scale"] = lerpf(1.0, 0.82, best_risk)
 	return plan
+
+
+func _surface_model(direction: Vector2) -> Dictionary:
+	var model := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
+	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
+		var zone := node as SurfaceZone
+		if zone == null:
+			continue
+		for distance: float in SURFACE_PROBE_DISTANCES:
+			if not zone.contains_global_point(vehicle.global_position + direction * distance):
+				continue
+			var risk := _surface_zone_risk(zone)
+			if risk >= float(model["risk"]):
+				model = {"risk": risk, "grip": zone.grip_multiplier, "speed": zone.speed_multiplier}
+			break
+	return model
 
 
 func _upcoming_shortcut_zone(direction: Vector2) -> SurfaceZone:
