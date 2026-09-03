@@ -61,9 +61,17 @@ func _run_giant_jam_scenario() -> bool:
 	var nearest_line_point := _nearest_line_point(giant.global_position, racing_line, track)
 	var outward := giant.global_position.direction_to(nearest_line_point)
 	var support := _collision_support_point(collision, outward)
-	target.global_position = support + outward * 26.0
-	target.rotation = Vector2.UP.angle_to(-outward)
-	target.linear_velocity = -outward * 35.0
+	var jam_position := support + outward * 26.0
+	var jam_rotation := Vector2.UP.angle_to(-outward)
+	# Hold the fixture against the giant long enough to model a sustained jam,
+	# rather than letting the initial physics impulse resolve it as a normal bump.
+	var jam_frame := 0
+	while jam_frame < 90 and controller.static_escape_attempt_count == 0:
+		target.global_position = jam_position
+		target.rotation = jam_rotation
+		target.linear_velocity = -outward * 35.0
+		await physics_frame
+		jam_frame += 1
 
 	var frame := 0
 	while frame < MAX_SCENARIO_FRAMES and not manager.is_racer_finished(target):
