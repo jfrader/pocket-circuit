@@ -27,6 +27,9 @@ const BOOST_SPEED_CAP_MULTIPLIER := 1.2
 
 enum ControlMode { PLAYER, EXTERNAL }
 
+## Drift state machine states.
+enum DriftState { NONE, ACTIVE, EXITING }
+
 @export var stats: VehicleStats = preload("res://data/vehicles/rustbug.tres")
 @export var control_mode: ControlMode = ControlMode.PLAYER
 
@@ -71,6 +74,15 @@ var _rear_slip_angle := 0.0
 var _last_speed := 0.0
 var _drift_entry_speed := 0.0
 
+# ── v1 state ──
+var _rack_angle := 0.0  # persistent steering rack angle (radians)
+var _drift_state: DriftState = DriftState.NONE
+var _drift_qualified_time := 0.0  # seconds at optimal slip
+var _drift_boost_awarded := false  # once-only flag
+var _drift_collision_cancel := false  # collision invalidation
+var _rear_grip_recovery := 1.0  # 0..1 interpolation factor during recovery
+var _front_lateral_force := 0.0  # cached for friction circle
+var _rear_lateral_force := 0.0  # cached for friction circle
 
 
 func _ready() -> void:
@@ -91,12 +103,15 @@ func _physics_process(delta: float) -> void:
 		_racer_tag.global_position = global_position + _racer_tag_offset
 	_read_input()
 	_update_motion_state()
-	_apply_drive_forces(delta)
-	_apply_lateral_grip()
-	_apply_steering(delta)
-	_update_boost(delta)
-	_limit_top_speed()
+	if stats.physics_model_version == 1:
+		_v1_physics_step(delta)
+	else:
+		_v0_physics_step(delta)
 
+
+# ═══════════════════════════════════════════════════════════════════════
+# Input reading (shared)
+# ═══════════════════════════════════════════════════════════════════════
 
 func _read_input() -> void:
 	if controls_locked:
@@ -120,6 +135,10 @@ func _read_input() -> void:
 		_handbrake_input = _external_handbrake
 		_boosting = _external_boost and boost_amount > 0.0
 
+
+# ═══════════════════════════════════════════════════════════════════════
+# Public API (preserved)
+# ═══════════════════════════════════════════════════════════════════════
 
 func set_player_controlled(player_controlled: bool) -> void:
 	control_mode = ControlMode.PLAYER if player_controlled else ControlMode.EXTERNAL
@@ -152,6 +171,80 @@ func set_external_power_multiplier(multiplier: float) -> void:
 	# limiter below still enforces the same 1.0x/1.2x normal/boosted caps.
 	_external_power_multiplier = clampf(multiplier, 1.0, MAX_EXTERNAL_POWER_MULTIPLIER)
 
+
+func is_boost_active() -> bool:
+	return _boosting and _throttle_input > 0.0 and boost_amount > 0.0
+
+
+func get_engine_load() -> float:
+	return maxf(_throttle_input, _brake_input * LEGACY_REVERSE_ENGINE_FACTOR)
+
+
+func get_effective_max_speed() -> float:
+	if stats.physics_model_version == 1:
+		return VehicleDynamics.get_effective_max_speed(stats, surface_speed_multiplier)
+	return stats.get_legacy_max_speed() * surface_speed_multiplier
+
+
+func get_boost_capacity() -> float:
+	if stats.physics_model_version == 1:
+		return stats.boost_capacity
+	return stats.get_legacy_boost_capacity()
+
+
+func get_effective_grip() -> float:
+	if stats.physics_model_version == 1:
+		return VehicleDynamics.get_effective_grip(stats, surface_grip_multiplier)
+	return stats.grip * surface_grip_multiplier
+
+
+func get_safe_corner_speed(radius: float, surface_grip: float = -1.0) -> float:
+	## AI/public query: safe cornering speed for given radius and grip.
+	var grip := surface_grip if surface_grip >= 0.0 else surface_grip_multiplier
+	var lat_accel := VehicleDynamics.get_effective_lat_accel(stats, grip)
+	return VehicleDynamics.get_safe_corner_speed(radius, lat_accel)
+
+
+func get_braking_distance(v_now: float, v_target: float, surface_grip: float = -1.0) -> float:
+	## AI/public query: braking distance from v_now to v_target.
+	var grip := surface_grip if surface_grip >= 0.0 else surface_grip_multiplier
+	var brake_accel := VehicleDynamics.get_effective_brake_accel(stats, grip)
+	return VehicleDynamics.get_braking_distance(v_now, v_target, brake_accel)
+
+
+func add_boost(amount: float, source: String = "general") -> void:
+	## Unified boost entry point. Sources: "drift", "clean-line", "drafting", etc.
+	if stats.physics_model_version == 1 and is_boost_active() and source != "drift":
+		# No recharge while boosting (spec: "No recharge while boosting")
+		return
+	boost_amount = clampf(boost_amount + amount, 0.0, get_boost_capacity())
+
+
+func reset_dynamics_state() -> void:
+	## Called on recovery/reset to clear all v1 transient state.
+	is_drifting = false
+	_drift_state = DriftState.NONE
+	_drift_boost_accumulated = 0.0
+	_drift_qualified_time = 0.0
+	_drift_boost_awarded = false
+	_drift_collision_cancel = false
+	_drift_grace_timer = 0.0
+	_drift_entry_speed = 0.0
+	_rack_angle = 0.0
+	_rear_grip_recovery = 1.0
+	_front_slip_angle = 0.0
+	_rear_slip_angle = 0.0
+	_front_lateral_force = 0.0
+	_rear_lateral_force = 0.0
+
+
+func collision_snapshot() -> Dictionary:
+	return {"mass": mass}
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Identity & presentation (unchanged)
+# ═══════════════════════════════════════════════════════════════════════
 
 func configure_identity(driver_name: String, racer_vehicle_name: String, vehicle_id: String = "") -> void:
 	driver_display_name = driver_name
@@ -233,9 +326,17 @@ func apply_stats(new_stats: VehicleStats) -> void:
 	if new_stats == null:
 		return
 	stats = new_stats
-	mass = stats.get_legacy_mass()
-	boost_amount = stats.get_legacy_boost_capacity() * 0.35
+	if stats.physics_model_version == 1:
+		mass = stats.mass
+		boost_amount = stats.boost_capacity * 0.35
+	else:
+		mass = stats.get_legacy_mass()
+		boost_amount = stats.get_legacy_boost_capacity() * 0.35
 
+
+# ═══════════════════════════════════════════════════════════════════════
+# Surface management (shared)
+# ═══════════════════════════════════════════════════════════════════════
 
 func configure_base_surface(surface_name: StringName) -> void:
 	_base_surface = surface_name
@@ -263,27 +364,6 @@ func reset_surface_modifiers() -> void:
 	_refresh_surface_modifier()
 
 
-func get_effective_max_speed() -> float:
-	if stats.physics_model_version == 1:
-		return VehicleDynamics.get_effective_max_speed(stats, surface_speed_multiplier)
-	return stats.get_legacy_max_speed() * surface_speed_multiplier
-
-
-func get_boost_capacity() -> float:
-	if stats.physics_model_version == 1:
-		return stats.boost_capacity
-	return stats.get_legacy_boost_capacity()
-
-func add_boost(amount: float, source: String = "general") -> void:
-	boost_amount = clampf(boost_amount + amount, 0.0, get_boost_capacity())
-
-func reset_dynamics_state() -> void:
-	is_drifting = false
-	_drift_boost_accumulated = 0.0
-	_drift_grace_timer = 0.0
-	_drift_entry_speed = 0.0
-
-
 func _refresh_surface_modifier() -> void:
 	current_surface = _base_surface
 	surface_grip_multiplier = 1.0
@@ -298,52 +378,303 @@ func _refresh_surface_modifier() -> void:
 		surface_speed_multiplier = float(modifier["speed"])
 
 
-func is_boost_active() -> bool:
-	return _boosting and _throttle_input > 0.0 and boost_amount > 0.0
+# ═══════════════════════════════════════════════════════════════════════
+# Motion state update (shared measurement)
+# ═══════════════════════════════════════════════════════════════════════
 
-
-func get_engine_load() -> float:
-	return maxf(_throttle_input, _brake_input * LEGACY_REVERSE_ENGINE_FACTOR)
-
-
-func collision_snapshot() -> Dictionary:
-	return {"mass": mass}
-
-
-
-func _apply_drive_forces(_delta: float) -> void:
-	if stats.physics_model_version == 1:
+func _update_motion_state() -> void:
+	speed = linear_velocity.length()
+	if speed > LEGACY_SLIP_MEASUREMENT_MIN_SPEED:
 		var forward := Vector2.UP.rotated(rotation)
-		var forward_speed := linear_velocity.dot(forward)
-		var effective_max_speed := get_effective_max_speed()
-		
-		var engine_force := 0.0
-		if _throttle_input > 0.0 and forward_speed < effective_max_speed:
-			var curve_mult := VehicleDynamics.get_engine_torque_curve(absf(forward_speed), effective_max_speed, stats.launch_torque_multiplier, stats.torque_peak_ratio, stats.torque_at_max_speed, stats.torque_falloff_exponent)
-			engine_force = _throttle_input * stats.engine_force * curve_mult * _external_power_multiplier * surface_speed_multiplier
-		
-		var rolling_force := VehicleDynamics.calculate_rolling_resistance(forward_speed, stats.rolling_resistance) * (1.0 / maxf(surface_speed_multiplier, 0.01))
-		var drag_mult := 1.0 / maxf(surface_speed_multiplier * surface_speed_multiplier, 0.0001)
-		var drag_force := VehicleDynamics.calculate_drag_force(forward_speed, stats.aero_drag_coefficient) * drag_mult
-		
-		var brake_force := 0.0
-		if _brake_input > 0.0:
-			if forward_speed > 12.0:
-				var max_brake := stats.brake_force * surface_grip_multiplier * mass * 0.62 / maxf(stats.mass, 0.01)
-				brake_force = -signf(forward_speed) * stats.brake_force * _brake_input
-			elif forward_speed > -stats.reverse_speed:
-				engine_force = -stats.engine_force * LEGACY_REVERSE_ENGINE_FACTOR * _brake_input * surface_speed_multiplier
-		
-		if _handbrake_input:
-			brake_force -= signf(forward_speed) * stats.handbrake_force
-		
-		var boost_force := 0.0
-		if is_boost_active():
-			boost_force = stats.boost_power
-			
-		apply_central_force(forward * (engine_force - rolling_force - drag_force + brake_force + boost_force))
+		slip_angle = rad_to_deg(forward.angle_to(linear_velocity.normalized()))
+	else:
+		slip_angle = 0.0
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# V1 — Bicycle/tire model (behind physics_model_version == 1)
+# ═══════════════════════════════════════════════════════════════════════
+
+func _v1_physics_step(delta: float) -> void:
+	var forward := Vector2.UP.rotated(rotation)
+	var right := Vector2.RIGHT.rotated(rotation)
+	var fwd_speed := linear_velocity.dot(forward)
+	var lat_speed := linear_velocity.dot(right)
+	var yaw_rate := angular_velocity
+	var eff_max := get_effective_max_speed()
+
+	# ── Steering rack (persistent angle with response rate) ──
+	var target_steer := VehicleDynamics.calculate_target_steer_angle(
+		_steer_input, stats.max_steer_angle_deg, fwd_speed, eff_max,
+		stats.high_speed_steer_ratio, stats.steer_fade_start_ratio,
+	)
+	_rack_angle = VehicleDynamics.update_rack_angle(
+		_rack_angle, target_steer, stats.steering_response, delta,
+	)
+
+	# ── Slip angles ──
+	var slips := VehicleDynamics.calculate_slip_angles(
+		fwd_speed, lat_speed, yaw_rate,
+		stats.wheelbase, stats.front_weight_ratio, _rack_angle,
+	)
+	_front_slip_angle = float(slips["front"])
+	_rear_slip_angle = float(slips["rear"])
+
+	# ── Normal loads (load split) ──
+	var front_normal := VehicleDynamics.calculate_axle_normal_load(
+		stats.mass, stats.front_weight_ratio, true,
+	)
+	var rear_normal := VehicleDynamics.calculate_axle_normal_load(
+		stats.mass, stats.front_weight_ratio, false,
+	)
+
+	# ── Progressive stiffness scaling ──
+	var prog := VehicleDynamics.calculate_progressive_stiffness(surface_grip_multiplier)
+
+	# ── Peak grip computation ──
+	var front_peak_grip := stats.front_grip * surface_grip_multiplier
+	var rear_peak_grip := stats.rear_grip * surface_grip_multiplier
+
+	# ── Drift grip reduction + recovery interpolation ──
+	var effective_rear_grip := rear_peak_grip
+	if _drift_state == DriftState.ACTIVE:
+		effective_rear_grip *= stats.drift_rear_grip_ratio
+	elif _rear_grip_recovery < 1.0:
+		# Exponential recovery after drift exit
+		_rear_grip_recovery = minf(1.0, _rear_grip_recovery + (1.0 - _rear_grip_recovery) * (1.0 - exp(-stats.drift_grip_recovery_rate * delta)))
+		effective_rear_grip *= lerpf(stats.drift_rear_grip_ratio, 1.0, _rear_grip_recovery)
+
+	# ── Tire lateral forces ──
+	_front_lateral_force = -VehicleDynamics.calculate_tire_lateral_force(
+		_front_slip_angle,
+		stats.front_cornering_stiffness * prog,
+		front_peak_grip,
+		front_normal,
+		stats.post_peak_grip_ratio,
+		stats.slip_falloff_rate,
+	)
+	_rear_lateral_force = -VehicleDynamics.calculate_tire_lateral_force(
+		_rear_slip_angle,
+		stats.rear_cornering_stiffness * prog,
+		effective_rear_grip,
+		rear_normal,
+		stats.post_peak_grip_ratio,
+		stats.slip_falloff_rate,
+	)
+
+	# ── Front force along steered axis at front axle ──
+	var front_arm := stats.wheelbase * (1.0 - stats.front_weight_ratio)
+	var rear_arm := stats.wheelbase * stats.front_weight_ratio
+	var front_pos := forward * front_arm
+	var rear_pos := -forward * rear_arm
+
+	# Front force projected to steered axis (spec: "Front force along steered axis")
+	var steer_dir := Vector2(-sin(_rack_angle), cos(_rack_angle))
+	var steer_world := Vector2(
+		steer_dir.x * right.x + steer_dir.y * forward.x,
+		steer_dir.x * right.y + steer_dir.y * forward.y,
+	)
+	var front_force_world := steer_world * _front_lateral_force
+	# Rear force along body lateral
+	var rear_force_world := right * _rear_lateral_force
+
+	apply_force(front_force_world, front_pos)
+	apply_force(rear_force_world, rear_pos)
+
+	# ── Low-speed kinematic blend / yaw stability ──
+	if absf(fwd_speed) < VehicleDynamics.KINEMATIC_BLEND_SPEED:
+		var blend := 1.0 - clampf(absf(fwd_speed) / VehicleDynamics.KINEMATIC_BLEND_SPEED, 0.0, 1.0)
+		apply_torque(-yaw_rate * stats.yaw_stability_rate * stats.mass * VehicleDynamics.REFERENCE_GRAVITY * blend)
+
+	# ── Drift yaw assist ──
+	if _drift_state == DriftState.ACTIVE:
+		var assist := stats.drift_yaw_assist * stats.mass * VehicleDynamics.REFERENCE_GRAVITY * signf(_steer_input)
+		# Counter-steer reduces assist
+		if signf(_steer_input) != signf(yaw_rate) and signf(_steer_input) != 0.0:
+			assist *= 0.5
+		apply_torque(assist)
+
+	# ── Engine / Drag / Rolling ──
+	_v1_apply_longitudinal(delta, forward, fwd_speed, eff_max)
+
+	# ── Braking with friction circle ──
+	_v1_apply_braking(forward, fwd_speed, eff_max)
+
+	# ── Handbrake (rear-only) ──
+	if _handbrake_input:
+		var hb := VehicleDynamics.calculate_handbrake_force(true, fwd_speed, stats)
+		apply_force(-forward * hb, rear_pos)
+		# Rear lateral grip reduction during handbrake (already handled by drift grip ratio)
+
+	# ── Boost ──
+	_v1_apply_boost(delta, forward, fwd_speed)
+
+	# ── Drift state machine ──
+	_v1_update_drift(delta, fwd_speed)
+
+	# ── Speed caps (soft + hard) ──
+	_v1_apply_speed_caps(forward, fwd_speed, eff_max)
+
+
+func _v1_apply_longitudinal(delta: float, forward: Vector2, fwd_speed: float, eff_max: float) -> void:
+	# Engine
+	if _throttle_input > 0.0 and fwd_speed < eff_max:
+		var engine := VehicleDynamics.calculate_engine_force(
+			_throttle_input, fwd_speed, stats,
+			surface_speed_multiplier, _external_power_multiplier,
+		)
+		apply_central_force(forward * engine)
+	elif _brake_input > 0.0 and fwd_speed <= VehicleDynamics.HOLD_SPEED_THRESHOLD and fwd_speed > -stats.reverse_speed:
+		# Reverse after hold
+		var rev_force := -stats.engine_force * LEGACY_REVERSE_ENGINE_FACTOR * _brake_input * surface_speed_multiplier
+		apply_central_force(forward * rev_force)
+
+	# Rolling resistance (scaled by 1/surface_speed_mult)
+	var rolling := VehicleDynamics.calculate_rolling_resistance(fwd_speed, stats.rolling_resistance)
+	rolling *= 1.0 / maxf(surface_speed_multiplier, 0.01)
+	apply_central_force(-forward * rolling)
+
+	# Drag (scaled by 1/surface_speed_mult^2, opposes travel direction)
+	var drag := VehicleDynamics.calculate_drag_force(fwd_speed, stats.aero_drag_coefficient)
+	drag *= 1.0 / maxf(surface_speed_multiplier * surface_speed_multiplier, 0.0001)
+	apply_central_force(-forward * drag)
+
+	# Soft overspeed cap
+	var soft := VehicleDynamics.calculate_soft_cap_force(fwd_speed, eff_max, stats.mass)
+	if absf(soft) > 0.0:
+		apply_central_force(-forward * soft)
+
+
+func _v1_apply_braking(forward: Vector2, fwd_speed: float, _eff_max: float) -> void:
+	if _brake_input <= 0.0 or fwd_speed <= VehicleDynamics.HOLD_SPEED_THRESHOLD:
+		# Hold / reverse handled in longitudinal
+		if _brake_input > 0.0 and absf(fwd_speed) <= VehicleDynamics.HOLD_SPEED_THRESHOLD:
+			# Hold in place
+			linear_velocity *= 0.9
 		return
 
+	var brakes := VehicleDynamics.calculate_brake_forces(
+		_brake_input, fwd_speed, stats, surface_grip_multiplier,
+		_front_lateral_force, _rear_lateral_force,
+	)
+	var total_brake := float(brakes["front_brake"]) + float(brakes["rear_brake"])
+	apply_central_force(-forward * total_brake)
+
+
+func _v1_apply_boost(delta: float, forward: Vector2, _fwd_speed: float) -> void:
+	if is_boost_active():
+		apply_central_force(forward * stats.boost_power)
+		boost_amount = maxf(0.0, boost_amount - stats.boost_drain_rate * delta)
+
+
+func _v1_update_drift(delta: float, fwd_speed: float) -> void:
+	var rear_slip_deg := rad_to_deg(absf(_rear_slip_angle))
+
+	match _drift_state:
+		DriftState.NONE:
+			_v1_drift_try_entry(fwd_speed, rear_slip_deg)
+
+		DriftState.ACTIVE:
+			_v1_drift_during(delta, fwd_speed, rear_slip_deg)
+
+		DriftState.EXITING:
+			# Recovery interpolation handled by _rear_grip_recovery above
+			_drift_state = DriftState.NONE
+
+	is_drifting = _drift_state == DriftState.ACTIVE
+
+
+func _v1_drift_try_entry(fwd_speed: float, _rear_slip_deg: float) -> void:
+	## Entry: handbrake held AND |steer|>=drift_entry_steer AND speed>=drift_min_speed
+	## AND rear slip growing in steering direction.
+	if not _handbrake_input:
+		return
+	if absf(_steer_input) < stats.drift_entry_steer:
+		return
+	if speed < stats.drift_min_speed:
+		return
+	var rear_slip_growing := signf(_steer_input) == signf(_rear_slip_angle) and absf(_rear_slip_angle) > 0.01
+	if not rear_slip_growing:
+		return
+
+	_drift_state = DriftState.ACTIVE
+	_drift_entry_speed = speed
+	_drift_boost_accumulated = 0.0
+	_drift_qualified_time = 0.0
+	_drift_boost_awarded = false
+	_drift_collision_cancel = false
+	_drift_grace_timer = VehicleDynamics.DRIFT_GRACE_DURATION
+	_rear_grip_recovery = 0.0
+
+
+func _v1_drift_during(delta: float, fwd_speed: float, rear_slip_deg: float) -> void:
+	# ── Boost accumulation: qualified time at optimal slip ──
+	if absf(rear_slip_deg - stats.drift_optimal_slip_deg) <= 12.0 and _throttle_input > 0.0 and speed >= _drift_entry_speed:
+		_drift_qualified_time += delta
+
+	# ── Exit checks ──
+	var controlled_exit := false
+	var cancel_exit := false
+
+	# Controlled exit: handbrake released + slip < 6deg for 0.20s
+	if not _handbrake_input and rear_slip_deg < VehicleDynamics.DRIFT_EXIT_SLIP_DEG:
+		_drift_grace_timer -= delta
+		if _drift_grace_timer <= 0.0:
+			controlled_exit = true
+	else:
+		# Reset grace timer when conditions not met
+		_drift_grace_timer = VehicleDynamics.DRIFT_GRACE_DURATION
+
+	# Speed loss exit: speed < 80% entry speed
+	if speed < 0.8 * _drift_entry_speed:
+		cancel_exit = true
+
+	# Spin exit: slip > 60deg & forward v not positive
+	if rear_slip_deg > VehicleDynamics.DRIFT_SPIN_SLIP_DEG and fwd_speed <= 0.0:
+		cancel_exit = true
+		_drift_collision_cancel = true  # spin = no boost
+
+	# Collision invalidation
+	if _drift_collision_cancel:
+		cancel_exit = true
+
+	if controlled_exit:
+		# Award boost ONCE on controlled exit
+		if not _drift_boost_awarded and _drift_qualified_time >= VehicleDynamics.DRIFT_MIN_QUALIFIED_TIME:
+			var reward := minf(_drift_qualified_time * stats.boost_recharge, stats.drift_boost_max_reward)
+			add_boost(reward, "drift")
+			_drift_boost_awarded = true
+		_drift_state = DriftState.EXITING
+		_rear_grip_recovery = 0.0  # start recovery interpolation
+
+	elif cancel_exit:
+		# No boost on cancel (spin/collision/speed loss)
+		_drift_state = DriftState.EXITING
+		_rear_grip_recovery = 0.0
+
+
+func _v1_apply_speed_caps(forward: Vector2, fwd_speed: float, eff_max: float) -> void:
+	# HARD legal caps: 1.0x eff_max normal, 1.2x boosted
+	var cap_mult := BOOST_SPEED_CAP_MULTIPLIER if is_boost_active() else NORMAL_SPEED_CAP_MULTIPLIER
+	var hard_limit := eff_max * cap_mult
+	if linear_velocity.length() > hard_limit:
+		linear_velocity = linear_velocity.limit_length(hard_limit)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# V0 — Legacy model (default/release behavior, unchanged)
+# ═══════════════════════════════════════════════════════════════════════
+
+func _v0_physics_step(delta: float) -> void:
+	_v0_apply_drive_forces(delta)
+	_v0_apply_lateral_grip()
+	_v0_apply_steering(delta)
+	_v0_update_boost(delta)
+	_v0_limit_top_speed()
+	_v0_update_drift_state()
+
+
+func _v0_apply_drive_forces(_delta: float) -> void:
 	var forward := Vector2.UP.rotated(rotation)
 	var forward_speed := linear_velocity.dot(forward)
 	var effective_max_speed := get_effective_max_speed()
@@ -375,57 +706,7 @@ func _apply_drive_forces(_delta: float) -> void:
 	apply_central_force(-linear_velocity * stats.grip * surface_grip_multiplier * mass * LEGACY_LINEAR_DAMPING_RATE)
 
 
-func _apply_lateral_grip() -> void:
-	if stats.physics_model_version == 1:
-		var forward := Vector2.UP.rotated(rotation)
-		var right := Vector2.RIGHT.rotated(rotation)
-		var fwd_speed := linear_velocity.dot(forward)
-		var lat_speed := linear_velocity.dot(right)
-		var yaw_rate := angular_velocity
-		
-		var front_pos := forward * (stats.wheelbase * (1.0 - stats.front_weight_ratio))
-		var rear_pos := -forward * (stats.wheelbase * stats.front_weight_ratio)
-		var v_front_lat := lat_speed + yaw_rate * front_pos.length()
-		var v_rear_lat := lat_speed - yaw_rate * rear_pos.length()
-		
-		_front_slip_angle = 0.0
-		_rear_slip_angle = 0.0
-		if absf(fwd_speed) > 1.0:
-			var target_angle := _steer_input * deg_to_rad(stats.max_steer_angle_deg)
-			var speed_ratio := clampf(absf(fwd_speed) / maxf(get_effective_max_speed(), 0.001), 0.0, 1.0)
-			if speed_ratio > stats.steer_fade_start_ratio:
-				var fade := (speed_ratio - stats.steer_fade_start_ratio) / (1.0 - stats.steer_fade_start_ratio)
-				target_angle *= lerpf(1.0, stats.high_speed_steer_ratio, fade)
-			
-			_front_slip_angle = atan2(v_front_lat, absf(fwd_speed)) - target_angle * signf(fwd_speed)
-			_rear_slip_angle = atan2(v_rear_lat, absf(fwd_speed))
-		
-		var prog_stiffness := sqrt(maxf(surface_grip_multiplier, 0.01))
-		var front_peak := stats.front_grip * surface_grip_multiplier * stats.front_weight_ratio * mass * 980.0
-		var rear_peak := stats.rear_grip * surface_grip_multiplier * (1.0 - stats.front_weight_ratio) * mass * 980.0
-		if is_drifting:
-			rear_peak *= stats.drift_rear_grip_ratio
-		
-		var f_front := -VehicleDynamics.calculate_tire_lateral_force(_front_slip_angle, stats.front_cornering_stiffness * prog_stiffness, front_peak / maxf(mass * 980.0, 0.01), mass * 980.0 * stats.front_weight_ratio, stats.post_peak_grip_ratio, stats.slip_falloff_rate)
-		var f_rear := -VehicleDynamics.calculate_tire_lateral_force(_rear_slip_angle, stats.rear_cornering_stiffness * prog_stiffness, rear_peak / maxf(mass * 980.0, 0.01), mass * 980.0 * (1.0 - stats.front_weight_ratio), stats.post_peak_grip_ratio, stats.slip_falloff_rate)
-		
-		var steer_angle := _steer_input * deg_to_rad(stats.max_steer_angle_deg)
-		var front_force_world := right * (f_front * cos(steer_angle)) + forward * (f_front * sin(steer_angle))
-		var rear_force_world := right * f_rear
-		
-		apply_force(front_force_world, front_pos)
-		apply_force(rear_force_world, rear_pos)
-		
-		if absf(fwd_speed) < 35.0:
-			apply_torque(-yaw_rate * stats.yaw_stability_rate * mass * 980.0)
-			
-		if is_drifting:
-			var assist := stats.drift_yaw_assist * mass * 980.0 * signf(_steer_input)
-			if signf(_steer_input) != signf(yaw_rate) and signf(_steer_input) != 0.0:
-				assist *= 0.5
-			apply_torque(assist)
-		return
-
+func _v0_apply_lateral_grip() -> void:
 	var right := Vector2.RIGHT.rotated(rotation)
 	var lateral_speed := linear_velocity.dot(right)
 	current_grip = stats.lateral_grip * surface_grip_multiplier
@@ -434,10 +715,7 @@ func _apply_lateral_grip() -> void:
 	apply_central_force(-right * lateral_speed * current_grip * mass)
 
 
-func _apply_steering(delta: float) -> void:
-	if stats.physics_model_version == 1:
-		return
-		
+func _v0_apply_steering(delta: float) -> void:
 	var forward := Vector2.UP.rotated(rotation)
 	var forward_speed := linear_velocity.dot(forward)
 	var direction_sign: float = -1.0 if forward_speed < LEGACY_REVERSE_STEER_THRESHOLD else 1.0
@@ -450,70 +728,31 @@ func _apply_steering(delta: float) -> void:
 	angular_velocity = lerpf(angular_velocity, target_angular_velocity, response)
 
 
-func _update_boost(delta: float) -> void:
-	if stats.physics_model_version == 1:
-		if is_boost_active():
-			boost_amount = maxf(0.0, boost_amount - stats.boost_drain_rate * delta)
-		elif is_drifting:
-			var slip_deg := rad_to_deg(absf(_rear_slip_angle))
-			if absf(slip_deg - stats.drift_optimal_slip_deg) <= 12.0 and _throttle_input > 0.0 and speed >= _drift_entry_speed:
-				_drift_boost_accumulated += stats.boost_recharge * delta
-		return
-
+func _v0_update_boost(delta: float) -> void:
 	if is_boost_active():
 		boost_amount = maxf(0.0, boost_amount - LEGACY_BOOST_DRAIN_RATE * delta)
 	elif is_drifting and absf(slip_angle) > LEGACY_BOOST_SLIP_MIN_DEG and absf(slip_angle) < LEGACY_BOOST_SLIP_MAX_DEG:
 		boost_amount = minf(get_boost_capacity(), boost_amount + stats.get_legacy_boost_recharge() * delta)
 
 
-func _update_motion_state() -> void:
-	speed = linear_velocity.length()
-	if stats.physics_model_version == 1:
-		if speed > LEGACY_SLIP_MEASUREMENT_MIN_SPEED:
-			var forward := Vector2.UP.rotated(rotation)
-			slip_angle = rad_to_deg(forward.angle_to(linear_velocity.normalized()))
-		else:
-			slip_angle = 0.0
-			
-		if not is_drifting:
-			var rear_slip_growing := signf(_steer_input) == signf(_rear_slip_angle) and absf(_rear_slip_angle) > 0.01
-			if _handbrake_input and absf(_steer_input) >= stats.drift_entry_steer and speed >= stats.drift_min_speed and rear_slip_growing:
-				is_drifting = true
-				_drift_entry_speed = speed
-				_drift_boost_accumulated = 0.0
-				_drift_grace_timer = 0.20
-		else:
-			var forward := Vector2.UP.rotated(rotation)
-			var forward_speed := linear_velocity.dot(forward)
-			var exit_condition := false
-			if not _handbrake_input and rad_to_deg(absf(_rear_slip_angle)) < 6.0:
-				_drift_grace_timer -= get_physics_process_delta_time()
-				if _drift_grace_timer <= 0.0:
-					exit_condition = true
-			elif speed < 0.8 * _drift_entry_speed:
-				exit_condition = true
-			elif rad_to_deg(absf(_rear_slip_angle)) > 60.0 and forward_speed <= 0.0:
-				exit_condition = true
-				_drift_boost_accumulated = 0.0
-				
-			if exit_condition:
-				is_drifting = false
-				if _drift_boost_accumulated >= stats.boost_recharge * 0.35:
-					add_boost(minf(_drift_boost_accumulated, stats.drift_boost_max_reward), "drift")
-				_drift_boost_accumulated = 0.0
-		return
-
-	if speed > LEGACY_SLIP_MEASUREMENT_MIN_SPEED:
-		var forward := Vector2.UP.rotated(rotation)
-		slip_angle = rad_to_deg(forward.angle_to(linear_velocity.normalized()))
-	else:
-		slip_angle = 0.0
+func _v0_update_drift_state() -> void:
 	is_drifting = (
 		_handbrake_input
 		and absf(_steer_input) > LEGACY_DRIFT_ENTRY_STEER
 		and speed > LEGACY_DRIFT_MIN_SPEED
 	)
 
+
+func _v0_limit_top_speed() -> void:
+	var cap_multiplier := BOOST_SPEED_CAP_MULTIPLIER if is_boost_active() else NORMAL_SPEED_CAP_MULTIPLIER
+	var speed_limit := get_effective_max_speed() * cap_multiplier
+	if linear_velocity.length() > speed_limit:
+		linear_velocity = linear_velocity.limit_length(speed_limit)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# Collision handling (shared, unchanged)
+# ═══════════════════════════════════════════════════════════════════════
 
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	var delta := state.step
@@ -582,11 +821,8 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		state.linear_velocity = last_collision_response["velocity"]
 		state.angular_velocity = float(last_collision_response["angular_velocity"])
 
+		# Collision invalidates active drift boost (v1)
+		if stats.physics_model_version == 1 and _drift_state == DriftState.ACTIVE:
+			_drift_collision_cancel = true
+
 	_last_output_velocity = state.linear_velocity
-
-
-func _limit_top_speed() -> void:
-	var cap_multiplier := BOOST_SPEED_CAP_MULTIPLIER if is_boost_active() else NORMAL_SPEED_CAP_MULTIPLIER
-	var speed_limit := get_effective_max_speed() * cap_multiplier
-	if linear_velocity.length() > speed_limit:
-		linear_velocity = linear_velocity.limit_length(speed_limit)
