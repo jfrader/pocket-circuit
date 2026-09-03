@@ -173,7 +173,7 @@ func configure(
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
 	vehicle.add_boost(
-		
+
 		vehicle.get_boost_capacity()
 		* float(tuning["starting_boost"])
 		* float(personality["boost_eagerness"])
@@ -307,12 +307,12 @@ func _physics_process(delta: float) -> void:
 		difficulty_margin = 0.86
 	elif difficulty == "clockwork":
 		difficulty_margin = 0.99
-	
+
 	if line_radius > 40.0:
 		if vehicle.stats.physics_model_version == 1:
-			var surface_grip = float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
-			var eff_grip = VehicleDynamics.get_effective_grip(vehicle.stats, vehicle.surface_grip_multiplier * surface_grip)
-			var eff_lat_accel = eff_grip * 980.0
+			var surface_grip := float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
+			var combined_grip := vehicle.surface_grip_multiplier * surface_grip
+			var eff_lat_accel := VehicleDynamics.get_effective_lat_accel(vehicle.stats, combined_grip)
 			corner_speed = clampf(
 				VehicleDynamics.get_safe_corner_speed(line_radius, eff_lat_accel) * difficulty_margin * float(personality["corner_pace"]),
 				effective_max_speed * 0.25,
@@ -328,7 +328,7 @@ func _physics_process(delta: float) -> void:
 				effective_max_speed * corner_floor,
 				effective_max_speed
 			)
-	
+
 	var target_speed := minf(
 		effective_max_speed * lerpf(0.98, float(tuning["sharp_corner_ratio"]), corner_ratio) * pace_multiplier,
 		corner_speed
@@ -345,10 +345,10 @@ func _physics_process(delta: float) -> void:
 
 	var braking_distance := 0.0
 	if vehicle.stats.physics_model_version == 1:
-		var surface_grip = float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
-		var eff_grip = VehicleDynamics.get_effective_grip(vehicle.stats, vehicle.surface_grip_multiplier * surface_grip)
-		var eff_brake_accel = vehicle.stats.brake_force * eff_grip / vehicle.stats.mass
-		var reaction_margin = 15.0
+		var surface_grip := float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
+		var combined_grip := vehicle.surface_grip_multiplier * surface_grip
+		var eff_brake_accel := VehicleDynamics.get_effective_brake_accel(vehicle.stats, combined_grip)
+		var reaction_margin := 15.0
 		braking_distance = VehicleDynamics.get_braking_distance(vehicle.speed, target_speed, eff_brake_accel) + reaction_margin
 		braking_distance *= float(personality["brake_timing"])
 	else:
@@ -357,7 +357,7 @@ func _physics_process(delta: float) -> void:
 			float(tuning["braking_far"]),
 			corner_ratio
 		) * float(personality["brake_timing"])
-		
+
 	var should_brake := vehicle.speed > target_speed and distance_to_target < braking_distance
 	var throttle := 0.0 if should_brake else 1.0
 	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
@@ -395,7 +395,7 @@ func _physics_process(delta: float) -> void:
 		and vehicle.speed > effective_max_speed * 0.55
 	):
 		vehicle.add_boost(
-			
+
 			float(tuning["clean_line_recharge"]) * delta, "clean-line"
 		)
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
@@ -745,7 +745,7 @@ func _apply_drafting_recharge(delta: float, traffic_plan: Dictionary, should_bra
 	if should_brake or not bool(traffic_plan.get("drafting", false)):
 		return
 	vehicle.add_boost(
-		
+
 		DRAFT_RECHARGE_PER_SECOND * delta, "drafting"
 	)
 
