@@ -94,6 +94,7 @@ var lane_offset: float = 0.0
 var difficulty: String = "club_circuit"
 var recovery_count := 0
 var overtake_attempt_count := 0
+var uses_shortcut_line := false
 
 var _checkpoints_by_index: Dictionary = {}
 var _stuck_time: float = 0.0
@@ -105,6 +106,8 @@ var _stuck_target_key := ""
 var _best_checkpoint_distance := INF
 var _smoothed_steer := 0.0
 var _racing_line: PackedVector2Array = PackedVector2Array()
+var _standard_racing_line: PackedVector2Array = PackedVector2Array()
+var _shortcut_racing_line: PackedVector2Array = PackedVector2Array()
 var _overtake_offset := 0.0
 var _overtake_hold_remaining := 0.0
 var _overtake_cooldown_remaining := 0.0
@@ -138,11 +141,19 @@ func _cache_checkpoints() -> void:
 	if not _checkpoints_by_index.is_empty():
 		_track_center /= float(_checkpoints_by_index.size())
 	_racing_line = PackedVector2Array()
+	_standard_racing_line = PackedVector2Array()
+	_shortcut_racing_line = PackedVector2Array()
+	uses_shortcut_line = false
 	var track := get_tree().get_first_node_in_group("track") if is_inside_tree() else null
 	if track:
 		var racing_line := track.get_node_or_null("RacingLine") as Line2D
 		if racing_line:
-			_racing_line = racing_line.points
+			_standard_racing_line = racing_line.points
+		var shortcut_line := track.get_node_or_null("ShortcutRacingLine") as Line2D
+		if shortcut_line:
+			_shortcut_racing_line = shortcut_line.points
+		uses_shortcut_line = _shortcut_route_is_suitable(track)
+		_racing_line = _shortcut_racing_line if uses_shortcut_line else _standard_racing_line
 
 
 func _physics_process(delta: float) -> void:
@@ -613,6 +624,23 @@ func _difficulty_tuning() -> Dictionary:
 	return DIFFICULTY_TUNING.get(difficulty, DIFFICULTY_TUNING["club_circuit"]) as Dictionary
 
 
+func _shortcut_route_is_suitable(track: Node) -> bool:
+	if difficulty == "sunday_drive" or _shortcut_racing_line.is_empty():
+		return false
+	var definitions: Variant = track.get_meta("generated_surfaces", [])
+	if definitions is not Array:
+		return false
+	for definition: Dictionary in definitions:
+		if StringName(definition.get("role", &"")) != &"shortcut":
+			continue
+		if not bool(definition.get("ai_path_clear", false)):
+			return false
+		var combined_grip := float(definition.get("grip", 0.0)) * vehicle.stats.grip
+		var minimum_grip := 0.34 if difficulty == "clockwork" else 0.38
+		return combined_grip >= minimum_grip and float(definition.get("speed", 0.0)) >= 1.0
+	return false
+
+
 func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 	var plan := {
 		"weight": 0.0,
@@ -621,6 +649,13 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 		"avoid_direction": desired_direction,
 	}
 	if not vehicle.is_inside_tree():
+		return plan
+	var shortcut_zone := _upcoming_shortcut_zone(desired_direction)
+	if shortcut_zone != null:
+		var shortcut_risk := _surface_zone_risk(shortcut_zone)
+		var combined_grip := vehicle.stats.grip * shortcut_zone.grip_multiplier
+		plan["risk"] = shortcut_risk
+		plan["speed_scale"] = clampf(0.74 + combined_grip * 0.32, 0.78, 0.94)
 		return plan
 	var center_risk := _surface_exposure(desired_direction)
 	plan["risk"] = center_risk
@@ -644,6 +679,21 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 		plan["weight"] = clampf(0.28 + center_risk * 0.34, 0.0, 0.58)
 		plan["speed_scale"] = lerpf(1.0, 0.82, best_risk)
 	return plan
+
+
+func _upcoming_shortcut_zone(direction: Vector2) -> SurfaceZone:
+	if not uses_shortcut_line:
+		return null
+	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
+		var zone := node as SurfaceZone
+		if zone == null or StringName(zone.get_meta("role", &"")) != &"shortcut":
+			continue
+		if not bool(zone.get_meta("ai_path_clear", false)):
+			continue
+		for distance: float in SURFACE_PROBE_DISTANCES:
+			if zone.contains_global_point(vehicle.global_position + direction * distance):
+				return zone
+	return null
 
 
 func _surface_exposure(direction: Vector2) -> float:

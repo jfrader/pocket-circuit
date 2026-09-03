@@ -93,6 +93,8 @@ func _run_test() -> void:
 				var racing_line: PackedVector2Array = child.get("_racing_line")
 				if not _expect(racing_line.size() == 260, "%s should cache the generated racing line" % vehicle.name):
 					return
+				if not _expect(child.uses_shortcut_line, "%s should select the clear Club Circuit shortcut line" % vehicle.name):
+					return
 	if not _expect(ai_controller_count == 3, "runtime race should configure three generated-track AI controllers"):
 		return
 

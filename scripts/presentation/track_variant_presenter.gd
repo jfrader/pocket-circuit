@@ -75,7 +75,7 @@ func _create_surface_zones() -> void:
 		zone.name = "%sSurface" % String(data["name"]).to_pascal_case()
 		add_child(zone)
 		zone.configure(data["name"], data["points"], float(data["grip"]), float(data["speed"]), data["color"], String(data["label"]))
-		for key: String in ["role", "lane", "centerline_index", "inside_sign"]:
+		for key: String in ["role", "lane", "centerline_index", "inside_sign", "ai_path_clear"]:
 			if data.has(key):
 				zone.set_meta(key, data[key])
 		surface_zones.append(zone)

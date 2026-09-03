@@ -3066,6 +3066,7 @@ static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dicti
 		"decal": String(shortcut_data["decal"]),
 		"centerline_index": shortcut_index,
 		"inside_sign": float(shortcut_geometry["inside_sign"]),
+		"ai_path_clear": true,
 	}
 	definitions.append(shortcut_definition)
 	var shortcut := Node2D.new()
@@ -3078,6 +3079,7 @@ static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dicti
 	shortcut.set_meta("decal_texture", shortcut_definition["decal"])
 	shortcut.set_meta("centerline_index", shortcut_index)
 	shortcut.set_meta("inside_sign", shortcut_definition["inside_sign"])
+	shortcut.set_meta("ai_path_clear", shortcut_definition["ai_path_clear"])
 	shortcut.set_meta("shortcut_path", shortcut_path)
 	shortcut.set_meta("safe_path", safe_path)
 	shortcut.set_meta("shortcut_length", float(shortcut_geometry["shortcut_length"]))
@@ -3710,7 +3712,8 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 
 static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}) -> void:
 	var count := centerline.size()
-	var line_points := _curvature_apex_line(centerline)
+	var apex_points := _curvature_apex_line(centerline)
+	var line_points := apex_points.duplicate()
 	var shortcut_index := int(moments.get("shortcut", -1))
 	var shortcut_inside_sign := 0.0
 	if shortcut_index >= 0:
@@ -3724,13 +3727,37 @@ static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, mom
 				var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
 				var safe_target := centerline[index] - normal * shortcut_inside_sign * SAFE_RACING_LINE_OFFSET
 				line_points[index] = line_points[index].lerp(safe_target, influence)
+	_add_hidden_racing_line(root, "RacingLine", line_points)
+	if shortcut_index >= 0:
+		var shortcut_points := apex_points.duplicate()
+		var taper_span := SHORTCUT_HALF_SPAN + 8
+		for index in count:
+			var shortcut_distance := _cyclic_index_distance(index, shortcut_index, count)
+			if shortcut_distance > taper_span:
+				continue
+			var influence := 1.0 - smoothstep(
+				float(SHORTCUT_HALF_SPAN),
+				float(taper_span),
+				float(shortcut_distance)
+			)
+			var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
+			var shortcut_target := centerline[index] + normal * shortcut_inside_sign * SHORTCUT_LANE_OFFSET
+			shortcut_points[index] = shortcut_points[index].lerp(shortcut_target, influence)
+		var shortcut_line := _add_hidden_racing_line(root, "ShortcutRacingLine", shortcut_points)
+		shortcut_line.set_meta("role", &"shortcut")
+		shortcut_line.set_meta("centerline_index", shortcut_index)
+		shortcut_line.set_meta("ai_path_clear", true)
+
+
+static func _add_hidden_racing_line(parent: Node2D, line_name: String, points: PackedVector2Array) -> Line2D:
 	var line := Line2D.new()
-	line.name = "RacingLine"
-	line.points = line_points
+	line.name = line_name
+	line.points = points
 	line.closed = true
 	line.width = 2.0
 	line.visible = false
-	root.add_child(line)
+	parent.add_child(line)
+	return line
 
 
 static func _curvature_apex_line(centerline: PackedVector2Array) -> PackedVector2Array:
