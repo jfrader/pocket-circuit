@@ -92,9 +92,11 @@ rooms, route geometry, palette, interface, and story.
 
 - Generated rooms layer density by scale: 1-3 giant household landmarks,
   authored story clusters, 2-4 broad ground anchors, 60-120 low-contrast floor
-  details, and 60-150 tiny non-colliding edge/apron details.
-- Edge details sit close enough to both sides of the corridor to prevent empty
-  floor bands, but remain outside the drivable area and recovery lanes.
+  details, and 60-150 tiny edge/apron details. Painted/material micro details
+  are non-colliding; raised rails and recognizable loose props use
+  silhouette-matched collision.
+- Edge details remain outside the drivable area and recovery lanes while sitting
+  close enough to both sides of the corridor to prevent empty floor bands.
 - The room surface ends at its fully backed perimeter wall; the 760-unit camera
   overscan beyond it is the dark void rather than more floor material.
 - Thirty-two faint material marks break up each generated corridor. They read
