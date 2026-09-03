@@ -76,6 +76,13 @@
 - Generated circuits no longer stop cars against invisible corridor walls.
   Every generated collider is backed by a visible prop, rail, raised-island
   rim, gate post, hazard, giant landmark, or room wall.
+- AI rivals now detect stalls by route progress, keep avoiding obstacles at low
+  speed, reverse and steer out of sustained scenery contact, and recover from
+  severe route departures without forming DNF trains. Finished rivals become
+  non-colliding ghosts instead of parked obstacles.
+- Generated rails, solid apron props, and giant landmarks now reserve a full
+  car-width safety margin outside the racing corridor, while giant placement
+  also protects the committed safe and shortcut racing lines with a swept hull.
 - The race camera and out-of-bounds recovery now follow each generated room's
   full scale and shape, including the missing quadrant of L-shaped rooms.
 - Start grids remain outside the island, lap gates span the full available room
