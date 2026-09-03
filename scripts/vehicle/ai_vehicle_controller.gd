@@ -83,7 +83,6 @@ var difficulty: String = "club_circuit"
 var recovery_count := 0
 
 var _checkpoints_by_index: Dictionary = {}
-var _gate_targets: Dictionary = {}
 var _stuck_time: float = 0.0
 var _recovering: bool = false
 var _track_center := Vector2.ZERO
@@ -115,7 +114,6 @@ func configure(
 
 func _cache_checkpoints() -> void:
 	_checkpoints_by_index.clear()
-	_gate_targets.clear()
 	_track_center = Vector2.ZERO
 	for checkpoint: Node in race_manager.get_ordered_checkpoints():
 		_checkpoints_by_index[int(checkpoint.get("checkpoint_index"))] = checkpoint
@@ -517,7 +515,7 @@ func _surface_zone_risk(zone: SurfaceZone) -> float:
 
 
 func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictionary:
-	var plan := {"steer": 0.0, "weight": 0.0, "speed_scale": 1.0, "avoid_direction": desired_direction}
+	var plan := {"weight": 0.0, "speed_scale": 1.0, "avoid_direction": desired_direction}
 	if not vehicle.is_inside_tree():
 		return plan
 	if vehicle.speed < 60.0:
@@ -551,7 +549,6 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 		best_direction = slide.normalized()
 	var obstruction := 1.0 - center_clearance
 	plan["avoid_direction"] = best_direction.normalized()
-	plan["steer"] = clampf(forward.angle_to(plan["avoid_direction"] as Vector2) / 0.72, -1.0, 1.0)
 	plan["weight"] = clampf((0.34 if hitting_vehicle else 0.52) + obstruction * 0.5, 0.0, 0.95)
 	plan["speed_scale"] = lerpf(0.9, 0.58, obstruction) if hitting_vehicle else lerpf(0.78, 0.34, obstruction)
 	return plan
@@ -610,8 +607,6 @@ func _update_stuck_recovery(delta: float, target_key: String, distance_to_target
 		_stuck_time = 0.0
 		return
 	_stuck_time += delta
-	if _stuck_time >= 0.8:
-		_gate_targets.erase(int(target_key.get_slice(":", 0)))
 	if _stuck_time >= STUCK_TIMEOUT:
 		_recover_vehicle()
 
@@ -627,7 +622,6 @@ func _recover_vehicle() -> void:
 	_stuck_target_key = ""
 	_best_checkpoint_distance = INF
 	_smoothed_steer = 0.0
-	_gate_targets.clear()
 	vehicle.set_external_controls(0.0, 0.0, 0.0)
 	var saved_layer := vehicle.collision_layer
 	var saved_mask := vehicle.collision_mask
