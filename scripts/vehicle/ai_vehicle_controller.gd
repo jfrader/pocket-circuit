@@ -38,6 +38,17 @@ const DRAFT_MIN_DISTANCE := 54.0
 const DRAFT_MAX_DISTANCE := 185.0
 const DRAFT_LATERAL_WIDTH := 34.0
 const DRAFT_RECHARGE_PER_SECOND := 4.0
+const OFF_ROUTE_DISTANCE := 250.0
+const SEVERE_OFF_ROUTE_DISTANCE := 420.0
+const OFF_ROUTE_TIMEOUT := 1.25
+const NO_PROGRESS_TIMEOUT := 2.0
+const WRONG_WAY_PROGRESS_TIMEOUT := 0.75
+const ROUTE_PROGRESS_COMMIT_DISTANCE := 18.0
+const LOW_SPEED_FEELER_LENGTH := 72.0
+const STATIC_CONTACT_CLEARANCE_RATIO := 0.42
+const STATIC_CONTACT_TIMEOUT := 0.65
+const STATIC_ESCAPE_DURATION := 0.4
+const STATIC_ESCAPE_MAX_SPEED := 70.0
 const DEFAULT_PERSONALITY: Dictionary = {
 	"corner_pace": 1.0,
 	"brake_timing": 1.0,
@@ -132,6 +143,19 @@ var _overtake_hold_remaining := 0.0
 var _overtake_cooldown_remaining := 0.0
 var _overtake_target_id := 0
 var _last_recovery_time := 0
+var _off_route_time := 0.0
+var _no_progress_time := 0.0
+var _wrong_way_progress_time := 0.0
+var _route_progress_accumulator := 0.0
+var _watchdog_target_key := ""
+var _last_route_arc := 0.0
+var _static_contact_time := 0.0
+var _escape_time_remaining := 0.0
+var _escape_steer := 0.0
+var static_escape_attempt_count := 0
+var _race_collision_layer := 0
+var _race_collision_mask := 0
+var _finished_ghosted := false
 
 
 func configure(
@@ -158,8 +182,14 @@ func configure(
 	if not race_manager.race_started.is_connected(_cache_checkpoints):
 		race_manager.race_started.connect(_cache_checkpoints)
 	vehicle.set_player_controlled(false)
+	_race_collision_layer = vehicle.collision_layer
+	_race_collision_mask = vehicle.collision_mask
+	_finished_ghosted = false
 	_last_recovery_time = 0
 	_stuck_time = 0.0
+	_reset_route_watchdog()
+	if not race_manager.race_started.is_connected(_restore_racing_collisions):
+		race_manager.race_started.connect(_restore_racing_collisions)
 
 
 func _cache_checkpoints() -> void:
@@ -189,9 +219,15 @@ func _cache_checkpoints() -> void:
 func _physics_process(delta: float) -> void:
 	if not is_instance_valid(vehicle) or not is_instance_valid(race_manager) or _recovering:
 		return
-	if vehicle.controls_locked or not race_manager.is_running or race_manager.is_racer_finished(vehicle):
+	if race_manager.is_racer_finished(vehicle):
+		_ghost_finished_vehicle()
+		vehicle.set_external_controls(0.0, 0.0, 0.0)
+		_reset_route_watchdog()
+		return
+	if vehicle.controls_locked or not race_manager.is_running:
 		vehicle.set_external_controls(0.0, 0.0, 0.0)
 		_stuck_time = 0.0
+		_reset_route_watchdog()
 		return
 
 	var expected_index := race_manager.get_expected_checkpoint(vehicle)
@@ -223,6 +259,9 @@ func _physics_process(delta: float) -> void:
 		)
 
 	var forward := Vector2.UP.rotated(vehicle.rotation)
+	var watchdog := _update_route_watchdog(delta, expected_index)
+	if _recovering:
+		return
 	var line_radius := _racing_line_radius(vehicle.global_position)
 	if not _racing_line.is_empty():
 		target_position = _racing_line_target(forward)
@@ -239,6 +278,8 @@ func _physics_process(delta: float) -> void:
 			float(surface_plan["weight"])
 		).normalized()
 	var obstacle_plan := _obstacle_avoidance(forward, desired_direction)
+	if _update_static_escape(delta, obstacle_plan, bool(watchdog["made_progress"])):
+		return
 	if float(obstacle_plan["weight"]) > 0.35:
 		desired_direction = desired_direction.lerp(
 			obstacle_plan["avoid_direction"] as Vector2,
@@ -582,6 +623,8 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 		var candidate := node as VehicleController
 		if candidate == null or candidate == vehicle:
 			continue
+		if race_manager.is_racer_finished(candidate) or bool(race_manager.get_racer_state(candidate).get("dnf", false)):
+			continue
 		var separation := candidate.global_position - vehicle.global_position
 		var distance_ahead := separation.dot(forward)
 		var lateral_distance := separation.dot(lateral_axis)
@@ -812,13 +855,17 @@ func _surface_zone_risk(zone: SurfaceZone) -> float:
 
 
 func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictionary:
-	var plan := {"weight": 0.0, "speed_scale": 1.0, "avoid_direction": desired_direction}
+	var plan := {
+		"weight": 0.0,
+		"speed_scale": 1.0,
+		"avoid_direction": desired_direction,
+		"static_contact": false,
+		"escape_steer": 0.0,
+	}
 	if not vehicle.is_inside_tree():
 		return plan
-	if vehicle.speed < 60.0:
-		return plan
 	var origin := vehicle.global_position + forward * OBSTACLE_FRONT_OFFSET
-	var feeler_length := clampf(vehicle.speed * 0.75, 160.0, 360.0)
+	var feeler_length := clampf(vehicle.speed * 0.75, LOW_SPEED_FEELER_LENGTH, 360.0)
 	var best_clearance := -1.0
 	var best_direction := desired_direction
 	var center_clearance := 1.0
@@ -846,7 +893,17 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 		best_direction = slide.normalized()
 	var obstruction := 1.0 - center_clearance
 	plan["avoid_direction"] = best_direction.normalized()
-	plan["weight"] = clampf((0.34 if hitting_vehicle else 0.52) + obstruction * 0.5, 0.0, 0.95)
+	var minimum_weight := 0.34 if hitting_vehicle else (0.68 if vehicle.speed < 60.0 else 0.52)
+	plan["weight"] = clampf(minimum_weight + obstruction * 0.5, 0.0, 0.95)
+	if (
+		not hitting_vehicle
+		and wall_normal.length_squared() > 0.01
+		and center_clearance <= STATIC_CONTACT_CLEARANCE_RATIO
+		and vehicle.speed <= STATIC_ESCAPE_MAX_SPEED
+	):
+		plan["static_contact"] = true
+		var escape_angle := forward.angle_to(best_direction)
+		plan["escape_steer"] = signf(escape_angle) if not is_zero_approx(escape_angle) else 1.0
 	# Traffic pace is planned by _traffic_plan; obstacle avoidance still chooses
 	# a safe direction without multiplying it into a permanent slow train.
 	plan["speed_scale"] = 1.0 if hitting_vehicle else lerpf(0.78, 0.34, obstruction)
@@ -927,6 +984,140 @@ func _update_stuck_recovery(delta: float, target_key: String, distance_to_target
 		_recover_vehicle()
 
 
+func _update_route_watchdog(delta: float, expected_index: int) -> Dictionary:
+	var sample := _active_route_sample(expected_index)
+	var target_key := str(expected_index)
+	if target_key != _watchdog_target_key:
+		_watchdog_target_key = target_key
+		_last_route_arc = float(sample["arc"])
+		_route_progress_accumulator = 0.0
+		_off_route_time = 0.0
+		_no_progress_time = 0.0
+		_wrong_way_progress_time = 0.0
+		return {"made_progress": true}
+
+	var route_length := maxf(float(sample["length"]), 0.001)
+	var route_delta := float(sample["arc"]) - _last_route_arc
+	if bool(sample["closed"]):
+		if route_delta > route_length * 0.5:
+			route_delta -= route_length
+		elif route_delta < -route_length * 0.5:
+			route_delta += route_length
+	_last_route_arc = float(sample["arc"])
+	var made_progress := false
+	if route_delta > 0.0:
+		_route_progress_accumulator += route_delta
+	if _route_progress_accumulator >= ROUTE_PROGRESS_COMMIT_DISTANCE:
+		made_progress = true
+		_route_progress_accumulator = 0.0
+		_no_progress_time = 0.0
+	else:
+		_no_progress_time += delta
+
+	var lateral_distance := float(sample["distance"])
+	if lateral_distance >= OFF_ROUTE_DISTANCE:
+		_off_route_time += delta
+	else:
+		_off_route_time = 0.0
+
+	var moving_against_route := route_delta < -4.0
+	if _escape_time_remaining > 0.0:
+		_wrong_way_progress_time = maxf(0.0, _wrong_way_progress_time - delta)
+	elif race_manager.is_racer_wrong_way(vehicle) or moving_against_route:
+		_wrong_way_progress_time += delta
+	elif route_delta > 2.0:
+		_wrong_way_progress_time = 0.0
+	else:
+		_wrong_way_progress_time = maxf(0.0, _wrong_way_progress_time - delta * 0.5)
+
+	if _off_route_time >= OFF_ROUTE_TIMEOUT:
+		var severe := lateral_distance >= SEVERE_OFF_ROUTE_DISTANCE
+		if severe or not _recovery_cooldown_active():
+			_recover_vehicle()
+	elif (
+		_no_progress_time >= NO_PROGRESS_TIMEOUT
+		or _wrong_way_progress_time >= WRONG_WAY_PROGRESS_TIMEOUT
+	):
+		if not _recovery_cooldown_active():
+			_recover_vehicle()
+	return {"made_progress": made_progress}
+
+
+func _active_route_sample(expected_index: int) -> Dictionary:
+	if _racing_line.size() >= 2:
+		var best_distance_squared := INF
+		var best_arc := 0.0
+		var walked := 0.0
+		var total := 0.0
+		for index in _racing_line.size():
+			var from := _racing_line[index]
+			var to := _racing_line[(index + 1) % _racing_line.size()]
+			var segment := to - from
+			var segment_length := segment.length()
+			var fraction := clampf(
+				(vehicle.global_position - from).dot(segment) / maxf(segment.length_squared(), 0.001),
+				0.0,
+				1.0
+			)
+			var nearest := from + segment * fraction
+			var distance_squared := vehicle.global_position.distance_squared_to(nearest)
+			if distance_squared < best_distance_squared:
+				best_distance_squared = distance_squared
+				best_arc = walked + segment_length * fraction
+			walked += segment_length
+			total += segment_length
+		var directional_arc := fposmod(total - best_arc, total) if race_manager.is_reverse_direction() else best_arc
+		return {
+			"arc": directional_arc,
+			"length": total,
+			"distance": sqrt(best_distance_squared),
+			"closed": true,
+		}
+
+	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
+	var previous := race_manager.get_checkpoint_before(expected_index) as Node2D
+	if checkpoint == null or previous == null:
+		return {"arc": 0.0, "length": 1.0, "distance": 0.0, "closed": false}
+	var segment := checkpoint.global_position - previous.global_position
+	var fraction := clampf(
+		(vehicle.global_position - previous.global_position).dot(segment) / maxf(segment.length_squared(), 0.001),
+		0.0,
+		1.0
+	)
+	var nearest := previous.global_position + segment * fraction
+	return {
+		"arc": segment.length() * fraction,
+		"length": segment.length(),
+		"distance": vehicle.global_position.distance_to(nearest),
+		"closed": false,
+	}
+
+
+func _update_static_escape(delta: float, obstacle_plan: Dictionary, made_progress: bool) -> bool:
+	if _escape_time_remaining > 0.0:
+		_escape_time_remaining = maxf(0.0, _escape_time_remaining - delta)
+		vehicle.set_external_controls(0.0, 1.0, _escape_steer)
+		if _escape_time_remaining <= 0.0:
+			_static_contact_time = 0.0
+		return true
+	if made_progress:
+		_static_contact_time = 0.0
+		return false
+	if bool(obstacle_plan.get("static_contact", false)):
+		_static_contact_time += delta
+	else:
+		_static_contact_time = maxf(0.0, _static_contact_time - delta * 2.0)
+	if _static_contact_time < STATIC_CONTACT_TIMEOUT:
+		return false
+	_escape_time_remaining = STATIC_ESCAPE_DURATION
+	_escape_steer = clampf(float(obstacle_plan.get("escape_steer", 1.0)), -1.0, 1.0)
+	if is_zero_approx(_escape_steer):
+		_escape_steer = 1.0
+	static_escape_attempt_count += 1
+	vehicle.set_external_controls(0.0, 1.0, _escape_steer)
+	return true
+
+
 func _recover_vehicle() -> void:
 	if _recovering:
 		return
@@ -939,6 +1130,8 @@ func _recover_vehicle() -> void:
 	_stuck_target_key = ""
 	_best_checkpoint_distance = INF
 	_smoothed_steer = 0.0
+	_reset_overtake_state()
+	_reset_route_watchdog()
 	vehicle.set_external_controls(0.0, 0.0, 0.0)
 	var saved_layer := vehicle.collision_layer
 	var saved_mask := vehicle.collision_mask
@@ -957,10 +1150,13 @@ func _recover_vehicle() -> void:
 	vehicle.boost_amount *= 0.5
 
 	await get_tree().create_timer(RECOVERY_GHOST_TIME, false).timeout
-	if is_instance_valid(vehicle):
+	if is_instance_valid(vehicle) and is_instance_valid(race_manager) and not race_manager.is_racer_finished(vehicle):
 		vehicle.collision_layer = saved_layer
 		vehicle.collision_mask = saved_mask
 		vehicle.modulate.a = 1.0
+	elif is_instance_valid(vehicle):
+		vehicle.collision_layer = 0
+		vehicle.collision_mask = 0
 	_recovering = false
 
 
@@ -968,6 +1164,41 @@ func _recovery_cooldown_active() -> bool:
 	if _last_recovery_time == 0:
 		return false
 	return (Time.get_ticks_msec() - _last_recovery_time) < int(RECOVERY_COOLDOWN * 1000.0)
+
+
+func _reset_overtake_state() -> void:
+	_overtake_hold_remaining = 0.0
+	_overtake_cooldown_remaining = 0.0
+	_overtake_target_id = 0
+	_overtake_offset = 0.0
+
+
+func _reset_route_watchdog() -> void:
+	_off_route_time = 0.0
+	_no_progress_time = 0.0
+	_wrong_way_progress_time = 0.0
+	_route_progress_accumulator = 0.0
+	_watchdog_target_key = ""
+	_last_route_arc = 0.0
+	_static_contact_time = 0.0
+	_escape_time_remaining = 0.0
+	_escape_steer = 0.0
+
+
+func _ghost_finished_vehicle() -> void:
+	if _finished_ghosted:
+		return
+	_finished_ghosted = true
+	vehicle.collision_layer = 0
+	vehicle.collision_mask = 0
+
+
+func _restore_racing_collisions() -> void:
+	_finished_ghosted = false
+	if is_instance_valid(vehicle):
+		vehicle.collision_layer = _race_collision_layer
+		vehicle.collision_mask = _race_collision_mask
+	_reset_route_watchdog()
 
 
 func _nearest_line_index(position: Vector2) -> int:
