@@ -31,6 +31,7 @@ const SHADOW_TINT := Color("3f2a22", 0.35)
 const GIANT_CAST_SHADOW_TINT := Color("3f2a22", 0.15)
 const COLLISION_SOLID := &"solid"
 const COLLISION_FLAT := &"flat"
+const ORIENTED_FOOTPRINT_MIN_ANISOTROPY := 1.35
 
 ## Generated asset contract (authoritative across every constructor below):
 ## - PROP_SHAPES contains ordinary SOLID props. `shape` is `circle` or `rect`,
@@ -69,6 +70,26 @@ static var FLAT_EDGE_ASSETS := {
 	"desk_pad_grid.png": true,
 }
 static var _texture_footprint_cache: Dictionary = {}
+
+## Exceptions to the broad PROP_SHAPES presentation categories. These assets
+## are visibly elongated or rectangular even though older placement data used a
+## circle. `no_rotation` also protects axis-aligned art from unstable PCA angles.
+static var ASSET_FOOTPRINT_OVERRIDES := {
+	"watermelon.png": {"kind": &"capsule", "no_rotation": true},
+	"giant_watermelon.png": {"kind": &"capsule", "no_rotation": true},
+	"giant_mug.png": {"kind": &"capsule", "no_rotation": true},
+	"giant_mouse.png": {"kind": &"capsule", "no_rotation": true},
+	"mug_top.png": {"kind": &"rect", "no_rotation": true},
+	"mug_blue.png": {"kind": &"rect", "no_rotation": true},
+	"kitchen_mug_blue.png": {"kind": &"rect", "no_rotation": true},
+	"kitchen_mug_hero.png": {"kind": &"rect", "no_rotation": true},
+	"sponge_wet.png": {"kind": &"rect", "no_rotation": true},
+	"kitchen_sponge.png": {"kind": &"rect", "no_rotation": true},
+	"napkin.png": {"kind": &"rect", "no_rotation": true},
+	"workshop_toolbox_top_bright.jpg": {"kind": &"rect", "no_rotation": true},
+	"office_keyboard_top_bright.jpg": {"kind": &"rect", "no_rotation": true},
+	"stove_top.png": {"kind": &"rect", "no_rotation": true},
+}
 
 static var ROOM_SHAPES := {
 	"classic": PackedVector2Array([Vector2(-875, -575) * WORLD_SCALE, Vector2(875, -575) * WORLD_SCALE, Vector2(875, 575) * WORLD_SCALE, Vector2(-875, 575) * WORLD_SCALE]),
@@ -2768,7 +2789,7 @@ static func _build_giant_landmarks(
 			visual_center_offset = ((footprint["center"] as Vector2) - Vector2(tex.get_width(), tex.get_height()) * 0.5) * sprite_scale
 			world_shape_size = footprint_size * sprite_scale
 			local_footprint_rotation = float(footprint["rotation"])
-			placement = _best_giant_position(pref_idx, world_shape_size, StringName(shape_entry.get("shape", "circle")), local_footprint_rotation, room_polygon, centerline, gate_samples, occupied)
+			placement = _best_giant_position(pref_idx, world_shape_size, StringName(footprint["kind"]), local_footprint_rotation, room_polygon, centerline, gate_samples, occupied)
 			if bool(placement.get("found", false)):
 				break
 		if not bool(placement.get("found", false)) or tex == null:
@@ -3886,15 +3907,22 @@ static func _texture_opaque_rect(texture: Texture2D) -> Rect2:
 	return Rect2(Vector2.ZERO, Vector2(texture.get_width(), texture.get_height()))
 
 
-static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringName) -> Dictionary:
-	var cache_key := "%s:%s" % [texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id()), shape_kind]
+static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringName, force_axis_aligned: bool = false) -> Dictionary:
+	var override: Dictionary = ASSET_FOOTPRINT_OVERRIDES.get(texture.resource_path.get_file(), {})
+	var resolved_kind := StringName(override.get("kind", shape_kind))
+	var no_rotation := force_axis_aligned or bool(override.get("no_rotation", false))
+	var cache_key := "%s:%s:%s" % [texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id()), resolved_kind, no_rotation]
 	if _texture_footprint_cache.has(cache_key):
 		return _texture_footprint_cache[cache_key]
 	var used := _texture_opaque_rect(texture)
-	var fallback := {"center": used.get_center(), "size": used.size, "rotation": 0.0}
-	if shape_kind == &"circle":
+	var fallback := {"center": used.get_center(), "size": used.size, "rotation": 0.0, "kind": resolved_kind}
+	if resolved_kind == &"circle":
 		_texture_footprint_cache[cache_key] = fallback
 		return fallback
+	if no_rotation:
+		var forced_axis_result := _axis_aligned_texture_footprint(used, resolved_kind)
+		_texture_footprint_cache[cache_key] = forced_axis_result
+		return forced_axis_result
 	var image := texture.get_image()
 	if image == null or image.is_empty():
 		_texture_footprint_cache[cache_key] = fallback
@@ -3993,10 +4021,17 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 				max_projection = max_projection.max(pr)
 	var padding := 1.0
 	var center_projection := (min_projection + max_projection) * 0.5
+	var fitted_size := max_projection - min_projection
+	var anisotropy := maxf(fitted_size.x, fitted_size.y) / maxf(minf(fitted_size.x, fitted_size.y), 0.001)
+	if anisotropy < ORIENTED_FOOTPRINT_MIN_ANISOTROPY:
+		var low_anisotropy_result := _axis_aligned_texture_footprint(used, resolved_kind)
+		_texture_footprint_cache[cache_key] = low_anisotropy_result
+		return low_anisotropy_result
 	var result := {
 		"center": best_axis_x * center_projection.x + best_axis_y * center_projection.y,
-		"size": max_projection - min_projection + Vector2.ONE * padding * 2.0,
+		"size": fitted_size + Vector2.ONE * padding * 2.0,
 		"rotation": best_rotation,
+		"kind": resolved_kind,
 	}
 	# Canonicalize so longer axis on size.x; equivalent rect (rot +90, dims swap).
 	var sz: Vector2 = result["size"]
@@ -4005,6 +4040,15 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 		result["rotation"] = float(result["rotation"]) + PI * 0.5
 	_texture_footprint_cache[cache_key] = result
 	return result
+
+
+static func _axis_aligned_texture_footprint(used: Rect2, shape_kind: StringName) -> Dictionary:
+	return {
+		"center": used.get_center(),
+		"size": used.size + Vector2.ONE * 2.0,
+		"rotation": 0.0,
+		"kind": shape_kind,
+	}
 
 
 static func _record_shape_probe_points(parent: Node, center: Vector2, size: Vector2, shape_kind: StringName, rotation: float = 0.0) -> void:
@@ -4026,26 +4070,47 @@ static func _record_shape_probe_points(parent: Node, center: Vector2, size: Vect
 
 
 static func _add_scaled_texture_collision(parent: Node, texture: Texture2D, sprite_scale: float, shape_kind: StringName) -> Vector2:
-	var footprint := _texture_collision_footprint(texture, shape_kind)
+	return _add_texture_collision(parent, texture, Vector2.ONE * sprite_scale, shape_kind)
+
+
+static func _add_texture_collision(
+		parent: Node,
+		texture: Texture2D,
+		sprite_scale: Vector2,
+		shape_kind: StringName,
+		force_axis_aligned: bool = false,
+		padding: float = 0.0
+) -> Vector2:
+	var footprint := _texture_collision_footprint(texture, shape_kind, force_axis_aligned)
 	var footprint_center: Vector2 = footprint["center"]
-	var footprint_size: Vector2 = footprint["size"]
+	var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale + Vector2.ONE * padding
 	var canvas_size := Vector2(texture.get_width(), texture.get_height())
 	var visual_center_offset := (footprint_center - canvas_size * 0.5) * sprite_scale
-	if shape_kind == &"circle":
+	var resolved_kind := StringName(footprint["kind"])
+	if resolved_kind == &"circle":
 		var circle := CircleShape2D.new()
-		# Ninety-eight percent of the visible major-axis radius: large enough to
-		# stop a vehicle at the silhouette edge without becoming an oversized blob.
-		circle.radius = maxf(footprint_size.x, footprint_size.y) * sprite_scale * 0.5
+		circle.radius = maxf(footprint_size.x, footprint_size.y) * 0.5
 		var circle_collision := CollisionShape2D.new()
 		circle_collision.name = "AssetCollision"
 		circle_collision.shape = circle
 		parent.add_child(circle_collision)
 		_record_shape_probe_points(parent, Vector2.ZERO, Vector2.ONE * circle.radius * 2.0, &"circle")
 		return visual_center_offset
+	if resolved_kind == &"capsule":
+		var capsule := CapsuleShape2D.new()
+		capsule.radius = minf(footprint_size.x, footprint_size.y) * 0.5
+		capsule.height = maxf(footprint_size.x, footprint_size.y)
+		var capsule_collision := CollisionShape2D.new()
+		capsule_collision.name = "AssetCollision"
+		capsule_collision.rotation = float(footprint["rotation"]) + (PI * 0.5 if footprint_size.x >= footprint_size.y else 0.0)
+		capsule_collision.shape = capsule
+		parent.add_child(capsule_collision)
+		_record_shape_probe_points(parent, Vector2.ZERO, footprint_size, &"capsule", float(footprint["rotation"]))
+		return visual_center_offset
 	var rect := RectangleShape2D.new()
 	# The local rectangle follows the texture's alpha-fitted orientation instead
 	# of creating invisible AABB corners around diagonal tools and utensils.
-	rect.size = footprint_size * sprite_scale * 1.0
+	rect.size = footprint_size
 	var rect_collision := CollisionShape2D.new()
 	rect_collision.name = "AssetCollision"
 	rect_collision.rotation = float(footprint["rotation"])
@@ -4126,13 +4191,14 @@ static func _add_directional_shadow(
 		footprint_rotation: float = 0.0
 ) -> void:
 	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
-	var shape_kind := StringName(entry.get("shape", "circle"))
+	var override: Dictionary = ASSET_FOOTPRINT_OVERRIDES.get(texture_path.get_file(), {})
+	var shape_kind := StringName(override.get("kind", entry.get("shape", "circle")))
 	var footprint: Vector2 = footprint_override
 	if footprint.is_zero_approx():
 		footprint = (entry.get("size", Vector2.ONE * fallback_diameter) as Vector2) * size_scale
 	if footprint.x <= 0.0 or footprint.y <= 0.0:
 		footprint = Vector2.ONE * fallback_diameter
-	var shadow_path := SHADOW_RECT_TEXTURE if shape_kind == &"rect" else SHADOW_CIRCLE_TEXTURE
+	var shadow_path := SHADOW_CIRCLE_TEXTURE if shape_kind == &"circle" else SHADOW_RECT_TEXTURE
 	var shadow_texture := load(shadow_path) as Texture2D
 	if shadow_texture == null:
 		push_error("TrackBuilderCore: directional shadow asset is missing: %s" % shadow_path)
