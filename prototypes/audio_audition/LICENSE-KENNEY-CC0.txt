@@ -1,0 +1,77 @@
+Kenney CC0 license records preserved for the Pocket Circuit audio audition prototype
+Source files copied from the verified extracted packs on 2026-08-28:
+  /tmp/opencode/audio-sources/interface/License.txt
+  /tmp/opencode/audio-sources/impact/License.txt
+  /tmp/opencode/audio-sources/sci-fi/License.txt
+
+The following pack license text is preserved from those source files.
+
+-------------------------------------------------------------------------------
+Interface Sounds (1.0)
+
+Created/distributed by Kenney (www.kenney.nl)
+Creation date: 11-02-2020
+
+		------------------------------
+
+License: (Creative Commons Zero, CC0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+This content is free to use in personal, educational and commercial projects.
+
+Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
+
+		------------------------------
+
+Donate:   http://support.kenney.nl
+Patreon:  http://patreon.com/kenney/
+
+Follow on Twitter for updates:
+http://twitter.com/KenneyNL
+
+-------------------------------------------------------------------------------
+Impact Sounds (1.0)
+
+Created/distributed by Kenney (www.kenney.nl)
+Creation date: 19-12-2019
+
+		------------------------------
+
+License: (Creative Commons Zero, CC0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+This content is free to use in personal, educational and commercial projects.
+
+Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
+
+		------------------------------
+
+Donate:   http://support.kenney.nl
+Request:  http://request.kenney.nl
+Patreon:  http://patreon.com/kenney/
+
+Follow on Twitter for updates:
+http://twitter.com/KenneyNL
+
+-------------------------------------------------------------------------------
+Sci-Fi Sounds (1.0)
+
+Created/distributed by Kenney (www.kenney.nl)
+Creation date: 11-10-2020
+
+		------------------------------
+
+License: (Creative Commons Zero, CC0)
+http://creativecommons.org/publicdomain/zero/1.0/
+
+This content is free to use in personal, educational and commercial projects.
+
+Support us by crediting Kenney or www.kenney.nl (this is not mandatory)
+
+		------------------------------
+
+Donate:   http://support.kenney.nl
+Patreon:  http://patreon.com/kenney/
+
+Follow on Twitter for updates:
+http://twitter.com/KenneyNL
