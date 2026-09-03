@@ -39,8 +39,8 @@ short post-race exchanges. It never interrupts driving with long cutscenes.
 | Inez "Spanner" Solis | Mentor and garage owner | Practical, warm, never stops tuning |
 | Juniper Gear | Act I rival | Precise lines and late braking in the Pinbolt |
 | Milo Dash | Act II rival | Heavy contact and fearless shortcuts in the Scrapjaw |
-| Tess Circuit | Act III rival | Long controlled drifts in the Flicker |
-| Cass Relay | Reigning champion | Calm, fast, and dismissive until Rae earns respect |
+| Tess Circuit | Act III rival | Technical line commitment in the Flicker |
+| Cass Relay | Reigning champion | Calm, opportunistic passing and complete racecraft |
 
 ## Event Structure
 
@@ -170,8 +170,8 @@ rewards or content access.
 | Preset | AI behavior |
 |---|---|
 | Sunday Drive | Conservative corner floor, earlier braking, limited opening boost, and no catch-up power |
-| Club Circuit | Competitive baseline with later braking, clean-line boost recovery, and modest bounded catch-up |
-| Clockwork | Highest legal corner pace, strongest boost economy, and maximum legal acceleration without catch-up |
+| Club Circuit | Competitive baseline with later braking, drafting, clear-lane overtakes, suitable shortcut use, clean-line boost recovery, and modest bounded catch-up |
+| Clockwork | Highest legal corner pace, decisive clear-lane overtakes, suitable shortcut use, strongest boost economy, and maximum legal acceleration without catch-up |
 
 Catch-up never teleports a racer, alters checkpoints, or raises the vehicle
 beyond its legal boosted speed. AI engine force is capped at 1.15x while the
@@ -180,6 +180,16 @@ top-speed limits for every racer. AI cannot handbrake-drift, so Club Circuit and
 Clockwork recover a small amount of boost only while holding a clean, fast line;
 the meter still uses the player capacity, drain, and boosted-speed cap. The
 player receives no hidden handling penalty.
+
+All presets use curvature-aware setup, apex, and exit lines. Passing is limited
+to straights: AI checks both sides against cars and visible collision before it
+commits, follows when blocked, and observes a cooldown between attempts.
+Competitive AI can use a generated shortcut only when its declared speed and
+grip are appropriate; Sunday Drive always takes the safe route. Juniper brakes
+late and carries corner pace, Milo spends boost eagerly, Tess commits to the
+technical line, and Cass looks for the most passing opportunities. These
+data-driven personality differences are deliberately narrow and are reduced on
+Sunday Drive.
 
 ## Release Gates
 
