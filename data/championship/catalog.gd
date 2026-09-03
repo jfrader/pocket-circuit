@@ -46,6 +46,10 @@ const CAST := [
 		"role": "Act I rival",
 		"identity": "Precise lines and late braking in the Pinbolt",
 		"vehicle_id": "pinbolt",
+		"ai_style": {
+			"corner_pace": 1.04, "brake_timing": 0.9, "boost_eagerness": 1.0,
+			"overtake_aggression": 1.0, "shortcut_preference": 1.0, "line_commitment": 1.06,
+		},
 		"avatar_art": {
 			"seed": 91003,
 			"options": {
@@ -63,6 +67,10 @@ const CAST := [
 		"role": "Act II rival",
 		"identity": "Heavy contact and fearless shortcuts in the Scrapjaw",
 		"vehicle_id": "scrapjaw",
+		"ai_style": {
+			"corner_pace": 0.96, "brake_timing": 1.02, "boost_eagerness": 1.18,
+			"overtake_aggression": 1.04, "shortcut_preference": 1.16, "line_commitment": 0.96,
+		},
 		"avatar_art": {
 			"seed": 91004,
 			"options": {
@@ -80,6 +88,10 @@ const CAST := [
 		"role": "Act III rival",
 		"identity": "Long controlled drifts in the Flicker",
 		"vehicle_id": "flicker",
+		"ai_style": {
+			"corner_pace": 1.01, "brake_timing": 1.1, "boost_eagerness": 0.94,
+			"overtake_aggression": 0.9, "shortcut_preference": 0.96, "line_commitment": 1.1,
+		},
 		"avatar_art": {
 			"seed": 91005,
 			"options": {
@@ -97,6 +109,10 @@ const CAST := [
 		"role": "Reigning champion",
 		"identity": "Calm, fast, and dismissive until Rae earns respect",
 		"vehicle_id": "flicker",
+		"ai_style": {
+			"corner_pace": 1.02, "brake_timing": 0.97, "boost_eagerness": 1.04,
+			"overtake_aggression": 1.22, "shortcut_preference": 1.08, "line_commitment": 1.04,
+		},
 		"avatar_art": {
 			"seed": 91006,
 			"options": {

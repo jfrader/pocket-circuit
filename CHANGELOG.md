@@ -56,9 +56,10 @@
   one down-right light direction, with longer cast shadows grounding the largest
   objects. Room perimeter walls now overlook a dark void instead of extra floor.
 - Racing-line AI now fields genuinely competitive opponents: difficulty changes
-  corner pace, braking, acceleration, and boost strategy; racers anticipate bad
-  surfaces, dodge every collidable course prop, and stay within the player's
-  legal normal and boosted speed limits.
+  corner pace, braking, acceleration, and boost strategy; rivals set up and hit
+  corner apexes, draft, pass through checked clear lanes, use suitable
+  shortcuts, and express distinct bounded driving personalities while staying
+  within the player's legal normal and boosted speed limits.
 - Championship screens pair controller-safe actions with original drivers,
   machines, garage art, and route illustrations; the garage presents the full
   roster, unlock requirements, and focused-machine stats.

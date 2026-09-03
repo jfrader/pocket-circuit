@@ -15,6 +15,9 @@ const SHORTCUT_HALF_SPAN := 10
 const SHORTCUT_LANE_OFFSET := 70.0
 const SHORTCUT_LANE_HALF_WIDTH := 26.0
 const SAFE_RACING_LINE_OFFSET := 58.0
+const APEX_MAX_INWARD_OFFSET := 90.0
+const APEX_MAX_ENTRY_OFFSET := 32.0
+const APEX_SAMPLE_SPAN := 10
 const FINISH_APPROACH_SPAN := 20
 const GRIP_PATCH_MIN_COUNT := 4
 const GRIP_PATCH_MAX_COUNT := 8
@@ -3122,6 +3125,7 @@ static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dicti
 		"decal": String(shortcut_data["decal"]),
 		"centerline_index": shortcut_index,
 		"inside_sign": float(shortcut_geometry["inside_sign"]),
+		"ai_path_clear": true,
 	}
 	definitions.append(shortcut_definition)
 	var shortcut := Node2D.new()
@@ -3134,6 +3138,7 @@ static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dicti
 	shortcut.set_meta("decal_texture", shortcut_definition["decal"])
 	shortcut.set_meta("centerline_index", shortcut_index)
 	shortcut.set_meta("inside_sign", shortcut_definition["inside_sign"])
+	shortcut.set_meta("ai_path_clear", shortcut_definition["ai_path_clear"])
 	shortcut.set_meta("shortcut_path", shortcut_path)
 	shortcut.set_meta("safe_path", safe_path)
 	shortcut.set_meta("shortcut_length", float(shortcut_geometry["shortcut_length"]))
@@ -3766,34 +3771,94 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 
 static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}) -> void:
 	var count := centerline.size()
-	var line_points := PackedVector2Array()
+	var apex_points := _curvature_apex_line(centerline)
+	var line_points := apex_points.duplicate()
 	var shortcut_index := int(moments.get("shortcut", -1))
 	var shortcut_inside_sign := 0.0
 	if shortcut_index >= 0:
 		shortcut_inside_sign = float(_shortcut_lane_geometry(centerline, shortcut_index)["inside_sign"])
 	for index in count:
-		var tangent_behind := (centerline[index] - centerline[(index - 12 + count) % count]).normalized()
-		var tangent_ahead := (centerline[(index + 12) % count] - centerline[index]).normalized()
-		var turn := tangent_behind.angle_to(tangent_ahead)
-		var normal := tangent_behind.rotated(PI * 0.5)
-		var inward := normal if turn > 0.0 else -normal
-		var offset := clampf(absf(turn) * 210.0, 0.0, 40.0)
-		var target := centerline[index] + inward * offset
 		if shortcut_index >= 0:
 			var shortcut_distance := _cyclic_index_distance(index, shortcut_index, count)
 			var taper_span := SHORTCUT_HALF_SPAN + 6
 			if shortcut_distance <= taper_span:
 				var influence := 1.0 - smoothstep(float(SHORTCUT_HALF_SPAN), float(taper_span), float(shortcut_distance))
+				var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
 				var safe_target := centerline[index] - normal * shortcut_inside_sign * SAFE_RACING_LINE_OFFSET
-				target = target.lerp(safe_target, influence)
-		line_points.append(target)
+				line_points[index] = line_points[index].lerp(safe_target, influence)
+	_add_hidden_racing_line(root, "RacingLine", line_points)
+	if shortcut_index >= 0:
+		var shortcut_points := apex_points.duplicate()
+		var taper_span := SHORTCUT_HALF_SPAN + 8
+		for index in count:
+			var shortcut_distance := _cyclic_index_distance(index, shortcut_index, count)
+			if shortcut_distance > taper_span:
+				continue
+			var influence := 1.0 - smoothstep(
+				float(SHORTCUT_HALF_SPAN),
+				float(taper_span),
+				float(shortcut_distance)
+			)
+			var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
+			var shortcut_target := centerline[index] + normal * shortcut_inside_sign * SHORTCUT_LANE_OFFSET
+			shortcut_points[index] = shortcut_points[index].lerp(shortcut_target, influence)
+		var shortcut_line := _add_hidden_racing_line(root, "ShortcutRacingLine", shortcut_points)
+		shortcut_line.set_meta("role", &"shortcut")
+		shortcut_line.set_meta("centerline_index", shortcut_index)
+		shortcut_line.set_meta("ai_path_clear", true)
+
+
+static func _add_hidden_racing_line(parent: Node2D, line_name: String, points: PackedVector2Array) -> Line2D:
 	var line := Line2D.new()
-	line.name = "RacingLine"
-	line.points = line_points
+	line.name = line_name
+	line.points = points
 	line.closed = true
 	line.width = 2.0
 	line.visible = false
-	root.add_child(line)
+	parent.add_child(line)
+	return line
+
+
+static func _curvature_apex_line(centerline: PackedVector2Array) -> PackedVector2Array:
+	var line_points := PackedVector2Array()
+	var count := centerline.size()
+	if count < APEX_SAMPLE_SPAN * 2 + 1:
+		return centerline.duplicate()
+	for index in count:
+		var local_turn := _signed_turn_at(centerline, index, APEX_SAMPLE_SPAN)
+		var entry_turn := _signed_turn_at(centerline, index + APEX_SAMPLE_SPAN, APEX_SAMPLE_SPAN)
+		var exit_turn := _signed_turn_at(centerline, index - APEX_SAMPLE_SPAN, APEX_SAMPLE_SPAN)
+		var strongest_turn := local_turn
+		if absf(entry_turn) > absf(strongest_turn):
+			strongest_turn = entry_turn
+		if absf(exit_turn) > absf(strongest_turn):
+			strongest_turn = exit_turn
+		var severity := clampf(absf(strongest_turn) / 0.78, 0.0, 1.0)
+		if severity < 0.04:
+			line_points.append(centerline[index])
+			continue
+		var apex_weight := clampf(absf(local_turn) / maxf(absf(strongest_turn), 0.001), 0.0, 1.0)
+		apex_weight = pow(apex_weight, 1.45)
+		var inward_offset := APEX_MAX_INWARD_OFFSET * severity * apex_weight
+		var setup_offset := APEX_MAX_ENTRY_OFFSET * severity * (1.0 - apex_weight)
+		var signed_offset := signf(strongest_turn) * (inward_offset - setup_offset)
+		var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
+		line_points.append(centerline[index] + normal * signed_offset)
+	return line_points
+
+
+static func _signed_turn_at(centerline: PackedVector2Array, index: int, span: int) -> float:
+	var count := centerline.size()
+	var wrapped := posmod(index, count)
+	var incoming := (
+		centerline[wrapped]
+		- centerline[posmod(wrapped - span, count)]
+	).normalized()
+	var outgoing := (
+		centerline[posmod(wrapped + span, count)]
+		- centerline[wrapped]
+	).normalized()
+	return incoming.angle_to(outgoing)
 
 
 static func _add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: PackedVector2Array, corridor: PackedVector2Array) -> void:

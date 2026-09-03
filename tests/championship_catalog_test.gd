@@ -13,6 +13,15 @@ func _run_test() -> void:
 		return
 	if not _expect(CATALOG.EVENTS.size() == 9 and CATALOG.ACTS.size() == 3, "catalog should contain nine events in three acts"):
 		return
+	var rival_styles := {}
+	for driver_id: String in ["juniper", "milo", "tess", "cass"]:
+		var driver := CATALOG.get_driver(driver_id)
+		var style: Dictionary = driver.get("ai_style", {})
+		if not _expect(style.size() == 6, "%s should define all bounded AI personality dimensions" % driver_id):
+			return
+		rival_styles[driver_id] = style
+	if not _expect(rival_styles["juniper"] != rival_styles["milo"] and rival_styles["milo"] != rival_styles["tess"] and rival_styles["tess"] != rival_styles["cass"], "the four rivals should not share identical driving behavior"):
+		return
 	for event: Dictionary in CATALOG.EVENTS:
 		if not _expect(String(event.get("theme", "")) in ["kitchen", "workshop", "office"], "every event should declare a supported track theme"):
 			return
