@@ -6,6 +6,24 @@ const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_po
 const CONTACT_RELEASE_GRACE := 0.12
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
+const LEGACY_ANGULAR_DAMP := 2.5
+const LEGACY_ENGINE_CURVE_MIN := 0.1
+const LEGACY_BRAKE_TO_REVERSE_SPEED := 25.0
+const LEGACY_REVERSE_ENGINE_FACTOR := 0.55
+const LEGACY_HANDBRAKE_MIN_SPEED := 80.0
+const LEGACY_LINEAR_DAMPING_RATE := 0.32
+const LEGACY_REVERSE_STEER_THRESHOLD := -10.0
+const LEGACY_FULL_STEER_SPEED := 70.0
+const LEGACY_HIGH_SPEED_STEER_RATIO := 0.52
+const LEGACY_DRIFT_ROTATION_MULTIPLIER := 1.65
+const LEGACY_BOOST_DRAIN_RATE := 32.0
+const LEGACY_BOOST_SLIP_MIN_DEG := 8.0
+const LEGACY_BOOST_SLIP_MAX_DEG := 58.0
+const LEGACY_SLIP_MEASUREMENT_MIN_SPEED := 2.0
+const LEGACY_DRIFT_ENTRY_STEER := 0.2
+const LEGACY_DRIFT_MIN_SPEED := 110.0
+const NORMAL_SPEED_CAP_MULTIPLIER := 1.0
+const BOOST_SPEED_CAP_MULTIPLIER := 1.2
 
 enum ControlMode { PLAYER, EXTERNAL }
 
@@ -52,7 +70,7 @@ func _ready() -> void:
 	apply_stats(stats)
 	gravity_scale = 0.0
 	linear_damp = 0.0
-	angular_damp = 2.5
+	angular_damp = LEGACY_ANGULAR_DAMP
 	var physics_material := PhysicsMaterial.new()
 	physics_material.bounce = 0.0
 	physics_material.friction = 0.06
@@ -208,8 +226,8 @@ func apply_stats(new_stats: VehicleStats) -> void:
 	if new_stats == null:
 		return
 	stats = new_stats
-	mass = stats.mass
-	boost_amount = stats.boost_capacity * 0.35
+	mass = stats.get_legacy_mass()
+	boost_amount = stats.get_legacy_boost_capacity() * 0.35
 
 
 func configure_base_surface(surface_name: StringName) -> void:
@@ -239,7 +257,11 @@ func reset_surface_modifiers() -> void:
 
 
 func get_effective_max_speed() -> float:
-	return stats.max_speed * surface_speed_multiplier
+	return stats.get_legacy_max_speed() * surface_speed_multiplier
+
+
+func get_boost_capacity() -> float:
+	return stats.get_legacy_boost_capacity()
 
 
 func _refresh_surface_modifier() -> void:
@@ -261,7 +283,7 @@ func is_boost_active() -> bool:
 
 
 func get_engine_load() -> float:
-	return maxf(_throttle_input, _brake_input * 0.55)
+	return maxf(_throttle_input, _brake_input * LEGACY_REVERSE_ENGINE_FACTOR)
 
 
 func collision_snapshot() -> Dictionary:
@@ -275,7 +297,7 @@ func _apply_drive_forces(_delta: float) -> void:
 	var speed_ratio: float = clampf(absf(forward_speed) / maxf(effective_max_speed, 0.001), 0.0, 1.0)
 
 	if _throttle_input > 0.0 and forward_speed < effective_max_speed:
-		var power_curve: float = maxf(0.1, 1.0 - speed_ratio)
+		var power_curve: float = maxf(LEGACY_ENGINE_CURVE_MIN, 1.0 - speed_ratio)
 		apply_central_force(
 			forward
 			* stats.engine_power
@@ -286,18 +308,18 @@ func _apply_drive_forces(_delta: float) -> void:
 		)
 
 	if _brake_input > 0.0:
-		if forward_speed > 25.0:
-			apply_central_force(-forward * stats.brake_force * _brake_input)
-		elif forward_speed > -stats.reverse_speed:
-			apply_central_force(-forward * stats.engine_power * 0.55 * _brake_input)
+		if forward_speed > LEGACY_BRAKE_TO_REVERSE_SPEED:
+			apply_central_force(-forward * stats.get_legacy_brake_force() * _brake_input)
+		elif forward_speed > -stats.get_legacy_reverse_speed():
+			apply_central_force(-forward * stats.engine_power * LEGACY_REVERSE_ENGINE_FACTOR * _brake_input)
 
 	if is_boost_active():
-		apply_central_force(forward * stats.boost_power)
+		apply_central_force(forward * stats.get_legacy_boost_power())
 
-	if _handbrake_input and speed > 80.0:
-		apply_central_force(-linear_velocity.normalized() * stats.handbrake_force)
+	if _handbrake_input and speed > LEGACY_HANDBRAKE_MIN_SPEED:
+		apply_central_force(-linear_velocity.normalized() * stats.get_legacy_handbrake_force())
 
-	apply_central_force(-linear_velocity * stats.grip * surface_grip_multiplier * mass * 0.32)
+	apply_central_force(-linear_velocity * stats.grip * surface_grip_multiplier * mass * LEGACY_LINEAR_DAMPING_RATE)
 
 
 func _apply_lateral_grip() -> void:
@@ -312,34 +334,34 @@ func _apply_lateral_grip() -> void:
 func _apply_steering(delta: float) -> void:
 	var forward := Vector2.UP.rotated(rotation)
 	var forward_speed := linear_velocity.dot(forward)
-	var direction_sign: float = -1.0 if forward_speed < -10.0 else 1.0
+	var direction_sign: float = -1.0 if forward_speed < LEGACY_REVERSE_STEER_THRESHOLD else 1.0
 	var speed_ratio: float = clampf(speed / maxf(get_effective_max_speed(), 0.001), 0.0, 1.0)
-	var rolling_factor: float = clampf(speed / 70.0, 0.0, 1.0)
-	var high_speed_response: float = lerpf(1.0, 0.52, speed_ratio)
-	var drift_rotation: float = 1.65 if is_drifting else 1.0
+	var rolling_factor: float = clampf(speed / LEGACY_FULL_STEER_SPEED, 0.0, 1.0)
+	var high_speed_response: float = lerpf(1.0, LEGACY_HIGH_SPEED_STEER_RATIO, speed_ratio)
+	var drift_rotation: float = LEGACY_DRIFT_ROTATION_MULTIPLIER if is_drifting else 1.0
 	var target_angular_velocity := _steer_input * stats.steering_rate * rolling_factor * high_speed_response * drift_rotation * direction_sign
-	var response := 1.0 - exp(-stats.steering_response * delta)
+	var response := 1.0 - exp(-stats.get_legacy_steering_response() * delta)
 	angular_velocity = lerpf(angular_velocity, target_angular_velocity, response)
 
 
 func _update_boost(delta: float) -> void:
 	if is_boost_active():
-		boost_amount = maxf(0.0, boost_amount - 32.0 * delta)
-	elif is_drifting and absf(slip_angle) > 8.0 and absf(slip_angle) < 58.0:
-		boost_amount = minf(stats.boost_capacity, boost_amount + stats.boost_recharge * delta)
+		boost_amount = maxf(0.0, boost_amount - LEGACY_BOOST_DRAIN_RATE * delta)
+	elif is_drifting and absf(slip_angle) > LEGACY_BOOST_SLIP_MIN_DEG and absf(slip_angle) < LEGACY_BOOST_SLIP_MAX_DEG:
+		boost_amount = minf(get_boost_capacity(), boost_amount + stats.get_legacy_boost_recharge() * delta)
 
 
 func _update_motion_state() -> void:
 	speed = linear_velocity.length()
-	if speed > 2.0:
+	if speed > LEGACY_SLIP_MEASUREMENT_MIN_SPEED:
 		var forward := Vector2.UP.rotated(rotation)
 		slip_angle = rad_to_deg(forward.angle_to(linear_velocity.normalized()))
 	else:
 		slip_angle = 0.0
 	is_drifting = (
 		_handbrake_input
-		and absf(_steer_input) > 0.2
-		and speed > 110.0
+		and absf(_steer_input) > LEGACY_DRIFT_ENTRY_STEER
+		and speed > LEGACY_DRIFT_MIN_SPEED
 	)
 
 
@@ -414,6 +436,7 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 
 
 func _limit_top_speed() -> void:
-	var speed_limit := get_effective_max_speed() * (1.2 if is_boost_active() else 1.0)
+	var cap_multiplier := BOOST_SPEED_CAP_MULTIPLIER if is_boost_active() else NORMAL_SPEED_CAP_MULTIPLIER
+	var speed_limit := get_effective_max_speed() * cap_multiplier
 	if linear_velocity.length() > speed_limit:
 		linear_velocity = linear_velocity.limit_length(speed_limit)

@@ -302,7 +302,7 @@ func _update_race_hud() -> void:
 	if not is_instance_valid(_race_hud) or not is_instance_valid(_player_vehicle):
 		return
 	var shown_lap := mini(race_manager.lap_count + 1, race_manager.laps_to_finish)
-	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.stats.boost_capacity, 0.001), 0.0, 1.0)
+	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.get_boost_capacity(), 0.001), 0.0, 1.0)
 	var speed_ratio := clampf(_player_vehicle.speed / maxf(_player_vehicle.get_effective_max_speed(), 0.001), 0.0, 1.2)
 	_race_hud.set_telemetry(
 		race_manager.get_racer_position(_player_vehicle),

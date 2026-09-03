@@ -173,8 +173,8 @@ func configure(
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
 	vehicle.boost_amount = minf(
-		vehicle.stats.boost_capacity,
-		vehicle.stats.boost_capacity
+		vehicle.get_boost_capacity(),
+		vehicle.get_boost_capacity()
 		* float(tuning["starting_boost"])
 		* float(personality["boost_eagerness"])
 	)
@@ -370,7 +370,7 @@ func _physics_process(delta: float) -> void:
 		and vehicle.speed > effective_max_speed * 0.55
 	):
 		vehicle.boost_amount = minf(
-			vehicle.stats.boost_capacity,
+			vehicle.get_boost_capacity(),
 			vehicle.boost_amount + float(tuning["clean_line_recharge"]) * delta
 		)
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
@@ -720,7 +720,7 @@ func _apply_drafting_recharge(delta: float, traffic_plan: Dictionary, should_bra
 	if should_brake or not bool(traffic_plan.get("drafting", false)):
 		return
 	vehicle.boost_amount = minf(
-		vehicle.stats.boost_capacity,
+		vehicle.get_boost_capacity(),
 		vehicle.boost_amount + DRAFT_RECHARGE_PER_SECOND * delta
 	)
 
