@@ -262,8 +262,18 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	if not _expect(float(shortcut_definition["grip"]) < 0.7 and float(shortcut_definition["speed"]) > 1.0, "%s shortcut should trade lower grip for a faster route" % theme):
 		return false
 	var racing_line := track.get_node_or_null("RacingLine") as Line2D
+	var shortcut_racing_line := track.get_node_or_null("ShortcutRacingLine") as Line2D
 	var shortcut_index := int(shortcut.get_meta("centerline_index", -1))
 	if not _expect(racing_line != null and shortcut_index >= 0 and not Geometry2D.is_point_in_polygon(racing_line.points[shortcut_index], shortcut_polygon), "%s generated AI line should take the safe lane around the optional shortcut" % theme):
+		return false
+	if not _expect(shortcut_racing_line != null and bool(shortcut_racing_line.get_meta("ai_path_clear", false)) and Geometry2D.is_point_in_polygon(shortcut_racing_line.points[shortcut_index], shortcut_polygon), "%s should expose a metadata-cleared AI line through the risky shortcut lane" % theme):
+		return false
+	var max_apex_offset := 0.0
+	for line_index in centerline.size():
+		if BUILDER._cyclic_index_distance(line_index, shortcut_index, centerline.size()) <= BUILDER.SHORTCUT_HALF_SPAN + 6:
+			continue
+		max_apex_offset = maxf(max_apex_offset, racing_line.points[line_index].distance_to(centerline[line_index]))
+	if not _expect(max_apex_offset > 42.0 and max_apex_offset <= BUILDER.APEX_MAX_INWARD_OFFSET + 0.5, "%s racing line should use a bounded sharp-corner apex beyond the old 40-unit cut" % theme):
 		return false
 
 	var presenter := PRESENTER.new() as TrackVariantPresenter

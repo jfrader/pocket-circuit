@@ -142,9 +142,10 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 `generated_moment_indices`, `generated_hazard_paths`, and
 `generated_surfaces` expose these contracts for runtime presentation and tests.
 The surface array contains the technical moment, shortcut, and 4-8 grip
-patches. The generated racing line deliberately takes the safe outer lane
-through the shortcut window; the shortcut remains a player choice rather than
-an AI trap.
+patches. `RacingLine` takes the safe outer lane through the shortcut window,
+while `ShortcutRacingLine` exposes the shorter lane to competitive AI when its
+speed and grip metadata are suitable. Sunday Drive always stays on the safe
+line.
 
 ## Visual and Collision Language
 
@@ -207,16 +208,31 @@ an AI trap.
 
 ## AI
 
-- AI follows the invisible curvature-offset `RacingLine` with speed-dependent
-  lookahead and curvature-limited speed.
+- AI follows an invisible curvature-aware `RacingLine` with speed-dependent
+  lookahead and curvature-limited speed. Broad turns set up toward the outside,
+  then move inward at the apex by up to 90 units before opening the exit.
 - Reverse events traverse the same line in reverse through
   `RaceManager.is_reverse_direction`; never reverse only checkpoint order.
-- Generated shortcut windows move the AI target to the safe outer lane with a
-  tapered transition. This geometry is safe in both race directions.
+- Generated shortcut windows provide both safe and shortcut racing lines with
+  tapered transitions. Club Circuit and Clockwork may select the shortcut only
+  when its declared speed advantage and grip meet their bounded thresholds.
+- Traffic planning is stateful and straight-only. A trailing AI checks both
+  lateral pass lanes with parallel probes against vehicles, walls, and visible
+  scenery, commits to one clear side for a short hold, and cools down before
+  another attempt. When neither side is clear it follows at 0.84 throttle
+  instead of forcing contact.
+- Close aligned following on a straight recharges the existing boost meter at a
+  bounded drafting rate. Drafting never bypasses boost capacity, drain, or the
+  shared boosted-speed limit.
 - AI probes walls, traffic, AI-dodge scenery, and player-collision corner giants.
   It also samples upcoming `SurfaceZone` polygons, pre-slows for low-grip or
   low-speed material, and only steers around a zone when its lane metadata says
   an alternate corridor exists.
+- Juniper, Milo, Tess, and Cass use data-driven personalities for braking,
+  corner pace, line commitment, boost timing, shortcut confidence, and passing
+  aggression. All personality values are clamped to narrow legal ranges and
+  reduced to 30% effect on Sunday Drive, so identity never becomes a hidden
+  physics advantage.
 - Curvature sampling caps the fitted racing-line radius at 2600 units. Current
   legal-physics tuning is:
 
@@ -233,6 +249,11 @@ an AI trap.
   in `theme_ai_harness.gd`. The harness also emits `AI_RACE_LAP` telemetry and
   enforces first-lap ceilings of 38 seconds on Sunday Drive, 34 on Club Circuit,
   and 32 on Clockwork across its supported authored and generated tracks.
+- `ai_field_spread_test.gd` runs four AI racers for three Club Circuit laps on
+  Kitchen, Workshop, and Office. It requires ordered legal gates, no DNFs, at
+  least one position exchange and deliberate pass attempt, no more than three
+  recoveries per racer, and a slowest/fastest finish-time ratio no greater than
+  1.80.
 
 ## Verification
 
@@ -248,10 +269,12 @@ Run after generator, builder, surface, collision, or AI changes:
    or `clockwork` when comparing presets.
 6. `godot --headless --path . --script res://tests/ai_race_smoke_test.gd` for
    the three authored regression tracks.
-7. A broad theme x room x seed construction stress matrix after geometry or
+7. `godot --headless --path . --script res://tests/ai_field_spread_test.gd` for
+   three-lap four-AI overtaking and field-spread coverage.
+8. A broad theme x room x seed construction stress matrix after geometry or
    composition changes.
-8. Direct runtime captures for all six route families after visual changes.
-9. `tools/build_release.sh <clean-output-directory>` for the authoritative
+9. Direct runtime captures for all six route families after visual changes.
+10. `tools/build_release.sh <clean-output-directory>` for the authoritative
    import, complete test suite, scene smokes, native exports, packaged Linux
    smoke, and PCK inspection.
 
