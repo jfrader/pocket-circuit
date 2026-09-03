@@ -172,8 +172,8 @@ func configure(
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
-	vehicle.boost_amount = minf(
-		vehicle.get_boost_capacity(),
+	vehicle.add_boost(
+		
 		vehicle.get_boost_capacity()
 		* float(tuning["starting_boost"])
 		* float(personality["boost_eagerness"])
@@ -302,18 +302,33 @@ func _physics_process(delta: float) -> void:
 	var handling_pace := clampf(vehicle.stats.steering_rate / 3.75, 0.78, 1.08)
 	var corner_speed := effective_max_speed
 	var commit := float(personality["line_commitment"])
-	# corner-speed floor per driver vs the new apex line (conservative only on club to stabilize office L without hurting clockwork pace)
-	var floor_adj := 1.0
-	if difficulty == "club_circuit":
-		floor_adj = clampf(0.99 - 0.10 * (commit - 1.0), 0.90, 0.99)
-	var corner_floor := float(tuning["corner_floor"]) * floor_adj
+	var difficulty_margin := 0.96
+	if difficulty == "sunday_drive":
+		difficulty_margin = 0.86
+	elif difficulty == "clockwork":
+		difficulty_margin = 0.99
+	
 	if line_radius > 40.0:
-		corner_speed = clampf(
-			float(tuning["corner_constant"]) * sqrt(line_radius) * pace_multiplier,
-			effective_max_speed * corner_floor,
-			effective_max_speed
-		)
-	corner_speed *= float(personality["corner_pace"])
+		if vehicle.stats.physics_model_version == 1:
+			var surface_grip = float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
+			var eff_grip = VehicleDynamics.get_effective_grip(vehicle.stats, vehicle.surface_grip_multiplier * surface_grip)
+			var eff_lat_accel = eff_grip * 980.0
+			corner_speed = clampf(
+				VehicleDynamics.get_safe_corner_speed(line_radius, eff_lat_accel) * difficulty_margin * float(personality["corner_pace"]),
+				effective_max_speed * 0.25,
+				effective_max_speed
+			)
+		else:
+			var floor_adj := 1.0
+			if difficulty == "club_circuit":
+				floor_adj = clampf(0.99 - 0.10 * (commit - 1.0), 0.90, 0.99)
+			var corner_floor := float(tuning["corner_floor"]) * floor_adj
+			corner_speed = clampf(
+				float(tuning["corner_constant"]) * sqrt(line_radius) * pace_multiplier * float(personality["corner_pace"]),
+				effective_max_speed * corner_floor,
+				effective_max_speed
+			)
+	
 	var target_speed := minf(
 		effective_max_speed * lerpf(0.98, float(tuning["sharp_corner_ratio"]), corner_ratio) * pace_multiplier,
 		corner_speed
@@ -328,11 +343,21 @@ func _physics_process(delta: float) -> void:
 	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
 		target_speed = minf(target_speed, effective_max_speed * float(tuning["wrong_way_cap"]))
 
-	var braking_distance := lerpf(
-		float(tuning["braking_near"]),
-		float(tuning["braking_far"]),
-		corner_ratio
-	) * float(personality["brake_timing"])
+	var braking_distance := 0.0
+	if vehicle.stats.physics_model_version == 1:
+		var surface_grip = float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
+		var eff_grip = VehicleDynamics.get_effective_grip(vehicle.stats, vehicle.surface_grip_multiplier * surface_grip)
+		var eff_brake_accel = vehicle.stats.brake_force * eff_grip / vehicle.stats.mass
+		var reaction_margin = 15.0
+		braking_distance = VehicleDynamics.get_braking_distance(vehicle.speed, target_speed, eff_brake_accel) + reaction_margin
+		braking_distance *= float(personality["brake_timing"])
+	else:
+		braking_distance = lerpf(
+			float(tuning["braking_near"]),
+			float(tuning["braking_far"]),
+			corner_ratio
+		) * float(personality["brake_timing"])
+		
 	var should_brake := vehicle.speed > target_speed and distance_to_target < braking_distance
 	var throttle := 0.0 if should_brake else 1.0
 	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
@@ -369,9 +394,9 @@ func _physics_process(delta: float) -> void:
 		and float(surface_plan["risk"]) < 0.12
 		and vehicle.speed > effective_max_speed * 0.55
 	):
-		vehicle.boost_amount = minf(
-			vehicle.get_boost_capacity(),
-			vehicle.boost_amount + float(tuning["clean_line_recharge"]) * delta
+		vehicle.add_boost(
+			
+			float(tuning["clean_line_recharge"]) * delta, "clean-line"
 		)
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
@@ -719,9 +744,9 @@ func _cancel_overtake() -> void:
 func _apply_drafting_recharge(delta: float, traffic_plan: Dictionary, should_brake: bool) -> void:
 	if should_brake or not bool(traffic_plan.get("drafting", false)):
 		return
-	vehicle.boost_amount = minf(
-		vehicle.get_boost_capacity(),
-		vehicle.boost_amount + DRAFT_RECHARGE_PER_SECOND * delta
+	vehicle.add_boost(
+		
+		DRAFT_RECHARGE_PER_SECOND * delta, "drafting"
 	)
 
 
@@ -1146,11 +1171,16 @@ func _recover_vehicle() -> void:
 	vehicle.linear_velocity = Vector2.ZERO
 	vehicle.angular_velocity = 0.0
 	vehicle.reset_surface_modifiers()
+	if vehicle.has_method("reset_dynamics_state"):
+		vehicle.call("reset_dynamics_state")
 	vehicle.collision_layer = 0
 	vehicle.collision_mask = 0
 	vehicle.modulate.a = 0.45
 	vehicle.freeze = false
-	vehicle.linear_velocity = recovery_forward * 85.0
+	var eff_max := 650.0
+	if vehicle.has_method("get_effective_max_speed"):
+		eff_max = vehicle.call("get_effective_max_speed")
+	vehicle.linear_velocity = recovery_forward * clampf(eff_max * 0.12, 70.0, 90.0)
 	vehicle.boost_amount *= 0.5
 
 	await get_tree().create_timer(RECOVERY_GHOST_TIME, false).timeout
