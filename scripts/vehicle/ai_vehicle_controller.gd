@@ -37,6 +37,22 @@ const DRAFT_MIN_DISTANCE := 54.0
 const DRAFT_MAX_DISTANCE := 185.0
 const DRAFT_LATERAL_WIDTH := 34.0
 const DRAFT_RECHARGE_PER_SECOND := 4.0
+const DEFAULT_PERSONALITY: Dictionary = {
+	"corner_pace": 1.0,
+	"brake_timing": 1.0,
+	"boost_eagerness": 1.0,
+	"overtake_aggression": 1.0,
+	"shortcut_preference": 1.0,
+	"line_commitment": 1.0,
+}
+const PERSONALITY_BOUNDS: Dictionary = {
+	"corner_pace": Vector2(0.96, 1.04),
+	"brake_timing": Vector2(0.9, 1.1),
+	"boost_eagerness": Vector2(0.9, 1.18),
+	"overtake_aggression": Vector2(0.85, 1.22),
+	"shortcut_preference": Vector2(0.9, 1.16),
+	"line_commitment": Vector2(0.94, 1.1),
+}
 const DIFFICULTY_TUNING: Dictionary = {
 	"sunday_drive": {
 		"pace": 0.94,
@@ -92,6 +108,8 @@ var vehicle: VehicleController
 var race_manager: RaceManager
 var lane_offset: float = 0.0
 var difficulty: String = "club_circuit"
+var personality_id := "baseline"
+var personality: Dictionary = DEFAULT_PERSONALITY.duplicate()
 var recovery_count := 0
 var overtake_attempt_count := 0
 var uses_shortcut_line := false
@@ -118,14 +136,22 @@ func configure(
 		controlled_vehicle: VehicleController,
 		manager: RaceManager,
 		preferred_lane_offset: float,
-		difficulty_id: String = "club_circuit"
+		difficulty_id: String = "club_circuit",
+		driver_id: String = "baseline",
+		driver_style: Dictionary = {}
 ) -> void:
 	vehicle = controlled_vehicle
 	race_manager = manager
 	lane_offset = preferred_lane_offset
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
+	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
-	vehicle.boost_amount = vehicle.stats.boost_capacity * float(tuning["starting_boost"])
+	vehicle.boost_amount = minf(
+		vehicle.stats.boost_capacity,
+		vehicle.stats.boost_capacity
+		* float(tuning["starting_boost"])
+		* float(personality["boost_eagerness"])
+	)
 	_cache_checkpoints()
 	if not race_manager.race_started.is_connected(_cache_checkpoints):
 		race_manager.race_started.connect(_cache_checkpoints)
@@ -236,6 +262,7 @@ func _physics_process(delta: float) -> void:
 			effective_max_speed * float(tuning["corner_floor"]),
 			effective_max_speed
 		)
+	corner_speed *= float(personality["corner_pace"])
 	var target_speed := minf(
 		effective_max_speed * lerpf(0.98, float(tuning["sharp_corner_ratio"]), corner_ratio) * pace_multiplier,
 		corner_speed
@@ -254,7 +281,7 @@ func _physics_process(delta: float) -> void:
 		float(tuning["braking_near"]),
 		float(tuning["braking_far"]),
 		corner_ratio
-	)
+	) * float(personality["brake_timing"])
 	var should_brake := vehicle.speed > target_speed and distance_to_target < braking_distance
 	var throttle := 0.0 if should_brake else 1.0
 	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
@@ -274,9 +301,9 @@ func _physics_process(delta: float) -> void:
 	_apply_drafting_recharge(delta, traffic_plan, should_brake)
 	var boost := (
 		absf(steering_angle) < 0.26
-		and planned_turn_severity < float(tuning["boost_turn_threshold"])
-		and (line_radius <= 0.0 or line_radius >= float(tuning["boost_radius"]))
-		and distance_to_target > braking_distance * 1.25
+		and planned_turn_severity < float(tuning["boost_turn_threshold"]) * float(personality["boost_eagerness"])
+		and (line_radius <= 0.0 or line_radius >= float(tuning["boost_radius"]) / float(personality["boost_eagerness"]))
+		and distance_to_target > braking_distance * 1.25 / float(personality["boost_eagerness"])
 		and float(surface_plan["risk"]) < 0.12
 		and float(obstacle_plan["speed_scale"]) > 0.96
 		and not should_brake
@@ -509,12 +536,13 @@ func _traffic_plan(
 		and distance <= DRAFT_MAX_DISTANCE
 		and lateral_distance <= DRAFT_LATERAL_WIDTH
 	)
-	var leader_is_slower := leader.speed + 22.0 < vehicle.speed or leader.speed < vehicle.get_effective_max_speed() * 0.76
+	var aggression := float(personality["overtake_aggression"])
+	var leader_is_slower := leader.speed + 22.0 / aggression < vehicle.speed or leader.speed < vehicle.get_effective_max_speed() * (0.75 + (aggression - 1.0) * 0.08)
 	if is_straight and leader_is_slower and _overtake_cooldown_remaining <= 0.0:
 		var selected_side := _select_overtake_side(forward, leader)
 		if not is_zero_approx(selected_side):
 			_overtake_offset = selected_side * OVERTAKE_LINE_OFFSET
-			_overtake_hold_remaining = OVERTAKE_HOLD_TIME
+			_overtake_hold_remaining = OVERTAKE_HOLD_TIME * aggression
 			_overtake_target_id = leader.get_instance_id()
 			overtake_attempt_count += 1
 			plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
@@ -538,7 +566,7 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 		var separation := candidate.global_position - vehicle.global_position
 		var distance_ahead := separation.dot(forward)
 		var lateral_distance := separation.dot(lateral_axis)
-		if distance_ahead < 28.0 or distance_ahead > OVERTAKE_REACH:
+		if distance_ahead < 28.0 or distance_ahead > OVERTAKE_REACH * float(personality["overtake_aggression"]):
 			continue
 		if absf(lateral_distance) > OVERTAKE_LATERAL_REACH:
 			continue
@@ -607,7 +635,7 @@ func _overtake_side_score(forward: Vector2, side: float, leader: VehicleControll
 func _cancel_overtake() -> void:
 	_overtake_hold_remaining = 0.0
 	_overtake_target_id = 0
-	_overtake_cooldown_remaining = OVERTAKE_COOLDOWN
+	_overtake_cooldown_remaining = OVERTAKE_COOLDOWN / float(personality["overtake_aggression"])
 	_overtake_offset = 0.0
 
 
@@ -624,6 +652,16 @@ func _difficulty_tuning() -> Dictionary:
 	return DIFFICULTY_TUNING.get(difficulty, DIFFICULTY_TUNING["club_circuit"]) as Dictionary
 
 
+func _configure_personality(driver_id: String, driver_style: Dictionary) -> void:
+	personality_id = driver_id if not driver_id.is_empty() else "baseline"
+	personality = DEFAULT_PERSONALITY.duplicate()
+	var difficulty_scale := 0.3 if difficulty == "sunday_drive" else (1.0 if difficulty == "clockwork" else 0.78)
+	for key: String in DEFAULT_PERSONALITY:
+		var bounds: Vector2 = PERSONALITY_BOUNDS[key]
+		var requested := clampf(float(driver_style.get(key, 1.0)), bounds.x, bounds.y)
+		personality[key] = lerpf(1.0, requested, difficulty_scale)
+
+
 func _shortcut_route_is_suitable(track: Node) -> bool:
 	if difficulty == "sunday_drive" or _shortcut_racing_line.is_empty():
 		return false
@@ -636,7 +674,8 @@ func _shortcut_route_is_suitable(track: Node) -> bool:
 		if not bool(definition.get("ai_path_clear", false)):
 			return false
 		var combined_grip := float(definition.get("grip", 0.0)) * vehicle.stats.grip
-		var minimum_grip := 0.34 if difficulty == "clockwork" else 0.38
+		var preference := float(personality["shortcut_preference"])
+		var minimum_grip := (0.34 if difficulty == "clockwork" else 0.38) / preference
 		return combined_grip >= minimum_grip and float(definition.get("speed", 0.0)) >= 1.0
 	return false
 
@@ -904,7 +943,7 @@ func _racing_line_target(forward: Vector2) -> Vector2:
 	var count := _racing_line.size()
 	var index := _nearest_line_index(vehicle.global_position)
 	var direction := -1 if race_manager.is_reverse_direction() else 1
-	var lookahead := 70.0 + vehicle.speed * 0.4
+	var lookahead := (70.0 + vehicle.speed * 0.4) / float(personality["line_commitment"])
 	var walked := 0.0
 	for step in count:
 		var next := (index + direction + count) % count

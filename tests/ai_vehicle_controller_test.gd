@@ -45,6 +45,27 @@ func _run_test() -> void:
 	controller.configure(vehicle, manager, 0.0)
 	if not _expect(is_equal_approx(vehicle.boost_amount, vehicle.stats.boost_capacity * 0.58), "Club Circuit should start with its difficulty-scaled legal boost reserve"):
 		return
+	controller.configure(
+		vehicle,
+		manager,
+		0.0,
+		"club_circuit",
+		"juniper",
+		{"corner_pace": 1.04, "brake_timing": 0.9, "overtake_aggression": 1.0}
+	)
+	if not _expect(controller.personality_id == "juniper" and float(controller.personality["corner_pace"]) > 1.0 and float(controller.personality["brake_timing"]) < 1.0, "Club Circuit should preserve a bounded, scaled driver personality"):
+		return
+	controller.configure(
+		vehicle,
+		manager,
+		0.0,
+		"sunday_drive",
+		"juniper",
+		{"corner_pace": 1.04, "brake_timing": 0.9}
+	)
+	if not _expect(float(controller.personality["corner_pace"]) < 1.02 and float(controller.personality["brake_timing"]) > 0.96, "Sunday Drive should narrow personality differences"):
+		return
+	controller.configure(vehicle, manager, 0.0)
 	manager.prepare_race()
 	manager.start_race()
 	controller.set("_racing_line", PackedVector2Array([

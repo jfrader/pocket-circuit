@@ -157,7 +157,14 @@ func _configure_racers() -> void:
 		_configure_vehicle(ai_vehicle, ai_index + 1, false, driver, ai_vehicle_id)
 		var ai_controller := AI_CONTROLLER_SCRIPT.new() as AIVehicleController
 		ai_vehicle.add_child(ai_controller)
-		ai_controller.configure(ai_vehicle, race_manager, AI_LANE_OFFSETS[ai_index], difficulty)
+		ai_controller.configure(
+			ai_vehicle,
+			race_manager,
+			AI_LANE_OFFSETS[ai_index],
+			difficulty,
+			driver_id,
+			driver.get("ai_style", {}) as Dictionary
+		)
 
 
 func _configure_vehicle(
