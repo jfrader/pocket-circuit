@@ -428,7 +428,7 @@ func _check_open_boundary_assets(track: Node2D, theme: StringName, seed: int) ->
 			return false
 		var sprite := section.get_node_or_null("Sprite") as Sprite2D
 		var collision := section.get_node_or_null("RailCollision") as CollisionShape2D
-		if not _expect(section.collision_layer == 16 and sprite != null and sprite.texture != null and collision != null and collision.shape is RectangleShape2D, "%s every colliding rail must be a footprint-matched visible asset" % label):
+		if not _expect(section.collision_layer == 16 and sprite != null and sprite.texture != null and collision != null and (collision.shape is RectangleShape2D or collision.shape is ConvexPolygonShape2D), "%s every colliding rail must be a footprint-matched visible asset" % label):
 			return false
 		if not _expect(_minimum_point_distance(section.position, centerline) >= BUILDER.HALF_WIDTH and String(section.get_meta("asset_path", "")) in expected_sections, "%s real rail should stay outside the nominal corridor and use the themed kit" % label):
 			return false
@@ -679,7 +679,7 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 		var asset_path := String(landmark.get_meta("asset_path", ""))
 		if not _expect(asset_path.begins_with("res://assets/textures/giant_props/") and world_size >= 300.0 and world_size <= 600.0, "%s giant landmarks should use tracked 300-600u theme assets" % label):
 			return false
-		var shape_kind := StringName(BUILDER.PROP_SHAPES.get(asset_path.get_file(), {}).get("shape", "circle"))
+		var shape_kind := StringName(landmark.get_meta("footprint_kind", BUILDER.PROP_SHAPES.get(asset_path.get_file(), {}).get("shape", "circle")))
 		var gate_samples := PackedVector2Array()
 		for checkpoint_index in 8:
 			var checkpoint := track.get_node_or_null("Checkpoint0Finish" if checkpoint_index == 0 else "Checkpoint%d" % checkpoint_index) as Node2D
@@ -769,7 +769,7 @@ func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
 		assets[String(prop.get_meta("asset_path", ""))] = true
 		var shadow := prop.get_node_or_null("ContactShadow") as Sprite2D
 		var shadow_offset := shadow.global_position - prop.global_position if shadow else Vector2.ZERO
-		if not _expect(shadow != null and shadow_offset.dot(BUILDER.SHADOW_DIRECTION) > 0.0 and StringName(shadow.get_meta("shadow_shape", &"")) in [&"circle", &"rect"], "%s seed %d ambient prop should use the unified down-right shape-aware shadow" % [theme, seed]):
+		if not _expect(shadow != null and shadow_offset.dot(BUILDER.SHADOW_DIRECTION) > 0.0 and StringName(shadow.get_meta("shadow_shape", &"")) in [&"circle", &"rect"], "%s seed %d ambient prop %s (asset=%s) should use the unified down-right shape-aware shadow (shadow=%s dot=%.3f)" % [theme, seed, prop.name, prop.get_meta("asset_path", "?"), shadow.name if shadow else "null", shadow_offset.dot(BUILDER.SHADOW_DIRECTION)]):
 			return false
 		var normalized: Vector2 = (position - bounds.position) / bounds.size
 		sectors[Vector2i(clampi(int(normalized.x * 3.0), 0, 2), clampi(int(normalized.y * 2.0), 0, 1))] = true
