@@ -10,11 +10,12 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const EPSILON := 0.001
 const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker"]
 
+var _failed := 0
+
 
 func _init() -> void:
 	print("Running VehicleDynamics Unit Tests...")
 	var passed := 0
-	var failed := 0
 
 	# ── Torque curve ──
 	passed += _assert_near("launch_torque",
@@ -28,6 +29,10 @@ func _init() -> void:
 		lerpf(1.0, 0.5, pow((65.0/100.0 - 0.3) / 0.7, 2.0)))
 	passed += _assert_near("zero_max_speed",
 		VehicleDynamics.get_engine_torque_curve(50.0, 0.0, 1.2, 0.3, 0.5, 2.0), 0.0)
+	var falloff_a := VehicleDynamics.get_engine_torque_curve(45.0, 100.0, 1.2, 0.3, 0.5, 2.0)
+	var falloff_b := VehicleDynamics.get_engine_torque_curve(70.0, 100.0, 1.2, 0.3, 0.5, 2.0)
+	var falloff_c := VehicleDynamics.get_engine_torque_curve(100.0, 100.0, 1.2, 0.3, 0.5, 2.0)
+	passed += _assert_true("torque_falloff_monotonic", falloff_a > falloff_b and falloff_b > falloff_c)
 
 	# ── Drag force ──
 	passed += _assert_near("drag_100",
@@ -36,6 +41,10 @@ func _init() -> void:
 		VehicleDynamics.calculate_drag_force(-100.0, 0.001), -10.0)
 	passed += _assert_near("drag_zero",
 		VehicleDynamics.calculate_drag_force(0.0, 0.001), 0.0)
+	passed += _assert_true("drag_opposes_positive_motion",
+		-VehicleDynamics.calculate_drag_force(100.0, 0.001) * 100.0 < 0.0)
+	passed += _assert_true("drag_opposes_negative_motion",
+		-VehicleDynamics.calculate_drag_force(-100.0, 0.001) * -100.0 < 0.0)
 
 	# ── Rolling resistance ──
 	passed += _assert_near("rolling_positive",
@@ -63,16 +72,22 @@ func _init() -> void:
 
 	# ── Tire lateral force (linear region) ──
 	passed += _assert_near("tire_linear",
-		VehicleDynamics.calculate_tire_lateral_force(0.1, 5000.0, 1.0, 1000.0, 0.8, 0.5), 500.0)
+		VehicleDynamics.calculate_tire_lateral_force(0.1, 5000.0, 1.0, 1000.0, 0.8, 0.5), -500.0)
 
 	# ── Tire lateral force (post-peak with falloff) ──
 	# peak = 1000, demand = 2500, ratio = 2.5, falloff = max(0.8, 1-0.5*1.5) = max(0.8, 0.25) = 0.8
 	passed += _assert_near("tire_postpeak",
-		VehicleDynamics.calculate_tire_lateral_force(0.5, 5000.0, 1.0, 1000.0, 0.8, 0.5), 800.0)
+		VehicleDynamics.calculate_tire_lateral_force(0.5, 5000.0, 1.0, 1000.0, 0.8, 0.5), -800.0)
 
 	# ── Tire lateral force (negative slip) ──
 	passed += _assert_near("tire_negative_slip",
-		VehicleDynamics.calculate_tire_lateral_force(-0.1, 5000.0, 1.0, 1000.0, 0.8, 0.5), -500.0)
+		VehicleDynamics.calculate_tire_lateral_force(-0.1, 5000.0, 1.0, 1000.0, 0.8, 0.5), 500.0)
+	var at_peak := absf(VehicleDynamics.calculate_tire_lateral_force(0.2, 5000.0, 1.0, 1000.0, 0.5, 0.25))
+	var just_post_peak := absf(VehicleDynamics.calculate_tire_lateral_force(0.24, 5000.0, 1.0, 1000.0, 0.5, 0.25))
+	var far_post_peak := absf(VehicleDynamics.calculate_tire_lateral_force(4.0, 5000.0, 1.0, 1000.0, 0.5, 0.25))
+	passed += _assert_true("tire_peak_clamp", just_post_peak <= at_peak)
+	passed += _assert_true("tire_post_peak_monotonic", far_post_peak <= just_post_peak)
+	passed += _assert_near("tire_post_peak_floor", far_post_peak, 500.0)
 
 	# ── Tire zero peak grip ──
 	passed += _assert_near("tire_zero_peak",
@@ -93,6 +108,9 @@ func _init() -> void:
 		VehicleDynamics.calculate_progressive_stiffness(0.25), 0.5)
 	passed += _assert_near("prog_stiffness_low",
 		VehicleDynamics.calculate_progressive_stiffness(0.45), sqrt(0.45))
+	passed += _assert_true("surface_reduces_lateral_accel",
+		VehicleDynamics.get_effective_lat_accel(_make_test_stats(), 0.45)
+		< VehicleDynamics.get_effective_lat_accel(_make_test_stats(), 1.0))
 
 	# ── Steering rack ──
 	var target_deg := 32.0
@@ -104,6 +122,9 @@ func _init() -> void:
 	passed += _assert_near("steer_target_max_speed",
 		VehicleDynamics.calculate_target_steer_angle(1.0, target_deg, 680.0, 680.0, 0.48, 0.30),
 		target_rad * 0.48)
+	var steer_mid := VehicleDynamics.calculate_target_steer_angle(1.0, target_deg, 400.0, 680.0, 0.48, 0.30)
+	passed += _assert_true("steering_monotonic_with_speed",
+		target_rad > steer_mid and steer_mid > target_rad * 0.48)
 
 	# ── Rack angle update ──
 	var rack := VehicleDynamics.update_rack_angle(0.0, 0.5, 8.5, 1.0 / 60.0)
@@ -137,6 +158,20 @@ func _init() -> void:
 	var front_brake_lat := float(brakes_lat["front_brake"])
 	passed += _assert_true("friction_circle_reduces_brake",
 		front_brake_lat <= front_brake + 0.1)
+	var light_stats := _make_test_stats()
+	var heavy_stats := _make_test_stats()
+	light_stats.mass = 0.70
+	heavy_stats.mass = 1.20
+	var light_distance := VehicleDynamics.get_braking_distance(
+		500.0, 0.0, VehicleDynamics.get_effective_brake_accel(light_stats, 1.0))
+	var heavy_distance := VehicleDynamics.get_braking_distance(
+		500.0, 0.0, VehicleDynamics.get_effective_brake_accel(heavy_stats, 1.0))
+	passed += _assert_true("braking_scales_with_mass", heavy_distance > light_distance)
+	var dry_distance := VehicleDynamics.get_braking_distance(
+		500.0, 0.0, VehicleDynamics.get_effective_brake_accel(_make_test_stats(), 1.0))
+	var low_grip_distance := VehicleDynamics.get_braking_distance(
+		500.0, 0.0, VehicleDynamics.get_effective_brake_accel(_make_test_stats(), 0.45))
+	passed += _assert_true("braking_grows_on_low_grip", low_grip_distance > dry_distance)
 
 	# ── Handbrake is rear-only ──
 	var hb := VehicleDynamics.calculate_handbrake_force(true, 100.0, _make_test_stats())
@@ -159,7 +194,8 @@ func _init() -> void:
 		var eff_max := VehicleDynamics.get_effective_max_speed(s, 1.0)
 		passed += _assert_near("eff_max_%s" % vid, eff_max, s.max_speed)
 		var eff_grip := VehicleDynamics.get_effective_grip(s, 1.0)
-		passed += _assert_near("eff_grip_%s" % vid, eff_grip, (s.front_grip + s.rear_grip) * 0.5)
+		passed += _assert_near("eff_grip_%s" % vid, eff_grip,
+			s.front_grip * s.front_weight_ratio + s.rear_grip * (1.0 - s.front_weight_ratio))
 		var lat_accel := VehicleDynamics.get_effective_lat_accel(s, 1.0)
 		passed += _assert_near("lat_accel_%s" % vid, lat_accel, eff_grip * 980.0)
 		var corner := VehicleDynamics.get_safe_corner_speed(300.0, lat_accel)
@@ -195,12 +231,11 @@ func _init() -> void:
 		var s3 := CATALOG.create_vehicle_stats(vid3)
 		s3.physics_model_version = 1
 		var sim_brake := VehicleDynamics.simulate_braking(s3, 500.0, 1.0, 5.0)
-		var analytical_dist := VehicleDynamics.get_braking_distance(
-			500.0, 0.0, VehicleDynamics.get_effective_brake_accel(s3, 1.0))
+		var analytical_dist := VehicleDynamics.predict_braking_distance(500.0, 0.0, s3, 1.0)
 		var sim_dist := float(sim_brake["stop_distance"])
 		var dist_agreement := absf(sim_dist - analytical_dist) / maxf(analytical_dist, 0.001)
 		passed += _assert_true("brake_sim_%s (%.1f vs %.1f = %.1f%%)" % [vid3, sim_dist, analytical_dist, dist_agreement * 100.0],
-			dist_agreement < 0.20)  # Braking includes drag/rolling so wider tolerance
+			dist_agreement < 0.08)
 
 	# ── Steady-state lateral accel agreement (skidpad) ──
 	for vid4: String in VEHICLE_IDS:
@@ -220,8 +255,8 @@ func _init() -> void:
 			errors.is_empty())
 
 	print("")
-	if failed > 0:
-		push_error("VehicleDynamics unit tests: %d PASSED, %d FAILED" % [passed, failed])
+	if _failed > 0:
+		push_error("VehicleDynamics unit tests: %d PASSED, %d FAILED" % [passed, _failed])
 		quit(1)
 	else:
 		print("VehicleDynamics unit tests: %d PASSED, 0 FAILED" % passed)
@@ -233,6 +268,7 @@ func _assert_near(name: String, actual: float, expected: float, tolerance: float
 	if absf(actual - expected) <= tolerance:
 		return 1
 	push_error("FAIL %s: expected %.6f, got %.6f (diff %.6f)" % [name, expected, actual, absf(actual - expected)])
+	_failed += 1
 	return 0
 
 
@@ -240,6 +276,7 @@ func _assert_true(name: String, condition: bool) -> int:
 	if condition:
 		return 1
 	push_error("FAIL %s" % name)
+	_failed += 1
 	return 0
 
 

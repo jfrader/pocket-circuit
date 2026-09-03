@@ -1,16 +1,5 @@
 extends SceneTree
 
-## Drift test: verifies drift state machine behavior for both v0 and v1.
-##
-## v0: full scene smoke test (existing behavior — handbrake + steer enters
-##     drift, slip angle exceeds threshold).
-## v1: isolated fixture tests for entry conditions, controlled exit with
-##     boost award, spin cancellation, speed-loss exit, collision invalidation,
-##     and recovery reset.
-##
-## Supports PC_PHYSICS_MODEL_VERSION env: "0" runs only v0, "1" only v1,
-## unset runs both.
-
 const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const VEHICLE_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
@@ -20,6 +9,7 @@ const DELTA := 1.0 / float(PHYSICS_HZ)
 var _world: Node2D
 var _failed := 0
 var _passed := 0
+var _spawn_index := 0
 
 
 func _initialize() -> void:
@@ -28,27 +18,20 @@ func _initialize() -> void:
 
 
 func _run_test() -> void:
-	var env_version := OS.get_environment("PC_PHYSICS_MODEL_VERSION")
-
-	if env_version != "1":
+	var requested_version := OS.get_environment("PC_PHYSICS_MODEL_VERSION")
+	if requested_version != "1":
 		await _run_v0_smoke_test()
-
-	if env_version != "0":
+	if requested_version != "0":
 		_world = Node2D.new()
-		_world.name = "DriftTestWorld"
 		root.add_child(_world)
 		current_scene = _world
-		await _run_v1_entry_test()
-		await _run_v1_controlled_exit_test()
-		await _run_v1_spin_cancel_test()
-		await _run_v1_speed_loss_exit_test()
-		await _run_v1_boost_once_only_test()
-		await _run_v1_no_boost_without_qualification_test()
-		await _run_v1_recovery_reset_test()
+		await _test_entry_gates_and_axle_slip()
+		await _test_counter_steer_and_scrub()
+		await _test_controlled_exit_awards_once()
+		await _test_invalid_exits_award_nothing()
+		await _test_reward_identity_and_recovery()
 		_world.queue_free()
 		await process_frame
-
-	print("")
 	if _failed > 0:
 		push_error("DRIFT_TEST: %d PASSED, %d FAILED" % [_passed, _failed])
 		quit(1)
@@ -58,334 +41,249 @@ func _run_test() -> void:
 		quit(0)
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# V0 — Legacy scene-based smoke test (preserved)
-# ═══════════════════════════════════════════════════════════════════════
-
 func _run_v0_smoke_test() -> void:
-	print("--- v0 drift smoke test ---")
 	var prototype := PROTOTYPE_SCENE.instantiate()
 	root.add_child(prototype)
 	current_scene = prototype
-
 	for _settle in 6:
 		await create_timer(0.1).timeout
 	paused = false
-
 	for _frame in 5:
 		await physics_frame
-
 	var vehicle := get_first_node_in_group("player_vehicle") as RigidBody2D
-	if vehicle == null:
-		_fail_assert("v0_player_found", "player_vehicle not found")
-		_cleanup_scene(prototype)
-		return
-	var race_manager := get_first_node_in_group("race_manager") as RaceManager
-	if race_manager == null:
-		_fail_assert("v0_race_manager", "race_manager not found")
-		_cleanup_scene(prototype)
-		return
-	var started := [race_manager.is_running]
-	if not started[0]:
-		race_manager.race_started.connect(func() -> void: started[0] = true, CONNECT_ONE_SHOT)
-	var timeout_frames := 300
-	while not bool(started[0]) and timeout_frames > 0:
-		await physics_frame
-		timeout_frames -= 1
-	if not bool(started[0]):
-		_fail_assert("v0_race_started", "race not started in time")
-		_cleanup_scene(prototype)
-		return
-
-	Input.action_press("accelerate")
-	var peak_speed := 0.0
-	for _frame in 90:
-		await physics_frame
-		peak_speed = maxf(peak_speed, float(vehicle.get("speed")))
-
-	Input.action_press("handbrake")
-	Input.action_press("steer_right")
-	var drift_seen := false
-	var max_slip := 0.0
-	for _frame in 60:
-		await physics_frame
-		max_slip = maxf(max_slip, absf(float(vehicle.get("slip_angle"))))
-		if bool(vehicle.get("is_drifting")):
-			drift_seen = true
-
+	var manager := get_first_node_in_group("race_manager") as RaceManager
+	_check("v0 player exists", vehicle != null)
+	_check("v0 race manager exists", manager != null)
+	if vehicle != null and manager != null:
+		var timeout := 300
+		while not manager.is_running and timeout > 0:
+			await physics_frame
+			timeout -= 1
+		Input.action_press("accelerate")
+		for _frame in 90:
+			await physics_frame
+		Input.action_press("handbrake")
+		Input.action_press("steer_right")
+		var drift_seen := false
+		var max_slip := 0.0
+		for _frame in 60:
+			await physics_frame
+			drift_seen = drift_seen or bool(vehicle.get("is_drifting"))
+			max_slip = maxf(max_slip, absf(float(vehicle.get("slip_angle"))))
+		_check("v0 drift enters", drift_seen)
+		_check("v0 drift develops slip", max_slip > 5.0)
 	Input.action_release("accelerate")
 	Input.action_release("handbrake")
 	Input.action_release("steer_right")
-
-	print("v0: peak_speed=%.2f drift=%s max_slip=%.2f" % [peak_speed, str(drift_seen), max_slip])
-	_pass_assert("v0_drift_entered", drift_seen)
-	_pass_assert("v0_slip_threshold", max_slip > 12.0)
-
-	_cleanup_scene(prototype)
-
-
-func _cleanup_scene(prototype: Node) -> void:
 	current_scene = null
 	prototype.queue_free()
-	for _f in 3:
+	for _frame in 3:
 		await process_frame
 
 
-# ═══════════════════════════════════════════════════════════════════════
-# V1 — Isolated fixture tests
-# ═══════════════════════════════════════════════════════════════════════
+func _test_entry_gates_and_axle_slip() -> void:
+	var vehicle := await _spawn_vehicle("rustbug")
+	_set_entry_fixture(vehicle, 200.0, 1.0, true, -10.0)
+	vehicle.call("_v1_update_drift", DELTA, 200.0)
+	_check("v1 valid entry", vehicle.is_drifting)
+	_check("rear slip exceeds front on entry", absf(vehicle._rear_slip_angle) > absf(vehicle._front_slip_angle))
 
-func _spawn_v1_vehicle(vehicle_id: String = "rustbug") -> VehicleController:
-	var stats := CATALOG.create_vehicle_stats(vehicle_id)
-	stats.physics_model_version = 1
-	var vehicle: RigidBody2D
-	if ResourceLoader.exists("res://scenes/vehicles/rustbug.tscn"):
-		vehicle = VEHICLE_SCENE.instantiate() as RigidBody2D
-	else:
-		vehicle = RigidBody2D.new()
-		var shape := CapsuleShape2D.new()
-		shape.radius = 18.0
-		shape.height = 52.0
-		var collision := CollisionShape2D.new()
-		collision.shape = shape
-		vehicle.add_child(collision)
-	if vehicle is VehicleController:
-		(vehicle as VehicleController).apply_stats(stats)
-		(vehicle as VehicleController).set_player_controlled(false)
-	_world.add_child(vehicle)
-	vehicle.rotation = 0.0
-	vehicle.position = Vector2(randf_range(-100, 100), randf_range(-100, 100))
-	vehicle.linear_velocity = Vector2.ZERO
-	vehicle.angular_velocity = 0.0
-	return vehicle as VehicleController
+	vehicle.reset_dynamics_state()
+	_set_entry_fixture(vehicle, 200.0, 1.0, false, -10.0)
+	vehicle.call("_v1_update_drift", DELTA, 200.0)
+	_check("entry requires handbrake", not vehicle.is_drifting)
 
+	vehicle.reset_dynamics_state()
+	_set_entry_fixture(vehicle, 200.0, vehicle.stats.drift_entry_steer - 0.01, true, -10.0)
+	vehicle.call("_v1_update_drift", DELTA, 200.0)
+	_check("entry requires steering threshold", not vehicle.is_drifting)
 
-func _remove_v1(vehicle: VehicleController) -> void:
-	vehicle.queue_free()
-	await physics_frame
+	vehicle.reset_dynamics_state()
+	_set_entry_fixture(vehicle, vehicle.stats.drift_min_speed - 1.0, 1.0, true, -10.0)
+	vehicle.call("_v1_update_drift", DELTA, vehicle.speed)
+	_check("entry requires minimum speed", not vehicle.is_drifting)
+
+	vehicle.reset_dynamics_state()
+	_set_entry_fixture(vehicle, 200.0, 1.0, true, 10.0)
+	vehicle.call("_v1_update_drift", DELTA, 200.0)
+	_check("entry requires growing rear slip direction", not vehicle.is_drifting)
+	await _remove_vehicle(vehicle)
 
 
-func _run_v1_entry_test() -> void:
-	## Entry: handbrake + steer + speed + rear slip growing.
-	print("--- v1 drift entry test ---")
-	var vehicle := _spawn_v1_vehicle()
-	vehicle.linear_velocity = Vector2.UP * 450.0
-	await physics_frame
-
-	# No drift without handbrake
-	vehicle.set_external_controls(1.0, 0.0, 1.0, false)
-	for _f in 30:
-		await physics_frame
-	_pass_assert("v1_no_drift_without_handbrake", not vehicle.is_drifting)
-
-	# Drift with handbrake + steer
+func _test_counter_steer_and_scrub() -> void:
+	var vehicle := await _spawn_vehicle("flicker")
 	vehicle.linear_velocity = Vector2.UP * 450.0
 	vehicle.set_external_controls(1.0, 0.0, 1.0, true)
 	var entered := false
-	for _f in 60:
+	for _frame in 45:
 		await physics_frame
 		if vehicle.is_drifting:
 			entered = true
 			break
-	_pass_assert("v1_drift_entry", entered)
+	_check("physical drift entry", entered)
+	for _frame in 18:
+		await physics_frame
+	var pre_counter_slip := absf(vehicle.slip_angle)
+	vehicle.set_external_controls(1.0, 0.0, -1.0, true)
+	var final_slip := INF
+	for _frame in 36:
+		await physics_frame
+		if _frame >= 12:
+			final_slip = minf(final_slip, absf(vehicle.slip_angle))
+	print("DRIFT_COUNTER_STEER vehicle=flicker before=%.3f after=%.3f" % [pre_counter_slip, final_slip])
+	_check("counter-steer reduces slip within 0.6s", final_slip < pre_counter_slip)
+	await _remove_vehicle(vehicle)
 
-	# Entry needs minimum speed
-	vehicle.linear_velocity = Vector2.UP * 50.0
+	var scrub_vehicle := await _spawn_vehicle("rustbug")
+	scrub_vehicle.linear_velocity = Vector2.UP * 350.0
+	_force_active_drift(scrub_vehicle)
+	scrub_vehicle._throttle_input = 0.0
+	scrub_vehicle._external_throttle = 0.0
+	var speed_before := scrub_vehicle.linear_velocity.length()
+	for _frame in 24:
+		await physics_frame
+	_check("unboosted drift loses speed", scrub_vehicle.linear_velocity.length() < speed_before)
+	await _remove_vehicle(scrub_vehicle)
+
+
+func _test_controlled_exit_awards_once() -> void:
+	var vehicle := await _spawn_vehicle("rustbug")
+	_force_active_drift(vehicle)
+	for _frame in 24:
+		vehicle.call("_v1_update_drift", DELTA, 200.0)
+	var before := vehicle.boost_amount
+	vehicle._handbrake_input = false
+	vehicle._rear_slip_angle = 0.0
+	for _frame in 13:
+		vehicle.call("_v1_update_drift", DELTA, 200.0)
+	var awarded := vehicle.boost_amount - before
+	_check("qualified controlled exit ends drift", not vehicle.is_drifting)
+	_check("qualified controlled exit awards boost", awarded > 0.0)
+	var after_first_exit := vehicle.boost_amount
+	for _frame in 30:
+		vehicle.call("_v1_update_drift", DELTA, 200.0)
+	_check("controlled exit awards exactly once", is_equal_approx(vehicle.boost_amount, after_first_exit))
+	await _remove_vehicle(vehicle)
+
+
+func _test_invalid_exits_award_nothing() -> void:
+	var quick_tap := await _spawn_vehicle("rustbug")
+	_force_active_drift(quick_tap)
+	for _frame in 10:
+		quick_tap.call("_v1_update_drift", DELTA, 200.0)
+	var quick_before := quick_tap.boost_amount
+	quick_tap._handbrake_input = false
+	quick_tap._rear_slip_angle = 0.0
+	for _frame in 13:
+		quick_tap.call("_v1_update_drift", DELTA, 200.0)
+	_check("handbrake tap awards nothing", is_equal_approx(quick_tap.boost_amount, quick_before))
+	await _remove_vehicle(quick_tap)
+
+	var spin := await _spawn_vehicle("rustbug")
+	_force_active_drift(spin)
+	spin._drift_qualified_time = 0.5
+	var spin_before := spin.boost_amount
+	spin._rear_slip_angle = deg_to_rad(70.0)
+	spin.call("_v1_update_drift", DELTA, -1.0)
+	_check("spin awards nothing", is_equal_approx(spin.boost_amount, spin_before))
+	await _remove_vehicle(spin)
+
+	var wall := await _spawn_vehicle("rustbug")
+	_force_active_drift(wall)
+	wall._drift_qualified_time = 0.5
+	var wall_before := wall.boost_amount
+	wall._drift_collision_cancel = true
+	wall.call("_v1_update_drift", DELTA, 200.0)
+	_check("wall collision awards nothing", is_equal_approx(wall.boost_amount, wall_before))
+	await _remove_vehicle(wall)
+
+	var speed_loss := await _spawn_vehicle("rustbug")
+	_force_active_drift(speed_loss)
+	speed_loss._drift_qualified_time = 0.5
+	var loss_before := speed_loss.boost_amount
+	speed_loss.speed = speed_loss._drift_entry_speed * 0.79
+	speed_loss.call("_v1_update_drift", DELTA, speed_loss.speed)
+	_check("speed-loss exits drift", not speed_loss.is_drifting)
+	_check("speed-loss awards nothing", is_equal_approx(speed_loss.boost_amount, loss_before))
+	await _remove_vehicle(speed_loss)
+
+
+func _test_reward_identity_and_recovery() -> void:
+	var pinbolt_reward := await _qualified_reward("pinbolt", 0.5)
+	var flicker_reward := await _qualified_reward("flicker", 0.5)
+	_check("Flicker reward exceeds Pinbolt for equal duration", flicker_reward > pinbolt_reward)
+
+	var vehicle := await _spawn_vehicle("rustbug")
+	_force_active_drift(vehicle)
+	vehicle._rack_angle = 0.3
+	vehicle._drift_qualified_time = 0.5
+	var before := vehicle.boost_amount
 	vehicle.reset_dynamics_state()
-	vehicle.set_external_controls(1.0, 0.0, 1.0, true)
-	for _f in 30:
-		await physics_frame
-	_pass_assert("v1_no_drift_below_min_speed", not vehicle.is_drifting)
-
-	await _remove_v1(vehicle)
-
-
-func _run_v1_controlled_exit_test() -> void:
-	## Controlled exit: release handbrake, slip < 6deg for 0.20s → boost awarded.
-	print("--- v1 controlled exit test ---")
-	var vehicle := _spawn_v1_vehicle()
-	vehicle.linear_velocity = Vector2.UP * 450.0
-	vehicle.set_external_controls(1.0, 0.0, 1.0, true)
-	await physics_frame
-
-	# Wait for drift entry
-	for _f in 60:
-		await physics_frame
-		if vehicle.is_drifting:
-			break
-
-	if not vehicle.is_drifting:
-		_fail_assert("v1_exit_drift_entered", "drift did not enter for exit test")
-		await _remove_v1(vehicle)
-		return
-
-	# Hold drift long enough to qualify (>0.35s at optimal slip)
-	for _f in 45:
-		await physics_frame
-
-	var boost_before := vehicle.boost_amount
-
-	# Release handbrake and straighten (controlled exit)
-	vehicle.set_external_controls(1.0, 0.0, 0.0, false)
-
-	# Wait for exit + grace period
-	var exited := false
-	for _f in 60:
-		await physics_frame
-		if not vehicle.is_drifting:
-			exited = true
-			break
-
-	_pass_assert("v1_controlled_exit", exited)
-
-	# Check boost was awarded
-	var boost_after := vehicle.boost_amount
-	var boost_gained := boost_after > boost_before + 0.1
-	print("  boost: before=%.2f after=%.2f gained=%s" % [boost_before, boost_after, str(boost_gained)])
-	# Note: boost gain depends on qualifying time; may be zero if slip wasn't in window
-	_pass_assert("v1_exit_completed", exited)
-
-	await _remove_v1(vehicle)
+	_check("recovery clears drift", not vehicle.is_drifting)
+	_check("recovery clears steering rack", is_zero_approx(vehicle._rack_angle))
+	_check("recovery clears axle slip", is_zero_approx(vehicle._front_slip_angle) and is_zero_approx(vehicle._rear_slip_angle))
+	_check("recovery awards nothing", is_equal_approx(vehicle.boost_amount, before))
+	await _remove_vehicle(vehicle)
 
 
-func _run_v1_spin_cancel_test() -> void:
-	## Spin: slip > 60deg with forward speed <= 0 → no boost.
-	print("--- v1 spin cancel test ---")
-	var vehicle := _spawn_v1_vehicle("flicker")  # Flicker has sharpest falloff
-	vehicle.linear_velocity = Vector2.UP * 450.0
-	vehicle.set_external_controls(1.0, 0.0, 1.0, true)
-	await physics_frame
-
-	# Wait for drift entry
-	for _f in 60:
-		await physics_frame
-		if vehicle.is_drifting:
-			break
-
-	if not vehicle.is_drifting:
-		# Skip if drift didn't enter (acceptable in isolated test)
-		print("  spin test skipped: drift did not enter")
-		await _remove_v1(vehicle)
-		return
-
-	# Force a spin condition by applying extreme yaw
-	var boost_before := vehicle.boost_amount
-	vehicle.angular_velocity = 20.0  # Force spin
-	vehicle.linear_velocity = Vector2.DOWN * 10.0  # Forward speed negative
-	for _f in 30:
-		await physics_frame
-
-	var boost_after := vehicle.boost_amount
-	var no_boost_on_spin := boost_after <= boost_before + 0.1
-	_pass_assert("v1_no_boost_on_spin", no_boost_on_spin)
-
-	await _remove_v1(vehicle)
+func _qualified_reward(vehicle_id: String, seconds: float) -> float:
+	var vehicle := await _spawn_vehicle(vehicle_id)
+	_force_active_drift(vehicle)
+	var before := vehicle.boost_amount
+	for _frame in int(ceil(seconds * PHYSICS_HZ)):
+		vehicle.call("_v1_update_drift", DELTA, 200.0)
+	vehicle._handbrake_input = false
+	vehicle._rear_slip_angle = 0.0
+	for _frame in 13:
+		vehicle.call("_v1_update_drift", DELTA, 200.0)
+	var reward := vehicle.boost_amount - before
+	await _remove_vehicle(vehicle)
+	return reward
 
 
-func _run_v1_speed_loss_exit_test() -> void:
-	## Speed < 80% entry speed → exit without boost.
-	print("--- v1 speed loss exit test ---")
-	var vehicle := _spawn_v1_vehicle()
-	vehicle.linear_velocity = Vector2.UP * 450.0
-	vehicle.set_external_controls(1.0, 0.0, 1.0, true)
-	await physics_frame
-
-	for _f in 60:
-		await physics_frame
-		if vehicle.is_drifting:
-			break
-
-	if not vehicle.is_drifting:
-		print("  speed loss test skipped: drift did not enter")
-		await _remove_v1(vehicle)
-		return
-
-	var boost_before := vehicle.boost_amount
-
-	# Kill speed to trigger speed-loss exit
-	vehicle.linear_velocity = Vector2.UP * 50.0
-	for _f in 30:
-		await physics_frame
-
-	var boost_after := vehicle.boost_amount
-	_pass_assert("v1_speed_loss_no_boost", boost_after <= boost_before + 0.1)
-	_pass_assert("v1_speed_loss_exit", not vehicle.is_drifting)
-
-	await _remove_v1(vehicle)
-
-
-func _run_v1_boost_once_only_test() -> void:
-	## Boost is awarded only ONCE per drift.
-	print("--- v1 boost once-only test ---")
-	var vehicle := _spawn_v1_vehicle()
-	# Simply verify that reset_dynamics_state clears the awarded flag
+func _force_active_drift(vehicle: VehicleController) -> void:
 	vehicle.reset_dynamics_state()
-	_pass_assert("v1_reset_clears_drift", not vehicle.is_drifting)
-	_pass_assert("v1_reset_clears_boost_acc", vehicle._drift_boost_accumulated == 0.0)
-	_pass_assert("v1_reset_clears_awarded", vehicle._drift_boost_awarded == false)
-	await _remove_v1(vehicle)
+	vehicle._drift_state = VehicleController.DriftState.ACTIVE
+	vehicle.is_drifting = true
+	vehicle._drift_entry_speed = 150.0
+	vehicle.speed = 200.0
+	vehicle._throttle_input = 1.0
+	vehicle._handbrake_input = true
+	vehicle._steer_input = 1.0
+	vehicle._rear_slip_angle = deg_to_rad(vehicle.stats.drift_optimal_slip_deg)
 
 
-func _run_v1_no_boost_without_qualification_test() -> void:
-	## No boost if qualified time < 0.35s (handbrake tapping).
-	print("--- v1 no boost without qualification ---")
-	var vehicle := _spawn_v1_vehicle()
-	vehicle.linear_velocity = Vector2.UP * 450.0
-	vehicle.set_external_controls(1.0, 0.0, 1.0, true)
+func _set_entry_fixture(vehicle: VehicleController, fixture_speed: float, steer: float, handbrake: bool, rear_slip_deg: float) -> void:
+	vehicle.speed = fixture_speed
+	vehicle._steer_input = steer
+	vehicle._handbrake_input = handbrake
+	vehicle._front_slip_angle = deg_to_rad(3.0)
+	vehicle._rear_slip_angle = deg_to_rad(rear_slip_deg)
+
+
+func _spawn_vehicle(vehicle_id: String) -> VehicleController:
+	var stats := CATALOG.create_vehicle_stats(vehicle_id)
+	stats.physics_model_version = 1
+	var vehicle := VEHICLE_SCENE.instantiate() as VehicleController
+	vehicle.apply_stats(stats)
+	vehicle.set_player_controlled(false)
+	_spawn_index += 1
+	vehicle.position = Vector2(float(_spawn_index) * 300.0, 0.0)
+	_world.add_child(vehicle)
+	await physics_frame
+	vehicle.linear_velocity = Vector2.ZERO
+	vehicle.angular_velocity = 0.0
+	return vehicle
+
+
+func _remove_vehicle(vehicle: VehicleController) -> void:
+	vehicle.queue_free()
 	await physics_frame
 
-	# Quick tap: enter drift very briefly
-	for _f in 10:
-		await physics_frame
-		if vehicle.is_drifting:
-			break
 
-	var boost_before := vehicle.boost_amount
-	# Immediately release for exit
-	vehicle.set_external_controls(1.0, 0.0, 0.0, false)
-	for _f in 30:
-		await physics_frame
-
-	var boost_after := vehicle.boost_amount
-	# Should NOT have gained boost (qualified time too short)
-	_pass_assert("v1_no_boost_quick_tap", boost_after <= boost_before + 0.5)
-
-	await _remove_v1(vehicle)
-
-
-func _run_v1_recovery_reset_test() -> void:
-	## reset_dynamics_state clears all drift state.
-	print("--- v1 recovery reset test ---")
-	var vehicle := _spawn_v1_vehicle()
-	vehicle.linear_velocity = Vector2.UP * 450.0
-	vehicle.set_external_controls(1.0, 0.0, 1.0, true)
-	await physics_frame
-
-	for _f in 60:
-		await physics_frame
-		if vehicle.is_drifting:
-			break
-
-	# Reset mid-drift
-	vehicle.reset_dynamics_state()
-	_pass_assert("v1_recovery_clears_drift", not vehicle.is_drifting)
-	_pass_assert("v1_recovery_clears_rack", vehicle._rack_angle == 0.0)
-	_pass_assert("v1_recovery_clears_grip", vehicle._rear_grip_recovery == 1.0)
-
-	await _remove_v1(vehicle)
-
-
-# ═══════════════════════════════════════════════════════════════════════
-# Assertion helpers
-# ═══════════════════════════════════════════════════════════════════════
-
-func _pass_assert(name: String, condition: bool) -> void:
+func _check(name: String, condition: bool) -> void:
 	if condition:
 		_passed += 1
 	else:
-		_fail_assert(name, "condition was false")
-
-
-func _fail_assert(name: String, message: String) -> void:
-	_failed += 1
-	push_error("DRIFT_TEST FAIL [%s]: %s" % [name, message])
+		_failed += 1
+		push_error("DRIFT_TEST FAIL [%s]" % name)

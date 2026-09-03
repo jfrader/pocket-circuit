@@ -138,7 +138,8 @@ static func calculate_tire_lateral_force(
 	var peak_force := peak_grip * normal_load
 	if is_zero_approx(peak_force):
 		return 0.0
-	var linear_force := cornering_stiffness * slip_angle_rad
+	# Tire force always opposes the axle slip angle.
+	var linear_force := -cornering_stiffness * slip_angle_rad
 	var demand_ratio := absf(linear_force) / maxf(peak_force, 0.001)
 	if demand_ratio <= 1.0:
 		return linear_force
@@ -220,7 +221,10 @@ static func get_effective_max_speed(stats: VehicleStats, surface_speed_mult: flo
 
 
 static func get_effective_grip(stats: VehicleStats, surface_grip_mult: float) -> float:
-	return (stats.front_grip + stats.rear_grip) * 0.5 * surface_grip_mult
+	return (
+		stats.front_grip * stats.front_weight_ratio
+		+ stats.rear_grip * (1.0 - stats.front_weight_ratio)
+	) * surface_grip_mult
 
 
 static func get_effective_lat_accel(stats: VehicleStats, surface_grip_mult: float) -> float:
@@ -248,9 +252,35 @@ static func get_braking_distance(
 
 static func get_effective_brake_accel(stats: VehicleStats, surface_grip_mult: float) -> float:
 	## Effective braking deceleration in wu/s² for AI predictions.
-	var avg_grip := get_effective_grip(stats, surface_grip_mult)
-	# Brake decel limited by both raw brake force and grip
-	return minf(stats.brake_force / stats.mass, avg_grip * REFERENCE_GRAVITY)
+	var forces := calculate_brake_forces(1.0, 1.0, stats, surface_grip_mult, 0.0, 0.0)
+	return (float(forces["front_brake"]) + float(forces["rear_brake"])) / maxf(stats.mass, 0.001)
+
+
+static func predict_braking_distance(
+	v_now: float,
+	v_target: float,
+	stats: VehicleStats,
+	surface_grip_mult: float,
+	surface_speed_mult: float = 1.0,
+) -> float:
+	## Deterministic 60 Hz prediction using the same brake, drag, and rolling
+	## terms as the controller. This is the public planner model query.
+	if v_now <= v_target:
+		return 0.0
+	var speed := v_now
+	var distance := 0.0
+	var delta := 1.0 / 60.0
+	for _step in 60 * 30:
+		if speed <= v_target:
+			break
+		var brake_accel := get_effective_brake_accel(stats, surface_grip_mult)
+		var drag := calculate_drag_force(speed, stats.aero_drag_coefficient)
+		drag /= maxf(surface_speed_mult * surface_speed_mult, 0.0001)
+		var rolling := stats.rolling_resistance / maxf(surface_speed_mult, 0.01)
+		var decel := brake_accel + (drag + rolling) / maxf(stats.mass, 0.001)
+		speed = maxf(v_target, speed - decel * delta)
+		distance += speed * delta
+	return distance
 
 
 # ─── 60 Hz Euler simulation (for unit-test agreement) ────────────────
