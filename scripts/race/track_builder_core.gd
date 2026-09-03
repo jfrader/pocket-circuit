@@ -1186,19 +1186,24 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 	barrier.set_meta("visible_collision_backing", &"raised_island_rim")
 	root.add_child(barrier)
 	if spec.get("seed_obstacles", false):
+		# The line art is centered on `expanded`; contact belongs at its outer
+		# (track-facing) edge, not invisibly halfway through the 26u textured rim.
+		var collision_boundary := _outset_polygon(expanded, ISLAND_TEXTURED_RIM_WIDTH * 0.5)
 		# A generated inner offset can be concave enough that solid polygon
 		# decomposition fails. A closed concave segment chain is valid on a static
 		# body and still makes the household island a physical boundary.
 		var segments := PackedVector2Array()
-		for index in expanded.size():
-			segments.append(expanded[index])
-			segments.append(expanded[(index + 1) % expanded.size()])
+		for index in collision_boundary.size():
+			segments.append(collision_boundary[index])
+			segments.append(collision_boundary[(index + 1) % collision_boundary.size()])
 		var boundary_shape := ConcavePolygonShape2D.new()
 		boundary_shape.segments = segments
 		var boundary_collision := CollisionShape2D.new()
 		boundary_collision.name = "BoundaryCollision"
 		boundary_collision.shape = boundary_shape
 		barrier.add_child(boundary_collision)
+		barrier.set_meta("collision_boundary_polygon", collision_boundary)
+		barrier.set_meta("rim_contact_offset", ISLAND_TEXTURED_RIM_WIDTH * 0.5)
 	else:
 		var barrier_collision := CollisionPolygon2D.new()
 		barrier_collision.polygon = expanded
@@ -1435,19 +1440,17 @@ static func _build_generated_outer_boundary_visuals(
 		accent_body.set_meta("centerline_index", index)
 		_mark_solid_body(accent_body, accent_path, &"boundary_prop")
 		container.add_child(accent_body)
-		var accent_shape := RectangleShape2D.new()
-		accent_shape.size = Vector2(153.6, 67.2)
-		var accent_collision := CollisionShape2D.new()
-		accent_collision.name = "AssetCollision"
-		accent_collision.shape = accent_shape
-		accent_body.add_child(accent_collision)
-		_record_shape_probe_points(accent_body, Vector2.ZERO, accent_shape.size, &"rect")
-		_add_directional_shadow(accent_body, accent_path, 160.0, 1.0, Vector2(160.0, 70.0))
+		var accent_scale := Vector2(160.0 / accent_texture.get_width(), 70.0 / accent_texture.get_height())
+		var accent_footprint := _texture_collision_footprint(accent_texture, &"rect", true)
+		var accent_size: Vector2 = (accent_footprint["size"] as Vector2) * accent_scale + Vector2.ONE * 2.0
+		var accent_offset := _add_texture_collision(accent_body, accent_texture, accent_scale, &"rect", true, 2.0)
+		_add_directional_shadow(accent_body, accent_path, 160.0, 1.0, accent_size)
 		var accent_sprite := Sprite2D.new()
 		accent_sprite.name = "Sprite"
 		accent_sprite.texture = accent_texture
 		accent_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		accent_sprite.scale = Vector2(160.0 / accent_texture.get_width(), 70.0 / accent_texture.get_height())
+		accent_sprite.scale = accent_scale
+		accent_sprite.position = -accent_offset
 		_mark_solid_visual(accent_sprite, accent_path, &"boundary_prop")
 		accent_body.add_child(accent_sprite)
 		accent_count += 1
@@ -1514,19 +1517,18 @@ static func _add_generated_boundary_section(
 	body.set_meta("visible_collision_backing", &"rail_sprite")
 	_mark_solid_body(body, texture.resource_path, &"rail")
 	container.add_child(body)
-	var shape := RectangleShape2D.new()
-	shape.size = Vector2(151.0, 54.0)
-	var collision := CollisionShape2D.new()
-	collision.name = "RailCollision"
-	collision.shape = shape
-	body.add_child(collision)
-	_record_shape_probe_points(body, Vector2.ZERO, shape.size, &"rect")
-	_add_directional_shadow(body, texture.resource_path, 156.0, 1.0, Vector2(142.0, 38.0))
+	var sprite_scale := Vector2(156.0 / texture.get_width(), 56.0 / texture.get_height())
+	var footprint := _texture_collision_footprint(texture, &"rect", true)
+	var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale + Vector2.ONE * 2.0
+	var offset := _add_texture_collision(body, texture, sprite_scale, &"rect", true, 2.0)
+	(body.get_node("AssetCollision") as CollisionShape2D).name = "RailCollision"
+	_add_directional_shadow(body, texture.resource_path, 156.0, 1.0, footprint_size)
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	sprite.scale = Vector2(156.0 / texture.get_width(), 56.0 / texture.get_height())
+	sprite.scale = sprite_scale
+	sprite.position = -offset
 	_mark_solid_visual(sprite, texture.resource_path, &"rail")
 	body.add_child(sprite)
 	return true
@@ -1639,6 +1641,18 @@ static func _polygon_area(points: PackedVector2Array) -> float:
 		var next := (index + 1) % points.size()
 		total += points[index].x * points[next].y - points[next].x * points[index].y
 	return total * 0.5
+
+
+static func _outset_polygon(points: PackedVector2Array, distance: float) -> PackedVector2Array:
+	var contours: Array[PackedVector2Array] = Geometry2D.offset_polygon(points, distance, Geometry2D.JOIN_ROUND)
+	var largest := PackedVector2Array()
+	var largest_area := 0.0
+	for contour: PackedVector2Array in contours:
+		var area := absf(_polygon_area(contour))
+		if contour.size() >= 3 and area > largest_area:
+			largest = contour
+			largest_area = area
+	return largest if not largest.is_empty() else points
 
 
 static func _simple_island_loop(points: PackedVector2Array) -> PackedVector2Array:
@@ -1882,19 +1896,18 @@ static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tan
 		post.set_meta("visible_collision_backing", &"gate_post_sprite")
 		_mark_solid_body(post, asset_path, &"gate_post")
 		container.add_child(post)
-		var shape := RectangleShape2D.new()
-		shape.size = GATE_POST_SIZE * 0.96
-		var collision := CollisionShape2D.new()
-		collision.name = "PostCollision"
-		collision.shape = shape
-		post.add_child(collision)
-		_record_shape_probe_points(post, Vector2.ZERO, shape.size, &"rect")
-		_add_directional_shadow(post, asset_path, GATE_POST_SIZE.x, 1.0, shape.size)
+		var sprite_scale := Vector2(GATE_POST_SIZE.x / texture.get_width(), GATE_POST_SIZE.y / texture.get_height())
+		var footprint := _texture_collision_footprint(texture, &"rect", true)
+		var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale + Vector2.ONE * 2.0
+		var offset := _add_texture_collision(post, texture, sprite_scale, &"rect", true, 2.0)
+		(post.get_node("AssetCollision") as CollisionShape2D).name = "PostCollision"
+		_add_directional_shadow(post, asset_path, GATE_POST_SIZE.x, 1.0, footprint_size)
 		var sprite := Sprite2D.new()
 		sprite.name = "Sprite"
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprite.scale = Vector2(GATE_POST_SIZE.x / texture.get_width(), GATE_POST_SIZE.y / texture.get_height())
+		sprite.scale = sprite_scale
+		sprite.position = -offset
 		_mark_solid_visual(sprite, asset_path, &"gate_post")
 		post.add_child(sprite)
 		container.set_meta("placed_count", int(container.get_meta("placed_count", 0)) + 1)
