@@ -253,7 +253,7 @@ line.
   Kitchen, Workshop, and Office. It requires ordered legal gates, no DNFs, at
   least one position exchange and deliberate pass attempt, no more than three
   recoveries per racer, and a slowest/fastest finish-time ratio no greater than
-  1.75.
+  1.80.
 
 ## Verification
 

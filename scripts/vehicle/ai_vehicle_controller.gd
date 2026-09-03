@@ -1,9 +1,10 @@
 class_name AIVehicleController
 extends Node
 
-const STUCK_TIMEOUT := 2.2
+const STUCK_TIMEOUT := 2.8
 const STUCK_SPEED := 85.0
 const RECOVERY_GHOST_TIME := 1.0
+const RECOVERY_COOLDOWN := 5.0
 const CORNER_GUIDE_AXIS_THRESHOLD := 180.0
 const CORNER_GUIDE_BLEND_DISTANCE := 180.0
 const CORNER_GUIDE_REACHED_DISTANCE := 40.0
@@ -49,9 +50,9 @@ const PERSONALITY_BOUNDS: Dictionary = {
 	"corner_pace": Vector2(0.96, 1.04),
 	"brake_timing": Vector2(0.9, 1.1),
 	"boost_eagerness": Vector2(0.9, 1.18),
-	"overtake_aggression": Vector2(0.85, 1.22),
+	"overtake_aggression": Vector2(0.85, 1.13),
 	"shortcut_preference": Vector2(0.9, 1.16),
-	"line_commitment": Vector2(0.94, 1.1),
+	"line_commitment": Vector2(0.95, 1.06),
 }
 const DIFFICULTY_TUNING: Dictionary = {
 	"sunday_drive": {
@@ -130,6 +131,7 @@ var _overtake_offset := 0.0
 var _overtake_hold_remaining := 0.0
 var _overtake_cooldown_remaining := 0.0
 var _overtake_target_id := 0
+var _last_recovery_time := 0
 
 
 func configure(
@@ -156,6 +158,8 @@ func configure(
 	if not race_manager.race_started.is_connected(_cache_checkpoints):
 		race_manager.race_started.connect(_cache_checkpoints)
 	vehicle.set_player_controlled(false)
+	_last_recovery_time = 0
+	_stuck_time = 0.0
 
 
 func _cache_checkpoints() -> void:
@@ -256,10 +260,16 @@ func _physics_process(delta: float) -> void:
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var handling_pace := clampf(vehicle.stats.steering_rate / 3.75, 0.78, 1.08)
 	var corner_speed := effective_max_speed
+	var commit := float(personality["line_commitment"])
+	# corner-speed floor per driver vs the new apex line (conservative only on club to stabilize office L without hurting clockwork pace)
+	var floor_adj := 1.0
+	if difficulty == "club_circuit":
+		floor_adj = clampf(0.99 - 0.10 * (commit - 1.0), 0.90, 0.99)
+	var corner_floor := float(tuning["corner_floor"]) * floor_adj
 	if line_radius > 40.0:
 		corner_speed = clampf(
 			float(tuning["corner_constant"]) * sqrt(line_radius) * pace_multiplier,
-			effective_max_speed * float(tuning["corner_floor"]),
+			effective_max_speed * corner_floor,
 			effective_max_speed
 		)
 	corner_speed *= float(personality["corner_pace"])
@@ -500,8 +510,15 @@ func _traffic_plan(
 		line_target: Vector2,
 		line_radius: float
 ) -> Dictionary:
+	var was_holding_overtake := _overtake_hold_remaining > 0.0
 	_overtake_cooldown_remaining = maxf(0.0, _overtake_cooldown_remaining - delta)
 	_overtake_hold_remaining = maxf(0.0, _overtake_hold_remaining - delta)
+	if was_holding_overtake and _overtake_hold_remaining <= 0.0:
+		_overtake_target_id = 0
+		_overtake_cooldown_remaining = maxf(
+			_overtake_cooldown_remaining,
+			OVERTAKE_COOLDOWN / float(personality["overtake_aggression"])
+		)
 	var plan := {
 		"target_position": line_target,
 		"speed_scale": 1.0,
@@ -521,7 +538,8 @@ func _traffic_plan(
 			plan["passing"] = true
 			return plan
 		_cancel_overtake()
-
+	if _overtake_cooldown_remaining > 0.0 and not is_zero_approx(_overtake_offset):
+		plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
 	if leader == null:
 		_overtake_offset = move_toward(_overtake_offset, 0.0, OVERTAKE_LINE_OFFSET * delta * 2.5)
 		if not is_zero_approx(_overtake_offset):
@@ -538,7 +556,8 @@ func _traffic_plan(
 	)
 	var aggression := float(personality["overtake_aggression"])
 	var leader_is_slower := leader.speed + 22.0 / aggression < vehicle.speed or leader.speed < vehicle.get_effective_max_speed() * (0.75 + (aggression - 1.0) * 0.08)
-	if is_straight and leader_is_slower and _overtake_cooldown_remaining <= 0.0:
+	# only commit overtake when gap/room truly clear (corridor/apron checks inside side_score)
+	if is_straight and leader_is_slower and _overtake_cooldown_remaining <= 0.0 and distance > 55.0:
 		var selected_side := _select_overtake_side(forward, leader)
 		if not is_zero_approx(selected_side):
 			_overtake_offset = selected_side * OVERTAKE_LINE_OFFSET
@@ -591,11 +610,11 @@ func _select_overtake_side(forward: Vector2, leader: VehicleController) -> float
 		if score > best_score:
 			best_score = score
 			best_side = side
-	return best_side if best_score >= 0.92 else 0.0
+	return best_side if best_score >= 0.90 else 0.0
 
 
 func _overtake_side_clear(forward: Vector2, side: float, leader: VehicleController) -> bool:
-	return _overtake_side_score(forward, side, leader) >= 0.88
+	return _overtake_side_score(forward, side, leader) >= 0.86
 
 
 func _overtake_side_score(forward: Vector2, side: float, leader: VehicleController) -> float:
@@ -629,7 +648,22 @@ func _overtake_side_score(forward: Vector2, side: float, leader: VehicleControll
 		OVERTAKE_CLEAR_DISTANCE,
 		STATIC_OBSTACLE_MASK | VEHICLE_COLLISION_MASK
 	)["clearance"])
-	return minf(side_clearance, minf(merge_clearance, lane_clearance))
+	# corridor-side clearance checks for open-apron reality (no walls on open tracks): "safe" means staying on/near racing corridor.
+	# If chosen side open (high) but opposite bounded (low), swerving toward apron -> low score.
+	var opp_side := -side
+	var opp_lateral := forward.orthogonal() * opp_side
+	var opp_clearance := float(_ray_probe_from(
+		origin,
+		opp_lateral,
+		OVERTAKE_LINE_OFFSET * 1.3,
+		STATIC_OBSTACLE_MASK | VEHICLE_COLLISION_MASK,
+		excluded
+	)["clearance"])
+	var base := minf(side_clearance, minf(merge_clearance, lane_clearance))
+	if side_clearance >= 0.94 and opp_clearance <= 0.82:
+		# open chosen + bounded opp = apron direction, not corridor safe for overtake
+		return 0.35
+	return base
 
 
 func _cancel_overtake() -> void:
@@ -878,6 +912,9 @@ func _update_stuck_recovery(delta: float, target_key: String, distance_to_target
 		_best_checkpoint_distance = distance_to_target
 		_stuck_time = 0.0
 		return
+	if _recovery_cooldown_active():
+		_stuck_time = 0.0
+		return
 	if distance_to_target < _best_checkpoint_distance - 18.0:
 		_best_checkpoint_distance = distance_to_target
 		_stuck_time = 0.0
@@ -895,6 +932,7 @@ func _recover_vehicle() -> void:
 		return
 	_recovering = true
 	recovery_count += 1
+	_last_recovery_time = Time.get_ticks_msec()
 	_stuck_time = 0.0
 	_guide_checkpoint_index = -1
 	_guide_reached = false
@@ -924,6 +962,12 @@ func _recover_vehicle() -> void:
 		vehicle.collision_mask = saved_mask
 		vehicle.modulate.a = 1.0
 	_recovering = false
+
+
+func _recovery_cooldown_active() -> bool:
+	if _last_recovery_time == 0:
+		return false
+	return (Time.get_ticks_msec() - _last_recovery_time) < int(RECOVERY_COOLDOWN * 1000.0)
 
 
 func _nearest_line_index(position: Vector2) -> int:

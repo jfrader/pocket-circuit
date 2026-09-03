@@ -177,6 +177,18 @@ func _run_test() -> void:
 		return
 	if not _expect(controller.overtake_attempt_count == 1, "a new clear pass should be exposed for race telemetry"):
 		return
+	controller.set("_overtake_hold_remaining", 0.01)
+	var expired_plan := controller.call(
+		"_traffic_plan",
+		0.02,
+		Vector2.UP,
+		Vector2(0.0, -220.0),
+		1800.0
+	) as Dictionary
+	if not _expect(not bool(expired_plan["passing"]) and float(controller.get("_overtake_cooldown_remaining")) > 0.0, "a completed pass hold should cool down before another attempt"):
+		return
+	if not _expect(controller.overtake_attempt_count == 1, "hold expiry should not immediately count a duplicate pass attempt"):
+		return
 
 	var blocker := StaticBody2D.new()
 	blocker.collision_layer = 2
