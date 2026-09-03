@@ -1,0 +1,144 @@
+extends SceneTree
+
+const CATALOG := preload("res://data/championship/catalog.gd")
+const VEHICLE_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
+const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker"]
+const TARGETS := {
+	"rustbug": {
+		"mass": 0.88, "wheelbase": 39.0, "front_weight_ratio": 0.52,
+		"engine_force": 820.0, "launch_torque_multiplier": 1.08, "torque_peak_ratio": 0.30,
+		"torque_at_max_speed": 0.37, "torque_falloff_exponent": 1.65, "max_speed": 680.0,
+		"reverse_speed": 240.0, "rolling_resistance": 18.0, "aero_drag_coefficient": 0.000617,
+		"front_grip": 1.15, "rear_grip": 1.18, "front_cornering_stiffness": 3600.0,
+		"rear_cornering_stiffness": 3500.0, "post_peak_grip_ratio": 0.68, "slip_falloff_rate": 0.28,
+		"max_steer_angle_deg": 32.0, "steering_response": 8.5, "high_speed_steer_ratio": 0.48,
+		"steer_fade_start_ratio": 0.30, "yaw_stability_rate": 8.0, "brake_force": 1050.0,
+		"handbrake_force": 270.0, "drift_min_speed": 130.0, "drift_entry_steer": 0.35,
+		"drift_rear_grip_ratio": 0.40, "drift_yaw_assist": 2.0, "drift_grip_recovery_rate": 7.0,
+		"drift_optimal_slip_deg": 26.0, "drift_boost_max_reward": 16.0, "boost_power": 560.0,
+		"boost_capacity": 100.0, "boost_recharge": 10.0, "boost_drain_rate": 32.0, "durability": 52.0,
+	},
+	"pinbolt": {
+		"mass": 0.74, "wheelbase": 37.0, "front_weight_ratio": 0.54,
+		"engine_force": 690.0, "launch_torque_multiplier": 1.12, "torque_peak_ratio": 0.27,
+		"torque_at_max_speed": 0.30, "torque_falloff_exponent": 1.80, "max_speed": 640.0,
+		"reverse_speed": 245.0, "rolling_resistance": 16.0, "aero_drag_coefficient": 0.000466,
+		"front_grip": 1.34, "rear_grip": 1.32, "front_cornering_stiffness": 4200.0,
+		"rear_cornering_stiffness": 3600.0, "post_peak_grip_ratio": 0.76, "slip_falloff_rate": 0.18,
+		"max_steer_angle_deg": 36.0, "steering_response": 11.5, "high_speed_steer_ratio": 0.58,
+		"steer_fade_start_ratio": 0.38, "yaw_stability_rate": 10.5, "brake_force": 1000.0,
+		"handbrake_force": 220.0, "drift_min_speed": 150.0, "drift_entry_steer": 0.42,
+		"drift_rear_grip_ratio": 0.50, "drift_yaw_assist": 1.2, "drift_grip_recovery_rate": 10.0,
+		"drift_optimal_slip_deg": 22.0, "drift_boost_max_reward": 10.0, "boost_power": 480.0,
+		"boost_capacity": 90.0, "boost_recharge": 7.5, "boost_drain_rate": 34.0, "durability": 46.0,
+	},
+	"scrapjaw": {
+		"mass": 1.22, "wheelbase": 43.0, "front_weight_ratio": 0.56,
+		"engine_force": 1220.0, "launch_torque_multiplier": 1.10, "torque_peak_ratio": 0.38,
+		"torque_at_max_speed": 0.35, "torque_falloff_exponent": 1.35, "max_speed": 700.0,
+		"reverse_speed": 220.0, "rolling_resistance": 27.0, "aero_drag_coefficient": 0.000816,
+		"front_grip": 1.02, "rear_grip": 1.12, "front_cornering_stiffness": 4000.0,
+		"rear_cornering_stiffness": 4000.0, "post_peak_grip_ratio": 0.72, "slip_falloff_rate": 0.22,
+		"max_steer_angle_deg": 27.0, "steering_response": 5.5, "high_speed_steer_ratio": 0.40,
+		"steer_fade_start_ratio": 0.24, "yaw_stability_rate": 5.0, "brake_force": 1250.0,
+		"handbrake_force": 360.0, "drift_min_speed": 145.0, "drift_entry_steer": 0.40,
+		"drift_rear_grip_ratio": 0.42, "drift_yaw_assist": 1.4, "drift_grip_recovery_rate": 4.5,
+		"drift_optimal_slip_deg": 24.0, "drift_boost_max_reward": 12.0, "boost_power": 640.0,
+		"boost_capacity": 95.0, "boost_recharge": 8.0, "boost_drain_rate": 30.0, "durability": 75.0,
+	},
+	"flicker": {
+		"mass": 0.68, "wheelbase": 36.0, "front_weight_ratio": 0.48,
+		"engine_force": 670.0, "launch_torque_multiplier": 1.06, "torque_peak_ratio": 0.33,
+		"torque_at_max_speed": 0.34, "torque_falloff_exponent": 2.10, "max_speed": 725.0,
+		"reverse_speed": 250.0, "rolling_resistance": 14.0, "aero_drag_coefficient": 0.000407,
+		"front_grip": 1.12, "rear_grip": 0.98, "front_cornering_stiffness": 3100.0,
+		"rear_cornering_stiffness": 2700.0, "post_peak_grip_ratio": 0.56, "slip_falloff_rate": 0.48,
+		"max_steer_angle_deg": 34.0, "steering_response": 9.5, "high_speed_steer_ratio": 0.44,
+		"steer_fade_start_ratio": 0.28, "yaw_stability_rate": 7.0, "brake_force": 820.0,
+		"handbrake_force": 200.0, "drift_min_speed": 115.0, "drift_entry_steer": 0.28,
+		"drift_rear_grip_ratio": 0.30, "drift_yaw_assist": 3.2, "drift_grip_recovery_rate": 6.5,
+		"drift_optimal_slip_deg": 32.0, "drift_boost_max_reward": 28.0, "boost_power": 600.0,
+		"boost_capacity": 110.0, "boost_recharge": 14.0, "boost_drain_rate": 36.0, "durability": 42.0,
+	},
+}
+
+
+func _initialize() -> void:
+	if not _test_catalog_resources():
+		return
+	if not _test_scene_default_parity():
+		return
+	if not _test_validation_diagnostics():
+		return
+	print("VEHICLE_STATS_RESOURCE_TEST PASS")
+	quit(0)
+
+
+func _test_catalog_resources() -> bool:
+	for vehicle_id: String in VEHICLE_IDS:
+		var definition := CATALOG.get_vehicle(vehicle_id)
+		var stats_path := String(definition.get("stats_path", ""))
+		if not _expect(stats_path == "res://data/vehicles/%s.tres" % vehicle_id, "%s should reference its canonical VehicleStats resource" % vehicle_id):
+			return false
+		var source := load(stats_path) as VehicleStats
+		if not _expect(source != null, "%s stats resource should load" % vehicle_id):
+			return false
+		if not _expect(source.physics_model_version == VehicleStats.LEGACY_MODEL_VERSION, "%s should remain on legacy physics for P1" % vehicle_id):
+			return false
+		if not _expect(source.get_validation_errors().is_empty(), "%s target parameters should pass schema validation: %s" % [vehicle_id, ", ".join(source.get_validation_errors())]):
+			return false
+		var expected: Dictionary = TARGETS[vehicle_id]
+		if not _expect(expected.size() == VehicleStats.PARAMETER_RANGES.size(), "%s target fixture should cover every versioned parameter" % vehicle_id):
+			return false
+		for property_name: String in VehicleStats.PARAMETER_RANGES:
+			if not _expect(expected.has(property_name), "%s target fixture is missing %s" % [vehicle_id, property_name]):
+				return false
+			if not _expect(is_equal_approx(float(source.get(property_name)), float(expected[property_name])), "%s %s should match the GURI-557 target" % [vehicle_id, property_name]):
+				return false
+		var ratings: Dictionary = definition.get("ratings", {})
+		if not _expect(ratings.keys().size() == 4, "%s should expose four presentation-only ratings" % vehicle_id):
+			return false
+		for rating_name: String in ["speed", "grip", "mass", "drift"]:
+			var rating := float(ratings.get(rating_name, -1.0))
+			if not _expect(rating >= 0.0 and rating <= 1.0, "%s %s presentation rating should be normalized" % [vehicle_id, rating_name]):
+				return false
+		var first := CATALOG.create_vehicle_stats(vehicle_id)
+		var second := CATALOG.create_vehicle_stats(vehicle_id)
+		if not _expect(first != source and second != source and first != second, "%s callers should receive independent deep duplicates" % vehicle_id):
+			return false
+		first.mass = VehicleStats.PARAMETER_RANGES["mass"][0]
+		if not _expect(is_equal_approx(second.mass, source.mass), "%s duplicate mutation should not alter catalog data" % vehicle_id):
+			return false
+	return true
+
+
+func _test_scene_default_parity() -> bool:
+	var scene_vehicle := VEHICLE_SCENE.instantiate() as VehicleController
+	var catalog_path := String(CATALOG.get_vehicle("rustbug").get("stats_path", ""))
+	var matches := scene_vehicle != null and scene_vehicle.stats != null and scene_vehicle.stats.resource_path == catalog_path
+	if scene_vehicle != null:
+		scene_vehicle.free()
+	return _expect(matches, "the shared vehicle scene default should reference the catalog Rustbug resource")
+
+
+func _test_validation_diagnostics() -> bool:
+	var invalid := CATALOG.create_vehicle_stats("rustbug")
+	invalid.physics_model_version = 7
+	invalid.mass = 0.0
+	invalid.wheelbase = 10.0
+	invalid.front_grip = 0.0
+	invalid.torque_peak_ratio = 0.9
+	invalid.drift_entry_steer = 0.9
+	var diagnostics := "\n".join(invalid.get_validation_errors())
+	for property_name: String in ["physics_model_version", "mass", "wheelbase", "front_grip", "torque_peak_ratio", "drift_entry_steer"]:
+		if not _expect(diagnostics.contains(property_name) and diagnostics.contains("must be"), "invalid %s should produce an actionable range diagnostic" % property_name):
+			return false
+	return true
+
+
+func _expect(condition: bool, message: String) -> bool:
+	if condition:
+		return true
+	push_error("VEHICLE_STATS_RESOURCE_TEST FAIL: " + message)
+	quit(1)
+	return false
