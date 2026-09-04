@@ -16,14 +16,13 @@ const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker"]
 const SURFACES: Array[float] = [1.0, 0.78, 0.58, 0.45]
 const PHYSICS_HZ := 60
 const DELTA := 1.0 / float(PHYSICS_HZ)
-const ACCEL_FRAMES := PHYSICS_HZ * 12
-const COAST_FRAMES := PHYSICS_HZ * 3
-const SKIDPAD_WARMUP_FRAMES := PHYSICS_HZ * 2
-const SKIDPAD_SAMPLE_FRAMES := PHYSICS_HZ * 3
-const DRIFT_WARMUP_FRAMES := PHYSICS_HZ
-const DRIFT_SAMPLE_FRAMES := PHYSICS_HZ * 2
-const COUNTER_STEER_FRAMES := PHYSICS_HZ * 2
-const BOOST_FRAMES := PHYSICS_HZ * 2
+const ACCEL_FRAMES := PHYSICS_HZ * 6
+const COAST_FRAMES := int(PHYSICS_HZ * 1.5)
+const SKIDPAD_WARMUP_FRAMES := PHYSICS_HZ
+const SKIDPAD_SAMPLE_FRAMES := int(PHYSICS_HZ * 1.5)
+const DRIFT_WARMUP_FRAMES := int(PHYSICS_HZ * 0.5)
+const DRIFT_SAMPLE_FRAMES := PHYSICS_HZ
+const BOOST_FRAMES := int(PHYSICS_HZ * 1.5)
 const TEN_MIN_FRAMES := PHYSICS_HZ * 600
 
 # Metric gates (dry surface, v1 only) — P2 bounds
@@ -43,6 +42,9 @@ const BRAKE_DIST_GATES := {
 var _world: Node2D
 var _gate_failures: int = 0
 var _requested_versions: Array[int] = []
+var _requested_vehicle_ids: Array[String] = []
+var _requested_surfaces: Array[float] = []
+var _brake_distances := {}
 
 
 func _initialize() -> void:
@@ -55,6 +57,16 @@ func _initialize() -> void:
 		_requested_versions = [1]
 	else:
 		_requested_versions = [0, 1]
+	var vehicle_filter := OS.get_environment("PC_BENCH_VEHICLE")
+	if vehicle_filter.is_empty():
+		_requested_vehicle_ids.assign(VEHICLE_IDS)
+	else:
+		_requested_vehicle_ids.append(vehicle_filter)
+	var surface_filter := OS.get_environment("PC_BENCH_SURFACE")
+	if surface_filter.is_empty():
+		_requested_surfaces.assign(SURFACES)
+	else:
+		_requested_surfaces.append(surface_filter.to_float())
 	call_deferred("_run_benchmark")
 
 
@@ -64,9 +76,9 @@ func _run_benchmark() -> void:
 	root.add_child(_world)
 	current_scene = _world
 
-	for vehicle_id: String in VEHICLE_IDS:
+	for vehicle_id: String in _requested_vehicle_ids:
 		for version: int in _requested_versions:
-			for surf: float in SURFACES:
+			for surf: float in _requested_surfaces:
 				var stats := CATALOG.create_vehicle_stats(vehicle_id)
 				stats.physics_model_version = version
 
@@ -87,6 +99,7 @@ func _run_benchmark() -> void:
 	# ── Repeatability: run launch twice, check <2% variance ──
 	if 1 in _requested_versions:
 		await _benchmark_repeatability("rustbug")
+		_check_surface_braking_gates()
 
 	_world.queue_free()
 	await process_frame
@@ -202,6 +215,7 @@ func _benchmark_acceleration(vehicle_id: String, stats: VehicleStats, surf: floa
 	if stats.physics_model_version == 1 and is_equal_approx(surf, 1.0) and STABLE_SPEED_GATES.has(vehicle_id):
 		var gate: Vector2 = STABLE_SPEED_GATES[vehicle_id]
 		_check_gate("stable_speed_%s" % vehicle_id, top_speed, gate.x, gate.y)
+		_check_gate("normal_cap_%s" % vehicle_id, top_speed, 0.0, eff_max + 1.0)
 
 	await _remove_vehicle(vehicle)
 
@@ -248,6 +262,8 @@ func _benchmark_braking(vehicle_id: String, stats: VehicleStats, surf: float) ->
 		"500->0_dist": stop_dist,
 		"500->0_time": stop_time,
 	})
+	if stats.physics_model_version == 1:
+		_brake_distances["%s:%.2f" % [vehicle_id, surf]] = stop_dist
 
 	# Gate: braking distance on dry surface
 	if stats.physics_model_version == 1 and is_equal_approx(surf, 1.0) and BRAKE_DIST_GATES.has(vehicle_id):
@@ -296,16 +312,27 @@ func _benchmark_drift(vehicle_id: String, stats: VehicleStats, surf: float) -> v
 
 	var max_slip := 0.0
 	var drift_detected := false
+	var slip_before_counter := 0.0
+	var slip_after_counter := INF
 	for frame: int in DRIFT_WARMUP_FRAMES + DRIFT_SAMPLE_FRAMES:
+		if frame == DRIFT_WARMUP_FRAMES + DRIFT_SAMPLE_FRAMES / 2:
+			_set_controls(vehicle, 1.0, 0.0, -1.0, true)
 		await physics_frame
 		if frame >= DRIFT_WARMUP_FRAMES:
-			max_slip = maxf(max_slip, absf(float(vehicle.get("slip_angle"))))
+			var current_slip := absf(float(vehicle.get("slip_angle")))
+			max_slip = maxf(max_slip, current_slip)
+			if frame < DRIFT_WARMUP_FRAMES + DRIFT_SAMPLE_FRAMES / 2:
+				slip_before_counter = maxf(slip_before_counter, current_slip)
+			else:
+				slip_after_counter = minf(slip_after_counter, current_slip)
 			if bool(vehicle.get("is_drifting")):
 				drift_detected = true
 
 	_emit_row(vehicle_id, stats, surf, "handbrake-drift", {
 		"max_slip": max_slip,
 		"drift_detected": drift_detected,
+		"slip_before_counter": slip_before_counter,
+		"slip_after_counter": slip_after_counter,
 	})
 
 	# Release handbrake for controlled exit test
@@ -399,8 +426,9 @@ func _benchmark_stability(vehicle_id: String) -> void:
 
 	var nan_detected := false
 	var max_speed := 0.0
-	# Run abbreviated (10 sim-seconds for benchmark timing, real 10-min is too slow)
-	var stability_frames := mini(TEN_MIN_FRAMES, PHYSICS_HZ * 10)
+	# Ten live seconds exercises the RigidBody2D path; the pure-model run below
+	# covers the full ten simulated minutes without wall-clock throttling.
+	var stability_frames := PHYSICS_HZ * 10
 	for _f: int in stability_frames:
 		await physics_frame
 		var v := vehicle.linear_velocity
@@ -425,6 +453,17 @@ func _benchmark_stability(vehicle_id: String) -> void:
 		print("GATE PASS stability_%s: no NaN/inf over %d frames" % [vehicle_id, stability_frames])
 
 	await _remove_vehicle(vehicle)
+	var pure_run := VehicleDynamics.simulate_straight_line(stats, 1.0, 0.0, 1.0, 1.0, 600.0)
+	var pure_speed := float(pure_run["final_speed"])
+	var pure_finite := not is_nan(pure_speed) and not is_inf(pure_speed)
+	_emit_row(vehicle_id, stats, 1.0, "stability-10min", {
+		"finite": pure_finite,
+		"frames": TEN_MIN_FRAMES,
+		"final_speed": pure_speed,
+	})
+	if not pure_finite:
+		push_error("GATE FAIL stability_10min_%s" % vehicle_id)
+		_gate_failures += 1
 
 
 func _benchmark_repeatability(vehicle_id: String) -> void:
@@ -452,3 +491,20 @@ func _benchmark_repeatability(vehicle_id: String) -> void:
 		_gate_failures += 1
 	else:
 		print("GATE PASS repeatability_%s: %.2f%% variance" % [vehicle_id, variance * 100.0])
+
+
+func _check_surface_braking_gates() -> void:
+	if not 1.0 in _requested_surfaces or not 0.45 in _requested_surfaces:
+		return
+	for vehicle_id: String in _requested_vehicle_ids:
+		var dry_key := "%s:1.00" % vehicle_id
+		var low_key := "%s:0.45" % vehicle_id
+		if not _brake_distances.has(dry_key) or not _brake_distances.has(low_key):
+			continue
+		var dry := float(_brake_distances[dry_key])
+		var low := float(_brake_distances[low_key])
+		if low <= dry:
+			push_error("GATE FAIL low_grip_braking_%s: %.3f <= %.3f" % [vehicle_id, low, dry])
+			_gate_failures += 1
+		else:
+			print("GATE PASS low_grip_braking_%s: %.3f > %.3f" % [vehicle_id, low, dry])
