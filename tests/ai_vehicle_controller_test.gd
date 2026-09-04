@@ -120,6 +120,11 @@ func _run_test() -> void:
 		return
 	if not _expect(is_zero_approx(float(surface_plan["weight"])), "AI should not leave the racing line when a full-width surface has no safe alternate lane"):
 		return
+	vehicle.surface_grip_multiplier = 0.45
+	var planned_grip := float(controller.call("_planned_surface_grip", surface_plan))
+	if not _expect(is_equal_approx(planned_grip, 0.45), "AI should use replacement surface grip without squaring the current modifier"):
+		return
+	vehicle.surface_grip_multiplier = 1.0
 	root.remove_child(surface_zone)
 	surface_zone.free()
 

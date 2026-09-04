@@ -139,12 +139,12 @@ func _spawn_vehicle(stats: VehicleStats, surf: float) -> RigidBody2D:
 	if vehicle is VehicleController:
 		var vc := vehicle as VehicleController
 		vc.stats = stats
-		vc.surface_speed_multiplier = surf
+		vc.surface_speed_multiplier = 1.0
 		vc.surface_grip_multiplier = surf
 		vc.set_player_controlled(false)
 	else:
 		vehicle.set("stats", stats)
-		vehicle.set("surface_speed_multiplier", surf)
+		vehicle.set("surface_speed_multiplier", 1.0)
 		vehicle.set("surface_grip_multiplier", surf)
 
 	_world.add_child(vehicle)

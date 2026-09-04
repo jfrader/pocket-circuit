@@ -688,7 +688,14 @@ func _v1_drift_during(delta: float, fwd_speed: float, rear_slip_deg: float) -> v
 	if _drift_collision_cancel:
 		cancel_exit = true
 
-	if controlled_exit:
+	if cancel_exit:
+		# No boost on cancel (spin/collision/speed loss)
+		_drift_state = DriftState.EXITING
+		_rear_grip_recovery = 0.0
+		_drift_requires_release = _handbrake_input
+		_drift_boost_accumulated = 0.0
+
+	elif controlled_exit:
 		# Award boost ONCE on controlled exit
 		if not _drift_boost_awarded and _drift_qualified_time >= VehicleDynamics.DRIFT_MIN_QUALIFIED_TIME:
 			var reward := minf(_drift_qualified_time * stats.boost_recharge, stats.drift_boost_max_reward)
@@ -696,13 +703,6 @@ func _v1_drift_during(delta: float, fwd_speed: float, rear_slip_deg: float) -> v
 			_drift_boost_awarded = true
 		_drift_state = DriftState.EXITING
 		_rear_grip_recovery = 0.0  # start recovery interpolation
-
-	elif cancel_exit:
-		# No boost on cancel (spin/collision/speed loss)
-		_drift_state = DriftState.EXITING
-		_rear_grip_recovery = 0.0
-		_drift_requires_release = _handbrake_input
-		_drift_boost_accumulated = 0.0
 
 
 func _v1_apply_speed_caps(forward: Vector2, fwd_speed: float, eff_max: float) -> void:

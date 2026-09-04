@@ -192,9 +192,12 @@ func _test_invalid_exits_award_nothing() -> void:
 	_force_active_drift(wall)
 	wall._drift_qualified_time = 0.5
 	var wall_before := wall.boost_amount
+	wall._handbrake_input = false
+	wall._rear_slip_angle = 0.0
+	wall._drift_grace_timer = 0.0
 	wall._drift_collision_cancel = true
 	wall.call("_v1_update_drift", DELTA, 200.0)
-	_check("wall collision awards nothing", is_equal_approx(wall.boost_amount, wall_before))
+	_check("wall collision overrides controlled exit and awards nothing", is_equal_approx(wall.boost_amount, wall_before))
 	await _remove_vehicle(wall)
 
 	var speed_loss := await _spawn_vehicle("rustbug")

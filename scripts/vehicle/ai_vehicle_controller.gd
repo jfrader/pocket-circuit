@@ -310,9 +310,8 @@ func _physics_process(delta: float) -> void:
 
 	if line_radius > 40.0:
 		if vehicle.stats.physics_model_version == 1:
-			var surface_grip := float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
-			var combined_grip := vehicle.surface_grip_multiplier * surface_grip
-			var eff_lat_accel := VehicleDynamics.get_effective_lat_accel(vehicle.stats, combined_grip)
+			var surface_grip := _planned_surface_grip(surface_plan)
+			var eff_lat_accel := VehicleDynamics.get_effective_lat_accel(vehicle.stats, surface_grip)
 			corner_speed = clampf(
 				VehicleDynamics.get_safe_corner_speed(line_radius, eff_lat_accel) * difficulty_margin * float(personality["corner_pace"]),
 				effective_max_speed * 0.25,
@@ -346,11 +345,10 @@ func _physics_process(delta: float) -> void:
 
 	var braking_distance := 0.0
 	if vehicle.stats.physics_model_version == 1:
-		var surface_grip := float(surface_plan["grip_scale"]) if surface_plan.has("grip_scale") else 1.0
-		var combined_grip := vehicle.surface_grip_multiplier * surface_grip
+		var surface_grip := _planned_surface_grip(surface_plan)
 		var reaction_seconds := 0.34 if difficulty == "sunday_drive" else (0.15 if difficulty == "clockwork" else 0.22)
 		var reaction_margin := vehicle.speed * reaction_seconds
-		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, combined_grip) + reaction_margin
+		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, surface_grip) + reaction_margin
 		braking_distance *= float(personality["brake_timing"])
 	else:
 		braking_distance = lerpf(
@@ -785,6 +783,12 @@ func _shortcut_route_is_suitable(track: Node) -> bool:
 		var minimum_grip := (0.34 if difficulty == "clockwork" else 0.38) / preference
 		return combined_grip >= minimum_grip and float(definition.get("speed", 0.0)) >= 1.0
 	return false
+
+
+func _planned_surface_grip(surface_plan: Dictionary) -> float:
+	if float(surface_plan.get("risk", 0.0)) > 0.0:
+		return float(surface_plan.get("grip_scale", 1.0))
+	return vehicle.surface_grip_multiplier
 
 
 func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
