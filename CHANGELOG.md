@@ -32,6 +32,8 @@
   full four-car roster, unlock requirements, and focused-machine stats.
 - Driver portraits and race machines now use distinct, deterministic pixel-art
   identities throughout the championship shell and live races.
+- Live music now ships from the pinned Gamestruments GDExtension; WAV remains
+  the fallback.
 
 ### Fixed
 
