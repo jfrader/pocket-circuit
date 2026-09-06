@@ -188,7 +188,11 @@ static func update_rack_angle(
 	delta: float,
 ) -> float:
 	## Smoothly track target angle at the configured response rate.
-	var response := 1.0 - exp(-steering_response * delta)
+	## Faster recenter (toward zero) for responsive turn-in but limited overshoot on release.
+	var resp := steering_response
+	if absf(target_angle) < absf(current_angle) or is_zero_approx(target_angle):
+		resp *= 5.0  # faster recenter to limit overshoot on release (tap regression fix); attack rate unchanged
+	var response := 1.0 - exp(-resp * delta)
 	return lerpf(current_angle, target_angle, response)
 
 

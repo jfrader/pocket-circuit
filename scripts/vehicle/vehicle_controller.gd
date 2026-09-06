@@ -449,7 +449,8 @@ func _v1_physics_step(delta: float) -> void:
 
 	# ── Drift grip reduction + recovery interpolation ──
 	var effective_rear_grip := rear_peak_grip
-	if _drift_state == DriftState.ACTIVE or _handbrake_input:
+	if _handbrake_input:
+		_rear_grip_recovery = 0.0
 		effective_rear_grip *= stats.drift_rear_grip_ratio
 	elif _rear_grip_recovery < 1.0:
 		# Exponential recovery after drift exit
@@ -498,17 +499,28 @@ func _v1_physics_step(delta: float) -> void:
 		absf(_front_lateral_force) < front_peak_grip * front_normal * 0.98
 		and absf(_rear_lateral_force) < effective_rear_grip * rear_normal * 0.98
 	)
-	if below_peak:
+	# Fade the low-speed assist out smoothly; tire forces own high-speed yaw.
+	var stability_blend := 1.0 - smoothstep(35.0, 150.0, absf(fwd_speed))
+	if stability_blend > 0.0 and below_peak:
 		var stability_torque := (
 			(target_yaw_rate - yaw_rate)
 			* estimated_inertia
-			* stats.yaw_stability_rate
+			* stats.yaw_stability_rate * 0.35 * stability_blend
 		)
 		var stability_limit := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.30
 		apply_torque(clampf(stability_torque, -stability_limit, stability_limit))
 	if absf(fwd_speed) < VehicleDynamics.KINEMATIC_BLEND_SPEED:
 		var blend := 1.0 - clampf(absf(fwd_speed) / VehicleDynamics.KINEMATIC_BLEND_SPEED, 0.0, 1.0)
-		angular_velocity = lerpf(angular_velocity, target_yaw_rate, blend * (1.0 - exp(-stats.steering_response * delta)))
+		var err := target_yaw_rate - yaw_rate
+		var k_torque := err * estimated_inertia * stats.steering_response * blend * 0.7
+		var k_lim := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.25
+		apply_torque(clampf(k_torque, -k_lim, k_lim))  # use torque (not direct vel set) to avoid timestep instability / vel override fights with applied forces
+	# Releasing a slide is a request to regain control, not to keep spinning.
+	# Neutral steering damps residual yaw while ordinary cornering and
+	# deliberate held-handbrake slides remain tire-driven.
+	angular_damp = 0.0
+	if not _handbrake_input and absf(_steer_input) < 0.1:
+		angular_damp = stats.yaw_stability_rate * 2.0
 
 	# ── Drift yaw assist ──
 	if _drift_state == DriftState.ACTIVE:
@@ -527,7 +539,7 @@ func _v1_physics_step(delta: float) -> void:
 		var assist := stats.drift_yaw_assist * estimated_inertia * signf(_steer_input) * _drift_yaw_assist_scale
 		apply_torque(assist)
 		if counter_steering:
-			var counter_torque := (target_yaw_rate - yaw_rate) * estimated_inertia * stats.yaw_stability_rate
+			var counter_torque := (target_yaw_rate - yaw_rate) * estimated_inertia * stats.yaw_stability_rate * 1.8
 			var counter_limit := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.45
 			apply_torque(clampf(counter_torque, -counter_limit, counter_limit))
 
@@ -691,7 +703,8 @@ func _v1_drift_during(delta: float, fwd_speed: float, rear_slip_deg: float) -> v
 	if cancel_exit:
 		# No boost on cancel (spin/collision/speed loss)
 		_drift_state = DriftState.EXITING
-		_rear_grip_recovery = 0.0
+		if _handbrake_input:
+			_rear_grip_recovery = 0.0
 		_drift_requires_release = _handbrake_input
 		_drift_boost_accumulated = 0.0
 
@@ -702,7 +715,8 @@ func _v1_drift_during(delta: float, fwd_speed: float, rear_slip_deg: float) -> v
 			add_boost(reward, "drift")
 			_drift_boost_awarded = true
 		_drift_state = DriftState.EXITING
-		_rear_grip_recovery = 0.0  # start recovery interpolation
+		# Grip has already been returning since handbrake release; do not
+		# drop it again when the controlled-exit grace period completes.
 
 
 func _v1_apply_speed_caps(forward: Vector2, fwd_speed: float, eff_max: float) -> void:

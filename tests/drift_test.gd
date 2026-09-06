@@ -42,23 +42,19 @@ func _run_test() -> void:
 
 
 func _run_v0_smoke_test() -> void:
-	var prototype := PROTOTYPE_SCENE.instantiate()
-	root.add_child(prototype)
-	current_scene = prototype
-	for _settle in 6:
-		await create_timer(0.1).timeout
-	paused = false
-	for _frame in 5:
-		await physics_frame
-	var vehicle := get_first_node_in_group("player_vehicle") as RigidBody2D
-	var manager := get_first_node_in_group("race_manager") as RaceManager
-	_check("v0 player exists", vehicle != null)
-	_check("v0 race manager exists", manager != null)
-	if vehicle != null and manager != null:
-		var timeout := 300
-		while not manager.is_running and timeout > 0:
-			await physics_frame
-			timeout -= 1
+	# Test handling through real player input, isolated from track obstacles and
+	# newer AI opponents which can interrupt a legacy acceleration run.
+	var fixture := Node2D.new()
+	root.add_child(fixture)
+	current_scene = fixture
+	var vehicle := VEHICLE_SCENE.instantiate() as VehicleController
+	vehicle.stats = CATALOG.create_vehicle_stats("rustbug")
+	vehicle.stats.physics_model_version = VehicleStats.LEGACY_MODEL_VERSION
+	fixture.add_child(vehicle)
+	vehicle.controls_locked = false
+	_check("v0 player exists", is_instance_valid(vehicle))
+	_check("v0 selected explicitly", vehicle.stats.physics_model_version == 0)
+	if is_instance_valid(vehicle):
 		Input.action_press("accelerate")
 		for _frame in 90:
 			await physics_frame
@@ -76,7 +72,7 @@ func _run_v0_smoke_test() -> void:
 	Input.action_release("handbrake")
 	Input.action_release("steer_right")
 	current_scene = null
-	prototype.queue_free()
+	fixture.queue_free()
 	for _frame in 3:
 		await process_frame
 

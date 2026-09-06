@@ -25,6 +25,9 @@ func _run_test() -> void:
 	var manager := RaceManager.new()
 	var vehicle := VehicleController.new()
 	var controller := AI_CONTROLLER_SCRIPT.new() as AIVehicleController
+	# Duplicate the shared preloaded stats so toggling physics_model_version for
+	# the legacy/v1 fixtures below never mutates the shared resource.
+	vehicle.stats = vehicle.stats.duplicate() as VehicleStats
 	var checkpoints: Array = [
 		TestCheckpoint.new(0, true, Vector2(-700.0, 360.0), PI * 0.5),
 		TestCheckpoint.new(1, false, Vector2(-220.0, 360.0)),
@@ -139,6 +142,9 @@ func _run_test() -> void:
 	if not _expect(straight_guide == null, "straight checkpoint segments should not add redundant guides"):
 		return
 
+	# Explicit legacy (v0) sharp-brake fixture: the 350/430 markers are
+	# calibrated against the v0 0.72 steer divisor and legacy braking plan.
+	vehicle.stats.physics_model_version = 0
 	manager.report_checkpoint(checkpoints[1], vehicle)
 	manager.report_checkpoint(checkpoints[2], vehicle)
 	vehicle.global_position = Vector2(350.0, 360.0)
@@ -146,18 +152,57 @@ func _run_test() -> void:
 	vehicle.linear_velocity = Vector2.RIGHT * 520.0
 	vehicle.speed = 520.0
 	controller.call("_physics_process", 1.0 / 60.0)
-	if not _expect(is_zero_approx(float(vehicle.get("_external_brake"))), "competitive AI should not brake at the old overly-early marker"):
+	if not _expect(is_zero_approx(float(vehicle.get("_external_brake"))), "v0 AI should not brake at the old overly-early marker"):
 		return
 	vehicle.global_position = Vector2(430.0, 360.0)
 	controller.call("_physics_process", 1.0 / 60.0)
-	if not _expect(float(vehicle.get("_external_brake")) > 0.5, "AI should brake later and strongly before a sharp corner"):
+	if not _expect(float(vehicle.get("_external_brake")) > 0.5, "v0 AI should brake later and strongly before a sharp corner"):
 		return
-	if not _expect(not bool(vehicle.get("_external_handbrake")), "AI cornering should remain stable without handbrake spins"):
+	if not _expect(not bool(vehicle.get("_external_handbrake")), "v0 AI cornering should remain stable without handbrake spins"):
 		return
-	if not _expect(absf(float(vehicle.get("_external_steer"))) < 0.8, "steering should ramp instead of snapping to full lock"):
+	if not _expect(absf(float(vehicle.get("_external_steer"))) < 0.8, "v0 steering should ramp instead of snapping to full lock"):
 		return
 	vehicle.set_external_power_multiplier(2.0)
 	if not _expect(is_equal_approx(float(vehicle.get("_external_power_multiplier")), 1.15), "AI acceleration should be bounded at the legal 1.15x ceiling"):
+		return
+
+	# ── v1 (bicycle) model planning ──
+	vehicle.stats.physics_model_version = 1
+	# A true straight derives the maximum radius, never a constant hairpin.
+	manager.prepare_race()
+	manager.start_race()
+	vehicle.global_position = Vector2(-500.0, 360.0)
+	vehicle.rotation = PI * 0.5
+	vehicle.speed = 650.0
+	vehicle.linear_velocity = Vector2.RIGHT * 650.0
+	var straight_hazard := controller.call("_v1_curvature_hazard", manager.get_expected_checkpoint(vehicle)) as Dictionary
+	if not _expect(
+		is_inf(float(straight_hazard["distance"])) and float(straight_hazard["radius"]) >= 2600.0,
+		"v1 should report no finite curvature hazard on a true straight"
+	):
+		return
+	controller.call("_physics_process", 1.0 / 60.0)
+	if not _expect(is_zero_approx(float(vehicle.get("_external_brake"))), "v1 AI should not brake on a true straight at near-top speed"):
+		return
+
+	# Approach the checkpoint-3 corner at top speed from inside its model-derived
+	# braking distance and confirm the model brakes before the reachable corner.
+	manager.report_checkpoint(checkpoints[1], vehicle)
+	manager.report_checkpoint(checkpoints[2], vehicle)
+	vehicle.global_position = Vector2(700.0, 280.0)
+	vehicle.rotation = PI * 0.5
+	vehicle.speed = 650.0
+	vehicle.linear_velocity = Vector2.RIGHT * 650.0
+	var corner_hazard := controller.call("_v1_curvature_hazard", manager.get_expected_checkpoint(vehicle)) as Dictionary
+	if not _expect(
+		float(corner_hazard["radius"]) < 2000.0 and not is_inf(float(corner_hazard["distance"])),
+		"v1 should derive a conservative finite radius from the checkpoint-3 turn angle"
+	):
+		return
+	controller.call("_physics_process", 1.0 / 60.0)
+	if not _expect(float(vehicle.get("_external_brake")) > 0.0, "v1 AI should brake before the reachable corner at the model-derived distance"):
+		return
+	if not _expect(not bool(vehicle.get("_external_handbrake")), "v1 AI cornering should remain stable without handbrake"):
 		return
 
 	var traffic_leader := VehicleController.new()

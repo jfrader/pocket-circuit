@@ -4,11 +4,12 @@
 
 `VehicleStats.physics_model_version` selects the handling implementation:
 
-- **`0` (Legacy)** — Shipped default. Direct-yaw steering, simple lateral grip,
-  arcade drift via handbrake+steer boolean. All legacy behavior preserved.
-- **`1` (Bicycle)** — Two-axle tire model behind feature switch (not default
-  until P3 cutover). Per-axle cornering forces, friction circle braking,
-  persistent steering rack, drift state machine with qualified boost.
+- **`0` (Legacy)** — Explicit comparison mode. Direct-yaw steering, simple
+  lateral grip, and input-driven arcade drift.
+- **`1` (Bicycle)** — Default for all four cars. Two-axle tire forces,
+  friction-circle braking, a speed-sensitive steering rack, and deliberate
+  drift with qualified boost rewards. Arcade recentering and neutral yaw
+  damping keep steering corrections and slide release predictable.
 
 Canonical per-car values live in `data/vehicles/*.tres`; the championship
 catalog references those resources and keeps presentation ratings separate
@@ -63,6 +64,9 @@ NONE → ACTIVE → EXITING → NONE
 - **Cancel**: speed < 80% entry speed, or slip > 60° with forward v ≤ 0, or
   collision during drift → no boost.
 - **Recovery**: rear grip recovers exponentially at `drift_grip_recovery_rate`.
+  Recovery starts on handbrake release, not after the drift-state exit. A
+  completed exit never drops the restored grip again. Neutral steering adds
+  yaw damping without snapping velocity or changing the car's position.
 
 ## Boost (v1)
 
@@ -110,3 +114,32 @@ All v1 parameters have validated ranges in `VehicleStats.PARAMETER_RANGES`.
 - `tests/vehicle_dynamics_unit_test.gd` — Comprehensive pure-math tests.
 - `tests/vehicle_physics_benchmark.gd` — Full scenario benchmark with gates.
 - `tests/drift_test.gd` — v0 smoke + v1 isolated drift state tests.
+
+## Verification and comparison
+
+Run the current game with `godot --path .`. All canonical resources select v1.
+The benchmark environment variable below selects a test model; it does not
+change the normal game's selected resources.
+
+```bash
+PC_PHYSICS_MODEL_VERSION=1 godot --path . --headless --script res://tests/vehicle_physics_benchmark.gd
+PC_PHYSICS_MODEL_VERSION=0 godot --path . --headless --script res://tests/vehicle_physics_benchmark.gd
+godot --path . --headless --script res://tests/vehicle_controllability_test.gd
+```
+
+The controllability test runs actual rigid bodies at 60 Hz, three repetitions
+per car/model, with short taps, partial steering, S-turns, braking turns and
+handbrake release. It observes a full second after release. A high-speed
+Rustbug tap is limited to 15 degrees total and 7 degrees after release;
+high-speed slide-release rotation is limited to 45 degrees for every car.
+These are regression filters, not claims that automated tests prove fun.
+
+The four cars share collision geometry but differ in power delivery, mass,
+braking, grip and steering response. Flicker's dry rear grip remains stable;
+its drift identity comes from deliberate handbrake use, not unavoidable spins.
+
+The AI adapter follows projected reference paths, requests wheel steering
+through the speed-limited rack, and predicts braking from this same model.
+Legacy fixtures without a RacingLine use their ordered track-surface samples;
+grid slots on bends face the local road tangent. Race pace/recovery limits
+remain separate tests and were not widened for the new model.

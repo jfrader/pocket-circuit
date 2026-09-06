@@ -171,23 +171,15 @@ func _test_rear_contact_and_release_agency(world: Node2D) -> bool:
 
 	trailing.queue_free()
 	await physics_frame
+	# Use the post-collision lead (v1 path) for release; throttle sustains speed for drift state machine in v1 and flag in v0.
 	lead.position = Vector2(360.0, 420.0)
 	lead.rotation = 0.0
 	lead.linear_velocity = Vector2.UP * 260.0
 	lead.angular_velocity = 0.0
-	lead.set("controls_locked", false)
-	lead.call("set_external_controls", 0.0, 0.0, 1.0, true, false)
-	var control := _spawn_vehicle(world, "SteeringControl", Vector2(900.0, 420.0), Vector2.UP * 260.0)
-	control.set("controls_locked", false)
-	control.call("set_external_controls", 0.0, 0.0, 1.0, true, false)
-	for _frame in 10:
-		await physics_frame
-	var rotation_error := absf(lead.rotation - control.rotation)
-	var angular_error := absf(lead.angular_velocity - control.angular_velocity)
-	print("COLLISION_RESPONSE_INTEGRATION_TEST RELEASE rotation_error=%.6f angular_error=%.6f drifting=%s/%s" % [rotation_error, angular_error, str(lead.get("is_drifting")), str(control.get("is_drifting"))])
-	if not _expect(absf(control.rotation) > 0.01 and bool(lead.get("is_drifting")), "steering command did not establish the release-agency baseline"):
+	if not await _test_release_agency_scenario(world, lead, 1):
 		return false
-	if not _expect(rotation_error <= 0.002 and angular_error <= 0.02, "post-contact settling suppressed steering after separation"):
+	await _clear_world(world)
+	if not await _test_release_agency_scenario(world, null, 0):
 		return false
 	return true
 
@@ -252,7 +244,8 @@ func _spawn_vehicle(
 		spawn_position: Vector2,
 		velocity: Vector2,
 		rotation_value: float = 0.0,
-		mass_value: float = -1.0
+		mass_value: float = -1.0,
+		version: int = -1
 ) -> RigidBody2D:
 	var vehicle := VEHICLE_SCENE.instantiate() as RigidBody2D
 	vehicle.name = vehicle_name
@@ -267,7 +260,41 @@ func _spawn_vehicle(
 	world.add_child(vehicle)
 	if mass_value > 0.0:
 		vehicle.mass = mass_value
+	if version >= 0:
+		var base_stats := preload("res://data/vehicles/rustbug.tres").duplicate() as VehicleStats
+		base_stats.physics_model_version = version
+		vehicle.stats = base_stats
+		vehicle.apply_stats(base_stats)
+		if version == 0 and mass_value <= 0.0:
+			vehicle.mass = base_stats.get_legacy_mass()
 	return vehicle
+
+
+func _test_release_agency_scenario(world: Node2D, post_contact_lead: RigidBody2D, ver: int) -> bool:
+	var lead: RigidBody2D
+	if post_contact_lead != null:
+		lead = post_contact_lead
+		lead.set("controls_locked", false)
+		lead.call("set_external_controls", 1.0, 0.0, 1.0, true, false)
+	else:
+		lead = _spawn_vehicle(world, "LeadRel" + str(ver), Vector2(360.0, 420.0), Vector2.UP * 260.0, 0.0, -1.0, ver)
+		lead.set("controls_locked", false)
+		lead.call("set_external_controls", 1.0, 0.0, 1.0, true, false)
+	var control := _spawn_vehicle(world, "CtrlRel" + str(ver), Vector2(900.0, 420.0), Vector2.UP * 260.0, 0.0, -1.0, ver)
+	control.set("controls_locked", false)
+	control.call("set_external_controls", 1.0, 0.0, 1.0, true, false)
+	for _frame in 12:
+		await physics_frame
+	var rotation_error := absf(lead.rotation - control.rotation)
+	var angular_error := absf(lead.angular_velocity - control.angular_velocity)
+	print("COLLISION_RESPONSE_INTEGRATION_TEST RELEASE ver=%d rotation_error=%.6f angular_error=%.6f drifting=%s/%s ctrl_rot=%.4f" % [ver, rotation_error, angular_error, str(lead.get("is_drifting")), str(control.get("is_drifting")), absf(control.rotation)])
+	if not _expect(absf(control.rotation) > 0.05, "steering command did not establish the release-agency baseline (ver " + str(ver) + ")"):
+		return false
+	if not _expect(rotation_error <= 0.002 and angular_error <= 0.02, "post-contact settling suppressed steering after separation (ver " + str(ver) + ")"):
+		return false
+	if not _expect(bool(lead.get("is_drifting")) and bool(control.get("is_drifting")), "drift agency not restored equally after collision (ver " + str(ver) + ")"):
+		return false
+	return true
 
 
 func _clear_world(world: Node2D) -> void:

@@ -272,7 +272,22 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 		for child: Node in container.get_children():
 			var marker := child as Node2D
 			if marker:
-				transforms.append(Transform2D(marker.rotation, marker.position))
+				var heading := marker.rotation
+				var tiles := track_root.get_node_or_null("TrackSurfaceTiles")
+				if track_root.get_node_or_null("RacingLine") == null and tiles != null and tiles.get_child_count() >= 3:
+					# Old snapshots reused the finish-line heading for every slot,
+					# including slots already on a bend. Face the local road tangent.
+					var nearest_distance := INF
+					for i in tiles.get_child_count():
+						var start := (tiles.get_child(i) as Node2D).position
+						var end := (tiles.get_child((i + 1) % tiles.get_child_count()) as Node2D).position
+						var closest := Geometry2D.get_closest_point_to_segment(marker.position, start, end)
+						var distance := marker.position.distance_squared_to(closest)
+						if distance < nearest_distance and start.distance_squared_to(end) > 0.001:
+							nearest_distance = distance
+							var tangent := (end - start) * (-1.0 if reverse else 1.0)
+							heading = tangent.angle() + PI * 0.5
+				transforms.append(Transform2D(heading, marker.position))
 	if transforms.size() == 4:
 		return transforms
 	return REVERSE_GRID_TRANSFORMS if reverse else GRID_TRANSFORMS
@@ -531,6 +546,8 @@ func _push_live_race_state(phase: String, final_lap: bool = false) -> void:
 
 func _ensure_debug_overlay() -> void:
 	if has_node("DebugOverlay"):
+		return
+	if not ResourceLoader.exists("res://scripts/ui/" + "debug_overlay.gd"):
 		return
 	var debug_script := load("res://scripts/ui/" + "debug_overlay.gd") as Script
 	if debug_script == null:

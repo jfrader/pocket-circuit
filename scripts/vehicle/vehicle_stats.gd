@@ -44,7 +44,7 @@ const PARAMETER_RANGES := {
 }
 
 @export_category("Physics model")
-@export_enum("Legacy:0", "Bicycle:1") var physics_model_version: int = LEGACY_MODEL_VERSION
+@export_enum("Legacy:0", "Bicycle:1") var physics_model_version: int = BICYCLE_MODEL_VERSION
 
 @export_category("Chassis and powertrain")
 @export_range(0.65, 1.30) var mass: float = 1.0

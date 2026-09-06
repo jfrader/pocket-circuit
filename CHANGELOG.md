@@ -36,6 +36,11 @@
 
 ### Changed
 
+- Vehicle handling now uses per-car power curves, axle grip and braking with
+  speed-sensitive steering. Steering settles promptly after release, and
+  releasing the handbrake restores grip instead of sustaining a spin.
+- Rustbug, Pinbolt, Scrapjaw and Flicker have distinct chassis parameters;
+  AI steering and braking use the same handling model as the player.
 - Quick Race now accepts arbitrary seeds, and championship events draw a fresh
   seed and deterministic room canvas whenever a race starts.
 - Generated circuits now use larger 1.75x room canvases, longer absolute laps,
