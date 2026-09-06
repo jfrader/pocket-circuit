@@ -44,6 +44,9 @@
 - Slippery and slow surfaces preserve entry momentum instead of abruptly
   cutting speed. Rival cars accelerate between corners, brake for the actual
   upcoming curve, and no longer mistake repeated escape shuffling for progress.
+- Rivals can use clear apron shortcuts to the next required checkpoint,
+  avoid unnecessary straight-line grip braking, and judge passing space
+  against the actual route rather than nearby wall placement.
 - Quick Race now accepts arbitrary seeds, and championship events draw a fresh
   seed and deterministic room canvas whenever a race starts.
 - Generated circuits now use larger 1.75x room canvases, longer absolute laps,

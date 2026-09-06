@@ -213,6 +213,9 @@ func _run_test() -> void:
 	vehicle.global_position = Vector2.ZERO
 	vehicle.rotation = 0.0
 	vehicle.speed = 420.0
+	# This passing fixture is a northbound straight, independent of the
+	# earlier corner fixture's reference path.
+	controller.set("_reference_path", PackedVector2Array([Vector2.ZERO, Vector2(0, -500), Vector2(500, -500), Vector2(500, 0)]))
 	traffic_leader.global_position = Vector2(0.0, -105.0)
 	traffic_leader.speed = 180.0
 	var pass_plan := controller.call(

@@ -23,6 +23,8 @@ func _run() -> void:
 		return
 	if not _check_net_progress():
 		return
+	if not await _check_room_cuts():
+		return
 	for case: Array in CASES:
 		var solo := await _race(case, 0)
 		if solo.is_empty():
@@ -58,6 +60,8 @@ func _check_planning() -> bool:
 	car.surface_grip_multiplier = 0.45
 	var wet := float(controller.call("_v1_speed_envelope", 300.0, 0.0))
 	var maximum := car.get_effective_max_speed()
+	var slick_straight := float(controller.call("_surface_driving_speed_scale", 1.0, 0.45, Vector2.UP))
+	var slick_turn := float(controller.call("_surface_driving_speed_scale", 1.0, 0.45, Vector2.UP.rotated(0.2)))
 	controller.free()
 	manager.free()
 	car.free()
@@ -65,7 +69,55 @@ func _check_planning() -> bool:
 		_expect(absf(measured_radius - 300.0) < 1.0, "circumradius must match the known circular route")
 		and _expect(near < 500.0 and distant >= maximum * 0.99, "a distant corner allows acceleration while its apex requires braking")
 		and _expect(wet < dry, "reduced tire grip still limits corner speed")
+		and _expect(is_equal_approx(slick_straight, 1.0) and slick_turn < 1.0, "low grip limits turns, not an aligned straight")
 	)
+
+
+func _check_room_cuts() -> bool:
+	var fixture := Node2D.new()
+	root.add_child(fixture)
+	var car := VehicleController.new()
+	car.stats = CATALOG.create_vehicle_stats("rustbug")
+	fixture.add_child(car)
+	car.freeze = true
+	var manager := RaceManager.new()
+	fixture.add_child(manager)
+	var gate := Node2D.new()
+	gate.position = Vector2(0.0, -400.0)
+	fixture.add_child(gate)
+	var controller := AIVehicleController.new()
+	car.add_child(controller)
+	controller.set_physics_process(false)
+	controller.vehicle = car
+	controller.race_manager = manager
+	controller.set("_allow_room_cuts", true)
+	controller.set("_checkpoints_by_index", {1: gate})
+	controller.set("_racing_line", PackedVector2Array([Vector2.ZERO, Vector2(200, 0), Vector2(200, -400), Vector2(0, -400)]))
+	var blocker := StaticBody2D.new()
+	blocker.collision_layer = 2
+	blocker.position = Vector2(0.0, -200.0)
+	var shape := CollisionShape2D.new()
+	var rect := RectangleShape2D.new()
+	rect.size = Vector2(60.0, 60.0)
+	shape.shape = rect
+	blocker.add_child(shape)
+	fixture.add_child(blocker)
+	await physics_frame
+	await physics_frame
+	controller.call("_update_room_cut", 1, Vector2.UP)
+	var rejects_wall := int(controller.get("_room_cut_checkpoint")) == -1
+	fixture.remove_child(blocker)
+	blocker.free()
+	await physics_frame
+	await physics_frame
+	controller.call("_update_room_cut", 1, Vector2.UP)
+	var accepts_clear := int(controller.get("_room_cut_checkpoint")) == 1
+	controller.call("_update_room_cut", 2, Vector2.UP)
+	var respects_next_gate := int(controller.get("_room_cut_checkpoint")) == -1
+	root.remove_child(fixture)
+	fixture.free()
+	await physics_frame
+	return _expect(rejects_wall and accepts_clear and respects_next_gate, "apron cuts require a clear car-width path to the currently required gate")
 
 
 func _check_net_progress() -> bool:

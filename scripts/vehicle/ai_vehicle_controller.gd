@@ -13,7 +13,8 @@ const CORNER_GUIDE_PASS_WIDTH := 80.0
 const LOOK_AHEAD_DISTANCE := 340.0
 const MAX_LOOK_AHEAD_WEIGHT := 0.38
 const TURN_AROUND_HEADING := 1.6
-const CORNER_GRIP_UTILIZATION := 0.5
+const CORNER_GRIP_UTILIZATION := 0.85
+const CORRECTION_GRIP_UTILIZATION := 0.5
 const TRACK_COLLISION_MASK := 2
 const VEHICLE_COLLISION_MASK := 1
 const SCENERY_COLLISION_MASK := 4
@@ -140,6 +141,13 @@ var _racing_line: PackedVector2Array = PackedVector2Array()
 var _standard_racing_line: PackedVector2Array = PackedVector2Array()
 var _shortcut_racing_line: PackedVector2Array = PackedVector2Array()
 var _reference_path: PackedVector2Array = PackedVector2Array()
+var _tracking_grip_utilization := CORNER_GRIP_UTILIZATION
+var _anticipated_grip := 1.0
+var _allow_room_cuts := false
+var _room_cut_checkpoint := -1
+var _room_cut_start := Vector2.ZERO
+var _room_cut_end := Vector2.ZERO
+var _room_cut_shape: CapsuleShape2D
 var _overtake_offset := 0.0
 var _overtake_hold_remaining := 0.0
 var _overtake_cooldown_remaining := 0.0
@@ -206,12 +214,15 @@ func _cache_checkpoints() -> void:
 	_standard_racing_line = PackedVector2Array()
 	_shortcut_racing_line = PackedVector2Array()
 	uses_shortcut_line = false
+	_allow_room_cuts = false
+	_room_cut_checkpoint = -1
 	var track: Node = null
 	if not _checkpoints_by_index.is_empty():
 		track = (_checkpoints_by_index.values()[0] as Node).get_parent()
 		while track != null and not track.is_in_group("track"):
 			track = track.get_parent()
 	if track:
+		_allow_room_cuts = bool(track.get_meta("generated_track", false)) and difficulty != "sunday_drive"
 		var racing_line := track.get_node_or_null("RacingLine") as Line2D
 		if racing_line:
 			for point: Vector2 in racing_line.points:
@@ -298,30 +309,36 @@ func _physics_process(delta: float) -> void:
 		)
 
 	var forward := Vector2.UP.rotated(vehicle.rotation)
+	_update_room_cut(expected_index, forward)
 	var heading_to_checkpoint := absf(forward.angle_to(vehicle.global_position.direction_to(checkpoint_position)))
 	var watchdog := _update_route_watchdog(delta, expected_index, heading_to_checkpoint > TURN_AROUND_HEADING)
 	if _recovering:
 		return
+	if vehicle.stats.physics_model_version == 1:
+		var route_error := float(_active_route_sample(expected_index)["distance"])
+		var correction := clampf(maxf(route_error / 70.0, absf(vehicle.slip_angle) / 20.0), 0.0, 1.0)
+		_tracking_grip_utilization = lerpf(CORNER_GRIP_UTILIZATION, CORRECTION_GRIP_UTILIZATION, correction)
 	var line_radius := _racing_line_radius(vehicle.global_position)
 	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version == 1 else {}
 	var pursuit_lookahead := _lookahead_distance()
-	if not curvature_hazard.is_empty():
-		# Cap the look-ahead by the tightest upcoming corner radius so a sharp
-		# corner is traced as an arc instead of cut as a chord. A long
-		# speed-proportional look-ahead otherwise aims past the apex and lets a
-		# low-rear-grip car run wide into the wall on hairpins. Never drop the
-		# look-ahead below the vehicle's own minimum turn radius, or the goal
-		# would sit inside an arc the car cannot trace (turn-around stalls).
+	if line_radius > 0.0:
+		# Steering follows local curvature. A future hairpin may constrain
+		# braking, but must not shorten pursuit on the preceding straight.
 		var min_turn_radius := vehicle.stats.wheelbase / maxf(tan(deg_to_rad(vehicle.stats.max_steer_angle_deg)), 0.001)
-		pursuit_lookahead = minf(pursuit_lookahead, maxf(float(curvature_hazard["radius"]), min_turn_radius))
+		pursuit_lookahead = minf(pursuit_lookahead, maxf(line_radius, min_turn_radius))
 	var pursuit_goal := _reference_goal(forward, pursuit_lookahead)
 	target_position = pursuit_goal["goal"] as Vector2
+	if _room_cut_checkpoint == expected_index:
+		target_position = _room_cut_end
+		curvature_hazard = _checkpoint_curvature_hazard(expected_index)
+		line_radius = 0.0
 	var traffic_plan := _traffic_plan(delta, forward, target_position, line_radius)
 	target_position = traffic_plan["target_position"] as Vector2
 	var goal_chord := vehicle.global_position.distance_to(target_position)
 	var desired_direction := vehicle.global_position.direction_to(target_position)
 	desired_direction = _avoid_hazards(desired_direction, forward)
 	var surface_plan := _surface_anticipation(desired_direction)
+	_anticipated_grip = _planned_surface_grip(surface_plan)
 	if float(surface_plan["weight"]) > 0.0:
 		desired_direction = desired_direction.lerp(
 			surface_plan["avoid_direction"] as Vector2,
@@ -409,7 +426,10 @@ func _physics_process(delta: float) -> void:
 		# Surface speed is an absolute limit relative to the dry chassis, not
 		# another multiplier on an already surface-limited target.
 		target_speed = minf(target_speed, vehicle.stats.max_speed * float(surface_plan["speed_scale"]))
-	target_speed *= float(obstacle_plan["speed_scale"])
+	if vehicle.stats.physics_model_version == 1:
+		target_speed = minf(target_speed, float(obstacle_plan["speed_limit"]))
+	else:
+		target_speed *= float(obstacle_plan["speed_scale"])
 	target_speed *= float(traffic_plan["speed_scale"])
 	var heading_error := absf(steering_angle)
 	if heading_error > 1.05:
@@ -473,10 +493,11 @@ func _physics_process(delta: float) -> void:
 		if hr < float(tuning["boost_radius"]):
 			local_turn = clampf((float(tuning["boost_radius"]) - hr) / 1400.0, 0.0, 1.3)
 	var boost_dist_clear := (hazard_distance > braking_distance * 1.25 / float(personality["boost_eagerness"]) or hazard_distance >= 800.0 or hazard_distance == INF)
+	var exit_acceleration_window := vehicle.stats.physics_model_version == 1 and target_speed > vehicle.speed + 120.0 and boost_dist_clear
 	var boost := (
 		absf(steering_angle) < 0.26
-		and local_turn < float(tuning["boost_turn_threshold"]) * float(personality["boost_eagerness"])
-		and (line_radius <= 0.0 or line_radius >= float(tuning["boost_radius"]) / float(personality["boost_eagerness"]))
+		and (local_turn < float(tuning["boost_turn_threshold"]) * float(personality["boost_eagerness"]) or exit_acceleration_window)
+		and (line_radius <= 0.0 or line_radius >= float(tuning["boost_radius"]) / float(personality["boost_eagerness"]) or exit_acceleration_window)
 		and boost_dist_clear
 		and float(surface_plan["risk"]) < 0.12
 		and float(obstacle_plan["speed_scale"]) > 0.96
@@ -499,6 +520,63 @@ func _physics_process(delta: float) -> void:
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
 	_update_stuck_recovery(delta, stuck_target_key, distance_to_target)
+
+
+func _update_room_cut(expected_index: int, forward: Vector2) -> void:
+	if _room_cut_checkpoint != expected_index:
+		_room_cut_checkpoint = -1
+	if not _allow_room_cuts or vehicle.has_static_contact:
+		_room_cut_checkpoint = -1
+		return
+	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
+	if checkpoint == null:
+		return
+	var goal := checkpoint.global_position
+	var delta := goal - vehicle.global_position
+	if delta.length() < 40.0:
+		return
+	var direction := delta.normalized()
+	if _room_cut_checkpoint < 0 and absf(forward.angle_to(direction)) > 0.75:
+		return
+	if _room_cut_checkpoint < 0 and _racing_line.size() >= 3:
+		var count := _racing_line.size()
+		var index := _nearest_line_index(vehicle.global_position)
+		var gate_index := _nearest_line_index(goal)
+		var step := -1 if race_manager.is_reverse_direction() else 1
+		var route_distance := 0.0
+		for sample in count:
+			if index == gate_index:
+				break
+			var next := posmod(index + step, count)
+			route_distance += _racing_line[index].distance_to(_racing_line[next])
+			index = next
+		if route_distance < delta.length() * 1.1:
+			return
+	# Sweep the whole car, not separated rays which could miss small props.
+	# Gate Areas are sensors and do not obstruct this solid-body query.
+	if _room_cut_shape == null:
+		_room_cut_shape = CapsuleShape2D.new()
+		_room_cut_shape.radius = 22.0
+		_room_cut_shape.height = 56.0
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = _room_cut_shape
+	query.transform = Transform2D(direction.angle() + PI * 0.5, vehicle.global_position)
+	query.collision_mask = STATIC_OBSTACLE_MASK
+	query.exclude = [vehicle.get_rid()]
+	var space := vehicle.get_world_2d().direct_space_state
+	if not space.intersect_shape(query, 1).is_empty():
+		_room_cut_checkpoint = -1
+		return
+	query.motion = delta
+	var sweep := space.cast_motion(query)
+	if sweep.size() != 2 or sweep[0] < 0.999:
+		_room_cut_checkpoint = -1
+		return
+	if _room_cut_checkpoint < 0:
+		_room_cut_start = vehicle.global_position
+		_room_cut_end = goal
+		_room_cut_checkpoint = expected_index
+		_reset_route_watchdog()
 
 
 func _active_target_position(checkpoint_index: int) -> Vector2:
@@ -899,21 +977,23 @@ func _overtake_side_score(forward: Vector2, side: float, leader: VehicleControll
 		OVERTAKE_CLEAR_DISTANCE,
 		STATIC_OBSTACLE_MASK | VEHICLE_COLLISION_MASK
 	)["clearance"])
-	# corridor-side clearance checks for open-apron reality (no walls on open tracks): "safe" means staying on/near racing corridor.
-	# If chosen side open (high) but opposite bounded (low), swerving toward apron -> low score.
-	var opp_side := -side
-	var opp_lateral := forward.orthogonal() * opp_side
-	var opp_clearance := float(_ray_probe_from(
-		origin,
-		opp_lateral,
-		OVERTAKE_LINE_OFFSET * 1.3,
-		STATIC_OBSTACLE_MASK | VEHICLE_COLLISION_MASK,
-		excluded
-	)["clearance"])
 	var base := minf(side_clearance, minf(merge_clearance, lane_clearance))
-	if side_clearance >= 0.94 and opp_clearance <= 0.82:
-		# open chosen + bounded opp = apron direction, not corridor safe for overtake
-		return 0.35
+	# An obstacle on the opposite side does not make the clear side unsafe.
+	# Bound the pass to the actual route instead of inferring a corridor
+	# from unrelated walls in an intentionally open room.
+	if _room_cut_checkpoint >= 0:
+		for point: Vector2 in [lane_origin, merge_end]:
+			var nearest := Geometry2D.get_closest_point_to_segment(point, _room_cut_start, _room_cut_end)
+			if point.distance_to(nearest) > OVERTAKE_LINE_OFFSET + OBSTACLE_FEELER_HALF_WIDTH:
+				return 0.0
+	elif _reference_path.size() >= 3:
+		for point: Vector2 in [lane_origin, merge_end]:
+			var distance := INF
+			for i in _reference_path.size():
+				var nearest := Geometry2D.get_closest_point_to_segment(point, _reference_path[i], _reference_path[(i + 1) % _reference_path.size()])
+				distance = minf(distance, point.distance_to(nearest))
+			if distance > OVERTAKE_LINE_OFFSET + OBSTACLE_FEELER_HALF_WIDTH:
+				return 0.0
 	return base
 
 
@@ -991,10 +1071,7 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 		plan["risk"] = shortcut_risk
 		plan["grip_scale"] = shortcut_zone.grip_multiplier
 		if vehicle.stats.physics_model_version == 1:
-			plan["speed_scale"] = minf(
-				shortcut_zone.speed_multiplier,
-				sqrt(maxf(shortcut_zone.grip_multiplier, 0.01)),
-			)
+			plan["speed_scale"] = _surface_driving_speed_scale(shortcut_zone.speed_multiplier, shortcut_zone.grip_multiplier, desired_direction)
 		else:
 			var combined_grip := vehicle.stats.grip * shortcut_zone.grip_multiplier
 			plan["speed_scale"] = clampf(0.74 + combined_grip * 0.32, 0.78, 0.94)
@@ -1004,7 +1081,7 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 	plan["risk"] = center_risk
 	plan["grip_scale"] = float(center_model["grip"])
 	plan["speed_scale"] = (
-		minf(float(center_model["speed"]), sqrt(maxf(float(center_model["grip"]), 0.01)))
+		_surface_driving_speed_scale(float(center_model["speed"]), float(center_model["grip"]), desired_direction)
 		if vehicle.stats.physics_model_version == 1
 		else lerpf(1.0, 0.72, center_risk)
 	)
@@ -1027,6 +1104,15 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 		plan["weight"] = clampf(0.28 + center_risk * 0.34, 0.0, 0.58)
 		plan["speed_scale"] = lerpf(1.0, 0.82, best_risk)
 	return plan
+
+
+func _surface_driving_speed_scale(speed_scale: float, grip_scale: float, direction: Vector2) -> float:
+	# Low grip limits correction/turning authority, not forward speed by
+	# itself. A straight, aligned car may carry its momentum across a slick.
+	var forward := Vector2.UP.rotated(vehicle.rotation)
+	var correction := maxf(absf(forward.angle_to(direction)) / 0.12, absf(vehicle.slip_angle) / 8.0)
+	var traction_limit := lerpf(1.0, sqrt(maxf(grip_scale, 0.01)), clampf(correction, 0.0, 1.0))
+	return minf(speed_scale, traction_limit)
 
 
 func _surface_model(direction: Vector2) -> Dictionary:
@@ -1106,6 +1192,7 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 	var plan := {
 		"weight": 0.0,
 		"speed_scale": 1.0,
+		"speed_limit": INF,
 		"avoid_direction": desired_direction,
 		"static_contact": false,
 		"escape_steer": 0.0,
@@ -1159,6 +1246,11 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 	# Traffic pace is planned by _traffic_plan; obstacle avoidance still chooses
 	# a safe direction without multiplying it into a permanent slow train.
 	plan["speed_scale"] = 1.0 if hitting_vehicle else lerpf(0.78, 0.34, obstruction)
+	if not hitting_vehicle:
+		# Steering has already chosen the escape/slide direction. Preserve
+		# enough rolling speed to follow it, without multiplying a corner's
+		# independently safe speed by this obstacle limit a second time.
+		plan["speed_limit"] = vehicle.get_effective_max_speed() * float(plan["speed_scale"])
 	return plan
 
 
@@ -1238,7 +1330,7 @@ func _update_stuck_recovery(delta: float, target_key: String, distance_to_target
 
 func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool = false) -> Dictionary:
 	var sample := _active_route_sample(expected_index)
-	var target_key := str(expected_index)
+	var target_key := "%d:%d" % [expected_index, _room_cut_checkpoint]
 	if target_key != _watchdog_target_key:
 		_watchdog_target_key = target_key
 		_last_route_arc = float(sample["arc"])
@@ -1302,6 +1394,11 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 
 
 func _active_route_sample(expected_index: int) -> Dictionary:
+	if _room_cut_checkpoint == expected_index:
+		var segment := _room_cut_end - _room_cut_start
+		var fraction := clampf((vehicle.global_position - _room_cut_start).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
+		var nearest := _room_cut_start + segment * fraction
+		return {"arc": segment.length() * fraction, "length": segment.length(), "distance": vehicle.global_position.distance_to(nearest), "closed": false}
 	if _racing_line.size() >= 2:
 		var best_distance_squared := INF
 		var best_arc := 0.0
@@ -1380,6 +1477,7 @@ func _recover_vehicle() -> void:
 	if _recovering:
 		return
 	_recovering = true
+	_room_cut_checkpoint = -1
 	recovery_count += 1
 	_last_recovery_time = Time.get_ticks_msec()
 	_stuck_time = 0.0
@@ -1559,10 +1657,13 @@ func _v1_speed_envelope(radius: float, distance: float) -> float:
 	var maximum := vehicle.get_effective_max_speed()
 	if radius <= 0.0 or is_inf(distance):
 		return maximum
-	var grip := vehicle.surface_grip_multiplier
+	# Grip anticipation belongs in corner capacity, not a blanket straight-
+	# line speed penalty. The previous frame's short horizon is conservative
+	# on entry while actual surface grip always takes precedence when lower.
+	var grip := minf(vehicle.surface_grip_multiplier, _anticipated_grip)
 	# Reserve some tire capacity for braking and tracking corrections instead
 	# of planning every corner at the theoretical steady-state grip peak.
-	var lateral_accel := minf(vehicle.stats.front_grip, vehicle.stats.rear_grip) * grip * VehicleDynamics.REFERENCE_GRAVITY * CORNER_GRIP_UTILIZATION
+	var lateral_accel := minf(vehicle.stats.front_grip, vehicle.stats.rear_grip) * grip * VehicleDynamics.REFERENCE_GRAVITY * _tracking_grip_utilization
 	var margin := 0.86 if difficulty == "sunday_drive" else (0.99 if difficulty == "clockwork" else 0.96)
 	var corner := minf(maximum, sqrt(lateral_accel * radius) * margin * float(personality["corner_pace"]))
 	var rack := VehicleDynamics.calculate_target_steer_angle(1.0, vehicle.stats.max_steer_angle_deg, corner, maximum, vehicle.stats.high_speed_steer_ratio, vehicle.stats.steer_fade_start_ratio)

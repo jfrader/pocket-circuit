@@ -100,6 +100,19 @@ and measured cruising pace. They are not a proxy for a measured human lap.
 Stall progress is net forward arc distance: repeated reversing and advancing
 over the same few units cannot keep resetting recovery detection.
 
+Steering lookahead uses local curvature; future corners constrain braking,
+not the steering target on the current straight. Grip-only surfaces reduce
+speed only when turning or correcting sideslip. Obstacle avoidance supplies
+an independent speed limit rather than multiplying the corner limit again.
+
+Club and Clockwork can take a shorter clear apron route to the currently
+required checkpoint. The complete route is checked with a car-width swept
+strip against solid scenery; a gate is never skipped. These routes require
+at least ten percent distance savings, and recovery switches its progress
+reference to that route while committed. Sunday retains the reference line.
+Passing clearance is measured against the active route, not inferred from
+whether an unrelated obstacle exists on the opposite side.
+
 ## Parameter table
 
 | Category | `VehicleStats` export group |
