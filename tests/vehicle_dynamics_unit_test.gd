@@ -185,7 +185,13 @@ func _init() -> void:
 	var soft_at := VehicleDynamics.calculate_soft_cap_force(680.0, 680.0, 0.88)
 	passed += _assert_true("soft_cap_at_max", soft_at > 0.0)
 	var soft_over := VehicleDynamics.calculate_soft_cap_force(700.0, 680.0, 0.88)
-	passed += _assert_true("soft_cap_over_max", soft_over > soft_at)
+	passed += _assert_true("soft_cap_over_max", soft_over > 0.0)
+	# Bounded: far overspeed saturates at SOFT_CAP_MAX_DECEL (0.5g), never an
+	# unbounded quadratic spike after a sudden surface target change.
+	var soft_far := VehicleDynamics.calculate_soft_cap_force(2000.0, 680.0, 0.88)
+	passed += _assert_near("soft_cap_bounded", soft_far, soft_at)
+	passed += _assert_true("soft_cap_le_half_g",
+		absf(soft_far) / 0.88 <= VehicleDynamics.SOFT_CAP_MAX_DECEL + 0.01)
 
 	# ── AI query consistency ──
 	for vid: String in VEHICLE_IDS:

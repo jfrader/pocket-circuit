@@ -6,6 +6,7 @@ extends RefCounted
 ## Used by both VehicleController and AI planner for consistent predictions.
 
 const REFERENCE_GRAVITY := 980.0  # wu/s²
+const SOFT_CAP_MAX_DECEL := 0.5 * REFERENCE_GRAVITY  # 490 wu/s² — passive surface-scrub bound
 const FRONT_BRAKE_BIAS := 0.62
 const KINEMATIC_BLEND_SPEED := 35.0  # wu/s
 const HOLD_SPEED_THRESHOLD := 12.0  # wu/s below which brakes hold
@@ -68,12 +69,20 @@ static func calculate_soft_cap_force(
 	effective_max_speed: float,
 	mass: float,
 ) -> float:
-	## Drag-like overspeed force that ramps up near the target speed.
-	## Returns a decelerating force magnitude (positive = opposes direction).
+	## Drag-like overspeed force that ramps up near the target speed and
+	## saturates at SOFT_CAP_MAX_DECEL. Returns a decelerating force magnitude
+	## (positive = opposes direction).
+	##
+	## Bounded so a sudden surface target change (e.g. entering a slow zone at
+	## speed) cannot produce an unbounded quadratic deceleration spike. The
+	## bound is 0.5g ≈ 43% of the vehicle's friction-circle braking capacity,
+	## a clearly passive magnitude that never approaches active braking.
 	if absf(forward_speed) <= effective_max_speed * 0.95:
 		return 0.0
 	var overspeed_ratio := (absf(forward_speed) - effective_max_speed * 0.95) / maxf(effective_max_speed * 0.05, 0.01)
-	return signf(forward_speed) * overspeed_ratio * overspeed_ratio * mass * REFERENCE_GRAVITY * 0.5
+	var force := signf(forward_speed) * overspeed_ratio * overspeed_ratio * mass * REFERENCE_GRAVITY * 0.5
+	var max_force := mass * SOFT_CAP_MAX_DECEL
+	return clampf(force, -max_force, max_force)
 
 
 # ─── Braking ─────────────────────────────────────────────────────────
@@ -269,6 +278,9 @@ static func predict_braking_distance(
 ) -> float:
 	## Deterministic 60 Hz prediction using the same brake, drag, and rolling
 	## terms as the controller. This is the public planner model query.
+	## surface_speed_mult is retained for API compatibility; the controller no
+	## longer scales drag/rolling by it (the surface target is enforced by the
+	## bounded soft overspeed cap, which does not act during braking).
 	if v_now <= v_target:
 		return 0.0
 	var speed := v_now
@@ -279,8 +291,7 @@ static func predict_braking_distance(
 			break
 		var brake_accel := get_effective_brake_accel(stats, surface_grip_mult)
 		var drag := calculate_drag_force(speed, stats.aero_drag_coefficient)
-		drag /= maxf(surface_speed_mult * surface_speed_mult, 0.0001)
-		var rolling := stats.rolling_resistance / maxf(surface_speed_mult, 0.01)
+		var rolling := stats.rolling_resistance
 		var decel := brake_accel + (drag + rolling) / maxf(stats.mass, 0.001)
 		speed = maxf(v_target, speed - decel * delta)
 		distance += speed * delta
@@ -313,8 +324,8 @@ static func simulate_straight_line(
 	for step in steps:
 		var elapsed := float(step + 1) * dt
 		var engine := calculate_engine_force(throttle, speed, stats, surface_speed_mult, external_power_mult)
-		var drag := calculate_drag_force(speed, stats.aero_drag_coefficient) * (1.0 / maxf(surface_speed_mult * surface_speed_mult, 0.0001))
-		var rolling := calculate_rolling_resistance(speed, stats.rolling_resistance) * (1.0 / maxf(surface_speed_mult, 0.01))
+		var drag := calculate_drag_force(speed, stats.aero_drag_coefficient)
+		var rolling := calculate_rolling_resistance(speed, stats.rolling_resistance)
 		var soft_cap := calculate_soft_cap_force(speed, eff_max, stats.mass)
 		var net_force := engine - drag - rolling - soft_cap
 		speed += (net_force / stats.mass) * dt

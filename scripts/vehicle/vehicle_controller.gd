@@ -562,7 +562,7 @@ func _v1_physics_step(delta: float) -> void:
 	_v1_update_drift(delta, fwd_speed)
 
 	# ── Speed caps (soft + hard) ──
-	_v1_apply_speed_caps(forward, fwd_speed, eff_max)
+	_v1_apply_speed_caps()
 
 
 func _v1_apply_longitudinal(delta: float, forward: Vector2, fwd_speed: float, eff_max: float) -> void:
@@ -578,14 +578,13 @@ func _v1_apply_longitudinal(delta: float, forward: Vector2, fwd_speed: float, ef
 		var rev_force := -stats.engine_force * LEGACY_REVERSE_ENGINE_FACTOR * _brake_input * surface_speed_multiplier
 		apply_central_force(forward * rev_force)
 
-	# Rolling resistance (scaled by 1/surface_speed_mult)
+	# Rolling resistance (dry coefficient — the surface target is enforced by the
+	# bounded soft overspeed cap below, not by scaling resistance with the surface)
 	var rolling := VehicleDynamics.calculate_rolling_resistance(fwd_speed, stats.rolling_resistance)
-	rolling *= 1.0 / maxf(surface_speed_multiplier, 0.01)
 	apply_central_force(-forward * rolling)
 
-	# Drag (scaled by 1/surface_speed_mult^2, opposes travel direction)
+	# Drag (dry coefficient, opposes travel direction)
 	var drag := VehicleDynamics.calculate_drag_force(speed, stats.aero_drag_coefficient)
-	drag *= 1.0 / maxf(surface_speed_multiplier * surface_speed_multiplier, 0.0001)
 	if speed > 0.001:
 		apply_central_force(-linear_velocity.normalized() * drag)
 
@@ -719,10 +718,13 @@ func _v1_drift_during(delta: float, fwd_speed: float, rear_slip_deg: float) -> v
 		# drop it again when the controlled-exit grace period completes.
 
 
-func _v1_apply_speed_caps(forward: Vector2, fwd_speed: float, eff_max: float) -> void:
-	# HARD legal caps: 1.0x eff_max normal, 1.2x boosted
+func _v1_apply_speed_caps() -> void:
+	# HARD legal ceiling is the DRY global cap (1.0x normal / 1.2x boosted of
+	# stats.max_speed), NOT the per-surface target. Entering a slow surface carries
+	# momentum; the surface target is approached by the bounded soft overspeed cap in
+	# _v1_apply_longitudinal, never by an instantaneous velocity truncation.
 	var cap_mult := BOOST_SPEED_CAP_MULTIPLIER if is_boost_active() else NORMAL_SPEED_CAP_MULTIPLIER
-	var hard_limit := eff_max * cap_mult
+	var hard_limit := stats.max_speed * cap_mult
 	if linear_velocity.length() > hard_limit:
 		linear_velocity = linear_velocity.limit_length(hard_limit)
 

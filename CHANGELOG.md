@@ -41,6 +41,9 @@
   releasing the handbrake restores grip instead of sustaining a spin.
 - Rustbug, Pinbolt, Scrapjaw and Flicker have distinct chassis parameters;
   AI steering and braking use the same handling model as the player.
+- Slippery and slow surfaces preserve entry momentum instead of abruptly
+  cutting speed. Rival cars accelerate between corners, brake for the actual
+  upcoming curve, and no longer mistake repeated escape shuffling for progress.
 - Quick Race now accepts arbitrary seeds, and championship events draw a fresh
   seed and deterministic room canvas whenever a race starts.
 - Generated circuits now use larger 1.75x room canvases, longer absolute laps,

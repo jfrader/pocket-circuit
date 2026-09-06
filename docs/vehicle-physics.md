@@ -32,15 +32,18 @@ Per tick at 60 Hz:
 5. **Load split**: front_weight_ratio distributes normal load between axles.
 6. **Engine**: torque curve (launch_torque → peak → falloff to max_speed).
    Scaled by surface_speed_multiplier and external_power_multiplier.
-7. **Drag**: `aero_drag_coefficient × v × |v|`, scaled by
-   `1/surface_speed_mult²`. Rolling: `rolling_resistance × sign(v)`,
-   scaled by `1/surface_speed_mult`.
+7. **Drag**: `aero_drag_coefficient × v × |v|`. Rolling:
+   `rolling_resistance × sign(v)`. Slow materials do not multiply these
+   resistances again: their lower drive target and bounded scrub already
+   reduce sustained speed.
 8. **Braking**: 62/38 front/rear bias. Each axle capped by remaining friction
    circle capacity (ABS-style clamp, no cadence). Mass/grip/surface dependent.
 9. **Handbrake**: rear-only longitudinal braking + rear grip reduction via
    `drift_rear_grip_ratio` during drift.
-10. **Soft cap**: drag-like overspeed force ramps up near `eff_max × 0.95`.
-    Hard caps: `1.0×` normal, `1.2×` boosted (shared all racers).
+10. **Surface target**: overspeed scrub ramps up near `eff_max × 0.95`, bounded
+    to 0.5 gravity-equivalent deceleration. Entering a slow patch carries
+    momentum instead of truncating velocity. Hard caps use the dry chassis
+    maximum: `1.0×` normal, `1.2×` boosted, shared by all racers.
 11. **Low-speed blend**: yaw stability damping below 35 wu/s prevents
     oscillation.
 
@@ -85,6 +88,17 @@ AI queries derive from the same `VehicleDynamics` helpers:
 
 Difficulty margins: sunday 0.86, club 0.96, clockwork 0.99.
 AI never sends handbrake; catch-up within 1.15 total; no hidden modifiers.
+
+Each upcoming curve is paired with its own distance and a reachable-speed
+braking envelope. The most restrictive envelope wins; a distant hairpin
+does not impose apex speed on the entire preceding straight. Corner planning
+reserves tire capacity for braking and tracking corrections. Circular-path
+geometry tests guard the circumradius calculation, and solo-versus-field
+races use the same chassis, normal finish grace, explicit finish/DNF checks,
+and measured cruising pace. They are not a proxy for a measured human lap.
+
+Stall progress is net forward arc distance: repeated reversing and advancing
+over the same few units cannot keep resetting recovery detection.
 
 ## Parameter table
 
