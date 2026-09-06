@@ -218,6 +218,12 @@ func _run_test() -> void:
 	controller.set("_reference_path", PackedVector2Array([Vector2.ZERO, Vector2(0, -500), Vector2(500, -500), Vector2(500, 0)]))
 	traffic_leader.global_position = Vector2(0.0, -105.0)
 	traffic_leader.speed = 180.0
+	traffic_leader.linear_velocity = Vector2.UP * 180.0
+	manager.race_time = 0.0
+	var launch_plan := controller.call("_traffic_plan", 1.0 / 60.0, Vector2.UP, Vector2(0.0, -220.0), 1800.0) as Dictionary
+	if not _expect(not bool(launch_plan["passing"]) and float(launch_plan["speed_limit"]) <= 260.0, "grid launch should follow the slower car at a safe headway before attempting a pass"):
+		return
+	manager.race_time = 2.0
 	var pass_plan := controller.call(
 		"_traffic_plan",
 		1.0 / 60.0,

@@ -35,6 +35,8 @@ const OVERTAKE_MERGE_DISTANCE := 82.0
 const OVERTAKE_CLEAR_DISTANCE := 220.0
 const OVERTAKE_HOLD_TIME := 2.1
 const OVERTAKE_COOLDOWN := 0.8
+const FOLLOWING_DISTANCE := 70.0
+const FOLLOWING_TIME := 0.5
 const OVERTAKE_STRAIGHT_RADIUS := 1050.0
 const DRAFT_MIN_DISTANCE := 54.0
 const DRAFT_MAX_DISTANCE := 185.0
@@ -376,6 +378,14 @@ func _physics_process(delta: float) -> void:
 		if absf(steering_angle) < TURN_AROUND_HEADING:
 			var curvature := 2.0 * sin(steering_angle) / maxf(goal_chord, 5.0)
 			var wheel_steer := atan(vehicle.stats.wheelbase * curvature)
+			# A heavy front-biased car needs more rack angle than a rigid-wheel
+			# bicycle to produce the same curvature. Use its real axle stiffness
+			# rather than giving every chassis the same steering response.
+			var stiffness := VehicleDynamics.calculate_progressive_stiffness(vehicle.surface_grip_multiplier)
+			var front_slip := vehicle.stats.front_weight_ratio / (vehicle.stats.front_cornering_stiffness * stiffness)
+			var rear_slip := (1.0 - vehicle.stats.front_weight_ratio) / (vehicle.stats.rear_cornering_stiffness * stiffness)
+			var slip_correction := vehicle.stats.mass * vehicle.speed * vehicle.speed * curvature * (front_slip - rear_slip)
+			wheel_steer += clampf(slip_correction, -0.1, 0.1)
 			requested_steer = clampf(wheel_steer / maxf(absf(rack_max), 0.001), -1.0, 1.0)
 		else:
 			# Goal well off the current heading (past the point where pure
@@ -426,11 +436,20 @@ func _physics_process(delta: float) -> void:
 		# Surface speed is an absolute limit relative to the dry chassis, not
 		# another multiplier on an already surface-limited target.
 		target_speed = minf(target_speed, vehicle.stats.max_speed * float(surface_plan["speed_scale"]))
+		# Rejoining or entering an apron cut can demand a tighter turn than
+		# the route ahead. Respect that immediate steering arc as well.
+		var turn_sine := absf(sin(steering_angle))
+		if turn_sine > 0.05:
+			var pursuit_radius := maxf(goal_chord, 5.0) / (2.0 * turn_sine)
+			target_speed = minf(target_speed, _v1_speed_envelope(pursuit_radius, 0.0))
 	if vehicle.stats.physics_model_version == 1:
 		target_speed = minf(target_speed, float(obstacle_plan["speed_limit"]))
 	else:
 		target_speed *= float(obstacle_plan["speed_scale"])
-	target_speed *= float(traffic_plan["speed_scale"])
+	if vehicle.stats.physics_model_version == 1:
+		target_speed = minf(target_speed, float(traffic_plan["speed_limit"]))
+	else:
+		target_speed *= float(traffic_plan["speed_scale"])
 	var heading_error := absf(steering_angle)
 	if heading_error > 1.05:
 		target_speed = minf(target_speed, effective_max_speed * float(tuning["heading_cap"]))
@@ -849,6 +868,7 @@ func _traffic_plan(
 	var plan := {
 		"target_position": line_target,
 		"speed_scale": 1.0,
+		"speed_limit": INF,
 		"passing": false,
 		"drafting": false,
 	}
@@ -884,7 +904,9 @@ func _traffic_plan(
 	var aggression := float(personality["overtake_aggression"])
 	var leader_is_slower := leader.speed + 22.0 / aggression < vehicle.speed or leader.speed < vehicle.get_effective_max_speed() * (0.75 + (aggression - 1.0) * 0.08)
 	# only commit overtake when gap/room truly clear (corridor/apron checks inside side_score)
-	if is_straight and leader_is_slower and _overtake_cooldown_remaining <= 0.0 and distance > 55.0:
+	var launch_complete := race_manager.race_time >= 1.0
+	var pass_speed_ready := vehicle.speed >= 160.0 or leader.speed < 20.0
+	if is_straight and leader_is_slower and launch_complete and pass_speed_ready and _overtake_cooldown_remaining <= 0.0 and distance > 55.0:
 		var selected_side := _select_overtake_side(forward, leader)
 		if not is_zero_approx(selected_side):
 			_overtake_offset = selected_side * OVERTAKE_LINE_OFFSET
@@ -897,6 +919,7 @@ func _traffic_plan(
 
 	# A blocked pass remains a controlled tow rather than the former heavy brake.
 	plan["speed_scale"] = 0.84
+	plan["speed_limit"] = maxf(0.0, leader.linear_velocity.dot(forward)) + maxf(0.0, distance - FOLLOWING_DISTANCE) / FOLLOWING_TIME
 	return plan
 
 
@@ -1222,6 +1245,10 @@ func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictio
 		hitting_vehicle = false
 		wall_normal = vehicle.static_contact_normal
 	if center_clearance >= 0.92:
+		return plan
+	if hitting_vehicle and center_clearance * feeler_length >= 20.0:
+		# Traffic planning owns following and passing. Do not add an unplanned
+		# swerve toward scenery merely because the leader is visible ahead.
 		return plan
 	if wall_normal.length_squared() > 0.01 and not hitting_vehicle:
 		var slide := Vector2(-wall_normal.y, wall_normal.x)

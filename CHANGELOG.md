@@ -47,6 +47,9 @@
 - Rivals can use clear apron shortcuts to the next required checkpoint,
   avoid unnecessary straight-line grip braking, and judge passing space
   against the actual route rather than nearby wall placement.
+- Starting-grid physics no longer displaces rivals into the island before
+  they launch. Following cars now respect the leader's speed and distance
+  rather than accelerating into a slow queue.
 - Quick Race now accepts arbitrary seeds, and championship events draw a fresh
   seed and deterministic room canvas whenever a race starts.
 - Generated circuits now use larger 1.75x room canvases, longer absolute laps,

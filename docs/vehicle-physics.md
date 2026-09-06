@@ -113,6 +113,13 @@ reference to that route while committed. Sunday retains the reference line.
 Passing clearance is measured against the active route, not inferred from
 whether an unrelated obstacle exists on the opposite side.
 
+Grid initialization holds cars stationary through countdown and synchronizes
+their rigid-body spawn transforms before enabling normal race collision.
+This prevents stale contacts at the default scene origin from displacing a
+rival into scenery when the starting grid is released. Tests inspect the
+actual bodies during countdown and immediately after launch, and run six
+three-lap fields with the production eight-second finish grace.
+
 ## Parameter table
 
 | Category | `VehicleStats` export group |

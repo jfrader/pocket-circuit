@@ -76,6 +76,8 @@ var _drift_entry_speed := 0.0
 
 # ── v1 state ──
 var _rack_angle := 0.0  # persistent steering rack angle (radians)
+var _grid_transform_pending := false
+var _pending_grid_transform := Transform2D.IDENTITY
 var _drift_state: DriftState = DriftState.NONE
 var _drift_qualified_time := 0.0  # seconds at optimal slip
 var _drift_boost_awarded := false  # once-only flag
@@ -153,6 +155,15 @@ func set_controls_locked(locked: bool) -> void:
 	controls_locked = locked
 	if locked:
 		set_external_controls(0.0, 0.0, 0.0, false, false)
+
+
+func place_on_grid(spawn_transform: Transform2D) -> void:
+	_pending_grid_transform = spawn_transform
+	_grid_transform_pending = true
+	global_transform = spawn_transform
+	linear_velocity = Vector2.ZERO
+	angular_velocity = 0.0
+	reset_dynamics_state()
 
 
 func set_external_controls(
@@ -828,6 +839,15 @@ func _v0_limit_top_speed() -> void:
 # ═══════════════════════════════════════════════════════════════════════
 
 func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
+	if _grid_transform_pending:
+		# Commit the spawn in physics state as well as the visible node. On
+		# thaw, Godot must not restore an older body transform inside scenery.
+		state.transform = _pending_grid_transform
+		state.linear_velocity = Vector2.ZERO
+		state.angular_velocity = 0.0
+		_last_output_velocity = Vector2.ZERO
+		_grid_transform_pending = false
+		return
 	var delta := state.step
 	_contact_elapsed += delta
 	var intended_forward := Vector2.UP.rotated(state.transform.get_rotation())

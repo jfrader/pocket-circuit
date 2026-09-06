@@ -92,6 +92,7 @@ var _track_variant_presenter: TrackVariantPresenter
 var _countdown_tween: Tween
 var _race_flash_tween: Tween
 var _countdown_active := false
+var _starting_collision_states: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -102,6 +103,13 @@ func _ready() -> void:
 		return
 	_create_pause_overlay()
 	_configure_racers()
+	for racer: Node2D in race_manager.get_rankings():
+		if racer is RigidBody2D:
+			var body := racer as RigidBody2D
+			_starting_collision_states.append({"body": body, "layer": body.collision_layer, "mask": body.collision_mask})
+			body.collision_layer = 0
+			body.collision_mask = 0
+	race_manager.race_started.connect(_release_starting_grid)
 	race_manager.race_finished.connect(_on_race_finished)
 	race_manager.position_changed.connect(_on_position_changed)
 	race_manager.wrong_way_changed.connect(_on_wrong_way_changed)
@@ -142,6 +150,7 @@ func _configure_racers() -> void:
 	var opponent_ids: Array = event.get("opponents", FALLBACK_OPPONENTS) if not event.is_empty() else FALLBACK_OPPONENTS
 	var opponent_count := clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
 	var difficulty := String(_session.get("difficulty", "club_circuit"))
+	var grid := _grid_transforms(race_manager.is_reverse_direction())
 	for ai_index in mini(opponent_ids.size(), opponent_count):
 		var driver_id := String(opponent_ids[ai_index])
 		var driver := CATALOG.get_driver(driver_id)
@@ -153,6 +162,9 @@ func _configure_racers() -> void:
 		ai_vehicle.add_to_group("race_vehicle")
 		ai_vehicle.set_player_controlled(false)
 		ai_vehicle.set_controls_locked(true)
+		# Register the rigid body at its actual spawn, not at the scene's
+		# default origin inside the island followed by a live teleport.
+		ai_vehicle.transform = global_transform.affine_inverse() * grid[ai_index + 1]
 		add_child(ai_vehicle)
 		_configure_vehicle(ai_vehicle, ai_index + 1, false, driver, ai_vehicle_id)
 		var ai_controller := AI_CONTROLLER_SCRIPT.new() as AIVehicleController
@@ -175,7 +187,8 @@ func _configure_vehicle(
 		vehicle_id: String
 ) -> void:
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
-	vehicle.global_transform = grid[racer_index]
+	vehicle.freeze = true
+	vehicle.place_on_grid(grid[racer_index])
 	vehicle.collision_layer |= 1
 	vehicle.collision_mask |= 1
 	vehicle.add_to_group("race_vehicle")
@@ -189,6 +202,24 @@ func _configure_vehicle(
 	vehicle.configure_identity(driver_name, vehicle_name, vehicle_id)
 	vehicle.configure_racer_marker(RACER_MARKER_COLORS[racer_index], racer_index)
 	race_manager.register_racer(vehicle, driver_name, vehicle_name, is_player)
+
+
+func _release_starting_grid() -> void:
+	# Clear stale contacts while the body accepts its queued spawn transform.
+	# Restore normal collision immediately after the physics server syncs it.
+	for entry: Dictionary in _starting_collision_states:
+		var body := entry["body"] as RigidBody2D
+		body.collision_layer = 0
+		body.collision_mask = 0
+		body.freeze = false
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	for entry: Dictionary in _starting_collision_states:
+		var body := entry["body"] as RigidBody2D
+		if is_instance_valid(body):
+			body.collision_layer = int(entry["layer"])
+			body.collision_mask = int(entry["mask"])
+	_starting_collision_states.clear()
 
 
 func _configure_session() -> void:
