@@ -36,6 +36,8 @@
 
 ### Changed
 
+- Race cars no longer draw a heading caret on the rear; front wheels steer
+  and tyres roll with the live Procedural 2D animation frames.
 - Starting a race after updating an existing checkout no longer depends on
   refreshing Godot's generated global-script cache first.
 - Driver portraits and vehicle sprites now use Procedural 2D's remade native

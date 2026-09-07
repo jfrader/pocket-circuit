@@ -38,10 +38,15 @@ func _initialize() -> void:
 		if not _expect(collision_shape.height == collision_height and collision_shape.radius == collision_radius, "%s must not resize collision geometry" % vehicle_id):
 			return
 	vehicle.configure_racer_marker(Color("71b7ff"))
-	var marker := vehicle.get_node_or_null("VisualRoot/RacerMarker") as Line2D
-	if not _expect(marker != null and marker.default_color == Color("71b7ff"), "duplicate machine selections should retain a readable racer marker"):
+	if not _expect(vehicle.get_node_or_null("VisualRoot/RacerMarker") == null, "race cars should not keep a heading caret overlay"):
 		return
 	if not _expect(collision.shape == collision_shape and collision_shape.height == collision_height and collision_shape.radius == collision_radius, "racer markers must not change collision geometry"):
+		return
+	var rest := vehicle.get_node("VisualRoot/CarSprite") as Sprite2D
+	vehicle.linear_velocity = Vector2(0.0, 400.0)
+	vehicle.set("_rack_angle", 0.4)
+	vehicle.call("_update_car_animation", 0.25)
+	if not _expect(rest.texture != IDENTITIES.car_texture("flicker"), "rolling and steering should swap onto a live motion frame"):
 		return
 	vehicle.free()
 	print("VEHICLE_VISUAL_IDENTITY_TEST PASS")

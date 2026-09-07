@@ -9,10 +9,14 @@ const AVATAR_SPRITES := preload("res://scripts/vendor/procedural_2d/procedural_a
 const CAR_GENERATOR := preload("res://scripts/vendor/procedural_2d/procedural_car_generator.gd")
 const CAR_SPRITES := preload("res://scripts/vendor/procedural_2d/procedural_car_sprites.gd")
 
+const REST_STEER_POSE := 2
+const RACE_WHEEL_ROLL_DISTANCE := 64.0
+
 static var _avatar_payload_cache: Dictionary = {}
 static var _avatar_texture_cache: Dictionary = {}
 static var _car_payload_cache: Dictionary = {}
 static var _car_texture_cache: Dictionary = {}
+static var _car_spin_cache: Dictionary = {}
 
 
 static func avatar_payload(driver_id: String) -> Dictionary:
@@ -71,3 +75,34 @@ static func car_texture(vehicle_id: String) -> Texture2D:
 	if texture:
 		_car_texture_cache[vehicle_id] = texture
 	return texture
+
+
+static func car_motion_texture(vehicle_id: String, travel: float, steer: float) -> Texture2D:
+	var spin := 0
+	if travel > 0.0:
+		spin = posmod(int(floor(travel / RACE_WHEEL_ROLL_DISTANCE)), CAR_SPRITES.WHEEL_FRAME_COUNT)
+	return _texture_for_spin_pose(vehicle_id, spin, CAR_SPRITES.steer_pose_index(steer))
+
+
+static func _texture_for_spin_pose(vehicle_id: String, spin: int, pose: int) -> Texture2D:
+	if not _car_spin_cache.has(vehicle_id):
+		_car_spin_cache[vehicle_id] = {}
+	var per_spin: Dictionary = _car_spin_cache[vehicle_id]
+	if not per_spin.has(spin):
+		var payload := car_payload(vehicle_id)
+		if payload.is_empty():
+			return null
+		var images: Array[Image] = CAR_SPRITES.car_steer_frames(payload, spin, NATIVE_PIXEL_SCALE)
+		var textures: Array = []
+		for pose_index in range(images.size()):
+			if spin == 0 and pose_index == REST_STEER_POSE:
+				textures.append(car_texture(vehicle_id))
+			elif images[pose_index] == null:
+				textures.append(null)
+			else:
+				textures.append(ImageTexture.create_from_image(images[pose_index]))
+		per_spin[spin] = textures
+	var frames: Array = per_spin[spin]
+	if frames.is_empty():
+		return car_texture(vehicle_id)
+	return frames[clampi(pose, 0, frames.size() - 1)]
