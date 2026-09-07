@@ -48,6 +48,18 @@ func _initialize() -> void:
 			return
 		if not _expect(texture == IDENTITIES.car_texture(vehicle_id), "%s should reuse the car texture cache" % vehicle_id):
 			return
+		if not _expect(IDENTITIES.car_motion_texture(vehicle_id, 0.0, 0.0) == texture, "%s rest motion frame should reuse the static car texture" % vehicle_id):
+			return
+		var rolling := IDENTITIES.car_motion_texture(vehicle_id, IDENTITIES.RACE_WHEEL_ROLL_DISTANCE, 0.0)
+		var steered := IDENTITIES.car_motion_texture(vehicle_id, 0.0, 1.0)
+		if not _expect(rolling != null and rolling.get_size() == Vector2(96.0, 128.0), "%s rolling frame should stay native 96x128" % vehicle_id):
+			return
+		if not _expect(steered != null and steered.get_size() == Vector2(96.0, 128.0), "%s steered frame should stay native 96x128" % vehicle_id):
+			return
+		if not _expect(rolling != texture, "%s rolling tyres should change the sprite" % vehicle_id):
+			return
+		if not _expect(steered != texture, "%s steered front wheels should change the sprite" % vehicle_id):
+			return
 	print("PROCEDURAL_IDENTITY_LIBRARY_TEST PASS")
 	quit(0)
 

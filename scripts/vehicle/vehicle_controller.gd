@@ -68,6 +68,9 @@ var has_static_contact := false
 var static_contact_normal := Vector2.ZERO
 var _racer_tag: Label
 var _racer_tag_offset := Vector2(-45.0, -64.0)
+var _car_sprite: Sprite2D
+var _visual_vehicle_id := ""
+var _wheel_travel := 0.0
 var _drift_boost_accumulated := 0.0
 var _drift_grace_timer := 0.0
 var _front_slip_angle := 0.0
@@ -107,6 +110,7 @@ func _physics_process(delta: float) -> void:
 	if is_instance_valid(_racer_tag):
 		_racer_tag.global_position = global_position + _racer_tag_offset
 	_read_input()
+	_update_car_animation(delta)
 	if stats.physics_model_version == 1:
 		_update_motion_state()
 		_v1_physics_step(delta)
@@ -284,15 +288,24 @@ func configure_visual_identity(vehicle_id: String) -> void:
 	if existing:
 		existing.free()
 	if vehicle_id.is_empty():
+		_visual_vehicle_id = ""
+		_car_sprite = null
+		_wheel_travel = 0.0
 		return
 	var texture := IDENTITIES.car_texture(vehicle_id)
 	var car_sprite := visual_root.get_node_or_null("CarSprite") as Sprite2D
 	if texture == null or car_sprite == null:
+		_visual_vehicle_id = ""
+		_car_sprite = null
+		_wheel_travel = 0.0
 		return
 	car_sprite.texture = texture
 	car_sprite.scale = Vector2.ONE * 0.5
 	car_sprite.self_modulate = Color.WHITE
 	car_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	_car_sprite = car_sprite
+	_visual_vehicle_id = vehicle_id
+	_wheel_travel = 0.0
 	var legacy_shadow := visual_root.get_node_or_null("ShadowSprite") as Sprite2D
 	if legacy_shadow:
 		legacy_shadow.visible = false
@@ -323,7 +336,7 @@ func _configure_racer_tag(driver_name: String) -> void:
 	_racer_tag.global_position = global_position + _racer_tag_offset
 
 
-func configure_racer_marker(marker_color: Color, racer_index: int = 0) -> void:
+func configure_racer_marker(_marker_color: Color, racer_index: int = 0) -> void:
 	_racer_tag_offset.y = RACER_TAG_Y_OFFSETS[clampi(racer_index, 0, RACER_TAG_Y_OFFSETS.size() - 1)]
 	if is_instance_valid(_racer_tag):
 		_racer_tag.global_position = global_position + _racer_tag_offset
@@ -333,14 +346,20 @@ func configure_racer_marker(marker_color: Color, racer_index: int = 0) -> void:
 	var existing := visual_root.get_node_or_null("RacerMarker")
 	if existing:
 		existing.free()
-	var marker := Line2D.new()
-	marker.name = "RacerMarker"
-	marker.points = PackedVector2Array([Vector2(-7.0, 29.0), Vector2(0.0, 35.0), Vector2(7.0, 29.0)])
-	marker.width = 3.0
-	marker.default_color = marker_color
-	marker.antialiased = false
-	marker.z_index = 3
-	visual_root.add_child(marker)
+
+
+func _update_car_animation(delta: float) -> void:
+	if _car_sprite == null or _visual_vehicle_id.is_empty():
+		return
+	_wheel_travel += linear_velocity.length() * delta
+	var steer := _steer_input
+	if stats != null and stats.physics_model_version == 1:
+		var max_rack := deg_to_rad(stats.max_steer_angle_deg)
+		if max_rack > 0.001:
+			steer = clampf(_rack_angle / max_rack, -1.0, 1.0)
+	var texture := IDENTITIES.car_motion_texture(_visual_vehicle_id, _wheel_travel, steer)
+	if texture != null and _car_sprite.texture != texture:
+		_car_sprite.texture = texture
 
 
 func apply_stats(new_stats: VehicleStats) -> void:
