@@ -36,6 +36,8 @@
 
 ### Changed
 
+- Starting a race after updating an existing checkout no longer depends on
+  refreshing Godot's generated global-script cache first.
 - Driver portraits and vehicle sprites now use Procedural 2D's remade native
   layered artwork, with sharper silhouettes, body panels, faces, clothing,
   wheels, lights, trim, and liveries while preserving gameplay dimensions.

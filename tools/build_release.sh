@@ -72,6 +72,20 @@ run_godot_checked() {
 
 python3 "$PROJECT_ROOT/tools/validate_release_config.py"
 
+printf 'Checking runtime vehicle dependencies...\n'
+for runtime_script in \
+	"$PROJECT_ROOT/scripts/vehicle/vehicle_controller.gd" \
+	"$PROJECT_ROOT/scripts/vehicle/ai_vehicle_controller.gd"; do
+	if ! grep -Fq 'const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")' "$runtime_script"; then
+		printf 'Runtime controller must explicitly preload vehicle_dynamics.gd: %s\n' "$runtime_script" >&2
+		exit 1
+	fi
+	if grep -Fq 'VehicleDynamics.' "$runtime_script"; then
+		printf 'Runtime controller depends on Godot generated class-cache state: %s\n' "$runtime_script" >&2
+		exit 1
+	fi
+done
+
 printf 'Importing project with Godot %s...\n' "$godot_version"
 run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --import
 
