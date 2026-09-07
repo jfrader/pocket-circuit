@@ -89,7 +89,7 @@ func _verify_scene_contract() -> bool:
 	if not _expect(finish != null, "%s should define a finish-line checkpoint" % _track_label()):
 		return false
 	var shape := (finish.get_node("CollisionShape2D") as CollisionShape2D).shape as RectangleShape2D
-	if not _expect(shape.size.x >= 272.0 or shape.size.y >= 272.0, "%s finish gate should span the corridor" % _track_label()):
+	if not _expect(shape.size.x >= TRACK_BUILDER.HALF_WIDTH * 2.0 or shape.size.y >= TRACK_BUILDER.HALF_WIDTH * 2.0, "%s finish gate should span the corridor" % _track_label()):
 		return false
 	for container_name: String in ["GridForward", "GridReverse"]:
 		if _seed < 0 and _theme == &"kitchen":

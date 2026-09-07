@@ -36,6 +36,8 @@
 
 ### Changed
 
+- Cutting a corner across inner grass no longer counts as a legal checkpoint
+  or lap; gates only cover the racing corridor.
 - Race cars no longer draw a heading caret on the rear; front wheels steer
   and tyres roll with the live Procedural 2D animation frames.
 - Starting a race after updating an existing checkout no longer depends on

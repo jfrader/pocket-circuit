@@ -1948,9 +1948,15 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 static func _gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:
 	var normal := tangent.rotated(PI * 0.5).normalized()
 	return PackedVector2Array([
-		_nearest_gate_boundary(sample, normal, room_polygon, island_polygon),
-		_nearest_gate_boundary(sample, -normal, room_polygon, island_polygon),
+		_corridor_gate_endpoint(sample, normal, room_polygon, island_polygon),
+		_corridor_gate_endpoint(sample, -normal, room_polygon, island_polygon),
 	])
+
+
+static func _corridor_gate_endpoint(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
+	var boundary := _nearest_gate_boundary(sample, direction, room_polygon, island_polygon)
+	var projected := (boundary - sample).dot(direction.normalized())
+	return sample + direction.normalized() * minf(projected, HALF_WIDTH)
 
 
 static func _nearest_gate_boundary(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
@@ -2039,7 +2045,7 @@ static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation
 		collision.position = checkpoint_transform.affine_inverse() * span_endpoints[0].lerp(span_endpoints[1], 0.5)
 		cp.set_meta("sensor_endpoints", span_endpoints)
 		cp.set_meta("sensor_span", span_endpoints[0].distance_to(span_endpoints[1]))
-		cp.set_meta("sensor_full_room_cross_section", true)
+		cp.set_meta("sensor_corridor_span", true)
 	elif not is_finish:
 		var forgiving := RectangleShape2D.new()
 		forgiving.size = Vector2(70.0, 300.0)

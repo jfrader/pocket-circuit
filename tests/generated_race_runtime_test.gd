@@ -1,6 +1,7 @@
 extends SceneTree
 
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
+const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const REQUESTED_SEED := 8
 
 
@@ -66,7 +67,7 @@ func _run_test() -> void:
 	if not _expect(camera != null and camera.limit_left == floori(room_bounds.position.x) and camera.limit_top == floori(room_bounds.position.y) and camera.limit_right == ceili(room_bounds.end.x) and camera.limit_bottom == ceili(room_bounds.end.y), "generated room bounds should expand the runtime camera limits"):
 		return
 	var finish := track.get_node_or_null("Checkpoint0Finish") as Area2D
-	if not _expect(finish != null and float(finish.get_meta("sensor_span", 0.0)) > 300.0 and bool(finish.get_meta("sensor_full_room_cross_section", false)), "runtime finish sensor should span the available room cross-section"):
+	if not _expect(finish != null and float(finish.get_meta("sensor_span", 0.0)) <= BUILDER.HALF_WIDTH * 2.0 + 0.5 and float(finish.get_meta("sensor_span", 0.0)) >= BUILDER.HALF_WIDTH and bool(finish.get_meta("sensor_corridor_span", false)), "runtime finish sensor should span the racing corridor"):
 		return
 	if not await _probe_open_apron(track):
 		return
