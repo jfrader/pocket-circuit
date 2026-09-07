@@ -36,8 +36,9 @@
 
 ### Changed
 
-- Cutting a corner across inner grass no longer counts as a legal checkpoint
-  or lap; gates only cover the racing corridor.
+- Raised inner islands now stop corner cuts at their visible edge, while legal
+  wide lines across the open outer apron still count. Persistent wrong-way
+  driving returns the car to its last checkpoint instead of wasting a lap.
 - Race cars no longer draw a heading caret on the rear; front wheels steer
   and tyres roll with the live Procedural 2D animation frames.
 - Starting a race after updating an existing checkout no longer depends on

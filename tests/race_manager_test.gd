@@ -48,6 +48,9 @@ func _run_test() -> void:
 		return
 	if not _expect(manager.is_racer_wrong_way(racers[0]), "out-of-order checkpoint should mark wrong way"):
 		return
+	manager.report_recovery(racers[0])
+	if not _expect(not manager.is_racer_wrong_way(racers[0]), "recovery should clear stale wrong-way state"):
+		return
 	if not _pass_lap(manager, checkpoints, racers[0]):
 		return
 	if not _expect(manager.lap_count == 1 and manager.current_checkpoint_index == 1, "player compatibility state should track lap and next gate"):

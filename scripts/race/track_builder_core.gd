@@ -1232,13 +1232,13 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 		barrier.add_child(boundary_collision)
 		barrier.set_meta("collision_boundary_polygon", collision_boundary)
 		barrier.set_meta("rim_contact_offset", ISLAND_TEXTURED_RIM_WIDTH * 0.5)
+		root.set_meta("island_invalid_polygon", collision_boundary)
 	else:
 		var barrier_collision := CollisionPolygon2D.new()
 		barrier_collision.polygon = expanded
 		barrier.add_child(barrier_collision)
 	if spec.get("seed_obstacles", false):
 		_build_raised_island_rim(barrier, spec, expanded)
-		root.set_meta("island_invalid_polygon", expanded)
 
 	var min_point := Vector2(INF, INF)
 	var max_point := Vector2(-INF, -INF)
@@ -1947,9 +1947,15 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 
 static func _gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:
 	var normal := tangent.rotated(PI * 0.5).normalized()
+	var positive_island := _nearest_gate_boundary(sample, normal, PackedVector2Array(), island_polygon)
+	var negative_island := _nearest_gate_boundary(sample, -normal, PackedVector2Array(), island_polygon)
+	var positive_distance := (positive_island - sample).dot(normal)
+	var negative_distance := (negative_island - sample).dot(-normal)
+	var inner_direction := normal if positive_distance <= negative_distance else -normal
+	var outer_direction := -inner_direction
 	return PackedVector2Array([
-		_corridor_gate_endpoint(sample, normal, room_polygon, island_polygon),
-		_corridor_gate_endpoint(sample, -normal, room_polygon, island_polygon),
+		_corridor_gate_endpoint(sample, inner_direction, room_polygon, island_polygon),
+		_nearest_gate_boundary(sample, outer_direction, room_polygon, island_polygon),
 	])
 
 
@@ -2044,8 +2050,10 @@ static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation
 		var checkpoint_transform := Transform2D(rotation, position)
 		collision.position = checkpoint_transform.affine_inverse() * span_endpoints[0].lerp(span_endpoints[1], 0.5)
 		cp.set_meta("sensor_endpoints", span_endpoints)
+		cp.set_meta("sensor_inner_endpoint", span_endpoints[0])
+		cp.set_meta("sensor_outer_endpoint", span_endpoints[1])
 		cp.set_meta("sensor_span", span_endpoints[0].distance_to(span_endpoints[1]))
-		cp.set_meta("sensor_corridor_span", true)
+		cp.set_meta("sensor_asymmetric_span", true)
 	elif not is_finish:
 		var forgiving := RectangleShape2D.new()
 		forgiving.size = Vector2(70.0, 300.0)
@@ -4698,7 +4706,7 @@ static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, 
 	surface.name = "TrackSurface"
 	surface.points = centerline
 	surface.closed = true
-	surface.width = HALF_WIDTH * 1.82
+	surface.width = HALF_WIDTH * 2.0
 	surface.texture = texture
 	surface.texture_mode = Line2D.LINE_TEXTURE_TILE
 	surface.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED

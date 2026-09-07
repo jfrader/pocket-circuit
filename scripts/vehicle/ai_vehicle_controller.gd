@@ -1505,6 +1505,8 @@ func _recover_vehicle() -> void:
 	if _recovering:
 		return
 	_recovering = true
+	if race_manager.has_method("report_recovery"):
+		race_manager.call("report_recovery", vehicle)
 	_room_cut_checkpoint = -1
 	recovery_count += 1
 	_last_recovery_time = Time.get_ticks_msec()

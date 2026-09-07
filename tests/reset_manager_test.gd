@@ -6,12 +6,21 @@ const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controll
 class TestRaceManager extends Node:
 	var is_running := false
 	var finished := false
+	var wrong_way := false
+	var reported_recoveries := 0
 
 	func is_racer_finished(_vehicle: Node2D) -> bool:
 		return finished
 
 	func get_last_recovery_transform() -> Transform2D:
 		return Transform2D(0.0, Vector2(24.0, 36.0))
+
+	func is_racer_wrong_way(_vehicle: Node2D) -> bool:
+		return wrong_way
+
+	func report_recovery(_vehicle: Node2D) -> void:
+		wrong_way = false
+		reported_recoveries += 1
 
 
 func _initialize() -> void:
@@ -55,6 +64,19 @@ func _run_test() -> void:
 	await create_timer(0.08).timeout
 	if not _expect(not bool(reset_manager.get("_recovering")) and vehicle.collision_layer == 5 and vehicle.collision_mask == 7, "recovery should restore collisions after unpaused ghost time"):
 		return
+
+	race_manager.wrong_way = true
+	reset_manager.wrong_way_timeout = 0.05
+	vehicle.linear_velocity = Vector2.ZERO
+	reset_manager.call("_physics_process", 0.06)
+	if not _expect(not bool(reset_manager.get("_recovering")), "a stationary car should keep the warning without triggering a stale wrong-way recovery"):
+		return
+	vehicle.linear_velocity = Vector2(100.0, 0.0)
+	reset_manager.call("_physics_process", 0.03)
+	reset_manager.call("_physics_process", 0.03)
+	if not _expect(bool(reset_manager.get("_recovering")) and race_manager.reported_recoveries == 2 and not race_manager.wrong_way, "persistent wrong-way driving should recover once and clear the warning state"):
+		return
+	await create_timer(0.08).timeout
 
 	var ai_controller := AI_CONTROLLER_SCRIPT.new()
 	var ai_vehicle := VehicleController.new()

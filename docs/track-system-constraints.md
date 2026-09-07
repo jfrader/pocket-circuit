@@ -182,10 +182,11 @@ line.
   tints and grip decals, worn-floor hints, shadows, and checker paint. Solid
   objects must never use a sprite-only placement path.
 - The island is one visibly raised solid object. Its closed layer-2
-  `ConcavePolygonShape2D` segment chain follows the same points as a dark
+  `ConcavePolygonShape2D` segment chain follows the outer contact edge of a dark
   side-face, tiled theme edge, and warm top lip. Two to four small visible
-  colliding props sit just inside that rim for scale. The interior is invalid
-  recovery space; do not send the concave island through convex decomposition.
+  colliding props sit just inside that rim for scale. Recovery begins at that
+  visible contact edge; do not send the concave island through convex
+  decomposition.
 - Themed course rails are deliberately partial real assets. Eight deterministic
   sectors retain exactly one open run, at least four both-sided runs, and two or
   three one-sided runs. Each edge remains represented in at least five sectors;
@@ -196,12 +197,12 @@ line.
   rails; Office mixes pencil, ruler, pen, and book-spine rails. Rail and corner-
   accent colliders validate their complete oriented footprint, not only their
   center. An empty run means open drivable apron, never hidden collision.
-- Every ordered checkpoint `Area2D` spans the racing corridor at its station
-  (`HALF_WIDTH` each side of the centerline), stopping earlier if it hits the
-  raised island or a room wall. Inner grass beyond the ribbon does not trip
-  the gate. The checkpoint recovery anchor remains on the racing line, and the
-  checker/banner remain corridor-sized visual landmarks. Two small colliding
-  themed posts mark the nominal corridor ends without blocking the racing line.
+- Every ordered checkpoint `Area2D` is asymmetric: its inner endpoint stops at
+  `HALF_WIDTH` or the raised island, while its outer endpoint reaches the room
+  wall. Inner grass does not trip the gate, but legal outer-apron lines do. The
+  checkpoint recovery anchor remains on the racing line, and the checker/banner
+  remain corridor-sized visual landmarks. Two small colliding themed posts mark
+  the nominal corridor ends without blocking the racing line.
 - All physical scenery uses the same upper-left key light: soft warm contact
   shadows offset down-right by 8-12% of the footprint, rectangular or circular
   to match the prop. Giants add a faint elongated down-right cast shadow.

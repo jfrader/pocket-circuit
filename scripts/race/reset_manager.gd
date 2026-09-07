@@ -6,10 +6,12 @@ extends Node
 @export var invalid_polygon := PackedVector2Array()
 @export var ghost_duration: float = 1.5
 @export var stuck_timeout: float = 2.4
+@export var wrong_way_timeout: float = 1.0
 
 var _vehicle: RigidBody2D
 var _race_manager: Node
 var _stuck_time: float = 0.0
+var _wrong_way_time: float = 0.0
 var _recovering: bool = false
 
 
@@ -22,10 +24,23 @@ func _physics_process(delta: float) -> void:
 		return
 	if not _can_recover():
 		_stuck_time = 0.0
+		_wrong_way_time = 0.0
 		return
 	if Input.is_action_just_pressed("reset") or not is_position_valid(_vehicle.global_position):
 		recover_vehicle()
 		return
+	var moving_wrong_way := (
+		_race_manager.has_method("is_racer_wrong_way")
+		and bool(_race_manager.call("is_racer_wrong_way", _vehicle))
+		and _vehicle.linear_velocity.length() >= 80.0
+	)
+	if moving_wrong_way:
+		_wrong_way_time += delta
+		if _wrong_way_time >= wrong_way_timeout:
+			recover_vehicle()
+			return
+	else:
+		_wrong_way_time = 0.0
 
 	var trying_to_move := Input.get_action_strength("accelerate") > 0.7
 	if trying_to_move and _vehicle.linear_velocity.length() < 18.0:
@@ -70,6 +85,9 @@ func recover_vehicle() -> void:
 		return
 	_recovering = true
 	_stuck_time = 0.0
+	_wrong_way_time = 0.0
+	if _race_manager.has_method("report_recovery"):
+		_race_manager.call("report_recovery", _vehicle)
 
 	var saved_layer := _vehicle.collision_layer
 	var saved_mask := _vehicle.collision_mask
