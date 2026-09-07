@@ -61,9 +61,9 @@ rooms, route geometry, palette, interface, and story.
 - The room apron is open Micro Machines-style diorama space. No invisible
   corridor wall sits under bare floor; collision is reserved for real visible
   household assets, the raised island, and room walls.
-- Traversable shortcuts include authored surface lanes and player-discovered
-  apron routes. Ordered full-room gate sensors, not hidden walls, protect lap
-  integrity.
+- Traversable shortcuts include authored surface lanes inside the racing
+  corridor. Ordered corridor gate sensors, not hidden walls, protect lap
+  integrity: inner grass cuts miss the gate and do not count.
 - Kitchen props are oversized, friendly, and readable from directly above.
   Details are broad shapes, not thin linework.
 - Micro details such as crumbs, fibers, droplets, scratches, and wood grain use

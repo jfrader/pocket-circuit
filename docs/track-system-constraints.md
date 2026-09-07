@@ -196,12 +196,12 @@ line.
   rails; Office mixes pencil, ruler, pen, and book-spine rails. Rail and corner-
   accent colliders validate their complete oriented footprint, not only their
   center. An empty run means open drivable apron, never hidden collision.
-- Every ordered checkpoint `Area2D` spans the complete available room
-  cross-section at its station: the first raised-island or room-wall boundary
-  hit in each normal direction. The checkpoint recovery anchor remains on the
-  racing line, and the checker/banner remain corridor-sized visual landmarks.
-  Two small colliding themed posts mark the nominal corridor ends without
-  blocking the racing line.
+- Every ordered checkpoint `Area2D` spans the racing corridor at its station
+  (`HALF_WIDTH` each side of the centerline), stopping earlier if it hits the
+  raised island or a room wall. Inner grass beyond the ribbon does not trip
+  the gate. The checkpoint recovery anchor remains on the racing line, and the
+  checker/banner remain corridor-sized visual landmarks. Two small colliding
+  themed posts mark the nominal corridor ends without blocking the racing line.
 - All physical scenery uses the same upper-left key light: soft warm contact
   shadows offset down-right by 8-12% of the footprint, rectangular or circular
   to match the prop. Giants add a faint elongated down-right cast shadow.
