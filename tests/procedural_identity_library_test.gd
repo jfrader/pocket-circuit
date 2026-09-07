@@ -8,7 +8,7 @@ const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker"]
 
 
 func _initialize() -> void:
-	if not _expect(IDENTITIES.SOURCE_REVISION == "f8eb03805f3fcc30fec56553033ad01988ef7857", "the vendored source revision should stay pinned"):
+	if not _expect(IDENTITIES.SOURCE_REVISION == "d60ed1f95dc7154f7870c62d6058ed440ed3eb09", "the vendored source revision should stay pinned"):
 		return
 	for driver_id: String in DRIVER_IDS:
 		var mapping: Dictionary = CATALOG.get_driver(driver_id).get("avatar_art", {})
@@ -22,7 +22,9 @@ func _initialize() -> void:
 			var actual: Variant = payload.get("facing", "") if option == "facing" else payload.get("traits", {}).get(option)
 			if not _expect(actual == mapping["options"][option], "%s should keep its mapped avatar %s" % [driver_id, option]):
 				return
-		if not _expect(texture != null and texture.get_size() == Vector2(64.0, 64.0), "%s should render a 64x64 portrait" % driver_id):
+		if not _expect(int(payload.get("schema_version", 0)) == 2, "%s should use the current gendered avatar payload" % driver_id):
+			return
+		if not _expect(texture != null and texture.get_size() == Vector2(128.0, 128.0), "%s should render a native 128x128 portrait" % driver_id):
 			return
 		if not _expect(texture == IDENTITIES.avatar_texture(driver_id), "%s should reuse the avatar texture cache" % driver_id):
 			return
@@ -42,7 +44,7 @@ func _initialize() -> void:
 		for part: String in options.get("parts", {}).keys():
 			if not _expect(payload.get("parts", {}).get(part) == options["parts"][part], "%s should keep its mapped car %s" % [vehicle_id, part]):
 				return
-		if not _expect(texture != null and texture.get_size() == Vector2(48.0, 64.0), "%s should render a 48x64 race sprite" % vehicle_id):
+		if not _expect(texture != null and texture.get_size() == Vector2(96.0, 128.0), "%s should render a native 96x128 race sprite" % vehicle_id):
 			return
 		if not _expect(texture == IDENTITIES.car_texture(vehicle_id), "%s should reuse the car texture cache" % vehicle_id):
 			return

@@ -289,7 +289,7 @@ func configure_visual_identity(vehicle_id: String) -> void:
 	if texture == null or car_sprite == null:
 		return
 	car_sprite.texture = texture
-	car_sprite.scale = Vector2.ONE
+	car_sprite.scale = Vector2.ONE * 0.5
 	car_sprite.self_modulate = Color.WHITE
 	car_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	var legacy_shadow := visual_root.get_node_or_null("ShadowSprite") as Sprite2D

@@ -15,6 +15,7 @@ const CAST := [
 		"avatar_art": {
 			"seed": 91001,
 			"options": {
+				"gender": "female",
 				"face_shape": "oval", "skin_tone": "golden", "hair_style": "curls",
 				"hair_color": "blue_black", "brow_style": "arched", "eye_style": "wide",
 				"eye_color": "hazel", "nose_style": "short", "mouth_style": "grin",
@@ -32,6 +33,7 @@ const CAST := [
 		"avatar_art": {
 			"seed": 91002,
 			"options": {
+				"gender": "female",
 				"face_shape": "square", "skin_tone": "amber", "hair_style": "top_knot",
 				"hair_color": "espresso", "brow_style": "thick", "eye_style": "hooded",
 				"eye_color": "coffee", "nose_style": "broad", "mouth_style": "smile",
@@ -53,6 +55,7 @@ const CAST := [
 		"avatar_art": {
 			"seed": 91003,
 			"options": {
+				"gender": "female",
 				"face_shape": "diamond", "skin_tone": "ivory", "hair_style": "side_part",
 				"hair_color": "copper", "brow_style": "angled", "eye_style": "narrow",
 				"eye_color": "sky", "nose_style": "angular", "mouth_style": "serious",
@@ -74,6 +77,7 @@ const CAST := [
 		"avatar_art": {
 			"seed": 91004,
 			"options": {
+				"gender": "male",
 				"face_shape": "square", "skin_tone": "cocoa", "hair_style": "buzz",
 				"hair_color": "black", "brow_style": "thick", "eye_style": "wide",
 				"eye_color": "amber", "nose_style": "broad", "mouth_style": "grin",
@@ -95,6 +99,7 @@ const CAST := [
 		"avatar_art": {
 			"seed": 91005,
 			"options": {
+				"gender": "female",
 				"face_shape": "heart", "skin_tone": "olive", "hair_style": "locs",
 				"hair_color": "auburn", "brow_style": "soft", "eye_style": "upturned",
 				"eye_color": "violet", "nose_style": "button", "mouth_style": "smirk",
@@ -116,6 +121,7 @@ const CAST := [
 		"avatar_art": {
 			"seed": 91006,
 			"options": {
+				"gender": "male",
 				"face_shape": "long", "skin_tone": "ivory", "hair_style": "quiff",
 				"hair_color": "silver", "brow_style": "angled", "eye_style": "narrow",
 				"eye_color": "slate", "nose_style": "hooked", "mouth_style": "serious",

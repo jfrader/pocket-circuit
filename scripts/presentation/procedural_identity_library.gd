@@ -1,7 +1,8 @@
 class_name ProceduralIdentityLibrary
 extends RefCounted
 
-const SOURCE_REVISION := "f8eb03805f3fcc30fec56553033ad01988ef7857"
+const SOURCE_REVISION := "d60ed1f95dc7154f7870c62d6058ed440ed3eb09"
+const NATIVE_PIXEL_SCALE := 2
 const CATALOG := preload("res://data/championship/catalog.gd")
 const AVATAR_GENERATOR := preload("res://scripts/vendor/procedural_2d/procedural_avatar_generator.gd")
 const AVATAR_SPRITES := preload("res://scripts/vendor/procedural_2d/procedural_avatar_sprites.gd")
@@ -37,7 +38,7 @@ static func avatar_texture(driver_id: String) -> Texture2D:
 	var payload := avatar_payload(driver_id)
 	if payload.is_empty():
 		return null
-	var texture := AVATAR_SPRITES.avatar_texture(payload)
+	var texture := AVATAR_SPRITES.avatar_texture(payload, NATIVE_PIXEL_SCALE)
 	if texture:
 		_avatar_texture_cache[driver_id] = texture
 	return texture
@@ -66,7 +67,7 @@ static func car_texture(vehicle_id: String) -> Texture2D:
 	var payload := car_payload(vehicle_id)
 	if payload.is_empty():
 		return null
-	var texture := CAR_SPRITES.car_texture(payload)
+	var texture := CAR_SPRITES.car_texture(payload, NATIVE_PIXEL_SCALE)
 	if texture:
 		_car_texture_cache[vehicle_id] = texture
 	return texture
