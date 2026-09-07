@@ -122,8 +122,10 @@ func _run_direction(theme: StringName, reverse: bool) -> bool:
 			return false
 	print("AI_RACE_DIRECTION_PASS %s %s frames=%d checkpoints=%s" % [theme, direction_label, frame, str(checkpoint_counts.values())])
 	current_scene = null
-	prototype.queue_free()
+	root.remove_child(prototype)
+	prototype.free()
 	await process_frame
+	await physics_frame
 	return true
 
 

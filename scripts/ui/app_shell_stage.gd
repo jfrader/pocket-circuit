@@ -174,12 +174,12 @@ func _draw_ending_stage() -> void:
 
 
 func _draw_vehicle_stats(vehicle: Dictionary, origin: Vector2, width: float) -> void:
-	var stats: Dictionary = vehicle.get("stats", {})
+	var ratings: Dictionary = vehicle.get("ratings", {})
 	var entries := [
-		{"label": "SPEED", "value": clampf(float(stats.get("max_speed", 640.0)) / 720.0, 0.0, 1.0)},
-		{"label": "GRIP", "value": clampf(float(stats.get("grip", 0.8)), 0.0, 1.0)},
-		{"label": "MASS", "value": clampf(float(stats.get("mass", 0.8)) / 1.2, 0.0, 1.0)},
-		{"label": "DRIFT", "value": clampf(float(stats.get("drift_factor", 0.25)) / 0.42, 0.0, 1.0)},
+		{"label": "SPEED", "value": clampf(float(ratings.get("speed", 0.0)), 0.0, 1.0)},
+		{"label": "GRIP", "value": clampf(float(ratings.get("grip", 0.0)), 0.0, 1.0)},
+		{"label": "MASS", "value": clampf(float(ratings.get("mass", 0.0)), 0.0, 1.0)},
+		{"label": "DRIFT", "value": clampf(float(ratings.get("drift", 0.0)), 0.0, 1.0)},
 	]
 	for index in entries.size():
 		var entry: Dictionary = entries[index]

@@ -107,10 +107,37 @@ func _run_test() -> void:
 		return
 	if not _expect(bool(loaded["championship_started"]) and loaded.has("music_volume") and loaded.has("first_run") and not bool(loaded["reduced_motion"]), "older raced saves should merge the current reduced-motion default"):
 		return
+	if not _test_legacy_vehicle_selections(store):
+		return
 
 	store.remove_save()
 	print("SAVE_STORE_TEST PASS")
 	quit(0)
+
+
+func _test_legacy_vehicle_selections(store: SaveStore) -> bool:
+	var unlock_sequences := {
+		"rustbug": [],
+		"pinbolt": ["kitchen_crumb_rush", "kitchen_mug_run", "kitchen_clean_line"],
+		"scrapjaw": [
+			"kitchen_crumb_rush", "kitchen_mug_run", "kitchen_clean_line",
+			"workshop_screw_loose", "workshop_ruler_drop", "workshop_heavy_metal",
+		],
+		"flicker": CATALOG.event_ids(),
+	}
+	for vehicle_id: String in unlock_sequences:
+		var finishes := {}
+		for event_id: String in unlock_sequences[vehicle_id]:
+			finishes[event_id] = 1
+		_write_raw(TEST_PATH, JSON.stringify({
+			"version": 1,
+			"best_event_finishes": finishes,
+			"selected_vehicle": vehicle_id,
+		}))
+		var loaded := store.load_data()
+		if not _expect(String(loaded["selected_vehicle"]) == vehicle_id, "legacy save should keep selected vehicle '%s' after catalog resource migration" % vehicle_id):
+			return false
+	return true
 
 
 func _write_raw(path: String, text: String) -> void:

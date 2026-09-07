@@ -142,15 +142,8 @@ const VEHICLES := [
 				"wheels": "classic", "spoiler": "none", "livery": "center_stripe",
 			}},
 		},
-		"stats": {
-			"mass": 0.85, "engine_power": 720.0, "max_speed": 680.0,
-			"acceleration": 1.08, "reverse_speed": 255.0,
-			"steering_rate": 3.75, "steering_response": 9.5,
-			"grip": 0.84, "lateral_grip": 10.5, "drift_factor": 0.26,
-			"brake_force": 980.0, "handbrake_force": 240.0,
-			"boost_power": 540.0, "boost_capacity": 100.0,
-			"boost_recharge": 10.0, "durability": 52.0,
-		},
+		"stats_path": "res://data/vehicles/rustbug.tres",
+		"ratings": {"speed": 0.944444, "grip": 0.84, "mass": 0.708333, "drift": 0.619048},
 	},
 	{
 		"id": "pinbolt",
@@ -167,15 +160,8 @@ const VEHICLES := [
 				"wheels": "mesh", "spoiler": "lip", "livery": "twin_stripe",
 			}},
 		},
-		"stats": {
-			"mass": 0.78, "engine_power": 700.0, "max_speed": 640.0,
-			"acceleration": 1.1, "reverse_speed": 250.0,
-			"steering_rate": 4.05, "steering_response": 10.2,
-			"grip": 0.94, "lateral_grip": 12.4, "drift_factor": 0.2,
-			"brake_force": 1100.0, "handbrake_force": 220.0,
-			"boost_power": 480.0, "boost_capacity": 90.0,
-			"boost_recharge": 7.5, "durability": 46.0,
-		},
+		"stats_path": "res://data/vehicles/pinbolt.tres",
+		"ratings": {"speed": 0.888889, "grip": 0.94, "mass": 0.65, "drift": 0.476190},
 	},
 	{
 		"id": "scrapjaw",
@@ -192,15 +178,8 @@ const VEHICLES := [
 				"wheels": "rugged", "spoiler": "none", "livery": "solid",
 			}},
 		},
-		"stats": {
-			"mass": 1.15, "engine_power": 780.0, "max_speed": 700.0,
-			"acceleration": 1.0, "reverse_speed": 240.0,
-			"steering_rate": 3.1, "steering_response": 7.2,
-			"grip": 0.9, "lateral_grip": 11.0, "drift_factor": 0.22,
-			"brake_force": 1050.0, "handbrake_force": 280.0,
-			"boost_power": 500.0, "boost_capacity": 90.0,
-			"boost_recharge": 8.0, "durability": 75.0,
-		},
+		"stats_path": "res://data/vehicles/scrapjaw.tres",
+		"ratings": {"speed": 0.972222, "grip": 0.90, "mass": 0.958333, "drift": 0.523810},
 	},
 	{
 		"id": "flicker",
@@ -217,15 +196,8 @@ const VEHICLES := [
 				"wheels": "mesh", "spoiler": "wing", "livery": "side_flash",
 			}},
 		},
-		"stats": {
-			"mass": 0.72, "engine_power": 700.0, "max_speed": 665.0,
-			"acceleration": 1.12, "reverse_speed": 255.0,
-			"steering_rate": 4.2, "steering_response": 11.0,
-			"grip": 0.72, "lateral_grip": 9.0, "drift_factor": 0.38,
-			"brake_force": 940.0, "handbrake_force": 210.0,
-			"boost_power": 560.0, "boost_capacity": 110.0,
-			"boost_recharge": 13.0, "durability": 42.0,
-		},
+		"stats_path": "res://data/vehicles/flicker.tres",
+		"ratings": {"speed": 0.923611, "grip": 0.72, "mass": 0.60, "drift": 0.904762},
 	},
 ]
 
@@ -452,8 +424,12 @@ static func create_vehicle_stats(vehicle_id: String) -> VehicleStats:
 	var vehicle := get_vehicle(vehicle_id)
 	if vehicle.is_empty():
 		vehicle = get_vehicle("rustbug")
-	var resource := VehicleStats.new()
-	var stats: Dictionary = vehicle["stats"]
-	for property_name: String in stats:
-		resource.set(property_name, stats[property_name])
+	var stats_path := String(vehicle.get("stats_path", ""))
+	var source := ResourceLoader.load(stats_path) as VehicleStats
+	if source == null:
+		push_error("Vehicle '%s' could not load VehicleStats from %s" % [String(vehicle.get("id", vehicle_id)), stats_path])
+		return VehicleStats.new()
+	var resource := source.duplicate(true) as VehicleStats
+	for validation_error: String in resource.get_validation_errors():
+		push_error("Vehicle '%s' has invalid physics data: %s" % [String(vehicle["id"]), validation_error])
 	return resource

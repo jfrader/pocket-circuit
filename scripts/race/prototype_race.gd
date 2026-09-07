@@ -92,6 +92,7 @@ var _track_variant_presenter: TrackVariantPresenter
 var _countdown_tween: Tween
 var _race_flash_tween: Tween
 var _countdown_active := false
+var _starting_collision_states: Array[Dictionary] = []
 
 
 func _ready() -> void:
@@ -102,6 +103,13 @@ func _ready() -> void:
 		return
 	_create_pause_overlay()
 	_configure_racers()
+	for racer: Node2D in race_manager.get_rankings():
+		if racer is RigidBody2D:
+			var body := racer as RigidBody2D
+			_starting_collision_states.append({"body": body, "layer": body.collision_layer, "mask": body.collision_mask})
+			body.collision_layer = 0
+			body.collision_mask = 0
+	race_manager.race_started.connect(_release_starting_grid)
 	race_manager.race_finished.connect(_on_race_finished)
 	race_manager.position_changed.connect(_on_position_changed)
 	race_manager.wrong_way_changed.connect(_on_wrong_way_changed)
@@ -142,6 +150,7 @@ func _configure_racers() -> void:
 	var opponent_ids: Array = event.get("opponents", FALLBACK_OPPONENTS) if not event.is_empty() else FALLBACK_OPPONENTS
 	var opponent_count := clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
 	var difficulty := String(_session.get("difficulty", "club_circuit"))
+	var grid := _grid_transforms(race_manager.is_reverse_direction())
 	for ai_index in mini(opponent_ids.size(), opponent_count):
 		var driver_id := String(opponent_ids[ai_index])
 		var driver := CATALOG.get_driver(driver_id)
@@ -153,6 +162,9 @@ func _configure_racers() -> void:
 		ai_vehicle.add_to_group("race_vehicle")
 		ai_vehicle.set_player_controlled(false)
 		ai_vehicle.set_controls_locked(true)
+		# Register the rigid body at its actual spawn, not at the scene's
+		# default origin inside the island followed by a live teleport.
+		ai_vehicle.transform = global_transform.affine_inverse() * grid[ai_index + 1]
 		add_child(ai_vehicle)
 		_configure_vehicle(ai_vehicle, ai_index + 1, false, driver, ai_vehicle_id)
 		var ai_controller := AI_CONTROLLER_SCRIPT.new() as AIVehicleController
@@ -175,7 +187,8 @@ func _configure_vehicle(
 		vehicle_id: String
 ) -> void:
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
-	vehicle.global_transform = grid[racer_index]
+	vehicle.freeze = true
+	vehicle.place_on_grid(grid[racer_index])
 	vehicle.collision_layer |= 1
 	vehicle.collision_mask |= 1
 	vehicle.add_to_group("race_vehicle")
@@ -189,6 +202,24 @@ func _configure_vehicle(
 	vehicle.configure_identity(driver_name, vehicle_name, vehicle_id)
 	vehicle.configure_racer_marker(RACER_MARKER_COLORS[racer_index], racer_index)
 	race_manager.register_racer(vehicle, driver_name, vehicle_name, is_player)
+
+
+func _release_starting_grid() -> void:
+	# Clear stale contacts while the body accepts its queued spawn transform.
+	# Restore normal collision immediately after the physics server syncs it.
+	for entry: Dictionary in _starting_collision_states:
+		var body := entry["body"] as RigidBody2D
+		body.collision_layer = 0
+		body.collision_mask = 0
+		body.freeze = false
+	await get_tree().physics_frame
+	await get_tree().physics_frame
+	for entry: Dictionary in _starting_collision_states:
+		var body := entry["body"] as RigidBody2D
+		if is_instance_valid(body):
+			body.collision_layer = int(entry["layer"])
+			body.collision_mask = int(entry["mask"])
+	_starting_collision_states.clear()
 
 
 func _configure_session() -> void:
@@ -272,7 +303,22 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 		for child: Node in container.get_children():
 			var marker := child as Node2D
 			if marker:
-				transforms.append(Transform2D(marker.rotation, marker.position))
+				var heading := marker.rotation
+				var tiles := track_root.get_node_or_null("TrackSurfaceTiles")
+				if track_root.get_node_or_null("RacingLine") == null and tiles != null and tiles.get_child_count() >= 3:
+					# Old snapshots reused the finish-line heading for every slot,
+					# including slots already on a bend. Face the local road tangent.
+					var nearest_distance := INF
+					for i in tiles.get_child_count():
+						var start := (tiles.get_child(i) as Node2D).position
+						var end := (tiles.get_child((i + 1) % tiles.get_child_count()) as Node2D).position
+						var closest := Geometry2D.get_closest_point_to_segment(marker.position, start, end)
+						var distance := marker.position.distance_squared_to(closest)
+						if distance < nearest_distance and start.distance_squared_to(end) > 0.001:
+							nearest_distance = distance
+							var tangent := (end - start) * (-1.0 if reverse else 1.0)
+							heading = tangent.angle() + PI * 0.5
+				transforms.append(Transform2D(heading, marker.position))
 	if transforms.size() == 4:
 		return transforms
 	return REVERSE_GRID_TRANSFORMS if reverse else GRID_TRANSFORMS
@@ -302,7 +348,7 @@ func _update_race_hud() -> void:
 	if not is_instance_valid(_race_hud) or not is_instance_valid(_player_vehicle):
 		return
 	var shown_lap := mini(race_manager.lap_count + 1, race_manager.laps_to_finish)
-	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.stats.boost_capacity, 0.001), 0.0, 1.0)
+	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.get_boost_capacity(), 0.001), 0.0, 1.0)
 	var speed_ratio := clampf(_player_vehicle.speed / maxf(_player_vehicle.get_effective_max_speed(), 0.001), 0.0, 1.2)
 	_race_hud.set_telemetry(
 		race_manager.get_racer_position(_player_vehicle),
@@ -531,6 +577,8 @@ func _push_live_race_state(phase: String, final_lap: bool = false) -> void:
 
 func _ensure_debug_overlay() -> void:
 	if has_node("DebugOverlay"):
+		return
+	if not ResourceLoader.exists("res://scripts/ui/" + "debug_overlay.gd"):
 		return
 	var debug_script := load("res://scripts/ui/" + "debug_overlay.gd") as Script
 	if debug_script == null:

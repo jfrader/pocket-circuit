@@ -36,6 +36,20 @@
 
 ### Changed
 
+- Vehicle handling now uses per-car power curves, axle grip and braking with
+  speed-sensitive steering. Steering settles promptly after release, and
+  releasing the handbrake restores grip instead of sustaining a spin.
+- Rustbug, Pinbolt, Scrapjaw and Flicker have distinct chassis parameters;
+  AI steering and braking use the same handling model as the player.
+- Slippery and slow surfaces preserve entry momentum instead of abruptly
+  cutting speed. Rival cars accelerate between corners, brake for the actual
+  upcoming curve, and no longer mistake repeated escape shuffling for progress.
+- Rivals can use clear apron shortcuts to the next required checkpoint,
+  avoid unnecessary straight-line grip braking, and judge passing space
+  against the actual route rather than nearby wall placement.
+- Starting-grid physics no longer displaces rivals into the island before
+  they launch. Following cars now respect the leader's speed and distance
+  rather than accelerating into a slow queue.
 - Quick Race now accepts arbitrary seeds, and championship events draw a fresh
   seed and deterministic room canvas whenever a race starts.
 - Generated circuits now use larger 1.75x room canvases, longer absolute laps,
