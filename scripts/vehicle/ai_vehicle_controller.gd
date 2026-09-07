@@ -1,6 +1,7 @@
 class_name AIVehicleController
 extends Node
 
+const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const STUCK_TIMEOUT := 2.8
 const STUCK_SPEED := 85.0
 const RECOVERY_GHOST_TIME := 1.0
@@ -360,7 +361,7 @@ func _physics_process(delta: float) -> void:
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var rack_max := 0.0
 	if vehicle.stats.physics_model_version == 1:
-		rack_max = VehicleDynamics.calculate_target_steer_angle(
+		rack_max = DYNAMICS.calculate_target_steer_angle(
 			1.0,
 			vehicle.stats.max_steer_angle_deg,
 			vehicle.speed,
@@ -381,7 +382,7 @@ func _physics_process(delta: float) -> void:
 			# A heavy front-biased car needs more rack angle than a rigid-wheel
 			# bicycle to produce the same curvature. Use its real axle stiffness
 			# rather than giving every chassis the same steering response.
-			var stiffness := VehicleDynamics.calculate_progressive_stiffness(vehicle.surface_grip_multiplier)
+			var stiffness := DYNAMICS.calculate_progressive_stiffness(vehicle.surface_grip_multiplier)
 			var front_slip := vehicle.stats.front_weight_ratio / (vehicle.stats.front_cornering_stiffness * stiffness)
 			var rear_slip := (1.0 - vehicle.stats.front_weight_ratio) / (vehicle.stats.rear_cornering_stiffness * stiffness)
 			var slip_correction := vehicle.stats.mass * vehicle.speed * vehicle.speed * curvature * (front_slip - rear_slip)
@@ -1690,15 +1691,15 @@ func _v1_speed_envelope(radius: float, distance: float) -> float:
 	var grip := minf(vehicle.surface_grip_multiplier, _anticipated_grip)
 	# Reserve some tire capacity for braking and tracking corrections instead
 	# of planning every corner at the theoretical steady-state grip peak.
-	var lateral_accel := minf(vehicle.stats.front_grip, vehicle.stats.rear_grip) * grip * VehicleDynamics.REFERENCE_GRAVITY * _tracking_grip_utilization
+	var lateral_accel := minf(vehicle.stats.front_grip, vehicle.stats.rear_grip) * grip * DYNAMICS.REFERENCE_GRAVITY * _tracking_grip_utilization
 	var margin := 0.86 if difficulty == "sunday_drive" else (0.99 if difficulty == "clockwork" else 0.96)
 	var corner := minf(maximum, sqrt(lateral_accel * radius) * margin * float(personality["corner_pace"]))
-	var rack := VehicleDynamics.calculate_target_steer_angle(1.0, vehicle.stats.max_steer_angle_deg, corner, maximum, vehicle.stats.high_speed_steer_ratio, vehicle.stats.steer_fade_start_ratio)
+	var rack := DYNAMICS.calculate_target_steer_angle(1.0, vehicle.stats.max_steer_angle_deg, corner, maximum, vehicle.stats.high_speed_steer_ratio, vehicle.stats.steer_fade_start_ratio)
 	var minimum_radius := vehicle.stats.wheelbase / maxf(tan(rack), 0.001)
 	corner *= minf(1.0, radius / minimum_radius)
 	var reaction_seconds := 0.34 if difficulty == "sunday_drive" else (0.15 if difficulty == "clockwork" else 0.22)
 	var braking_distance := maxf(0.0, distance - vehicle.speed * reaction_seconds * float(personality["brake_timing"]))
-	var braking_accel := VehicleDynamics.get_effective_brake_accel(vehicle.stats, grip)
+	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip)
 	return minf(maximum, sqrt(corner * corner + 2.0 * braking_accel * braking_distance))
 
 
