@@ -1,0 +1,112 @@
+{
+  "schema_version": 1,
+  "sprite_size": {"width": 48, "height": 64},
+  "types": {
+    "compact": {
+      "display_name": "Compact",
+      "name_nouns": ["Comet", "Pico", "Metro"],
+      "collision_bounds": {"x": 10, "y": 6, "width": 28, "height": 52},
+      "handling": [
+        {"id": "city_nimble", "display_name": "City Nimble", "description": "Short-wheelbase responses with a playful urban character.", "traits": ["nimble", "light", "friendly"]},
+        {"id": "steady_runabout", "display_name": "Steady Runabout", "description": "Predictable turn-in and an easygoing everyday feel.", "traits": ["steady", "approachable", "tidy"]},
+        {"id": "pocket_sprinter", "display_name": "Pocket Sprinter", "description": "Eager direction changes and a cheeky toy-car attitude.", "traits": ["eager", "quick_turning", "playful"]}
+      ]
+    },
+    "coupe": {
+      "display_name": "Coupe",
+      "name_nouns": ["Apex", "Veloce", "Arrow"],
+      "collision_bounds": {"x": 9, "y": 5, "width": 30, "height": 54},
+      "handling": [
+        {"id": "grand_tourer", "display_name": "Grand Tourer", "description": "Long, settled arcs with an assured road-going personality.", "traits": ["settled", "smooth", "confident"]},
+        {"id": "tail_happy", "display_name": "Tail Happy", "description": "A lively rear-biased identity intended for expressive driving.", "traits": ["lively", "rear_biased", "dramatic"]},
+        {"id": "precision_line", "display_name": "Precision Line", "description": "Clean turn-in and a deliberate, technical demeanor.", "traits": ["precise", "focused", "low_slung"]}
+      ]
+    },
+    "muscle": {
+      "display_name": "Muscle",
+      "name_nouns": ["Rumbler", "Hammer", "Thunder"],
+      "collision_bounds": {"x": 8, "y": 6, "width": 32, "height": 52},
+      "handling": [
+        {"id": "straight_line_bruiser", "display_name": "Straight-Line Bruiser", "description": "A planted, heavyweight identity with theatrical power delivery.", "traits": ["heavy", "planted", "theatrical"]},
+        {"id": "street_brawler", "display_name": "Street Brawler", "description": "Broad-shouldered responses and a rough-edged cornering style.", "traits": ["bold", "rough_edged", "wide_stance"]},
+        {"id": "cruiser_torque", "display_name": "Cruiser Torque", "description": "Relaxed steering paired with an unmistakably forceful presence.", "traits": ["relaxed", "forceful", "rumbling"]}
+      ]
+    },
+    "buggy": {
+      "display_name": "Buggy",
+      "name_nouns": ["Dune Hopper", "Trail Beetle", "Dust Skipper"],
+      "collision_bounds": {"x": 5, "y": 5, "width": 38, "height": 54},
+      "handling": [
+        {"id": "dirt_dancer", "display_name": "Dirt Dancer", "description": "Loose-surface agility with an intentionally lively chassis identity.", "traits": ["agile", "loose_surface", "buoyant"]},
+        {"id": "trail_climber", "display_name": "Trail Climber", "description": "A high-clearance, obstacle-ready character with measured responses.", "traits": ["high_clearance", "measured", "rugged"]},
+        {"id": "sand_skimmer", "display_name": "Sand Skimmer", "description": "Light-footed direction changes and a breezy off-road personality.", "traits": ["light_footed", "adventurous", "responsive"]}
+      ]
+    }
+  },
+  "palettes": [
+    {"id": "candy_red", "display_name": "Candy Red", "name_prefix": "Candy", "colors": {"outline": "#17151A", "shadow": "#11131A", "tire": "#25272C", "tire_highlight": "#555B63", "hub": "#BFC7CE", "hub_light": "#EEF2F3", "body_dark": "#7A1F2A", "body_mid": "#C83B47", "body_light": "#F06A68", "accent": "#F5C84B", "glass_dark": "#183044", "glass_mid": "#2D5870", "glass_light": "#91D7DE", "headlight": "#EAF8E8", "taillight": "#F03136", "trim": "#C9D0D2"}},
+    {"id": "marina_blue", "display_name": "Marina Blue", "name_prefix": "Marina", "colors": {"outline": "#111820", "shadow": "#10151A", "tire": "#20272D", "tire_highlight": "#4B5962", "hub": "#AEBCC5", "hub_light": "#E6F1F2", "body_dark": "#174D73", "body_mid": "#267FB0", "body_light": "#58B5D1", "accent": "#F0B94B", "glass_dark": "#122D42", "glass_mid": "#24566E", "glass_light": "#8DD4DB", "headlight": "#EDF9E9", "taillight": "#F14A45", "trim": "#B9CBD2"}},
+    {"id": "citrus_pop", "display_name": "Citrus Pop", "name_prefix": "Citrus", "colors": {"outline": "#1C1A15", "shadow": "#11130F", "tire": "#292922", "tire_highlight": "#616052", "hub": "#BFC1AF", "hub_light": "#F0F1DF", "body_dark": "#9A651C", "body_mid": "#E3A52D", "body_light": "#F7D967", "accent": "#2E887A", "glass_dark": "#17393A", "glass_mid": "#2C6665", "glass_light": "#A6DDD1", "headlight": "#F5F7D9", "taillight": "#D93B32", "trim": "#D0D1B8"}},
+    {"id": "midnight_teal", "display_name": "Midnight Teal", "name_prefix": "Midnight", "colors": {"outline": "#0E1619", "shadow": "#0B1113", "tire": "#1E2729", "tire_highlight": "#47595A", "hub": "#91A8A8", "hub_light": "#D5E3DF", "body_dark": "#123F42", "body_mid": "#176C6C", "body_light": "#38A194", "accent": "#E16655", "glass_dark": "#112C38", "glass_mid": "#205365", "glass_light": "#75C4C8", "headlight": "#DDF7E8", "taillight": "#F04A49", "trim": "#9DB9B5"}},
+    {"id": "desert_sage", "display_name": "Desert Sage", "name_prefix": "Desert", "colors": {"outline": "#1A1B17", "shadow": "#11120F", "tire": "#292A25", "tire_highlight": "#5D5F54", "hub": "#B6B6A5", "hub_light": "#ECECDD", "body_dark": "#58633B", "body_mid": "#88965A", "body_light": "#BBC47B", "accent": "#D77A3C", "glass_dark": "#26383B", "glass_mid": "#486166", "glass_light": "#A8CBC4", "headlight": "#F0F2D9", "taillight": "#C9483D", "trim": "#C8C8B8"}},
+    {"id": "plum_soda", "display_name": "Plum Soda", "name_prefix": "Plum", "colors": {"outline": "#1A1420", "shadow": "#100D14", "tire": "#29242E", "tire_highlight": "#5D5366", "hub": "#B9AEC5", "hub_light": "#EEE7F3", "body_dark": "#572E6E", "body_mid": "#8B4BA7", "body_light": "#C378D0", "accent": "#65C7A5", "glass_dark": "#1A3044", "glass_mid": "#315A71", "glass_light": "#98D2D8", "headlight": "#E9F6E9", "taillight": "#F0525B", "trim": "#C9BDD2"}}
+  ],
+  "parts": {
+    "hood": [
+      {"id": "smooth", "display_name": "Smooth Hood"},
+      {"id": "twin_vents", "display_name": "Twin-Vent Hood"},
+      {"id": "power_scoop", "display_name": "Power-Scoop Hood"},
+      {"id": "flat", "display_name": "Flat Hood"},
+      {"id": "dual_scoop", "display_name": "Dual-Scoop Hood"},
+      {"id": "ridged", "display_name": "Ridged Hood"}
+    ],
+    "cabin": [
+      {"id": "bubble", "display_name": "Bubble Cabin"},
+      {"id": "angular", "display_name": "Angular Cabin"},
+      {"id": "panoramic", "display_name": "Panoramic Cabin"},
+      {"id": "low", "display_name": "Low Cabin"},
+      {"id": "notched", "display_name": "Notched Cabin"},
+      {"id": "fastback", "display_name": "Fastback Cabin"},
+      {"id": "cage", "display_name": "Cage Cabin"}
+    ],
+    "bumpers": [
+      {"id": "chrome", "display_name": "Chrome Bumpers"},
+      {"id": "sport", "display_name": "Sport Bumpers"},
+      {"id": "utility", "display_name": "Utility Bumpers"},
+      {"id": "slim", "display_name": "Slim Bumpers"},
+      {"id": "wide", "display_name": "Wide Bumpers"},
+      {"id": "pipe", "display_name": "Pipe Bumpers"}
+    ],
+    "wheels": [
+      {"id": "classic", "display_name": "Classic Wheels"},
+      {"id": "mesh", "display_name": "Mesh Wheels"},
+      {"id": "rugged", "display_name": "Rugged Wheels"},
+      {"id": "spoke", "display_name": "Spoke Wheels"},
+      {"id": "disc", "display_name": "Disc Wheels"},
+      {"id": "open", "display_name": "Open Wheels"},
+      {"id": "beadlock", "display_name": "Beadlock Wheels"}
+    ],
+    "spoiler": [
+      {"id": "none", "display_name": "No Spoiler"},
+      {"id": "lip", "display_name": "Deck-Lip Spoiler"},
+      {"id": "wing", "display_name": "Raised Wing"},
+      {"id": "tall", "display_name": "Tall Spoiler"},
+      {"id": "winged", "display_name": "Winged Spoiler"},
+      {"id": "hoop", "display_name": "Rear Hoop"}
+    ],
+    "livery": [
+      {"id": "solid", "display_name": "Solid"},
+      {"id": "center_stripe", "display_name": "Center Stripe"},
+      {"id": "twin_stripe", "display_name": "Twin Stripes"},
+      {"id": "side_flash", "display_name": "Side Flash"},
+      {"id": "checker", "display_name": "Checker Band"},
+      {"id": "sunburst", "display_name": "Sunburst"},
+      {"id": "hood_stripe", "display_name": "Hood Stripe"},
+      {"id": "side_swoosh", "display_name": "Side Swoosh"},
+      {"id": "two_tone", "display_name": "Two-Tone Split"},
+      {"id": "racing_stripe", "display_name": "Racing Stripe"},
+      {"id": "dust_kick", "display_name": "Dust Kick"},
+      {"id": "hash_marks", "display_name": "Hash Marks"}
+    ]
+  }
+}

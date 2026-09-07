@@ -1,10 +1,9 @@
 extends RefCounted
-## Vendored from GurisitosGames/procedural-2d at f8eb038 for GURI-319.
 class_name ProceduralCarGenerator
 
 ## Deterministic, JSON-friendly top-down toy car generation.
 
-const CATALOG_PATH := "res://data/vendor/procedural_2d/car_catalog.json"
+const CATALOG_PATH := "res://data/cars/car_catalog.json"
 const RNG_MODULUS := 2147483647
 const SUPPORTED_TYPES: Array[String] = ["compact", "coupe", "muscle", "buggy"]
 const PALETTE_IDS: Array[String] = [
@@ -127,9 +126,9 @@ static func validate_options(car_type: String, options: Dictionary) -> String:
 
 
 ## Generates a self-contained payload. Every choice has its own seed stream so overrides are isolated.
-static func generate(input_seed: int, car_type: String, options: Dictionary = {}) -> Dictionary:
-	if input_seed < 0:
-		push_error("ProceduralCarGenerator rejected seed %s; seed must be non-negative." % input_seed)
+static func generate(seed: int, car_type: String, options: Dictionary = {}) -> Dictionary:
+	if seed < 0:
+		push_error("ProceduralCarGenerator rejected seed %s; seed must be non-negative." % seed)
 		return {}
 	if not SUPPORTED_TYPES.has(car_type):
 		push_error(
@@ -145,7 +144,7 @@ static func generate(input_seed: int, car_type: String, options: Dictionary = {}
 	if catalog_data.is_empty():
 		return {}
 
-	var mixed_seed := _mix_seed(input_seed, car_type)
+	var mixed_seed := _mix_seed(seed, car_type)
 	var nested: Dictionary = options.get("parts", {})
 	var selected_parts := {}
 	for field in PART_FIELDS:
@@ -189,7 +188,7 @@ static func generate(input_seed: int, car_type: String, options: Dictionary = {}
 
 	return {
 		"schema_version": 1,
-		"seed": input_seed,
+		"seed": seed,
 		"type": car_type,
 		"sprite_size": {"width": 48, "height": 64},
 		"palette_id": palette_id,
@@ -240,8 +239,8 @@ static func _load_catalog() -> Dictionary:
 	return _catalog_cache
 
 
-static func _mix_seed(input_seed: int, car_type: String) -> int:
-	var normalized := input_seed % RNG_MODULUS
+static func _mix_seed(seed: int, car_type: String) -> int:
+	var normalized := seed % RNG_MODULUS
 	return ((normalized + int(TYPE_SALTS[car_type])) * 48271 + 69621) % RNG_MODULUS
 
 

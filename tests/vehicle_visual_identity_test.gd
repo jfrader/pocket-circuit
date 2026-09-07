@@ -19,7 +19,7 @@ func _initialize() -> void:
 		var texture := car_sprite.texture
 		if not _expect(texture != null, "%s should resolve a procedural texture" % vehicle_id):
 			return
-		if not _expect(texture.get_size() == Vector2(48.0, 64.0), "%s should use the 48x64 race sprite contract" % vehicle_id):
+		if not _expect(texture.get_size() == Vector2(96.0, 128.0), "%s should use the native 96x128 race sprite" % vehicle_id):
 			return
 		if not _expect(texture == IDENTITIES.car_texture(vehicle_id), "%s should reuse the shared texture cache" % vehicle_id):
 			return
@@ -27,7 +27,7 @@ func _initialize() -> void:
 		if not _expect(not image_hashes.has(image_hash), "%s should keep distinct rendered pixels" % vehicle_id):
 			return
 		image_hashes[image_hash] = vehicle_id
-		if not _expect(car_sprite.scale == Vector2.ONE, "%s should render at the race scene's authored footprint" % vehicle_id):
+		if not _expect(car_sprite.scale == Vector2.ONE * 0.5, "%s should display native art at the race scene's authored footprint" % vehicle_id):
 			return
 		if not _expect(car_sprite.self_modulate == Color.WHITE, "%s should keep its generated palette instead of a runtime tint" % vehicle_id):
 			return

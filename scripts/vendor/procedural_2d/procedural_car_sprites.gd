@@ -1,11 +1,11 @@
 extends RefCounted
-## Vendored from GurisitosGames/procedural-2d at f8eb038 for GURI-319.
 class_name ProceduralCarSprites
 
 ## Payload-only, hard-pixel 48x64 top-down toy car rendering.
 
 const IMAGE_WIDTH := 48
 const IMAGE_HEIGHT := 64
+const NativeArt = preload("res://scripts/vendor/procedural_2d/procedural_car_art.gd")
 const TYPES := ["compact", "coupe", "muscle", "buggy"]
 const PALETTE_IDS := [
 	"candy_red", "marina_blue", "citrus_pop", "midnight_teal", "desert_sage", "plum_soda",
@@ -43,6 +43,22 @@ const ANCHORS := {
 	"rear": {"x": 24, "y": 59},
 	"driver": {"x": 21, "y": 32},
 }
+## Number of wheel-spin frames. Each frame advances the hub motif by 90°.
+const WHEEL_FRAME_COUNT := 4
+## Nominal travel in pixels between wheel-spin frames. A full rotation is four
+## frames, so the nominal rolling circumference is 64px (≈ a 20px wheel).
+const WHEEL_ROLL_DISTANCE := 16.0
+## Canonical tyre family. Every car shares one rubber colour, one rim highlight,
+## one hub colour, and one hub-light colour; only the bounding wheel size varies
+## by car type. The hub motif varies per wheels part ID (see `_hub_offsets`) while
+## the rubber ring and edge treatment stay identical everywhere. The palette tyre
+## fields remain in the frozen payload contract for byte-compatibility but no
+## longer drive tyre pixels.
+const TYRE_OUTLINE := Color("#17151A")
+const TYRE_RUBBER := Color("#25272C")
+const TYRE_HIGHLIGHT := Color("#555B63")
+const TYRE_HUB := Color("#BFC7CE")
+const TYRE_HUB_LIGHT := Color("#EEF2F3")
 
 
 ## Returns an empty string for a valid self-contained car payload.
@@ -137,37 +153,132 @@ static func validate_payload(payload: Dictionary) -> String:
 
 
 ## Renders a transparent RGBA8 image from payload data only.
-static func car_image(payload: Dictionary) -> Image:
+static func car_image(payload: Dictionary, pixel_scale: int = 1) -> Image:
+	return _render_car(payload, 0, 0, pixel_scale)
+
+
+## Four full-car frames (48x64) with the hub motif rotated 90° per frame.
+## Frame 0 is byte-identical to `car_image(payload)`.
+static func car_frames(payload: Dictionary, pixel_scale: int = 1) -> Array[Image]:
+	var frames: Array[Image] = []
+	for rotation in range(WHEEL_FRAME_COUNT):
+		frames.append(_render_car(payload, rotation, 0, pixel_scale))
+	return frames
+
+
+## Five steering poses (48x64) in steer order -2, -1, 0, +1, +2 (index 0..4).
+## Only the two front wheels change: they angle (rotate around their own centres)
+## by -24°, -12°, 0°, +12°, +24°, so the tyre reads as turned, never translated.
+## The rear wheels, body, and every other pixel stay identical across all five
+## poses. Pose 2 (0°) is byte-identical to `car_image(payload)`.
+static func steer_frames(payload: Dictionary, pixel_scale: int = 1) -> Array[Image]:
+	var frames: Array[Image] = []
+	for steer in range(-2, 3):
+		frames.append(_render_car(payload, 0, steer, pixel_scale))
+	return frames
+
+
+## Five steering poses composed with one wheel-spin frame. `spin_frame` indexes
+## `car_frames(payload)` (0..3, wrapped); `steer_frames(payload)` is exactly
+## `car_steer_frames(payload, 0)`.
+static func car_steer_frames(payload: Dictionary, spin_frame: int = 0, pixel_scale: int = 1) -> Array[Image]:
+	var rotation := posmod(spin_frame, WHEEL_FRAME_COUNT)
+	var frames: Array[Image] = []
+	for steer in range(-2, 3):
+		frames.append(_render_car(payload, rotation, steer, pixel_scale))
+	return frames
+
+
+## Four wheel tiles (one per rotation state) sized to this car's wheel profile.
+## Each tile is the tyre + hub motif in isolation, so a game can composite the
+## spinning wheels onto its own chassis or drive an AnimatedSprite2D.
+static func wheel_frames(payload: Dictionary, pixel_scale: int = 1) -> Array[Image]:
+	var error := validate_payload(payload)
+	if not error.is_empty():
+		push_error("ProceduralCarSprites rejected payload: %s." % error)
+		return []
+	if pixel_scale == 2:
+		return NativeArt.new().wheel_tiles(payload)
+	if pixel_scale != 1:
+		push_error("pixel_scale must be 1 (48x64) or 2 (native 96x128)")
+		return []
+	var rect := _wheel_rects(String(payload["type"]))[0]
+	var tiles: Array[Image] = []
+	for rotation in range(WHEEL_FRAME_COUNT):
+		var tile := Image.create(rect.size.x, rect.size.y, false, Image.FORMAT_RGBA8)
+		tile.fill(Color(0, 0, 0, 0))
+		_draw_single_wheel(tile, Rect2i(Vector2i.ZERO, rect.size), rotation, String(payload["parts"]["wheels"]))
+		tiles.append(tile)
+	return tiles
+
+
+## Static helper mapping motion to a wheel-spin frame. Returns 0 when stopped
+## and cycles 0..3 while rolling: distance = speed_px * elapsed_s, and one frame
+## advances every WHEEL_ROLL_DISTANCE pixels of travel. Drive an AnimatedSprite2D
+## (set frame) or swap `car_frames(payload)[wheel_frame_index(...)]` manually.
+static func wheel_frame_index(speed_px: float, elapsed_s: float) -> int:
+	if speed_px <= 0.0 or elapsed_s <= 0.0:
+		return 0
+	var distance := speed_px * elapsed_s
+	return posmod(int(distance / WHEEL_ROLL_DISTANCE), WHEEL_FRAME_COUNT)
+
+
+## Maps a steering input in [-1, 1] to a steer pose index 0..4: -1 -> 0 (full
+## left), 0 -> 2 (straight), +1 -> 4 (full right). Intermediate inputs round to
+## the nearest pose and out-of-range values clamp.
+static func steer_pose_index(steer: float) -> int:
+	var clamped := clampf(steer, -1.0, 1.0)
+	return clampi(int(round((clamped + 1.0) * 2.0)), 0, 4)
+
+
+## Combined motion helper: returns `{spin: int, steer_pose: int}`. `spin` is the
+## wheel-spin frame from `wheel_frame_index`; `steer_pose` is the steer pose from
+## `steer_pose_index`. Index the pose set with
+## `car_steer_frames(payload, spin)[steer_pose]`.
+static func car_frame_index(speed_px: float, elapsed_s: float, steer: float = 0.0) -> Dictionary:
+	return {
+		"spin": wheel_frame_index(speed_px, elapsed_s),
+		"steer_pose": steer_pose_index(steer),
+	}
+
+
+static func _render_car(payload: Dictionary, wheel_rotation: int, steer: int = 0, pixel_scale: int = 1) -> Image:
 	var error := validate_payload(payload)
 	if not error.is_empty():
 		push_error("ProceduralCarSprites rejected payload: %s." % error)
 		return null
+	if pixel_scale == 2:
+		return NativeArt.new().render(payload, wheel_rotation, steer * 12.0)["car"]
+	if pixel_scale != 1:
+		push_error("pixel_scale must be 1 (48x64) or 2 (native 96x128)")
+		return null
 	var image := Image.create(IMAGE_WIDTH, IMAGE_HEIGHT, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0, 0, 0, 0))
 	var spans := _body_spans(String(payload["type"]), payload["parts"])
-	_draw_contact_shadow(image, spans, String(payload["type"]), payload["parts"], payload["palette"])
+	_draw_contact_shadow(image, spans, String(payload["type"]), payload["palette"], steer)
 	_draw_body(image, spans, payload["palette"])
 	_draw_livery(image, spans, payload["parts"], payload["palette"])
 	_draw_body_planes(image, spans, String(payload["type"]), payload["parts"], payload["palette"])
+	_draw_hood_form(image, spans, String(payload["type"]), payload["palette"])
 	_draw_cabin(image, String(payload["type"]), payload["parts"], payload["palette"])
 	_draw_bumpers(image, String(payload["type"]), payload["parts"], payload["palette"])
 	_draw_spoiler(image, String(payload["type"]), payload["parts"], payload["palette"])
 	_draw_lights_and_trim(image, spans, String(payload["type"]), payload["palette"])
-	_draw_wheels(image, String(payload["type"]), payload["parts"], payload["palette"])
+	_draw_wheels(image, String(payload["type"]), payload["parts"], payload["palette"], wheel_rotation, steer)
 	return image
 
 
 
-static func car_texture(payload: Dictionary) -> Texture2D:
-	var image := car_image(payload)
+static func car_texture(payload: Dictionary, pixel_scale: int = 1) -> Texture2D:
+	var image := car_image(payload, pixel_scale)
 	return ImageTexture.create_from_image(image) if image != null else null
 
 
-static func save_car_png(payload: Dictionary, output_path: String) -> Error:
+static func save_car_png(payload: Dictionary, output_path: String, pixel_scale: int = 1) -> Error:
 	if output_path.is_empty():
 		push_error("ProceduralCarSprites requires a non-empty PNG output path.")
 		return ERR_INVALID_PARAMETER
-	var image := car_image(payload)
+	var image := car_image(payload, pixel_scale)
 	if image == null:
 		return ERR_INVALID_DATA
 	var save_error := image.save_png(output_path)
@@ -271,71 +382,209 @@ static func _body_spans(car_type: String, parts: Dictionary = {}) -> Array[Vecto
 	return spans
 
 
-static func _draw_contact_shadow(image: Image, spans: Array[Vector2i], car_type: String, parts: Dictionary, palette: Dictionary) -> void:
-	var shadow := Color(palette["shadow"], 0.34)
+static func _draw_contact_shadow(image: Image, spans: Array[Vector2i], car_type: String, palette: Dictionary, steer: int = 0) -> void:
+	var shadow := Color(palette["shadow"], 0.42)
 	for y in range(IMAGE_HEIGHT - 6):
 		var span := spans[y]
 		if span.x < 0:
 			continue
 		for x in range(maxi(2, span.x - 2), mini(44, span.y + 3)):
 			_set_pixel(image, x + 1, mini(61, y + 3), shadow)
-	var wheel_rects := _wheel_rects(car_type, parts)
-	for rect in wheel_rects:
-		_fill_rect(image, Rect2i(rect.position + Vector2i(1, 3), rect.size), shadow)
+	var wheel_rects := _wheel_rects(car_type)
+	for index in range(wheel_rects.size()):
+		var rect: Rect2i = wheel_rects[index]
+		# A thin ground-contact strip under each tyre; the heavier shadow stays
+		# under the center body so catalog-sheet sprites don't get muddy. The
+		# front wheels carry their own strip with them when they steer (baked
+		# into the angled wheel buffer), so the straight strip is only drawn here
+		# for the never-steered rear wheels and for straight front wheels.
+		if index < 2 and steer != 0:
+			continue
+		_fill_rect(image, Rect2i(Vector2i(rect.position.x + 1, rect.end.y), Vector2i(rect.size.x - 1, 1)), shadow)
 
 
-static func _draw_wheels(image: Image, car_type: String, parts: Dictionary, palette: Dictionary) -> void:
-	var outline := Color(palette["outline"])
-	var tire := Color(palette["tire"])
-	var tire_highlight := Color(palette["tire_highlight"])
-	var hub := Color(palette["hub"])
-	var hub_light := Color(palette["hub_light"])
-	for rect: Rect2i in _wheel_rects(car_type, parts):
-		_fill_rect(image, rect, outline)
-		_fill_rect(image, Rect2i(rect.position + Vector2i(1, 1), rect.size - Vector2i(2, 2)), tire)
-		for y in range(rect.position.y + 2, rect.end.y - 2, 3):
-			_set_pixel(image, rect.position.x + (1 if rect.position.x < 20 else rect.size.x - 2), y, tire_highlight)
-		var center := rect.get_center()
-		match parts["wheels"]:
-			"classic":
-				_fill_rect(image, Rect2i(center - Vector2i(1, 2), Vector2i(3, 4)), hub)
-				_set_pixel(image, center.x, center.y - 1, hub_light)
-			"mesh":
-				for offset in [Vector2i(0, -2), Vector2i(0, 2), Vector2i(-1, 0), Vector2i(1, 0)]:
-					_set_pixel(image, center.x + offset.x, center.y + offset.y, hub)
-				_set_pixel(image, center.x, center.y, hub_light)
-			"rugged":
-				_fill_rect(image, Rect2i(center - Vector2i(1, 1), Vector2i(3, 3)), hub)
-				_set_pixel(image, center.x, center.y, outline)
-			"spoke":
-				for offset in range(-2, 3):
-					_set_pixel(image, center.x + offset, center.y, hub)
-				for offset in range(-2, 3):
-					_set_pixel(image, center.x, center.y + offset, hub)
-				_set_pixel(image, center.x, center.y, hub_light)
-			"disc":
-				_fill_rect(image, Rect2i(center - Vector2i(2, 2), Vector2i(5, 5)), hub)
-				_set_pixel(image, center.x, center.y, hub_light)
-				_set_pixel(image, center.x - 1, center.y + 1, tire_highlight)
-			"open":
-				for offset in range(-2, 3):
-					_set_pixel(image, center.x + offset, center.y - 2, hub)
-					_set_pixel(image, center.x + offset, center.y + 2, hub)
-				for offset in range(-1, 2):
-					_set_pixel(image, center.x - 2, center.y + offset, hub)
-					_set_pixel(image, center.x + 2, center.y + offset, hub_light)
-				_set_pixel(image, center.x, center.y, outline)
-			"beadlock":
-				_fill_rect(image, Rect2i(center - Vector2i(2, 2), Vector2i(5, 5)), hub)
-				for offset in range(-2, 3):
-					_set_pixel(image, center.x + offset, center.y - 2, outline)
-					_set_pixel(image, center.x + offset, center.y + 2, outline)
-					_set_pixel(image, center.x - 2, center.y + offset, outline)
-					_set_pixel(image, center.x + 2, center.y + offset, outline)
-				_set_pixel(image, center.x, center.y, hub_light)
+static func _draw_wheels(image: Image, car_type: String, parts: Dictionary, palette: Dictionary, rotation: int, steer: int = 0) -> void:
+	var wheels_id := String(parts.get("wheels", "classic"))
+	var rects := _wheel_rects(car_type)
+	for index in range(rects.size()):
+		var rect: Rect2i = rects[index]
+		if index < 2 and steer != 0:
+			_draw_wheel_angled(image, rect, rotation, wheels_id, _steer_angle_deg(steer), Color(palette["shadow"], 0.42))
+		else:
+			_draw_single_wheel(image, rect, rotation, wheels_id)
 
 
-static func _wheel_rects(car_type: String, parts: Dictionary = {}) -> Array[Rect2i]:
+## Draws one tyre (canonical rubber, rim, and per-wheels-ID hub motif) into
+## `image` at `rect`. The hub motif rotates 90° clockwise per `rotation` step;
+## the rubber ring and edge treatment are identical in every state and for every
+## car.
+static func _draw_single_wheel(image: Image, rect: Rect2i, rotation: int, wheels_id: String) -> void:
+	_draw_wheel_tyre(image, rect)
+	_draw_hub(image, rect.get_center(), rotation, wheels_id)
+
+
+## Draws the canonical rubber ring, inner-rim key light, and corner rounding into
+## `image` at `rect`. Shared by straight and angled wheels so both use identical
+## tyre pixels.
+static func _draw_wheel_tyre(image: Image, rect: Rect2i) -> void:
+	var rubber_dark := TYRE_RUBBER.darkened(0.32)
+	_fill_rect(image, rect, TYRE_OUTLINE)
+	_fill_rect(image, Rect2i(rect.position + Vector2i(1, 1), rect.size - Vector2i(2, 2)), rubber_dark)
+	# Round the four inner corners so wheels stop reading as square blocks.
+	_set_pixel(image, rect.position.x + 1, rect.position.y + 1, TYRE_OUTLINE)
+	_set_pixel(image, rect.end.x - 2, rect.position.y + 1, TYRE_OUTLINE)
+	_set_pixel(image, rect.position.x + 1, rect.end.y - 2, TYRE_OUTLINE)
+	_set_pixel(image, rect.end.x - 2, rect.end.y - 2, TYRE_OUTLINE)
+	# Bright inner-rim key light across the top shoulder of the tyre.
+	for x in range(rect.position.x + 2, rect.end.x - 2):
+		_set_pixel(image, x, rect.position.y + 2, TYRE_HIGHLIGHT)
+
+
+## Maps a steer pose (-2..+2) to the front-wheel angle in degrees: -24°, -12°,
+## 0°, +12°, +24°. Negative angles turn left (counter-clockwise from the
+## front-up orientation), positive angles turn right.
+static func _steer_angle_deg(steer: int) -> float:
+	return float(clampi(steer, -2, 2)) * 12.0
+
+
+## Draws one front wheel rotated `angle_deg` around its own centre. The straight
+## wheel (canonical rubber ring + tread/edge treatment + hub motif) is painted
+## into a local buffer with the exact same `_draw_wheel_tyre` / `_draw_hub`
+## painters used for straight wheels, plus its ground-contact strip one row below
+## the tyre, then every destination pixel in a bounding box around the centre is
+## inverse-rotated by -angle and sampled back from that buffer with
+## nearest-neighbour rounding. This yields a crisp angled wheel (a rhombus /
+## parallelogram read) rather than a shifted square, with the contact strip
+## angling along with it so nothing straight remains beneath the turned tyre.
+## Only opaque source pixels are written, so the body shows through wherever the
+## rotated wheel no longer covers it.
+static func _draw_wheel_angled(image: Image, rect: Rect2i, rotation: int, wheels_id: String, angle_deg: float, shadow_color: Color) -> void:
+	var wheel_size := rect.size
+	# One extra row below the tyre holds the ground-contact strip so the whole
+	# wheel + strip composite rotates together instead of leaving a straight,
+	# screen-aligned shadow bar under an angled wheel.
+	var buffer := Image.create(wheel_size.x, wheel_size.y + 1, false, Image.FORMAT_RGBA8)
+	buffer.fill(Color(0, 0, 0, 0))
+	var local_rect := Rect2i(Vector2i.ZERO, wheel_size)
+	_draw_wheel_tyre(buffer, local_rect)
+	_draw_hub(buffer, local_rect.get_center(), rotation, wheels_id)
+	_fill_rect(buffer, Rect2i(Vector2i(1, wheel_size.y), Vector2i(wheel_size.x - 1, 1)), shadow_color)
+
+	var angle := deg_to_rad(angle_deg)
+	var cosine := cos(angle)
+	var sine := sin(angle)
+	var center := Vector2(rect.position) + Vector2(wheel_size) * 0.5
+	var half_w := wheel_size.x * 0.5
+	var half_h := wheel_size.y * 0.5
+
+	# Axis-aligned bounding box guaranteed to contain the rotated rectangle and
+	# the contact strip one row below it.
+	var radius_x := int(ceil(abs(half_w * cosine) + abs(half_h * sine))) + 2
+	var radius_y := int(ceil(abs(half_w * sine) + abs(half_h * cosine))) + 3
+	var min_x := maxi(0, int(floor(center.x)) - radius_x)
+	var max_x := mini(IMAGE_WIDTH - 1, int(ceil(center.x)) + radius_x)
+	var min_y := maxi(0, int(floor(center.y)) - radius_y)
+	var max_y := mini(IMAGE_HEIGHT - 1, int(ceil(center.y)) + radius_y)
+
+	for y in range(min_y, max_y + 1):
+		for x in range(min_x, max_x + 1):
+			var offset := Vector2(x, y) - center
+			# Inverse rotation: rotate the destination offset by -angle to find
+			# the un-rotated local wheel coordinate.
+			var local_x := half_w + offset.x * cosine + offset.y * sine
+			var local_y := half_h - offset.x * sine + offset.y * cosine
+			var source_x := int(round(local_x))
+			var source_y := int(round(local_y))
+			if source_x < 0 or source_y < 0 or source_x >= wheel_size.x or source_y >= wheel_size.y + 1:
+				continue
+			var color := buffer.get_pixel(source_x, source_y)
+			if color.a > 0.0:
+				_set_pixel(image, x, y, color)
+
+
+## Per-wheels-ID hub motif, drawn with the canonical hub colours. `hub` offsets
+## use TYRE_HUB (silver) and `light` offsets use TYRE_HUB_LIGHT (bright). Every
+## motif deliberately breaks 4-fold symmetry (by shape or by one off-centre lug)
+## so the four wheel-spin frames are pairwise distinct while staying readable at
+## 48x64 inside the 3x3 hub area.
+static func _hub_offsets(wheels_id: String) -> Dictionary:
+	match wheels_id:
+		"disc":
+			# Solid disc: a full 3x3 cap with a bright centre and one bright
+			# off-centre lug so the spin is visible.
+			return {
+				"hub": [Vector2i(0, -1), Vector2i(1, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)],
+				"light": [Vector2i(0, 0), Vector2i(-1, -1)],
+			}
+		"classic":
+			# 5-lug ring: four corner lugs around a bright centre cap, plus a
+			# bright top lug that orbits through the spin frames.
+			return {
+				"hub": [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1)],
+				"light": [Vector2i(0, 0), Vector2i(0, -1)],
+			}
+		"mesh":
+			# Plus/cross mesh: four cardinal arms meet at a bright centre, with a
+			# bright top-left lug for spin visibility.
+			return {
+				"hub": [Vector2i(0, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(0, 1)],
+				"light": [Vector2i(0, 0), Vector2i(-1, -1)],
+			}
+		"rugged":
+			# Beadlock ring: a chunky hollow ring with a dark centre and a bright
+			# top lug so the heavy beadlock reads as rolling.
+			return {
+				"hub": [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 0), Vector2i(1, 0), Vector2i(-1, 1), Vector2i(0, 1), Vector2i(1, 1)],
+				"light": [Vector2i(0, -1)],
+			}
+		"spoke":
+			# 3-spoke: three radial arms (top, lower-left, lower-right) around a
+			# bright centre; inherently asymmetric, so spin frames differ without
+			# an extra lug.
+			return {
+				"hub": [Vector2i(0, -1), Vector2i(-1, 1), Vector2i(1, 1)],
+				"light": [Vector2i(0, 0)],
+			}
+		"open":
+			# Open hub: a bare bright centre with one bright lug; the dark tyre
+			# body shows through for a minimal, see-through look.
+			return {
+				"hub": [],
+				"light": [Vector2i(0, 0), Vector2i(-1, -1)],
+			}
+		"beadlock":
+			# Beadlock bolts: four bright rim bolts around a silver centre, plus a
+			# bright top lug that orbits through the spin frames.
+			return {
+				"hub": [Vector2i(0, 0)],
+				"light": [Vector2i(-1, -1), Vector2i(1, -1), Vector2i(-1, 1), Vector2i(1, 1), Vector2i(0, -1)],
+			}
+	return {"hub": [Vector2i(0, 0)], "light": []}
+
+
+## Draws one hub motif at `center`, rotating every offset 90° clockwise per
+## `rotation` step. Silver (`hub`) offsets draw first, bright (`light`) offsets
+## on top, so the centre cap and lug stay crisp.
+static func _draw_hub(image: Image, center: Vector2i, rotation: int, wheels_id: String) -> void:
+	var motif := _hub_offsets(wheels_id)
+	var hub_offsets: Array = motif["hub"]
+	var light_offsets: Array = motif["light"]
+	for offset: Vector2i in hub_offsets:
+		var rotated := _rotate_offset(offset, rotation)
+		_set_pixel(image, center.x + rotated.x, center.y + rotated.y, TYRE_HUB)
+	for offset: Vector2i in light_offsets:
+		var rotated := _rotate_offset(offset, rotation)
+		_set_pixel(image, center.x + rotated.x, center.y + rotated.y, TYRE_HUB_LIGHT)
+
+
+static func _rotate_offset(offset: Vector2i, turns: int) -> Vector2i:
+	var result := offset
+	for _index in range(turns % 4):
+		result = Vector2i(-result.y, result.x)
+	return result
+
+
+static func _wheel_rects(car_type: String) -> Array[Rect2i]:
 	var left_x := 5
 	var right_x := 38
 	var width := 5
@@ -369,10 +618,6 @@ static func _wheel_rects(car_type: String, parts: Dictionary = {}) -> Array[Rect
 			front_y = 11
 			rear_y = 41
 			height = 14
-	var wheels := String(parts.get("wheels", "classic"))
-	if wheels in ["rugged", "beadlock", "open"]:
-		left_x = maxi(2, left_x - 1)
-		width = mini(7, width + 1)
 	right_x = mini(right_x, 44 - width)
 	left_x = mini(left_x, 20)
 	return [
@@ -393,17 +638,32 @@ static func _draw_body(image: Image, spans: Array[Vector2i], palette: Dictionary
 		for x in range(span.x - 1, span.y + 2):
 			if not _inside_body(spans, x, y) and _touches_body(spans, x, y):
 				_set_pixel(image, x, y, outline)
+	var shades := [body_light, body_mid, body_dark]
+	var front_y := -1
+	var rear_y := -1
+	for y in range(IMAGE_HEIGHT):
+		if spans[y].x >= 0:
+			if front_y < 0:
+				front_y = y
+			rear_y = y
+	var ramp_height := maxi(1, rear_y - front_y)
 	for y in range(IMAGE_HEIGHT):
 		var span := spans[y]
 		if span.x < 0:
 			continue
+		var rel := float(y - front_y) / float(ramp_height)
 		for x in range(span.x, span.y + 1):
-			var color := body_mid
-			if x <= span.x + 2:
-				color = body_dark
-			elif x >= span.y - 1:
-				color = body_light
-			_set_pixel(image, x, y, color)
+			# Front-to-rear ramp: hood catches the key light, trunk falls away.
+			var shade := _ramp_shade(rel, x, y, 0.34, 0.68)
+			# Cylindrical cross-shade from the top-left key light: the left flank
+			# stays lit near the front while the right flank falls into shadow.
+			if x <= span.x + 1:
+				# Lit only for the front ~half so the key light concentrates in
+				# the top-left corner instead of washing down the whole flank.
+				shade = 0 if rel < 0.55 else mini(2, shade + 1)
+			elif x >= span.y:
+				shade = mini(2, shade + 1)
+			_set_pixel(image, x, y, shades[shade])
 
 
 static func _draw_livery(image: Image, spans: Array[Vector2i], parts: Dictionary, palette: Dictionary) -> void:
@@ -414,11 +674,11 @@ static func _draw_livery(image: Image, spans: Array[Vector2i], parts: Dictionary
 			return
 		"center_stripe":
 			for y in range(7, 58):
-				for x in range(22, 26):
+				for x in range(23, 25):
 					_paint_inside(image, spans, x, y, accent)
 		"twin_stripe":
 			for y in range(7, 58):
-				for x in [19, 20, 27, 28]:
+				for x in [20, 27]:
 					_paint_inside(image, spans, x, y, accent)
 		"side_flash":
 			for y in range(12, 55):
@@ -426,9 +686,9 @@ static func _draw_livery(image: Image, spans: Array[Vector2i], parts: Dictionary
 				for offset in range(3):
 					_paint_inside(image, spans, x + offset, y, accent)
 		"checker":
-			for y in range(44, 51):
-				for x in range(12, 37):
-					if ((x - 12) / 3 + (y - 44) / 3) % 2 == 0:
+			for y in range(45, 50):
+				for x in range(13, 36):
+					if ((x - 13) / 4 + (y - 45) / 3) % 2 == 0:
 						_paint_inside(image, spans, x, y, accent)
 		"sunburst":
 			for y in range(8, 22):
@@ -455,20 +715,22 @@ static func _draw_livery(image: Image, spans: Array[Vector2i], parts: Dictionary
 					_paint_inside(image, spans, x, y, accent)
 		"racing_stripe":
 			for y in range(6, 58):
-				_paint_inside(image, spans, 21, y, accent)
+				if y >= 17 and y <= 44:
+					continue
 				_paint_inside(image, spans, 22, y, accent)
 				_paint_inside(image, spans, 25, y, accent)
-				_paint_inside(image, spans, 26, y, accent)
 		"dust_kick":
-			for y in range(46, 56):
-				for x in range(11, 37):
-					if (x + y) % 2 == 0:
+			for y in range(47, 55):
+				for x in range(12, 36):
+					if ((x - 12) / 4 + (y - 47) / 4) % 2 == 0:
 						_paint_inside(image, spans, x, y, accent)
 		"hash_marks":
 			for y in [16, 24, 32, 40]:
 				for x in range(14, 20):
 					_paint_inside(image, spans, x, y, accent)
+					_paint_inside(image, spans, x, y + 1, accent)
 					_paint_inside(image, spans, x + 14, y, accent)
+					_paint_inside(image, spans, x + 14, y + 1, accent)
 
 
 static func _draw_body_planes(image: Image, spans: Array[Vector2i], car_type: String, parts: Dictionary, palette: Dictionary) -> void:
@@ -480,26 +742,25 @@ static func _draw_body_planes(image: Image, spans: Array[Vector2i], car_type: St
 		_paint_inside(image, spans, x, hood_end, dark)
 		_paint_inside(image, spans, x, 44, dark)
 	for y in range(10, hood_end):
-		_paint_inside(image, spans, 16, y, dark)
-		_paint_inside(image, spans, 31, y, light)
+		_paint_inside(image, spans, 16, y, light)
+		_paint_inside(image, spans, 31, y, dark)
 	match parts["hood"]:
 		"smooth":
 			for x in range(20, 28):
 				_paint_inside(image, spans, x, 11, light)
 		"twin_vents":
-			for y in range(13, 18):
-				for x in [18, 19, 28, 29]:
+			for y in [14, 16]:
+				for x in range(17, 23):
 					_paint_inside(image, spans, x, y, outline)
-				if y % 2 == 1:
-					_paint_inside(image, spans, 20, y, light)
-					_paint_inside(image, spans, 27, y, light)
+				for x in range(25, 31):
+					_paint_inside(image, spans, x, y, outline)
 		"power_scoop":
 			_fill_clipped_rect(image, spans, Rect2i(20, 12, 8, 7), outline)
 			_fill_clipped_rect(image, spans, Rect2i(21, 13, 6, 5), dark)
 			_fill_clipped_rect(image, spans, Rect2i(22, 13, 4, 1), light)
 		"flat":
 			for x in range(18, 30):
-				_paint_inside(image, spans, x, 12, light)
+				_paint_inside(image, spans, x, 12, outline)
 		"dual_scoop":
 			_fill_clipped_rect(image, spans, Rect2i(17, 11, 5, 5), outline)
 			_fill_clipped_rect(image, spans, Rect2i(18, 12, 3, 3), dark)
@@ -511,20 +772,53 @@ static func _draw_body_planes(image: Image, spans: Array[Vector2i], car_type: St
 					_paint_inside(image, spans, x, y, light if y % 4 == 0 else dark)
 	for y in range(47, 54):
 		_paint_inside(image, spans, 17, y, dark)
-		_paint_inside(image, spans, 30, y, light)
+		_paint_inside(image, spans, 30, y, dark)
 	if car_type == "muscle":
 		for x in range(10, 15):
-			_paint_inside(image, spans, x, 22, dark)
-		for x in range(33, 38):
 			_paint_inside(image, spans, x, 22, light)
+		for x in range(33, 38):
+			_paint_inside(image, spans, x, 22, dark)
 	if car_type == "coupe":
 		for y in range(38, 48):
-			_paint_inside(image, spans, 11, y, dark)
-			_paint_inside(image, spans, 36, y, light)
+			_paint_inside(image, spans, 11, y, light)
+			_paint_inside(image, spans, 36, y, dark)
 	if car_type == "buggy":
 		for x in range(12, 36):
 			_paint_inside(image, spans, x, 15, outline)
 			_paint_inside(image, spans, x, 42, outline)
+
+
+## Class-specific hood form language so each body shape reads as a distinct
+## silhouette rather than a generic slab. Kept to a few deliberate pixels.
+static func _draw_hood_form(image: Image, spans: Array[Vector2i], car_type: String, palette: Dictionary) -> void:
+	var dark := Color(palette["body_dark"])
+	var light := Color(palette["body_light"])
+	var outline := Color(palette["outline"])
+	match car_type:
+		"compact":
+			# Short front crease: one darker horizontal just before the windshield.
+			for x in range(15, 33):
+				_paint_inside(image, spans, x, 17, dark)
+		"coupe":
+			# Thin hood channels running forward from the cowl.
+			for y in range(14, 28):
+				_paint_inside(image, spans, 17, y, dark)
+				_paint_inside(image, spans, 30, y, dark)
+		"muscle":
+			# Center seam with a single 1px top-left key highlight.
+			for y in range(8, 23):
+				_paint_inside(image, spans, 24, y, dark)
+			_paint_inside(image, spans, 23, 8, light)
+		"buggy":
+			# One dominant 2px central spine over the front pod, flanked by
+			# shorter, darker secondary bars.
+			for y in range(12, 23):
+				_paint_inside(image, spans, 23, y, dark)
+				_paint_inside(image, spans, 24, y, dark)
+			for x in range(17, 21):
+				_paint_inside(image, spans, x, 17, outline)
+			for x in range(26, 30):
+				_paint_inside(image, spans, x, 21, outline)
 
 
 static func _draw_cabin(image: Image, car_type: String, parts: Dictionary, palette: Dictionary) -> void:
@@ -546,18 +840,38 @@ static func _draw_cabin(image: Image, car_type: String, parts: Dictionary, palet
 			if not _inside_body(cabin_spans, x, y) and _touches_body(cabin_spans, x, y):
 				_set_pixel(image, x, y, outline)
 	if car_type != "buggy":
+		var glass_shades := [glass_light, glass_mid, glass_dark]
+		var cabin_height := maxi(1, bottom_y - top_y)
 		for y in range(IMAGE_HEIGHT):
 			var span := cabin_spans[y]
 			if span.x < 0:
 				continue
+			var rel := float(y - top_y) / float(cabin_height)
 			for x in range(span.x, span.y + 1):
-				var color := glass_mid
-				if x <= span.x + 2:
-					color = glass_dark
-				elif x >= span.y - 2:
-					color = glass_light
-				_set_pixel(image, x, y, color)
+				# Glossy glass: sky reflection fades from light at the top edge
+				# down to dark at the roof line. A narrow blend keeps the glass
+				# smooth instead of dithering into a visible checker.
+				var shade := _ramp_shade(rel, x, y, 0.32, 0.70, 0.045)
+				# Top-left key light: the left edge catches light, the right falls off.
+				if x <= span.x + 1:
+					shade = maxi(0, shade - 1)
+				elif x >= span.y:
+					shade = mini(2, shade + 1)
+				_set_pixel(image, x, y, glass_shades[shade])
+		# A few crisp specular glints on the windshield (top-left reflection).
+		if top_y >= 0:
+			var mid_y := top_y + (bottom_y - top_y) / 2
+			if mid_y < IMAGE_HEIGHT:
+				var mid_span := cabin_spans[mid_y]
+				if mid_span.x >= 0:
+					var start_x := mid_span.x + maxi(2, (mid_span.y - mid_span.x) / 2 - 1)
+					for i in range(3):
+						var glint_x := start_x + i
+						var glint_y := mid_y + i
+						if _inside_body(cabin_spans, glint_x, glint_y):
+							_set_pixel(image, glint_x, glint_y, glass_light)
 	else:
+		# Buggy cockpit: one clean tub + seat frame so the center stays readable.
 		var trim := Color(palette["trim"])
 		for y in range(26, 40):
 			_set_pixel(image, 17, y, outline)
@@ -573,9 +887,10 @@ static func _draw_cabin(image: Image, car_type: String, parts: Dictionary, palet
 			_set_pixel(image, x, top_y + 5, outline)
 		if _inside_body(cabin_spans, x, bottom_y - 4):
 			_set_pixel(image, x, bottom_y - 4, outline)
-	for y in range(top_y + 3, bottom_y - 2):
-		if _inside_body(cabin_spans, 24, y):
-			_set_pixel(image, 24, y, glass_dark)
+	if car_type != "buggy":
+		for y in range(top_y + 3, bottom_y - 2):
+			if _inside_body(cabin_spans, 24, y):
+				_set_pixel(image, 24, y, glass_dark)
 	if parts["cabin"] == "panoramic":
 		for y in range(top_y + 2, bottom_y - 2):
 			if _inside_body(cabin_spans, 27, y):
@@ -600,25 +915,22 @@ static func _draw_cabin(image: Image, car_type: String, parts: Dictionary, palet
 		_set_pixel(image, 18, top_y + 3, outline)
 		_set_pixel(image, 29, top_y + 3, outline)
 	if car_type == "buggy":
+		# Single roll-cage hoop plus per-cabin glints, instead of the old dense
+		# double frame, so suspension/chassis stay readable at 48x64.
 		for x in range(15, 33):
 			_set_pixel(image, x, 25, outline)
 			_set_pixel(image, x, 40, outline)
 		for y in range(25, 41):
 			_set_pixel(image, 15, y, outline)
 			_set_pixel(image, 32, y, outline)
-		for x in range(17, 31):
-			_set_pixel(image, x, 26, outline)
-			_set_pixel(image, x, 39, outline)
 		if parts["cabin"] == "bubble":
-			_set_pixel(image, 17, 27, glass_light)
-			_set_pixel(image, 30, 27, glass_light)
-			_set_pixel(image, 17, 38, glass_dark)
-			_set_pixel(image, 30, 38, glass_dark)
+			_set_pixel(image, 18, 28, glass_light)
+			_set_pixel(image, 29, 28, glass_light)
+			_set_pixel(image, 18, 38, glass_dark)
+			_set_pixel(image, 29, 38, glass_dark)
 		elif parts["cabin"] == "angular":
-			_set_pixel(image, 16, 28, outline)
-			_set_pixel(image, 31, 28, outline)
-			_set_pixel(image, 17, 39, outline)
-			_set_pixel(image, 30, 39, outline)
+			_set_pixel(image, 18, 28, outline)
+			_set_pixel(image, 29, 28, outline)
 		elif parts["cabin"] == "low":
 			_set_pixel(image, 18, 29, glass_mid)
 			_set_pixel(image, 29, 29, glass_mid)
@@ -740,10 +1052,17 @@ static func _draw_lights_and_trim(image: Image, spans: Array[Vector2i], car_type
 		var span := spans[y]
 		if span.x >= 0 and y % 3 != 0:
 			_set_pixel(image, span.x + 1, y, outline)
-			_set_pixel(image, span.y - 1, y, trim)
+			# Keep the metal rim glint only on the lit front flank; the lower
+			# right flank falls into shadow so the key light stays top-left.
+			if y < 30:
+				_set_pixel(image, span.y - 1, y, trim)
 	if car_type == "muscle":
-		_fill_rect(image, Rect2i(10, 11, 4, 2), trim)
-		_fill_rect(image, Rect2i(34, 11, 4, 2), trim)
+		# Horizontal slat grilles with darker negative space instead of solid
+		# intake blocks.
+		for gx in [10, 34]:
+			for row in range(3):
+				for x in range(gx, gx + 4):
+					_set_pixel(image, x, 11 + row * 2, trim)
 	elif car_type == "buggy":
 		_fill_rect(image, Rect2i(19, 7, 10, 2), trim)
 
@@ -855,6 +1174,24 @@ static func _fill_rect(image: Image, rect: Rect2i, color: Color) -> void:
 static func _set_pixel(image: Image, x: int, y: int, color: Color) -> void:
 	if x >= 0 and x < IMAGE_WIDTH and y >= 0 and y < IMAGE_HEIGHT:
 		image.set_pixel(x, y, color)
+
+
+## Maps a 0..1 vertical position to a three-step light/mid/dark ramp (0 = light,
+## 2 = dark). A dithered blend zone around each cut keeps the ramp reading as
+## soft painted metal instead of hard horizontal bands that reveal the grid.
+## `blend` controls the width of the dither zone; glass passes a narrower value
+## so the windshield keeps its gloss without turning into a checker pattern.
+static func _ramp_shade(rel: float, x: int, y: int, light_cut: float, dark_cut: float, blend: float = 0.07) -> int:
+	var checker := (x + y) & 1
+	if rel < light_cut - blend:
+		return 0
+	if rel < light_cut + blend:
+		return 0 if checker == 0 else 1
+	if rel < dark_cut - blend:
+		return 1
+	if rel < dark_cut + blend:
+		return 1 if checker == 0 else 2
+	return 2
 
 
 static func _validate_rect(value: Variant, path: String) -> String:

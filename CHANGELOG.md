@@ -36,6 +36,9 @@
 
 ### Changed
 
+- Driver portraits and vehicle sprites now use Procedural 2D's remade native
+  layered artwork, with sharper silhouettes, body panels, faces, clothing,
+  wheels, lights, trim, and liveries while preserving gameplay dimensions.
 - Vehicle handling now uses per-car power curves, axle grip and braking with
   speed-sensitive steering. Steering settles promptly after release, and
   releasing the handbrake restores grip instead of sustaining a spin.
