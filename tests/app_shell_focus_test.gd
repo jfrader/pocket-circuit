@@ -4,6 +4,7 @@ const APP_SHELL_SCRIPT := preload("res://scripts/ui/app_shell.gd")
 
 class TestApp extends Node:
 	var save_read_only := false
+	var launched_vehicle := ""
 	var save_data := {
 		"best_event_finishes": {
 			"kitchen_crumb_rush": 1,
@@ -54,7 +55,7 @@ class TestApp extends Node:
 		return save_data
 
 	func start_race(_event_id: String, _vehicle_id: String, _quick_race: bool) -> void:
-		pass
+		launched_vehicle = _vehicle_id
 
 	func random_circuit_seed(theme: StringName) -> Dictionary:
 		return {"theme": String(theme), "room": "classic", "seed": 24680}
@@ -63,7 +64,7 @@ class TestApp extends Node:
 		return &"classic"
 
 	func start_circuit_race(_theme: StringName, _room: StringName, _seed: int, _vehicle_id: String) -> void:
-		pass
+		launched_vehicle = _vehicle_id
 
 
 func _initialize() -> void:
@@ -184,8 +185,8 @@ func _run_test() -> void:
 	await process_frame
 	await process_frame
 	focus_owner = root.get_viewport().gui_get_focus_owner()
-	if focus_owner == null or focus_owner.get("text") != "CHOOSE VEHICLE" or scroll.scroll_vertical != 0:
-		push_error("APP_SHELL_FOCUS_TEST FAIL: briefing should focus its action without moving the page")
+	if focus_owner == null or focus_owner.get("text") != "PLAY" or scroll.scroll_vertical != 0:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: briefing should offer Play with the saved vehicle without requiring another selection")
 		quit(1)
 		return
 	for node: Node in shell.find_children("*", "Label", true, false):

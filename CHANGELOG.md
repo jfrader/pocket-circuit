@@ -36,6 +36,17 @@
 
 ### Changed
 
+- Menu buttons now keep crisp borders at different sizes, with distinct hover,
+  keyboard focus, pressed, disabled and car-selection feedback. HUD instruments
+  use fixed-size details, cleaner type and more consistent spacing.
+- Race starts and retries now show an illustrated pit lane while preparing the
+  circuit, car animations and graphics before the countdown. Car animation
+  frames are prepared ahead of play instead of being drawn when racing begins.
+- Title and garage screens now use illustrated motorsport workbench artwork,
+  clear Play/Next actions, and the actual selected car. Quick Race can change
+  cars without losing its chosen circuit, and briefings can launch immediately.
+- Race position, lap, checkpoint, timer, speed, boost, and racer progress now
+  use a compact illustrated HUD that leaves more of the circuit visible.
 - Raised inner islands now stop corner cuts at their visible edge, while legal
   wide lines across the open outer apron still count. Persistent wrong-way
   driving returns the car to its last checkpoint instead of wasting a lap.

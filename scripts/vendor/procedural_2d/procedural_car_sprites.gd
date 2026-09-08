@@ -189,6 +189,10 @@ static func car_steer_frames(payload: Dictionary, spin_frame: int = 0, pixel_sca
 	return frames
 
 
+static func car_pose_image(payload: Dictionary, spin_frame: int, steer_pose: int, pixel_scale: int = 1) -> Image:
+	return _render_car(payload, posmod(spin_frame, WHEEL_FRAME_COUNT), clampi(steer_pose, 0, 4) - 2, pixel_scale)
+
+
 ## Four wheel tiles (one per rotation state) sized to this car's wheel profile.
 ## Each tile is the tyre + hub motif in isolation, so a game can composite the
 ## spinning wheels onto its own chassis or drive an AnimatedSprite2D.

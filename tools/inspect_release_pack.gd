@@ -3,6 +3,9 @@ extends SceneTree
 
 func _initialize() -> void:
 	for excluded_path in [
+		"res://assets/ui/concepts/title-concept.jpg",
+		"res://assets/ui/concepts/garage-concept.jpg",
+		"res://assets/ui/concepts/hud-concept.jpg",
 		"res://scripts/ui/debug_overlay.gd",
 		"res://addons/godot_mcp/plugin.cfg",
 		"res://addons/release_export/plugin.cfg",

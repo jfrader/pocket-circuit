@@ -26,6 +26,9 @@ licensed commercial font.
 
 | Paths or content | Production method | Release status |
 |---|---|---|
+| `assets/ui/imagine/motorsport_panel_dark.png`, `motorsport_panel_paper.png` | 96×64 nine-slice derivatives of the existing Imagine telemetry and number-plate sources, assembled with Pillow using fixed 12px corners/edges and clean center strips. The paper panel mirrors its clean right edge to remove the baked checker strip; Godot draws fixed-size checker marks. No new generation or external source material. | Integrated UI-polish candidate; operator review pending |
+| `assets/ui/imagine/motorsport_loading.jpg` | xAI `grok-imagine-image-quality`, developer-directed text-only prompt for an original miniature pit-lane workbench illustration. No source images, brands or embedded UI text. Godot draws the actual loading stages and Back control over the image. | Integrated candidate; runtime/operator review pending |
+| `assets/ui/imagine/motorsport_title.jpg`, `motorsport_garage.jpg`, `motorsport_telemetry_plate.jpg`, `motorsport_number_plate.jpg` and `.png` | xAI `grok-imagine-image-quality`, developer-directed text-only prompts following the approved GURI-636 workbench concepts. Production images contain no interface lettering: Godot renders text and interactive controls. The number plate PNG is a 1168×386 crop at (40, 240) of the 1248×832 source JPEG; other images are used as full rectangles. Garage cars are rendered by the existing first-party Procedural 2D identity library, not generated replacements. | Integrated candidate; exact-build operator review pending |
 | `assets/textures/ground_dressing/*.png` | Original project SVG compositions defined in `tools/gen_ground_dressing_assets.gd` and rendered locally to transparent PNGs with Godot's `Image.load_svg_from_buffer`; no external images, brands, or source media. | Cleared for this release |
 | `assets/textures/track_boundary/*.png` | Original project SVG compositions defined in `tools/gen_track_boundary_assets.gd` and `tools/gen_visual_density_assets.gd`, rendered locally to transparent PNGs with Godot's `Image.load_svg_from_buffer`; includes fictional kitchen towel/spoon/chopstick/bread-board, workshop stirrer/dowel/clamp/ruler, and office pencil/ruler/pen/book-spine rails plus corner accents. Runtime composition reuses these cleared rail textures for colliding course sections and small gate posts; no external source media. | Cleared for this release |
 | `assets/textures/edge_dressing/*.png` | Original project SVG compositions defined in `tools/gen_visual_density_assets.gd` and rendered locally at 1024 x 1024 to transparent PNGs with Godot's `Image.load_svg_from_buffer`; includes crumbs, fibers, rice/herbs/sugar, nails/washers/bolts, binder clips/pins/pen caps, worn-floor/material marks, and the two white-alpha directional shadow masks used by runtime tinting. | Cleared for this release |
@@ -44,6 +47,18 @@ licensed commercial font.
 Unused original prototype images under `assets/models/` and `assets/textures/`
 follow the same pre-generated graphic workflow. They are retained as project
 resources and make no third-party rights claim.
+
+## Design-review concepts (not approved release assets)
+
+`assets/ui/concepts/title-concept.jpg`, `garage-concept.jpg`, and
+`hud-concept.jpg` were generated with xAI `grok-imagine-image-quality` from
+developer-directed text prompts for GURI-636. They propose an after-hours
+miniature-motorsport tabletop title, garage selection, and compact race HUD.
+No source images were provided. The concepts are attached to GURI-636 for
+review; they are not implemented UI or evidence of actual gameplay.
+Generated lettering, controls, car proportions, and track geometry are
+illustrative and require replacement or reconciliation before integration.
+Do not include these flattened mockups in a release package.
 
 ## Kenney review-audio mappings
 

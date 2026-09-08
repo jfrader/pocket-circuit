@@ -13,6 +13,9 @@ class RacePauseOverlay extends Control:
 		set_process_input(true)
 
 	func _input(event: InputEvent) -> void:
+		var app := get_node_or_null("/root/App")
+		if app and app.has_method("is_race_loading") and app.call("is_race_loading"):
+			return
 		var requested_pause := InputMap.has_action("pause") and event.is_action_pressed("pause")
 		if event is InputEventKey:
 			requested_pause = requested_pause or (event as InputEventKey).pressed and (event as InputEventKey).keycode == KEY_ESCAPE
@@ -35,6 +38,10 @@ const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_
 const CATALOG := preload("res://data/championship/catalog.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const RACE_HUD_SCRIPT := preload("res://scripts/ui/race_hud.gd")
+const MENU_BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
+const MENU_SKIN := preload("res://scripts/ui/motorsport_skin.gd")
+const PREPARATION_SCRIPT := preload("res://scripts/race/race_preparation.gd")
+const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const COUNTDOWN_STEP_SECONDS := 0.65
 const FALLBACK_OPPONENTS: Array[String] = ["juniper", "milo", "tess"]
 const GRID_TRANSFORMS: Array[Transform2D] = [
@@ -93,15 +100,30 @@ var _countdown_tween: Tween
 var _race_flash_tween: Tween
 var _countdown_active := false
 var _starting_collision_states: Array[Dictionary] = []
+var is_preparing := false
 
 
 func _ready() -> void:
 	_create_phase_one_ui()
 	_configure_session()
+	var app := get_node_or_null("/root/App")
+	if app and app.has_method("is_race_loading") and app.call("is_race_loading"):
+		is_preparing = true
+		process_mode = Node.PROCESS_MODE_DISABLED
+		var player := get_tree().get_first_node_in_group("player_vehicle") as RigidBody2D
+		if player:
+			player.freeze = true
+		call_deferred("_prepare_race_async")
+		return
 	if not _configure_track_variant():
 		call_deferred("_abort_failed_race")
 		return
+	_complete_race_setup()
+
+
+func _complete_race_setup(start_countdown: bool = true) -> void:
 	_create_pause_overlay()
+	_pause_overlay.enabled = start_countdown
 	_configure_racers()
 	for racer: Node2D in race_manager.get_rankings():
 		if racer is RigidBody2D:
@@ -118,6 +140,89 @@ func _ready() -> void:
 	race_manager.results_ready.connect(_on_results_ready)
 	if OS.is_debug_build():
 		_ensure_debug_overlay()
+	if start_countdown:
+		_countdown_active = true
+		call_deferred("_run_countdown")
+
+
+func _loading_step(phase: String) -> void:
+	var app := get_node_or_null("/root/App")
+	if app:
+		await app.call("loading_step", phase)
+
+
+func _prepare_race_async() -> void:
+	var app := get_node("/root/App")
+	var event: Dictionary = _session.get("event", {})
+	var preparation := PREPARATION_SCRIPT.new()
+	add_child(preparation)
+	app.call("set_loading_section", 1)
+	await _loading_step("Generating a legal circuit")
+	if String(event.get("circuit", "")) == "generated":
+		var prepared: Dictionary = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0))))
+		if app.call("is_race_loading_cancelled"):
+			app.call("complete_race_loading")
+			return
+		if prepared.is_empty():
+			app.call("fail_race_loading", "A valid circuit could not be generated")
+			return
+		await _loading_step("Building the room")
+		var embedded := track_root
+		remove_child(embedded)
+		embedded.free()
+		track_root = TRACK_BUILDER.create_layout_root(prepared)
+		track_root.name = "Track"
+		add_child(track_root)
+		await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step)
+		_apply_track_variant(StringName(event.get("theme", "kitchen")))
+	else:
+		if not _configure_track_variant():
+			app.call("fail_race_loading", "The circuit could not be opened")
+			return
+	if app.call("is_race_loading_cancelled"):
+		app.call("complete_race_loading")
+		return
+	app.call("set_loading_section", 2)
+	var vehicles: Array[String] = [String(_session.get("vehicle_id", "rustbug"))]
+	var opponents: Array = event.get("opponents", FALLBACK_OPPONENTS)
+	for index in mini(int(event.get("opponent_count", opponents.size())), opponents.size()):
+		var vehicle_id := String(CATALOG.get_driver(String(opponents[index])).get("vehicle_id", "rustbug"))
+		if not vehicles.has(vehicle_id):
+			vehicles.append(vehicle_id)
+	for vehicle_id: String in vehicles:
+		await _loading_step("Preparing %s animation" % vehicle_id.capitalize())
+		var plan := IDENTITIES.motion_preparation_plan(vehicle_id)
+		if not (plan["jobs"] as Array).is_empty():
+			var rendered: Dictionary = await preparation.run_data_job(IDENTITIES.render_motion_plan.bind(plan))
+			if rendered.is_empty():
+				app.call("fail_race_loading", "Vehicle graphics could not be prepared")
+				return
+			for index in rendered["jobs"].size():
+				if not IDENTITIES.install_motion_image(vehicle_id, rendered["jobs"][index], rendered["images"][index]):
+					app.call("fail_race_loading", "Vehicle graphics could not be prepared")
+					return
+				await _loading_step("Preparing %s animation" % vehicle_id.capitalize())
+		if app.call("is_race_loading_cancelled"):
+			app.call("complete_race_loading")
+			return
+	preparation.queue_free()
+	app.call("set_loading_section", 3)
+	await _loading_step("Setting the starting grid")
+	_complete_race_setup(false)
+	camera.global_position = _player_vehicle.global_position
+	camera.reset_smoothing()
+	camera.force_update_scroll()
+	await _loading_step("Preparing race audio")
+	var director := app.get("audio_director") as Node
+	if director:
+		director.call("play_race_music")
+	for frame in 3:
+		await _loading_step("Warming graphics for the starting grid")
+	if not app.call("complete_race_loading"):
+		return
+	is_preparing = false
+	process_mode = Node.PROCESS_MODE_INHERIT
+	_pause_overlay.enabled = true
 	_countdown_active = true
 	call_deferred("_run_countdown")
 
@@ -265,6 +370,11 @@ func _configure_track_variant() -> bool:
 	track_root = packed.instantiate() as Node2D
 	track_root.name = "Track"
 	add_child(track_root)
+	_apply_track_variant(requested_theme)
+	return true
+
+
+func _apply_track_variant(requested_theme: StringName) -> void:
 	if track_root.has_meta("room_bounds"):
 		var room_bounds: Rect2 = track_root.get_meta("room_bounds")
 		camera.limit_left = floori(room_bounds.position.x)
@@ -285,7 +395,6 @@ func _configure_track_variant() -> bool:
 		if child.is_in_group("track_checkpoints"):
 			discovered_checkpoints.append(child)
 	race_manager.configure_checkpoints(discovered_checkpoints)
-	return true
 
 
 func _abort_failed_race() -> void:
@@ -359,6 +468,12 @@ func _update_race_hud() -> void:
 		speed_ratio,
 		boost_ratio
 	)
+	var racers := race_manager.get_rankings()
+	var progress := PackedFloat32Array()
+	var total_gates := maxf(1.0, race_manager.laps_to_finish * race_manager.get_checkpoint_count())
+	for racer: Node2D in racers:
+		progress.append(race_manager.get_racer_progress(racer) / total_gates)
+	_race_hud.set_route_progress(progress, racers.find(_player_vehicle), race_manager.get_expected_checkpoint(_player_vehicle))
 
 
 func _on_race_finished(_total_time: float) -> void:
@@ -671,7 +786,7 @@ func _create_phase_one_ui() -> void:
 	_results_label.add_theme_color_override("font_color", Color(0.96, 0.94, 0.89))
 	_results_panel.add_child(_results_label)
 
-	_retry_button = Button.new()
+	_retry_button = MENU_BUTTON_SCRIPT.new() as Button
 	_retry_button.text = "RETRY"
 	_retry_button.position = Vector2(120.0, 340.0)
 	_retry_button.size = Vector2(170.0, 48.0)
@@ -680,12 +795,12 @@ func _create_phase_one_ui() -> void:
 	_retry_button.add_theme_font_size_override("font_size", 16)
 	_retry_button.pressed.connect(_on_retry_pressed)
 	_results_panel.add_child(_retry_button)
-	_continue_button = Button.new()
+	_continue_button = MENU_BUTTON_SCRIPT.new() as Button
 	_continue_button.text = "CONTINUE"
 	_continue_button.position = Vector2(330.0, 340.0)
 	_continue_button.size = Vector2(170.0, 48.0)
 	_continue_button.disabled = true
-	_apply_menu_button_art(_continue_button)
+	_apply_menu_button_art(_continue_button, true)
 	_continue_button.add_theme_font_size_override("font_size", 16)
 	_continue_button.pressed.connect(request_return)
 	_results_panel.add_child(_continue_button)
@@ -727,7 +842,7 @@ func _create_pause_overlay() -> void:
 	menu_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	menu_heading.add_theme_font_size_override("font_size", 34)
 	menu_column.add_child(menu_heading)
-	_pause_resume_button = _add_pause_button(menu_column, "Resume", _toggle_pause)
+	_pause_resume_button = _add_pause_button(menu_column, "Resume", _toggle_pause, true)
 	_add_pause_button(menu_column, "Settings", _show_pause_settings)
 	_add_pause_button(menu_column, "Restart", restart_race)
 	var return_label := "Return to Title" if String(_session.get("mode", "quick")) == "quick" else "Return to Championship"
@@ -854,39 +969,17 @@ func _pause_panel_style(fill: Color, border: Color) -> StyleBoxFlat:
 	return box
 
 
-func _menu_plate(fill: Color, border: Color, width: int = 2) -> StyleBoxFlat:
-	var box := StyleBoxFlat.new()
-	box.bg_color = fill
-	box.border_color = border
-	box.set_border_width_all(width)
-	box.set_corner_radius_all(8)
-	box.content_margin_left = 22.0
-	box.content_margin_right = 22.0
-	box.content_margin_top = 10.0
-	box.content_margin_bottom = 12.0
-	box.shadow_color = Color(0.0, 0.0, 0.0, 0.35)
-	box.shadow_size = 3
-	box.shadow_offset = Vector2(0, 2)
-	return box
+func _apply_menu_button_art(button: Button, primary: bool = false) -> void:
+	MENU_SKIN.apply_button(button, primary)
 
 
-func _apply_menu_button_art(button: Button) -> void:
-	button.add_theme_stylebox_override("normal", _menu_plate(Color("1c2633"), Color("4a5a6c"), 2))
-	button.add_theme_stylebox_override("hover", _menu_plate(Color("2a3646"), Color("f4c65a"), 2))
-	button.add_theme_stylebox_override("pressed", _menu_plate(Color("17202a"), Color("f4c65a"), 2))
-	button.add_theme_stylebox_override("focus", _menu_plate(Color("2a3646"), Color("f4c65a"), 3))
-	button.add_theme_color_override("font_color", Color("fff8e8"))
-	button.add_theme_color_override("font_hover_color", Color("fff8e8"))
-	button.add_theme_color_override("font_focus_color", Color("fff8e8"))
-
-
-func _add_pause_button(parent: Control, text: String, callback: Callable) -> Button:
-	var button := Button.new()
+func _add_pause_button(parent: Control, text: String, callback: Callable, primary: bool = false) -> Button:
+	var button := MENU_BUTTON_SCRIPT.new() as Button
 	button.text = text
 	button.custom_minimum_size = Vector2(400.0, 58.0)
 	button.focus_mode = Control.FOCUS_ALL
 	button.add_theme_font_size_override("font_size", 18)
-	_apply_menu_button_art(button)
+	_apply_menu_button_art(button, primary)
 	button.focus_entered.connect(_play_sfx.bind(&"ui_move", 0.62))
 	button.pressed.connect(callback)
 	button.pressed.connect(_play_sfx.bind(&"ui_confirm", 0.78))

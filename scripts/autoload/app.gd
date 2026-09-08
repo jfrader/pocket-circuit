@@ -6,6 +6,7 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 const SHELL_SCRIPT := preload("res://scripts/ui/app_shell.gd")
 const AUDIO_DIRECTOR_SCRIPT := preload("res://scripts/audio/audio_director.gd")
+const LOADING_SCRIPT := preload("res://scripts/ui/race_loading_screen.gd")
 const PROCEDURAL_ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"long", &"square", &"el"]
 
 var current_race_session: Dictionary = {}
@@ -21,6 +22,11 @@ var _destination := "title"
 var _last_result_summary: Dictionary = {}
 var _test_mode := false
 var _last_save_error := ""
+var _transitioning_to_race := false
+var _loading_screen: CanvasLayer
+var _loading_cancelled := false
+var _loading_failed := false
+var loading_metrics: Dictionary = {}
 
 
 func _enter_tree() -> void:
@@ -65,6 +71,8 @@ func _process(_delta: float) -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _transitioning_to_race:
+		return
 	if _shell == null or not _shell.visible or get_tree().current_scene == null:
 		return
 	if event.is_action_pressed("ui_cancel"):
@@ -159,6 +167,8 @@ func open_quick_race() -> void:
 
 
 func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) -> void:
+	if _transitioning_to_race:
+		return
 	var event := CATALOG.get_event(event_id)
 	if event.is_empty():
 		return
@@ -193,9 +203,7 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 		"difficulty": String(_save_data["difficulty"]),
 		"result_committed": false,
 	}
-	if _shell:
-		_shell.visible = false
-	get_tree().change_scene_to_file(RACE_SCENE)
+	_begin_race_transition()
 
 
 func random_circuit_seed(theme: StringName) -> Dictionary:
@@ -213,6 +221,8 @@ func circuit_room_for_seed(seed: int) -> StringName:
 
 
 func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String) -> void:
+	if _transitioning_to_race:
+		return
 	var event := {
 		"id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
 		"name": "%s %s Circuit %d" % [String(theme).capitalize(), String(room).capitalize(), seed],
@@ -235,9 +245,133 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 		"difficulty": String(_save_data["difficulty"]),
 		"result_committed": false,
 	}
+	_begin_race_transition()
+
+
+func is_race_loading() -> bool:
+	return _transitioning_to_race
+
+
+func is_race_loading_cancelled() -> bool:
+	return _loading_cancelled
+
+
+func set_loading_section(section: int) -> void:
+	if is_instance_valid(_loading_screen):
+		_loading_screen.call("set_section", section)
+
+
+func loading_step(phase: String) -> void:
+	if is_instance_valid(_loading_screen):
+		_loading_screen.call("set_phase", phase)
+	await get_tree().process_frame
+	if DisplayServer.get_name() != "headless":
+		await RenderingServer.frame_post_draw
+
+
+func _begin_race_transition() -> void:
+	_transitioning_to_race = true
+	_loading_cancelled = false
+	_loading_failed = false
+	get_tree().paused = false
+	if is_instance_valid(_loading_screen):
+		_loading_screen.queue_free()
+	_loading_screen = LOADING_SCRIPT.new()
+	_loading_screen.name = "RaceLoading"
+	_loading_screen.set("reduced_motion", reduced_motion)
+	_loading_screen.connect("cancel_requested", _cancel_race_loading)
+	add_child(_loading_screen)
 	if _shell:
 		_shell.visible = false
-	get_tree().change_scene_to_file(RACE_SCENE)
+	var previous := get_tree().current_scene
+	if previous != null:
+		previous.process_mode = Node.PROCESS_MODE_DISABLED
+	await loading_step("Loading race resources")
+	if _loading_cancelled:
+		_leave_race_loading()
+		return
+	var resources: Dictionary = {}
+	var loaded := await _load_scene_resources(RACE_SCENE, resources)
+	if _loading_cancelled:
+		_leave_race_loading()
+		return
+	if not loaded:
+		fail_race_loading("Race resources could not be loaded")
+		return
+	var packed := resources.get(RACE_SCENE) as PackedScene
+	await loading_step("Opening the circuit")
+	if _loading_cancelled:
+		_leave_race_loading()
+		return
+	if packed == null or get_tree().change_scene_to_packed(packed) != OK:
+		fail_race_loading("The race scene could not be opened")
+
+
+func _load_scene_resources(path: String, resources: Dictionary) -> bool:
+	if _loading_cancelled:
+		return false
+	if resources.has(path):
+		return true
+	resources[path] = null
+	var scripts: Array[String] = []
+	var assets: Array[String] = []
+	for dependency in ResourceLoader.get_dependencies(path):
+		var resource_path := String(dependency).split("::")[-1]
+		if resource_path.get_extension() == "gd":
+			scripts.append(resource_path)
+		else:
+			assets.append(resource_path)
+	assets.append_array(scripts)
+	for dependency: String in assets:
+		if not await _load_scene_resources(dependency, resources):
+			return false
+	# Scene scripts can preload textures. Keep their compilation and GPU resource
+	# creation on the main thread, loading dependencies across rendered frames.
+	resources[path] = load(path)
+	await loading_step("Loading race resources")
+	return resources[path] != null
+
+
+func complete_race_loading() -> bool:
+	if _loading_cancelled:
+		_leave_race_loading()
+		return false
+	if is_instance_valid(_loading_screen):
+		loading_metrics = _loading_screen.call("metrics")
+		_loading_screen.queue_free()
+	_loading_screen = null
+	_transitioning_to_race = false
+	return true
+
+
+func fail_race_loading(message: String) -> void:
+	if _loading_cancelled:
+		_leave_race_loading()
+		return
+	_loading_failed = true
+	if is_instance_valid(_loading_screen):
+		_loading_screen.call("fail", message)
+
+
+func _cancel_race_loading() -> void:
+	if not _transitioning_to_race:
+		return
+	_loading_cancelled = true
+	if _loading_failed:
+		_leave_race_loading()
+	elif is_instance_valid(_loading_screen):
+		_loading_screen.call("cancel")
+
+
+func _leave_race_loading() -> void:
+	if is_instance_valid(_loading_screen):
+		_loading_screen.queue_free()
+	_loading_screen = null
+	_transitioning_to_race = false
+	_loading_failed = false
+	_destination = "title" if String(current_race_session.get("mode", "quick")) == "quick" else "map"
+	current_race_session.clear()
+	get_tree().change_scene_to_file(BOOT_SCENE)
 
 
 func report_race_result(player_position: int, total_time: float, results: Array, player_dnf: bool = false) -> bool:
@@ -302,7 +436,7 @@ func continue_after_race(transition_scene: bool = true) -> void:
 
 
 func retry_race(reload_scene: bool = true) -> void:
-	if current_race_session.is_empty():
+	if current_race_session.is_empty() or _transitioning_to_race:
 		return
 	current_race_session.erase("result")
 	current_race_session.erase("result_summary")
@@ -310,7 +444,7 @@ func retry_race(reload_scene: bool = true) -> void:
 	current_race_session.erase("save_error")
 	current_race_session["result_committed"] = false
 	if reload_scene:
-		get_tree().reload_current_scene()
+		_begin_race_transition()
 
 
 func abandon_race() -> void:
@@ -382,6 +516,8 @@ func _sync_current_scene() -> void:
 	var scene := get_tree().current_scene
 	if scene == null:
 		return
+	if _transitioning_to_race and scene.scene_file_path == BOOT_SCENE:
+		return
 	_last_scene = scene
 	if scene.scene_file_path == BOOT_SCENE:
 		if is_instance_valid(audio_director):
@@ -403,7 +539,7 @@ func _sync_current_scene() -> void:
 		_destination = "title"
 		current_race_session.clear()
 	else:
-		if scene.scene_file_path == RACE_SCENE and is_instance_valid(audio_director):
+		if scene.scene_file_path == RACE_SCENE and is_instance_valid(audio_director) and not _transitioning_to_race:
 			audio_director.play_race_music()
 		if _shell:
 			_shell.visible = false

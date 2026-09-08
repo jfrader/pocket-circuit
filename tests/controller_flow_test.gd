@@ -45,7 +45,13 @@ func _run_test() -> void:
 	if not _expect(focused_play_action != null and focused_play_action.text == "PLAY", "controller navigation should reach PLAY in Quick Race"):
 		return
 	await _tap_joypad_button(0)
-	await _wait_until(func() -> bool: return current_scene != null and current_scene.scene_file_path == RACE_SCENE.resource_path, 60)
+	if not _expect(app.call("is_race_loading"), "accepting Play should display preparation before gameplay"):
+		return
+	var loading_deadline := Time.get_ticks_msec() + 25000
+	while app.call("is_race_loading") and Time.get_ticks_msec() < loading_deadline:
+		await process_frame
+	if not _expect(not app.call("is_race_loading"), "preparation should reach the ready grid within its wall-clock deadline"):
+		return
 	var race := current_scene
 	var session: Dictionary = app.call("get_current_race_session")
 	if not _expect(
