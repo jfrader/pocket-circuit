@@ -78,6 +78,7 @@ static var FLAT_EDGE_ASSETS := {
 static var _texture_footprint_cache: Dictionary = {}
 static var _texture_hull_cache: Dictionary = {}
 static var _texture_opaque_rect_cache: Dictionary = {}
+static var _texture_outline_cache: Dictionary = {}
 
 ## Exceptions to the broad PROP_SHAPES presentation categories. These assets
 ## are visibly elongated or rectangular even though older placement data used a
@@ -882,6 +883,21 @@ const LAYOUTS := {
 
 
 static func build_packed(theme: StringName, room_shape: StringName, seed: int) -> Dictionary:
+	var prepared := prepare_layout(theme, room_shape, seed)
+	if prepared.is_empty():
+		return {"scene": null, "seed": seed}
+	var root := create_layout_root(prepared)
+	_build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], theme)
+	_mark_owned(root)
+	var packed := PackedScene.new()
+	packed.pack(root)
+	root.free()
+	return {"scene": packed, "seed": prepared["seed"]}
+
+
+static func prepare_layout(theme: StringName, room_shape: StringName, seed: int) -> Dictionary:
+	if not LAYOUTS.has(theme) or not ROOM_SHAPES.has(room_shape):
+		return {}
 	var spec: Dictionary = LAYOUTS[theme]
 	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape] if seed >= 0 else BASE_ROOM_SHAPES[room_shape]
 	var used_seed := seed
@@ -910,7 +926,7 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 		var gen := TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
 		if gen["points"].is_empty():
 			push_error("TrackBuilderCore: could not generate a valid circuit near seed " + str(seed))
-			return {"scene": null, "seed": seed}
+			return {}
 		spec = spec.duplicate()
 		spec["controls"] = gen["points"]
 		spec["seed_obstacles"] = true
@@ -928,6 +944,21 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 		spec["island_expansion"] = 10.0
 		spec.erase("gate_fractions")
 		used_seed = int(gen["seed"])
+	var centerline := _sample_centerline(spec["controls"])
+	var edges := _corridor_edges(centerline)
+	if spec.get("seed_obstacles", false):
+		var left: PackedVector2Array = edges["left"]
+		var right: PackedVector2Array = edges["right"]
+		var outer := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
+		var inner := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
+		edges["inner_boundary"] = _simple_inner_boundary_loop(inner, centerline)
+		edges["outer_boundary"] = _simple_boundary_loop(outer, centerline)
+	return {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed}
+
+
+static func create_layout_root(prepared: Dictionary) -> Node2D:
+	var spec: Dictionary = prepared["spec"]
+	var room_polygon: PackedVector2Array = prepared["room_polygon"]
 	var root := Node2D.new()
 	root.name = String(spec["root_name"])
 	root.add_to_group("track", true)
@@ -940,19 +971,16 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 		root.set_meta("generation_fallback", bool(spec["generation_fallback"]))
 		root.set_meta("story_id", StringName(spec["story_id"]))
 		root.set_meta("loop_length", float(spec["loop_length"]))
-		root.set_meta("theme", theme)
-		root.set_meta("room_shape", room_shape)
+		root.set_meta("theme", prepared["theme"])
+		root.set_meta("room_shape", prepared["room_shape"])
 		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
 		root.set_meta("room_polygon", room_polygon)
 		root.set_meta("world_scale", WORLD_SCALE)
-	var centerline := _sample_centerline(spec["controls"])
-	var edges := _corridor_edges(centerline)
-	_build_scene(root, spec, centerline, edges, room_polygon, theme)
-	_mark_owned(root)
-	var packed := PackedScene.new()
-	packed.pack(root)
-	root.free()
-	return {"scene": packed, "seed": used_seed}
+	return root
+
+
+static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable) -> void:
+	await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage)
 
 
 static func _sample_centerline(controls: Array) -> PackedVector2Array:
@@ -991,7 +1019,7 @@ static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
 	return {"left": left, "right": right, "centerline": centerline}
 
 
-static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName) -> void:
+static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable()) -> void:
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
@@ -1004,6 +1032,8 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	_add_polygon(root, "Floor", _rect_points(backdrop.get_center(), backdrop.size), Color("111316"), -22)
 	var room_surface := _expand_loop(room_polygon, 26.0)
 	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20)
+	if stage.is_valid():
+		await stage.call("Laying the racing surface")
 
 	# Painted track ribbon (visual only — no collision)
 	var corridor := PackedVector2Array()
@@ -1026,6 +1056,8 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 
 	if spec.get("seed_obstacles", false):
 		_add_corridor_patterning(root, spec, centerline, room_polygon)
+	if stage.is_valid():
+		await stage.call("Building physical track boundaries")
 
 	# No painted delimitation lines: the ribbon, island prop, and placed props
 	# define the course
@@ -1033,14 +1065,16 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var inner_loop := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
 	var outer_boundary := outer_loop
 	if spec.get("seed_obstacles", false):
-		inner_loop = _simple_inner_boundary_loop(inner_loop, centerline)
-		outer_boundary = _simple_boundary_loop(outer_loop, centerline)
+		inner_loop = edges["inner_boundary"] if edges.has("inner_boundary") else _simple_inner_boundary_loop(inner_loop, centerline)
+		outer_boundary = edges["outer_boundary"] if edges.has("outer_boundary") else _simple_boundary_loop(outer_loop, centerline)
 	# Generated centerlines are clearance-validated, so their inner offset is the
 	# authoritative island boundary. Boolean subtraction represents the annular
 	# ribbon as nested outer/hole polygons and can otherwise select the whole room
 	# as a solid collision body.
 	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) else _island_region(room_polygon, clipped, inner_loop)
-	_build_island_prop(root, spec, island_region, inner_loop, centerline)
+	await _build_island_prop(root, spec, island_region, inner_loop, centerline, stage)
+	if stage.is_valid():
+		await stage.call("Placing room edges and checkpoints")
 
 	# Legacy authored tracks keep their fixed room-corner dressing. Generated
 	# tracks choose landmarks from geometry-aware story moments below.
@@ -1070,6 +1104,8 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var start_tangent := (centerline[1] - centerline[centerline.size() - 1]).normalized()
 	var gate_samples := PackedVector2Array()
 	for gate_index in GATE_COUNT:
+		if stage.is_valid() and gate_index % 2 == 0:
+			await stage.call("Placing room edges and checkpoints")
 		var fraction: float = gate_fractions[gate_index]
 		var sample := _sample_at_arc(centerline, arc, total * fraction)
 		gate_samples.append(sample)
@@ -1140,10 +1176,14 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	# Racing line the AI follows (curvature-offset ideal path, stored invisibly).
 	# Generated AI stays on the safe side of the optional risk shortcut.
 	_build_racing_line(root, centerline, generated_moments)
+	if stage.is_valid():
+		await stage.call("Building trackside scenery")
 
 	if spec.get("seed_obstacles", false):
 		_build_generated_outer_boundary_visuals(root, spec, centerline, inner_loop, outer_boundary, room_polygon, generated_moments)
-		_compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments)
+		if stage.is_valid():
+			await stage.call("Placing landmarks")
+		await _compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments, stage)
 	else:
 		# Canonical/static tracks retain their authored legacy dressing.
 		_fill_island(root, spec, inner_loop, centerline)
@@ -1191,7 +1231,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	_add_start_banner(root, start, start_tangent, corridor)
 
 
-static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
+static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
 	var expanded := PackedVector2Array()
 	if spec.get("seed_obstacles", false):
 		# Geometry2D already returns a simple central polygon. Procedural concave
@@ -1267,7 +1307,7 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 		visual.color = spec["island"]
 	root.add_child(visual)
 	if spec.get("seed_obstacles", false):
-		_add_island_rim_landmarks(root, spec, expanded, centerline)
+		await _add_island_rim_landmarks(root, spec, expanded, centerline, stage)
 
 
 static func _build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, points: PackedVector2Array) -> void:
@@ -1315,7 +1355,7 @@ static func _build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, poi
 	parent.add_child(lip)
 
 
-static func _add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array) -> void:
+static func _add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
 	var assets: Array = spec.get("island_fill_textures", [])
 	if assets.is_empty() or boundary.size() < 12:
 		return
@@ -1326,6 +1366,8 @@ static func _add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: 
 	var seed := _mix_seed(int(spec.get("requested_seed", spec.get("seed", 0))), "island_rim_landmarks")
 	var offset := posmod(seed, boundary.size())
 	for landmark_index in 3:
+		if stage.is_valid():
+			await stage.call("Building physical track boundaries")
 		var boundary_index := posmod(offset + int(round(float(landmark_index) * float(boundary.size()) / 3.0)), boundary.size())
 		var boundary_point := boundary[boundary_index]
 		var center_sample: Vector2 = _closest_point_on_loop(boundary_point, centerline)["position"]
@@ -2110,7 +2152,8 @@ static func _compose_generated_story(
 		outer_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		moments: Dictionary
+		moments: Dictionary,
+		stage: Callable = Callable()
 ) -> void:
 	var story: Dictionary = spec["story_kit"]
 	var container := Node2D.new()
@@ -2124,7 +2167,9 @@ static func _compose_generated_story(
 		var line := root.get_node_or_null(line_name) as Line2D
 		if line and not line.points.is_empty():
 			committed_racing_lines.append(line.points)
-	_build_giant_landmarks(container, spec, centerline, room_polygon, gate_samples, occupied, committed_racing_lines)
+	await _build_giant_landmarks(container, spec, centerline, room_polygon, gate_samples, occupied, committed_racing_lines, stage)
+	if stage.is_valid():
+		await stage.call("Dressing the start area")
 	var opening_index := _build_opening_landmark(
 		container,
 		story,
@@ -2142,7 +2187,9 @@ static func _compose_generated_story(
 	var opening := container.get_node("OpeningLandmark")
 	if int(opening.get_meta("placed_count", 0)) == 1:
 		reserved_unique_assets[String(opening.get_meta("asset_path", ""))] = true
-	_build_island_story(container, story, spec, centerline, inner_loop, room_polygon, gate_samples, occupied)
+	await _build_island_story(container, story, spec, centerline, inner_loop, room_polygon, gate_samples, occupied, stage)
+	if stage.is_valid():
+		await stage.call("Placing track objects")
 	_build_track_formation(
 		container,
 		"ObjectLine",
@@ -2168,8 +2215,14 @@ static func _compose_generated_story(
 		occupied
 	)
 	_build_corner_landmarks(container, story, spec, moments["corners"], centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
-	_build_room_dressing(container, story, spec, centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
-	_build_edge_and_apron_decor(container, spec, centerline, room_polygon, gate_samples, occupied)
+	if stage.is_valid():
+		await stage.call("Dressing the room")
+	await _build_room_dressing(container, story, spec, centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied, stage)
+	if stage.is_valid():
+		await stage.call("Adding surface detail")
+	await _build_edge_and_apron_decor(container, spec, centerline, room_polygon, gate_samples, occupied, stage)
+	if stage.is_valid():
+		await stage.call("Preparing grip zones and hazards")
 	_build_generated_surfaces(root, container, story, spec, moments, centerline, gate_samples)
 	_build_finish_moments(container, centerline)
 
@@ -2432,7 +2485,8 @@ static func _build_island_story(
 		inner_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		stage: Callable = Callable()
 ) -> void:
 	var cluster := Node2D.new()
 	cluster.name = "IslandFocalCluster"
@@ -2459,6 +2513,8 @@ static func _build_island_story(
 			anchor += (apron_fit["position"] as Vector2) - focal_preferred
 	cluster.set_meta("placement_region", placement_region)
 	for formation_data: Dictionary in story["island"]:
+		if stage.is_valid():
+			await stage.call("Dressing the start area")
 		var quantity := StringName(formation_data["quantity"])
 		var requested_count := _bounded_quantity_count(quantity, int(formation_data["count"]))
 		var formation := Node2D.new()
@@ -2712,7 +2768,8 @@ static func _build_room_dressing(
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		reserved_unique_assets: Dictionary,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		stage: Callable = Callable()
 ) -> void:
 	var dressing := Node2D.new()
 	dressing.name = "RoomDressing"
@@ -2729,6 +2786,8 @@ static func _build_room_dressing(
 	var anchors := _room_dressing_anchors(room_polygon, centerline, gate_samples, occupied, target_pockets, rng)
 	var placed_count := 0
 	for pocket_index in anchors.size():
+		if stage.is_valid():
+			await stage.call("Dressing the room")
 		var pocket := Node2D.new()
 		pocket.name = "Pocket%02d" % pocket_index
 		pocket.set_meta("semantic_quantity", &"few")
@@ -2760,7 +2819,11 @@ static func _build_room_dressing(
 			if not placed:
 				continue
 		pocket.set_meta("placed_count", pocket_placed)
+	if stage.is_valid():
+		await stage.call("Laying room materials")
 	var ground_section_count := _build_room_ground_sections(dressing, story, spec, centerline, outer_loop, room_polygon)
+	if stage.is_valid():
+		await stage.call("Adding floor detail")
 	var decal_count := _build_room_floor_details(dressing, spec, centerline, room_polygon, occupied, rng)
 	dressing.set_meta("placed_count", placed_count)
 	dressing.set_meta("pocket_count", anchors.size())
@@ -2774,7 +2837,8 @@ static func _build_edge_and_apron_decor(
 		centerline: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		stage: Callable = Callable()
 ) -> void:
 	var decor: Array = spec.get("edge_decor", [])
 	if decor.is_empty():
@@ -2790,7 +2854,11 @@ static func _build_edge_and_apron_decor(
 	var bounds := _polygon_bounds_rect(room_polygon)
 	# Dense along both edges + into apron. Painted material details stay FLAT;
 	# recognizable hardware becomes small SOLID scenery.
+	var last_yield := Time.get_ticks_usec()
 	for attempt in 1200:
+		if stage.is_valid() and Time.get_ticks_usec() - last_yield >= 6000:
+			await stage.call("Adding surface detail")
+			last_yield = Time.get_ticks_usec()
 		var candidate := Vector2(
 			rng.randf_range(bounds.position.x, bounds.end.x),
 			rng.randf_range(bounds.position.y, bounds.end.y)
@@ -2878,7 +2946,8 @@ static func _build_giant_landmarks(
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		committed_racing_lines: Array[PackedVector2Array] = []
+		committed_racing_lines: Array[PackedVector2Array] = [],
+		stage: Callable = Callable()
 ) -> void:
 	var giants: Array = spec.get("giants", [])
 	if giants.is_empty():
@@ -2910,6 +2979,8 @@ static func _build_giant_landmarks(
 		var asset_offset := rng.randi_range(0, giants.size() - 1)
 		var pref_idx := corners[rng.randi() % corners.size()]
 		for asset_attempt in giants.size():
+			if stage.is_valid():
+				await stage.call("Placing landmarks")
 			tex_path = String(giants[(asset_offset + asset_attempt) % giants.size()])
 			tex = load(tex_path) as Texture2D
 			if tex == null:
@@ -4174,24 +4245,64 @@ static func _texture_opaque_rect(texture: Texture2D) -> Rect2:
 	var cache_key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
 	if _texture_opaque_rect_cache.has(cache_key):
 		return _texture_opaque_rect_cache[cache_key]
+	var result: Rect2 = _texture_alpha_outline(texture)["used"]
+	_texture_opaque_rect_cache[cache_key] = result
+	return result
+
+
+static func _texture_alpha_outline(texture: Texture2D) -> Dictionary:
+	var cache_key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
+	if _texture_outline_cache.has(cache_key):
+		return _texture_outline_cache[cache_key]
+	var width := texture.get_width()
+	var height := texture.get_height()
+	var rows_first := PackedInt32Array()
+	var rows_last := PackedInt32Array()
+	var columns_first := PackedInt32Array()
+	var columns_last := PackedInt32Array()
+	rows_first.resize(height)
+	rows_last.resize(height)
+	columns_first.resize(width)
+	columns_last.resize(width)
+	rows_first.fill(-1)
+	rows_last.fill(-1)
+	columns_first.fill(-1)
+	columns_last.fill(-1)
+	var boundary := PackedVector2Array()
+	var bounds := Rect2(Vector2.ZERO, Vector2(width, height))
 	var image := texture.get_image()
 	if image != null and not image.is_empty():
+		if image.is_compressed():
+			image.decompress()
 		var used := image.get_used_rect()
+		var byte_alpha := image.get_format() == Image.FORMAT_RGBA8
+		var pixels := image.get_data() if byte_alpha else PackedByteArray()
+		var threshold := int(floor(COLLISION_ALPHA_THRESHOLD * 255.0))
 		if used.size.x > 0 and used.size.y > 0:
 			var minimum := Vector2i(used.end)
 			var maximum := Vector2i(used.position - Vector2i.ONE)
 			for y in range(used.position.y, used.end.y):
+				var offset := (y * width + used.position.x) * 4 + 3
 				for x in range(used.position.x, used.end.x):
-					if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
-						minimum = minimum.min(Vector2i(x, y))
-						maximum = maximum.max(Vector2i(x, y))
+					var opaque := pixels[offset] > threshold if byte_alpha else image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD
+					if opaque:
+						if rows_first[y] < 0:
+							rows_first[y] = x
+						rows_last[y] = x
+						if columns_first[x] < 0:
+							columns_first[x] = y
+						columns_last[x] = y
+					offset += 4
+				if rows_first[y] >= 0:
+					minimum = minimum.min(Vector2i(rows_first[y], y))
+					maximum = maximum.max(Vector2i(rows_last[y], y))
+					boundary.append(Vector2(rows_first[y] + 0.5, y + 0.5))
+					boundary.append(Vector2(rows_last[y] + 0.5, y + 0.5))
 			if maximum.x >= minimum.x and maximum.y >= minimum.y:
-				var alpha_rect := Rect2(Vector2(minimum), Vector2(maximum - minimum + Vector2i.ONE))
-				_texture_opaque_rect_cache[cache_key] = alpha_rect
-				return alpha_rect
-	var fallback := Rect2(Vector2.ZERO, Vector2(texture.get_width(), texture.get_height()))
-	_texture_opaque_rect_cache[cache_key] = fallback
-	return fallback
+				bounds = Rect2(Vector2(minimum), Vector2(maximum - minimum + Vector2i.ONE))
+	var result := {"used": bounds, "rows_first": rows_first, "rows_last": rows_last, "columns_first": columns_first, "columns_last": columns_last, "boundary": boundary}
+	_texture_outline_cache[cache_key] = result
+	return result
 
 
 static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringName, force_axis_aligned: bool = false) -> Dictionary:
@@ -4214,8 +4325,8 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 		var forced_axis_result := _axis_aligned_texture_footprint(used, resolved_kind)
 		_texture_footprint_cache[cache_key] = forced_axis_result
 		return forced_axis_result
-	var image := texture.get_image()
-	if image == null or image.is_empty():
+	var outline := _texture_alpha_outline(texture)
+	if (outline["boundary"] as PackedVector2Array).is_empty():
 		_texture_footprint_cache[cache_key] = fallback
 		return fallback
 	# Gather the first and last opaque pixel on sampled rows and columns. This
@@ -4228,24 +4339,14 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 	var right := int(used.end.x)
 	var bottom := int(used.end.y)
 	for y in range(top, bottom, scan_step):
-		var first_x := -1
-		var last_x := -1
-		for x in range(left, right):
-			if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
-				if first_x < 0:
-					first_x = x
-				last_x = x
+		var first_x: int = outline["rows_first"][y]
+		var last_x: int = outline["rows_last"][y]
 		if first_x >= 0:
 			points.append(Vector2(first_x + 0.5, y + 0.5))
 			points.append(Vector2(last_x + 0.5, y + 0.5))
 	for x in range(left, right, scan_step):
-		var first_y := -1
-		var last_y := -1
-		for y in range(top, bottom):
-			if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
-				if first_y < 0:
-					first_y = y
-				last_y = y
+		var first_y: int = outline["columns_first"][x]
+		var last_y: int = outline["columns_last"][x]
 		if first_y >= 0:
 			points.append(Vector2(x + 0.5, first_y + 0.5))
 			points.append(Vector2(x + 0.5, last_y + 0.5))
@@ -4298,18 +4399,14 @@ static func _texture_collision_footprint(texture: Texture2D, shape_kind: StringN
 			best_rotation = angle
 	var best_axis_x := Vector2(cos(best_rotation), sin(best_rotation))
 	var best_axis_y := best_axis_x.rotated(PI * 0.5)
-	# Refine exact min/max proj using dense scan (step=1) over all opaque to guarantee
-	# every alpha pixel (incl diagonal/elongated) is enclosed by the returned rect.
-	# This finishes the oriented footprint for rotated sprites (intrinsic orient + body rot compose).
+	# Linear projection extrema on each row occur at its first or last opaque
+	# pixel. These endpoints preserve the dense scan's exact support bounds.
 	var min_projection := Vector2(INF, INF)
 	var max_projection := Vector2(-INF, -INF)
-	for y in range(top, bottom):
-		for x in range(left, right):
-			if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
-				var pt := Vector2(x + 0.5, y + 0.5)
-				var pr := Vector2(pt.dot(best_axis_x), pt.dot(best_axis_y))
-				min_projection = min_projection.min(pr)
-				max_projection = max_projection.max(pr)
+	for pt: Vector2 in outline["boundary"]:
+		var pr := Vector2(pt.dot(best_axis_x), pt.dot(best_axis_y))
+		min_projection = min_projection.min(pr)
+		max_projection = max_projection.max(pr)
 	var center_projection := (min_projection + max_projection) * 0.5
 	var fitted_size := max_projection - min_projection
 	var anisotropy := maxf(fitted_size.x, fitted_size.y) / maxf(minf(fitted_size.x, fitted_size.y), 0.001)
@@ -4347,21 +4444,7 @@ static func _texture_convex_hull(texture: Texture2D) -> PackedVector2Array:
 	var cache_key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
 	if _texture_hull_cache.has(cache_key):
 		return _texture_hull_cache[cache_key]
-	var image := texture.get_image()
-	var points := PackedVector2Array()
-	if image != null and not image.is_empty():
-		var used := image.get_used_rect()
-		for y in range(used.position.y, used.end.y):
-			var first_x := -1
-			var last_x := -1
-			for x in range(used.position.x, used.end.x):
-				if image.get_pixel(x, y).a > COLLISION_ALPHA_THRESHOLD:
-					if first_x < 0:
-						first_x = x
-					last_x = x
-			if first_x >= 0:
-				points.append(Vector2(first_x + 0.5, y + 0.5))
-				points.append(Vector2(last_x + 0.5, y + 0.5))
+	var points: PackedVector2Array = _texture_alpha_outline(texture)["boundary"]
 	var hull := Geometry2D.convex_hull(points) if points.size() >= 3 else points
 	if hull.size() > 1 and hull[0].is_equal_approx(hull[hull.size() - 1]):
 		hull.remove_at(hull.size() - 1)

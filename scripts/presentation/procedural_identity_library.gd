@@ -17,6 +17,7 @@ static var _avatar_texture_cache: Dictionary = {}
 static var _car_payload_cache: Dictionary = {}
 static var _car_texture_cache: Dictionary = {}
 static var _car_spin_cache: Dictionary = {}
+static var motion_image_generations := 0
 
 
 static func avatar_payload(driver_id: String) -> Dictionary:
@@ -89,20 +90,56 @@ static func _texture_for_spin_pose(vehicle_id: String, spin: int, pose: int) -> 
 		_car_spin_cache[vehicle_id] = {}
 	var per_spin: Dictionary = _car_spin_cache[vehicle_id]
 	if not per_spin.has(spin):
+		var empty: Array = []
+		empty.resize(5)
+		per_spin[spin] = empty
+	var textures: Array = per_spin[spin]
+	pose = clampi(pose, 0, textures.size() - 1)
+	if textures[pose] == null:
+		if spin == 0 and pose == REST_STEER_POSE:
+			textures[pose] = car_texture(vehicle_id)
+			return textures[pose]
 		var payload := car_payload(vehicle_id)
 		if payload.is_empty():
 			return null
-		var images: Array[Image] = CAR_SPRITES.car_steer_frames(payload, spin, NATIVE_PIXEL_SCALE)
-		var textures: Array = []
-		for pose_index in range(images.size()):
-			if spin == 0 and pose_index == REST_STEER_POSE:
-				textures.append(car_texture(vehicle_id))
-			elif images[pose_index] == null:
-				textures.append(null)
-			else:
-				textures.append(ImageTexture.create_from_image(images[pose_index]))
-		per_spin[spin] = textures
-	var frames: Array = per_spin[spin]
-	if frames.is_empty():
-		return car_texture(vehicle_id)
-	return frames[clampi(pose, 0, frames.size() - 1)]
+		var image := CAR_SPRITES.car_pose_image(payload, spin, pose, NATIVE_PIXEL_SCALE)
+		if image != null:
+			textures[pose] = ImageTexture.create_from_image(image)
+			motion_image_generations += 1
+	return textures[pose]
+
+
+static func motion_preparation_plan(vehicle_id: String) -> Dictionary:
+	if not _car_spin_cache.has(vehicle_id):
+		_car_spin_cache[vehicle_id] = {}
+	var per_spin: Dictionary = _car_spin_cache[vehicle_id]
+	var jobs: Array[Vector2i] = []
+	for spin in CAR_SPRITES.WHEEL_FRAME_COUNT:
+		if not per_spin.has(spin):
+			var frames: Array = []
+			frames.resize(5)
+			per_spin[spin] = frames
+		for pose in 5:
+			if spin == 0 and pose == REST_STEER_POSE and _car_texture_cache.has(vehicle_id):
+				per_spin[spin][pose] = _car_texture_cache[vehicle_id]
+			if per_spin[spin][pose] == null:
+				jobs.append(Vector2i(spin, pose))
+	return {"payload": car_payload(vehicle_id), "jobs": jobs}
+
+
+static func render_motion_plan(plan: Dictionary) -> Dictionary:
+	var images: Array[Image] = []
+	for job: Vector2i in plan["jobs"]:
+		images.append(CAR_SPRITES.car_pose_image(plan["payload"], job.x, job.y, NATIVE_PIXEL_SCALE))
+	return {"jobs": plan["jobs"], "images": images}
+
+
+static func install_motion_image(vehicle_id: String, frame: Vector2i, image: Image) -> bool:
+	if image == null:
+		return false
+	var texture := ImageTexture.create_from_image(image)
+	_car_spin_cache[vehicle_id][frame.x][frame.y] = texture
+	if frame.x == 0 and frame.y == REST_STEER_POSE:
+		_car_texture_cache[vehicle_id] = texture
+	motion_image_generations += 1
+	return true

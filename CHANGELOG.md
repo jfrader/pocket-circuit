@@ -36,6 +36,17 @@
 
 ### Changed
 
+- Menu buttons now keep crisp borders at different sizes, with distinct hover,
+  keyboard focus, pressed, disabled and car-selection feedback. HUD instruments
+  use fixed-size details, cleaner type and more consistent spacing.
+- Race starts and retries now show an illustrated pit lane while preparing the
+  circuit, car animations and graphics before the countdown. Car animation
+  frames are prepared ahead of play instead of being drawn when racing begins.
+- Title and garage screens now use illustrated motorsport workbench artwork,
+  clear Play/Next actions, and the actual selected car. Quick Race can change
+  cars without losing its chosen circuit, and briefings can launch immediately.
+- Race position, lap, checkpoint, timer, speed, boost, and racer progress now
+  use a compact illustrated HUD that leaves more of the circuit visible.
 - Recovering players can pass through rival cars but still collide with the
   circuit and trigger checkpoints, preventing ghost-state corner cuts and
   repeated resets when accelerating away from recovery.
