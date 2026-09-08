@@ -67,7 +67,9 @@ func _run_test() -> void:
 	if not _expect(camera != null and camera.limit_left == floori(room_bounds.position.x) and camera.limit_top == floori(room_bounds.position.y) and camera.limit_right == ceili(room_bounds.end.x) and camera.limit_bottom == ceili(room_bounds.end.y), "generated room bounds should expand the runtime camera limits"):
 		return
 	var finish := track.get_node_or_null("Checkpoint0Finish") as Area2D
-	if not _expect(finish != null and float(finish.get_meta("sensor_span", 0.0)) <= BUILDER.HALF_WIDTH * 2.0 + 0.5 and float(finish.get_meta("sensor_span", 0.0)) >= BUILDER.HALF_WIDTH and bool(finish.get_meta("sensor_corridor_span", false)), "runtime finish sensor should span the racing corridor"):
+	if not _expect(finish != null and float(finish.get_meta("sensor_span", 0.0)) >= BUILDER.HALF_WIDTH * 2.0 - 0.5 and bool(finish.get_meta("sensor_asymmetric_span", false)), "runtime finish sensor should cover the corridor and available outer apron while stopping on the island side"):
+		return
+	if not await _probe_inner_rim(track):
 		return
 	if not await _probe_open_apron(track):
 		return
@@ -141,6 +143,30 @@ func _probe_open_apron(track: Node2D) -> bool:
 			if hit == null:
 				return true
 	return _expect(false, "a vehicle should be able to drive from the racing corridor into the open apron without hitting an invisible contour")
+
+
+func _probe_inner_rim(track: Node2D) -> bool:
+	var centerline := (track.get_node("TrackSurface") as Line2D).points
+	var island_polygon: PackedVector2Array = track.get_meta("island_invalid_polygon", PackedVector2Array())
+	for index in range(0, centerline.size(), 26):
+		var inner_direction := centerline[index].direction_to(_closest_point_on_loop(centerline[index], island_polygon))
+		var probe := CharacterBody2D.new()
+		probe.name = "InnerRimProbe"
+		probe.collision_layer = 1
+		probe.collision_mask = 2 | 4 | 16
+		probe.position = centerline[index]
+		var probe_collision := CollisionShape2D.new()
+		var probe_shape := CircleShape2D.new()
+		probe_shape.radius = 14.0
+		probe_collision.shape = probe_shape
+		probe.add_child(probe_collision)
+		track.add_child(probe)
+		await physics_frame
+		var hit := probe.move_and_collide(inner_direction * 260.0)
+		probe.queue_free()
+		if not _expect(hit != null, "the visible raised island should physically stop an inside cut at sample %d" % index):
+			return false
+	return true
 
 
 func _closest_point_on_loop(point: Vector2, loop: PackedVector2Array) -> Vector2:

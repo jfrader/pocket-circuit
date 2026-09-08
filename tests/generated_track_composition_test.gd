@@ -364,11 +364,12 @@ func _check_island_geometry(track: Node2D, label: String) -> bool:
 	if not _expect(boundary_collision != null and boundary_collision.shape is ConcavePolygonShape2D, "%s should have one physical island boundary" % label):
 		return false
 	var island_polygon: PackedVector2Array = barrier.get_meta("boundary_polygon", PackedVector2Array())
+	var collision_polygon: PackedVector2Array = barrier.get_meta("collision_boundary_polygon", PackedVector2Array())
 	if not _expect(island_polygon.size() > 20, "%s island collision should follow the generated inner loop" % label):
 		return false
 	if not _expect(not _has_self_intersection(island_polygon), "%s island collision should be a simple polygon" % label):
 		return false
-	if not _expect(track.get_meta("island_invalid_polygon", PackedVector2Array()) == island_polygon, "%s recovery should reject the same polygon enclosed by the raised island" % label):
+	if not _expect(collision_polygon.size() >= 3 and track.get_meta("island_invalid_polygon", PackedVector2Array()) == collision_polygon, "%s recovery should begin at the raised rim's physical contact edge" % label):
 		return false
 	var side_face := barrier.get_node_or_null("SideFace") as Line2D
 	var textured_rim := barrier.get_node_or_null("TexturedRim") as Line2D
@@ -377,6 +378,12 @@ func _check_island_geometry(track: Node2D, label: String) -> bool:
 		return false
 	if not _expect(side_face.points == island_polygon and textured_rim.points == island_polygon and top_lip.points == island_polygon and textured_rim.texture != null, "%s raised island visuals should follow the exact physical contour" % label):
 		return false
+	for collision_point: Vector2 in collision_polygon:
+		var visual_clearance := INF
+		for point_index in island_polygon.size():
+			visual_clearance = minf(visual_clearance, BUILDER._point_to_segment_distance(collision_point, island_polygon[point_index], island_polygon[(point_index + 1) % island_polygon.size()]))
+		if not _expect(visual_clearance <= BUILDER.ISLAND_TEXTURED_RIM_WIDTH * 0.5 + 1.0, "%s island recovery boundary must remain under the visible textured rim" % label):
+			return false
 	var rim_landmarks := track.get_node_or_null("IslandRimLandmarks")
 	if not _expect(rim_landmarks != null and int(rim_landmarks.get_meta("placed_count", 0)) == 3 and rim_landmarks.get_child_count() == 3, "%s raised island should carry three colliding edge landmarks for scale" % label):
 		return false
@@ -397,7 +404,10 @@ func _check_open_boundary_assets(track: Node2D, theme: StringName, seed: int) ->
 	var label := "%s seed %d" % [theme, seed]
 	if not _expect(track.get_node_or_null("OuterBarrier") == null and track.get_node_or_null("ContinuousBoundaryBacking") == null, "%s open apron must not contain a continuous outer collider or contour rim" % label):
 		return false
-	var centerline := (track.get_node("TrackSurface") as Line2D).points
+	var track_surface := track.get_node("TrackSurface") as Line2D
+	var centerline := track_surface.points
+	if not _expect(absf(track_surface.width - BUILDER.HALF_WIDTH * 2.0) < 0.1, "%s visible road should reach the full legal corridor edge" % label):
+		return false
 	var visuals := track.get_node_or_null("GeneratedOuterBoundaryVisuals")
 	var expected: Dictionary = BUILDER.LAYOUTS[theme]["generated_boundary"]
 	if not _expect(visuals != null and String(visuals.get_meta("section_asset", "")) == String(expected["section"]) and String(visuals.get_meta("accent_asset", "")) == String(expected["accent"]), "%s sparse boundary assets should use only their theme-specific kit" % label):
@@ -502,34 +512,30 @@ func _has_clear_open_apron_path(track: Node2D, visuals: Node, centerline: Packed
 func _check_corridor_gates(track: Node2D, label: String) -> bool:
 	var room_polygon: PackedVector2Array = track.get_meta("room_polygon", PackedVector2Array())
 	var island_polygon: PackedVector2Array = track.get_meta("island_invalid_polygon", PackedVector2Array())
-	var island_center := Vector2.ZERO
-	for island_point: Vector2 in island_polygon:
-		island_center += island_point
-	island_center /= maxf(float(island_polygon.size()), 1.0)
 	var minimum_span := INF
 	var maximum_span := 0.0
 	for gate_index in BUILDER.GATE_COUNT:
 		var checkpoint := track.get_node_or_null("Checkpoint0Finish" if gate_index == 0 else "Checkpoint%d" % gate_index) as Area2D
-		if not _expect(checkpoint != null and bool(checkpoint.get_meta("sensor_corridor_span", false)), "%s gate %d should declare a corridor sensor" % [label, gate_index]):
+		if not _expect(checkpoint != null and bool(checkpoint.get_meta("sensor_asymmetric_span", false)), "%s gate %d should declare an inner-capped, outer-apron sensor" % [label, gate_index]):
 			return false
 		var endpoints: PackedVector2Array = checkpoint.get_meta("sensor_endpoints", PackedVector2Array())
 		var span := float(checkpoint.get_meta("sensor_span", 0.0))
 		var collision := checkpoint.get_node_or_null("CollisionShape2D") as CollisionShape2D
 		var shape := collision.shape as RectangleShape2D if collision else null
-		if not _expect(endpoints.size() == 2 and shape != null and span <= BUILDER.HALF_WIDTH * 2.0 + 0.5 and span >= BUILDER.HALF_WIDTH and shape.size.y >= span, "%s gate %d sensor should cover the corridor without the inner grass (endpoints=%d span=%.1f shape=%s)" % [label, gate_index, endpoints.size(), span, shape.size if shape else Vector2.ZERO]):
+		if not _expect(endpoints.size() == 2 and shape != null and span >= BUILDER.HALF_WIDTH * 2.0 - 0.5 and shape.size.y >= span, "%s gate %d sensor should cover the corridor and any available legal outer apron (endpoints=%d span=%.1f shape=%s)" % [label, gate_index, endpoints.size(), span, shape.size if shape else Vector2.ZERO]):
 			return false
-		for endpoint: Vector2 in endpoints:
-			if not _expect(checkpoint.position.distance_to(endpoint) <= BUILDER.HALF_WIDTH + 0.5, "%s gate %d endpoint should stay inside the racing corridor (%.2f)" % [label, gate_index, checkpoint.position.distance_to(endpoint)]):
-				return false
 		var local_a := collision.position + Vector2(0.0, -shape.size.y * 0.5)
 		var local_b := collision.position + Vector2(0.0, shape.size.y * 0.5)
 		var world_a := checkpoint.transform * local_a
 		var world_b := checkpoint.transform * local_b
 		if not _expect(minf(world_a.distance_to(endpoints[0]), world_a.distance_to(endpoints[1])) <= 5.0 and minf(world_b.distance_to(endpoints[0]), world_b.distance_to(endpoints[1])) <= 5.0, "%s gate %d collision rectangle should physically reach both recorded corridor ends" % [label, gate_index]):
 			return false
-		var inner_end := endpoints[0]
-		if endpoints[1].distance_squared_to(island_center) < endpoints[0].distance_squared_to(island_center):
-			inner_end = endpoints[1]
+		var inner_end: Vector2 = checkpoint.get_meta("sensor_inner_endpoint", Vector2.ZERO)
+		var outer_end: Vector2 = checkpoint.get_meta("sensor_outer_endpoint", Vector2.ZERO)
+		if not _expect(inner_end == endpoints[0] and outer_end == endpoints[1], "%s gate %d should expose its locally resolved island and apron sides" % [label, gate_index]):
+			return false
+		if not _expect(checkpoint.position.distance_to(inner_end) <= BUILDER.HALF_WIDTH + 0.5 and checkpoint.position.distance_to(outer_end) >= BUILDER.HALF_WIDTH - 0.5, "%s gate %d should cap its island side and retain the full outer corridor" % [label, gate_index]):
+			return false
 		var inner_dir := inner_end - checkpoint.position
 		if inner_dir.length_squared() > 1.0:
 			inner_dir = inner_dir.normalized()
@@ -540,6 +546,11 @@ func _check_corridor_gates(track: Node2D, label: String) -> bool:
 			if Geometry2D.is_point_in_polygon(grass, room_polygon) and not Geometry2D.is_point_in_polygon(grass, island_polygon):
 				if not _expect(not _checkpoint_contains_world(checkpoint, grass), "%s gate %d must not count an inner-grass corner cut" % [label, gate_index]):
 					return false
+		if checkpoint.position.distance_to(outer_end) > BUILDER.HALF_WIDTH + 8.0:
+			var outer_dir := (outer_end - checkpoint.position).normalized()
+			var outer_apron := checkpoint.position + outer_dir * minf(BUILDER.HALF_WIDTH + 36.0, checkpoint.position.distance_to(outer_end) - 4.0)
+			if not _expect(_checkpoint_contains_world(checkpoint, outer_apron), "%s gate %d should count a legal outer-apron line" % [label, gate_index]):
+				return false
 		minimum_span = minf(minimum_span, span)
 		maximum_span = maxf(maximum_span, span)
 	var posts := track.get_node_or_null("GatePosts")

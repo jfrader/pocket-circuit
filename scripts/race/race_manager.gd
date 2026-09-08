@@ -308,6 +308,15 @@ func is_racer_wrong_way(vehicle: Node2D) -> bool:
 	return bool(_racers[vehicle]["wrong_way"]) if _racers.has(vehicle) else false
 
 
+func report_recovery(vehicle: Node2D) -> void:
+	if not _racers.has(vehicle):
+		return
+	var state: Dictionary = _racers[vehicle]
+	state["wrong_way_time"] = 0.0
+	_set_wrong_way(vehicle, state, false)
+	_racers[vehicle] = state
+
+
 func finalize_remaining_racers_as_dnf() -> void:
 	if _results_finalized:
 		return

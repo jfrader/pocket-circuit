@@ -62,8 +62,9 @@ rooms, route geometry, palette, interface, and story.
   corridor wall sits under bare floor; collision is reserved for real visible
   household assets, the raised island, and room walls.
 - Traversable shortcuts include authored surface lanes inside the racing
-  corridor. Ordered corridor gate sensors, not hidden walls, protect lap
-  integrity: inner grass cuts miss the gate and do not count.
+  corridor. The raised island physically closes the inside line; ordered gates
+  stop there but extend across the open outer apron. If a car penetrates the
+  island or persists the wrong way, it returns to its last legal gate.
 - Kitchen props are oversized, friendly, and readable from directly above.
   Details are broad shapes, not thin linework.
 - Micro details such as crumbs, fibers, droplets, scratches, and wood grain use
