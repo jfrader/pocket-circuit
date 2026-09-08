@@ -36,6 +36,9 @@
 
 ### Changed
 
+- Recovering players can pass through rival cars but still collide with the
+  circuit and trigger checkpoints, preventing ghost-state corner cuts and
+  repeated resets when accelerating away from recovery.
 - Raised inner islands now stop corner cuts at their visible edge, while legal
   wide lines across the open outer apron still count. Persistent wrong-way
   driving returns the car to its last checkpoint instead of wasting a lap.
