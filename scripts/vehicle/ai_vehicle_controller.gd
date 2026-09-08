@@ -4,7 +4,7 @@ extends Node
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const STUCK_TIMEOUT := 2.8
 const STUCK_SPEED := 85.0
-const RECOVERY_GHOST_TIME := 1.0
+const RECOVERY_GHOST_TIME := 0.65
 const RECOVERY_COOLDOWN := 5.0
 const CORNER_GUIDE_AXIS_THRESHOLD := 180.0
 const CORNER_GUIDE_BLEND_DISTANCE := 180.0
@@ -44,7 +44,6 @@ const DRAFT_MAX_DISTANCE := 185.0
 const DRAFT_LATERAL_WIDTH := 34.0
 const DRAFT_RECHARGE_MULTIPLIER := 0.40
 const OFF_ROUTE_DISTANCE := 250.0
-const SEVERE_OFF_ROUTE_DISTANCE := 420.0
 const OFF_ROUTE_TIMEOUT := 1.25
 const NO_PROGRESS_TIMEOUT := 2.0
 const WRONG_WAY_PROGRESS_TIMEOUT := 0.75
@@ -63,7 +62,7 @@ const DEFAULT_PERSONALITY: Dictionary = {
 	"line_commitment": 1.0,
 }
 const PERSONALITY_BOUNDS: Dictionary = {
-	"corner_pace": Vector2(0.96, 1.04),
+	"corner_pace": Vector2(1.0, 1.04),
 	"brake_timing": Vector2(0.9, 1.1),
 	"boost_eagerness": Vector2(0.9, 1.18),
 	"overtake_aggression": Vector2(0.85, 1.13),
@@ -128,6 +127,7 @@ var difficulty: String = "club_circuit"
 var personality_id := "baseline"
 var personality: Dictionary = DEFAULT_PERSONALITY.duplicate()
 var recovery_count := 0
+var recovery_reasons: Dictionary = {}
 var overtake_attempt_count := 0
 var uses_shortcut_line := false
 
@@ -155,7 +155,7 @@ var _overtake_offset := 0.0
 var _overtake_hold_remaining := 0.0
 var _overtake_cooldown_remaining := 0.0
 var _overtake_target_id := 0
-var _last_recovery_time := 0
+var _recovery_cooldown_remaining := 0.0
 var _off_route_time := 0.0
 var _no_progress_time := 0.0
 var _wrong_way_progress_time := 0.0
@@ -198,7 +198,8 @@ func configure(
 	_race_collision_layer = vehicle.collision_layer
 	_race_collision_mask = vehicle.collision_mask
 	_finished_ghosted = false
-	_last_recovery_time = 0
+	_recovery_cooldown_remaining = 0.0
+	recovery_reasons.clear()
 	_stuck_time = 0.0
 	_reset_route_watchdog()
 	if not race_manager.race_started.is_connected(_restore_racing_collisions):
@@ -270,6 +271,7 @@ func _cache_checkpoints() -> void:
 
 
 func _physics_process(delta: float) -> void:
+	_recovery_cooldown_remaining = maxf(0.0, _recovery_cooldown_remaining - delta)
 	if not is_instance_valid(vehicle) or not is_instance_valid(race_manager) or _recovering:
 		return
 	if race_manager.is_racer_finished(vehicle):
@@ -502,9 +504,14 @@ func _physics_process(delta: float) -> void:
 	var catch_up_power := 0.0
 	if difficulty == "club_circuit":
 		var progress_deficit := _leader_progress_deficit()
-		catch_up_power = minf(0.09, maxf(float(maxi(0, position - 1)) * 0.02, progress_deficit * 0.04))
+		catch_up_power = minf(0.09, maxf(float(maxi(0, position - 1)) * 0.03, progress_deficit * 0.04))
 	vehicle.set_external_power_multiplier(baseline_power + catch_up_power)
 	_apply_drafting_recharge(delta, traffic_plan, should_brake)
+	if difficulty == "club_circuit" and catch_up_power > 0.0 and not should_brake:
+		vehicle.add_boost(
+			vehicle.stats.boost_recharge * (catch_up_power / 0.09) * 0.75 * delta,
+			"catch-up",
+		)
 	# Boost gating uses local safe distance + curvature (not stale checkpoint dist/turn_severity) so clear straights get boosts.
 	var local_turn := planned_turn_severity
 	if vehicle.stats.physics_model_version == 1 and not curvature_hazard.is_empty():
@@ -1051,6 +1058,8 @@ func _configure_personality(driver_id: String, driver_style: Dictionary) -> void
 func _shortcut_route_is_suitable(track: Node) -> bool:
 	if difficulty == "sunday_drive" or _shortcut_racing_line.is_empty():
 		return false
+	if difficulty == "club_circuit" and vehicle.stats.physics_model_version == 1 and vehicle.stats.steering_rate < 3.25:
+		return false
 	var definitions: Variant = track.get_meta("generated_surfaces", [])
 	if definitions is not Array:
 		return false
@@ -1353,7 +1362,7 @@ func _update_stuck_recovery(delta: float, target_key: String, distance_to_target
 		return
 	_stuck_time += delta
 	if _stuck_time >= STUCK_TIMEOUT:
-		_recover_vehicle()
+		_recover_vehicle(&"checkpoint_stall")
 
 
 func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool = false) -> Dictionary:
@@ -1409,15 +1418,14 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 		_wrong_way_progress_time = maxf(0.0, _wrong_way_progress_time - delta * 0.5)
 
 	if _off_route_time >= OFF_ROUTE_TIMEOUT:
-		var severe := lateral_distance >= SEVERE_OFF_ROUTE_DISTANCE
-		if severe or not _recovery_cooldown_active():
-			_recover_vehicle()
+		if not _recovery_cooldown_active():
+			_recover_vehicle(&"off_route")
 	elif (
 		_no_progress_time >= NO_PROGRESS_TIMEOUT
 		or _wrong_way_progress_time >= WRONG_WAY_PROGRESS_TIMEOUT
 	):
 		if not _recovery_cooldown_active():
-			_recover_vehicle()
+			_recover_vehicle(&"wrong_way" if _wrong_way_progress_time >= WRONG_WAY_PROGRESS_TIMEOUT else &"no_progress")
 	return {"made_progress": made_progress}
 
 
@@ -1501,7 +1509,7 @@ func _update_static_escape(delta: float, obstacle_plan: Dictionary, made_progres
 	return true
 
 
-func _recover_vehicle() -> void:
+func _recover_vehicle(reason: StringName = &"unknown") -> void:
 	if _recovering:
 		return
 	_recovering = true
@@ -1509,7 +1517,8 @@ func _recover_vehicle() -> void:
 		race_manager.call("report_recovery", vehicle)
 	_room_cut_checkpoint = -1
 	recovery_count += 1
-	_last_recovery_time = Time.get_ticks_msec()
+	recovery_reasons[reason] = int(recovery_reasons.get(reason, 0)) + 1
+	_recovery_cooldown_remaining = RECOVERY_COOLDOWN
 	_stuck_time = 0.0
 	_guide_checkpoint_index = -1
 	_guide_reached = false
@@ -1523,6 +1532,7 @@ func _recover_vehicle() -> void:
 	var saved_mask := vehicle.collision_mask
 	var recovery_transform := race_manager.get_last_recovery_transform(vehicle)
 	var recovery_forward := Vector2.UP.rotated(recovery_transform.get_rotation())
+	recovery_transform.origin += recovery_forward.orthogonal() * lane_offset
 	vehicle.freeze = true
 	vehicle.global_transform = recovery_transform
 	vehicle.linear_velocity = Vector2.ZERO
@@ -1537,8 +1547,8 @@ func _recover_vehicle() -> void:
 	var eff_max := 650.0
 	if vehicle.has_method("get_effective_max_speed"):
 		eff_max = vehicle.call("get_effective_max_speed")
-	vehicle.linear_velocity = recovery_forward * clampf(eff_max * 0.12, 70.0, 90.0)
-	vehicle.boost_amount *= 0.5
+	vehicle.linear_velocity = recovery_forward * clampf(eff_max * 0.28, 170.0, 210.0)
+	vehicle.boost_amount = maxf(vehicle.boost_amount * 0.5, vehicle.get_boost_capacity() * 0.35)
 
 	await get_tree().create_timer(RECOVERY_GHOST_TIME, false).timeout
 	if is_instance_valid(vehicle) and is_instance_valid(race_manager) and not race_manager.is_racer_finished(vehicle):
@@ -1552,9 +1562,7 @@ func _recover_vehicle() -> void:
 
 
 func _recovery_cooldown_active() -> bool:
-	if _last_recovery_time == 0:
-		return false
-	return (Time.get_ticks_msec() - _last_recovery_time) < int(RECOVERY_COOLDOWN * 1000.0)
+	return _recovery_cooldown_remaining > 0.0
 
 
 func _reset_overtake_state() -> void:

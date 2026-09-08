@@ -329,24 +329,38 @@ func _run_test() -> void:
 		Vector2(-100.0, 100.0),
 	]))
 	controller.call("_reset_route_watchdog")
-	controller.set("_last_recovery_time", Time.get_ticks_msec())
+	controller.set("_recovery_cooldown_remaining", 1.0)
+	controller.call("_physics_process", 0.25)
+	if not _expect(is_equal_approx(float(controller.get("_recovery_cooldown_remaining")), 0.75), "recovery cooldown should advance in simulation time"):
+		return
 	controller.set("_overtake_hold_remaining", 1.0)
 	controller.set("_overtake_offset", 52.0)
+	controller.lane_offset = 24.0
 	vehicle.global_position = Vector2(700.0, 700.0)
 	vehicle.speed = 300.0
 	for _step in 14:
 		controller.call("_update_route_watchdog", 0.1, manager.get_expected_checkpoint(vehicle))
-	if not _expect(bool(controller.get("_recovering")) and controller.recovery_count == 1, "a severe off-route AI should recover at speed even during the normal cooldown"):
+	if not _expect(not bool(controller.get("_recovering")) and controller.recovery_count == 0, "recovery cooldown should prevent immediate repeated off-route teleports"):
 		return
-	if not _expect(vehicle.global_position.distance_to(manager.get_last_recovery_transform(vehicle).origin) < 1.0, "off-route recovery should return the AI to its last legal gate"):
+	controller.set("_recovery_cooldown_remaining", 0.0)
+	controller.call("_update_route_watchdog", 0.1, manager.get_expected_checkpoint(vehicle))
+	if not _expect(bool(controller.get("_recovering")) and controller.recovery_count == 1, "a severe off-route AI should recover once the simulation cooldown completes"):
+		return
+	if not _expect(int(controller.recovery_reasons.get(&"off_route", 0)) == 1, "recovery telemetry should record the triggering watchdog"):
+		return
+	var recovery_transform := manager.get_last_recovery_transform(vehicle)
+	var recovery_forward := Vector2.UP.rotated(recovery_transform.get_rotation())
+	var expected_recovery_position := recovery_transform.origin + recovery_forward.orthogonal() * controller.lane_offset
+	if not _expect(vehicle.global_position.distance_to(expected_recovery_position) < 1.0, "off-route recovery should return the AI to its lane at the last legal gate"):
 		return
 	if not _expect(is_zero_approx(float(controller.get("_overtake_hold_remaining"))) and is_zero_approx(float(controller.get("_overtake_offset"))), "recovery should clear stale overtake hold and offset state"):
 		return
 	await create_timer(1.05).timeout
+	controller.lane_offset = 0.0
 
 	manager.start_race()
 	controller.set("_racing_line", PackedVector2Array())
-	controller.set("_last_recovery_time", 0)
+	controller.set("_recovery_cooldown_remaining", 0.0)
 	vehicle.global_position = Vector2(430.0, 360.0)
 	vehicle.rotation = PI * 0.5
 	vehicle.speed = 60.0
