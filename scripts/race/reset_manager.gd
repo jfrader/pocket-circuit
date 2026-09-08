@@ -13,6 +13,7 @@ var _race_manager: Node
 var _stuck_time: float = 0.0
 var _wrong_way_time: float = 0.0
 var _recovering: bool = false
+var _recovery_exceptions: Array[PhysicsBody2D] = []
 
 
 func _ready() -> void:
@@ -89,10 +90,9 @@ func recover_vehicle() -> void:
 	if _race_manager.has_method("report_recovery"):
 		_race_manager.call("report_recovery", _vehicle)
 
-	var saved_layer := _vehicle.collision_layer
-	var saved_mask := _vehicle.collision_mask
 	var recovery_transform: Transform2D = _race_manager.get_last_recovery_transform()
 	var recovery_forward := Vector2.UP.rotated(recovery_transform.get_rotation())
+	_ignore_racers_during_recovery()
 
 	_vehicle.freeze = true
 	_vehicle.global_transform = recovery_transform
@@ -102,8 +102,6 @@ func recover_vehicle() -> void:
 		_vehicle.call("reset_surface_modifiers")
 	if _vehicle.has_method("reset_dynamics_state"):
 		_vehicle.call("reset_dynamics_state")
-	_vehicle.collision_layer = 0
-	_vehicle.collision_mask = 0
 	_vehicle.modulate.a = 0.45
 	_vehicle.freeze = false
 
@@ -116,11 +114,34 @@ func recover_vehicle() -> void:
 		_vehicle.boost_amount *= 0.5
 
 	await get_tree().create_timer(ghost_duration, false).timeout
+	_clear_recovery_exceptions()
 	if is_instance_valid(_vehicle):
-		_vehicle.collision_layer = saved_layer
-		_vehicle.collision_mask = saved_mask
 		_vehicle.modulate.a = 1.0
 	_recovering = false
+
+
+func _ignore_racers_during_recovery() -> void:
+	if not _race_manager.has_method("get_rankings"):
+		return
+	var existing := _vehicle.get_collision_exceptions()
+	for racer: Node2D in _race_manager.get_rankings():
+		var body := racer as PhysicsBody2D
+		if body == null or body == _vehicle or existing.has(body):
+			continue
+		_vehicle.add_collision_exception_with(body)
+		_recovery_exceptions.append(body)
+
+
+func _clear_recovery_exceptions() -> void:
+	if is_instance_valid(_vehicle):
+		for body: PhysicsBody2D in _recovery_exceptions:
+			if is_instance_valid(body):
+				_vehicle.remove_collision_exception_with(body)
+	_recovery_exceptions.clear()
+
+
+func _exit_tree() -> void:
+	_clear_recovery_exceptions()
 
 
 func _can_recover() -> bool:

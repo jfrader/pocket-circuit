@@ -47,6 +47,9 @@
   cars without losing its chosen circuit, and briefings can launch immediately.
 - Race position, lap, checkpoint, timer, speed, boost, and racer progress now
   use a compact illustrated HUD that leaves more of the circuit visible.
+- Recovering players can pass through rival cars but still collide with the
+  circuit and trigger checkpoints, preventing ghost-state corner cuts and
+  repeated resets when accelerating away from recovery.
 - Raised inner islands now stop corner cuts at their visible edge, while legal
   wide lines across the open outer apron still count. Persistent wrong-way
   driving returns the car to its last checkpoint instead of wasting a lap.
