@@ -57,6 +57,8 @@
 - Rivals can use clear apron shortcuts to the next required checkpoint,
   avoid unnecessary straight-line grip braking, and judge passing space
   against the actual route rather than nearby wall placement.
+- Club Circuit rivals now keep competitive pace across generated fields and
+  resume recoveries in their own lane with useful speed and boost.
 - Starting-grid physics no longer displaces rivals into the island before
   they launch. Following cars now respect the leader's speed and distance
   rather than accelerating into a slow queue.
