@@ -8,6 +8,10 @@ class TestRaceManager extends Node:
 	var finished := false
 	var wrong_way := false
 	var reported_recoveries := 0
+	var racers: Array[Node2D] = []
+
+	func get_rankings() -> Array[Node2D]:
+		return racers
 
 	func is_racer_finished(_vehicle: Node2D) -> bool:
 		return finished
@@ -31,9 +35,15 @@ func _run_test() -> void:
 	var reset_manager := RESET_MANAGER_SCRIPT.new()
 	var vehicle := RigidBody2D.new()
 	var race_manager := TestRaceManager.new()
+	var rival := RigidBody2D.new()
+	var ignored_rival := RigidBody2D.new()
+	root.add_child(rival)
+	root.add_child(ignored_rival)
+	race_manager.racers = [vehicle, rival, ignored_rival]
 	vehicle.add_to_group("player_vehicle")
 	race_manager.add_to_group("race_manager")
 	root.add_child(vehicle)
+	vehicle.add_collision_exception_with(ignored_rival)
 	root.add_child(race_manager)
 	root.add_child(reset_manager)
 	reset_manager.set("_vehicle", vehicle)
@@ -56,13 +66,17 @@ func _run_test() -> void:
 	vehicle.collision_mask = 7
 	reset_manager.ghost_duration = 0.05
 	reset_manager.call("recover_vehicle")
+	if not _expect(vehicle.get_collision_exceptions().has(rival), "recovering player should not collide with another racer at the recovery gate"):
+		return
 	paused = true
 	await create_timer(0.08, true).timeout
-	if not _expect(bool(reset_manager.get("_recovering")) and vehicle.collision_layer == 0 and vehicle.collision_mask == 0, "recovery ghost time must not expire while paused"):
+	if not _expect(bool(reset_manager.get("_recovering")) and vehicle.collision_layer == 5 and vehicle.collision_mask == 7, "paused recovery should retain world and checkpoint collision while its ghost timer is suspended"):
 		return
 	paused = false
 	await create_timer(0.08).timeout
-	if not _expect(not bool(reset_manager.get("_recovering")) and vehicle.collision_layer == 5 and vehicle.collision_mask == 7, "recovery should restore collisions after unpaused ghost time"):
+	if not _expect(not bool(reset_manager.get("_recovering")) and vehicle.collision_layer == 5 and vehicle.collision_mask == 7, "recovery should leave world and checkpoint collision unchanged after unpaused ghost time"):
+		return
+	if not _expect(not vehicle.get_collision_exceptions().has(rival) and vehicle.get_collision_exceptions().has(ignored_rival), "recovery should remove only the racer exceptions it added"):
 		return
 
 	race_manager.wrong_way = true
@@ -77,6 +91,14 @@ func _run_test() -> void:
 	if not _expect(bool(reset_manager.get("_recovering")) and race_manager.reported_recoveries == 2 and not race_manager.wrong_way, "persistent wrong-way driving should recover once and clear the warning state"):
 		return
 	await create_timer(0.08).timeout
+
+	reset_manager.recover_vehicle()
+	race_manager.finished = true
+	vehicle.collision_layer = 0
+	vehicle.collision_mask = 0
+	await create_timer(0.08).timeout
+	if not _expect(vehicle.collision_layer == 0 and vehicle.collision_mask == 0 and not vehicle.get_collision_exceptions().has(rival), "ghost expiry after finishing should clean exceptions without restoring obsolete race collision masks"):
+		return
 
 	var ai_controller := AI_CONTROLLER_SCRIPT.new()
 	var ai_vehicle := VehicleController.new()
@@ -108,6 +130,8 @@ func _run_test() -> void:
 	root.remove_child(ai_race_manager)
 	reset_manager.free()
 	vehicle.free()
+	rival.free()
+	ignored_rival.free()
 	race_manager.free()
 	ai_controller.free()
 	ai_vehicle.free()
