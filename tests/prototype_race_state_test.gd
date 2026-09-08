@@ -9,8 +9,12 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	var prototype := PROTOTYPE_SCENE.instantiate()
+	if not _expect(not prototype.has_node("DebugOverlay"), "the source race scene should not own release-excluded telemetry"):
+		return
 	root.add_child(prototype)
 	current_scene = prototype
+	if not _expect(prototype.has_node("DebugOverlay"), "debug builds should create telemetry dynamically after the race enters the tree"):
+		return
 	var manager := prototype.get_node("RaceManager") as RaceManager
 	var race_hud := prototype.get("_race_hud") as Control
 	if not _expect(race_hud.visible, "race telemetry should be visible while driving"):

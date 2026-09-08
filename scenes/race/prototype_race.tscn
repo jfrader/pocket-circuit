@@ -4,7 +4,6 @@
 [ext_resource type="Script" uid="uid://dxwcqesawhldn" path="res://scripts/camera/follow_camera.gd" id="2_6jgnw"]
 [ext_resource type="Script" uid="uid://bhbxi2hhmvjhg" path="res://scripts/race/race_manager.gd" id="3_avw83"]
 [ext_resource type="Script" uid="uid://5ohnmd6nvvas" path="res://scripts/race/reset_manager.gd" id="4_1tj1u"]
-[ext_resource type="Script" uid="uid://b604ohcw5qwah" path="res://scripts/ui/debug_overlay.gd" id="5_2sqhw"]
 [ext_resource type="PackedScene" uid="uid://drf85t6nfrbhm" path="res://scenes/tracks/kitchen_graybox.tscn" id="6_6jgnw"]
 [ext_resource type="PackedScene" uid="uid://dg3wsgfax1t31" path="res://scenes/vehicles/rustbug.tscn" id="7_avw83"]
 
@@ -34,27 +33,6 @@ script = ExtResource("3_avw83")
 
 [node name="ResetManager" type="Node" parent="." unique_id=1454035104]
 script = ExtResource("4_1tj1u")
-
-[node name="DebugOverlay" type="CanvasLayer" parent="." unique_id=655046561]
-layer = 20
-script = ExtResource("5_2sqhw")
-
-[node name="Panel" type="Panel" parent="DebugOverlay" unique_id=1999212448]
-modulate = Color(0.08, 0.1, 0.14, 0.9)
-offset_left = 16.0
-offset_top = 72.0
-offset_right = 326.0
-offset_bottom = 372.0
-
-[node name="DebugLabel" type="Label" parent="DebugOverlay/Panel" unique_id=428391095]
-layout_mode = 0
-offset_left = 12.0
-offset_top = 10.0
-offset_right = 297.0
-offset_bottom = 285.0
-theme_override_colors/font_color = Color(0.75, 0.96, 1, 1)
-theme_override_font_sizes/font_size = 14
-text = "PHASE 0 TELEMETRY"
 
 [node name="HUD" type="CanvasLayer" parent="." unique_id=762435520]
 layer = 10
