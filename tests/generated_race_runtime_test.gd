@@ -14,10 +14,11 @@ func _run_test() -> void:
 	if not _expect(app != null, "App autoload should be available"):
 		return
 	app.call("start_circuit_race", &"office", &"el", REQUESTED_SEED, "rustbug")
-	var transition_frames := 300
-	while transition_frames > 0 and (current_scene == null or current_scene.scene_file_path != RACE_SCENE):
+	var deadline := Time.get_ticks_msec() + 45000
+	while app.call("is_race_loading") and not app.get("_loading_failed") and Time.get_ticks_msec() < deadline:
 		await process_frame
-		transition_frames -= 1
+	if not _expect(not app.call("is_race_loading") and not app.get("_loading_failed"), "Quick Race preparation should complete successfully before inspecting gameplay"):
+		return
 	if not _expect(current_scene != null and current_scene.scene_file_path == RACE_SCENE, "Quick Race should transition through App into the race scene"):
 		return
 	var session: Dictionary = app.call("get_current_race_session")
@@ -27,7 +28,6 @@ func _run_test() -> void:
 	if not _expect(String(event.get("theme", "")) == "office" and String(event.get("room", "")) == "el" and int(event.get("seed", -1)) == REQUESTED_SEED, "App should preserve the requested generated circuit identity"):
 		return
 	var race := current_scene
-	await process_frame
 
 	var track := race.get_node_or_null("Track") as Node2D
 	if not _expect(track != null, "race should replace the embedded kitchen with a live generated track"):
@@ -84,6 +84,7 @@ func _run_test() -> void:
 	if not _expect(vehicles.size() == 4, "runtime race should configure four racers"):
 		return
 	var ai_controller_count := 0
+	var shortcut_controller_count := 0
 	for vehicle: Node2D in vehicles:
 		var nearest := INF
 		for marker_position: Vector2 in marker_positions:
@@ -96,9 +97,15 @@ func _run_test() -> void:
 				var racing_line: PackedVector2Array = child.get("_racing_line")
 				if not _expect(racing_line.size() == 260, "%s should cache the generated racing line" % vehicle.name):
 					return
-				if not _expect(child.uses_shortcut_line, "%s should select the clear Club Circuit shortcut line" % vehicle.name):
-					return
+				if child.uses_shortcut_line:
+					shortcut_controller_count += 1
+				var selected_line := track.get_node("ShortcutRacingLine" if child.uses_shortcut_line else "RacingLine") as Line2D
+				for index in racing_line.size():
+					if not _expect(racing_line[index].is_equal_approx(selected_line.to_global(selected_line.points[index])), "%s should cache its selected legal route rather than the embedded fixture" % vehicle.name):
+						return
 	if not _expect(ai_controller_count == 3, "runtime race should configure three generated-track AI controllers"):
+		return
+	if not _expect(shortcut_controller_count > 0 and shortcut_controller_count < ai_controller_count, "the mixed Club roster should retain both safe and shortcut routing choices"):
 		return
 
 	race.queue_free()

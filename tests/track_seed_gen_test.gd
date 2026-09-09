@@ -22,12 +22,17 @@ func _run_test() -> void:
 	var family_seeds := {}
 	var seed_families := {}
 	var fingerprints := {}
+	var route_recipes := {}
+	var route_sequences := {}
 	var length_buckets := {}
 	var fallback_count := 0
 	var minimum_length := INF
 	var maximum_length := 0.0
 	var classic_params := _room_params("classic")
-	for seed in SAMPLE_SEEDS:
+	var sample_seed_count := SAMPLE_SEEDS
+	if OS.get_environment("PC_TRACK_SAMPLE_SEEDS").is_valid_int():
+		sample_seed_count = clampi(int(OS.get_environment("PC_TRACK_SAMPLE_SEEDS")), 12, SAMPLE_SEEDS)
+	for seed in sample_seed_count:
 		var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, classic_params)
 		if not _expect(int(result["seed"]) == seed, "seed %d must not walk to a neighboring seed" % seed):
 			return
@@ -48,6 +53,8 @@ func _run_test() -> void:
 		if bool(result.get("fallback", false)):
 			fallback_count += 1
 		fingerprints[_shape_fingerprint(controls)] = true
+		route_recipes[String(result.get("route_recipe", ""))] = true
+		route_sequences[String(result.get("route_sequence", ""))] = true
 		if not _check_loop(seed, "classic", controls, ROOM_SHAPES["classic"], 320.0):
 			return
 		if seed < 8:
@@ -60,6 +67,10 @@ func _run_test() -> void:
 	if not _expect(families.size() == 6, "representative seeds should exercise all six families (got %s)" % [families.keys()]):
 		return
 	if not _expect(fingerprints.size() >= 12, "representative seeds should produce many distinct shape fingerprints (got %d)" % fingerprints.size()):
+		return
+	if not _expect(route_recipes.size() >= 8, "independent route grammar should realize at least eight macro programs (got %s)" % [route_recipes.keys()]):
+		return
+	if not _expect(route_sequences.size() >= 8, "routes should expose varied normalized turn/straight sequences (got %d)" % route_sequences.size()):
 		return
 	if not _expect(length_buckets.size() >= 4, "independent length rolls should produce varied loop lengths (got %d buckets)" % length_buckets.size()):
 		return
@@ -76,37 +87,12 @@ func _run_test() -> void:
 		"deep_notch": 5,
 		"offset_s": 11,
 	}
-	var representative_features := {}
 	for family_name: String in representative_seeds:
 		var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(int(representative_seeds[family_name]), ROOM_RECT, classic_params)
-		if not _expect(String(result["family"]) == family_name and not bool(result["fallback"]), "%s representative must retain its explicit family template" % family_name):
+		if not _expect(String(result["family"]) == family_name and not bool(result["fallback"]), "%s representative must retain family identity while using the route grammar" % family_name):
 			return
-		representative_features[family_name] = _silhouette_features(result["points"])
-	var speed: Dictionary = representative_features["speed_loop"]
-	var dogbone: Dictionary = representative_features["dogbone"]
-	var triangle: Dictionary = representative_features["broad_triangle"]
-	var kidney: Dictionary = representative_features["kidney"]
-	var notch: Dictionary = representative_features["deep_notch"]
-	var offset_s: Dictionary = representative_features["offset_s"]
-	if not _expect(float(speed["aspect"]) > 1.5 and float(speed["concavity"]) < 0.12, "speed loop must remain an elongated fast perimeter around its shallow esses (aspect=%.2f concavity=%.2f)" % [float(speed["aspect"]), float(speed["concavity"])]):
-		return
-	if not _expect(float(dogbone["concavity"]) > 0.08 and float(dogbone["waist"]) < 0.85, "dogbone must have two lobes and a pronounced center waist"):
-		return
-	if not _expect(float(triangle["concavity"]) < 0.10 and float(triangle["triangle_taper"]) < 0.75, "broad triangle must retain a tapered macro silhouette around its technical kinks (concavity=%.2f taper=%.2f)" % [float(triangle["concavity"]), float(triangle["triangle_taper"])]):
-		return
-	if not _expect(float(kidney["concavity"]) > 0.10 and float(kidney["radial_min"]) <= 0.18 and float(kidney["mirror_error"]) > 0.008, "kidney must be a visibly asymmetric bean with a deep bay (concavity=%.2f radial=%.2f mirror=%.3f)" % [float(kidney["concavity"]), float(kidney["radial_min"]), float(kidney["mirror_error"])]):
-		return
-	if not _expect(float(notch["concavity"]) > 0.10 and float(notch["radial_min"]) < 0.18 and float(notch["mirror_error"]) < 0.03, "deep notch must retain its dramatic inward teardrop beneath seed-driven corner rhythm"):
-		return
-	if not _expect(float(offset_s["concavity"]) > 0.10 and float(offset_s["radial_min"]) > 0.28 and float(offset_s["alternation"]) > 0.025, "offset S must alternate its opposing lobes instead of reading as an oval"):
-		return
-	var feature_names: Array = representative_features.keys()
-	for first in feature_names.size():
-		for second in range(first + 1, feature_names.size()):
-			var first_name := String(feature_names[first])
-			var second_name := String(feature_names[second])
-			if not _expect(_feature_distance(representative_features[first_name], representative_features[second_name]) > 0.04, "%s and %s silhouettes must remain geometrically distinct" % [first_name, second_name]):
-				return
+		if not _expect(StringName(result.get("route_recipe", &"none")) != &"none", "%s representative should report its accepted macro route program" % family_name):
+			return
 
 	for room_name: String in ROOM_SHAPES:
 		var params := _room_params(room_name)
@@ -152,9 +138,12 @@ func _run_test() -> void:
 	var total_setup_straight_regions := 0
 	var minimum_setup_straight_regions := 999
 	var maximum_setup_straight_regions := 0
+	var matrix_seed_count := SAMPLE_SEEDS
+	if OS.get_environment("PC_TRACK_MATRIX_SEEDS").is_valid_int():
+		matrix_seed_count = clampi(int(OS.get_environment("PC_TRACK_MATRIX_SEEDS")), 1, sample_seed_count)
 	for room_name: String in ROOM_SHAPES:
 		var params := _room_params(room_name)
-		for seed in SAMPLE_SEEDS:
+		for seed in matrix_seed_count:
 			var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, params)
 			if not _expect(int(result["seed"]) == seed and String(result["family"]) == String(seed_families[seed]), "%s seed %d must preserve seed and family identity" % [room_name, seed]):
 				return
@@ -164,8 +153,12 @@ func _run_test() -> void:
 			if not _check_loop(seed, room_name, controls, ROOM_SHAPES[room_name], 320.0):
 				return
 			var gameplay: Dictionary = TRACK_SEED_GEN.gameplay_metrics(controls)
+			if not _expect(float(gameplay.get("minimum_turn_radius", 0.0)) >= TRACK_SEED_GEN.MIN_DRIVE_RADIUS, "%s seed %d must retain driveable curve radius" % [room_name, seed]):
+				return
 			var setup_straight_regions := int(gameplay.get("setup_straight_count", 0))
 			if not _expect(setup_straight_regions >= 2, "%s seed %d needs at least two distinct %.0fu setup straights (got %d)" % [room_name, seed, TRACK_SEED_GEN.MIN_SETUP_DISTANCE, setup_straight_regions]):
+				return
+			if not _expect(int(gameplay.get("literal_straight_count", 0)) >= 2, "%s seed %d needs two literal heading-stable straight runs" % [room_name, seed]):
 				return
 			if not _expect(not bool((gameplay.get("complex_bypass", {}) as Dictionary).get("found", false)), "%s seed %d must resist a straight chord replacing a whole complex" % [room_name, seed]):
 				return
@@ -186,7 +179,7 @@ func _run_test() -> void:
 			matrix_count += 1
 	if not _expect(matrix_fallbacks <= 72, "the 360-route matrix should retain selected-family geometry when it fits (fallbacks=%d)" % matrix_fallbacks):
 		return
-	if not _expect(total_turn_complexes <= matrix_count * 6, "the route matrix should average no more than six broad complexes (got %.1f)" % (float(total_turn_complexes) / float(matrix_count))):
+	if not _expect(total_turn_complexes <= matrix_count * 8, "the richer route grammar should average no more than eight broad complexes (got %.1f)" % (float(total_turn_complexes) / float(matrix_count))):
 		return
 
 	print("TRACK_SEED_GEN_TEST PASS families=%d fingerprints=%d classic_fallbacks=%d matrix_fallbacks=%d broad_complexes_avg=%.1f setup_regions=%d..%d avg=%.1f classic_length=%.0f..%.0f" % [families.size(), fingerprints.size(), fallback_count, matrix_fallbacks, float(total_turn_complexes) / float(matrix_count), minimum_setup_straight_regions, maximum_setup_straight_regions, float(total_setup_straight_regions) / float(matrix_count), minimum_length, maximum_length])

@@ -63,6 +63,7 @@ func _run() -> void:
 		quit(1)
 	else:
 		print("CONTROLLABILITY: all green (v1 within bounds from baseline)")
+		print("VEHICLE_CONTROLLABILITY_TEST PASS")
 		quit(0)
 
 func _spawn(car_name: String, stats: VehicleStats) -> RigidBody2D:

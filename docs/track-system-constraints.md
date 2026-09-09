@@ -9,6 +9,7 @@ changelog, not here.
 
 ```text
 scripts/race/track_seed_gen.gd          requested seed + room -> deterministic route
+scripts/race/track_route_grammar.gd     seed-driven macro sections and dimensions
 scripts/race/track_builder_core.gd      route + story kit -> runtime PackedScene
 tools/build_procedural_track.gd  optional CLI for saved development snapshots
 scripts/race/prototype_race.gd   builds the requested circuit at race startup
@@ -16,7 +17,8 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 
 - Generated races do not depend on a baked circuit roster or prebuilt scene
   pool. Quick Race and championship events build arbitrary seeds live through
-  `TrackBuilderCore.build_packed`.
+  staged `TrackBuilderCore.prepare_layout` / `assemble_runtime` preparation.
+  `build_packed` remains the synchronous tooling and fixture API.
 - The three authored track scenes remain regression fixtures for their themed
   collision and AI smoke tests. They are not a whitelist for generated play.
 - The builder is runtime-safe and headless-safe. It does not depend on the
@@ -30,24 +32,33 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 - Family, target length, route variation, story kit, opening landmark, and room
   canvas use independent deterministic streams. Changing the room must not
   silently change a seed's selected family.
-- A seed gets up to 12 rhythm variants of its selected family. If those do not
+- A seed gets up to 12 composed route attempts. If those do not
   fit, four deterministic technical-perimeter variants are attempted under the
   same seed and family metadata.
 - Generated roots retain `requested_seed`, `family`, `realization`,
   `generation_attempt`, `generation_fallback`, `story_id`, `loop_length`,
-  `theme`, and `room_shape` metadata.
+  `theme`, `room_shape`, `route_program`, `route_recipe`, and `route_sequence`
+  metadata. `family` is stable seed identity; the program/recipe describe the
+  actual accepted geometry.
 
 ## Route Geometry
 
 - Route families are `speed_loop`, `kidney`, `dogbone`, `broad_triangle`,
   `offset_s`, and `deep_notch`.
-- Family templates are normalized closed silhouettes. They are mirrored,
-  oriented for the room, deformed with broad low-frequency turn rhythm, fitted,
-  clearance-aware length-scaled, sampled into 24 controls, then exposed as a
-  260-point centerline.
-- Retry attempts vary deformation phase and strength rather than only shrinking
-  one silhouette. Wide and long rooms use stronger turn rhythm so their routes
-  retain changing-radius character instead of becoming stretched ovals.
+- Perimeter, lobe and wedge programs compose seed-dependent straight extents,
+  shoulders, waist/bay dimensions and optional sections. Room-safe non-axis
+  headings vary independently; a program is not a fixed circuit. Normalized
+  shape-distance tests must demonstrate variation within each program after
+  discounting translation, scale, rotation, mirroring and traversal direction.
+- Higher length rolls can select an explicitly identified `endurance` envelope
+  with a broad inward section, preserving the long-route coverage without
+  tightening corners. This is a separate realization, not evidence of greater
+  within-program variety; the proposed sheet still requires operator review.
+- Programs are fitted and rounded with world-space corner fillets, retaining
+  literal collinear controls along straight portions (spacing at most 110 units).
+  Control count is internal and variable, bounded below the 260-point public
+  centerline size; callers must not assume 24 controls. Retry attempts may change the
+  program/section combination, not just shrink the same failed shape.
 - Generated route and room dimensions use `WORLD_SCALE = 1.75`. The target
   length stream spans roughly 4,375 to 9,625 world units; elongated room
   perimeters can realize longer loops when required by their silhouette.
@@ -56,10 +67,17 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   centerline self-intersections, enforces nonlocal self-distance, and keeps the
   route inside the room polygon. That geometric corridor is not a collision
   tube: the surrounding room apron remains drivable.
+- Minimum accepted centerline turn radius is 147 units: the 125-unit corridor
+  half-width plus a 22-unit vehicle hull allowance. Geometry checks do not replace
+  four-car physics verification on accepted routes.
 - Every accepted route has at least two distinct 450-unit setup-straight
-  regions. Turn rhythm is limited to a small set of broad complexes rather than
+  regions whose segment headings stay within 0.04 radians (about 2.3 degrees),
+  not merely gentle curves. Turn rhythm is limited to broad complexes rather than
   spline-scale wiggles, and validation rejects driveable chords that replace a
   complete complex.
+- Individual routes retain a 1–10 broad-complex bound; the regression matrix
+  average is at most 8. Richer sections must remain separated by usable setup
+  straights, not high-frequency spline wiggles.
 - L-shaped rooms use the dedicated `el_safe` realization. The route must occupy
   both the upper-left arm and the right/lower extension while retaining the
   seed-selected family metadata.

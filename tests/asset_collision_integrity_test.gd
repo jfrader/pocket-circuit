@@ -75,8 +75,15 @@ func _check_every_giant_asset() -> bool:
 	fixture.name = "EveryGiantAssetFixture"
 	root.add_child(fixture)
 	var index := 0
+	var registered := {}
 	for theme: StringName in [&"kitchen", &"workshop", &"office"]:
-		for asset_path: String in BUILDER.LAYOUTS[theme]["giants"]:
+		var theme_assets: Array = BUILDER.LAYOUTS[theme]["giants"].duplicate()
+		for story: Dictionary in BUILDER.STORY_KITS[theme]:
+			theme_assets.append_array(story.get("giants", []))
+		for asset_path: String in theme_assets:
+			if registered.has(asset_path):
+				continue
+			registered[asset_path] = true
 			var entry: Dictionary = BUILDER.PROP_SHAPES.get(asset_path.get_file(), {})
 			if not _expect(bool(entry.get("solid", false)), "%s should explicitly declare solid=true" % asset_path):
 				return false
@@ -121,7 +128,7 @@ func _check_every_giant_asset() -> bool:
 			_solid_probe_points_checked += 1
 	fixture.queue_free()
 	await process_frame
-	return _expect(index == 18, "all 18 giant roster assets should receive direct collider verification")
+	return _expect(index == registered.size() and index > 0, "every distinct theme/story giant asset should receive direct collider verification")
 
 
 func _check_every_obstacle_asset() -> bool:
