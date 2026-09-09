@@ -83,6 +83,7 @@ static var _texture_footprint_cache: Dictionary = {}
 static var _texture_hull_cache: Dictionary = {}
 static var _texture_opaque_rect_cache: Dictionary = {}
 static var _texture_outline_cache: Dictionary = {}
+static var synchronous_outline_builds := 0
 
 ## Exceptions to the broad PROP_SHAPES presentation categories. These assets
 ## are visibly elongated or rectangular even though older placement data used a
@@ -984,6 +985,9 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int)
 		spec["requested_seed"] = seed
 		spec["family"] = StringName(gen["family"])
 		spec["realization"] = StringName(gen.get("realization", gen["family"]))
+		spec["route_program"] = StringName(gen.get("route_program", gen["family"]))
+		spec["route_recipe"] = StringName(gen.get("route_recipe", gen["family"]))
+		spec["route_sequence"] = String(gen.get("route_sequence", ""))
 		spec["generation_attempt"] = int(gen.get("attempt", 0))
 		spec["generation_fallback"] = bool(gen.get("fallback", false))
 		spec["loop_length"] = float(gen["length"])
@@ -1017,6 +1021,9 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 		root.set_meta("requested_seed", int(spec["requested_seed"]))
 		root.set_meta("family", StringName(spec["family"]))
 		root.set_meta("realization", StringName(spec["realization"]))
+		root.set_meta("route_program", spec["route_program"])
+		root.set_meta("route_recipe", spec["route_recipe"])
+		root.set_meta("route_sequence", spec["route_sequence"])
 		root.set_meta("generation_attempt", int(spec["generation_attempt"]))
 		root.set_meta("generation_fallback", bool(spec["generation_fallback"]))
 		root.set_meta("story_id", StringName(spec["story_id"]))
@@ -4329,8 +4336,46 @@ static func _texture_alpha_outline(texture: Texture2D) -> Dictionary:
 	var cache_key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
 	if _texture_outline_cache.has(cache_key):
 		return _texture_outline_cache[cache_key]
-	var width := texture.get_width()
-	var height := texture.get_height()
+	synchronous_outline_builds += 1
+	var result := compute_alpha_outline(texture.get_image(), texture.get_width(), texture.get_height())
+	_texture_outline_cache[cache_key] = result
+	return result
+
+
+static func has_prepared_outline(texture: Texture2D) -> bool:
+	var key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
+	return _texture_outline_cache.has(key)
+
+
+static func has_prepared_outline_path(path: String) -> bool:
+	return _texture_outline_cache.has(path)
+
+
+static func install_prepared_outline(texture: Texture2D, outline: Dictionary) -> void:
+	var key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
+	_texture_outline_cache[key] = outline
+
+
+static func preparation_texture_paths(value: Variant) -> Array[String]:
+	var found: Array[String] = []
+	if value is Dictionary:
+		for child: Variant in value.values():
+			for path in preparation_texture_paths(child):
+				if not found.has(path):
+					found.append(path)
+	elif value is Array:
+		for child: Variant in value:
+			for path in preparation_texture_paths(child):
+				if not found.has(path):
+					found.append(path)
+	elif value is String or value is StringName:
+		var path := String(value)
+		if path.begins_with("res://assets/") and path.get_extension() in ["png", "jpg", "webp", "svg"]:
+			found.append(path)
+	return found
+
+
+static func compute_alpha_outline(image: Image, width: int, height: int) -> Dictionary:
 	var rows_first := PackedInt32Array()
 	var rows_last := PackedInt32Array()
 	var columns_first := PackedInt32Array()
@@ -4345,7 +4390,6 @@ static func _texture_alpha_outline(texture: Texture2D) -> Dictionary:
 	columns_last.fill(-1)
 	var boundary := PackedVector2Array()
 	var bounds := Rect2(Vector2.ZERO, Vector2(width, height))
-	var image := texture.get_image()
 	if image != null and not image.is_empty():
 		if image.is_compressed():
 			image.decompress()
@@ -4376,7 +4420,6 @@ static func _texture_alpha_outline(texture: Texture2D) -> Dictionary:
 			if maximum.x >= minimum.x and maximum.y >= minimum.y:
 				bounds = Rect2(Vector2(minimum), Vector2(maximum - minimum + Vector2i.ONE))
 	var result := {"used": bounds, "rows_first": rows_first, "rows_last": rows_last, "columns_first": columns_first, "columns_last": columns_last, "boundary": boundary}
-	_texture_outline_cache[cache_key] = result
 	return result
 
 

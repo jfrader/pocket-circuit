@@ -1,7 +1,8 @@
 class_name TrackSeedGen
-## Deterministic procedural circuit generation from smooth, normalized route
-## families. Family, length, and per-attempt variation use independent hash
-## streams so changing the room does not change a seed's identity.
+## Deterministic procedural circuit generation from bounded macro-route grammar.
+## Family, length, and route-program selection use independent hash streams.
+
+const ROUTE_GRAMMAR := preload("res://scripts/race/track_route_grammar.gd")
 
 const SAMPLE_COUNT := 260
 const CONTROL_COUNT := 24
@@ -11,6 +12,11 @@ const SPLINE_GUARD := 12.0
 const MAX_VARIANTS := 12
 const WORLD_SCALE := 1.75
 const MIN_SETUP_DISTANCE := 450.0
+# A v1 vehicle sweeps roughly 22u around its center. Requiring the full 125u
+# half-corridor plus that hull prevents a legal centerline from demanding a
+# near-pivot turn while preserving the constrained L-room realization.
+const VEHICLE_HULL_RADIUS := 22.0
+const MIN_DRIVE_RADIUS := HALF_WIDTH + VEHICLE_HULL_RADIUS
 const SETUP_STRAIGHTNESS := 0.985
 const BYPASS_MIN_ARC := 500.0
 const BYPASS_MAX_ARC := 3000.0
@@ -29,8 +35,8 @@ const FAMILY_NAMES: Array[StringName] = [
 const FAMILY_SALT := 0x13579BDF
 const LENGTH_SALT := 0x2468ACE
 const VARIANT_SALT := 0x51A7E3D
-const FALLBACK_SALT := 0x6C8E9CF
 const RHYTHM_SALT := 0x4A71C9D
+const ROUTE_SALT := 0x2D91F3B
 
 
 static func generate_with_retries(seed: int, room_rect: Rect2, params: Dictionary = {}) -> Dictionary:
@@ -55,10 +61,59 @@ static func gameplay_metrics(controls: PackedVector2Array) -> Dictionary:
 	var setup_straight_count := _setup_straight_count(centerline)
 	return {
 		"length": _polyline_length(centerline),
+		"minimum_turn_radius": _minimum_turn_radius(centerline),
 		"has_setup_straight": setup_straight_count > 0,
 		"setup_straight_count": setup_straight_count,
 		"complex_bypass": bypass,
+		"route_sequence": normalized_route_sequence(controls),
 	}
+
+
+static func normalized_route_sequence(controls: PackedVector2Array) -> String:
+	var centerline := _sample_centerline(controls)
+	if centerline.is_empty():
+		return ""
+	var symbols: Array[String] = []
+	var span := 5
+	for index in range(0, centerline.size(), span):
+		var incoming := centerline[posmod(index - span, centerline.size())].direction_to(centerline[index])
+		var outgoing := centerline[index].direction_to(centerline[(index + span) % centerline.size()])
+		var angle := incoming.angle_to(outgoing)
+		if absf(angle) < 0.10:
+			symbols.append("S")
+		else:
+			var strength := "1" if absf(angle) < 0.28 else ("2" if absf(angle) < 0.52 else "3")
+			symbols.append(("L" if angle > 0.0 else "R") + strength)
+	return _canonical_symbol_sequence(symbols)
+
+
+static func _canonical_symbol_sequence(symbols: Array[String]) -> String:
+	var mirrored: Array[String] = []
+	var reversed: Array[String] = []
+	var reversed_mirrored: Array[String] = []
+	for symbol: String in symbols:
+		mirrored.append(_swap_turn_symbol(symbol))
+	for index in range(symbols.size() - 1, -1, -1):
+		reversed.append(_swap_turn_symbol(symbols[index]))
+		reversed_mirrored.append(symbols[index])
+	var best := ""
+	for variant: Array[String] in [symbols, mirrored, reversed, reversed_mirrored]:
+		for offset in variant.size():
+			var ordered := PackedStringArray()
+			for index in variant.size():
+				ordered.append(variant[(offset + index) % variant.size()])
+			var candidate := ".".join(ordered)
+			if best.is_empty() or candidate < best:
+				best = candidate
+	return best
+
+
+static func _swap_turn_symbol(symbol: String) -> String:
+	if symbol.begins_with("L"):
+		return "R" + symbol.substr(1)
+	if symbol.begins_with("R"):
+		return "L" + symbol.substr(1)
+	return symbol
 
 
 static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) -> Dictionary:
@@ -123,6 +178,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"attempt": attempt,
 				"fallback": false,
 				"realization": &"el_safe" if room_shape == &"el" else family,
+				"route_recipe": &"el_safe" if room_shape == &"el" else _route_name(seed, attempt),
+				"route_program": &"el_safe" if room_shape == &"el" else _route_program_name(seed, attempt),
+				"route_sequence": normalized_route_sequence(ordered_controls),
 			}
 
 	var family_reason := last_reason
@@ -162,6 +220,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"attempt": MAX_VARIANTS + fallback_attempt,
 				"fallback": true,
 				"realization": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
+				"route_recipe": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
+				"route_program": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
+				"route_sequence": normalized_route_sequence(ordered_controls),
 				"fallback_reason": family_reason,
 			}
 	var empty := _empty_result(seed, family)
@@ -178,6 +239,9 @@ static func _empty_result(seed: int, family: StringName) -> Dictionary:
 		"attempt": -1,
 		"fallback": true,
 		"realization": &"none",
+		"route_recipe": &"none",
+		"route_program": &"none",
+		"route_sequence": "",
 	}
 
 
@@ -196,32 +260,38 @@ static func _family_controls(
 	target_length: float,
 	min_self_distance: float
 ) -> PackedVector2Array:
-	var anchors := _family_template(template_family, seed)
+	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt)
+	var anchors := _technical_perimeter_template() if template_family == &"conservative" else definition["anchors"] as PackedVector2Array
 	if anchors.is_empty():
 		return PackedVector2Array()
 
 	# Templates are authored horizontally. Rotate them before fitting a tall room
 	# so dogbones become vertical dogbones, not stretched horizontal circles.
 	var orientation := 0.0
+	var heading_sign := -1.0 if _hash_unit(seed, ROUTE_SALT + 0x91 + attempt * 17) < 0.5 else 1.0
+	var heading_roll := _hash_unit(seed, ROUTE_SALT + 0xB3 + attempt * 29)
 	if usable_rect.size.y > usable_rect.size.x * 1.12:
-		orientation = PI * 0.5
+		orientation = PI * 0.5 + heading_sign * lerpf(0.08, 0.20, heading_roll)
 	elif maxf(usable_rect.size.x, usable_rect.size.y) < minf(usable_rect.size.x, usable_rect.size.y) * 1.12:
-		orientation = float(posmod(_hash32(seed ^ (VARIANT_SALT + 0x37)), 4)) * PI * 0.5
+		orientation = float(posmod(_hash32(seed ^ (VARIANT_SALT + 0x37)), 4)) * PI * 0.5 + heading_sign * lerpf(0.16, 0.42, heading_roll)
+	elif usable_rect.size.x > usable_rect.size.y * 1.75:
+		orientation = heading_sign * lerpf(0.06, 0.14, heading_roll)
+	else:
+		orientation = heading_sign * lerpf(0.10, 0.26, heading_roll)
 	var mirror := -1.0 if _hash_unit(seed, VARIANT_SALT + 7) < 0.5 else 1.0
 	for index in anchors.size():
 		var point := anchors[index]
 		point.x *= mirror
 		anchors[index] = point.rotated(orientation)
 	var normalized := _resample_template(anchors, CONTROL_COUNT)
-	normalized = _smooth_controls(normalized, 1 if template_family in [&"kidney", &"deep_notch"] else 2)
-	normalized = _apply_turn_rhythm(
-		normalized,
-		rhythm_family,
-		seed,
-		attempt,
-		target_length,
-		template_family == &"conservative"
-	)
+	if template_family == &"conservative":
+		normalized = _smooth_controls(normalized, 2)
+		normalized = _apply_turn_rhythm(normalized, rhythm_family, seed, attempt, target_length, true)
+	else:
+		# One relaxation rounds authored joins without erasing their unequal
+		# straights and distinct heading order. Later retries get one additional
+		# bounded relaxation before trying a different complete route program.
+		normalized = _smooth_controls(normalized, 8 + int(attempt >= 8))
 
 	var mapped := _map_to_rect(normalized, usable_rect)
 	var full_centerline := _sample_centerline(mapped)
@@ -249,76 +319,35 @@ static func _family_controls(
 	return mapped
 
 
-static func _family_template(family: StringName, seed: int) -> PackedVector2Array:
-	match family:
-		&"speed_loop":
-			return PackedVector2Array([
-				Vector2(-0.96, -0.08), Vector2(-0.88, -0.42), Vector2(-0.68, -0.70),
-				Vector2(-0.42, -0.84), Vector2(-0.16, -0.56), Vector2(0.10, -0.88),
-				Vector2(0.40, -0.62), Vector2(0.70, -0.72), Vector2(0.92, -0.24),
-				Vector2(0.94, 0.10), Vector2(0.78, 0.44), Vector2(0.52, 0.70),
-				Vector2(0.24, 0.56), Vector2(-0.04, 0.88), Vector2(-0.36, 0.66),
-				Vector2(-0.66, 0.58), Vector2(-0.88, 0.32),
-			])
-		&"kidney":
-			return PackedVector2Array([
-				Vector2(-0.74, -0.52), Vector2(-0.30, -0.80), Vector2(0.25, -0.84),
-				Vector2(0.70, -0.58), Vector2(0.88, -0.16), Vector2(0.80, 0.30),
-				Vector2(0.48, 0.68), Vector2(-0.02, 0.82), Vector2(-0.45, 0.68),
-				Vector2(-0.72, 0.48), Vector2(-0.48, 0.25), Vector2(-0.02, 0.02),
-				Vector2(-0.40, -0.30), Vector2(-0.72, -0.36),
-			])
-		&"dogbone":
-			return PackedVector2Array([
-				Vector2(-0.94, 0.00), Vector2(-0.84, -0.48), Vector2(-0.56, -0.76),
-				Vector2(-0.28, -0.68), Vector2(-0.15, -0.43), Vector2(0.00, -0.38),
-				Vector2(0.15, -0.43), Vector2(0.28, -0.68), Vector2(0.56, -0.76),
-				Vector2(0.84, -0.48), Vector2(0.94, 0.00), Vector2(0.84, 0.48),
-				Vector2(0.56, 0.76), Vector2(0.28, 0.68), Vector2(0.15, 0.43),
-				Vector2(0.00, 0.38), Vector2(-0.15, 0.43), Vector2(-0.28, 0.68),
-				Vector2(-0.56, 0.76), Vector2(-0.84, 0.48),
-			])
-		&"broad_triangle":
-			return PackedVector2Array([
-				Vector2(0.00, -0.94), Vector2(0.15, -0.84), Vector2(0.23, -0.62),
-				Vector2(0.40, -0.48), Vector2(0.47, -0.20), Vector2(0.72, 0.28),
-				Vector2(0.86, 0.54), Vector2(0.72, 0.72), Vector2(0.44, 0.80),
-				Vector2(0.20, 0.68), Vector2(-0.04, 0.84), Vector2(-0.30, 0.70),
-				Vector2(-0.54, 0.80), Vector2(-0.78, 0.64), Vector2(-0.86, 0.44),
-				Vector2(-0.68, 0.16), Vector2(-0.52, -0.20), Vector2(-0.40, -0.50),
-				Vector2(-0.22, -0.64), Vector2(-0.15, -0.84),
-			])
-		&"offset_s":
-			return PackedVector2Array([
-				Vector2(-0.86, -0.35), Vector2(-0.65, -0.70), Vector2(-0.20, -0.86),
-				Vector2(0.30, -0.78), Vector2(0.72, -0.55), Vector2(0.88, -0.32),
-				Vector2(0.68, -0.18), Vector2(0.25, -0.05), Vector2(0.55, 0.18),
-				Vector2(0.88, 0.38), Vector2(0.65, 0.72), Vector2(0.20, 0.86),
-				Vector2(-0.30, 0.78), Vector2(-0.72, 0.55), Vector2(-0.88, 0.32),
-				Vector2(-0.68, 0.18), Vector2(-0.25, 0.05), Vector2(-0.55, -0.18),
-			])
-		&"deep_notch":
-			return PackedVector2Array([
-				Vector2(-0.88, 0.00), Vector2(-0.76, -0.48), Vector2(-0.38, -0.78),
-				Vector2(0.10, -0.84), Vector2(0.58, -0.66), Vector2(0.86, -0.42),
-				Vector2(0.90, -0.32), Vector2(0.48, -0.30), Vector2(0.18, 0.00),
-				Vector2(0.48, 0.30), Vector2(0.90, 0.32), Vector2(0.86, 0.42),
-				Vector2(0.58, 0.66), Vector2(0.10, 0.84), Vector2(-0.38, 0.78),
-				Vector2(-0.76, 0.48),
-			])
-		_:
-			# A broad technical perimeter is safer than the concave family shapes,
-			# while staggered top and bottom sectors retain real corner rhythm in
-			# narrow rooms instead of collapsing to the old perturbed circle.
-			return PackedVector2Array([
-				Vector2(-0.96, -0.08), Vector2(-0.88, -0.48), Vector2(-0.68, -0.76),
-				Vector2(-0.46, -0.62), Vector2(-0.22, -0.84), Vector2(0.02, -0.66),
-				Vector2(0.28, -0.82), Vector2(0.54, -0.64), Vector2(0.80, -0.74),
-				Vector2(0.96, -0.36), Vector2(0.90, 0.04), Vector2(0.96, 0.38),
-				Vector2(0.74, 0.74), Vector2(0.48, 0.62), Vector2(0.20, 0.84),
-				Vector2(-0.06, 0.64), Vector2(-0.34, 0.82), Vector2(-0.60, 0.62),
-				Vector2(-0.84, 0.74), Vector2(-0.96, 0.34),
-			])
+static func _route_index(seed: int, attempt: int) -> int:
+	var base := posmod(_hash32(seed ^ ROUTE_SALT), ROUTE_GRAMMAR.count())
+	return posmod(base + attempt, ROUTE_GRAMMAR.count())
+
+
+static func _route_name(seed: int, attempt: int) -> StringName:
+	return StringName(_route_definition(seed, attempt)["recipe"])
+
+
+static func _route_program_name(seed: int, attempt: int) -> StringName:
+	return StringName(_route_definition(seed, attempt)["program"])
+
+
+static func _route_definition(seed: int, attempt: int) -> Dictionary:
+	return ROUTE_GRAMMAR.construct(_route_index(seed, attempt), _hash32(seed ^ (attempt * RHYTHM_SALT)))
+
+
+static func _technical_perimeter_template() -> PackedVector2Array:
+	# A broad perimeter is safer than concave programs after all twelve bounded
+	# grammar attempts fail, while staggered edges retain useful corner rhythm.
+	return PackedVector2Array([
+		Vector2(-0.96, -0.08), Vector2(-0.88, -0.48), Vector2(-0.68, -0.76),
+		Vector2(-0.46, -0.62), Vector2(-0.22, -0.84), Vector2(0.02, -0.66),
+		Vector2(0.28, -0.82), Vector2(0.54, -0.64), Vector2(0.80, -0.74),
+		Vector2(0.96, -0.36), Vector2(0.90, 0.04), Vector2(0.96, 0.38),
+		Vector2(0.74, 0.74), Vector2(0.48, 0.62), Vector2(0.20, 0.84),
+		Vector2(-0.06, 0.64), Vector2(-0.34, 0.82), Vector2(-0.60, 0.62),
+		Vector2(-0.84, 0.74), Vector2(-0.96, 0.34),
+	])
 
 
 static func _apply_turn_rhythm(
@@ -466,15 +495,16 @@ static func _el_controls(
 	# This route follows the eroded L footprint instead of pretending the room is
 	# its left rectangle. The rounded elbow stays clear of the concave corner.
 	var anchors := PackedVector2Array([
-		Vector2(-0.84, -0.70), Vector2(-0.38, -0.76), Vector2(0.04, -0.72),
-		Vector2(0.13, -0.56), Vector2(0.12, -0.24), Vector2(0.10, -0.08),
-		Vector2(0.16, 0.12), Vector2(0.30, 0.26), Vector2(0.62, 0.26),
-		Vector2(0.84, 0.36), Vector2(0.84, 0.70), Vector2(0.35, 0.76),
-		Vector2(-0.30, 0.76), Vector2(-0.84, 0.68), Vector2(-0.86, 0.26),
-		Vector2(-0.86, -0.28),
+		Vector2(-0.84, -0.35), Vector2(-0.84, -0.58), Vector2(-0.74, -0.72),
+		Vector2(-0.50, -0.76), Vector2(-0.20, -0.76), Vector2(0.02, -0.70),
+		Vector2(0.12, -0.55), Vector2(0.12, -0.30), Vector2(0.10, -0.12),
+		Vector2(0.16, 0.02), Vector2(0.28, 0.16), Vector2(0.48, 0.24),
+		Vector2(0.70, 0.28), Vector2(0.84, 0.38), Vector2(0.84, 0.58),
+		Vector2(0.72, 0.70), Vector2(0.45, 0.76), Vector2(0.10, 0.76),
+		Vector2(-0.30, 0.76), Vector2(-0.65, 0.72), Vector2(-0.82, 0.60),
+		Vector2(-0.86, 0.35), Vector2(-0.86, 0.05), Vector2(-0.86, -0.20),
 	])
-	var normalized := _resample_template(anchors, CONTROL_COUNT)
-	normalized = _apply_turn_rhythm(normalized, family, seed, attempt, target_length, false, 0.62)
+	var normalized := _smooth_controls(anchors, 2)
 	var mapped := PackedVector2Array()
 	for point: Vector2 in normalized:
 		mapped.append(source_rect.get_center() + point * source_rect.size * 0.5)
@@ -539,13 +569,16 @@ static func _validate_controls(
 	var setup_straight_count := _setup_straight_count(centerline)
 	if setup_straight_count < 2:
 		return {"valid": false, "reason": "only %d setup straight region(s)" % setup_straight_count}
+	var minimum_turn_radius := _minimum_turn_radius(centerline)
+	if minimum_turn_radius < MIN_DRIVE_RADIUS:
+		return {"valid": false, "reason": "turn radius %.1f < %.1f" % [minimum_turn_radius, MIN_DRIVE_RADIUS]}
 	var bypass := _best_complex_bypass(centerline)
 	if bool(bypass.get("found", false)):
 		return {
 			"valid": false,
 			"reason": "driveable chord saves %.0fu over %.0fu" % [float(bypass["saving"]), float(bypass["arc"])],
 		}
-	return {"valid": true, "centerline": centerline, "length": loop_length}
+	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius}
 
 
 static func _corridor_boundary_loops(centerline: PackedVector2Array) -> Dictionary:
@@ -638,6 +671,25 @@ static func _straight_window_length(centerline: PackedVector2Array, start: int) 
 		elif traveled >= MIN_SETUP_DISTANCE:
 			break
 	return longest
+
+
+static func _minimum_turn_radius(centerline: PackedVector2Array) -> float:
+	var minimum := INF
+	var span := 3
+	for index in centerline.size():
+		var before := centerline[posmod(index - span, centerline.size())]
+		var current := centerline[index]
+		var after := centerline[(index + span) % centerline.size()]
+		var incoming := before.direction_to(current)
+		var outgoing := current.direction_to(after)
+		if absf(incoming.angle_to(outgoing)) < 0.08:
+			continue
+		var area_twice := absf((current - before).cross(after - before))
+		if area_twice < 0.01:
+			continue
+		var radius := before.distance_to(current) * current.distance_to(after) * before.distance_to(after) / (2.0 * area_twice)
+		minimum = minf(minimum, radius)
+	return minimum
 
 
 static func _best_complex_bypass(centerline: PackedVector2Array) -> Dictionary:

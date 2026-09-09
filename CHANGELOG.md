@@ -36,6 +36,10 @@
 
 ### Changed
 
+- Generated circuits now compose different straight extents, headings and turn
+  sections within each route program, with broader minimum corner radii.
+- Scenery collision footprints are prepared off the main thread before race
+  assembly instead of being scanned during visible scene construction.
 - Workshop and Office now use coherent bench/desktop materials, distinct
   cutting-mat and desk-pad islands, and standalone tools, keyboard and notebook
   artwork instead of stretching whole objects across the infield.

@@ -17,6 +17,7 @@ func _run_test() -> void:
 	await process_frame
 	var app := root.get_node("App")
 	for retry in [false, true]:
+		var outlines_before := BUILDER.synchronous_outline_builds
 		if retry:
 			app.call("retry_race")
 		else:
@@ -40,6 +41,8 @@ func _run_test() -> void:
 			return
 		var metrics: Dictionary = app.get("loading_metrics")
 		print("RACE_START_TIMING retry=%s metrics=%s" % [retry, metrics])
+		if not _expect(BUILDER.synchronous_outline_builds == outlines_before, "scene assembly must not fall back to synchronous texture-alpha scans"):
+			return
 		if not _expect(int(metrics["frames"]) >= 3 and float(metrics["max_frame_gap_ms"]) < 250.0, "preparation must keep servicing frames (maximum gap under 250ms)"):
 			return
 		var generated_before := IDENTITIES.motion_image_generations
