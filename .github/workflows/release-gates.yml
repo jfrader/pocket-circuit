@@ -1,0 +1,46 @@
+name: Release gates
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-gates-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  release:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, pocket-circuit-ci]
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Check host capacity and dependencies
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -c 'import shutil; assert shutil.disk_usage(".").free > 8 * 1024**3, "At least 8 GiB free disk is required"'
+          command -v ffprobe
+          command -v magick || command -v convert
+      - name: Install verified Godot editor and native templates
+        run: python3 tools/install_ci_godot.py "$RUNNER_TEMP/pocket-godot" >> "$GITHUB_ENV"
+      - name: Full source, smoke and package gates
+        run: ./tools/build_release.sh "$RUNNER_TEMP/pocket-release"
+      - name: Verify artifact manifest
+        working-directory: ${{ runner.temp }}/pocket-release
+        run: sha256sum --check SHA256SUMS
+      - name: Retain verified release candidate
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: pocket-circuit-${{ github.sha }}
+          path: ${{ runner.temp }}/pocket-release
+          if-no-files-found: error
+          retention-days: 7

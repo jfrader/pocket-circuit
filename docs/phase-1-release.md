@@ -221,24 +221,32 @@ rules rather than holding this release open.
 
 ## Exact Release Commands
 
-Run from the repository root:
-
-```bash
-python3 tools/validate_release_config.py
-/usr/bin/godot --path . --headless --import
-for test in tests/*.gd; do /usr/bin/godot --path . --headless --script "res://$test"; done
-/usr/bin/godot --path . --headless --scene res://scenes/boot/boot.tscn --quit-after 300
-/usr/bin/godot --path . --headless --scene res://scenes/race/prototype_race.tscn --quit-after 600
-./tools/build_release.sh
-(cd builds && sha256sum --check SHA256SUMS)
-```
-
-To keep output outside the worktree, pass one explicit directory:
+Run the full gate on CI compute, not on the desktop used for playtesting. The
+`Release gates` workflow uses a trusted repository runner labeled
+`pocket-circuit-ci`, read-only repository permissions and checksum-pinned
+official Godot inputs from `tools/godot_release.json`.
 
 ```bash
 ./tools/build_release.sh /absolute/path/to/pocket-circuit-release
 (cd /absolute/path/to/pocket-circuit-release && sha256sum --check SHA256SUMS)
 ```
+
+The script performs configuration checks, imports, every Godot test, source
+smokes, both exports, packaged Linux flow verification and both PCK inspections.
+Every test must emit one literal terminal `*_TEST`, `*_QA`, `*_BENCHMARK` or
+`*_HARNESS` `PASS` marker; intermediate assertions and a zero exit status alone
+do not pass the gate. Tests have bounded wall-clock execution. The release flow
+smoke verifies readiness/results/persistence, not a full player-driven race.
+
+For bounded development checks, run only the relevant script:
+
+```bash
+/usr/bin/godot --path . --headless --script res://tests/race_start_timing_test.gd
+```
+
+Headless results do not certify rendered frame pacing, physical controller
+behavior or Windows/Deck hardware. Runner/network unavailability leaves CI
+blocked; it is not a successful check and does not waive those manual gates.
 
 ## Current External Steam Blockers
 

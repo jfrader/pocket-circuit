@@ -6,6 +6,7 @@ from __future__ import annotations
 import configparser
 import json
 import re
+import shutil
 import struct
 import subprocess
 import sys
@@ -214,9 +215,12 @@ def png_dimensions(path: Path) -> tuple[int, int] | None:
 
 
 def png_decodes(path: Path) -> bool:
+    decoder = shutil.which("magick") or shutil.which("convert")
+    if decoder is None:
+        return False
     try:
         result = subprocess.run(
-            ["magick", str(path), "null:"],
+            [decoder, str(path), "null:"],
             capture_output=True,
             text=True,
             timeout=30,

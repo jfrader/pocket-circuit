@@ -625,11 +625,10 @@ func _run_release_smoke() -> void:
 		_release_smoke_fail("new championship did not persist")
 		return
 	start_race("kitchen_crumb_rush", "rustbug", false)
-	var scene_frames_remaining := 300
-	while scene_frames_remaining > 0 and (get_tree().current_scene == null or get_tree().current_scene.scene_file_path != RACE_SCENE):
+	var startup_deadline := Time.get_ticks_msec() + 45000
+	while is_race_loading() and not _loading_failed and Time.get_ticks_msec() < startup_deadline:
 		await get_tree().process_frame
-		scene_frames_remaining -= 1
-	if get_tree().current_scene == null or get_tree().current_scene.scene_file_path != RACE_SCENE:
+	if is_race_loading() or get_tree().current_scene == null or get_tree().current_scene.scene_file_path != RACE_SCENE:
 		_release_smoke_fail("race scene did not load")
 		return
 	var race := get_tree().current_scene
@@ -640,10 +639,8 @@ func _run_release_smoke() -> void:
 	# Keep automated release verification independent from stale host input state.
 	if get_tree().paused:
 		race.call("_set_paused", false)
-	var race_frames_remaining := 900
-	while race_frames_remaining > 0 and not race_manager.is_running:
+	while Time.get_ticks_msec() < startup_deadline and not race_manager.is_running:
 		await get_tree().physics_frame
-		race_frames_remaining -= 1
 	if not race_manager.is_running:
 		_release_smoke_fail("race did not start")
 		return
