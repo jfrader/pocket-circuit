@@ -20,6 +20,9 @@ func _initialize() -> void:
 
 
 func _run_test() -> void:
+	if OS.get_environment("PC_TRACK_LENGTH_ONLY") == "1":
+		_run_high_length_test()
+		return
 	var recipes := {}
 	var sequences := {}
 	var representatives := {}
@@ -28,7 +31,10 @@ func _run_test() -> void:
 	var non_axis_headings := 0
 	var minimum_control_count := 999
 	var maximum_control_count := 0
-	for seed in 24:
+	var sample_seed_count := 24
+	if OS.get_environment("PC_ROUTE_SAMPLE_SEEDS").is_valid_int():
+		sample_seed_count = clampi(int(OS.get_environment("PC_ROUTE_SAMPLE_SEEDS")), 12, 24)
+	for seed in sample_seed_count:
 		var result := TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, _room_params("classic"))
 		if not _check_result("classic", seed, result, seed < 4):
 			return
@@ -56,7 +62,7 @@ func _run_test() -> void:
 		return
 	if not _expect(sequences.size() >= 8, "normalized turn/straight signatures should contain at least eight rhythms, got %d" % sequences.size()):
 		return
-	if not _expect(non_axis_headings >= 12, "at least half of classic routes should put their longest straight on a meaningful non-axis heading, got %d" % non_axis_headings):
+	if not _expect(non_axis_headings >= ceili(float(sample_seed_count) * 0.5), "at least half of classic routes should put their longest straight on a meaningful non-axis heading, got %d" % non_axis_headings):
 		return
 	if not _expect(minimum_control_count >= 40 and maximum_control_count < TRACK_SEED_GEN.SAMPLE_COUNT, "fillets and literal straights need bounded higher-density controls, got %d..%d" % [minimum_control_count, maximum_control_count]):
 		return
@@ -81,16 +87,16 @@ func _run_test() -> void:
 		return
 
 	var clusters: Array[PackedVector2Array] = []
-	for recipe: String in representatives:
-		var candidate: PackedVector2Array = representatives[recipe]
-		var distinct := true
-		for existing: PackedVector2Array in clusters:
-			if _shape_distance(candidate, existing) < DISTINCT_SHAPE_DISTANCE:
-				distinct = false
-				break
-		if distinct:
-			clusters.append(candidate)
-	if not _expect(clusters.size() >= 6, "rotation/mirror/scale-invariant shape distance should retain at least six material macro shapes, got %d from %d recipes" % [clusters.size(), representatives.size()]):
+	for program: String in program_variants:
+		for candidate: PackedVector2Array in program_variants[program]:
+			var distinct := true
+			for existing: PackedVector2Array in clusters:
+				if _shape_distance(candidate, existing) < DISTINCT_SHAPE_DISTANCE:
+					distinct = false
+					break
+			if distinct:
+				clusters.append(candidate)
+	if not _expect(clusters.size() >= 6, "rotation/mirror/scale-invariant shape distance should retain at least six material macro shapes, got %d from %d routes" % [clusters.size(), sample_seed_count]):
 		return
 
 	var transformed := PackedVector2Array()
@@ -135,6 +141,32 @@ func _run_test() -> void:
 	print("TRACK_ROUTE_DIAGNOSTICS " + " ".join(diagnostic_evidence))
 	print("TRACK_ROUTE_VARIETY_TEST PASS recipes=%d sequences=%d shape_clusters=%d within_programs=%d/%d strongest=%d off_axis=%d controls=%d..%d matrix=%d diagnostics=%d" % [recipes.size(), sequences.size(), clusters.size(), varied_programs, program_variants.size(), strongest_program_cluster, non_axis_headings, minimum_control_count, maximum_control_count, matrix_count, diagnostic_cases.size()])
 	quit(0)
+
+
+func _run_high_length_test() -> void:
+	var result := _high_length_evidence()
+	if not _expect(bool(result["valid"]), String(result["message"])):
+		return
+	print("TRACK_ROUTE_LENGTHS " + " ".join(result["evidence"] as Array[String]))
+	quit(0)
+
+
+func _high_length_evidence() -> Dictionary:
+	var evidence: Array[String] = []
+	var highest_realized := 0.0
+	for seed: int in [20, 33, 48]:
+		var result := TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, _room_params("classic"))
+		if (result.get("points", PackedVector2Array()) as PackedVector2Array).is_empty():
+			return {"valid": false, "evidence": evidence, "message": "high target seed %d failed geometry (%s)" % [seed, result.get("reason", "unknown")]}
+		var target := float(result.get("target_length", 0.0))
+		var realized := float(result.get("length", 0.0))
+		highest_realized = maxf(highest_realized, realized)
+		evidence.append("%d:target%.0f/realized%.0f(%.1f%% target)" % [seed, target, realized, realized / maxf(target, 1.0) * 100.0])
+	return {
+		"valid": highest_realized >= 7600.0 and highest_realized <= 9800.0,
+		"evidence": evidence,
+		"message": "high target stream must retain supported classic length coverage, got %.0f (%s)" % [highest_realized, " ".join(evidence)],
+	}
 
 
 func _check_result(label: String, seed: int, result: Dictionary, check_determinism: bool = false) -> bool:

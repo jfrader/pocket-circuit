@@ -50,6 +50,10 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   headings vary independently; a program is not a fixed circuit. Normalized
   shape-distance tests must demonstrate variation within each program after
   discounting translation, scale, rotation, mirroring and traversal direction.
+- Higher length rolls can select an explicitly identified `endurance` envelope
+  with a broad inward section, preserving the long-route coverage without
+  tightening corners. This is a separate realization, not evidence of greater
+  within-program variety; the proposed sheet still requires operator review.
 - Programs are fitted and rounded with world-space corner fillets, retaining
   literal collinear controls along straight portions (spacing at most 110 units).
   Control count is internal and variable, bounded below the 260-point public
