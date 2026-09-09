@@ -4,9 +4,6 @@ const BOOT_SCENE := "res://scenes/boot/boot.tscn"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
-const SHELL_SCRIPT := preload("res://scripts/ui/app_shell.gd")
-const AUDIO_DIRECTOR_SCRIPT := preload("res://scripts/audio/audio_director.gd")
-const LOADING_SCRIPT := preload("res://scripts/ui/race_loading_screen.gd")
 const PROCEDURAL_ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"long", &"square", &"el"]
 
 var current_race_session: Dictionary = {}
@@ -17,6 +14,8 @@ var audio_director: Node
 var _save_store: SaveStore
 var _save_data: Dictionary
 var _shell: CanvasLayer
+var _shell_script: Script
+var _loading_script: Script
 var _last_scene: Node
 var _destination := "title"
 var _last_result_summary: Dictionary = {}
@@ -39,7 +38,12 @@ func _enter_tree() -> void:
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_test_mode = "--script" in OS.get_cmdline_args() or "--release-smoke" in OS.get_cmdline_user_args()
-	audio_director = AUDIO_DIRECTOR_SCRIPT.new()
+	# Autoload parsing also happens before a clean editor import has created
+	# image/audio resources. Load presentation scripts only when the game runs.
+	_shell_script = load("res://scripts/ui/app_shell.gd") as Script
+	_loading_script = load("res://scripts/ui/race_loading_screen.gd") as Script
+	var audio_script := load("res://scripts/audio/audio_director.gd") as Script
+	audio_director = audio_script.new()
 	audio_director.name = "AudioDirector"
 	add_child(audio_director)
 	var active_save_path: String = "user://tests/pocket_circuit_app_autoload_test.json" if _test_mode else SaveStore.DEFAULT_PATH
@@ -276,7 +280,7 @@ func _begin_race_transition() -> void:
 	get_tree().paused = false
 	if is_instance_valid(_loading_screen):
 		_loading_screen.queue_free()
-	_loading_screen = LOADING_SCRIPT.new()
+	_loading_screen = _loading_script.new()
 	_loading_screen.name = "RaceLoading"
 	_loading_screen.set("reduced_motion", reduced_motion)
 	_loading_screen.connect("cancel_requested", _cancel_race_loading)
@@ -548,7 +552,7 @@ func _sync_current_scene() -> void:
 func _ensure_shell() -> void:
 	if is_instance_valid(_shell):
 		return
-	_shell = SHELL_SCRIPT.new() as CanvasLayer
+	_shell = _shell_script.new() as CanvasLayer
 	_shell.name = "AppShell"
 	add_child(_shell)
 	_shell.call("configure", self)
