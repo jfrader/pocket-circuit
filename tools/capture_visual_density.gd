@@ -22,43 +22,92 @@ func _capture() -> void:
 		push_error("VISUAL_DENSITY_CAPTURE FAIL: App autoload is unavailable")
 		quit(1)
 		return
-	app.call("start_circuit_race", theme, room, int(seed_text), "rustbug")
-	for transition_frame in 300:
-		if current_scene != null and current_scene.scene_file_path == RACE_SCENE:
-			break
-		await process_frame
-	if current_scene == null or current_scene.scene_file_path != RACE_SCENE:
+	var frozen := OS.get_environment("PC_CAPTURE_FROZEN") == "1"
+	if frozen:
+		var packed := load(RACE_SCENE) as PackedScene
+		var fixture := packed.instantiate()
+		fixture.set("_session", {"vehicle_id": "rustbug", "event": {"circuit": "generated", "theme": theme, "room": room, "seed": int(seed_text), "laps": 3}})
+		root.add_child(fixture)
+		current_scene = fixture
+	else:
+		change_scene_to_file("res://scenes/boot/boot.tscn")
+		for boot_frame in 3:
+			await process_frame
+		app.call("start_circuit_race", theme, room, int(seed_text), "rustbug")
+		var deadline := Time.get_ticks_msec() + 45000
+		while app.call("is_race_loading") and Time.get_ticks_msec() < deadline and not app.get("_loading_failed"):
+			await process_frame
+	if app.call("is_race_loading") or current_scene == null or current_scene.scene_file_path != RACE_SCENE:
+		var loading := app.get("_loading_screen") as Node
+		if loading:
+			print("VISUAL_CAPTURE_LOADING_STATE ", loading.call("metrics"))
 		push_error("VISUAL_DENSITY_CAPTURE FAIL: race scene did not load")
 		quit(1)
 		return
 	paused = false
 	current_scene.call("_set_paused", false)
-	for settle_frame in 20:
+	if frozen:
+		paused = true
+		var countdown := current_scene.get("_countdown_label") as Label
+		if countdown:
+			countdown.hide()
+		current_scene.call("_update_race_hud")
+		var camera := current_scene.get_node("FollowCamera2D") as Camera2D
+		camera.global_position = (current_scene.get("_player_vehicle") as Node2D).global_position
+		camera.reset_smoothing()
+		camera.force_update_scroll()
+	else:
+		for settle_frame in 20:
+			await process_frame
+		await create_timer(4.2, false).timeout
+	var track := current_scene.get_node("Track") as Node2D
+	var racing_line := track.get_node("RacingLine") as Line2D
+	var checkpoints := PackedVector2Array()
+	for node: Node in track.find_children("*", "Area2D", true, false):
+		if node.is_in_group("track_checkpoints"):
+			checkpoints.append((node as Node2D).position)
+	print("CAPTURE_GEOMETRY theme=%s room=%s seed=%s route_hash=%s gates_hash=%s" % [theme, room, seed_text, hash(racing_line.points), hash(checkpoints)])
+	for ready_frame in 2:
 		await process_frame
-	await create_timer(4.2, false).timeout
-	if focus in [&"overview", &"giant", &"grip"]:
-		_focus_density_detail(current_scene, focus)
+	var views: Array[StringName] = [focus]
+	if focus == &"all":
+		views = [&"race", &"overview"]
+	for view in views:
+		if view in [&"overview", &"giant", &"grip"]:
+			_focus_density_detail(current_scene, view)
+		if view == &"overview" and focus == &"all":
+			(current_scene.get_node("HUD") as CanvasLayer).hide()
 		for camera_frame in 8:
 			await process_frame
-	var image := root.get_texture().get_image()
-	if image == null or image.is_empty() or image.get_width() != 1280 or image.get_height() != 720:
-		push_error("VISUAL_DENSITY_CAPTURE FAIL: expected a rendered 1280x720 frame")
-		quit(1)
-		return
-	var save_error := image.save_png(output_path)
-	if save_error != OK:
-		push_error("VISUAL_DENSITY_CAPTURE FAIL: %s" % error_string(save_error))
-		quit(1)
-		return
-	print("VISUAL_DENSITY_CAPTURE PASS %s/%s/%s focus=%s path=%s" % [theme, room, seed_text, focus if focus else &"race", output_path])
+		if frozen:
+			(current_scene.get("_countdown_label") as Label).hide()
+		await RenderingServer.frame_post_draw
+		var path := output_path.get_basename() + "-" + String(view) + ".png" if focus == &"all" else output_path
+		if not _save_capture(path):
+			return
+		print("VISUAL_DENSITY_CAPTURE PASS %s/%s/%s focus=%s path=%s" % [theme, room, seed_text, view if view else &"race", path])
 	var race := current_scene
+	paused = false
 	current_scene = null
 	app.current_race_session.clear()
 	race.free()
 	app.free()
-	for cleanup_frame in 60:
-		await process_frame
+	await create_timer(1.0, true).timeout
 	quit(0)
+
+
+func _save_capture(path: String) -> bool:
+	var image := root.get_texture().get_image()
+	if image == null or image.is_empty() or image.get_width() != 1280 or image.get_height() != 720:
+		push_error("VISUAL_DENSITY_CAPTURE FAIL: expected a rendered 1280x720 frame")
+		quit(1)
+		return false
+	var save_error := image.save_png(path)
+	if save_error != OK:
+		push_error("VISUAL_DENSITY_CAPTURE FAIL: %s" % error_string(save_error))
+		quit(1)
+		return false
+	return true
 
 
 func _focus_density_detail(race: Node, focus: StringName) -> void:
@@ -89,3 +138,5 @@ func _focus_density_detail(race: Node, focus: StringName) -> void:
 	camera.global_position = track.to_global(target)
 	if focus != &"overview":
 		camera.zoom = Vector2.ONE * (0.9 if focus == &"giant" else 2.0)
+	camera.reset_smoothing()
+	camera.force_update_scroll()

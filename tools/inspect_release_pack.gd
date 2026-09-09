@@ -3,6 +3,8 @@ extends SceneTree
 
 func _initialize() -> void:
 	for excluded_path in [
+		"res://assets/source/kitchen_hero/mug.jpg",
+		"res://assets/source/kitchen_hero/tea_board.jpg",
 		"res://assets/ui/concepts/title-concept.jpg",
 		"res://assets/ui/concepts/garage-concept.jpg",
 		"res://assets/ui/concepts/hud-concept.jpg",

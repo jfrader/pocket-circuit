@@ -86,8 +86,15 @@ func _initialize() -> void:
 		{"name": "giant_mouse", "dir": GIANT_DIR, "body": _giant_new(&"mouse")},
 	]
 
+	var selected := ""
+	for argument in OS.get_cmdline_user_args():
+		if argument.begins_with("--asset="):
+			selected = argument.trim_prefix("--asset=")
+	var written := 0
 	for asset: Dictionary in assets:
 		var asset_name := String(asset["name"])
+		if not selected.is_empty() and asset_name != selected:
+			continue
 		var out_dir := String(asset["dir"])
 		var image := Image.new()
 		var load_error := image.load_svg_from_buffer(_svg(String(asset["body"]), asset_name).to_utf8_buffer(), 4.0)
@@ -106,8 +113,12 @@ func _initialize() -> void:
 			quit(1)
 			return
 		print("SAVE %s OK" % output_path)
+		written += 1
 
-	# Also ensure some existing are referenced; no-op
+	if written == 0:
+		push_error("VISUAL_DENSITY_GEN FAIL: unknown asset " + selected)
+		quit(1)
+		return
 	quit(0)
 
 
@@ -124,7 +135,6 @@ func _svg(body: String, title: String) -> String:
 <linearGradient id="giantBox" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f4c65a"/><stop offset="0.5" stop-color="#e85a2e"/><stop offset="1" stop-color="#c81e2e"/></linearGradient>
 <linearGradient id="giantMug" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#4a8fb8"/><stop offset="1" stop-color="#f5f0e3"/></linearGradient>
 <radialGradient id="softCircle"><stop offset="0" stop-color="#ffffff" stop-opacity=".86"/><stop offset=".58" stop-color="#ffffff" stop-opacity=".46"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
-<radialGradient id="softRect" cx="50%%" cy="50%%" r="68%%"><stop offset="0" stop-color="#ffffff" stop-opacity=".78"/><stop offset=".68" stop-color="#ffffff" stop-opacity=".38"/><stop offset="1" stop-color="#ffffff" stop-opacity="0"/></radialGradient>
 </defs>
 %s
 </svg>""" % [title, body]
@@ -223,7 +233,16 @@ func _micro_item(kind: StringName) -> String:
 
 func _soft_shadow(rectangular: bool) -> String:
 	if rectangular:
-		return """<rect x="18" y="49" width="220" height="158" rx="34" fill="url(#softRect)"/>"""
+		var body := ""
+		var previous_alpha := 0.0
+		for step in range(1, 17):
+			var t := float(step) / 16.0
+			var inset := t * 18.0
+			var target_alpha := 0.78 * smoothstep(0.0, 1.0, t)
+			var layer_alpha := (target_alpha - previous_alpha) / (1.0 - previous_alpha)
+			body += '<rect x="%.3f" y="%.3f" width="%.3f" height="%.3f" rx="%.3f" fill="#ffffff" fill-opacity="%.5f"/>' % [18.0 + inset, 49.0 + inset, 220.0 - inset * 2.0, 158.0 - inset * 2.0, 34.0 - inset, layer_alpha]
+			previous_alpha = target_alpha
+		return body
 	return """<ellipse cx="128" cy="132" rx="111" ry="91" fill="url(#softCircle)"/>"""
 
 

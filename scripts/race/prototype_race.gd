@@ -166,6 +166,22 @@ func _prepare_race_async() -> void:
 		if prepared.is_empty():
 			app.call("fail_race_loading", "A valid circuit could not be generated")
 			return
+		for texture_path in TRACK_BUILDER.preparation_texture_paths(prepared["spec"]):
+			if TRACK_BUILDER.has_prepared_outline_path(texture_path):
+				continue
+			if not ResourceLoader.exists(texture_path):
+				continue
+			await _loading_step("Preparing scenery footprints")
+			var texture := load(texture_path) as Texture2D
+			if texture != null and not TRACK_BUILDER.has_prepared_outline(texture):
+				var outline: Dictionary = await preparation.run_data_job(TRACK_BUILDER.compute_alpha_outline.bind(texture.get_image(), texture.get_width(), texture.get_height()))
+				if outline.is_empty():
+					app.call("fail_race_loading", "Scenery footprints could not be prepared")
+					return
+				TRACK_BUILDER.install_prepared_outline(texture, outline)
+			if app.call("is_race_loading_cancelled"):
+				app.call("complete_race_loading")
+				return
 		await _loading_step("Building the room")
 		var embedded := track_root
 		remove_child(embedded)

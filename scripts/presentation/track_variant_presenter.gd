@@ -27,7 +27,7 @@ func configure(track_root: Node2D, requested_theme: StringName, reverse_directio
 		&"workshop":
 			base_surface_name = &"workbench"
 		&"office":
-			base_surface_name = &"desk mat"
+			base_surface_name = &"desktop"
 		_:
 			base_surface_name = &"polished counter"
 			_build_kitchen_presentation()

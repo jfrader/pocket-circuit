@@ -36,6 +36,22 @@
 
 ### Changed
 
+- Generated circuits now compose different straight extents, headings and turn
+  sections within each route program, with broader minimum corner radii.
+- Scenery collision footprints are prepared off the main thread before race
+  assembly instead of being scanned during visible scene construction.
+- Workshop and Office now use coherent bench/desktop materials, distinct
+  cutting-mat and desk-pad islands, and standalone tools, keyboard and notebook
+  artwork instead of stretching whole objects across the infield.
+- Grip and shortcut markings no longer sit on grey translucent rectangles;
+  rectangular prop shadows now fade out smoothly instead of ending abruptly.
+- Kitchen races now use a coherent countertop and wooden island, with
+  world-aligned material detail and illustrated mugs, plates and tea-service
+  landmarks. Ambient cloth and paper dressing stays clear of the racing path.
+- Cloth, wood and desk-pad floors now repeat across the room at a consistent
+  material scale instead of appearing as large solid-color fills.
+- Raised-island artwork now displays its full image over a solid material base
+  rather than sampling a nearly invisible corner of the texture.
 - Menu buttons now keep crisp borders at different sizes, with distinct hover,
   keyboard focus, pressed, disabled and car-selection feedback. HUD instruments
   use fixed-size details, cleaner type and more consistent spacing.
