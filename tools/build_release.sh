@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
-readonly REQUIRED_GODOT_VERSION="4.7.2"
-readonly TEMPLATE_VERSION="4.7.2.stable"
 readonly PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
+command -v python3 >/dev/null 2>&1 || { printf 'python3 is required.\n' >&2; exit 1; }
+readonly REQUIRED_GODOT_VERSION="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["version"])' "$PROJECT_ROOT/tools/godot_release.json")"
+readonly TEMPLATE_VERSION="$REQUIRED_GODOT_VERSION.stable"
 
 if (( $# > 1 )); then
   printf 'Usage: %s [output-directory]\n' "$0" >&2
@@ -44,8 +45,8 @@ for platform_dir in "$linux_dir" "$windows_dir"; do
   mkdir -p -- "$platform_dir"
 done
 
-if ! command -v python3 >/dev/null 2>&1 || ! command -v sha256sum >/dev/null 2>&1 || ! command -v magick >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1 || ! command -v tee >/dev/null 2>&1; then
-	printf 'python3, sha256sum, magick, ffprobe, grep, and tee are required.\n' >&2
+if ! command -v sha256sum >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1 || ! command -v tee >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1 || { ! command -v magick >/dev/null 2>&1 && ! command -v convert >/dev/null 2>&1; }; then
+	printf 'python3, sha256sum, ImageMagick (magick or convert), ffprobe, grep, tee, and timeout are required.\n' >&2
 	exit 1
 fi
 
@@ -71,6 +72,7 @@ run_godot_checked() {
 }
 
 python3 "$PROJECT_ROOT/tools/validate_release_config.py"
+python3 -m unittest discover -s "$PROJECT_ROOT/tests" -p 'test_*.py'
 
 printf 'Checking runtime vehicle dependencies...\n'
 for runtime_script in \
@@ -87,7 +89,7 @@ for runtime_script in \
 done
 
 printf 'Importing project with Godot %s...\n' "$godot_version"
-run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --import
+run_godot_checked timeout 300 "$godot_bin" --path "$PROJECT_ROOT" --headless --editor --import --quit
 
 shopt -s nullglob dotglob
 tests=("$PROJECT_ROOT"/tests/*.gd)
@@ -99,11 +101,13 @@ fi
 for test_path in "${tests[@]}"; do
 	test_relative="${test_path#"$PROJECT_ROOT"/}"
 	printf 'Running %s...\n' "$test_relative"
-	run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative"
+	expected_marker="$(python3 "$PROJECT_ROOT/tools/test_success_marker.py" "$test_path")"
+	POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" run_godot_checked timeout 1200 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative"
 done
 
 printf 'Smoke-testing the boot scene...\n'
-run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --scene res://scenes/boot/boot.tscn --quit-after 300
+POCKET_CIRCUIT_EXPECT_OUTPUT="RELEASE_RACE_SMOKE PASS" \
+	run_godot_checked timeout 180 "$godot_bin" --path "$PROJECT_ROOT" --headless --scene res://scenes/boot/boot.tscn -- --release-smoke
 
 printf 'Smoke-testing the race scene...\n'
 run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --scene res://scenes/race/prototype_race.tscn --quit-after 600
@@ -163,7 +167,7 @@ printf 'Smoke-testing the packaged Linux release...\n'
 (
 	cd -- "$linux_dir"
 	POCKET_CIRCUIT_EXPECT_OUTPUT="RELEASE_RACE_SMOKE PASS" \
-		run_godot_checked ./pocket-circuit.x86_64 --headless --quit-after 1200 -- --release-smoke
+		run_godot_checked timeout 180 ./pocket-circuit.x86_64 --headless -- --release-smoke
 )
 
 printf 'Inspecting packaged release contents...\n'
@@ -174,8 +178,8 @@ cleanup_pack_check() {
 trap cleanup_pack_check EXIT
 (
 	cd -- "$pack_check_dir"
-	run_godot_checked "$godot_bin" --headless --main-pack "$linux_pck" --script "$PROJECT_ROOT/tools/inspect_release_pack.gd"
-	run_godot_checked "$godot_bin" --headless --main-pack "$windows_pck" --script "$PROJECT_ROOT/tools/inspect_release_pack.gd"
+	POCKET_CIRCUIT_EXPECT_OUTPUT="PACKAGED_CONTENT_TEST PASS" run_godot_checked timeout 120 "$godot_bin" --headless --main-pack "$linux_pck" --script "$PROJECT_ROOT/tools/inspect_release_pack.gd"
+	POCKET_CIRCUIT_EXPECT_OUTPUT="PACKAGED_CONTENT_TEST PASS" run_godot_checked timeout 120 "$godot_bin" --headless --main-pack "$windows_pck" --script "$PROJECT_ROOT/tools/inspect_release_pack.gd"
 )
 cleanup_pack_check
 trap - EXIT

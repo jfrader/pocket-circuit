@@ -267,6 +267,7 @@ func _init() -> void:
 	else:
 		print("VehicleDynamics unit tests: %d PASSED, 0 FAILED" % passed)
 		print("VehicleDynamics unit tests passed!")
+		print("VEHICLE_DYNAMICS_UNIT_TEST PASS")
 		quit(0)
 
 
