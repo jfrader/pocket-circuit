@@ -50,8 +50,10 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   headings vary independently; a program is not a fixed circuit. Normalized
   shape-distance tests must demonstrate variation within each program after
   discounting translation, scale, rotation, mirroring and traversal direction.
-- Programs are fitted, clearance-aware length-scaled and rounded into controls,
-  then sampled into a 260-point centerline. Retry attempts may change the
+- Programs are fitted and rounded with world-space corner fillets, retaining
+  literal collinear controls along straight portions (spacing at most 110 units).
+  Control count is internal and variable, bounded below the 260-point public
+  centerline size; callers must not assume 24 controls. Retry attempts may change the
   program/section combination, not just shrink the same failed shape.
 - Generated route and room dimensions use `WORLD_SCALE = 1.75`. The target
   length stream spans roughly 4,375 to 9,625 world units; elongated room
@@ -65,7 +67,8 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   half-width plus a 22-unit vehicle hull allowance. Geometry checks do not replace
   four-car physics verification on accepted routes.
 - Every accepted route has at least two distinct 450-unit setup-straight
-  regions. Turn rhythm is limited to a small set of broad complexes rather than
+  regions whose segment headings stay within 0.04 radians (about 2.3 degrees),
+  not merely gentle curves. Turn rhythm is limited to broad complexes rather than
   spline-scale wiggles, and validation rejects driveable chords that replace a
   complete complex.
 - Individual routes retain a 1–10 broad-complex bound; the regression matrix

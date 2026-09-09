@@ -38,13 +38,13 @@ static func _perimeter(seed: int, section: int) -> PackedVector2Array:
 	var top_depth := _roll(seed, 23, 0.08, 0.24)
 	var lower_depth := _roll(seed, 29, 0.04, 0.20)
 	var points := PackedVector2Array([
-		Vector2(-0.94, -0.08), Vector2(-0.86, -0.48), Vector2(-0.58, -0.80),
-		Vector2(top_split - 0.24, -0.72 - top_depth), Vector2(top_split + 0.26, -0.84 + top_depth * 0.30),
-		Vector2(0.66, -0.70), Vector2(0.92, -0.34), Vector2(0.92, 0.18),
-		Vector2(0.68, 0.70), Vector2(bottom_split + 0.25, 0.84 - lower_depth),
-		Vector2(bottom_split - 0.30, 0.68 + lower_depth), Vector2(-0.68, 0.76), Vector2(-0.92, 0.38),
+		Vector2(-0.94, -0.10), Vector2(-0.72, -0.68),
+		Vector2(top_split, -0.82 - top_depth * 0.25), Vector2(0.68, -0.68),
+		Vector2(0.94, -0.14), Vector2(0.78, 0.58),
+		Vector2(bottom_split, 0.80 + lower_depth * 0.20), Vector2(-0.70, 0.66),
+		Vector2(-0.94, 0.24),
 	])
-	return _insert_optional_section(points, section, seed, [3, 8, 11])
+	return _insert_optional_section(points, section, seed, [2, 5, 7])
 
 
 static func _lobes(seed: int, section: int) -> PackedVector2Array:
@@ -54,14 +54,12 @@ static func _lobes(seed: int, section: int) -> PackedVector2Array:
 	var left_size := _roll(seed, 83, 0.62, 0.82)
 	var right_size := _roll(seed, 89, 0.62, 0.84)
 	var points := PackedVector2Array([
-		Vector2(-0.94, 0.00), Vector2(-0.82, -0.48), Vector2(-0.52, -left_size),
-		Vector2(-0.22, -0.68), Vector2(waist_x - 0.18, upper_waist), Vector2(waist_x + 0.20, upper_waist - 0.03),
-		Vector2(0.42, -0.70), Vector2(0.72, -right_size), Vector2(0.94, -0.28),
-		Vector2(0.90, 0.28), Vector2(0.66, right_size), Vector2(0.30, 0.70),
-		Vector2(waist_x + 0.18, lower_waist), Vector2(waist_x - 0.20, lower_waist + 0.03),
-		Vector2(-0.38, 0.72), Vector2(-0.72, left_size),
+		Vector2(-0.94, -0.14), Vector2(-0.68, -left_size), Vector2(-0.06, -0.70),
+		Vector2(waist_x + 0.20, upper_waist), Vector2(0.70, -right_size),
+		Vector2(0.94, -0.10), Vector2(0.70, right_size), Vector2(0.08, 0.72),
+		Vector2(waist_x - 0.20, lower_waist), Vector2(-0.68, left_size), Vector2(-0.94, 0.22),
 	])
-	return _insert_optional_section(points, section, seed, [2, 7, 14])
+	return _insert_optional_section(points, section, seed, [1, 5, 8])
 
 
 static func _wedge(seed: int, section: int) -> PackedVector2Array:
@@ -70,13 +68,12 @@ static func _wedge(seed: int, section: int) -> PackedVector2Array:
 	var south_split := _roll(seed, 107, -0.28, 0.28)
 	var west_kink := _roll(seed, 109, -0.16, 0.12)
 	var points := PackedVector2Array([
-		Vector2(-0.74, -0.36), Vector2(-0.58, -0.70), Vector2(apex_x - 0.22, -0.88),
-		Vector2(apex_x + 0.24, -0.82), Vector2(east_shoulder, -0.50), Vector2(0.84, -0.10),
-		Vector2(0.90, 0.34), Vector2(0.80, 0.62),
-		Vector2(0.46, 0.82), Vector2(south_split + 0.20, 0.66), Vector2(south_split - 0.18, 0.86),
-		Vector2(-0.70, 0.68), Vector2(-0.92, 0.34), Vector2(-0.68 + west_kink, -0.04),
+		Vector2(apex_x, -0.90), Vector2(east_shoulder, -0.52),
+		Vector2(0.90, 0.28), Vector2(0.72, 0.68),
+		Vector2(south_split, 0.84), Vector2(-0.68, 0.66),
+		Vector2(-0.92, 0.18), Vector2(-0.58 + west_kink, -0.48),
 	])
-	return _insert_optional_section(points, section, seed, [3, 8, 11])
+	return _insert_optional_section(points, section, seed, [1, 3, 5])
 
 
 static func _insert_optional_section(points: PackedVector2Array, section: int, seed: int, segment_choices: Array[int]) -> PackedVector2Array:
@@ -92,8 +89,8 @@ static func _insert_optional_section(points: PackedVector2Array, section: int, s
 	var inward := (center - from.lerp(to, 0.5)).normalized()
 	var depth := _roll(seed, 131 + section * 11, 0.36, 0.52)
 	var result := points.duplicate()
-	for offset in range(-1, 3):
-		var weight := 1.0 if offset in [0, 1] else 0.48
+	for offset in range(-1, 2):
+		var weight := 1.0 if offset == 0 else 0.42
 		var index := posmod(segment + offset, result.size())
 		result[index] += inward * depth * weight
 	return result
