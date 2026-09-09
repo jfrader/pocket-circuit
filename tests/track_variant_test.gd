@@ -10,7 +10,7 @@ const THEME_SCENES: Dictionary = {
 const THEME_EXPECTATIONS: Dictionary = {
 	&"kitchen": {"base_surface": &"polished counter", "zones": 2, "hazard": "KitchenHazard"},
 	&"workshop": {"base_surface": &"workbench", "zones": 3, "hazard": "WorkshopHazard"},
-	&"office": {"base_surface": &"desk mat", "zones": 3, "hazard": "OfficeHazard"},
+	&"office": {"base_surface": &"desktop", "zones": 3, "hazard": "OfficeHazard"},
 }
 
 

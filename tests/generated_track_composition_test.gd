@@ -7,8 +7,8 @@ const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 const ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"square"]
 const SIGNATURE_ASSETS := {
 	&"kitchen": "res://assets/textures/imagine/stove_top.png",
-	&"workshop": "res://assets/textures/imagine/bucket_stack.png",
-	&"office": "res://assets/textures/imagine/monitor_top.png",
+	&"workshop": "res://assets/textures/workshop_hero/hero_workshop_toolbox.png",
+	&"office": "res://assets/textures/office_hero/hero_office_keyboard.png",
 }
 
 var _built_count := 0
@@ -105,6 +105,13 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	var room_surface := track.get_node_or_null("RoomSurface") as Polygon2D
 	if not _expect(void_backdrop != null and void_backdrop.color.is_equal_approx(Color("111316")) and room_surface != null, "%s should present its textured room as an island over a dark void" % theme):
 		return false
+	if not _expect(room_surface.texture != null and room_surface.texture_repeat == CanvasItem.TEXTURE_REPEAT_ENABLED and room_surface.uv.size() == room_surface.polygon.size(), "%s room floor should have complete, repeating material coordinates" % theme):
+		return false
+	var floor_period: Vector2 = BUILDER.LAYOUTS[theme].get("floor_tile_world_size", BUILDER.DEFAULT_FLOOR_TILE_WORLD_SIZE)
+	for index in room_surface.polygon.size():
+		var expected_uv := room_surface.polygon[index] / floor_period * room_surface.texture.get_size()
+		if not _expect(room_surface.uv[index].is_equal_approx(expected_uv), "%s floor must respect its configured world material period" % theme):
+			return false
 
 	if not _expect(track.find_children("PaperclipLine", "", true, false).is_empty(), "%s generated track must not use the old global PaperclipLine" % theme):
 		return false
@@ -241,12 +248,13 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	var shortcut := track.get_node_or_null("GeneratedMoments/ShortcutDecision")
 	if not _expect(technical_surface != null and shortcut != null, "%s should expose technical and shortcut moments" % theme):
 		return false
-	if not _expect(technical_surface.get_child_count() == 8 and shortcut.get_child_count() == 8, "%s surfaces should carry one faint tint and seven readable decal sprites" % theme):
+	if not _expect(technical_surface.get_child_count() == 7 and shortcut.get_child_count() == 7, "%s surfaces should use seven readable decals without a rectangular zone overlay" % theme):
+		return false
+	if not _expect(track.find_children("SurfaceTint", "Polygon2D", true, false).is_empty(), "%s should not render gameplay-zone rectangles under surface art" % theme):
 		return false
 	for surface_moment: Node2D in [technical_surface, shortcut]:
-		var tint := surface_moment.get_node_or_null("SurfaceTint") as Polygon2D
 		var decals := surface_moment.find_children("CenterlineDecal*", "Sprite2D", false, false)
-		if not _expect(tint != null and bool(tint.get_meta("visual_only", false)) and tint.color.a >= 0.08 and tint.color.a <= 0.12 and decals.size() == 7, "%s surface visuals should remain a faint polygon under seven themed decals" % theme):
+		if not _expect(decals.size() == 7, "%s should retain its themed surface cues when the overlay is removed" % theme):
 			return false
 	var shortcut_path: PackedVector2Array = shortcut.get_meta("shortcut_path", PackedVector2Array())
 	var safe_path: PackedVector2Array = shortcut.get_meta("safe_path", PackedVector2Array())
@@ -714,16 +722,27 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 	if not _expect(giants != null and giant_count >= 1 and giant_count <= 3 and giants.get_child_count() == giant_count, "%s should place 1-3 giant landmarks (got %d)" % [label, giant_count]):
 		return false
 	var colliding_giants := 0
+	var allowed_giants: Array = BUILDER.LAYOUTS[theme].get("giants", [])
+	for story: Dictionary in BUILDER.STORY_KITS[theme]:
+		if StringName(story["id"]) == StringName(track.get_meta("story_id")):
+			allowed_giants = story.get("giants", allowed_giants).duplicate()
+			for formation: Dictionary in story["island"]:
+				if StringName(formation["quantity"]) == &"unique":
+					allowed_giants.erase(formation["asset"])
 	var committed_racing_lines: Array[PackedVector2Array] = []
 	for line_name: String in ["RacingLine", "ShortcutRacingLine"]:
 		var line := track.get_node_or_null(line_name) as Line2D
 		if line and not line.points.is_empty():
 			committed_racing_lines.append(line.points)
+	var seen_giant_assets := {}
 	for landmark: Node2D in giants.get_children():
 		var world_size := float(landmark.get_meta("world_size", 0.0))
 		var footprint_size: Vector2 = landmark.get_meta("footprint_size", Vector2.ZERO)
 		var asset_path := String(landmark.get_meta("asset_path", ""))
-		if not _expect(asset_path.begins_with("res://assets/textures/giant_props/") and world_size >= 300.0 and world_size <= 600.0, "%s giant landmarks should use tracked 300-600u theme assets" % label):
+		if bool(BUILDER.LAYOUTS[theme].get("distinct_giant_assets", false)) and not _expect(not seen_giant_assets.has(asset_path), "%s giant landmarks should not repeat the same object" % label):
+			return false
+		seen_giant_assets[asset_path] = true
+		if not _expect(asset_path in allowed_giants and ResourceLoader.exists(asset_path) and bool(BUILDER.PROP_SHAPES.get(asset_path.get_file(), {}).get("solid", false)) and world_size >= 300.0 and world_size <= 600.0, "%s giant landmarks should use registered 300-600u assets from their story roster" % label):
 			return false
 		var shape_kind := StringName(landmark.get_meta("footprint_kind", BUILDER.PROP_SHAPES.get(asset_path.get_file(), {}).get("shape", "circle")))
 		var gate_samples := PackedVector2Array()
@@ -793,6 +812,12 @@ func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
 			return false
 		if not _expect(_minimum_point_distance(position, centerline) >= BUILDER.HALF_WIDTH, "%s seed %d ground section center should stay off the racing corridor" % [theme, seed]):
 			return false
+		var used := Rect2(section.texture.get_image().get_used_rect())
+		used.position -= section.texture.get_size() * 0.5
+		for point in [used.position, Vector2(used.end.x, used.position.y), used.end, Vector2(used.position.x, used.end.y), used.get_center()]:
+			var visual_point := section.to_global(point)
+			if not _expect(Geometry2D.is_point_in_polygon(visual_point, room_polygon) and BUILDER._distance_to_centerline(visual_point, centerline) >= BUILDER.HALF_WIDTH + 8.0, "%s seed %d visible ground-section footprint must clear the racing path, not merely its center" % [theme, seed]):
+				return false
 		ground_assets[asset_path] = true
 		var normalized: Vector2 = (position - bounds.position) / bounds.size
 		ground_sectors[Vector2i(clampi(int(normalized.x * 3.0), 0, 2), clampi(int(normalized.y * 2.0), 0, 1))] = true

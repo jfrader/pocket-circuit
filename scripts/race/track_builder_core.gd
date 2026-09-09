@@ -9,6 +9,8 @@ const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
 const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
+const DEFAULT_FLOOR_TILE_WORLD_SIZE := Vector2(512.0, 512.0)
+const WORLD_SURFACE_SHADER := preload("res://assets/shaders/world_surface.gdshader")
 const RECOVERY_LANE_HALF_LENGTH := 230.0
 const RECOVERY_LANE_HALF_WIDTH := 48.0
 const SHORTCUT_HALF_SPAN := 10
@@ -37,6 +39,8 @@ const COLLISION_FLAT := &"flat"
 const COLLISION_ALPHA_THRESHOLD := 0.08
 const ORIENTED_FOOTPRINT_MIN_ANISOTROPY := 1.35
 const APRON_COLLIDER_CLEARANCE := 36.0
+const FLAT_DRESSING_ROUTE_CLEARANCE := 12.0
+const ROOM_EDGE_TILE_WORLD_LENGTH := 1024.0
 const RACING_LINE_HULL_RADIUS := 22.0
 
 ## Generated asset contract (authoritative across every constructor below):
@@ -84,9 +88,19 @@ static var _texture_outline_cache: Dictionary = {}
 ## are visibly elongated or rectangular even though older placement data used a
 ## circle. `no_rotation` also protects axis-aligned art from unstable PCA angles.
 static var ASSET_FOOTPRINT_OVERRIDES := {
+	"hero_workshop_toolbox.png": {"kind": &"convex", "no_rotation": true},
+	"hero_workshop_wrench.png": {"kind": &"convex", "no_rotation": true},
+	"hero_workshop_paint_can.png": {"kind": &"convex", "no_rotation": true},
+	"hero_office_keyboard.png": {"kind": &"convex", "no_rotation": true},
+	"hero_office_notebook.png": {"kind": &"convex", "no_rotation": true},
+	"hero_office_keycap.png": {"kind": &"rect", "no_rotation": true},
+	"hero_kitchen_mug.png": {"kind": &"convex", "no_rotation": true},
+	"hero_kitchen_plate_stack.png": {"kind": &"convex", "no_rotation": true},
+	"hero_kitchen_tea_board.png": {"kind": &"convex", "no_rotation": true},
 	"watermelon.png": {"kind": &"capsule", "no_rotation": true},
 	"giant_watermelon.png": {"kind": &"capsule", "no_rotation": true},
 	"giant_mug.png": {"kind": &"convex", "no_rotation": true},
+	"giant_basketball.png": {"kind": &"convex", "no_rotation": true},
 	"giant_fork.png": {"kind": &"convex", "no_rotation": true},
 	"giant_toaster.png": {"kind": &"convex", "no_rotation": true},
 	"giant_milk_carton.png": {"kind": &"convex", "no_rotation": true},
@@ -97,6 +111,7 @@ static var ASSET_FOOTPRINT_OVERRIDES := {
 	"giant_paper_stack.png": {"kind": &"convex", "no_rotation": true},
 	"giant_pen.png": {"kind": &"convex", "no_rotation": true},
 	"giant_hammer.png": {"kind": &"convex", "no_rotation": true},
+	"hammer.png": {"kind": &"convex", "no_rotation": true},
 	"giant_wrench.png": {"kind": &"convex", "no_rotation": true},
 	"giant_stapler.png": {"kind": &"convex", "no_rotation": true},
 	"giant_mouse.png": {"kind": &"convex", "no_rotation": true},
@@ -217,6 +232,7 @@ static var STORY_KITS := {
 	&"kitchen": [
 		{
 			"id": &"breakfast_service",
+			"giants": ["res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", "res://assets/textures/giant_props/giant_milk_carton.png", "res://assets/textures/giant_props/giant_cereal_box.png"],
 			"island": [
 				{"asset": "res://assets/textures/imagine/stove_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
 				{"asset": "res://assets/textures/imagine/teacup_saucer.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(66, -12)},
@@ -224,7 +240,7 @@ static var STORY_KITS := {
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 10},
 			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_spoon.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/teapot_top.png", "res://assets/textures/imagine/plate_stack.png"],
+			"landmarks": ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png"],
 			"surfaces": [
 				{"name": &"breakfast crumbs", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/crumb_cluster.png"},
 				{"name": &"tea spill", "grip": 0.56, "speed": 0.88, "decal": "res://assets/textures/kitchen/wet_spill.png"},
@@ -247,14 +263,16 @@ static var STORY_KITS := {
 		},
 		{
 			"id": &"afternoon_tea",
+			"opening_asset": "res://assets/textures/kitchen_hero/hero_kitchen_mug.png",
+			"giants": ["res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png"],
 			"island": [
-				{"asset": "res://assets/textures/imagine/teapot_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-30, -8)},
-				{"asset": "res://assets/textures/imagine/teacup_saucer.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(66, -6)},
+				{"asset": "res://assets/textures/kitchen_hero/hero_kitchen_tea_board.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-30, -8), "max_radius": 210.0},
+				{"asset": "res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(66, -6), "max_radius": 72.0},
 				{"asset": "res://assets/textures/imagine/strawberry.png", "quantity": &"many", "count": 14, "formation": &"arc", "offset": Vector2(4, 74)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/kitchen_spoon.png", "count": 10},
 			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/stove_top.png", "res://assets/textures/imagine/plate_stack.png"],
+			"landmarks": ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png"],
 			"surfaces": [
 				{"name": &"tea biscuits", "grip": 0.84, "speed": 0.78, "decal": "res://assets/textures/imagine/crumb_cluster.png"},
 				{"name": &"saucer spill", "grip": 0.54, "speed": 0.9, "decal": "res://assets/textures/kitchen/wet_spill.png"},
@@ -262,8 +280,9 @@ static var STORY_KITS := {
 		},
 		{
 			"id": &"counter_cleanup",
+			"giants": ["res://assets/textures/giant_props/giant_milk_carton.png", "res://assets/textures/giant_props/giant_fork.png"],
 			"island": [
-				{"asset": "res://assets/textures/imagine/plate_stack.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 160.0},
 				{"asset": "res://assets/textures/kitchen/sponge_wet.png", "quantity": &"few", "count": 3, "formation": &"line", "offset": Vector2(62, -12)},
 				{"asset": "res://assets/textures/kitchen/cup_cartoon.png", "quantity": &"many", "count": 8, "formation": &"cluster", "offset": Vector2(8, 78)},
 			],
@@ -280,7 +299,7 @@ static var STORY_KITS := {
 		{
 			"id": &"carpentry_bench",
 			"island": [
-				{"asset": "res://assets/textures/imagine/island_tool_tray.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/workshop_hero/hero_workshop_toolbox.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 120.0},
 				{"asset": "res://assets/textures/imagine/hammer.png", "quantity": &"few", "count": 2, "formation": &"line", "offset": Vector2(70, -8)},
 				{"asset": "res://assets/textures/imagine/screw.png", "quantity": &"many", "count": 16, "formation": &"cluster", "offset": Vector2(8, 76)},
 			],
@@ -295,13 +314,13 @@ static var STORY_KITS := {
 		{
 			"id": &"paint_station",
 			"island": [
-				{"asset": "res://assets/textures/imagine/bucket_stack.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/workshop_hero/hero_workshop_paint_can.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 120.0},
 				{"asset": "res://assets/textures/imagine/workshop_paint_can.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
 				{"asset": "res://assets/textures/imagine/bolt.png", "quantity": &"many", "count": 12, "formation": &"arc", "offset": Vector2(4, 78)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/bolt.png", "count": 14},
 			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/workshop_paint_can.png", "res://assets/textures/imagine/hose_coil.png"],
+			"landmarks": ["res://assets/textures/workshop_hero/hero_workshop_wrench.png", "res://assets/textures/imagine/hose_coil.png"],
 			"surfaces": [
 				{"name": &"paint dust", "grip": 0.74, "speed": 0.72, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
 				{"name": &"paint station oil", "grip": 0.44, "speed": 0.88, "decal": "res://assets/textures/imagine/oil_stain.png"},
@@ -310,8 +329,8 @@ static var STORY_KITS := {
 		{
 			"id": &"repair_job",
 			"island": [
-				{"asset": "res://assets/textures/imagine/island_tool_tray.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
-				{"asset": "res://assets/textures/imagine/wrench.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
+				{"asset": "res://assets/textures/workshop_hero/hero_workshop_toolbox.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 120.0},
+				{"asset": "res://assets/textures/workshop_hero/hero_workshop_wrench.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
 				{"asset": "res://assets/textures/imagine/screw.png", "quantity": &"many", "count": 14, "formation": &"cluster", "offset": Vector2(4, 78)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/screw.png", "count": 14},
@@ -331,7 +350,7 @@ static var STORY_KITS := {
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/bolt.png", "count": 12},
 			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/barrel_wood.png", "res://assets/textures/imagine/workshop_paint_can.png"],
+			"landmarks": ["res://assets/textures/imagine/barrel_wood.png", "res://assets/textures/workshop_hero/hero_workshop_paint_can.png"],
 			"surfaces": [
 				{"name": &"garage oil", "grip": 0.42, "speed": 0.88, "decal": "res://assets/textures/imagine/oil_stain.png"},
 				{"name": &"garage dust", "grip": 0.75, "speed": 0.68, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
@@ -341,14 +360,15 @@ static var STORY_KITS := {
 	&"office": [
 		{
 			"id": &"dual_workstation",
+			"opening_asset": "res://assets/textures/office_hero/hero_office_notebook.png",
 			"island": [
-				{"asset": "res://assets/textures/imagine/monitor_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
-				{"asset": "res://assets/textures/imagine/island_keyboard.png", "quantity": &"few", "count": 2, "formation": &"line", "offset": Vector2(72, -8)},
+				{"asset": "res://assets/textures/office_hero/hero_office_keyboard.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 210.0},
+				{"asset": "res://assets/textures/office_hero/hero_office_keycap.png", "quantity": &"few", "count": 2, "formation": &"line", "offset": Vector2(72, -8)},
 				{"asset": "res://assets/textures/imagine/paperclip.png", "quantity": &"many", "count": 16, "formation": &"cluster", "offset": Vector2(4, 78)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/paperclip.png", "count": 16},
 			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/lamp_desk.png", "res://assets/textures/imagine/book_top.png"],
+			"landmarks": ["res://assets/textures/imagine/lamp_desk.png", "res://assets/textures/office_hero/hero_office_notebook.png"],
 			"surfaces": [
 				{"name": &"workstation papers", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/paper_sheet.png"},
 				{"name": &"workstation coffee", "grip": 0.6, "speed": 0.86, "decal": "res://assets/textures/imagine/stain_ring.png"},
@@ -357,7 +377,7 @@ static var STORY_KITS := {
 		{
 			"id": &"mail_sort",
 			"island": [
-				{"asset": "res://assets/textures/imagine/book_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/office_hero/hero_office_notebook.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 140.0},
 				{"asset": "res://assets/textures/imagine/stapler_top.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
 				{"asset": "res://assets/textures/imagine/paperclip.png", "quantity": &"many", "count": 14, "formation": &"cluster", "offset": Vector2(4, 78)},
 			],
@@ -371,6 +391,7 @@ static var STORY_KITS := {
 		},
 		{
 			"id": &"sketch_session",
+			"opening_asset": "res://assets/textures/office_hero/hero_office_notebook.png",
 			"island": [
 				{"asset": "res://assets/textures/imagine/crayons.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
 				{"asset": "res://assets/textures/imagine/scissors_top.png", "quantity": &"few", "count": 2, "formation": &"arc", "offset": Vector2(70, -8)},
@@ -378,7 +399,7 @@ static var STORY_KITS := {
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/pencil.png", "count": 10},
 			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/monitor_top.png", "res://assets/textures/imagine/lamp_desk.png"],
+			"landmarks": ["res://assets/textures/office_hero/hero_office_notebook.png", "res://assets/textures/imagine/lamp_desk.png"],
 			"surfaces": [
 				{"name": &"sketch papers", "grip": 0.83, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
 				{"name": &"sketch coffee", "grip": 0.61, "speed": 0.85, "decal": "res://assets/textures/imagine/stain_ring.png"},
@@ -386,14 +407,15 @@ static var STORY_KITS := {
 		},
 		{
 			"id": &"coffee_break",
+			"opening_asset": "res://assets/textures/office_hero/hero_office_notebook.png",
 			"island": [
-				{"asset": "res://assets/textures/imagine/mug_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
 				{"asset": "res://assets/textures/imagine/book_top.png", "quantity": &"few", "count": 2, "formation": &"line", "offset": Vector2(70, -8)},
-				{"asset": "res://assets/textures/imagine/office_keycap.png", "quantity": &"many", "count": 12, "formation": &"cluster", "offset": Vector2(4, 78)},
+				{"asset": "res://assets/textures/office_hero/hero_office_keycap.png", "quantity": &"many", "count": 12, "formation": &"cluster", "offset": Vector2(4, 78)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/paperclip.png", "count": 12},
 			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/monitor_top.png", "res://assets/textures/imagine/lamp_desk.png"],
+			"landmarks": ["res://assets/textures/office_hero/hero_office_notebook.png", "res://assets/textures/imagine/lamp_desk.png"],
 			"surfaces": [
 				{"name": &"coffee papers", "grip": 0.81, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
 				{"name": &"coffee ring", "grip": 0.55, "speed": 0.84, "decal": "res://assets/textures/imagine/stain_ring.png"},
@@ -404,6 +426,15 @@ static var STORY_KITS := {
 
 
 static var PROP_SHAPES := {
+	"hero_workshop_toolbox.png": {"solid": true, "shape": "rect", "size": Vector2(240.0, 240.0), "large_focal": true, "giant_max_size": 340.0},
+	"hero_workshop_wrench.png": {"solid": true, "shape": "rect", "size": Vector2(24.0, 80.0)},
+	"hero_workshop_paint_can.png": {"solid": true, "shape": "circle", "shadow_shape": &"circle", "size": Vector2(240.0, 240.0), "large_focal": true, "giant_max_size": 360.0},
+	"hero_office_keyboard.png": {"solid": true, "shape": "rect", "size": Vector2(420.0, 252.0), "large_focal": true, "giant_max_size": 480.0},
+	"hero_office_keycap.png": {"solid": true, "shape": "rect", "size": Vector2(24.0, 24.0)},
+	"hero_office_notebook.png": {"solid": true, "shape": "rect", "size": Vector2(180.0, 280.0), "large_focal": true, "giant_max_size": 400.0},
+	"hero_kitchen_mug.png": {"solid": true, "shape": "circle", "shadow_shape": &"circle", "size": Vector2(144.0, 144.0)},
+	"hero_kitchen_plate_stack.png": {"solid": true, "shape": "circle", "shadow_shape": &"circle", "size": Vector2(320.0, 320.0), "large_focal": true, "giant_max_size": 360.0},
+	"hero_kitchen_tea_board.png": {"solid": true, "shape": "rect", "size": Vector2(420.0, 420.0), "large_focal": true},
 	"ruler_plank.png": {"shape": "rect", "size": Vector2(110.0, 34.0)},
 	"kitchen_ruler.png": {"shape": "rect", "size": Vector2(110.0, 34.0)},
 	"plank_wood.png": {"shape": "rect", "size": Vector2(100.0, 38.0)},
@@ -478,7 +509,7 @@ static var PROP_SHAPES := {
 	"giant_mug.png": {"solid": true, "shape": "circle", "size": Vector2(130.0, 130.0)},
 	"giant_watermelon.png": {"solid": true, "shape": "circle", "size": Vector2(140.0, 140.0)},
 	"giant_fork.png": {"solid": true, "shape": "rect", "size": Vector2(60.0, 220.0)},
-	"giant_basketball.png": {"solid": true, "shape": "circle", "size": Vector2(140.0, 140.0)},
+	"giant_basketball.png": {"solid": true, "shape": "circle", "shadow_shape": &"circle", "size": Vector2(140.0, 140.0)},
 	"giant_toolbox.png": {"solid": true, "shape": "rect", "size": Vector2(200.0, 120.0)},
 	"giant_paint_can.png": {"solid": true, "shape": "rect", "size": Vector2(120.0, 120.0)},
 	"giant_keyboard.png": {"solid": true, "shape": "rect", "size": Vector2(220.0, 150.0)},
@@ -511,9 +542,15 @@ const LAYOUTS := {
 		"island": Color("4a4038"),
 		"asphalt": Color("2e2c28"),
 		"apron": Color("3f3830"),
-		"track_texture": "res://assets/textures/imagine/track_cloth.png",
-		"track_tile_modulate": 1.0,
-		"floor_texture": "res://assets/textures/imagine/floor_cloth.png",
+		"track_texture": "res://assets/textures/world_materials/kitchen_counter.png",
+		"track_tile_modulate": 1.06,
+		"track_world_tile_size": Vector2(1024.0, 1024.0),
+		"track_opacity": 0.6,
+		"floor_texture": "res://assets/textures/world_materials/kitchen_counter.png",
+		"floor_tile_world_size": Vector2(1024.0, 1024.0),
+		"island_material_texture": "res://assets/textures/world_materials/kitchen_board.png",
+		"island_material_world_size": Vector2(768.0, 768.0),
+		"opening_fraction": 0.035,
 		"prop_texture": "res://assets/textures/imagine/island_plate.png",
 		"prop_label": "Plate",
 		"edge_texture": "res://assets/textures/kitchen/counter_edge.png",
@@ -633,10 +670,17 @@ const LAYOUTS := {
 		"island": Color("4a4038"),
 		"asphalt": Color("2e2c28"),
 		"apron": Color("5c4638"),
-		"track_texture": "res://assets/textures/imagine/track_wood.png",
-		"track_tile_modulate": 1.0,
-		"floor_texture": "res://assets/textures/imagine/floor_wood.png",
+		"track_texture": "res://assets/textures/world_materials/workshop_bench.png",
+		"track_tile_modulate": 1.06,
+		"track_world_tile_size": Vector2(1280.0, 1280.0),
+		"track_opacity": 0.6,
+		"floor_texture": "res://assets/textures/world_materials/workshop_bench.png",
+		"floor_tile_world_size": Vector2(1280.0, 1280.0),
+		"island_material_texture": "res://assets/textures/world_materials/workshop_mat.png",
+		"island_material_world_size": Vector2(768.0, 768.0),
+		"opening_fraction": 0.035,
 		"prop_texture": "res://assets/textures/imagine/island_tool_tray.png",
+		"distinct_giant_assets": true,
 		"prop_label": "Toolbox",
 		"edge_texture": "res://assets/textures/imagine/workshop_edge_bright.png",
 		"island_fill_textures": [
@@ -707,10 +751,8 @@ const LAYOUTS := {
 			"res://assets/textures/edge_dressing/workshop_bolt_micro.png",
 		],
 		"giants": [
-			"res://assets/textures/giant_props/giant_basketball.png",
-			"res://assets/textures/giant_props/giant_toolbox.png",
-			"res://assets/textures/giant_props/giant_paint_can.png",
-			"res://assets/textures/giant_props/giant_watermelon.png",
+			"res://assets/textures/workshop_hero/hero_workshop_toolbox.png",
+			"res://assets/textures/workshop_hero/hero_workshop_paint_can.png",
 			"res://assets/textures/giant_props/giant_hammer.png",
 			"res://assets/textures/giant_props/giant_wrench.png",
 		],
@@ -764,12 +806,19 @@ const LAYOUTS := {
 		"island": Color("4a505c"),
 		"asphalt": Color("272b31"),
 		"apron": Color("4a5060"),
-		"track_texture": "res://assets/textures/imagine/track_pad.png",
-		"track_tile_modulate": 1.0,
-		"floor_texture": "res://assets/textures/imagine/floor_pad.png",
+		"track_texture": "res://assets/textures/world_materials/office_desk.png",
+		"track_tile_modulate": 1.05,
+		"track_world_tile_size": Vector2(1024.0, 1024.0),
+		"track_opacity": 0.6,
+		"floor_texture": "res://assets/textures/world_materials/office_desk.png",
+		"floor_tile_world_size": Vector2(1024.0, 1024.0),
+		"island_material_texture": "res://assets/textures/world_materials/office_pad.png",
+		"island_material_world_size": Vector2(768.0, 768.0),
+		"opening_fraction": 0.035,
 		"prop_texture": "res://assets/textures/imagine/island_keyboard.png",
+		"distinct_giant_assets": true,
 		"prop_label": "Keyboard",
-		"edge_texture": "res://assets/textures/imagine/office_edge_bright.png",
+		"edge_texture": "res://assets/textures/world_materials/office_pad.png",
 		"island_fill_textures": [
 			"res://assets/textures/imagine/book_top.png",
 			"res://assets/textures/imagine/plank_wood.png",
@@ -838,7 +887,8 @@ const LAYOUTS := {
 			"res://assets/textures/edge_dressing/office_pen_cap_micro.png",
 		],
 		"giants": [
-			"res://assets/textures/giant_props/giant_keyboard.png",
+			"res://assets/textures/office_hero/hero_office_keyboard.png",
+			"res://assets/textures/office_hero/hero_office_notebook.png",
 			"res://assets/textures/giant_props/giant_monitor.png",
 			"res://assets/textures/giant_props/giant_paper_stack.png",
 			"res://assets/textures/giant_props/giant_pen.png",
@@ -1031,7 +1081,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var backdrop := room_bounds.grow(760.0)
 	_add_polygon(root, "Floor", _rect_points(backdrop.get_center(), backdrop.size), Color("111316"), -22)
 	var room_surface := _expand_loop(room_polygon, 26.0)
-	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20)
+	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20, spec.get("floor_tile_world_size", DEFAULT_FLOOR_TILE_WORLD_SIZE))
 	if stage.is_valid():
 		await stage.call("Laying the racing surface")
 
@@ -1052,7 +1102,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		_add_polygon(root, "TrackRibbon", clipped, Color(1.0, 0.96, 0.88, 0.17), -10)
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
-		_add_centerline_tiles(root, centerline, track_texture, Vector2(0.30, 0.30), float(spec.get("track_tile_modulate", 1.35)))
+		_add_centerline_tiles(root, centerline, track_texture, float(spec.get("track_tile_modulate", 1.35)), spec.get("track_world_tile_size", Vector2.ZERO), float(spec.get("track_opacity", 0.52)))
 
 	if spec.get("seed_obstacles", false):
 		_add_corridor_patterning(root, spec, centerline, room_polygon)
@@ -1290,18 +1340,28 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 	visual.name = "IslandProp"
 	visual.z_index = -9
 	visual.polygon = region
-	var prop_texture := String(spec.get("prop_texture", ""))
+	var material_texture := String(spec.get("island_material_texture", ""))
+	var prop_texture := material_texture if not material_texture.is_empty() else String(spec.get("prop_texture", ""))
 	var texture := load(prop_texture) as Texture2D if not prop_texture.is_empty() else null
 	if texture:
+		# Transparent artwork margins must not make the solid island look hollow.
+		_add_polygon(root, "IslandMaterial", region, spec["island"], -9)
 		visual.texture = texture
 		visual.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		visual.modulate = Color(1.2, 1.2, 1.2)
 		var uvs := PackedVector2Array()
-		for point: Vector2 in region:
-			uvs.append(Vector2(
-				(point.x - min_point.x) / maxf(max_point.x - min_point.x, 1.0),
-				(point.y - min_point.y) / maxf(max_point.y - min_point.y, 1.0)
-			))
+		if not material_texture.is_empty():
+			visual.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+			visual.modulate = Color.WHITE
+			var period: Vector2 = spec.get("island_material_world_size", DEFAULT_FLOOR_TILE_WORLD_SIZE)
+			for point: Vector2 in region:
+				uvs.append(point / period * texture.get_size())
+		else:
+			for point: Vector2 in region:
+				uvs.append(Vector2(
+					(point.x - min_point.x) / maxf(max_point.x - min_point.x, 1.0),
+					(point.y - min_point.y) / maxf(max_point.y - min_point.y, 1.0)
+				) * texture.get_size())
 		visual.uv = uvs
 	else:
 		visual.color = spec["island"]
@@ -1964,8 +2024,11 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 		side_strip.texture = edge_texture_side
 		side_strip.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		side_strip.position = Vector2(0.0, -14.0)
-		var side_tiles := maxi(1, int(ceil((length + 60.0) / 1024.0)))
-		side_strip.scale = Vector2((length + 60.0) / (1024.0 * float(side_tiles)), 34.0 / 220.0)
+		var side_tiles := maxi(1, int(ceil((length + 60.0) / ROOM_EDGE_TILE_WORLD_LENGTH)))
+		side_strip.region_enabled = true
+		side_strip.region_rect = Rect2(0, 0, edge_texture_side.get_width() * side_tiles, edge_texture_side.get_height())
+		side_strip.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
+		side_strip.scale = Vector2((length + 60.0) / (edge_texture_side.get_width() * float(side_tiles)), 34.0 / edge_texture_side.get_height())
 		side_strip.modulate = Color(0.85, 0.85, 0.85)
 		wall.add_child(side_strip)
 	var top_lip := Polygon2D.new()
@@ -1975,7 +2038,7 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 	wall.add_child(top_lip)
 	var edge_texture := load(edge_texture_path) as Texture2D
 	if edge_texture:
-		var tile_count := maxi(1, int(ceil((length + 60.0) / 1024.0)))
+		var tile_count := maxi(1, int(ceil((length + 60.0) / ROOM_EDGE_TILE_WORLD_LENGTH)))
 		for tile in tile_count:
 			var strip := Sprite2D.new()
 			strip.name = "EdgeStrip"
@@ -1983,7 +2046,7 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 			strip.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			var offset := (float(tile) - float(tile_count - 1) * 0.5) * ((length + 60.0) / float(tile_count))
 			strip.position = Vector2(offset, 0.0)
-			strip.scale = Vector2((length + 60.0) / (1024.0 * float(tile_count)), 50.0 / 220.0)
+			strip.scale = Vector2((length + 60.0) / (edge_texture.get_width() * float(tile_count)), 50.0 / edge_texture.get_height())
 			wall.add_child(strip)
 
 
@@ -2162,12 +2225,22 @@ static func _compose_generated_story(
 	root.add_child(container)
 
 	var occupied: Array[Dictionary] = []
+	var reserved_unique_assets := {}
+	for formation_data: Dictionary in story["island"]:
+		if StringName(formation_data["quantity"]) == &"unique":
+			reserved_unique_assets[String(formation_data["asset"])] = true
 	var committed_racing_lines: Array[PackedVector2Array] = []
 	for line_name: String in ["RacingLine", "ShortcutRacingLine"]:
 		var line := root.get_node_or_null(line_name) as Line2D
 		if line and not line.points.is_empty():
 			committed_racing_lines.append(line.points)
-	await _build_giant_landmarks(container, spec, centerline, room_polygon, gate_samples, occupied, committed_racing_lines, stage)
+	var giant_spec := spec.duplicate()
+	var giant_assets: Array[String] = []
+	for path: String in story.get("giants", spec.get("giants", [])):
+		if not reserved_unique_assets.has(path):
+			giant_assets.append(path)
+	giant_spec["giants"] = giant_assets
+	await _build_giant_landmarks(container, giant_spec, centerline, room_polygon, gate_samples, occupied, committed_racing_lines, stage)
 	if stage.is_valid():
 		await stage.call("Dressing the start area")
 	var opening_index := _build_opening_landmark(
@@ -2180,10 +2253,6 @@ static func _compose_generated_story(
 		gate_samples,
 		occupied
 	)
-	var reserved_unique_assets := {}
-	for formation_data: Dictionary in story["island"]:
-		if StringName(formation_data["quantity"]) == &"unique":
-			reserved_unique_assets[String(formation_data["asset"])] = true
 	var opening := container.get_node("OpeningLandmark")
 	if int(opening.get_meta("placed_count", 0)) == 1:
 		reserved_unique_assets[String(opening.get_meta("asset_path", ""))] = true
@@ -2380,14 +2449,14 @@ static func _build_opening_landmark(
 	parent.add_child(opening)
 	var assets: Array = story["landmarks"]
 	var asset_index := posmod(_mix_seed(int(spec["requested_seed"]), "opening_asset"), assets.size())
-	var asset_path := String(assets[asset_index])
+	var asset_path := String(story.get("opening_asset", assets[asset_index]))
 	opening.set_meta("asset_path", asset_path)
 	opening.set_meta("semantic_quantity", &"unique")
 	opening.set_meta("requested_count", 1)
 	var base_radius := _asset_radius(asset_path, 64.0)
 	var size_scale := minf(1.0, 72.0 / maxf(base_radius, 1.0))
 	var radius := base_radius * size_scale
-	var preferred := int(round(float(centerline.size()) * 0.11))
+	var preferred := int(round(float(centerline.size()) * float(spec.get("opening_fraction", 0.11))))
 	var selected_index := preferred
 	var placed_count := 0
 	# Search the first quarter of the lap rather than trusting one index; long
@@ -2501,7 +2570,7 @@ static func _build_island_story(
 	var focal_data: Dictionary = story["island"][0]
 	var focal_path := String(focal_data["asset"])
 	var focal_base_radius := _asset_radius(focal_path, 24.0)
-	var focal_scale := minf(1.0, 72.0 / maxf(focal_base_radius, 1.0))
+	var focal_scale := minf(1.0, float(focal_data.get("max_radius", 72.0)) / maxf(focal_base_radius, 1.0))
 	var focal_radius := focal_base_radius * focal_scale
 	var focal_offset: Vector2 = focal_data.get("offset", Vector2.ZERO)
 	var focal_preferred := anchor + focal_offset.rotated(scene_angle)
@@ -2526,6 +2595,7 @@ static func _build_island_story(
 		var asset_path := String(formation_data["asset"])
 		var base_radius := _asset_radius(asset_path, 24.0)
 		var maximum_radius := 72.0 if quantity == &"unique" else (42.0 if quantity == &"few" else 18.0)
+		maximum_radius = float(formation_data.get("max_radius", maximum_radius))
 		var size_scale := minf(1.0, maximum_radius / maxf(base_radius, 1.0))
 		var radius := base_radius * size_scale
 		var authored_offset: Vector2 = formation_data.get("offset", Vector2.ZERO)
@@ -2821,7 +2891,7 @@ static func _build_room_dressing(
 		pocket.set_meta("placed_count", pocket_placed)
 	if stage.is_valid():
 		await stage.call("Laying room materials")
-	var ground_section_count := _build_room_ground_sections(dressing, story, spec, centerline, outer_loop, room_polygon)
+	var ground_section_count: int = await _build_room_ground_sections(dressing, story, spec, centerline, outer_loop, room_polygon, stage)
 	if stage.is_valid():
 		await stage.call("Adding floor detail")
 	var decal_count := _build_room_floor_details(dressing, spec, centerline, room_polygon, occupied, rng)
@@ -2960,6 +3030,7 @@ static func _build_giant_landmarks(
 	rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "giants:%s" % String(spec.get("story_id", "")))
 	var target := rng.randi_range(1, 3)
 	var placed := 0
+	var used_assets := {}
 	# Prefer near curves in the outer apron, but scan the complete room for a
 	# safe fallback so compact and concave canvases still receive a landmark.
 	var corners := PackedInt32Array()
@@ -2982,6 +3053,8 @@ static func _build_giant_landmarks(
 			if stage.is_valid():
 				await stage.call("Placing landmarks")
 			tex_path = String(giants[(asset_offset + asset_attempt) % giants.size()])
+			if bool(spec.get("distinct_giant_assets", false)) and used_assets.has(tex_path):
+				continue
 			tex = load(tex_path) as Texture2D
 			if tex == null:
 				continue
@@ -2992,7 +3065,7 @@ static func _build_giant_landmarks(
 			used_rect = _texture_opaque_rect(tex)
 			footprint = _texture_collision_footprint(tex, StringName(shape_entry.get("shape", &"rect")))
 			var footprint_size: Vector2 = footprint["size"]
-			desired_size = rng.randf_range(300.0, 600.0) if asset_attempt == 0 else 300.0
+			desired_size = rng.randf_range(300.0, float(shape_entry.get("giant_max_size", 600.0))) if asset_attempt == 0 else 300.0
 			sprite_scale = desired_size / maxf(footprint_size.x, footprint_size.y)
 			visual_center_offset = ((footprint["center"] as Vector2) - Vector2(tex.get_width(), tex.get_height()) * 0.5) * sprite_scale
 			world_shape_size = footprint_size * sprite_scale
@@ -3020,6 +3093,7 @@ static func _build_giant_landmarks(
 		landmark.set_meta("visual_opaque_rect", used_rect)
 		landmark.set_meta("footprint_rotation", local_footprint_rotation)
 		container.add_child(landmark)
+		used_assets[tex_path] = true
 		var spr := Sprite2D.new()
 		spr.name = "Sprite"
 		spr.texture = tex
@@ -3118,7 +3192,8 @@ static func _build_room_ground_sections(
 		spec: Dictionary,
 		centerline: PackedVector2Array,
 		outer_loop: PackedVector2Array,
-		room_polygon: PackedVector2Array
+		room_polygon: PackedVector2Array,
+		stage: Callable = Callable()
 ) -> int:
 	var definitions: Array = spec.get("ground_sections", [])
 	if definitions.is_empty():
@@ -3137,26 +3212,35 @@ static func _build_room_ground_sections(
 	var occupied_sectors := {}
 	var asset_offset := rng.randi_range(0, definitions.size() - 1)
 	for section_index in target_count:
+		if stage.is_valid():
+			await stage.call("Laying room materials")
 		var definition: Dictionary = definitions[(asset_offset + section_index) % definitions.size()]
 		var asset_path := String(definition["asset"])
 		var texture := load(asset_path) as Texture2D
 		if texture == null:
 			continue
+		var visible_bounds := _texture_opaque_rect(texture)
+		var source_size := texture.get_size()
+		var source_radius := visible_bounds.size.length() * 0.5 + visible_bounds.get_center().distance_to(source_size * 0.5)
 		var base_world_size := float(definition.get("size", 240.0)) * rng.randf_range(0.90, 1.08)
 		var alpha := float(definition.get("alpha", 0.94))
+		var last_yield := Time.get_ticks_usec()
 		for attempt in 520:
-			var size_factor := 1.0 - float(attempt / 180) * 0.08
-			var world_size := base_world_size * maxf(size_factor, 0.82)
-			var footprint_radius := world_size * 0.40
+			if stage.is_valid() and Time.get_ticks_usec() - last_yield >= 6000:
+				await stage.call("Laying room materials")
+				last_yield = Time.get_ticks_usec()
+			var size_factor := lerpf(1.0, 0.6, float(attempt) / 519.0)
+			var world_size := base_world_size * size_factor
+			var footprint_radius := source_radius * world_size / maxf(source_size.x, source_size.y)
 			var candidate := Vector2(
 				rng.randf_range(bounds.position.x, bounds.end.x),
 				rng.randf_range(bounds.position.y, bounds.end.y)
 			)
 			if Geometry2D.is_point_in_polygon(candidate, outer_loop):
 				continue
-			if not _inside_polygon_with_radius(candidate, minf(footprint_radius * 0.82, 92.0), room_polygon):
+			if not _inside_polygon_with_radius(candidate, footprint_radius, room_polygon):
 				continue
-			if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + footprint_radius * 0.14:
+			if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + footprint_radius + FLAT_DRESSING_ROUTE_CLEARANCE:
 				continue
 			var normalized: Vector2 = (candidate - bounds.position) / bounds.size
 			var sector := Vector2i(clampi(int(normalized.x * 3.0), 0, 2), clampi(int(normalized.y * 2.0), 0, 1))
@@ -3396,16 +3480,6 @@ static func _add_surface_decals(
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
-	var surface_polygon: PackedVector2Array = parent.get_meta("polygon", PackedVector2Array())
-	if surface_polygon.size() >= 3:
-		var tint := Polygon2D.new()
-		tint.name = "SurfaceTint"
-		tint.polygon = surface_polygon
-		tint.color = Color("3f2a22", 0.10)
-		tint.z_index = -7
-		tint.set_meta("visual_only", true)
-		_mark_flat_visual(tint, texture_path, &"surface_tint")
-		parent.add_child(tint)
 	var decal_count := 7
 	for decal_index in decal_count:
 		var fraction := float(decal_index) / float(decal_count - 1)
@@ -3858,7 +3932,8 @@ static func _clear_of_occupied(point: Vector2, radius: float, occupied: Array[Di
 
 
 static func _asset_radius(texture_path: String, fallback_radius: float) -> float:
-	return minf(_prop_visual_size(texture_path, fallback_radius * 2.0) * 0.5, 96.0)
+	var radius := _prop_visual_size(texture_path, fallback_radius * 2.0) * 0.5
+	return radius if bool(PROP_SHAPES.get(texture_path.get_file(), {}).get("large_focal", false)) else minf(radius, 96.0)
 
 
 static func _add_generated_prop(
@@ -4646,7 +4721,7 @@ static func _add_directional_shadow(
 ) -> void:
 	var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
 	var override: Dictionary = ASSET_FOOTPRINT_OVERRIDES.get(texture_path.get_file(), {})
-	var shape_kind := StringName(override.get("kind", entry.get("shape", "circle")))
+	var shape_kind := StringName(entry.get("shadow_shape", override.get("kind", entry.get("shape", "circle"))))
 	var footprint: Vector2 = footprint_override
 	if footprint.is_zero_approx():
 		footprint = (entry.get("size", Vector2.ONE * fallback_diameter) as Vector2) * size_scale
@@ -4739,7 +4814,15 @@ static func _add_prop_with_collision(parent: Node, position: Vector2, radius: fl
 		prop.add_child(sprite)
 
 
-static func _add_textured_polygon(parent: Node, node_name: String, points: PackedVector2Array, texture_path: String, fallback_color: Color, z: int) -> void:
+static func _add_textured_polygon(
+		parent: Node,
+		node_name: String,
+		points: PackedVector2Array,
+		texture_path: String,
+		fallback_color: Color,
+		z: int,
+		tile_world_size: Vector2 = DEFAULT_FLOOR_TILE_WORLD_SIZE
+) -> void:
 	var visual := Polygon2D.new()
 	visual.name = node_name
 	visual.z_index = z
@@ -4748,12 +4831,12 @@ static func _add_textured_polygon(parent: Node, node_name: String, points: Packe
 	if texture:
 		visual.texture = texture
 		visual.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		var min_point := Vector2(INF, INF)
-		for point: Vector2 in points:
-			min_point = Vector2(minf(min_point.x, point.x), minf(min_point.y, point.y))
+		visual.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		var uvs := PackedVector2Array()
+		# Polygon2D UVs are texture pixels. Track-space coordinates keep adjacent
+		# surface pieces in phase instead of stretching a few texels over the room.
 		for point: Vector2 in points:
-			uvs.append((point - min_point) / 512.0)
+			uvs.append(point / tile_world_size * texture.get_size())
 		visual.uv = uvs
 	else:
 		visual.color = fallback_color
@@ -4779,7 +4862,7 @@ static func _expand_loop(points: PackedVector2Array, distance: float) -> PackedV
 	return result
 
 
-static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, scale: Vector2, modulate_value: float = 1.35) -> void:
+static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52) -> void:
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
@@ -4794,7 +4877,12 @@ static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, 
 	surface.texture_mode = Line2D.LINE_TEXTURE_TILE
 	surface.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	surface.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	surface.default_color = Color(modulate_value, modulate_value, modulate_value, 0.52)
+	surface.default_color = Color(modulate_value, modulate_value, modulate_value, opacity)
+	if world_tile_size.x > 0 and world_tile_size.y > 0:
+		var material := ShaderMaterial.new()
+		material.shader = WORLD_SURFACE_SHADER
+		material.set_shader_parameter("tile_world_size", world_tile_size)
+		surface.material = material
 	surface.joint_mode = Line2D.LINE_JOINT_ROUND
 	surface.begin_cap_mode = Line2D.LINE_CAP_ROUND
 	surface.end_cap_mode = Line2D.LINE_CAP_ROUND

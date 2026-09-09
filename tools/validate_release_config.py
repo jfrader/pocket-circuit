@@ -16,6 +16,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REQUIRED_EXCLUSIONS = {
+    "assets/source/**",
     "assets/ui/concepts/**",
     "addons/godot_mcp/**",
     "addons/release_export/**",
