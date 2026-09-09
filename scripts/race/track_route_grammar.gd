@@ -11,7 +11,7 @@ static func count() -> int:
 	return NAMES.size()
 
 
-static func construct(index: int, seed: int) -> Dictionary:
+static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictionary:
 	var program_index := posmod(index, NAMES.size())
 	var program := NAMES[program_index]
 	var section := _roll_int(seed, 0x51A7 + program_index * 97, 3)
@@ -25,9 +25,15 @@ static func construct(index: int, seed: int) -> Dictionary:
 		_:
 			anchors = _wedge(seed, section)
 	anchors = _apply_extent(anchors, extent)
+	if length_bias > 0.50:
+		program = &"endurance"
+		anchors = _endurance(anchors, length_bias)
+	else:
+		anchors = _apply_length_bias(anchors, length_bias)
+	var length_mode := "_extended" if length_bias > 0.20 and program != &"endurance" else ""
 	return {
 		"program": program,
-		"recipe": StringName("%s_section_%d_extent_%d" % [program, section, extent]),
+		"recipe": StringName("%s_section_%d_extent_%d%s" % [program, section, extent, length_mode]),
 		"anchors": anchors,
 	}
 
@@ -108,6 +114,53 @@ static func _apply_extent(points: PackedVector2Array, extent: int) -> PackedVect
 		point.x = clampf(point.x, -0.96, 0.96)
 		result[index] = point
 	return result
+
+
+static func _endurance(source: PackedVector2Array, length_bias: float) -> PackedVector2Array:
+	var notch_x := clampf(source[0].x * 0.16, -0.14, 0.14)
+	var notch_depth := lerpf(0.48, 0.30, length_bias)
+	return PackedVector2Array([
+		Vector2(-0.96, -0.16), Vector2(-0.86, -0.86), Vector2(0.76, -0.90),
+		Vector2(0.96, -0.18), Vector2(0.88, 0.82), Vector2(0.48, 0.90),
+		Vector2(notch_x, notch_depth), Vector2(-0.48, 0.90),
+		Vector2(-0.86, 0.80), Vector2(-0.96, 0.18),
+	])
+
+
+static func _apply_length_bias(points: PackedVector2Array, length_bias: float) -> PackedVector2Array:
+	var result := points.duplicate()
+	for index in result.size():
+		var point := result[index]
+		if absf(point.x) > 0.48:
+			point.x = signf(point.x) * lerpf(absf(point.x), minf(0.97, absf(point.x) + 0.18), length_bias)
+		if absf(point.y) > 0.48:
+			point.y = signf(point.y) * lerpf(absf(point.y), minf(0.92, absf(point.y) + 0.14), length_bias)
+		result[index] = point
+	if length_bias <= 0.20:
+		return result
+	var longest_segment := 0
+	var longest_length := 0.0
+	for index in result.size():
+		var length := result[index].distance_squared_to(result[(index + 1) % result.size()])
+		if length > longest_length:
+			longest_length = length
+			longest_segment = index
+	var from := result[longest_segment]
+	var to := result[(longest_segment + 1) % result.size()]
+	var center := Vector2.ZERO
+	for point: Vector2 in result:
+		center += point
+	center /= float(result.size())
+	var inward := (center - from.lerp(to, 0.5)).normalized()
+	var depth := lerpf(0.18, 0.58, length_bias)
+	var lengthened := PackedVector2Array()
+	for index in result.size():
+		lengthened.append(result[index])
+		if index == longest_segment:
+			lengthened.append(from.lerp(to, 0.28) + inward * depth * 0.45)
+			lengthened.append(from.lerp(to, 0.50) + inward * depth)
+			lengthened.append(from.lerp(to, 0.72) + inward * depth * 0.45)
+	return lengthened
 
 
 static func _roll(seed: int, salt: int, minimum: float, maximum: float) -> float:

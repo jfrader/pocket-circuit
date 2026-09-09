@@ -179,11 +179,12 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"seed": seed,
 				"family": family,
 				"length": float(ordered_validation["length"]),
+				"target_length": target_length,
 				"attempt": attempt,
 				"fallback": false,
 				"realization": &"el_safe" if room_shape == &"el" else family,
-				"route_recipe": &"el_safe" if room_shape == &"el" else _route_name(seed, attempt),
-				"route_program": &"el_safe" if room_shape == &"el" else _route_program_name(seed, attempt),
+				"route_recipe": &"el_safe" if room_shape == &"el" else _route_name(seed, attempt, target_length),
+				"route_program": &"el_safe" if room_shape == &"el" else _route_program_name(seed, attempt, target_length),
 				"route_sequence": normalized_route_sequence(ordered_controls),
 			}
 
@@ -221,6 +222,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"seed": seed,
 				"family": family,
 				"length": float(ordered_validation["length"]),
+				"target_length": target_length,
 				"attempt": MAX_VARIANTS + fallback_attempt,
 				"fallback": true,
 				"realization": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
@@ -240,6 +242,7 @@ static func _empty_result(seed: int, family: StringName) -> Dictionary:
 		"seed": seed,
 		"family": family,
 		"length": 0.0,
+		"target_length": 0.0,
 		"attempt": -1,
 		"fallback": true,
 		"realization": &"none",
@@ -264,7 +267,7 @@ static func _family_controls(
 	target_length: float,
 	min_self_distance: float
 ) -> PackedVector2Array:
-	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt)
+	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length)
 	var anchors := _technical_perimeter_template() if template_family == &"conservative" else definition["anchors"] as PackedVector2Array
 	if anchors.is_empty():
 		return PackedVector2Array()
@@ -360,16 +363,17 @@ static func _route_index(seed: int, attempt: int) -> int:
 	return posmod(base + attempt, ROUTE_GRAMMAR.count())
 
 
-static func _route_name(seed: int, attempt: int) -> StringName:
-	return StringName(_route_definition(seed, attempt)["recipe"])
+static func _route_name(seed: int, attempt: int, target_length: float) -> StringName:
+	return StringName(_route_definition(seed, attempt, target_length)["recipe"])
 
 
-static func _route_program_name(seed: int, attempt: int) -> StringName:
-	return StringName(_route_definition(seed, attempt)["program"])
+static func _route_program_name(seed: int, attempt: int, target_length: float) -> StringName:
+	return StringName(_route_definition(seed, attempt, target_length)["program"])
 
 
-static func _route_definition(seed: int, attempt: int) -> Dictionary:
-	return ROUTE_GRAMMAR.construct(_route_index(seed, attempt), _hash32(seed ^ (attempt * RHYTHM_SALT)))
+static func _route_definition(seed: int, attempt: int, target_length: float = 2500.0 * WORLD_SCALE) -> Dictionary:
+	var length_bias := clampf(inverse_lerp(8500.0, 9600.0, target_length), 0.0, 1.0)
+	return ROUTE_GRAMMAR.construct(_route_index(seed, attempt), _hash32(seed ^ (attempt * RHYTHM_SALT)), length_bias)
 
 
 static func _technical_perimeter_template() -> PackedVector2Array:
