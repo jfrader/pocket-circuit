@@ -33,7 +33,11 @@ jobs:
       - name: Install verified Godot editor and native templates
         run: python3 tools/install_ci_godot.py "$RUNNER_TEMP/pocket-godot" >> "$GITHUB_ENV"
       - name: Full source, smoke and package gates
-        run: ./tools/build_release.sh "$RUNNER_TEMP/pocket-release"
+        env:
+          PC_ROUTE_SVG: ${{ runner.temp }}/route-variety.svg
+        run: |
+          set -o pipefail
+          ./tools/build_release.sh "$RUNNER_TEMP/pocket-release" 2>&1 | tee "$RUNNER_TEMP/release-gates.log"
       - name: Verify artifact manifest
         working-directory: ${{ runner.temp }}/pocket-release
         run: sha256sum --check SHA256SUMS
@@ -43,4 +47,14 @@ jobs:
           name: pocket-circuit-${{ github.sha }}
           path: ${{ runner.temp }}/pocket-release
           if-no-files-found: error
+          retention-days: 7
+      - name: Retain gate evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: gate-evidence-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/release-gates.log
+            ${{ runner.temp }}/route-variety.svg
+          if-no-files-found: warn
           retention-days: 7

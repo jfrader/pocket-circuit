@@ -158,6 +158,8 @@ func _run_test() -> void:
 			var setup_straight_regions := int(gameplay.get("setup_straight_count", 0))
 			if not _expect(setup_straight_regions >= 2, "%s seed %d needs at least two distinct %.0fu setup straights (got %d)" % [room_name, seed, TRACK_SEED_GEN.MIN_SETUP_DISTANCE, setup_straight_regions]):
 				return
+			if not _expect(int(gameplay.get("literal_straight_count", 0)) >= 2, "%s seed %d needs two literal heading-stable straight runs" % [room_name, seed]):
+				return
 			if not _expect(not bool((gameplay.get("complex_bypass", {}) as Dictionary).get("found", false)), "%s seed %d must resist a straight chord replacing a whole complex" % [room_name, seed]):
 				return
 			var physical_bypass := _physical_complex_bypass(TRACK_SEED_GEN.centerline_checkpoints(controls))

@@ -5,7 +5,6 @@ class_name TrackSeedGen
 const ROUTE_GRAMMAR := preload("res://scripts/race/track_route_grammar.gd")
 
 const SAMPLE_COUNT := 260
-const CONTROL_COUNT := 24
 const HALF_WIDTH := 125.0
 const CORRIDOR_CLEARANCE := HALF_WIDTH + 10.0
 const SPLINE_GUARD := 12.0
@@ -17,6 +16,9 @@ const MIN_SETUP_DISTANCE := 450.0
 # near-pivot turn while preserving the constrained L-room realization.
 const VEHICLE_HULL_RADIUS := 22.0
 const MIN_DRIVE_RADIUS := HALF_WIDTH + VEHICLE_HULL_RADIUS
+const FILLET_RADIUS_MARGIN := 24.0
+const STRAIGHT_CONTROL_SPACING := 110.0
+const LITERAL_STRAIGHT_HEADING_TOLERANCE := 0.04
 const SETUP_STRAIGHTNESS := 0.985
 const BYPASS_MIN_ARC := 500.0
 const BYPASS_MAX_ARC := 3000.0
@@ -59,11 +61,13 @@ static func gameplay_metrics(controls: PackedVector2Array) -> Dictionary:
 		return {}
 	var bypass := _best_complex_bypass(centerline)
 	var setup_straight_count := _setup_straight_count(centerline)
+	var literal_straight_count := _literal_straight_count(centerline)
 	return {
 		"length": _polyline_length(centerline),
 		"minimum_turn_radius": _minimum_turn_radius(centerline),
 		"has_setup_straight": setup_straight_count > 0,
 		"setup_straight_count": setup_straight_count,
+		"literal_straight_count": literal_straight_count,
 		"complex_bypass": bypass,
 		"route_sequence": normalized_route_sequence(controls),
 	}
@@ -253,7 +257,7 @@ static func _generation_rect(room_rect: Rect2, params: Dictionary, room_polygon:
 
 static func _family_controls(
 	template_family: StringName,
-	rhythm_family: StringName,
+	_rhythm_family: StringName,
 	seed: int,
 	attempt: int,
 	usable_rect: Rect2,
@@ -283,18 +287,13 @@ static func _family_controls(
 		var point := anchors[index]
 		point.x *= mirror
 		anchors[index] = point.rotated(orientation)
-	var normalized := _resample_template(anchors, CONTROL_COUNT)
-	if template_family == &"conservative":
-		normalized = _smooth_controls(normalized, 2)
-		normalized = _apply_turn_rhythm(normalized, rhythm_family, seed, attempt, target_length, true)
-	else:
-		# One relaxation rounds authored joins without erasing their unequal
-		# straights and distinct heading order. Later retries get one additional
-		# bounded relaxation before trying a different complete route program.
-		normalized = _smooth_controls(normalized, 8 + int(attempt >= 8))
-
-	var mapped := _map_to_rect(normalized, usable_rect)
-	var full_centerline := _sample_centerline(mapped)
+	# Fit the macro vertices first, then build world-space quadratic fillets.
+	# Collinear controls remain between fillets so Catmull sampling cannot turn a
+	# declared straight into the blanket-smoothed bends used by the old generator.
+	var mapped_vertices := _map_to_rect(anchors, usable_rect)
+	var fillet_radius := MIN_DRIVE_RADIUS + FILLET_RADIUS_MARGIN + lerpf(0.0, 24.0, _hash_unit(seed, ROUTE_SALT + 0xD7 + attempt * 37))
+	var full_controls := _filleted_controls(mapped_vertices, fillet_radius)
+	var full_centerline := _sample_centerline(full_controls)
 	var full_length := _polyline_length(full_centerline)
 	if full_length < 1.0:
 		return PackedVector2Array()
@@ -314,9 +313,46 @@ static func _family_controls(
 		(_hash_unit(seed, LENGTH_SALT + 31) * 2.0 - 1.0) * slack.x,
 		(_hash_unit(seed, LENGTH_SALT + 47) * 2.0 - 1.0) * slack.y
 	)
-	for index in mapped.size():
-		mapped[index] = center + (mapped[index] - center) * length_scale + offset
-	return mapped
+	for index in mapped_vertices.size():
+		mapped_vertices[index] = center + (mapped_vertices[index] - center) * length_scale + offset
+	return _filleted_controls(mapped_vertices, fillet_radius)
+
+
+static func _filleted_controls(vertices: PackedVector2Array, desired_radius: float) -> PackedVector2Array:
+	if vertices.size() < 3:
+		return PackedVector2Array()
+	var entries := PackedVector2Array()
+	var exits := PackedVector2Array()
+	for index in vertices.size():
+		var previous := vertices[posmod(index - 1, vertices.size())]
+		var corner := vertices[index]
+		var following := vertices[(index + 1) % vertices.size()]
+		var incoming := previous.direction_to(corner)
+		var outgoing := corner.direction_to(following)
+		var turn := absf(incoming.angle_to(outgoing))
+		var half_turn := turn * 0.5
+		var tangent := desired_radius * sin(half_turn) / maxf(cos(half_turn) * cos(half_turn), 0.08)
+		tangent = minf(tangent, minf(previous.distance_to(corner), corner.distance_to(following)) * 0.42)
+		entries.append(corner - incoming * tangent)
+		exits.append(corner + outgoing * tangent)
+
+	var result := PackedVector2Array()
+	for index in vertices.size():
+		var entry := entries[index]
+		var corner := vertices[index]
+		var exit := exits[index]
+		result.append(entry)
+		for step in range(1, 4):
+			var t := float(step) / 4.0
+			var inverse := 1.0 - t
+			result.append(entry * inverse * inverse + corner * 2.0 * inverse * t + exit * t * t)
+		result.append(exit)
+		var next_entry := entries[(index + 1) % vertices.size()]
+		var straight_length := exit.distance_to(next_entry)
+		var subdivisions := maxi(1, ceili(straight_length / STRAIGHT_CONTROL_SPACING))
+		for step in range(1, subdivisions):
+			result.append(exit.lerp(next_entry, float(step) / float(subdivisions)))
+	return result
 
 
 static func _route_index(seed: int, attempt: int) -> int:
@@ -338,76 +374,13 @@ static func _route_definition(seed: int, attempt: int) -> Dictionary:
 
 static func _technical_perimeter_template() -> PackedVector2Array:
 	# A broad perimeter is safer than concave programs after all twelve bounded
-	# grammar attempts fail, while staggered edges retain useful corner rhythm.
+	# grammar attempts fail. Its long opposing edges preserve literal straights.
 	return PackedVector2Array([
-		Vector2(-0.96, -0.08), Vector2(-0.88, -0.48), Vector2(-0.68, -0.76),
-		Vector2(-0.46, -0.62), Vector2(-0.22, -0.84), Vector2(0.02, -0.66),
-		Vector2(0.28, -0.82), Vector2(0.54, -0.64), Vector2(0.80, -0.74),
-		Vector2(0.96, -0.36), Vector2(0.90, 0.04), Vector2(0.96, 0.38),
-		Vector2(0.74, 0.74), Vector2(0.48, 0.62), Vector2(0.20, 0.84),
-		Vector2(-0.06, 0.64), Vector2(-0.34, 0.82), Vector2(-0.60, 0.62),
-		Vector2(-0.84, 0.74), Vector2(-0.96, 0.34),
+		Vector2(-0.92, -0.18), Vector2(-0.70, -0.74),
+		Vector2(0.56, -0.78), Vector2(0.92, -0.28),
+		Vector2(0.90, 0.30), Vector2(0.64, 0.74),
+		Vector2(-0.56, 0.78), Vector2(-0.92, 0.28),
 	])
-
-
-static func _apply_turn_rhythm(
-	points: PackedVector2Array,
-	family: StringName,
-	seed: int,
-	attempt: int,
-	target_length: float,
-	conservative: bool,
-	strength_multiplier: float = 1.0
-) -> PackedVector2Array:
-	if points.size() < 8:
-		return points
-	var attempt_strength := _attempt_rhythm_strength(attempt, conservative)
-	if attempt_strength <= 0.0:
-		return points
-	var family_index := maxi(FAMILY_NAMES.find(family), 0)
-	var rhythm_seed := _hash32(seed ^ RHYTHM_SALT ^ ((family_index + 1) * 0x1F123BB) ^ (attempt * 0x51A7E3D))
-	var phase_broad := TAU * _hash_unit(rhythm_seed, RHYTHM_SALT + 17)
-	var phase_detail := TAU * _hash_unit(rhythm_seed, RHYTHM_SALT + 41)
-	var broad_center := posmod(_hash32(rhythm_seed ^ (RHYTHM_SALT + 73)), points.size())
-	var quiet_center := posmod(broad_center + points.size() / 2, points.size())
-	var length_strength := lerpf(0.82, 1.18, clampf(inverse_lerp(2500.0 * WORLD_SCALE, 5500.0 * WORLD_SCALE, target_length), 0.0, 1.0))
-	var amplitude := _family_rhythm_strength(family) * attempt_strength * length_strength * strength_multiplier
-	if conservative:
-		amplitude *= 0.78
-
-	var offsets := PackedFloat32Array()
-	for index in points.size():
-		var angle := TAU * float(index) / float(points.size())
-		# Two broad harmonics create a few room-scale complexes.  The previous
-		# k=3/k=6 field and localized chicane produced direction changes only a
-		# corridor-width apart after fitting, which looked technical but could be
-		# bypassed by one straight chord.
-		var field := sin(angle * 2.0 + phase_broad) * 0.72
-		field += sin(angle * 3.0 + phase_detail) * 0.28
-		var broad_distance := _signed_cyclic_distance(index, broad_center, points.size())
-		if absf(broad_distance) < 5.5:
-			field += sin(PI * broad_distance / 5.5) * 0.24
-		offsets.append(field * amplitude)
-	# Circular smoothing turns the displacement field into readable corner
-	# sequences instead of spline-scale wiggles.
-	for _pass in 4:
-		var smoothed := PackedFloat32Array()
-		for index in offsets.size():
-			smoothed.append((offsets[posmod(index - 1, offsets.size())] + offsets[index] * 2.0 + offsets[(index + 1) % offsets.size()]) * 0.25)
-		offsets = smoothed
-	var mean := 0.0
-	for offset: float in offsets:
-		mean += offset
-	mean /= float(offsets.size())
-
-	var result := PackedVector2Array()
-	for index in points.size():
-		var tangent := points[posmod(index - 1, points.size())].direction_to(points[(index + 1) % points.size()])
-		var normal := tangent.rotated(PI * 0.5)
-		var quiet_distance := _cyclic_index_distance(index, quiet_center, points.size())
-		var quiet_factor := smoothstep(3.0, 6.0, float(quiet_distance))
-		result.append(points[index] + normal * (offsets[index] - mean) * quiet_factor)
-	return result
 
 
 static func _smooth_controls(points: PackedVector2Array, passes: int) -> PackedVector2Array:
@@ -421,66 +394,6 @@ static func _smooth_controls(points: PackedVector2Array, passes: int) -> PackedV
 				+ result[(index + 1) % result.size()] * 0.125
 			)
 		result = smoothed
-	return result
-
-
-static func _attempt_rhythm_strength(attempt: int, conservative: bool) -> float:
-	if conservative:
-		match attempt:
-			0:
-				return 0.90
-			1:
-				return 0.60
-			2:
-				return 0.30
-			_:
-				return 0.0
-	return clampf(1.0 - float(attempt) * 0.09, 0.0, 1.0)
-
-
-static func _family_rhythm_strength(family: StringName) -> float:
-	match family:
-		&"speed_loop":
-			return 0.16
-		&"kidney":
-			return 0.16
-		&"dogbone":
-			return 0.15
-		&"broad_triangle":
-			return 0.15
-		&"offset_s":
-			return 0.16
-		&"deep_notch":
-			return 0.16
-	return 0.10
-
-
-static func _signed_cyclic_distance(index: int, center: int, count: int) -> float:
-	var distance := posmod(index - center + count / 2, count) - count / 2
-	return float(distance)
-
-
-static func _cyclic_index_distance(first: int, second: int, count: int) -> int:
-	var direct := absi(first - second)
-	return mini(direct, count - direct)
-
-
-static func _resample_template(anchors: PackedVector2Array, target_count: int) -> PackedVector2Array:
-	var cumulative := PackedFloat32Array([0.0])
-	for index in anchors.size():
-		cumulative.append(cumulative[index] + anchors[index].distance_to(anchors[(index + 1) % anchors.size()]))
-	var total := cumulative[anchors.size()]
-	if total < 0.001:
-		return PackedVector2Array()
-	var result := PackedVector2Array()
-	var segment := 0
-	for output_index in target_count:
-		var target := total * float(output_index) / float(target_count)
-		while segment < anchors.size() - 1 and cumulative[segment + 1] < target:
-			segment += 1
-		var segment_length := cumulative[segment + 1] - cumulative[segment]
-		var local := (target - cumulative[segment]) / maxf(segment_length, 0.001)
-		result.append(anchors[segment].lerp(anchors[(segment + 1) % anchors.size()], local))
 	return result
 
 
@@ -569,6 +482,9 @@ static func _validate_controls(
 	var setup_straight_count := _setup_straight_count(centerline)
 	if setup_straight_count < 2:
 		return {"valid": false, "reason": "only %d setup straight region(s)" % setup_straight_count}
+	var literal_straight_count := _literal_straight_count(centerline)
+	if literal_straight_count < 2:
+		return {"valid": false, "reason": "only %d literal straight region(s)" % literal_straight_count}
 	var minimum_turn_radius := _minimum_turn_radius(centerline)
 	if minimum_turn_radius < MIN_DRIVE_RADIUS:
 		return {"valid": false, "reason": "turn radius %.1f < %.1f" % [minimum_turn_radius, MIN_DRIVE_RADIUS]}
@@ -578,7 +494,7 @@ static func _validate_controls(
 			"valid": false,
 			"reason": "driveable chord saves %.0fu over %.0fu" % [float(bypass["saving"]), float(bypass["arc"])],
 		}
-	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius}
+	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius, "literal_straight_count": literal_straight_count}
 
 
 static func _corridor_boundary_loops(centerline: PackedVector2Array) -> Dictionary:
@@ -671,6 +587,34 @@ static func _straight_window_length(centerline: PackedVector2Array, start: int) 
 		elif traveled >= MIN_SETUP_DISTANCE:
 			break
 	return longest
+
+
+static func _literal_straight_count(centerline: PackedVector2Array) -> int:
+	var count := centerline.size()
+	var starts := PackedByteArray()
+	for start in count:
+		starts.append(1 if _literal_straight_window_length(centerline, start) >= MIN_SETUP_DISTANCE else 0)
+	if starts.count(1) == 0:
+		return 0
+	if starts.count(1) == count:
+		return 1
+	var regions := 0
+	for index in count:
+		if starts[index] == 1 and starts[posmod(index - 1, count)] == 0:
+			regions += 1
+	return regions
+
+
+static func _literal_straight_window_length(centerline: PackedVector2Array, start: int) -> float:
+	var reference := centerline[start].direction_to(centerline[(start + 1) % centerline.size()])
+	var traveled := 0.0
+	for step in range(1, centerline.size() / 2):
+		var from := centerline[(start + step - 1) % centerline.size()]
+		var to := centerline[(start + step) % centerline.size()]
+		if absf(reference.angle_to(from.direction_to(to))) > LITERAL_STRAIGHT_HEADING_TOLERANCE:
+			break
+		traveled += from.distance_to(to)
+	return traveled
 
 
 static func _minimum_turn_radius(centerline: PackedVector2Array) -> float:

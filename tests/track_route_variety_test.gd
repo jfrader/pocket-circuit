@@ -26,6 +26,8 @@ func _run_test() -> void:
 	var program_variants := {}
 	var svg_representatives := {}
 	var non_axis_headings := 0
+	var minimum_control_count := 999
+	var maximum_control_count := 0
 	for seed in 24:
 		var result := TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, _room_params("classic"))
 		if not _check_result("classic", seed, result, seed < 4):
@@ -36,6 +38,8 @@ func _run_test() -> void:
 		var program := String(result.get("route_program", "none"))
 		var sequence := String(result.get("route_sequence", ""))
 		var centerline := TRACK_SEED_GEN.centerline_checkpoints(result["points"])
+		minimum_control_count = mini(minimum_control_count, (result["points"] as PackedVector2Array).size())
+		maximum_control_count = maxi(maximum_control_count, (result["points"] as PackedVector2Array).size())
 		recipes[recipe] = true
 		sequences[sequence] = true
 		if not representatives.has(recipe):
@@ -53,6 +57,8 @@ func _run_test() -> void:
 	if not _expect(sequences.size() >= 8, "normalized turn/straight signatures should contain at least eight rhythms, got %d" % sequences.size()):
 		return
 	if not _expect(non_axis_headings >= 12, "at least half of classic routes should put their longest straight on a meaningful non-axis heading, got %d" % non_axis_headings):
+		return
+	if not _expect(minimum_control_count >= 40 and maximum_control_count < TRACK_SEED_GEN.SAMPLE_COUNT, "fillets and literal straights need bounded higher-density controls, got %d..%d" % [minimum_control_count, maximum_control_count]):
 		return
 	var varied_programs := 0
 	var strongest_program_cluster := 0
@@ -107,10 +113,11 @@ func _run_test() -> void:
 		if not _check_result(String(case[0]), seed, result, true):
 			return
 		var metrics := TRACK_SEED_GEN.gameplay_metrics(result["points"])
-		diagnostic_evidence.append("%s=%s/attempt%d/fallback%s/length%.0f/radius%.0f" % [
+		diagnostic_evidence.append("%s=%s/attempt%d/fallback%s/length%.0f/radius%.0f/literal%d/controls%d" % [
 			String(case[0]), String(result.get("route_recipe", "none")), int(result.get("attempt", -1)),
 			str(bool(result.get("fallback", false))), float(result.get("length", 0.0)),
-			float(metrics.get("minimum_turn_radius", 0.0)),
+			float(metrics.get("minimum_turn_radius", 0.0)), int(metrics.get("literal_straight_count", 0)),
+			(result["points"] as PackedVector2Array).size(),
 		])
 
 	var matrix_seeds := [0, 11, 29]
@@ -126,7 +133,7 @@ func _run_test() -> void:
 	if not svg_path.is_empty():
 		_write_svg(svg_path, svg_representatives)
 	print("TRACK_ROUTE_DIAGNOSTICS " + " ".join(diagnostic_evidence))
-	print("TRACK_ROUTE_VARIETY_TEST PASS recipes=%d sequences=%d shape_clusters=%d within_programs=%d/%d strongest=%d off_axis=%d matrix=%d diagnostics=%d" % [recipes.size(), sequences.size(), clusters.size(), varied_programs, program_variants.size(), strongest_program_cluster, non_axis_headings, matrix_count, diagnostic_cases.size()])
+	print("TRACK_ROUTE_VARIETY_TEST PASS recipes=%d sequences=%d shape_clusters=%d within_programs=%d/%d strongest=%d off_axis=%d controls=%d..%d matrix=%d diagnostics=%d" % [recipes.size(), sequences.size(), clusters.size(), varied_programs, program_variants.size(), strongest_program_cluster, non_axis_headings, minimum_control_count, maximum_control_count, matrix_count, diagnostic_cases.size()])
 	quit(0)
 
 
@@ -144,6 +151,8 @@ func _check_result(label: String, seed: int, result: Dictionary, check_determini
 	if not _expect(float(metrics.get("minimum_turn_radius", 0.0)) >= TRACK_SEED_GEN.MIN_DRIVE_RADIUS, "%s seed %d needs driveable radius" % [label, seed]):
 		return false
 	if not _expect(int(metrics.get("setup_straight_count", 0)) >= 2, "%s seed %d needs two setup straights" % [label, seed]):
+		return false
+	if not _expect(int(metrics.get("literal_straight_count", 0)) >= 2, "%s seed %d needs two 450u runs whose heading stays within %.1f degrees" % [label, seed, rad_to_deg(TRACK_SEED_GEN.LITERAL_STRAIGHT_HEADING_TOLERANCE)]):
 		return false
 	if not _expect(not bool((metrics.get("complex_bypass", {}) as Dictionary).get("found", false)), "%s seed %d must not admit a driveable complex bypass" % [label, seed]):
 		return false
