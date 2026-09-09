@@ -98,12 +98,20 @@ if (( ${#tests[@]} == 0 )); then
   exit 1
 fi
 
+failed_tests=()
 for test_path in "${tests[@]}"; do
 	test_relative="${test_path#"$PROJECT_ROOT"/}"
 	printf 'Running %s...\n' "$test_relative"
 	expected_marker="$(python3 "$PROJECT_ROOT/tools/test_success_marker.py" "$test_path")"
-	POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" run_godot_checked timeout 1200 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative"
+	if ! POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" run_godot_checked timeout 1200 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative"; then
+		failed_tests+=("$test_relative")
+	fi
 done
+if (( ${#failed_tests[@]} > 0 )); then
+	printf 'Release tests failed; no exports will be attempted:\n' >&2
+	printf '  %s\n' "${failed_tests[@]}" >&2
+	exit 1
+fi
 
 printf 'Smoke-testing the boot scene...\n'
 POCKET_CIRCUIT_EXPECT_OUTPUT="RELEASE_RACE_SMOKE PASS" \

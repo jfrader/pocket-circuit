@@ -235,7 +235,9 @@ The script performs configuration checks, imports, every Godot test, source
 smokes, both exports, packaged Linux flow verification and both PCK inspections.
 Every test must emit one literal terminal `*_TEST`, `*_QA`, `*_BENCHMARK` or
 `*_HARNESS` `PASS` marker; intermediate assertions and a zero exit status alone
-do not pass the gate. Tests have bounded wall-clock execution. The release flow
+do not pass the gate. Tests have bounded wall-clock execution; all test failures
+are collected before the script refuses exports, avoiding one-failure-per-run
+discovery. The release flow
 smoke verifies readiness/results/persistence, not a full player-driven race.
 
 For bounded development checks, run only the relevant script:
