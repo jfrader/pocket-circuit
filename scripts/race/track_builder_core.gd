@@ -2301,7 +2301,6 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 		side_strip.modulate = Color(0.85, 0.85, 0.85)
 		side_strip.set_meta("asset_path", edge_texture_path)
 		VISUAL_ROLE_CONTRACT.assign(side_strip, VISUAL_ROLE_SOLID)
-		_mark_solid_visual(side_strip, edge_texture_path, &"room_wall")
 		wall.add_child(side_strip)
 	var top_lip := Polygon2D.new()
 	top_lip.name = "TopLip"
@@ -2322,7 +2321,6 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 			strip.scale = Vector2((length + 60.0) / (edge_texture.get_width() * float(tile_count)), 50.0 / edge_texture.get_height())
 			strip.set_meta("asset_path", edge_texture_path)
 			VISUAL_ROLE_CONTRACT.assign(strip, VISUAL_ROLE_SOLID)
-			_mark_solid_visual(strip, edge_texture_path, &"room_wall")
 			wall.add_child(strip)
 
 

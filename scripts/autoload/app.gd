@@ -443,6 +443,30 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 	if _transitioning_to_race:
 		return false
 	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse)
+	if identity.is_empty():
+		if not vehicle_id in _save_data["unlocked_vehicles"]:
+			vehicle_id = "rustbug"
+		current_race_session = {
+			"mode": "quick",
+			"event_id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
+			"event": {
+				"id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
+				"name": "Invalid Circuit",
+				"theme": String(theme),
+				"room": String(room),
+				"seed": seed,
+				"circuit": "generated",
+				"race_format": "circuit",
+				"reverse": reverse,
+				"opponent_count": 3,
+				"opponents": ["juniper", "milo", "tess"],
+			},
+			"vehicle_id": vehicle_id,
+			"difficulty": String(_save_data["difficulty"]),
+			"result_committed": false,
+		}
+		_begin_race_transition()
+		return true
 	return _start_generated_identity_race(identity, vehicle_id, "quick")
 
 
