@@ -174,7 +174,7 @@ func configure(ghost_value: Variant, texture: Texture2D) -> bool:
 	sprite.texture = texture
 	sprite.scale = Vector2.ONE * 0.5
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	sprite.modulate = Color(0.45, 0.9, 1.0, 0.38)
+	sprite.modulate = Color(0.55, 0.94, 1.0, 0.62)
 	sprite.show_behind_parent = true
 	add_child(sprite)
 	z_index = 3

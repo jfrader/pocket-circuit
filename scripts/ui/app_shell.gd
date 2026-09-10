@@ -787,17 +787,17 @@ func _add_section(left: String, right: String) -> Label:
 func _add_result_notice(summary: Dictionary) -> void:
 	if bool(summary.get("mastery", false)):
 		if bool(summary.get("mastery_dnf", false)):
-			_add_copy("MASTERY RUN · DNF · NO RECORD SAVED", AMBER)
+			_add_copy("TIME TRIAL · DID NOT FINISH", AMBER)
 			return
 		var record: Dictionary = summary.get("mastery_record", {})
-		var message := "MASTERY RESULT SAVED"
+		var message := "TIME TRIAL SAVED"
 		if not record.is_empty():
-			message = "MASTERY %s · LAP %s · RACE %s" % [String(record.get("medal", "none")).to_upper(), _format_time(float(record["best_lap"])), _format_time(float(record["best_race"]))]
+			message = "TIME TRIAL %s · LAP %s · RACE %s" % [String(record.get("medal", "none")).to_upper(), _format_time(float(record["best_lap"])), _format_time(float(record["best_race"]))]
 		if bool(summary.get("ghost_saved", false)):
 			message += " · GHOST SAVED"
 		_add_copy(message, AMBER)
 		return
-	var message := "RESULT FILED"
+	var message := "RESULT SAVED"
 	if int(summary.get("points_gained", 0)) > 0:
 		message += "  ·  +%d POINTS" % int(summary["points_gained"])
 	if bool(summary.get("act_completed", false)):
