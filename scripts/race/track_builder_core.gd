@@ -10,6 +10,7 @@ const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd"
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const TRACK_BUILDER_GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
+const TRACK_BUILDER_PLANNER := preload("res://scripts/race/track_builder_planner.gd")
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
@@ -71,127 +72,22 @@ static func _plan_generated_obstacles(
 		gate_samples: PackedVector2Array,
 		moments: Dictionary
 ) -> Array[Dictionary]:
-	var plan: Array[Dictionary] = []
-	if not bool(spec.get("obstacles_enabled", true)):
-		return plan
-	var roster: Array = GENERATED_OBSTACLE_TYPES.get(theme, [])
-	if roster.is_empty():
-		return plan
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(spec.get("obstacle_seed", 0))
-	var act := clampi(int(spec.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
-	var target_count := GENERATED_RULES.roll_obstacle_count(act, rng)
-	var standard_route := _racing_line_points(centerline, moments, false)
-	var shortcut_route := _racing_line_points(centerline, moments, true)
-	var protected_indices := PackedInt32Array([
-		0,
-		int(moments.get("early_conflict_forward", 0)),
-		int(moments.get("early_conflict_reverse", 0)),
-		int(moments.get("shortcut", 0)),
-		int(moments.get("technical", 0)),
-	])
-	var occupied: Array[Dictionary] = []
-	for slot in target_count:
-		var definition: Dictionary = (roster[posmod(rng.randi(), roster.size())] as Dictionary).duplicate(true)
-		var footprint_size: Vector2 = definition["footprint_size"]
-		var shape_kind := StringName(definition["footprint_kind"])
-		var preferred_index := rng.randi_range(0, centerline.size() - 1)
-		var preferred_side := -1.0 if rng.randi() % 2 == 0 else 1.0
-		var placed := false
-		for attempt in centerline.size():
-			var index := posmod(preferred_index + attempt * 37, centerline.size())
-			if _turn_strength(centerline, index, 10) > 0.10:
-				continue
-			var protected := false
-			for protected_index: int in protected_indices:
-				if _cyclic_index_distance(index, protected_index, centerline.size()) < 22:
-					protected = true
-					break
-			if protected:
-				continue
-			var tangent := _sample_tangent(centerline, index)
-			var normal := tangent.rotated(PI * 0.5)
-			var rotation := tangent.angle() if footprint_size.x >= footprint_size.y else tangent.angle() - PI * 0.5
-			var lateral_extent := _footprint_projected_extent(footprint_size, shape_kind, rotation, normal)
-			var route_offset := (standard_route[index] - centerline[index]).dot(normal)
-			var side := -signf(route_offset) if not is_zero_approx(route_offset) else preferred_side
-			var lateral_offset := HALF_WIDTH - OBSTACLE_EDGE_INSET - lateral_extent
-			var candidate := centerline[index] + normal * side * lateral_offset
-			var viable_width := HALF_WIDTH + absf(lateral_offset) - lateral_extent
-			if viable_width + 0.001 < MIN_VIABLE_CORRIDOR_WIDTH:
-				continue
-			if not _clear_of_points(candidate, gate_samples, maxf(90.0, footprint_size.length())):
-				continue
-			if not _clear_of_occupied(candidate, footprint_size.length() * 0.5, occupied):
-				continue
-			var route_clearance := float(definition.get("clearance", OBSTACLE_ROUTE_CLEARANCE))
-			if not _line_sweep_clears_footprint(standard_route, candidate, footprint_size, shape_kind, rotation, route_clearance):
-				continue
-			if not _line_sweep_clears_footprint(shortcut_route, candidate, footprint_size, shape_kind, rotation, route_clearance):
-				continue
-			definition["instance_id"] = "%s_%02d" % [String(definition["id"]), slot]
-			definition["position"] = candidate
-			definition["rotation"] = rotation
-			definition["centerline_index"] = index
-			definition["side"] = side
-			definition["visual_bounds"] = Rect2(-(definition["visual_size"] as Vector2) * 0.5, definition["visual_size"])
-			definition["lateral_footprint_extent"] = lateral_extent
-			definition["lateral_center_offset"] = absf((candidate - centerline[index]).dot(normal))
-			definition["viable_corridor_width"] = viable_width
-			definition["validated_ai_routes"] = PackedStringArray(["RacingLine", "ShortcutRacingLine"])
-			plan.append(definition)
-			occupied.append({"position": candidate, "radius": footprint_size.length() * 0.5})
-			placed = true
-			break
-		if not placed:
-			push_warning("TrackBuilderCore: skipped an obstacle that had no AI-safe placement")
-	return plan
+	return TRACK_BUILDER_PLANNER.plan_obstacles(
+		theme,
+		spec,
+		centerline,
+		gate_samples,
+		moments,
+		GENERATED_OBSTACLE_TYPES.get(theme, []),
+		_racing_line_points(centerline, moments, false),
+		_racing_line_points(centerline, moments, true)
+	)
 
 
 static func _plan_generated_hazard(theme: StringName, spec: Dictionary, centerline: PackedVector2Array, moments: Dictionary) -> Dictionary:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(spec.get("hazard_seed", 0))
-	var act := clampi(int(spec.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
-	var footprint_size := Vector2(60.0, 60.0)
-	var footprint_kind := &"circle"
-	if theme == &"workshop":
-		footprint_size = Vector2(58.0, 58.0)
-	elif theme == &"office":
-		footprint_size = Vector2(60.0, 36.0)
-		footprint_kind = &"rect"
-	var paths := {}
-	for direction: String in ["forward", "reverse"]:
-		var index := int(moments["early_conflict_%s" % direction])
-		paths[direction] = _crossing_path(centerline, index, 96.0)
-	return {
-		"version": 1,
-		"id": &"%s_crossing" % String(theme),
-		"seed": int(spec.get("hazard_seed", 0)),
-		"act": act,
-		"theme": theme,
-		"present": GENERATED_RULES.roll_hazard_present(act, rng),
-		"presence_chance": GENERATED_RULES.hazard_chance(act),
-		"role": &"moving_hazard",
-		"visual_role": VISUAL_ROLE_MOVING_HAZARD,
-		"footprint_kind": footprint_kind,
-		"footprint_size": footprint_size,
-		"visual_bounds": Rect2(-footprint_size * 0.5, footprint_size),
-		"clearance": OBSTACLE_ROUTE_CLEARANCE,
-		"paths": paths,
-		"entry_distance": 78.0,
-		"exit_distance": 92.0,
-		"idle_duration": rng.randf_range(0.8, 1.35),
-		"warning_duration": rng.randf_range(1.45, 1.65) - float(act - 1) * 0.14,
-		"active_duration": rng.randf_range(1.35, 1.7),
-		"exit_duration": rng.randf_range(0.45, 0.7),
-		"cooldown_duration": rng.randf_range(3.1, 3.8) - float(act - 1) * 0.25,
-		"danger_states": PackedStringArray(["active", "exit"]),
-	}
-## - PROP_SHAPES contains ordinary SOLID props. `shape` is `circle` or `rect`,
-##   and `size` is the intended visual size before constructor scaling.
-## - SOLID_EDGE_SHAPES contains SOLID edge details whose `shape` footprint is
-##   fitted from trimmed alpha because their presentation size varies per seed.
-## - FLAT_EDGE_ASSETS contains painted/material details and must never collide.
+	return TRACK_BUILDER_PLANNER.plan_hazard(theme, spec, centerline, moments)
+
+
 static var SOLID_EDGE_SHAPES: Dictionary = {}
 static var FLAT_EDGE_ASSETS: Dictionary = {}
 static var _texture_footprint_cache: Dictionary = {}
@@ -199,7 +95,6 @@ static var _texture_hull_cache: Dictionary = {}
 static var _texture_opaque_rect_cache: Dictionary = {}
 static var _texture_outline_cache: Dictionary = {}
 static var synchronous_outline_builds := 0
-
 static var ASSET_FOOTPRINT_OVERRIDES: Dictionary = {}
 static var ROOM_SHAPES: Dictionary = {}
 static var BASE_ROOM_SHAPES: Dictionary = {}
@@ -2881,11 +2776,7 @@ static func _open_path_length(path: PackedVector2Array) -> float:
 
 
 static func _crossing_path(centerline: PackedVector2Array, center_index: int, half_width: float) -> PackedVector2Array:
-	var normal := _sample_tangent(centerline, center_index).rotated(PI * 0.5)
-	return PackedVector2Array([
-		centerline[center_index] - normal * half_width,
-		centerline[center_index] + normal * half_width,
-	])
+	return TRACK_BUILDER_GEOMETRY.crossing_path(centerline, center_index, half_width)
 
 
 static func _build_finish_moments(parent: Node2D, centerline: PackedVector2Array) -> void:
@@ -3092,45 +2983,11 @@ static func _line_sweep_clears_footprint(
 		rotation: float,
 		hull_radius: float
 ) -> bool:
-	if line.size() < 2:
-		return true
-	if shape_kind == &"circle":
-		var radius := maxf(size.x, size.y) * 0.5 + hull_radius
-		for index in line.size():
-			if _point_to_segment_distance(center, line[index], line[(index + 1) % line.size()]) < radius:
-				return false
-		return true
-	var expanded_half_size := size * 0.5 + Vector2.ONE * hull_radius
-	for index in line.size():
-		var local_from := (line[index] - center).rotated(-rotation)
-		var local_to := (line[(index + 1) % line.size()] - center).rotated(-rotation)
-		if _segment_intersects_axis_rect(local_from, local_to, expanded_half_size):
-			return false
-	return true
+	return TRACK_BUILDER_GEOMETRY.line_sweep_clears_footprint(line, center, size, shape_kind, rotation, hull_radius)
 
 
 static func _segment_intersects_axis_rect(from: Vector2, to: Vector2, half_size: Vector2) -> bool:
-	if (
-		minf(from.x, to.x) > half_size.x
-		or maxf(from.x, to.x) < -half_size.x
-		or minf(from.y, to.y) > half_size.y
-		or maxf(from.y, to.y) < -half_size.y
-	):
-		return false
-	if absf(from.x) <= half_size.x and absf(from.y) <= half_size.y:
-		return true
-	if absf(to.x) <= half_size.x and absf(to.y) <= half_size.y:
-		return true
-	var top_left := Vector2(-half_size.x, -half_size.y)
-	var top_right := Vector2(half_size.x, -half_size.y)
-	var bottom_right := Vector2(half_size.x, half_size.y)
-	var bottom_left := Vector2(-half_size.x, half_size.y)
-	return (
-		Geometry2D.segment_intersects_segment(from, to, top_left, top_right) != null
-		or Geometry2D.segment_intersects_segment(from, to, top_right, bottom_right) != null
-		or Geometry2D.segment_intersects_segment(from, to, bottom_right, bottom_left) != null
-		or Geometry2D.segment_intersects_segment(from, to, bottom_left, top_left) != null
-	)
+	return TRACK_BUILDER_GEOMETRY.segment_intersects_axis_rect(from, to, half_size)
 
 
 static func _oriented_rect_inside_polygon(center: Vector2, size: Vector2, rotation: float, polygon: PackedVector2Array) -> bool:
@@ -3209,10 +3066,7 @@ static func _inside_polygon_with_radius(point: Vector2, radius: float, polygon: 
 
 
 static func _clear_of_points(point: Vector2, points: PackedVector2Array, clearance: float) -> bool:
-	for other: Vector2 in points:
-		if point.distance_to(other) < clearance:
-			return false
-	return true
+	return TRACK_BUILDER_GEOMETRY.clear_of_points(point, points, clearance)
 
 
 static func _clear_of_recovery_lanes(
@@ -3242,10 +3096,7 @@ static func _point_to_segment_distance(point: Vector2, from: Vector2, to: Vector
 
 
 static func _clear_of_occupied(point: Vector2, radius: float, occupied: Array[Dictionary]) -> bool:
-	for entry: Dictionary in occupied:
-		if point.distance_to(entry["position"]) < radius + float(entry["radius"]) + 7.0:
-			return false
-	return true
+	return TRACK_BUILDER_GEOMETRY.clear_of_occupied(point, radius, occupied)
 
 
 static func _asset_radius(texture_path: String, fallback_radius: float) -> float:

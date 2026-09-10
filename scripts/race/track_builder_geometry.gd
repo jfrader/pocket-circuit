@@ -226,3 +226,74 @@ static func footprint_projected_extent(footprint_size: Vector2, shape_kind: Stri
 	var local_x := Vector2.RIGHT.rotated(rotation)
 	var local_y := Vector2.DOWN.rotated(rotation)
 	return absf(normalized_axis.dot(local_x)) * footprint_size.x * 0.5 + absf(normalized_axis.dot(local_y)) * footprint_size.y * 0.5
+
+
+static func crossing_path(centerline: PackedVector2Array, center_index: int, half_width: float) -> PackedVector2Array:
+	var normal := sample_tangent(centerline, center_index).rotated(PI * 0.5)
+	return PackedVector2Array([
+		centerline[center_index] - normal * half_width,
+		centerline[center_index] + normal * half_width,
+	])
+
+
+static func clear_of_points(point: Vector2, points: PackedVector2Array, clearance: float) -> bool:
+	for other: Vector2 in points:
+		if point.distance_to(other) < clearance:
+			return false
+	return true
+
+
+static func clear_of_occupied(point: Vector2, radius: float, occupied: Array[Dictionary]) -> bool:
+	for entry: Dictionary in occupied:
+		if point.distance_to(entry["position"]) < radius + float(entry["radius"]) + 7.0:
+			return false
+	return true
+
+
+static func line_sweep_clears_footprint(
+		line: PackedVector2Array,
+		center: Vector2,
+		size: Vector2,
+		shape_kind: StringName,
+		rotation: float,
+		hull_radius: float
+) -> bool:
+	if line.size() < 2:
+		return true
+	if shape_kind == &"circle":
+		var radius := maxf(size.x, size.y) * 0.5 + hull_radius
+		for index in line.size():
+			if point_to_segment_distance(center, line[index], line[(index + 1) % line.size()]) < radius:
+				return false
+		return true
+	var expanded_half_size := size * 0.5 + Vector2.ONE * hull_radius
+	for index in line.size():
+		var local_from := (line[index] - center).rotated(-rotation)
+		var local_to := (line[(index + 1) % line.size()] - center).rotated(-rotation)
+		if segment_intersects_axis_rect(local_from, local_to, expanded_half_size):
+			return false
+	return true
+
+
+static func segment_intersects_axis_rect(from: Vector2, to: Vector2, half_size: Vector2) -> bool:
+	if (
+		minf(from.x, to.x) > half_size.x
+		or maxf(from.x, to.x) < -half_size.x
+		or minf(from.y, to.y) > half_size.y
+		or maxf(from.y, to.y) < -half_size.y
+	):
+		return false
+	if absf(from.x) <= half_size.x and absf(from.y) <= half_size.y:
+		return true
+	if absf(to.x) <= half_size.x and absf(to.y) <= half_size.y:
+		return true
+	var top_left := Vector2(-half_size.x, -half_size.y)
+	var top_right := Vector2(half_size.x, -half_size.y)
+	var bottom_right := Vector2(half_size.x, half_size.y)
+	var bottom_left := Vector2(-half_size.x, half_size.y)
+	return (
+		Geometry2D.segment_intersects_segment(from, to, top_left, top_right) != null
+		or Geometry2D.segment_intersects_segment(from, to, top_right, bottom_right) != null
+		or Geometry2D.segment_intersects_segment(from, to, bottom_right, bottom_left) != null
+		or Geometry2D.segment_intersects_segment(from, to, bottom_left, top_left) != null
+	)
