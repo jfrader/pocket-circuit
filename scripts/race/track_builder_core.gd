@@ -9,6 +9,7 @@ const VISUAL_ROLE_CONTRACT := preload("res://scripts/race/generated_world_visual
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
+const TRACK_BUILDER_GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
@@ -60,12 +61,9 @@ static var GENERATED_OBSTACLE_TYPES: Dictionary = {}
 
 
 static func _footprint_projected_extent(footprint_size: Vector2, shape_kind: StringName, rotation: float, axis: Vector2) -> float:
-	if shape_kind == &"circle":
-		return maxf(footprint_size.x, footprint_size.y) * 0.5
-	var normalized_axis := axis.normalized()
-	var local_x := Vector2.RIGHT.rotated(rotation)
-	var local_y := Vector2.DOWN.rotated(rotation)
-	return absf(normalized_axis.dot(local_x)) * footprint_size.x * 0.5 + absf(normalized_axis.dot(local_y)) * footprint_size.y * 0.5
+	return TRACK_BUILDER_GEOMETRY.footprint_projected_extent(footprint_size, shape_kind, rotation, axis)
+
+
 static func _plan_generated_obstacles(
 		theme: StringName,
 		spec: Dictionary,
@@ -404,39 +402,15 @@ static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable
 
 
 static func _sample_centerline(controls: Array) -> PackedVector2Array:
-	var points := PackedVector2Array()
-	for index in SAMPLE_COUNT:
-		points.append(_catmull_rom_closed(controls, float(index) / float(SAMPLE_COUNT)))
-	return points
+	return TRACK_BUILDER_GEOMETRY.sample_centerline(controls)
 
 
 static func _catmull_rom_closed(points: Array, t: float) -> Vector2:
-	var count := points.size()
-	var scaled := t * float(count)
-	var i := int(floor(scaled))
-	var local := scaled - float(i)
-	var p0: Vector2 = points[posmod(i - 1, count)]
-	var p1: Vector2 = points[posmod(i, count)]
-	var p2: Vector2 = points[posmod(i + 1, count)]
-	var p3: Vector2 = points[posmod(i + 2, count)]
-	return 0.5 * (
-		(2.0 * p1)
-		+ (-p0 + p2) * local
-		+ (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * local * local
-		+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * local * local * local
-	)
+	return TRACK_BUILDER_GEOMETRY.catmull_rom_closed(points, t)
 
 
 static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
-	var left := PackedVector2Array()
-	var right := PackedVector2Array()
-	var count := centerline.size()
-	for index in count:
-		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
-		var normal := tangent.rotated(PI * 0.5)
-		left.append(centerline[index] + normal * HALF_WIDTH)
-		right.append(centerline[index] - normal * HALF_WIDTH)
-	return {"left": left, "right": right, "centerline": centerline}
+	return TRACK_BUILDER_GEOMETRY.corridor_edges(centerline)
 
 
 static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable()) -> void:
@@ -1198,162 +1172,59 @@ static func _island_region(room_polygon: PackedVector2Array, ribbon: PackedVecto
 
 
 static func _rounded_rect_points(center: Vector2, size: Vector2, radius: float, corner_segments: int) -> PackedVector2Array:
-	var half := size * 0.5 - Vector2(radius, radius)
-	var points := PackedVector2Array()
-	for corner: Dictionary in [
-		{"c": center + Vector2(half.x, half.y), "start": 0.0},
-		{"c": center + Vector2(-half.x, half.y), "start": PI * 0.5},
-		{"c": center - half, "start": PI},
-		{"c": center + Vector2(half.x, -half.y), "start": PI * 1.5},
-	]:
-		for seg in corner_segments + 1:
-			var angle: float = corner["start"] + PI * 0.5 * float(seg) / float(corner_segments)
-			points.append(corner["c"] + Vector2(cos(angle), sin(angle)) * radius)
-	return points
+	return TRACK_BUILDER_GEOMETRY.rounded_rect_points(center, size, radius, corner_segments)
 
 
 static func _polygon_area(points: PackedVector2Array) -> float:
-	var total := 0.0
-	for index in points.size():
-		var next := (index + 1) % points.size()
-		total += points[index].x * points[next].y - points[next].x * points[index].y
-	return total * 0.5
+	return TRACK_BUILDER_GEOMETRY.polygon_area(points)
 
 
 static func _outset_polygon(points: PackedVector2Array, distance: float) -> PackedVector2Array:
-	var contours: Array[PackedVector2Array] = Geometry2D.offset_polygon(points, distance, Geometry2D.JOIN_ROUND)
-	var largest := PackedVector2Array()
-	var largest_area := 0.0
-	for contour: PackedVector2Array in contours:
-		var area := absf(_polygon_area(contour))
-		if contour.size() >= 3 and area > largest_area:
-			largest = contour
-			largest_area = area
-	return largest if not largest.is_empty() else points
+	return TRACK_BUILDER_GEOMETRY.outset_polygon(points, distance)
 
 
 static func _simple_island_loop(points: PackedVector2Array) -> PackedVector2Array:
-	# Normal offsets fold over themselves at concave corners. Running the contour
-	# through Clipper splits those folds into simple polygons; the largest contour
-	# is the central island and the smaller pieces are offset artifacts.
-	var pieces: Array[PackedVector2Array] = Geometry2D.intersect_polygons(points, points)
-	var result := PackedVector2Array()
-	var largest_area := 0.0
-	for piece: PackedVector2Array in pieces:
-		var area := absf(_polygon_area(piece))
-		if piece.size() >= 3 and area > largest_area:
-			result = piece
-			largest_area = area
-	return result if not result.is_empty() else points
+	return TRACK_BUILDER_GEOMETRY.simple_island_loop(points)
 
 
 static func _simple_boundary_loop(points: PackedVector2Array, centerline: PackedVector2Array) -> PackedVector2Array:
-	return _simple_corridor_boundary_loop(points, centerline, true)
+	return TRACK_BUILDER_GEOMETRY.simple_boundary_loop(points, centerline)
 
 
 static func _simple_inner_boundary_loop(points: PackedVector2Array, centerline: PackedVector2Array) -> PackedVector2Array:
-	return _simple_corridor_boundary_loop(points, centerline, false)
+	return TRACK_BUILDER_GEOMETRY.simple_inner_boundary_loop(points, centerline)
 
 
 static func _simple_corridor_boundary_loop(_points: PackedVector2Array, centerline: PackedVector2Array, select_outer: bool) -> PackedVector2Array:
-	# Build the joined stroke through Clipper rather than trusting raw vertex
-	# normals. A closed polyline yields simple contours on both sides; comparing
-	# them with centerline area selects the matching physical road edge.
-	var stroke_contours: Array[PackedVector2Array] = Geometry2D.offset_polyline(
-		centerline,
-		HALF_WIDTH,
-		Geometry2D.JOIN_ROUND,
-		Geometry2D.END_JOINED
-	)
-	var pieces: Array[PackedVector2Array] = []
-	for contour: PackedVector2Array in stroke_contours:
-		var resolved: Array[PackedVector2Array] = Geometry2D.intersect_polygons(contour, contour)
-		pieces.append_array(resolved if not resolved.is_empty() else [contour])
-	var centerline_area := absf(_polygon_area(centerline))
-	var result := PackedVector2Array()
-	var largest_area := 0.0
-	for piece: PackedVector2Array in pieces:
-		var cleaned := _deduplicate_loop(piece)
-		if cleaned.size() < 3 or _has_self_intersection(cleaned):
-			continue
-		var area := absf(_polygon_area(cleaned))
-		if (area > centerline_area) != select_outer:
-			continue
-		if not _loop_hugs_centerline(cleaned, centerline):
-			continue
-		if area > largest_area:
-			result = cleaned
-			largest_area = area
-	return result
+	return TRACK_BUILDER_GEOMETRY.simple_corridor_boundary_loop(_points, centerline, select_outer)
 
 
 static func _deduplicate_loop(points: PackedVector2Array) -> PackedVector2Array:
-	var result := PackedVector2Array()
-	for point: Vector2 in points:
-		if result.is_empty() or point.distance_squared_to(result[result.size() - 1]) > 0.01:
-			result.append(point)
-	if result.size() > 1 and result[0].distance_squared_to(result[result.size() - 1]) <= 0.01:
-		result.remove_at(result.size() - 1)
-	return result
+	return TRACK_BUILDER_GEOMETRY.deduplicate_loop(points)
 
 
 static func _has_self_intersection(points: PackedVector2Array) -> bool:
-	for first in points.size():
-		var first_next := (first + 1) % points.size()
-		for second in range(first + 1, points.size()):
-			var second_next := (second + 1) % points.size()
-			if first_next == second or second_next == first:
-				continue
-			if Geometry2D.segment_intersects_segment(points[first], points[first_next], points[second], points[second_next]) != null:
-				return true
-	return false
+	return TRACK_BUILDER_GEOMETRY.has_self_intersection(points)
 
 
 static func _loop_hugs_centerline(loop: PackedVector2Array, centerline: PackedVector2Array) -> bool:
-	for index in loop.size():
-		var from := loop[index]
-		var to := loop[(index + 1) % loop.size()]
-		for fraction: float in [0.0, 0.5]:
-			var sample := from.lerp(to, fraction)
-			var nearest := INF
-			for center_index in centerline.size():
-				nearest = minf(nearest, _point_to_segment_distance(sample, centerline[center_index], centerline[(center_index + 1) % centerline.size()]))
-			if nearest < HALF_WIDTH * 0.62 or nearest > HALF_WIDTH * 1.42:
-				return false
-	return true
+	return TRACK_BUILDER_GEOMETRY.loop_hugs_centerline(loop, centerline)
 
 
 static func _arc_lengths(centerline: PackedVector2Array) -> PackedFloat32Array:
-	var arc := PackedFloat32Array()
-	arc.append(0.0)
-	var running := 0.0
-	for index in range(1, centerline.size()):
-		running += centerline[index].distance_to(centerline[index - 1])
-		arc.append(running)
-	return arc
+	return TRACK_BUILDER_GEOMETRY.arc_lengths(centerline)
 
 
 static func _sample_at_arc(centerline: PackedVector2Array, arc: PackedFloat32Array, target: float) -> Vector2:
-	for index in range(1, arc.size()):
-		if arc[index] >= target:
-			var fraction := (target - arc[index - 1]) / maxf(arc[index] - arc[index - 1], 0.001)
-			return centerline[index - 1].lerp(centerline[index], fraction)
-	return centerline[centerline.size() - 1]
+	return TRACK_BUILDER_GEOMETRY.sample_at_arc(centerline, arc, target)
 
 
 static func _tangent_at_arc(centerline: PackedVector2Array, arc: PackedFloat32Array, target: float) -> Vector2:
-	for index in range(1, arc.size()):
-		if arc[index] >= target:
-			return (centerline[index] - centerline[index - 1]).normalized()
-	return (centerline[0] - centerline[centerline.size() - 1]).normalized()
+	return TRACK_BUILDER_GEOMETRY.tangent_at_arc(centerline, arc, target)
 
 
 static func _rect_points(center: Vector2, size: Vector2) -> PackedVector2Array:
-	var half := size * 0.5
-	return PackedVector2Array([
-		center + Vector2(-half.x, -half.y), center + Vector2(half.x, -half.y),
-		center + Vector2(half.x, half.y), center + Vector2(-half.x, half.y),
-	])
+	return TRACK_BUILDER_GEOMETRY.rect_points(center, size)
 
 
 static func _add_polygon(parent: Node, node_name: String, points: PackedVector2Array, color: Color, z: int) -> void:
@@ -1972,15 +1843,11 @@ static func _pick_straight_candidate(
 
 
 static func _turn_strength(centerline: PackedVector2Array, index: int, span: int) -> float:
-	var count := centerline.size()
-	var behind := (centerline[index] - centerline[posmod(index - span, count)]).normalized()
-	var ahead := (centerline[posmod(index + span, count)] - centerline[index]).normalized()
-	return absf(behind.angle_to(ahead))
+	return TRACK_BUILDER_GEOMETRY.turn_strength(centerline, index, span)
 
 
 static func _cyclic_index_distance(first: int, second: int, count: int) -> int:
-	var direct := absi(first - second)
-	return mini(direct, count - direct)
+	return TRACK_BUILDER_GEOMETRY.cyclic_index_distance(first, second, count)
 
 
 static func _safe_moment_index(centerline: PackedVector2Array, preferred: int, gate_samples: PackedVector2Array, clearance: float) -> int:
@@ -3059,7 +2926,7 @@ static func _build_finish_moments(parent: Node2D, centerline: PackedVector2Array
 
 
 static func _sample_tangent(centerline: PackedVector2Array, index: int) -> Vector2:
-	return (centerline[posmod(index + 1, centerline.size())] - centerline[posmod(index - 1, centerline.size())]).normalized()
+	return TRACK_BUILDER_GEOMETRY.sample_tangent(centerline, index)
 
 
 static func _placement_is_safe(
@@ -3371,11 +3238,7 @@ static func _clear_of_recovery_lanes(
 
 
 static func _point_to_segment_distance(point: Vector2, from: Vector2, to: Vector2) -> float:
-	var segment := to - from
-	if segment.length_squared() < 0.001:
-		return point.distance_to(from)
-	var fraction := clampf((point - from).dot(segment) / segment.length_squared(), 0.0, 1.0)
-	return point.distance_to(from + segment * fraction)
+	return TRACK_BUILDER_GEOMETRY.point_to_segment_distance(point, from, to)
 
 
 static func _clear_of_occupied(point: Vector2, radius: float, occupied: Array[Dictionary]) -> bool:
