@@ -67,7 +67,7 @@ static var GENERATED_OBSTACLE_TYPES := {
 	&"office": [
 		{"id": &"loose_keycap", "asset": "res://assets/textures/imagine/office_keycap.png", "footprint_kind": &"rect", "footprint_size": Vector2(42.0, 42.0), "visual_size": Vector2(42.0, 42.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 		{"id": &"fallen_pencil", "asset": "res://assets/textures/imagine/pencil.png", "footprint_kind": &"rect", "footprint_size": Vector2(64.0, 22.0), "visual_size": Vector2(64.0, 22.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
-		{"id": &"binder_clip", "asset": "res://assets/textures/edge_dressing/office_binder_clip_micro.png", "footprint_kind": &"circle", "footprint_size": Vector2(34.0, 34.0), "visual_size": Vector2(34.0, 34.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"binder_clip", "asset": "res://assets/textures/edge_dressing/office_binder_clip_micro.png", "footprint_kind": &"rect", "footprint_size": Vector2(22.0, 30.0), "visual_size": Vector2(34.0, 34.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 	],
 }
 static func _footprint_projected_extent(footprint_size: Vector2, shape_kind: StringName, rotation: float, axis: Vector2) -> float:
@@ -5137,43 +5137,23 @@ static func _add_planned_obstacle(parent: Node2D, data: Dictionary) -> void:
 		if data.has(key):
 			obstacle.set_meta(key, data[key])
 	parent.add_child(obstacle)
-	var footprint_size: Vector2 = data["footprint_size"]
-	var shape_kind := StringName(data["footprint_kind"])
-	var collision := CollisionShape2D.new()
-	collision.name = "ObstacleCollision"
-	if shape_kind == &"circle":
-		var circle := CircleShape2D.new()
-		circle.radius = maxf(footprint_size.x, footprint_size.y) * 0.5
-		collision.shape = circle
-		_record_shape_probe_points(obstacle, Vector2.ZERO, Vector2.ONE * circle.radius * 2.0, &"circle")
-	else:
-		var rectangle := RectangleShape2D.new()
-		rectangle.size = footprint_size
-		collision.shape = rectangle
-		_record_shape_probe_points(obstacle, Vector2.ZERO, footprint_size, &"rect")
-	collision.set_meta("footprint_kind", shape_kind)
-	collision.set_meta("footprint_size", footprint_size)
-	obstacle.set_meta("collision_footprint_size", footprint_size)
-	obstacle.set_meta("collision_shape_kind", shape_kind)
-	obstacle.set_meta("collision_footprint_rotation", 0.0)
-	obstacle.add_child(collision)
-	var visual_size: Vector2 = data["visual_size"]
-	_add_directional_shadow(obstacle, asset_path, maxf(visual_size.x, visual_size.y), 1.0, footprint_size)
 	var texture := load(asset_path) as Texture2D
 	if texture == null:
 		return
+	var visual_size: Vector2 = data["visual_size"]
 	var sprite_scale := maxf(visual_size.x, visual_size.y) / maxf(texture.get_width(), texture.get_height())
-	var visual_footprint := _texture_collision_footprint(texture, shape_kind)
-	var canvas_size := Vector2(texture.get_width(), texture.get_height())
-	var visual_center_offset := ((visual_footprint["center"] as Vector2) - canvas_size * 0.5) * sprite_scale
+	var shape_kind := StringName(data["footprint_kind"])
+	var offset := _add_scaled_texture_collision(obstacle, texture, sprite_scale, shape_kind)
+	obstacle.set_meta("collision_footprint_size", data["footprint_size"])
+	obstacle.set_meta("collision_shape_kind", shape_kind)
+	obstacle.set_meta("collision_footprint_rotation", 0.0)
+	_add_directional_shadow(obstacle, asset_path, maxf(visual_size.x, visual_size.y), 1.0, data["footprint_size"])
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
 	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	sprite.scale = Vector2.ONE * sprite_scale
-	sprite.rotation = -float(visual_footprint["rotation"])
-	sprite.position = -visual_center_offset.rotated(sprite.rotation)
-
+	sprite.position = -offset
 	_mark_solid_visual(sprite, asset_path, &"permanent_obstacle")
 	sprite.set_meta("visual_bounds", data["visual_bounds"])
 	obstacle.add_child(sprite)
