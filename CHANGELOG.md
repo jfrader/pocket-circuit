@@ -44,6 +44,8 @@
 - Kitchen, Workshop, and Office circuits now pick a room-story material family
   and one of two curated palettes from a separate seed. Floor and racing surface
   stay on one world-space pattern; the racing line does not change.
+- Solo time trials no longer trap you on Results if a save fails. Continue still
+  works, and championship progress stays unchanged.
 
 ### Changed
 
