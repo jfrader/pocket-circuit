@@ -73,7 +73,8 @@ func _run_test() -> void:
 			and applied["generated_circuit_identity"]["sub_seeds"] == events["kitchen_mug_run"]["sub_seeds"]
 			and bool(applied["generated_circuit_identity"]["reverse"])
 			and String(applied["circuit_display_name"]).contains("Circuit")
-			and String(applied["circuit_summary"]).contains("Material fallback"),
+			and String(applied["circuit_summary"]).contains("Material ")
+			and not String(applied["circuit_summary"]).contains("Material fallback"),
 			"applying identity should preserve event rules while exposing generator metadata"
 	):
 		return
