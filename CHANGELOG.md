@@ -46,6 +46,8 @@
   stay on one world-space pattern; the racing line does not change.
 - Solo time trials no longer trap you on Results if a save fails. Continue still
   works, and championship progress stays unchanged.
+- Time-trial ghosts now save after a real race instead of failing a hidden
+  validation check.
 
 ### Changed
 

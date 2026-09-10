@@ -59,7 +59,20 @@ func _run_test() -> void:
 		return
 	if not _expect(loaded["championship_circuit"] == data["championship_circuit"], "championship circuit identities should round-trip without changing"):
 		return
-	if not _expect(loaded["mastery_circuit_metrics"] == data["mastery_circuit_metrics"] and loaded["mastery_records"] == data["mastery_records"] and loaded["personal_ghosts"] == data["personal_ghosts"], "derived circuit metrics, mastery records, and bounded ghost samples should round-trip"):
+	if not _expect(loaded["mastery_circuit_metrics"] == data["mastery_circuit_metrics"] and loaded["mastery_records"] == data["mastery_records"], "derived circuit metrics and mastery records should round-trip"):
+		return
+	if not _expect((loaded["personal_ghosts"] as Array).size() == 1 and is_equal_approx(float(loaded["personal_ghosts"][0]["race_time"]), 82.0), "bounded ghost samples should survive save"):
+		return
+	var dense_samples: Array = []
+	var sample_time := 0.0
+	while sample_time <= 22.1:
+		dense_samples.append(PERSONAL_GHOST.sample(sample_time, Transform2D(sample_time * 0.01, Vector2(sample_time * 10.0, sin(sample_time) * 5.0))))
+		sample_time += 0.1
+	data["personal_ghosts"] = PERSONAL_GHOST.store_best([], mastery_identity, 22.1, dense_samples)["ghosts"]
+	if not _expect(store.save_data(data), "a full time-trial ghost should save: %s" % store.last_save_error):
+		return
+	loaded = store.load_data()
+	if not _expect((loaded["personal_ghosts"] as Array).size() == 1 and (loaded["personal_ghosts"][0]["samples"] as Array).size() > 200, "a raced ghost must persist instead of failing validation"):
 		return
 	var reboot_metrics := MASTERY.metrics_for_event(loaded["mastery_circuit_metrics"], mastery_event)
 	if not _expect(not reboot_metrics.is_empty() and not (MASTERY.create_context(mastery_event, "rustbug", reboot_metrics)["targets"] as Dictionary).is_empty(), "persisted metrics should make post-boot target lookup immediately ready without route preparation"):

@@ -76,7 +76,10 @@ func save_data(data: Dictionary) -> bool:
 	if is_read_only:
 		last_save_error = "Saving is disabled because this file was created by a newer Pocket Circuit version"
 		return false
-	var normalized := _normalize(data)
+	var normalized := _canonicalize_for_disk(data)
+	if normalized.is_empty():
+		last_save_error = "Temporary save failed validation"
+		return false
 	var base_dir := save_path.get_base_dir()
 	if not base_dir.is_empty():
 		var directory_error := DirAccess.make_dir_recursive_absolute(_absolute_path(base_dir))
@@ -147,6 +150,14 @@ func remove_save() -> void:
 	_remove_if_present(save_path + ".bak")
 	_remove_if_present(save_path + ".bak.tmp")
 	is_read_only = false
+
+
+func _canonicalize_for_disk(raw: Dictionary) -> Dictionary:
+	var normalized := _normalize(raw)
+	var parsed: Variant = JSON.parse_string(JSON.stringify(normalized))
+	if parsed is not Dictionary:
+		return {}
+	return _normalize(parsed as Dictionary)
 
 
 func _normalize(raw: Dictionary) -> Dictionary:
