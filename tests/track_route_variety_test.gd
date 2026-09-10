@@ -29,6 +29,7 @@ func _run_test() -> void:
 	var program_variants := {}
 	var svg_representatives := {}
 	var non_axis_headings := 0
+	var mixed_turn_routes := 0
 	var minimum_control_count := 999
 	var maximum_control_count := 0
 	var sample_seed_count := 24
@@ -57,12 +58,17 @@ func _run_test() -> void:
 			svg_representatives["%s_seed_%d" % [program, seed]] = centerline
 		if _off_axis_heading(centerline) >= 0.05:
 			non_axis_headings += 1
+		var mix := TRACK_SEED_GEN.raw_turn_mix(result["points"])
+		if mix.x > 0 and mix.y > 0:
+			mixed_turn_routes += 1
 
 	if not _expect(recipes.size() >= 8, "24 classic seeds should realize at least eight complete route programs, got %s" % [recipes.keys()]):
 		return
 	if not _expect(sequences.size() >= 8, "normalized turn/straight signatures should contain at least eight rhythms, got %d" % sequences.size()):
 		return
 	if not _expect(non_axis_headings >= ceili(float(sample_seed_count) * 0.5), "at least half of classic routes should put their longest straight on a meaningful non-axis heading, got %d" % non_axis_headings):
+		return
+	if not _expect(mixed_turn_routes >= ceili(float(sample_seed_count) * 0.4), "procedural routes should mix left and right corners instead of one-handed ovals, got %d" % mixed_turn_routes):
 		return
 	if not _expect(minimum_control_count >= 40 and maximum_control_count < TRACK_SEED_GEN.SAMPLE_COUNT, "fillets and literal straights need bounded higher-density controls, got %d..%d" % [minimum_control_count, maximum_control_count]):
 		return

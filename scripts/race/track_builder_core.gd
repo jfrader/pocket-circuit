@@ -1340,7 +1340,18 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		_mark_flat_visual(root.get_node("TrackRibbon") as Polygon2D, "", &"track_surface")
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
-		_add_centerline_tiles(root, centerline, track_texture, float(spec.get("track_tile_modulate", 1.35)), spec.get("track_world_tile_size", Vector2.ZERO), float(spec.get("track_opacity", 0.52)))
+		var same_material := track_texture == floor_texture
+		var tint: Color = spec.get("floor_modulate", Color.WHITE) if same_material else Color.WHITE
+		_add_centerline_tiles(
+			root,
+			centerline,
+			track_texture,
+			1.0 if same_material else float(spec.get("track_tile_modulate", 1.35)),
+			spec.get("track_world_tile_size", Vector2.ZERO),
+			1.0 if same_material else float(spec.get("track_opacity", 0.52)),
+			tint,
+			0.0 if same_material else 0.16
+		)
 
 	if spec.get("seed_obstacles", false):
 		_add_corridor_patterning(root, spec, centerline, room_polygon)
@@ -5256,7 +5267,7 @@ static func _expand_loop(points: PackedVector2Array, distance: float) -> PackedV
 	return result
 
 
-static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52) -> void:
+static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52, tint: Color = Color.WHITE, edge_feather: float = 0.16) -> void:
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
@@ -5271,11 +5282,12 @@ static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, 
 	surface.texture_mode = Line2D.LINE_TEXTURE_TILE
 	surface.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 	surface.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	surface.default_color = Color(modulate_value, modulate_value, modulate_value, opacity)
+	surface.default_color = Color(tint.r * modulate_value, tint.g * modulate_value, tint.b * modulate_value, opacity)
 	if world_tile_size.x > 0 and world_tile_size.y > 0:
 		var material := ShaderMaterial.new()
 		material.shader = WORLD_SURFACE_SHADER
 		material.set_shader_parameter("tile_world_size", world_tile_size)
+		material.set_shader_parameter("edge_feather", edge_feather)
 		surface.material = material
 	surface.joint_mode = Line2D.LINE_JOINT_ROUND
 	surface.begin_cap_mode = Line2D.LINE_CAP_ROUND

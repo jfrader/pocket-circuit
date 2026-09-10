@@ -48,6 +48,8 @@
   works, and championship progress stays unchanged.
 - Time-trial ghosts now save after a real race instead of failing a hidden
   validation check.
+- Generated circuits mix left and right corners instead of one-way ovals, and
+  workshop wood no longer sits under a grey racing-surface wash.
 
 ### Changed
 

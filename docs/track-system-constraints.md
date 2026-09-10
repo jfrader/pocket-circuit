@@ -46,10 +46,11 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 - Route families are `speed_loop`, `kidney`, `dogbone`, `broad_triangle`,
   `offset_s`, and `deep_notch`.
 - Perimeter, lobe and wedge programs compose seed-dependent straight extents,
-  shoulders, waist/bay dimensions and optional sections. Room-safe non-axis
-  headings vary independently; a program is not a fixed circuit. Normalized
-  shape-distance tests must demonstrate variation within each program after
-  discounting translation, scale, rotation, mirroring and traversal direction.
+  shoulders, waist/bay dimensions and optional sections. A seed-driven mirror
+  flips handedness; most routes also insert a left/right chicane on a long
+  straight so corners are not all the same way. Normalized shape-distance tests
+  still discount translation, scale, rotation, mirroring and traversal direction,
+  but raw turn mix must include both hands on a large fraction of seeds.
 - Higher length rolls can select an explicitly identified `endurance` envelope
   with a broad inward section, preserving the long-route coverage without
   tightening corners. This is a separate realization, not evidence of greater

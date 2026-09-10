@@ -74,10 +74,25 @@ static func gameplay_metrics(controls: PackedVector2Array) -> Dictionary:
 
 
 static func normalized_route_sequence(controls: PackedVector2Array) -> String:
+	return _canonical_symbol_sequence(_raw_turn_tokens(controls))
+
+
+static func raw_turn_mix(controls: PackedVector2Array) -> Vector2i:
+	var left := 0
+	var right := 0
+	for token: String in _raw_turn_tokens(controls):
+		if token.begins_with("L"):
+			left += 1
+		elif token.begins_with("R"):
+			right += 1
+	return Vector2i(left, right)
+
+
+static func _raw_turn_tokens(controls: PackedVector2Array) -> Array[String]:
 	var centerline := _sample_centerline(controls)
-	if centerline.is_empty():
-		return ""
 	var symbols: Array[String] = []
+	if centerline.is_empty():
+		return symbols
 	var span := 5
 	for index in range(0, centerline.size(), span):
 		var incoming := centerline[posmod(index - span, centerline.size())].direction_to(centerline[index])
@@ -88,7 +103,7 @@ static func normalized_route_sequence(controls: PackedVector2Array) -> String:
 		else:
 			var strength := "1" if absf(angle) < 0.28 else ("2" if absf(angle) < 0.52 else "3")
 			symbols.append(("L" if angle > 0.0 else "R") + strength)
-	return _canonical_symbol_sequence(symbols)
+	return symbols
 
 
 static func _canonical_symbol_sequence(symbols: Array[String]) -> String:
