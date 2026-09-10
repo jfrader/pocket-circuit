@@ -32,3 +32,5 @@ __pycache__/
 # Local run logs
 /runlogs/
 /tmp/
+
+graphify-out/
