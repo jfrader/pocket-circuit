@@ -2,6 +2,7 @@ class_name GeneratedCircuitIdentity
 extends RefCounted
 
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const SCHEMA_VERSION := 1
 const GENERATOR_VERSION := 1
 const MAX_SEED := 0x7FFFFFFF
@@ -150,6 +151,14 @@ static func encode_share_code(identity_value: Variant) -> Dictionary:
 		return _error("invalid_identity", "This circuit identity is incomplete or incompatible.")
 	var material_id := String(identity["material_id"])
 	var palette_id := String(identity["palette_id"])
+	var derived := WORLD_MATERIALS.resolve(
+		StringName(identity["theme"]),
+		StringName(identity["story_id"]),
+		int((identity["sub_seeds"] as Dictionary)["material"])
+	)
+	if material_id == String(derived["material_id"]) and palette_id == String(derived["palette_id"]):
+		material_id = ""
+		palette_id = ""
 	var payload := PackedByteArray([
 		GENERATOR_VERSION,
 		THEMES.find(String(identity["theme"])),
@@ -272,6 +281,9 @@ static func _canonical_identity(theme: String, room: String, reverse: bool, dang
 	if String(GENERATED_RULES.room_for_composition_seed(int(seeds["room_composition"]))) != room:
 		return {}
 	var story_id := String(GENERATED_RULES.story_id(StringName(theme), int(seeds["dressing"])))
+	var resolved := WORLD_MATERIALS.resolve(StringName(theme), StringName(story_id), int(seeds["material"]), material_id, palette_id)
+	material_id = String(resolved["material_id"])
+	palette_id = String(resolved["palette_id"])
 	var material_fallback := "base-%03d" % posmod(int(seeds["material"]), 1000)
 	var palette_fallback := "%s-default-%02d" % [theme, posmod(int(seeds["material"]) / 1000, 32)]
 	var danger := GENERATED_RULES.danger_profile(danger_level, int(seeds["obstacle"]), int(seeds["hazard"]))

@@ -19,12 +19,12 @@ func _run_test() -> void:
 		return
 	if not _expect((identity["fingerprints"] as Dictionary).keys().size() == IDENTITIES.DOMAINS.size() + 1, "every domain and the complete circuit should have fingerprints"):
 		return
-	if not _expect(identity["sub_seeds"] == {"route": 246810, "room_composition": 1821677131, "material": 1916693968, "dressing": 493555838, "obstacle": 328509393, "hazard": 1746009985} and String(identity["fingerprint"]) == "3eae8b80b46de999" and String(identity["display_name"]) == "Clockwork Clamp Circuit", "the v1 fixture identity, fingerprint, and every domain sub-seed should stay regression-pinned"):
+	if not _expect(identity["sub_seeds"] == {"route": 246810, "room_composition": 1821677131, "material": 1916693968, "dressing": 493555838, "obstacle": 328509393, "hazard": 1746009985} and String(identity["fingerprint"]) == "4c40d4172862682e" and String(identity["display_name"]) == "Clockwork Clamp Circuit" and String(identity["material_id"]) == "workshop_oiled" and String(identity["palette_id"]) == "oiled_espresso", "the v1 fixture identity, fingerprint, and every domain sub-seed should stay regression-pinned"):
 		return
 	for domain: String in IDENTITIES.DOMAINS:
 		if not _expect(String(identity["fingerprints"][domain]).length() == 16, "%s should have a stable inspectable fingerprint" % domain):
 			return
-	if not _expect(String(identity["display_name"]).contains("Circuit") and String(identity["summary"]).contains("Seed 246810") and String(identity["summary"]).contains("Workshop") and String(identity["summary"]).contains("Wide room") and String(identity["summary"]).contains("Material fallback") and String(identity["summary"]).contains("Forward"), "generated identity should expose a readable name and complete compact summary"):
+	if not _expect(String(identity["display_name"]).contains("Circuit") and String(identity["summary"]).contains("Seed 246810") and String(identity["summary"]).contains("Workshop") and String(identity["summary"]).contains("Wide room") and String(identity["summary"]).contains("Material workshop_oiled / palette oiled_espresso") and String(identity["summary"]).contains("Forward"), "generated identity should expose a readable name and complete compact summary"):
 		return
 
 	var code_result := IDENTITIES.encode_share_code(identity)

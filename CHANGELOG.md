@@ -41,6 +41,9 @@
   identity summaries. Offline share codes open a verified route preview before
   an exhibition race, while bounded recent history and favorites survive
   restarts without affecting championship progress, mastery records, or ghosts.
+- Kitchen, Workshop, and Office circuits now pick a room-story material family
+  and one of two curated palettes from a separate seed. Floor and racing surface
+  stay on one world-space pattern; the racing line does not change.
 
 ### Changed
 

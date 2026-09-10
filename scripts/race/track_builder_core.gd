@@ -7,6 +7,7 @@ class_name TrackBuilderCore
 const CHECKPOINT_SCRIPT := preload("res://scripts/race/checkpoint.gd")
 const VISUAL_ROLE_CONTRACT := preload("res://scripts/race/generated_world_visual_role.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
@@ -384,9 +385,10 @@ static var ISLAND_VIGNETTES := {
 }
 
 
-## Generated tracks use one complete scene kit.  Unlike the legacy static-track
-## pools below, every asset in a kit belongs to the same household story.
-static var STORY_KITS := {
+## Generated tracks use one complete room composition. Unlike the legacy static-track
+## pools below, every asset in a composition belongs to the same household story.
+## Internal name was STORY_KITS; that alias remains for existing tests.
+static var ROOM_COMPOSITIONS := {
 	&"kitchen": [
 		{
 			"id": StringName(GENERATED_RULES.STORY_IDS["kitchen"][0]),
@@ -581,6 +583,7 @@ static var STORY_KITS := {
 		},
 	],
 }
+static var STORY_KITS := ROOM_COMPOSITIONS
 
 
 static var PROP_SHAPES := {
@@ -1153,11 +1156,21 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["dressing_seed"] = int(generation_options.get("dressing_seed", sub_seeds.get("dressing", _mix_seed(seed, String(theme)))))
 		spec["material_id"] = String(generation_options.get("material_id", ""))
 		spec["palette_id"] = String(generation_options.get("palette_id", ""))
-		var kits: Array = STORY_KITS.get(theme, STORY_KITS[&"kitchen"])
+		var kits: Array = ROOM_COMPOSITIONS.get(theme, ROOM_COMPOSITIONS[&"kitchen"])
 		var kit_index := GENERATED_RULES.story_index(theme, int(spec["dressing_seed"]))
 		spec["story_kit"] = (kits[kit_index] as Dictionary).duplicate(true)
 		spec["story_id"] = GENERATED_RULES.story_id(theme, int(spec["dressing_seed"]))
 		spec["story_kit"]["id"] = spec["story_id"]
+		WORLD_MATERIALS.apply_to_spec(
+			spec,
+			WORLD_MATERIALS.resolve(
+				theme,
+				spec["story_id"],
+				int(spec["material_seed"]),
+				String(spec["material_id"]),
+				String(spec["palette_id"])
+			)
+		)
 		spec["island_expansion"] = 10.0
 		spec.erase("gate_fractions")
 		spec["obstacle_seed"] = int(generation_options.get("obstacle_seed", sub_seeds.get("obstacle", _mix_seed(seed, "obstacle_plan"))))
@@ -1305,7 +1318,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	_add_polygon(root, "Floor", _rect_points(backdrop.get_center(), backdrop.size), Color("111316"), -22)
 	_mark_flat_visual(root.get_node("Floor") as Polygon2D, "", &"void_backdrop")
 	var room_surface := _expand_loop(room_polygon, 26.0)
-	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20, spec.get("floor_tile_world_size", DEFAULT_FLOOR_TILE_WORLD_SIZE))
+	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20, spec.get("floor_tile_world_size", DEFAULT_FLOOR_TILE_WORLD_SIZE), spec.get("floor_modulate", Color.WHITE))
 	if stage.is_valid():
 		await stage.call("Laying the racing surface")
 
@@ -5222,7 +5235,8 @@ static func _add_textured_polygon(
 		texture_path: String,
 		fallback_color: Color,
 		z: int,
-		tile_world_size: Vector2 = DEFAULT_FLOOR_TILE_WORLD_SIZE
+		tile_world_size: Vector2 = DEFAULT_FLOOR_TILE_WORLD_SIZE,
+		modulate_color: Color = Color.WHITE
 ) -> void:
 	var visual := Polygon2D.new()
 	visual.name = node_name
@@ -5231,6 +5245,7 @@ static func _add_textured_polygon(
 	var texture := load(texture_path) as Texture2D if not texture_path.is_empty() else null
 	if texture:
 		visual.texture = texture
+		visual.color = modulate_color
 		visual.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		visual.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		var uvs := PackedVector2Array()

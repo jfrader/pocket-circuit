@@ -103,8 +103,10 @@ their original unscaled canvases.
 
 ## Household Stories
 
-- `STORY_KITS` is the source of truth for generated dressing. Kitchen,
-  Workshop, and Office each provide four coherent stories.
+- `ROOM_COMPOSITIONS` (`STORY_KITS` alias) is the source of truth for generated
+  dressing. Kitchen, Workshop, and Office each provide four coherent stories.
+  Each story selects one material family; an independent material stream then
+  chooses one of two curated palettes without changing route geometry.
 - Semantic quantities are literal: `unique` is exactly 1, `few` is 2-3, and
   `many` is 8-20. A unique asset cannot repeat between the island, opening, and
   corner landmarks in the same track.
