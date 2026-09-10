@@ -174,7 +174,6 @@ func _prepare_race_async() -> void:
 	await _loading_step("Generating a legal circuit")
 	if String(event.get("circuit", "")) == "generated":
 		var prepared: Dictionary = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)))
-		print("[DBG] prepared done, empty=", prepared.is_empty())
 		if app.call("is_race_loading_cancelled"):
 			app.call("complete_race_loading")
 			return
@@ -183,7 +182,6 @@ func _prepare_race_async() -> void:
 			return
 		if app.has_method("record_prepared_mastery_metrics"):
 			app.call("record_prepared_mastery_metrics", event, prepared.get("racing_line_metrics", {}))
-		print("[DBG] before fingerprint check")
 		var expected_preview_fingerprint := String(event.get("preview_fingerprint", ""))
 		if not expected_preview_fingerprint.is_empty():
 			var preview_identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
@@ -194,7 +192,6 @@ func _prepare_race_async() -> void:
 			prepared["loaded_preview_fingerprint"] = loaded_preview_fingerprint
 		if app.has_method("record_prepared_mastery_metrics"):
 			app.call("record_prepared_mastery_metrics", event, prepared.get("racing_line_metrics", {}))
-		print("[DBG] texture paths:", TRACK_BUILDER.preparation_texture_paths(prepared["spec"]).size())
 		for texture_path in TRACK_BUILDER.preparation_texture_paths(prepared["spec"]):
 			if TRACK_BUILDER.has_prepared_outline_path(texture_path):
 				continue
@@ -211,7 +208,6 @@ func _prepare_race_async() -> void:
 			if app.call("is_race_loading_cancelled"):
 				app.call("complete_race_loading")
 				return
-		print("[DBG] before building room")
 		await _loading_step("Building the room")
 		var embedded := track_root
 		remove_child(embedded)
@@ -238,7 +234,6 @@ func _prepare_race_async() -> void:
 		var vehicle_id := String(CATALOG.get_driver(String(opponents[index])).get("vehicle_id", "rustbug"))
 		if not vehicles.has(vehicle_id):
 			vehicles.append(vehicle_id)
-	print("[DBG] vehicles:", vehicles)
 	for vehicle_id: String in vehicles:
 		await _loading_step("Preparing %s animation" % vehicle_id.capitalize())
 		var plan := IDENTITIES.motion_preparation_plan(vehicle_id)
