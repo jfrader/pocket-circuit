@@ -77,9 +77,9 @@ func show_title(has_progress: bool, read_only: bool) -> void:
 	else:
 		second_row.append(_button("QUICK RACE", Rect2(80, 484, 496, 52), &"quick_race"))
 	var last_row: Array[Button] = []
-	for index in 3:
-		var actions := [&"options", &"credits", &"quit"]
-		last_row.append(_button(String(actions[index]).to_upper(), Rect2(80 + index * 168, 550, 158, 48), actions[index]))
+	for index in 4:
+		var actions := [&"options", &"discovery", &"credits", &"quit"]
+		last_row.append(_button(String(actions[index]).to_upper(), Rect2(80 + index * 126, 550, 116, 48), actions[index]))
 	_wire_rows([[play], second_row, last_row])
 	_label("ARROWS / STICK  MOVE   ·   ENTER / A  SELECT", Rect2(80, 654, 730, 30), 16, CREAM)
 	_focus_later(play if not play.disabled else second_row.back(), _generation)

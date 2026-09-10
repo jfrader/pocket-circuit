@@ -189,16 +189,27 @@ line.
   corridor and drive across the room apron wherever no real visible asset is
   present. Collision belongs only to visible household props, rail sections,
   hazards, giants, the raised island, gate posts, and room perimeter walls.
-- Generated collision-bearing visuals declare `SOLID` metadata, while audited
-  drive-over dressing declares `FLAT`. `SOLID` means the owning `StaticBody2D`
-  is on a vehicle-visible layer (`2`, `4`, or
-  `16`) and its circle, local rotated rectangle, or composed shape covers the
+- Every generated world visual declares one `visual_role`: `SOLID`, `FLAT`, or
+  `MOVING_HAZARD`. `SOLID` means the owning `StaticBody2D` is on a
+  vehicle-visible layer (`2`, `4`, or `16`) and its circle, local rotated
+  rectangle, or composed shape covers the
   visible center and ends. Circular colliders reach at least 90% of the visible
+  visual center and ends. Circular colliders reach at least 90% of the visible
   radius; rectangular coverage reaches at least 90% of the trimmed sprite AABB.
   `FLAT` means presentation only and never owns collision: floor decals, broad
   cloth/paper/cardboard ground sections, corridor material patterns, surface
   tints and grip decals, worn-floor hints, shadows, and checker paint. Solid
-  objects must never use a sprite-only placement path.
+  objects must never use a sprite-only placement path. `MOVING_HAZARD` means a
+  warning-telegraphed dynamic obstacle whose active sensor, motion, and visible
+  asset travel together; hazard art is never reused as static scenery.
+  objects must never use a sprite-only placement path. `MOVING_HAZARD` means a
+  warning-telegraphed dynamic obstacle whose active sensor, motion, and visible
+  asset travel together; hazard art is never reused as static scenery. `MOVING_HAZARD` means a
+  warning-telegraphed dynamic obstacle whose active sensor, motion, and visible
+  asset travel together; hazard art is never reused as static scenery. `MOVING_HAZARD` means a
+  warning-telegraphed dynamic obstacle whose active sensor, motion, and visible
+  asset travel together; generated hazard art is never reused as static
+  scenery.
 - The island is one visibly raised solid object. Its closed layer-2
   `ConcavePolygonShape2D` segment chain follows the outer contact edge of a dark
   side-face, tiled theme edge, and warm top lip. Two to four small visible
@@ -218,9 +229,16 @@ line.
 - Every ordered checkpoint `Area2D` is asymmetric: its inner endpoint stops at
   `HALF_WIDTH` or the raised island, while its outer endpoint reaches the room
   wall. Inner grass does not trip the gate, but legal outer-apron lines do. The
-  checkpoint recovery anchor remains on the racing line, and the checker/banner
-  remain corridor-sized visual landmarks. Two small colliding themed posts mark
-  the nominal corridor ends without blocking the racing line.
+  checkpoint recovery anchor remains on the racing line. The finish checker
+  spans the complete nominal corridor, and its larger paired themed posts sit
+  symmetrically at the corridor ends so the same landmark reads in forward and
+  reverse races. Other checkpoints use two small colliding themed posts without
+  blocking the racing line.
+  remain corridor-sized visual landmarks. The finish checker spans the complete
+  nominal corridor, and its larger paired themed posts sit symmetrically at the
+  corridor ends so the same landmark reads in forward and reverse races. Other
+  checkpoints use two small colliding themed posts without blocking the racing
+  line.
 - All physical scenery uses the same upper-left key light: soft warm contact
   shadows offset down-right by 8-12% of the footprint, rectangular or circular
   to match the prop. Giants add a faint elongated down-right cast shadow.

@@ -6,6 +6,7 @@ const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
 const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MENU_BACKGROUND := preload("res://assets/ui/imagine/motorsport_garage.jpg")
+const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
 
 const INK := Color("0e151f")
 const PAPER := Color("f5f0e3")
@@ -30,6 +31,10 @@ var _map_act_number := 1
 var _quick_race_theme: StringName = &"workshop"
 var _quick_race_room: StringName = &"classic"
 var _quick_race_seed := -1
+var _quick_race_reverse := false
+var _quick_identity_heading: Label
+var _quick_identity_summary: Label
+var _quick_direction_button: Button
 var _content_tween: Tween
 var _entrance_generation := 0
 var _save_error_back_action := Callable()
@@ -37,6 +42,7 @@ var _current_vehicle_select_id := ""
 var _quick_race_vehicle_id := ""
 var _page: MarginContainer
 var _art_menu: Control
+var _discovery_panel: CircuitDiscoveryPanel
 
 
 func configure(app: Node) -> void:
@@ -78,6 +84,7 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 	_clear_content()
 	var progress: Dictionary = _app.call("get_save_data")
 	var best_finishes: Dictionary = progress.get("best_event_finishes", {})
+	var best_points: Dictionary = progress.get("best_event_points", {})
 	var recommended_event_id := ""
 	for event: Dictionary in CATALOG.EVENTS:
 		var candidate_id := String(event["id"])
@@ -117,7 +124,7 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 		if unlocked:
 			status = "OPEN · %s" % String(event["format"])
 		if finish > 0:
-			status = "BEST %s · %d PTS" % [_ordinal(finish), int(progress["best_event_points"].get(event_id, 0))]
+			status = _completed_event_status(event_id, finish, int(best_points.get(event_id, 0)))
 		var event_button := _add_button(
 			"%s\n%s" % [String(event["name"]), status],
 			Callable(self, "_open_event").bind(event_id),
@@ -148,7 +155,14 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_content.add_theme_constant_override("separation", 4)
 	_configure_stage(&"map", "rustbug", "rae", String(_quick_race_theme))
 	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
-	_add_heading("Build a circuit")
+	var quick_identity: Dictionary = _current_quick_identity()
+	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, CREAM)
+	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
+	_content.add_child(_quick_identity_heading)
+	_quick_identity_summary = _add_copy(String(quick_identity.get("summary", "")), MUTED)
+	_quick_identity_summary.name = "QuickCircuitSummary"
+	_quick_identity_summary.add_theme_font_size_override("font_size", 13)
+	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
 	var room_status := _add_section("PICK A THEME", "CURRENT · %s" % String(_quick_race_theme).to_upper())
 	var room_themes: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 	var room_buttons: Array[Button] = []
@@ -172,8 +186,9 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	var seed_controls := _add_quick_race_seed_controls(seed_status)
 	for room_button: Button in room_buttons:
 		room_button.focus_neighbor_bottom = room_button.get_path_to(seed_controls[0])
+	_quick_direction_button = _add_button("DIRECTION · %s" % ("REVERSE" if _quick_race_reverse else "FORWARD"), _toggle_quick_race_direction, CREAM, false, "QuickRaceDirection")
+	_complete_focus_row(seed_controls, _quick_direction_button)
 	var play_button := _add_big_play_button(Callable(self, "_start_quick_race"), false)
-	_complete_focus_row(seed_controls, play_button)
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_race_vehicle_id.is_empty():
 		_quick_race_vehicle_id = String(progress.get("selected_vehicle", "rustbug"))
@@ -185,6 +200,22 @@ func show_quick_race(_requested_act: int = 0) -> void:
 		_grab_button_focus_after_layout(selected_room_button, _entrance_generation)
 	else:
 		_focus_first()
+
+
+func show_discovery() -> void:
+	_screen = "discovery"
+	_event_id = ""
+	_reset_quick_race_state()
+	_clear_content()
+	_configure_stage(&"map", "rustbug", "rae", "office")
+	_discovery_panel = DISCOVERY_PANEL.new() as CircuitDiscoveryPanel
+	_discovery_panel.name = "CircuitDiscoveryPanel"
+	_discovery_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	_discovery_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_discovery_panel.back_requested.connect(show_title)
+	_content.add_child(_discovery_panel)
+	_discovery_panel.configure(_app)
+	_footer.text = "OFFLINE EXHIBITION ONLY  ·  ESC / B  BACK"
 
 
 func show_briefing(event_id: String) -> void:
@@ -206,17 +237,92 @@ func show_briefing(event_id: String) -> void:
 	var rival_vehicle := CATALOG.get_vehicle(String(rival.get("vehicle_id", "rustbug")))
 	_add_section("LEAD RIVAL", "%s · %s" % [String(rival.get("name", "RACER")), String(rival_vehicle.get("name", "MACHINE"))])
 	var progress: Dictionary = _app.call("get_save_data")
+	var completed: bool = event_id in progress.get("completed_events", [])
 	if event_id == "kitchen_crumb_rush" and int(progress.get("best_event_finishes", {}).get(event_id, 0)) == 0:
 		_add_section("FIRST RACE", "LEARN THE LINE, THEN FIND SPEED")
 		_add_copy("W / Up or RT accelerate  ·  S / Down or LT brake  ·  A/D or left stick steer")
 		_add_copy("Space / A drift  ·  Shift / B boost  ·  R / Y resets at the last legal gate", MUTED)
 	_add_spacer(12)
 	_current_vehicle_select_id = String(progress.get("selected_vehicle", "rustbug"))
-	_add_big_play_button(Callable(self, "_start_current_selected_vehicle"), false)
+	var mastery_calibrating := false
+	var mastery_calibration_failed := false
+	if completed:
+		var mastery_state: Dictionary = _app.call("get_mastery_state", event_id, _current_vehicle_select_id)
+		mastery_calibrating = bool(mastery_state.get("calibrating", false))
+		mastery_calibration_failed = bool(mastery_state.get("calibration_failed", false))
+		var vehicle_name := String(CATALOG.get_vehicle(_current_vehicle_select_id).get("name", "Rustbug")).to_upper()
+		var mastery_status_label := _add_section("MASTERY · " + vehicle_name, _briefing_mastery_status(mastery_state))
+		mastery_status_label.name = "MasteryStatus"
+		var target_copy := _add_copy(_briefing_mastery_targets(mastery_state), AMBER)
+		target_copy.name = "MasteryTargets"
+		_add_copy("Personal medals and ghosts never change championship points or unlocks.", MUTED)
+	_add_big_play_button(Callable(self, "_start_current_selected_vehicle"), false).text = "REPLAY EVENT" if completed else "PLAY"
+	if completed:
+		var mastery_action := "RETRY MASTERY CALIBRATION" if mastery_calibration_failed else "MASTERY RUN · %s" % String(CATALOG.get_vehicle(_current_vehicle_select_id).get("name", "Rustbug")).to_upper()
+		_add_button(mastery_action, Callable(self, "_start_mastery_selected_vehicle"), CORAL, mastery_calibrating, "MasteryRun")
 	_add_button("CHOOSE VEHICLE", Callable(self, "show_vehicle_select").bind(event_id, false), AMBER)
 	_add_button("BACK TO MAP", Callable(self, "show_map"), CREAM)
 	_footer.text = "ESC / B  BACK"
 	_focus_first()
+
+
+func refresh_mastery_calibration(event_id: String) -> void:
+	if _screen == "map":
+		var progress: Dictionary = _app.call("get_save_data")
+		var finish := int(progress.get("best_event_finishes", {}).get(event_id, 0))
+		var button := find_child("Event_%s" % event_id, true, false) as Button
+		var event := CATALOG.get_event(event_id)
+		if button and not event.is_empty() and finish > 0:
+			button.text = "%s\n%s" % [String(event["name"]), _completed_event_status(event_id, finish, int(progress.get("best_event_points", {}).get(event_id, 0)))]
+		return
+	if _screen != "briefing" or _event_id != event_id:
+		return
+	var state: Dictionary = _app.call("get_mastery_state", event_id, _current_vehicle_select_id)
+	var status_label := find_child("MasteryStatus", true, false) as Label
+	var targets_label := find_child("MasteryTargets", true, false) as Label
+	var mastery_button := find_child("MasteryRun", true, false) as Button
+	if status_label:
+		status_label.text = _briefing_mastery_status(state)
+	if targets_label:
+		targets_label.text = _briefing_mastery_targets(state)
+	if mastery_button:
+		mastery_button.text = "RETRY MASTERY CALIBRATION" if bool(state.get("calibration_failed", false)) else "MASTERY RUN · %s" % String(CATALOG.get_vehicle(_current_vehicle_select_id).get("name", "Rustbug")).to_upper()
+		mastery_button.disabled = bool(state.get("calibrating", false))
+
+
+func _completed_event_status(event_id: String, finish: int, points: int) -> String:
+	var state: Dictionary = _app.call("get_mastery_state", event_id)
+	var championship_result := "%s · %d PTS" % [_ordinal(finish), points]
+	if bool(state.get("calibrating", false)):
+		return "%s · MASTERY CALIBRATING" % championship_result
+	if bool(state.get("calibration_failed", false)):
+		return "%s · CALIBRATION SAVE FAILED" % championship_result
+	var record: Dictionary = state.get("record", {})
+	if record.is_empty():
+		return "%s · MASTERY OPEN" % championship_result
+	return "%s · MASTERY %s %s" % [championship_result, String(record.get("medal", "none")).to_upper(), _format_time(float(record["best_race"]))]
+
+
+func _briefing_mastery_status(state: Dictionary) -> String:
+	if bool(state.get("calibrating", false)):
+		return "CALIBRATING · TARGETS PREPARING"
+	if bool(state.get("calibration_failed", false)):
+		return "CALIBRATION SAVE FAILED · RETRY"
+	var record: Dictionary = state.get("record", {})
+	if record.is_empty():
+		return "NO MEDAL · SET A TIME"
+	return "%s · LAP %s · RACE %s" % [String(record.get("medal", "none")).to_upper(), _format_time(float(record["best_lap"])), _format_time(float(record["best_race"]))]
+
+
+func _briefing_mastery_targets(state: Dictionary) -> String:
+	if bool(state.get("calibrating", false)):
+		return "CALIBRATING CIRCUIT TARGETS…"
+	if bool(state.get("calibration_failed", false)):
+		return "TARGETS NOT SAVED · RETRY CALIBRATION"
+	var targets: Dictionary = state.get("targets", {})
+	if targets.is_empty():
+		return "TARGETS UNAVAILABLE"
+	return "TARGETS  GOLD %s · SILVER %s · BRONZE %s" % [_format_time(float(targets["gold"])), _format_time(float(targets["silver"])), _format_time(float(targets["bronze"]))]
 
 
 func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
@@ -355,6 +461,9 @@ func go_back() -> void:
 			return
 		"map", "settings", "credits", "reset_confirmation", "quick_race":
 			show_title()
+		"discovery":
+			if not is_instance_valid(_discovery_panel) or not _discovery_panel.go_back():
+				show_title()
 		"save_error":
 			_leave_save_error()
 		"briefing":
@@ -528,6 +637,7 @@ func _apply_compact_button_art(button: Button) -> void:
 func _clear_content() -> void:
 	_page.show()
 	_art_menu.call("clear")
+	_discovery_panel = null
 	_entrance_generation += 1
 	_save_error_back_action = Callable()
 	_button_focus_chain.clear()
@@ -570,6 +680,8 @@ func _on_art_action(action: StringName) -> void:
 			_app.call("request_new_championship")
 		&"quick_race":
 			_app.call("open_quick_race")
+		&"discovery":
+			_app.call("open_discovery")
 		&"options":
 			show_settings()
 		&"credits":
@@ -641,10 +753,11 @@ func _add_heading(text: String) -> void:
 	_content.add_child(label)
 
 
-func _add_copy(text: String, color: Color = PAPER) -> void:
+func _add_copy(text: String, color: Color = PAPER) -> Label:
 	var label := _label(text, 18, color)
 	label.custom_minimum_size = Vector2(0.0, 34.0)
 	_content.add_child(label)
+	return label
 
 
 func _add_quote(text: String, color: Color = PAPER) -> void:
@@ -672,6 +785,18 @@ func _add_section(left: String, right: String) -> Label:
 
 
 func _add_result_notice(summary: Dictionary) -> void:
+	if bool(summary.get("mastery", false)):
+		if bool(summary.get("mastery_dnf", false)):
+			_add_copy("MASTERY RUN · DNF · NO RECORD SAVED", AMBER)
+			return
+		var record: Dictionary = summary.get("mastery_record", {})
+		var message := "MASTERY RESULT SAVED"
+		if not record.is_empty():
+			message = "MASTERY %s · LAP %s · RACE %s" % [String(record.get("medal", "none")).to_upper(), _format_time(float(record["best_lap"])), _format_time(float(record["best_race"]))]
+		if bool(summary.get("ghost_saved", false)):
+			message += " · GHOST SAVED"
+		_add_copy(message, AMBER)
+		return
 	var message := "RESULT FILED"
 	if int(summary.get("points_gained", 0)) > 0:
 		message += "  ·  +%d POINTS" % int(summary["points_gained"])
@@ -957,7 +1082,11 @@ func _reset_quick_race_state() -> void:
 	_quick_race_theme = &"workshop"
 	_quick_race_room = &"classic"
 	_quick_race_seed = -1
+	_quick_race_reverse = false
 	_quick_race_vehicle_id = ""
+	_quick_identity_heading = null
+	_quick_identity_summary = null
+	_quick_direction_button = null
 
 
 func _select_quick_race_theme(theme: StringName, room_buttons: Array[Button], room_status: Label) -> void:
@@ -967,6 +1096,7 @@ func _select_quick_race_theme(theme: StringName, room_buttons: Array[Button], ro
 		var room_theme := StringName(String(room_button.name).trim_prefix("QuickRaceRoom_"))
 		_apply_button_art(room_button, room_theme == theme)
 	_configure_stage(&"map", "rustbug", "rae", String(theme))
+	_refresh_quick_identity_labels()
 
 
 func _adjust_quick_race_seed(adjustment: int, seed_edit: LineEdit, seed_status: Label) -> void:
@@ -990,6 +1120,26 @@ func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 	_quick_race_room = StringName(_app.call("circuit_room_for_seed", _quick_race_seed))
 	seed_edit.text = str(_quick_race_seed)
 	seed_status.text = "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()]
+	_refresh_quick_identity_labels()
+
+
+func _toggle_quick_race_direction() -> void:
+	_quick_race_reverse = not _quick_race_reverse
+	_refresh_quick_identity_labels()
+
+
+func _current_quick_identity() -> Dictionary:
+	return _app.call("generated_circuit_identity", _quick_race_theme, _quick_race_room, _quick_race_seed, _quick_race_reverse)
+
+
+func _refresh_quick_identity_labels() -> void:
+	var identity := _current_quick_identity()
+	if is_instance_valid(_quick_identity_heading):
+		_quick_identity_heading.text = String(identity.get("display_name", "Build a circuit"))
+	if is_instance_valid(_quick_identity_summary):
+		_quick_identity_summary.text = String(identity.get("summary", ""))
+	if is_instance_valid(_quick_direction_button):
+		_quick_direction_button.text = "DIRECTION · %s" % ("REVERSE" if _quick_race_reverse else "FORWARD")
 
 
 func _random_quick_race_seed() -> int:
@@ -1003,7 +1153,7 @@ func _start_quick_race() -> void:
 	var vehicle_id := _quick_race_vehicle_id if not _quick_race_vehicle_id.is_empty() else String(progress.get("selected_vehicle", "rustbug"))
 	if not vehicle_id in progress.get("unlocked_vehicles", ["rustbug"]):
 		vehicle_id = "rustbug"
-	_app.call("start_circuit_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id)
+	_app.call("start_circuit_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id, _quick_race_reverse)
 
 
 func _start_with_vehicle(vehicle_id: String) -> void:
@@ -1013,6 +1163,17 @@ func _start_with_vehicle(vehicle_id: String) -> void:
 func _start_current_selected_vehicle() -> void:
 	if not _current_vehicle_select_id.is_empty():
 		_start_with_vehicle(_current_vehicle_select_id)
+
+
+func _start_mastery_selected_vehicle() -> void:
+	if not _event_id.is_empty() and not _current_vehicle_select_id.is_empty():
+		_app.call("start_mastery_run", _event_id, _current_vehicle_select_id)
+
+
+func _format_time(total_seconds: float) -> String:
+	if total_seconds <= 0.0:
+		return "--:--.-"
+	return "%02d:%04.1f" % [int(total_seconds / 60.0), fmod(total_seconds, 60.0)]
 
 
 func _ordinal(value: int) -> String:

@@ -298,15 +298,22 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 			presented_patch_count += 1
 	if not _expect(presented_patch_count == patch_definitions.size(), "%s grip patches should become authoritative runtime SurfaceZones" % theme):
 		return false
+	var hazard_plan: Dictionary = track.get_meta("generated_hazard_plan", {})
 	var forward_hazard_path: PackedVector2Array = hazard_paths["forward"]
-	if not _expect(presenter.hazard.start_position == forward_hazard_path[0] and presenter.hazard.end_position == forward_hazard_path[1] and StringName(presenter.hazard.get_meta("direction", &"")) == &"forward", "%s forward race should use the forward conflict path" % theme):
+	if bool(hazard_plan.get("present", false)):
+		if not _expect(presenter.hazard != null and presenter.hazard.start_position == forward_hazard_path[0] and presenter.hazard.end_position == forward_hazard_path[1] and StringName(presenter.hazard.get_meta("direction", &"")) == &"forward", "%s forward race should use the forward conflict path when its deterministic plan is present" % theme):
+			return false
+	elif not _expect(presenter.hazard == null, "%s should omit an occasional hazard when its deterministic plan says absent" % theme):
 		return false
 	presenter.free()
 	var reverse_presenter := PRESENTER.new() as TrackVariantPresenter
 	track.add_child(reverse_presenter)
 	reverse_presenter.configure(track, theme, true)
 	var reverse_hazard_path: PackedVector2Array = hazard_paths["reverse"]
-	if not _expect(reverse_presenter.hazard.start_position == reverse_hazard_path[0] and reverse_presenter.hazard.end_position == reverse_hazard_path[1] and StringName(reverse_presenter.hazard.get_meta("direction", &"")) == &"reverse", "%s reverse race should use the reverse conflict path" % theme):
+	if bool(hazard_plan.get("present", false)):
+		if not _expect(reverse_presenter.hazard != null and reverse_presenter.hazard.start_position == reverse_hazard_path[0] and reverse_presenter.hazard.end_position == reverse_hazard_path[1] and StringName(reverse_presenter.hazard.get_meta("direction", &"")) == &"reverse", "%s reverse race should use the reverse conflict path when its deterministic plan is present" % theme):
+			return false
+	elif not _expect(reverse_presenter.hazard == null, "%s reverse race should share the same absent hazard plan" % theme):
 		return false
 	return true
 
@@ -568,7 +575,8 @@ func _check_corridor_gates(track: Node2D, label: String) -> bool:
 		var sprite := post.get_node_or_null("Sprite") as Sprite2D
 		var collision := post.get_node_or_null("PostCollision") as CollisionShape2D
 		var checkpoint := track.get_node_or_null("Checkpoint0Finish" if int(post.get_meta("gate_index", -1)) == 0 else "Checkpoint%d" % int(post.get_meta("gate_index", -1))) as Node2D
-		if not _expect(sprite != null and sprite.texture != null and collision != null and post.collision_layer == 16 and absf(post.position.distance_to(checkpoint.position) - BUILDER.GATE_POST_OFFSET) < 1.0, "%s gate post should be a visible collider just outside the racing line" % label):
+		var expected_offset := BUILDER.FINISH_LANDMARK_OFFSET if int(post.get_meta("gate_index", -1)) == 0 else BUILDER.GATE_POST_OFFSET
+		if not _expect(sprite != null and sprite.texture != null and collision != null and post.collision_layer == 16 and absf(post.position.distance_to(checkpoint.position) - expected_offset) < 1.0, "%s gate post should be a visible collider just outside the racing line" % label):
 			return false
 	track.set_meta("tested_gate_span_range", Vector2(minimum_span, maximum_span))
 	_minimum_gate_span = minf(_minimum_gate_span, minimum_span)

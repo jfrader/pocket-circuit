@@ -41,7 +41,10 @@ const RACE_HUD_SCRIPT := preload("res://scripts/ui/race_hud.gd")
 const MENU_BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const MENU_SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const PREPARATION_SCRIPT := preload("res://scripts/race/race_preparation.gd")
+const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
+const CIRCUIT_PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const PERSONAL_GHOST_SCRIPT := preload("res://scripts/race/personal_ghost.gd")
 const COUNTDOWN_STEP_SECONDS := 0.65
 const FALLBACK_OPPONENTS: Array[String] = ["juniper", "milo", "tess"]
 const GRID_TRANSFORMS: Array[Transform2D] = [
@@ -85,6 +88,7 @@ var _wrong_way_label: Label
 var _results_panel: Panel
 var _results_label: Label
 var _retry_button: Button
+var _mastery_button: Button
 var _continue_button: Button
 var _pause_overlay: RacePauseOverlay
 var _pause_menu_panel: PanelContainer
@@ -101,6 +105,14 @@ var _race_flash_tween: Tween
 var _countdown_active := false
 var _starting_collision_states: Array[Dictionary] = []
 var is_preparing := false
+var _personal_ghost: PersonalGhost
+var _ghost_samples: Array = []
+var _next_ghost_sample_time := 0.0
+var _previous_ghost_capture_time := 0.0
+var _previous_ghost_capture_transform := Transform2D.IDENTITY
+var _mastery_capture_finished := false
+var _last_lap_elapsed := 0.0
+var _best_lap := INF
 
 
 func _ready() -> void:
@@ -125,6 +137,7 @@ func _complete_race_setup(start_countdown: bool = true) -> void:
 	_create_pause_overlay()
 	_pause_overlay.enabled = start_countdown
 	_configure_racers()
+	_configure_personal_ghost()
 	for racer: Node2D in race_manager.get_rankings():
 		if racer is RigidBody2D:
 			var body := racer as RigidBody2D
@@ -132,6 +145,7 @@ func _complete_race_setup(start_countdown: bool = true) -> void:
 			body.collision_layer = 0
 			body.collision_mask = 0
 	race_manager.race_started.connect(_release_starting_grid)
+	race_manager.race_started.connect(_begin_mastery_capture)
 	race_manager.race_finished.connect(_on_race_finished)
 	race_manager.position_changed.connect(_on_position_changed)
 	race_manager.wrong_way_changed.connect(_on_wrong_way_changed)
@@ -159,13 +173,28 @@ func _prepare_race_async() -> void:
 	app.call("set_loading_section", 1)
 	await _loading_step("Generating a legal circuit")
 	if String(event.get("circuit", "")) == "generated":
-		var prepared: Dictionary = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0))))
+		var prepared: Dictionary = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)))
+		print("[DBG] prepared done, empty=", prepared.is_empty())
 		if app.call("is_race_loading_cancelled"):
 			app.call("complete_race_loading")
 			return
 		if prepared.is_empty():
-			app.call("fail_race_loading", "A valid circuit could not be generated")
+			app.call("fail_race_loading", "Circuit generation failed")
 			return
+		if app.has_method("record_prepared_mastery_metrics"):
+			app.call("record_prepared_mastery_metrics", event, prepared.get("racing_line_metrics", {}))
+		print("[DBG] before fingerprint check")
+		var expected_preview_fingerprint := String(event.get("preview_fingerprint", ""))
+		if not expected_preview_fingerprint.is_empty():
+			var preview_identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
+			var loaded_preview_fingerprint := CIRCUIT_PREVIEW.fingerprint_for_prepared(preview_identity, prepared)
+			if loaded_preview_fingerprint != expected_preview_fingerprint:
+				app.call("fail_race_loading", "The loaded circuit did not match the confirmed preview")
+				return
+			prepared["loaded_preview_fingerprint"] = loaded_preview_fingerprint
+		if app.has_method("record_prepared_mastery_metrics"):
+			app.call("record_prepared_mastery_metrics", event, prepared.get("racing_line_metrics", {}))
+		print("[DBG] texture paths:", TRACK_BUILDER.preparation_texture_paths(prepared["spec"]).size())
 		for texture_path in TRACK_BUILDER.preparation_texture_paths(prepared["spec"]):
 			if TRACK_BUILDER.has_prepared_outline_path(texture_path):
 				continue
@@ -182,6 +211,7 @@ func _prepare_race_async() -> void:
 			if app.call("is_race_loading_cancelled"):
 				app.call("complete_race_loading")
 				return
+		print("[DBG] before building room")
 		await _loading_step("Building the room")
 		var embedded := track_root
 		remove_child(embedded)
@@ -189,7 +219,10 @@ func _prepare_race_async() -> void:
 		track_root = TRACK_BUILDER.create_layout_root(prepared)
 		track_root.name = "Track"
 		add_child(track_root)
+		if prepared.has("loaded_preview_fingerprint"):
+			track_root.set_meta("preview_fingerprint", prepared["loaded_preview_fingerprint"])
 		await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step)
+		_apply_circuit_identity_metadata(event)
 		_apply_track_variant(StringName(event.get("theme", "kitchen")))
 	else:
 		if not _configure_track_variant():
@@ -200,11 +233,12 @@ func _prepare_race_async() -> void:
 		return
 	app.call("set_loading_section", 2)
 	var vehicles: Array[String] = [String(_session.get("vehicle_id", "rustbug"))]
-	var opponents: Array = event.get("opponents", FALLBACK_OPPONENTS)
+	var opponents: Array = [] if String(_session.get("mode", "")) == "mastery" else event.get("opponents", FALLBACK_OPPONENTS)
 	for index in mini(int(event.get("opponent_count", opponents.size())), opponents.size()):
 		var vehicle_id := String(CATALOG.get_driver(String(opponents[index])).get("vehicle_id", "rustbug"))
 		if not vehicles.has(vehicle_id):
 			vehicles.append(vehicle_id)
+	print("[DBG] vehicles:", vehicles)
 	for vehicle_id: String in vehicles:
 		await _loading_step("Preparing %s animation" % vehicle_id.capitalize())
 		var plan := IDENTITIES.motion_preparation_plan(vehicle_id)
@@ -253,6 +287,60 @@ func _exit_tree() -> void:
 
 func _process(_delta: float) -> void:
 	_update_race_hud()
+	_update_personal_ghost()
+
+
+func _begin_mastery_capture() -> void:
+	_ghost_samples.clear()
+	_next_ghost_sample_time = 0.0
+	_last_lap_elapsed = 0.0
+	_best_lap = INF
+	_mastery_capture_finished = false
+	if String(_session.get("mode", "")) == "mastery" and is_instance_valid(_player_vehicle):
+		_previous_ghost_capture_time = 0.0
+		_previous_ghost_capture_transform = _player_vehicle.global_transform
+		_capture_ghost_sample(0.0, _previous_ghost_capture_transform)
+		_next_ghost_sample_time = PersonalGhost.SAMPLE_INTERVAL
+
+
+func _update_personal_ghost() -> void:
+	if is_instance_valid(_personal_ghost):
+		_personal_ghost.set_playback_time(race_manager.race_time)
+	if String(_session.get("mode", "")) != "mastery" or _mastery_capture_finished or not race_manager.is_running or not is_instance_valid(_player_vehicle):
+		return
+	_capture_mastery_through(race_manager.race_time, _player_vehicle.global_transform)
+
+
+func _capture_mastery_through(current_time: float, current_transform: Transform2D) -> void:
+	while _next_ghost_sample_time <= current_time + 0.0001 and _ghost_samples.size() < PersonalGhost.MAX_SAMPLES:
+		var duration := current_time - _previous_ghost_capture_time
+		var weight := clampf((_next_ghost_sample_time - _previous_ghost_capture_time) / duration, 0.0, 1.0) if duration > 0.000001 else 1.0
+		var sample_transform := Transform2D(
+			lerp_angle(_previous_ghost_capture_transform.get_rotation(), current_transform.get_rotation(), weight),
+			_previous_ghost_capture_transform.origin.lerp(current_transform.origin, weight)
+		)
+		_capture_ghost_sample(_next_ghost_sample_time, sample_transform)
+		_next_ghost_sample_time += PersonalGhost.SAMPLE_INTERVAL
+	_previous_ghost_capture_time = current_time
+	_previous_ghost_capture_transform = current_transform
+
+
+func _capture_ghost_sample(sample_time: float, sample_transform: Transform2D) -> void:
+	_ghost_samples.append(PERSONAL_GHOST_SCRIPT.sample(sample_time, sample_transform))
+
+
+func _configure_personal_ghost() -> void:
+	if String(_session.get("mode", "")) != "mastery":
+		return
+	var ghost: Dictionary = _session.get("best_ghost", {})
+	if ghost.is_empty():
+		return
+	_personal_ghost = PERSONAL_GHOST_SCRIPT.new() as PersonalGhost
+	_personal_ghost.name = "PersonalBestGhost"
+	add_child(_personal_ghost)
+	if not _personal_ghost.configure(ghost, IDENTITIES.car_texture(String(_session.get("vehicle_id", "rustbug")))):
+		_personal_ghost.queue_free()
+		_personal_ghost = null
 
 
 func _configure_racers() -> void:
@@ -269,7 +357,7 @@ func _configure_racers() -> void:
 
 	var event: Dictionary = _session.get("event", {})
 	var opponent_ids: Array = event.get("opponents", FALLBACK_OPPONENTS) if not event.is_empty() else FALLBACK_OPPONENTS
-	var opponent_count := clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
+	var opponent_count := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
 	var difficulty := String(_session.get("difficulty", "club_circuit"))
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
 	for ai_index in mini(opponent_ids.size(), opponent_count):
@@ -366,8 +454,11 @@ func _configure_track_variant() -> bool:
 	if String(event.get("circuit", "")) == "generated":
 		var circuit_room := StringName(event.get("room", "classic"))
 		var circuit_seed := int(event.get("seed", 0))
-		var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed)
+		var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed, _track_generation_options(event))
 		packed = built.get("scene") as PackedScene
+		var app := get_node_or_null("/root/App")
+		if app and app.has_method("record_prepared_mastery_metrics"):
+			app.call("record_prepared_mastery_metrics", event, built.get("racing_line_metrics", {}))
 		if packed == null:
 			push_error("Could not generate circuit %s/%s/%d" % [requested_theme, circuit_room, circuit_seed])
 			return false
@@ -386,8 +477,45 @@ func _configure_track_variant() -> bool:
 	track_root = packed.instantiate() as Node2D
 	track_root.name = "Track"
 	add_child(track_root)
+	_apply_circuit_identity_metadata(event)
 	_apply_track_variant(requested_theme)
 	return true
+
+
+func _track_generation_options(event: Dictionary) -> Dictionary:
+	var options := {
+		"act": int(event.get("act", 0)),
+		"obstacles_enabled": bool(event.get("obstacles_enabled", true)),
+	}
+	if int(options["act"]) <= 0:
+		options.erase("act")
+	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
+	if identity is Dictionary:
+		var identity_record := identity as Dictionary
+		var generated_options := GENERATED_CIRCUITS.generation_options(identity_record)
+		if generated_options.is_empty():
+			options["sub_seeds"] = (identity_record.get("sub_seeds", {}) as Dictionary).duplicate(true)
+		else:
+			options.merge(generated_options, true)
+	return options
+
+
+func _apply_circuit_identity_metadata(event: Dictionary) -> void:
+	var identity: Variant = event.get("circuit_identity")
+	if identity is Dictionary:
+		var identity_record := identity as Dictionary
+		track_root.set_meta("circuit_identity", identity_record.duplicate(true))
+		track_root.set_meta("circuit_fingerprint", String(event.get("circuit_fingerprint", "")))
+		track_root.set_meta("circuit_schema_version", int(event.get("circuit_schema_version", 0)))
+		track_root.set_meta("circuit_generator_version", int(event.get("circuit_generator_version", 0)))
+		track_root.set_meta("championship_seed", int(identity_record.get("championship_seed", 0)))
+		track_root.set_meta("circuit_sub_seeds", (identity_record.get("sub_seeds", {}) as Dictionary).duplicate(true))
+	var generated_identity: Variant = event.get("generated_circuit_identity")
+	if generated_identity is Dictionary:
+		track_root.set_meta("generated_circuit_identity", (generated_identity as Dictionary).duplicate(true))
+		track_root.set_meta("generated_circuit_fingerprint", String((generated_identity as Dictionary).get("fingerprint", "")))
+		track_root.set_meta("circuit_display_name", String((generated_identity as Dictionary).get("display_name", event.get("name", ""))))
+		track_root.set_meta("circuit_summary", String((generated_identity as Dictionary).get("summary", "")))
 
 
 func _apply_track_variant(requested_theme: StringName) -> void:
@@ -513,6 +641,12 @@ func _on_wrong_way_changed(racer: Node2D, wrong_way: bool) -> void:
 
 
 func _on_lap_completed(lap: int) -> void:
+	if String(_session.get("mode", "")) == "mastery" and is_instance_valid(_player_vehicle):
+		var elapsed := float(race_manager.get_racer_state(_player_vehicle).get("elapsed", race_manager.race_time))
+		var lap_time := elapsed - _last_lap_elapsed
+		if lap_time > 0.0:
+			_best_lap = minf(_best_lap, lap_time)
+		_last_lap_elapsed = elapsed
 	if lap >= race_manager.laps_to_finish:
 		return
 	_race_flash_label.text = "FINAL LAP" if lap == race_manager.laps_to_finish - 1 else "LAP %d" % (lap + 1)
@@ -528,7 +662,16 @@ func _on_lap_completed(lap: int) -> void:
 	_race_flash_tween.tween_callback(Callable(_race_flash_label, "hide"))
 
 
-func _on_racer_finished(_racer: Node2D, _position: int, _total_time: float) -> void:
+func _on_racer_finished(racer: Node2D, _position: int, total_time: float) -> void:
+	if racer == _player_vehicle and String(_session.get("mode", "")) == "mastery" and not _mastery_capture_finished:
+		_capture_mastery_through(total_time, _player_vehicle.global_transform)
+		_mastery_capture_finished = true
+		var final_sample_time := snappedf(total_time, 0.001)
+		while not _ghost_samples.is_empty() and float(_ghost_samples.back()[0]) >= final_sample_time - 0.0005:
+			_ghost_samples.pop_back()
+		if _ghost_samples.size() >= PersonalGhost.MAX_SAMPLES:
+			_ghost_samples.pop_back()
+		_capture_ghost_sample(final_sample_time, _player_vehicle.global_transform)
 	if _results_panel.visible:
 		_update_results(race_manager.get_results())
 
@@ -556,7 +699,21 @@ func _update_results(results: Array) -> void:
 			status,
 		])
 	lines.append("")
-	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if String(_session.get("mode", "quick")) == "quick" else "RESULT SAVED · CONTINUE OR RETRY"
+	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if String(_session.get("mode", "quick")) in ["quick", "discovery"] else "RESULT SAVED · CONTINUE OR RETRY"
+	var app := get_node_or_null("/root/App")
+	var live_session: Dictionary = app.call("get_current_race_session") if app and app.has_method("get_current_race_session") else {}
+	var summary: Dictionary = live_session.get("result_summary", {})
+	if bool(summary.get("mastery", false)):
+		var record: Dictionary = summary.get("mastery_record", {})
+		var targets: Dictionary = summary.get("mastery_targets", {})
+		if not record.is_empty():
+			lines.append("MASTERY · %s MEDAL" % String(record.get("medal", "none")).to_upper())
+			lines.append("BEST LAP %s · RACE %s" % [_format_time(float(record["best_lap"])), _format_time(float(record["best_race"]))])
+		if not targets.is_empty():
+			lines.append("TARGETS  G %s · S %s · B %s" % [_format_time(float(targets["gold"])), _format_time(float(targets["silver"])), _format_time(float(targets["bronze"]))])
+		if bool(summary.get("ghost_saved", false)):
+			lines.append("PERSONAL BEST GHOST SAVED")
+		final_prompt = "MASTERY DNF · NO RECORD SAVED" if bool(summary.get("mastery_dnf", false)) else "MASTERY SAVED · CONTINUE OR RETRY"
 	if not _save_error.is_empty():
 		final_prompt = "SAVE FAILED · RETRY SAVE BEFORE CONTINUING"
 	lines.append("FINALIZING..." if not _results_finalized else final_prompt)
@@ -798,22 +955,32 @@ func _create_phase_one_ui() -> void:
 	_results_label.offset_right = 592.0
 	_results_label.offset_bottom = 325.0
 	_results_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_results_label.add_theme_font_size_override("font_size", 22)
+	_results_label.add_theme_font_size_override("font_size", 20)
 	_results_label.add_theme_color_override("font_color", Color(0.96, 0.94, 0.89))
 	_results_panel.add_child(_results_label)
 
 	_retry_button = MENU_BUTTON_SCRIPT.new() as Button
 	_retry_button.text = "RETRY"
-	_retry_button.position = Vector2(120.0, 340.0)
+	_retry_button.position = Vector2(126.0, 340.0)
 	_retry_button.size = Vector2(170.0, 48.0)
 	_retry_button.disabled = true
 	_apply_menu_button_art(_retry_button)
 	_retry_button.add_theme_font_size_override("font_size", 16)
 	_retry_button.pressed.connect(_on_retry_pressed)
 	_results_panel.add_child(_retry_button)
+	_mastery_button = MENU_BUTTON_SCRIPT.new() as Button
+	_mastery_button.text = "MASTERY RUN"
+	_mastery_button.position = Vector2(225.0, 340.0)
+	_mastery_button.size = Vector2(170.0, 48.0)
+	_mastery_button.disabled = true
+	_mastery_button.visible = false
+	_apply_menu_button_art(_mastery_button)
+	_mastery_button.add_theme_font_size_override("font_size", 16)
+	_mastery_button.pressed.connect(_on_mastery_pressed)
+	_results_panel.add_child(_mastery_button)
 	_continue_button = MENU_BUTTON_SCRIPT.new() as Button
 	_continue_button.text = "CONTINUE"
-	_continue_button.position = Vector2(330.0, 340.0)
+	_continue_button.position = Vector2(324.0, 340.0)
 	_continue_button.size = Vector2(170.0, 48.0)
 	_continue_button.disabled = true
 	_apply_menu_button_art(_continue_button, true)
@@ -861,7 +1028,8 @@ func _create_pause_overlay() -> void:
 	_pause_resume_button = _add_pause_button(menu_column, "Resume", _toggle_pause, true)
 	_add_pause_button(menu_column, "Settings", _show_pause_settings)
 	_add_pause_button(menu_column, "Restart", restart_race)
-	var return_label := "Return to Title" if String(_session.get("mode", "quick")) == "quick" else "Return to Championship"
+	var mode := String(_session.get("mode", "quick"))
+	var return_label := "Return to Discovery" if mode == "discovery" else ("Return to Title" if mode == "quick" else "Return to Championship")
 	_add_pause_button(menu_column, return_label, request_abandon)
 
 	_pause_settings_panel = PanelContainer.new()
@@ -1010,16 +1178,43 @@ func _on_retry_pressed() -> void:
 		_attempt_result_commit(race_manager.get_results())
 
 
+func _on_mastery_pressed() -> void:
+	_set_paused(false)
+	var app := get_node_or_null("/root/App")
+	if app and app.has_method("start_mastery_rematch"):
+		app.call("start_mastery_rematch")
+
+
 func _attempt_result_commit(results: Array) -> void:
 	var committed := _report_result_to_app(results)
 	_retry_button.disabled = false
 	_continue_button.disabled = not committed
-	_retry_button.text = "Retry" if committed else "Retry Save"
+	_retry_button.text = ("RETRY MASTERY" if String(_session.get("mode", "")) == "mastery" else "RETRY") if committed else "RETRY SAVE"
+	var app := get_node_or_null("/root/App")
+	var mastery_available := committed and app and app.has_method("can_start_mastery_rematch") and bool(app.call("can_start_mastery_rematch"))
+	_mastery_button.visible = mastery_available
+	_mastery_button.disabled = not mastery_available
+	_layout_result_actions(mastery_available)
+	_retry_button.focus_neighbor_right = _retry_button.get_path_to(_mastery_button if mastery_available else _continue_button)
+	_continue_button.focus_neighbor_left = _continue_button.get_path_to(_mastery_button if mastery_available else _retry_button)
+	if mastery_available:
+		_mastery_button.focus_neighbor_left = _mastery_button.get_path_to(_retry_button)
+		_mastery_button.focus_neighbor_right = _mastery_button.get_path_to(_continue_button)
 	_update_results(results)
 	if committed:
 		_continue_button.grab_focus()
 	else:
 		_retry_button.grab_focus()
+
+
+func _layout_result_actions(mastery_available: bool) -> void:
+	if mastery_available:
+		_retry_button.position.x = 26.0
+		_mastery_button.position.x = 225.0
+		_continue_button.position.x = 424.0
+	else:
+		_retry_button.position.x = 126.0
+		_continue_button.position.x = 324.0
 
 
 func _report_result_to_app(results: Array) -> bool:
@@ -1029,7 +1224,12 @@ func _report_result_to_app(results: Array) -> bool:
 		return true
 	for result: Dictionary in results:
 		if result.get("vehicle") == _player_vehicle:
-			var committed := bool(app.call("report_race_result", int(result["position"]), float(result["time"]), results, bool(result.get("dnf", false))))
+			var finish_time := float(result["time"])
+			var performance := {
+				"best_lap": 0.0 if is_inf(_best_lap) else _best_lap,
+				"ghost_samples": PERSONAL_GHOST_SCRIPT.finalize_samples(_ghost_samples, finish_time),
+			}
+			var committed := bool(app.call("report_race_result", int(result["position"]), finish_time, results, bool(result.get("dnf", false)), performance))
 			if not committed and app.has_method("get_last_save_error"):
 				_save_error = String(app.call("get_last_save_error"))
 			return committed

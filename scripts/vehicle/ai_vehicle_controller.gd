@@ -835,10 +835,22 @@ func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
 	var avoid := Vector2.ZERO
 	for node: Node in vehicle.get_tree().get_nodes_in_group("track_hazard"):
 		var hazard := node as EnvironmentalHazard
-		if hazard == null or hazard.state == EnvironmentalHazard.HazardState.COOLDOWN:
+		if hazard == null:
 			continue
-		var local_hazard := hazard.start_position.lerp(hazard.end_position, hazard.get_travel_progress() if hazard.state == EnvironmentalHazard.HazardState.ACTIVE else 0.5)
-		var offset := hazard.to_global(local_hazard) - vehicle.global_position
+		var danger_center := hazard.to_global(hazard.start_position.lerp(hazard.end_position, 0.5))
+		var arrival_horizon := clampf(vehicle.global_position.distance_to(danger_center) / maxf(vehicle.speed, 180.0), 0.15, 1.2)
+		var prediction := hazard.get_prediction(arrival_horizon)
+		if not bool(prediction["collision_active"]):
+			if hazard.is_collision_active():
+				prediction = hazard.get_prediction(0.0)
+			else:
+				var time_until_danger := hazard.get_time_until_danger()
+				if time_until_danger > arrival_horizon + 0.35:
+					continue
+				prediction = hazard.get_prediction(time_until_danger + hazard.active_duration * 0.45)
+		if not bool(prediction["collision_active"]):
+			continue
+		var offset := hazard.to_global(prediction["position"]) - vehicle.global_position
 		if offset.length() > HAZARD_AVOID_DISTANCE or offset.dot(forward) < 0.0:
 			continue
 		var away := offset.orthogonal().normalized()

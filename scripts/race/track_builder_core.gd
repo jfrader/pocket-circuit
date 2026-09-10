@@ -5,6 +5,8 @@ class_name TrackBuilderCore
 ## the race can generate any arbitrary seed on demand.
 
 const CHECKPOINT_SCRIPT := preload("res://scripts/race/checkpoint.gd")
+const VISUAL_ROLE_CONTRACT := preload("res://scripts/race/generated_world_visual_role.gd")
+const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
@@ -29,6 +31,8 @@ const ISLAND_TOP_LIP_WIDTH := 8.0
 const GATE_SENSOR_THICKNESS := 70.0
 const GATE_POST_OFFSET := HALF_WIDTH + 24.0
 const GATE_POST_SIZE := Vector2(42.0, 24.0)
+const FINISH_LANDMARK_OFFSET := HALF_WIDTH + 26.0
+const FINISH_LANDMARK_SIZE := Vector2(64.0, 36.0)
 const SHADOW_CIRCLE_TEXTURE := "res://assets/textures/edge_dressing/shadow_soft_circle.png"
 const SHADOW_RECT_TEXTURE := "res://assets/textures/edge_dressing/shadow_soft_rect.png"
 const SHADOW_DIRECTION := Vector2(0.62, 0.78)
@@ -36,20 +40,173 @@ const SHADOW_TINT := Color("3f2a22", 0.35)
 const GIANT_CAST_SHADOW_TINT := Color("3f2a22", 0.15)
 const COLLISION_SOLID := &"solid"
 const COLLISION_FLAT := &"flat"
+const VISUAL_ROLE_SOLID := VISUAL_ROLE_CONTRACT.SOLID
+const VISUAL_ROLE_FLAT := VISUAL_ROLE_CONTRACT.FLAT
+const VISUAL_ROLE_MOVING_HAZARD := VISUAL_ROLE_CONTRACT.MOVING_HAZARD
 const COLLISION_ALPHA_THRESHOLD := 0.08
 const ORIENTED_FOOTPRINT_MIN_ANISOTROPY := 1.35
 const APRON_COLLIDER_CLEARANCE := 36.0
 const FLAT_DRESSING_ROUTE_CLEARANCE := 12.0
 const ROOM_EDGE_TILE_WORLD_LENGTH := 1024.0
 const RACING_LINE_HULL_RADIUS := 22.0
+const VEHICLE_WIDTH := 44.0
+const MIN_VIABLE_CORRIDOR_WIDTH := VEHICLE_WIDTH * 1.6
+const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
+const OBSTACLE_EDGE_INSET := 8.0
 
-## Generated asset contract (authoritative across every constructor below):
+static var GENERATED_OBSTACLE_TYPES := {
+	&"kitchen": [
+		{"id": &"rolling_apple", "asset": "res://assets/textures/kitchen/apple_cartoon.png", "footprint_kind": &"circle", "footprint_size": Vector2(32.0, 32.0), "visual_size": Vector2(42.0, 42.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"cereal_block", "asset": "res://assets/textures/imagine/kitchen_cereal_orange.png", "footprint_kind": &"rect", "footprint_size": Vector2(40.0, 38.0), "visual_size": Vector2(48.0, 48.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+	],
+	&"workshop": [
+		{"id": &"dropped_screwdriver", "asset": "res://assets/textures/imagine/screwdriver.png", "footprint_kind": &"rect", "footprint_size": Vector2(56.0, 20.0), "visual_size": Vector2(64.0, 24.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"loose_wrench", "asset": "res://assets/textures/imagine/wrench.png", "footprint_kind": &"rect", "footprint_size": Vector2(52.0, 20.0), "visual_size": Vector2(62.0, 26.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+	],
+	&"office": [
+		{"id": &"loose_keycap", "asset": "res://assets/textures/imagine/office_keycap.png", "footprint_kind": &"rect", "footprint_size": Vector2(42.0, 42.0), "visual_size": Vector2(42.0, 42.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"fallen_pencil", "asset": "res://assets/textures/imagine/pencil.png", "footprint_kind": &"rect", "footprint_size": Vector2(64.0, 22.0), "visual_size": Vector2(64.0, 22.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"binder_clip", "asset": "res://assets/textures/edge_dressing/office_binder_clip_micro.png", "footprint_kind": &"circle", "footprint_size": Vector2(34.0, 34.0), "visual_size": Vector2(34.0, 34.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+	],
+}
+static func _footprint_projected_extent(footprint_size: Vector2, shape_kind: StringName, rotation: float, axis: Vector2) -> float:
+	if shape_kind == &"circle":
+		return maxf(footprint_size.x, footprint_size.y) * 0.5
+	var normalized_axis := axis.normalized()
+	var local_x := Vector2.RIGHT.rotated(rotation)
+	var local_y := Vector2.DOWN.rotated(rotation)
+	return absf(normalized_axis.dot(local_x)) * footprint_size.x * 0.5 + absf(normalized_axis.dot(local_y)) * footprint_size.y * 0.5
+static func _plan_generated_obstacles(
+		theme: StringName,
+		spec: Dictionary,
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		moments: Dictionary
+) -> Array[Dictionary]:
+	var plan: Array[Dictionary] = []
+	if not bool(spec.get("obstacles_enabled", true)):
+		return plan
+	var roster: Array = GENERATED_OBSTACLE_TYPES.get(theme, [])
+	if roster.is_empty():
+		return plan
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.get("obstacle_seed", 0))
+	var act := clampi(int(spec.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
+	var target_count := GENERATED_RULES.roll_obstacle_count(act, rng)
+	var standard_route := _racing_line_points(centerline, moments, false)
+	var shortcut_route := _racing_line_points(centerline, moments, true)
+	var protected_indices := PackedInt32Array([
+		0,
+		int(moments.get("early_conflict_forward", 0)),
+		int(moments.get("early_conflict_reverse", 0)),
+		int(moments.get("shortcut", 0)),
+		int(moments.get("technical", 0)),
+	])
+	var occupied: Array[Dictionary] = []
+	for slot in target_count:
+		var definition: Dictionary = (roster[posmod(rng.randi(), roster.size())] as Dictionary).duplicate(true)
+		var footprint_size: Vector2 = definition["footprint_size"]
+		var shape_kind := StringName(definition["footprint_kind"])
+		var preferred_index := rng.randi_range(0, centerline.size() - 1)
+		var preferred_side := -1.0 if rng.randi() % 2 == 0 else 1.0
+		var placed := false
+		for attempt in centerline.size():
+			var index := posmod(preferred_index + attempt * 37, centerline.size())
+			if _turn_strength(centerline, index, 10) > 0.10:
+				continue
+			var protected := false
+			for protected_index: int in protected_indices:
+				if _cyclic_index_distance(index, protected_index, centerline.size()) < 22:
+					protected = true
+					break
+			if protected:
+				continue
+			var tangent := _sample_tangent(centerline, index)
+			var normal := tangent.rotated(PI * 0.5)
+			var rotation := tangent.angle() if footprint_size.x >= footprint_size.y else tangent.angle() - PI * 0.5
+			var lateral_extent := _footprint_projected_extent(footprint_size, shape_kind, rotation, normal)
+			var route_offset := (standard_route[index] - centerline[index]).dot(normal)
+			var side := -signf(route_offset) if not is_zero_approx(route_offset) else preferred_side
+			var lateral_offset := HALF_WIDTH - OBSTACLE_EDGE_INSET - lateral_extent
+			var candidate := centerline[index] + normal * side * lateral_offset
+			var viable_width := HALF_WIDTH + absf(lateral_offset) - lateral_extent
+			if viable_width + 0.001 < MIN_VIABLE_CORRIDOR_WIDTH:
+				continue
+			if not _clear_of_points(candidate, gate_samples, maxf(90.0, footprint_size.length())):
+				continue
+			if not _clear_of_occupied(candidate, footprint_size.length() * 0.5, occupied):
+				continue
+			var route_clearance := float(definition.get("clearance", OBSTACLE_ROUTE_CLEARANCE))
+			if not _line_sweep_clears_footprint(standard_route, candidate, footprint_size, shape_kind, rotation, route_clearance):
+				continue
+			if not _line_sweep_clears_footprint(shortcut_route, candidate, footprint_size, shape_kind, rotation, route_clearance):
+				continue
+			definition["instance_id"] = "%s_%02d" % [String(definition["id"]), slot]
+			definition["position"] = candidate
+			definition["rotation"] = rotation
+			definition["centerline_index"] = index
+			definition["side"] = side
+			definition["visual_bounds"] = Rect2(-(definition["visual_size"] as Vector2) * 0.5, definition["visual_size"])
+			definition["lateral_footprint_extent"] = lateral_extent
+			definition["lateral_center_offset"] = absf((candidate - centerline[index]).dot(normal))
+			definition["viable_corridor_width"] = viable_width
+			definition["validated_ai_routes"] = PackedStringArray(["RacingLine", "ShortcutRacingLine"])
+			plan.append(definition)
+			occupied.append({"position": candidate, "radius": footprint_size.length() * 0.5})
+			placed = true
+			break
+		if not placed:
+			push_warning("TrackBuilderCore: skipped an obstacle that had no AI-safe placement")
+	return plan
+
+
+static func _plan_generated_hazard(theme: StringName, spec: Dictionary, centerline: PackedVector2Array, moments: Dictionary) -> Dictionary:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = int(spec.get("hazard_seed", 0))
+	var act := clampi(int(spec.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
+	var footprint_size := Vector2(60.0, 60.0)
+	var footprint_kind := &"circle"
+	if theme == &"workshop":
+		footprint_size = Vector2(58.0, 58.0)
+	elif theme == &"office":
+		footprint_size = Vector2(60.0, 36.0)
+		footprint_kind = &"rect"
+	var paths := {}
+	for direction: String in ["forward", "reverse"]:
+		var index := int(moments["early_conflict_%s" % direction])
+		paths[direction] = _crossing_path(centerline, index, 96.0)
+	return {
+		"version": 1,
+		"id": &"%s_crossing" % String(theme),
+		"seed": int(spec.get("hazard_seed", 0)),
+		"act": act,
+		"theme": theme,
+		"present": GENERATED_RULES.roll_hazard_present(act, rng),
+		"presence_chance": GENERATED_RULES.hazard_chance(act),
+		"role": &"moving_hazard",
+		"visual_role": VISUAL_ROLE_MOVING_HAZARD,
+		"footprint_kind": footprint_kind,
+		"footprint_size": footprint_size,
+		"visual_bounds": Rect2(-footprint_size * 0.5, footprint_size),
+		"clearance": OBSTACLE_ROUTE_CLEARANCE,
+		"paths": paths,
+		"entry_distance": 78.0,
+		"exit_distance": 92.0,
+		"idle_duration": rng.randf_range(0.8, 1.35),
+		"warning_duration": rng.randf_range(1.45, 1.65) - float(act - 1) * 0.14,
+		"active_duration": rng.randf_range(1.35, 1.7),
+		"exit_duration": rng.randf_range(0.45, 0.7),
+		"cooldown_duration": rng.randf_range(3.1, 3.8) - float(act - 1) * 0.25,
+		"danger_states": PackedStringArray(["active", "exit"]),
+	}
 ## - PROP_SHAPES contains ordinary SOLID props. `shape` is `circle` or `rect`,
 ##   and `size` is the intended visual size before constructor scaling.
 ## - SOLID_EDGE_SHAPES contains SOLID edge details whose `shape` footprint is
 ##   fitted from trimmed alpha because their presentation size varies per seed.
 ## - FLAT_EDGE_ASSETS contains painted/material details and must never collide.
-## The collision_contract metadata on generated nodes mirrors these registries.
+## `visual_role` is the player-facing contract: SOLID stops cars, FLAT is
+## drive-over presentation, and MOVING_HAZARD is a telegraphed dynamic threat.
+## `collision_contract` remains as compatibility metadata for collision audits.
 static var SOLID_EDGE_SHAPES := {
 	"screw_small.png": &"rect",
 	"paperclip_micro.png": &"rect",
@@ -130,7 +287,7 @@ static var ASSET_FOOTPRINT_OVERRIDES := {
 	"kitchen_sponge.png": {"kind": &"rect", "no_rotation": true},
 	"napkin.png": {"kind": &"rect", "no_rotation": true},
 	"hazard_workshop_socket.png": {"kind": &"convex", "no_rotation": true},
-	"hazard_office_cable.png": {"kind": &"convex", "no_rotation": true},
+
 	"workshop_toolbox_top_bright.jpg": {"kind": &"rect", "no_rotation": true},
 	"office_keyboard_top_bright.jpg": {"kind": &"rect", "no_rotation": true},
 	"stove_top.png": {"kind": &"rect", "no_rotation": true},
@@ -232,7 +389,7 @@ static var ISLAND_VIGNETTES := {
 static var STORY_KITS := {
 	&"kitchen": [
 		{
-			"id": &"breakfast_service",
+			"id": StringName(GENERATED_RULES.STORY_IDS["kitchen"][0]),
 			"giants": ["res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", "res://assets/textures/giant_props/giant_milk_carton.png", "res://assets/textures/giant_props/giant_cereal_box.png"],
 			"island": [
 				{"asset": "res://assets/textures/imagine/stove_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
@@ -248,7 +405,7 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"vegetable_prep",
+			"id": StringName(GENERATED_RULES.STORY_IDS["kitchen"][1]),
 			"island": [
 				{"asset": "res://assets/textures/kitchen/cutting_board.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-28, 0)},
 				{"asset": "res://assets/textures/imagine/frying_pan.png", "quantity": &"few", "count": 2, "formation": &"arc", "offset": Vector2(70, -22)},
@@ -263,7 +420,7 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"afternoon_tea",
+			"id": StringName(GENERATED_RULES.STORY_IDS["kitchen"][2]),
 			"opening_asset": "res://assets/textures/kitchen_hero/hero_kitchen_mug.png",
 			"giants": ["res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png"],
 			"island": [
@@ -280,7 +437,7 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"counter_cleanup",
+			"id": StringName(GENERATED_RULES.STORY_IDS["kitchen"][3]),
 			"giants": ["res://assets/textures/giant_props/giant_milk_carton.png", "res://assets/textures/giant_props/giant_fork.png"],
 			"island": [
 				{"asset": "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 160.0},
@@ -298,7 +455,7 @@ static var STORY_KITS := {
 	],
 	&"workshop": [
 		{
-			"id": &"carpentry_bench",
+			"id": StringName(GENERATED_RULES.STORY_IDS["workshop"][0]),
 			"island": [
 				{"asset": "res://assets/textures/workshop_hero/hero_workshop_toolbox.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 120.0},
 				{"asset": "res://assets/textures/imagine/hammer.png", "quantity": &"few", "count": 2, "formation": &"line", "offset": Vector2(70, -8)},
@@ -313,7 +470,7 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"paint_station",
+			"id": StringName(GENERATED_RULES.STORY_IDS["workshop"][1]),
 			"island": [
 				{"asset": "res://assets/textures/workshop_hero/hero_workshop_paint_can.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 120.0},
 				{"asset": "res://assets/textures/imagine/workshop_paint_can.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
@@ -328,7 +485,7 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"repair_job",
+			"id": StringName(GENERATED_RULES.STORY_IDS["workshop"][2]),
 			"island": [
 				{"asset": "res://assets/textures/workshop_hero/hero_workshop_toolbox.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 120.0},
 				{"asset": "res://assets/textures/workshop_hero/hero_workshop_wrench.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
@@ -343,7 +500,7 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"garage_sort",
+			"id": StringName(GENERATED_RULES.STORY_IDS["workshop"][3]),
 			"island": [
 				{"asset": "res://assets/textures/imagine/hose_coil.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
 				{"asset": "res://assets/textures/imagine/bucket_stack.png", "quantity": &"few", "count": 2, "formation": &"arc", "offset": Vector2(72, -8)},
@@ -360,7 +517,7 @@ static var STORY_KITS := {
 	],
 	&"office": [
 		{
-			"id": &"dual_workstation",
+			"id": StringName(GENERATED_RULES.STORY_IDS["office"][0]),
 			"opening_asset": "res://assets/textures/office_hero/hero_office_notebook.png",
 			"island": [
 				{"asset": "res://assets/textures/office_hero/hero_office_keyboard.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 210.0},
@@ -368,7 +525,7 @@ static var STORY_KITS := {
 				{"asset": "res://assets/textures/imagine/paperclip.png", "quantity": &"many", "count": 16, "formation": &"cluster", "offset": Vector2(4, 78)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/paperclip.png", "count": 16},
-			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
+			"delimiter": {"asset": "res://assets/textures/imagine/remote_control.png", "count": 2},
 			"landmarks": ["res://assets/textures/imagine/lamp_desk.png", "res://assets/textures/office_hero/hero_office_notebook.png"],
 			"surfaces": [
 				{"name": &"workstation papers", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/paper_sheet.png"},
@@ -376,14 +533,14 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"mail_sort",
+			"id": StringName(GENERATED_RULES.STORY_IDS["office"][1]),
 			"island": [
 				{"asset": "res://assets/textures/office_hero/hero_office_notebook.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 140.0},
 				{"asset": "res://assets/textures/imagine/stapler_top.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(70, -8)},
 				{"asset": "res://assets/textures/imagine/paperclip.png", "quantity": &"many", "count": 14, "formation": &"cluster", "offset": Vector2(4, 78)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/paperclip.png", "count": 14},
-			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
+			"delimiter": {"asset": "res://assets/textures/imagine/tape_roll.png", "count": 2},
 			"landmarks": ["res://assets/textures/imagine/monitor_top.png", "res://assets/textures/imagine/tape_roll.png"],
 			"surfaces": [
 				{"name": &"mail papers", "grip": 0.8, "speed": 0.74, "decal": "res://assets/textures/imagine/paper_sheet.png"},
@@ -391,7 +548,7 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"sketch_session",
+			"id": StringName(GENERATED_RULES.STORY_IDS["office"][2]),
 			"opening_asset": "res://assets/textures/office_hero/hero_office_notebook.png",
 			"island": [
 				{"asset": "res://assets/textures/imagine/crayons.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
@@ -399,7 +556,7 @@ static var STORY_KITS := {
 				{"asset": "res://assets/textures/imagine/pencil.png", "quantity": &"many", "count": 10, "formation": &"arc", "offset": Vector2(4, 80)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/pencil.png", "count": 10},
-			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
+			"delimiter": {"asset": "res://assets/textures/imagine/stapler_top.png", "count": 2},
 			"landmarks": ["res://assets/textures/office_hero/hero_office_notebook.png", "res://assets/textures/imagine/lamp_desk.png"],
 			"surfaces": [
 				{"name": &"sketch papers", "grip": 0.83, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
@@ -407,7 +564,7 @@ static var STORY_KITS := {
 			],
 		},
 		{
-			"id": &"coffee_break",
+			"id": StringName(GENERATED_RULES.STORY_IDS["office"][3]),
 			"opening_asset": "res://assets/textures/office_hero/hero_office_notebook.png",
 			"island": [
 				{"asset": "res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
@@ -415,7 +572,7 @@ static var STORY_KITS := {
 				{"asset": "res://assets/textures/office_hero/hero_office_keycap.png", "quantity": &"many", "count": 12, "formation": &"cluster", "offset": Vector2(4, 78)},
 			],
 			"object_line": {"asset": "res://assets/textures/imagine/paperclip.png", "count": 12},
-			"delimiter": {"asset": "res://assets/textures/imagine/hazard_office_cable.png", "count": 2},
+			"delimiter": {"asset": "res://assets/textures/imagine/pencil.png", "count": 2},
 			"landmarks": ["res://assets/textures/office_hero/hero_office_notebook.png", "res://assets/textures/imagine/lamp_desk.png"],
 			"surfaces": [
 				{"name": &"coffee papers", "grip": 0.81, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
@@ -441,7 +598,7 @@ static var PROP_SHAPES := {
 	"plank_wood.png": {"shape": "rect", "size": Vector2(100.0, 38.0)},
 	"book_top.png": {"shape": "rect", "size": Vector2(84.0, 62.0)},
 	"remote_control.png": {"shape": "rect", "size": Vector2(76.0, 42.0)},
-	"hazard_office_cable.png": {"shape": "rect", "size": Vector2(96.0, 26.0)},
+
 	"hazard_workshop_socket.png": {"shape": "rect", "size": Vector2(96.0, 26.0)},
 	"cutting_board.png": {"shape": "rect", "size": Vector2(96.0, 60.0)},
 	"screwdriver.png": {"shape": "rect", "size": Vector2(56.0, 20.0)},
@@ -842,7 +999,7 @@ const LAYOUTS := {
 		"boundary_long": [
 			"res://assets/textures/kitchen/ruler_plank.png",
 			"res://assets/textures/imagine/office_keycap.png",
-			"res://assets/textures/imagine/hazard_office_cable.png",
+			"res://assets/textures/imagine/pencil.png",
 		],
 		"generated_boundary": {
 			"section": "res://assets/textures/track_boundary/office_pencil_rail.png",
@@ -916,7 +1073,7 @@ const LAYOUTS := {
 			"Sponge": {"pos": Vector2(-180, 300), "r": 34.0, "tex": "res://assets/textures/kitchen/sponge_wet.png"},
 			"Ruler": {"pos": Vector2(-60, 200), "r": 32.0, "tex": "res://assets/textures/kitchen/ruler_plank.png"},
 			"Fork": {"pos": Vector2(-820, -330), "r": 34.0, "tex": "res://assets/textures/kitchen/fork_cartoon.png"},
-			"Spoon": {"pos": Vector2(830, 120), "r": 36.0, "tex": "res://assets/textures/imagine/hazard_office_cable.png"},
+			"Remote": {"pos": Vector2(830, 120), "r": 36.0, "tex": "res://assets/textures/imagine/remote_control.png"},
 			"Apple": {"pos": Vector2(-470, 60), "r": 36.0, "tex": "res://assets/textures/kitchen/apple_cartoon.png"},
 			"Lime": {"pos": Vector2(-410, 170), "r": 36.0, "tex": "res://assets/textures/kitchen/lime_cartoon.png"},
 			"Cup": {"pos": Vector2(-560, 540), "r": 36.0, "tex": "res://assets/textures/kitchen/cup_cartoon.png"},
@@ -933,8 +1090,8 @@ const LAYOUTS := {
 }
 
 
-static func build_packed(theme: StringName, room_shape: StringName, seed: int) -> Dictionary:
-	var prepared := prepare_layout(theme, room_shape, seed)
+static func build_packed(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
+	var prepared := prepare_layout(theme, room_shape, seed, generation_options)
 	if prepared.is_empty():
 		return {"scene": null, "seed": seed}
 	var root := create_layout_root(prepared)
@@ -943,10 +1100,10 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int) -
 	var packed := PackedScene.new()
 	packed.pack(root)
 	root.free()
-	return {"scene": packed, "seed": prepared["seed"]}
+	return {"scene": packed, "seed": prepared["seed"], "racing_line_metrics": (prepared.get("racing_line_metrics", {}) as Dictionary).duplicate(true)}
 
 
-static func prepare_layout(theme: StringName, room_shape: StringName, seed: int) -> Dictionary:
+static func prepare_layout(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
 	if not LAYOUTS.has(theme) or not ROOM_SHAPES.has(room_shape):
 		return {}
 	var spec: Dictionary = LAYOUTS[theme]
@@ -991,12 +1148,22 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int)
 		spec["generation_attempt"] = int(gen.get("attempt", 0))
 		spec["generation_fallback"] = bool(gen.get("fallback", false))
 		spec["loop_length"] = float(gen["length"])
+		var sub_seeds: Dictionary = generation_options.get("sub_seeds", {})
+		spec["material_seed"] = int(generation_options.get("material_seed", sub_seeds.get("material", _mix_seed(seed, "material"))))
+		spec["dressing_seed"] = int(generation_options.get("dressing_seed", sub_seeds.get("dressing", _mix_seed(seed, String(theme)))))
+		spec["material_id"] = String(generation_options.get("material_id", ""))
+		spec["palette_id"] = String(generation_options.get("palette_id", ""))
 		var kits: Array = STORY_KITS.get(theme, STORY_KITS[&"kitchen"])
-		var kit_index := posmod(_mix_seed(seed, String(theme)), kits.size())
+		var kit_index := GENERATED_RULES.story_index(theme, int(spec["dressing_seed"]))
 		spec["story_kit"] = (kits[kit_index] as Dictionary).duplicate(true)
-		spec["story_id"] = StringName(spec["story_kit"]["id"])
+		spec["story_id"] = GENERATED_RULES.story_id(theme, int(spec["dressing_seed"]))
+		spec["story_kit"]["id"] = spec["story_id"]
 		spec["island_expansion"] = 10.0
 		spec.erase("gate_fractions")
+		spec["obstacle_seed"] = int(generation_options.get("obstacle_seed", sub_seeds.get("obstacle", _mix_seed(seed, "obstacle_plan"))))
+		spec["hazard_seed"] = int(generation_options.get("hazard_seed", sub_seeds.get("hazard", _mix_seed(seed, "hazard_plan"))))
+		spec["act"] = clampi(int(generation_options.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
+		spec["obstacles_enabled"] = bool(generation_options.get("obstacles_enabled", true))
 		used_seed = int(gen["seed"])
 	var centerline := _sample_centerline(spec["controls"])
 	var edges := _corridor_edges(centerline)
@@ -1007,7 +1174,47 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int)
 		var inner := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
 		edges["inner_boundary"] = _simple_inner_boundary_loop(inner, centerline)
 		edges["outer_boundary"] = _simple_boundary_loop(outer, centerline)
-	return {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed}
+		var gate_samples := _layout_gate_samples(centerline, spec)
+		var moments := _analyze_track_moments(centerline, gate_samples)
+		spec["obstacle_plan"] = _plan_generated_obstacles(theme, spec, centerline, gate_samples, moments)
+		spec["hazard_plan"] = _plan_generated_hazard(theme, spec, centerline, moments)
+	var prepared := {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed}
+	prepared["racing_line_metrics"] = racing_line_metrics_from_prepared(prepared)
+	return prepared
+
+
+static func racing_line_metrics_from_prepared(prepared: Dictionary) -> Dictionary:
+	if prepared.is_empty() or prepared.get("centerline") is not PackedVector2Array or prepared.get("spec") is not Dictionary:
+		return {}
+	var centerline: PackedVector2Array = prepared["centerline"]
+	var spec: Dictionary = prepared["spec"]
+	var gate_samples := _layout_gate_samples(centerline, spec)
+	var moments := _analyze_track_moments(centerline, gate_samples)
+	var racing_line := _racing_line_points(centerline, moments, false)
+	if racing_line.size() < 3:
+		return {}
+	var racing_line_length := 0.0
+	var absolute_turn_radians := 0.0
+	var technical_samples := 0
+	var max_sample_turn_radians := 0.0
+	for index in racing_line.size():
+		racing_line_length += racing_line[index].distance_to(racing_line[(index + 1) % racing_line.size()])
+		var incoming := (racing_line[index] - racing_line[posmod(index - 1, racing_line.size())]).normalized()
+		var outgoing := (racing_line[(index + 1) % racing_line.size()] - racing_line[index]).normalized()
+		var sample_turn := absf(incoming.angle_to(outgoing))
+		absolute_turn_radians += sample_turn
+		max_sample_turn_radians = maxf(max_sample_turn_radians, sample_turn)
+		if sample_turn >= 0.035:
+			technical_samples += 1
+	return {
+		"racing_line_length": racing_line_length,
+		"absolute_turn_radians": absolute_turn_radians,
+		"turn_demand": absolute_turn_radians / TAU,
+		"technical_fraction": float(technical_samples) / maxf(float(racing_line.size()), 1.0),
+		"max_sample_turn_radians": max_sample_turn_radians,
+		"sample_count": racing_line.size(),
+		"seed": int(prepared["seed"]),
+	}
 
 
 static func create_layout_root(prepared: Dictionary) -> Node2D:
@@ -1033,6 +1240,15 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
 		root.set_meta("room_polygon", room_polygon)
 		root.set_meta("world_scale", WORLD_SCALE)
+		root.set_meta("material_seed", int(spec["material_seed"]))
+		root.set_meta("dressing_seed", int(spec["dressing_seed"]))
+		root.set_meta("material_id", String(spec.get("material_id", "")))
+		root.set_meta("palette_id", String(spec.get("palette_id", "")))
+		root.set_meta("obstacle_seed", int(spec["obstacle_seed"]))
+		root.set_meta("hazard_seed", int(spec["hazard_seed"]))
+		root.set_meta("obstacles_enabled", bool(spec["obstacles_enabled"]))
+		root.set_meta("generated_obstacle_plan", (spec.get("obstacle_plan", []) as Array).duplicate(true))
+		root.set_meta("generated_hazard_plan", (spec.get("hazard_plan", {}) as Dictionary).duplicate(true))
 	return root
 
 
@@ -1087,6 +1303,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 	var room_bounds := _polygon_bounds_rect(room_polygon)
 	var backdrop := room_bounds.grow(760.0)
 	_add_polygon(root, "Floor", _rect_points(backdrop.get_center(), backdrop.size), Color("111316"), -22)
+	_mark_flat_visual(root.get_node("Floor") as Polygon2D, "", &"void_backdrop")
 	var room_surface := _expand_loop(room_polygon, 26.0)
 	_add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20, spec.get("floor_tile_world_size", DEFAULT_FLOOR_TILE_WORLD_SIZE))
 	if stage.is_valid():
@@ -1107,6 +1324,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		# the themed TrackSurface directly; a translucent annular overlay produces
 		# visible triangulation fans in deep notches and L-shaped routes.
 		_add_polygon(root, "TrackRibbon", clipped, Color(1.0, 0.96, 0.88, 0.17), -10)
+		_mark_flat_visual(root.get_node("TrackRibbon") as Polygon2D, "", &"track_surface")
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
 		_add_centerline_tiles(root, centerline, track_texture, float(spec.get("track_tile_modulate", 1.35)), spec.get("track_world_tile_size", Vector2.ZERO), float(spec.get("track_opacity", 0.52)))
@@ -1177,27 +1395,9 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		if spec.get("seed_obstacles", false):
 			_add_gate_posts(root, spec, sample, tangent, gate_index)
 
-	# Bold checker strip at the finish gate (two alternating rows across the corridor)
-	var finish_normal := start_tangent.rotated(PI * 0.5)
-	var strip_half := Vector2(finish_normal.y, -finish_normal.x) * HALF_WIDTH
-	var checker_white := PackedVector2Array()
-	var checker_black := PackedVector2Array()
-	var checker_count := 6
-	var cell_half := Vector2(finish_normal.y, -finish_normal.x) * (HALF_WIDTH / float(checker_count))
-	for row in 2:
-		var row_center := start + finish_normal * (30.0 - float(row) * 60.0)
-		for column in checker_count:
-			var cell_center := row_center + cell_half * (float(column) * 2.0 - float(checker_count - 1))
-			var cell_color := Color("f5eec8") if (column + row) % 2 == 0 else Color("0d0f14")
-			var target: PackedVector2Array = checker_white if (column + row) % 2 == 0 else checker_black
-			target.append(cell_center + finish_normal * 30.0 + cell_half)
-			target.append(cell_center + finish_normal * 30.0 - cell_half)
-			target.append(cell_center - finish_normal * 30.0 - cell_half)
-			target.append(cell_center - finish_normal * 30.0 + cell_half)
-	_add_polygon(root, "StartFinishWhite", checker_white, Color("f5eec8"), -7)
-	_add_polygon(root, "StartFinishBlack", checker_black, Color("0d0f14"), -6)
-	_mark_flat_visual(root.get_node("StartFinishWhite") as Polygon2D, "", &"checker")
-	_mark_flat_visual(root.get_node("StartFinishBlack") as Polygon2D, "", &"checker")
+	# The checker spans the complete nominal corridor. Each color cell is its own
+	# simple polygon so disconnected checks never become a self-crossing polygon.
+	_add_finish_checker(root, start, start_tangent)
 
 	# Follow the centerline arc rather than extending one start tangent through a
 	# nearby corner. This keeps every grid slot inside the drivable corridor on
@@ -1241,6 +1441,7 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 		if stage.is_valid():
 			await stage.call("Placing landmarks")
 		await _compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments, stage)
+		_build_generated_obstacles(root, spec)
 	else:
 		# Canonical/static tracks retain their authored legacy dressing.
 		_fill_island(root, spec, inner_loop, centerline)
@@ -1284,8 +1485,10 @@ static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVecto
 				hardware_index += 1
 
 
-	# Start banner above the finish line
-	_add_start_banner(root, start, start_tangent, corridor)
+	# Generated races use their paired physical gate-zero landmarks in both
+	# directions. Canonical fixtures retain the older one-sided start banner.
+	if not spec.get("seed_obstacles", false):
+		_add_start_banner(root, start, start_tangent, corridor)
 
 
 static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
@@ -1353,6 +1556,7 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 	if texture:
 		# Transparent artwork margins must not make the solid island look hollow.
 		_add_polygon(root, "IslandMaterial", region, spec["island"], -9)
+		_mark_solid_visual(root.get_node("IslandMaterial") as Polygon2D, "", &"raised_island")
 		visual.texture = texture
 		visual.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		visual.modulate = Color(1.2, 1.2, 1.2)
@@ -1372,6 +1576,7 @@ static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVec
 		visual.uv = uvs
 	else:
 		visual.color = spec["island"]
+	_mark_solid_visual(visual, prop_texture, &"raised_island")
 	root.add_child(visual)
 	if spec.get("seed_obstacles", false):
 		await _add_island_rim_landmarks(root, spec, expanded, centerline, stage)
@@ -1389,6 +1594,7 @@ static func _build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, poi
 	face.antialiased = true
 	face.z_index = -8
 	face.set_meta("backs_collision", true)
+	_mark_solid_visual(face, "", &"raised_island_rim")
 	parent.add_child(face)
 
 	var textured := Line2D.new()
@@ -1407,6 +1613,7 @@ static func _build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, poi
 		textured.texture_mode = Line2D.LINE_TEXTURE_TILE
 		textured.set_meta("asset_path", edge_texture_path)
 	textured.set_meta("backs_collision", true)
+	_mark_solid_visual(textured, edge_texture_path, &"raised_island_rim")
 	parent.add_child(textured)
 
 	var lip := Line2D.new()
@@ -1419,6 +1626,7 @@ static func _build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, poi
 	lip.antialiased = true
 	lip.z_index = -5
 	lip.set_meta("backs_collision", true)
+	_mark_solid_visual(lip, "", &"raised_island_rim")
 	parent.add_child(lip)
 
 
@@ -1430,7 +1638,7 @@ static func _add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: 
 	container.name = "IslandRimLandmarks"
 	container.set_meta("placed_count", 3)
 	root.add_child(container)
-	var seed := _mix_seed(int(spec.get("requested_seed", spec.get("seed", 0))), "island_rim_landmarks")
+	var seed := _mix_seed(int(spec.get("dressing_seed", spec.get("requested_seed", spec.get("seed", 0)))), "island_rim_landmarks")
 	var offset := posmod(seed, boundary.size())
 	for landmark_index in 3:
 		if stage.is_valid():
@@ -1480,7 +1688,7 @@ static func _build_generated_outer_boundary_visuals(
 	# number of both-sided moments. Rotating and mirroring the authored pattern
 	# keeps that hierarchy deterministic without reading like a repeating fence.
 	var rng := RandomNumberGenerator.new()
-	rng.seed = _mix_seed(int(spec["requested_seed"]), "boundary_runs:%s" % String(spec["story_id"]))
+	rng.seed = _mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), "boundary_runs:%s" % String(spec["story_id"]))
 	var base_modes: Array[StringName] = [&"both", &"inner", &"both", &"outer", &"both", &"both", &"both", &"none"]
 	var mode_offset := rng.randi_range(0, base_modes.size() - 1)
 	var swap_sides := rng.randf() < 0.5
@@ -1999,6 +2207,46 @@ static func _add_polygon(parent: Node, node_name: String, points: PackedVector2A
 	parent.add_child(polygon)
 
 
+static func _add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2) -> void:
+	var along := tangent.normalized()
+	var across := along.rotated(PI * 0.5)
+	var columns := 6
+	var rows := 2
+	var cell_width := HALF_WIDTH * 2.0 / float(columns)
+	var cell_depth := 36.0
+	var color_counts := {&"White": 0, &"Black": 0}
+	for row in rows:
+		for column in columns:
+			var color_key := &"White" if (row + column) % 2 == 0 else &"Black"
+			var color_index := int(color_counts[color_key])
+			var node_name := "StartFinish%s" % String(color_key) if color_index == 0 else "StartFinish%sCell%02d" % [String(color_key), color_index]
+			var center := finish
+			center += along * (float(row) - float(rows - 1) * 0.5) * cell_depth
+			center += across * (float(column) - float(columns - 1) * 0.5) * cell_width
+			var half_along := along * cell_depth * 0.5
+			var half_across := across * cell_width * 0.5
+			var cell := Polygon2D.new()
+			cell.name = node_name
+			cell.polygon = PackedVector2Array([
+				center - half_along - half_across,
+				center + half_along - half_across,
+				center + half_along + half_across,
+				center - half_along + half_across,
+			])
+			cell.color = Color("f5eec8") if color_key == &"White" else Color("0d0f14")
+			cell.z_index = -7 if color_key == &"White" else -6
+			cell.set_meta("checker_color", color_key)
+			cell.set_meta("checker_cell", row * columns + column)
+			_mark_flat_visual(cell, "", &"checker")
+			parent.add_child(cell)
+			color_counts[color_key] = color_index + 1
+	for color_key: StringName in color_counts:
+		var first := parent.get_node("StartFinish%s" % String(color_key))
+		first.set_meta("checker_cell_count", int(color_counts[color_key]))
+		first.set_meta("corridor_span", HALF_WIDTH * 2.0)
+		first.set_meta("bidirectional", true)
+
+
 static func _add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String) -> void:
 	var wall := StaticBody2D.new()
 	wall.name = node_name
@@ -2023,6 +2271,7 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 	side_face.name = "SideFace"
 	side_face.polygon = _rect_points(Vector2(0.0, -14.0), Vector2(length + 60.0, 22.0))
 	side_face.color = Color("262e3a")
+	_mark_solid_visual(side_face, "", &"room_wall")
 	wall.add_child(side_face)
 	var edge_texture_side := load(edge_texture_path) as Texture2D
 	if edge_texture_side:
@@ -2037,11 +2286,15 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 		side_strip.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
 		side_strip.scale = Vector2((length + 60.0) / (edge_texture_side.get_width() * float(side_tiles)), 34.0 / edge_texture_side.get_height())
 		side_strip.modulate = Color(0.85, 0.85, 0.85)
+		side_strip.set_meta("asset_path", edge_texture_path)
+		VISUAL_ROLE_CONTRACT.assign(side_strip, VISUAL_ROLE_SOLID)
+		_mark_solid_visual(side_strip, edge_texture_path, &"room_wall")
 		wall.add_child(side_strip)
 	var top_lip := Polygon2D.new()
 	top_lip.name = "TopLip"
 	top_lip.polygon = _rect_points(Vector2(0.0, -28.0), Vector2(length + 60.0, 5.0))
 	top_lip.color = Color("e8d9b8", 0.85)
+	_mark_solid_visual(top_lip, "", &"room_wall")
 	wall.add_child(top_lip)
 	var edge_texture := load(edge_texture_path) as Texture2D
 	if edge_texture:
@@ -2054,6 +2307,9 @@ static func _add_wall_segment(parent: Node, node_name: String, position: Vector2
 			var offset := (float(tile) - float(tile_count - 1) * 0.5) * ((length + 60.0) / float(tile_count))
 			strip.position = Vector2(offset, 0.0)
 			strip.scale = Vector2((length + 60.0) / (edge_texture.get_width() * float(tile_count)), 50.0 / edge_texture.get_height())
+			strip.set_meta("asset_path", edge_texture_path)
+			VISUAL_ROLE_CONTRACT.assign(strip, VISUAL_ROLE_SOLID)
+			_mark_solid_visual(strip, edge_texture_path, &"room_wall")
 			wall.add_child(strip)
 
 
@@ -2113,16 +2369,22 @@ static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tan
 			continue
 		var post := StaticBody2D.new()
 		post.name = "Gate%02d%s" % [gate_index, "Right" if side > 0 else "Left"]
-		post.position = sample + normal * GATE_POST_OFFSET * float(side)
+		var post_size := FINISH_LANDMARK_SIZE if gate_index == 0 else GATE_POST_SIZE
+		var post_offset := FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET
+		post.position = sample + normal * post_offset * float(side)
 		post.rotation = tangent.angle()
 		post.collision_layer = 16
-		post.z_index = -2
+		post.z_index = -1 if gate_index == 0 else -2
 		post.set_meta("asset_path", asset_path)
 		post.set_meta("gate_index", gate_index)
 		post.set_meta("visible_collision_backing", &"gate_post_sprite")
+		if gate_index == 0:
+			post.set_meta("finish_landmark", true)
+			post.set_meta("landmark_side", &"right" if side > 0 else &"left")
+			post.set_meta("race_directions", PackedStringArray(["forward", "reverse"]))
 		_mark_solid_body(post, asset_path, &"gate_post")
 		container.add_child(post)
-		var sprite_scale := Vector2(GATE_POST_SIZE.x / texture.get_width(), GATE_POST_SIZE.y / texture.get_height())
+		var sprite_scale := Vector2(post_size.x / texture.get_width(), post_size.y / texture.get_height())
 		var footprint := _texture_collision_footprint(texture, &"convex", true)
 		var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale + Vector2.ONE * 2.0
 		var offset := _add_texture_collision(post, texture, sprite_scale, &"convex", true, 2.0)
@@ -2137,6 +2399,9 @@ static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tan
 		_mark_solid_visual(sprite, asset_path, &"gate_post")
 		post.add_child(sprite)
 		container.set_meta("placed_count", int(container.get_meta("placed_count", 0)) + 1)
+	if gate_index == 0:
+		container.set_meta("finish_landmark_paths", [NodePath("Gate00Left"), NodePath("Gate00Right")])
+		container.set_meta("finish_landmark_offset", FINISH_LANDMARK_OFFSET)
 
 
 static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float, span_endpoints: PackedVector2Array = PackedVector2Array()) -> void:
@@ -2303,9 +2568,11 @@ static func _compose_generated_story(
 	_build_finish_moments(container, centerline)
 
 	var hazard_paths := {}
+	var planned_hazard: Dictionary = spec.get("hazard_plan", {})
+	var planned_paths: Dictionary = planned_hazard.get("paths", {})
 	for direction: String in ["forward", "reverse"]:
 		var hazard_index := int(moments["early_conflict_%s" % direction])
-		var hazard_path := _crossing_path(centerline, hazard_index, 82.0)
+		var hazard_path: PackedVector2Array = planned_paths.get(direction, _crossing_path(centerline, hazard_index, 96.0))
 		var conflict := Node2D.new()
 		conflict.name = "EarlyConflict%s" % direction.capitalize()
 		conflict.position = centerline[hazard_index]
@@ -2408,6 +2675,25 @@ static func _analyze_track_moments(centerline: PackedVector2Array, gate_samples:
 	}
 
 
+static func _default_act_for_theme(theme: StringName) -> int:
+	match theme:
+		&"workshop":
+			return 2
+		&"office":
+			return 3
+	return 1
+
+
+static func _layout_gate_samples(centerline: PackedVector2Array, spec: Dictionary) -> PackedVector2Array:
+	var samples := PackedVector2Array()
+	var fractions: Array = spec.get("gate_fractions", [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.84])
+	var arc := _arc_lengths(centerline)
+	var total := arc[arc.size() - 1]
+	for gate_index in GATE_COUNT:
+		samples.append(_sample_at_arc(centerline, arc, total * float(fractions[gate_index])))
+	return samples
+
+
 static func _centerline_arc_positions(centerline: PackedVector2Array) -> PackedFloat32Array:
 	var positions := PackedFloat32Array([0.0])
 	for index in range(1, centerline.size()):
@@ -2455,7 +2741,7 @@ static func _build_opening_landmark(
 	opening.name = "OpeningLandmark"
 	parent.add_child(opening)
 	var assets: Array = story["landmarks"]
-	var asset_index := posmod(_mix_seed(int(spec["requested_seed"]), "opening_asset"), assets.size())
+	var asset_index := posmod(_mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), "opening_asset"), assets.size())
 	var asset_path := String(story.get("opening_asset", assets[asset_index]))
 	opening.set_meta("asset_path", asset_path)
 	opening.set_meta("semantic_quantity", &"unique")
@@ -2571,7 +2857,7 @@ static func _build_island_story(
 	var anchor := _island_anchor(inner_loop, centerline)
 	var island_bounds := _polygon_bounds_rect(inner_loop)
 	var scene_angle := -PI * 0.5 if island_bounds.size.x > island_bounds.size.y else 0.0
-	if _mix_seed(int(spec["requested_seed"]), String(story["id"])) % 2 == 1:
+	if _mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), String(story["id"])) % 2 == 1:
 		scene_angle += PI
 	var placement_region := &"island"
 	var focal_data: Dictionary = story["island"][0]
@@ -2788,13 +3074,13 @@ static func _build_corner_landmarks(
 	landmarks.name = "CornerLandmarks"
 	parent.add_child(landmarks)
 	var assets: Array = story["landmarks"]
-	var asset_start := posmod(_mix_seed(int(spec["requested_seed"]), "landmark_asset"), assets.size())
+	var asset_start := posmod(_mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), "landmark_asset"), assets.size())
 	var available_assets: Array[String] = []
 	for asset_offset in assets.size():
 		var asset_path := String(assets[(asset_start + asset_offset) % assets.size()])
 		if not reserved_unique_assets.has(asset_path):
 			available_assets.append(asset_path)
-	var target_count := mini(1 + posmod(_mix_seed(int(spec["requested_seed"]), "landmarks"), 2), available_assets.size())
+	var target_count := mini(1 + posmod(_mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), "landmarks"), 2), available_assets.size())
 	landmarks.set_meta("requested_count", target_count)
 	var placed_count := 0
 	for corner_slot in corner_indices.size():
@@ -2855,7 +3141,7 @@ static func _build_room_dressing(
 	parent.add_child(dressing)
 	var asset_pool := _room_dressing_assets(story, spec, reserved_unique_assets)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = _mix_seed(int(spec["requested_seed"]), "room_dressing:%s" % String(story["id"]))
+	rng.seed = _mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), "room_dressing:%s" % String(story["id"]))
 	var room_area := absf(_polygon_area(room_polygon))
 	var target_pockets := clampi(int(round(room_area / 450000.0)), 4, 6)
 	var target_count := target_pockets * 3
@@ -2925,7 +3211,7 @@ static func _build_edge_and_apron_decor(
 	container.set_meta("moment_kind", &"edge_decor")
 	parent.add_child(container)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "edge_decor:%s" % String(spec.get("story_id", "")))
+	rng.seed = _mix_seed(int(spec.get("dressing_seed", spec.get("requested_seed", 0))), "edge_decor:%s" % String(spec.get("story_id", "")))
 	var target := clampi(70 + int(rng.randf() * 80), 60, 150)
 	var placed := 0
 	var bounds := _polygon_bounds_rect(room_polygon)
@@ -3034,7 +3320,7 @@ static func _build_giant_landmarks(
 	container.set_meta("moment_kind", &"giant")
 	parent.add_child(container)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "giants:%s" % String(spec.get("story_id", "")))
+	rng.seed = _mix_seed(int(spec.get("dressing_seed", spec.get("requested_seed", 0))), "giants:%s" % String(spec.get("story_id", "")))
 	var target := rng.randi_range(1, 3)
 	var placed := 0
 	var used_assets := {}
@@ -3097,6 +3383,7 @@ static func _build_giant_landmarks(
 		landmark.set_meta("footprint_radius", footprint_radius)
 		landmark.set_meta("colliding", true)
 		landmark.set_meta("collision_contract", COLLISION_SOLID)
+		VISUAL_ROLE_CONTRACT.assign(landmark, VISUAL_ROLE_SOLID)
 		landmark.set_meta("visual_opaque_rect", used_rect)
 		landmark.set_meta("footprint_rotation", local_footprint_rotation)
 		container.add_child(landmark)
@@ -3210,7 +3497,7 @@ static func _build_room_ground_sections(
 	sections.set_meta("moment_kind", &"ambient_ground")
 	parent.add_child(sections)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = _mix_seed(int(spec["requested_seed"]), "ground_sections:%s" % String(story["id"]))
+	rng.seed = _mix_seed(int(spec.get("material_seed", spec["requested_seed"])), "ground_sections:%s" % String(story["id"]))
 	var room_area := absf(_polygon_area(room_polygon))
 	var target_count := clampi(int(round(room_area / 750000.0)), 2, 4)
 	sections.set_meta("requested_count", target_count)
@@ -3411,7 +3698,7 @@ static func _build_generated_surfaces(root: Node2D, parent: Node2D, story: Dicti
 	var extra_patches: Array = spec.get("grip_patches", [])
 	if extra_patches.size() > 0:
 		var patch_rng := RandomNumberGenerator.new()
-		patch_rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "grip_patches:%s" % String(story.get("id", "")))
+		patch_rng.seed = _mix_seed(int(spec.get("material_seed", spec.get("requested_seed", 0))), "grip_patches:%s" % String(story.get("id", "")))
 		var target_count := patch_rng.randi_range(GRIP_PATCH_MIN_COUNT, GRIP_PATCH_MAX_COUNT)
 		var used_indices := PackedInt32Array([technical_index, shortcut_index])
 		var added := 0
@@ -3608,6 +3895,10 @@ static func _build_finish_moments(parent: Node2D, centerline: PackedVector2Array
 	finish.set_meta("finish_gate", NodePath("../../Checkpoint0Finish"))
 	finish.set_meta("checker_white", NodePath("../../StartFinishWhite"))
 	finish.set_meta("checker_black", NodePath("../../StartFinishBlack"))
+	finish.set_meta("finish_landmark_left", NodePath("../../GatePosts/Gate00Left"))
+	finish.set_meta("finish_landmark_right", NodePath("../../GatePosts/Gate00Right"))
+	finish.set_meta("corridor_span", HALF_WIDTH * 2.0)
+	finish.set_meta("bidirectional_landmarks", true)
 	parent.add_child(finish)
 
 
@@ -4092,42 +4383,34 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 
 
 static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}) -> void:
-	var count := centerline.size()
-	var apex_points := _curvature_apex_line(centerline)
-	var line_points := apex_points.duplicate()
+	var line_points := _racing_line_points(centerline, moments, false)
 	var shortcut_index := int(moments.get("shortcut", -1))
-	var shortcut_inside_sign := 0.0
-	if shortcut_index >= 0:
-		shortcut_inside_sign = float(_shortcut_lane_geometry(centerline, shortcut_index)["inside_sign"])
-	for index in count:
-		if shortcut_index >= 0:
-			var shortcut_distance := _cyclic_index_distance(index, shortcut_index, count)
-			var taper_span := SHORTCUT_HALF_SPAN + 6
-			if shortcut_distance <= taper_span:
-				var influence := 1.0 - smoothstep(float(SHORTCUT_HALF_SPAN), float(taper_span), float(shortcut_distance))
-				var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
-				var safe_target := centerline[index] - normal * shortcut_inside_sign * SAFE_RACING_LINE_OFFSET
-				line_points[index] = line_points[index].lerp(safe_target, influence)
 	_add_hidden_racing_line(root, "RacingLine", line_points)
 	if shortcut_index >= 0:
-		var shortcut_points := apex_points.duplicate()
-		var taper_span := SHORTCUT_HALF_SPAN + 8
-		for index in count:
-			var shortcut_distance := _cyclic_index_distance(index, shortcut_index, count)
-			if shortcut_distance > taper_span:
-				continue
-			var influence := 1.0 - smoothstep(
-				float(SHORTCUT_HALF_SPAN),
-				float(taper_span),
-				float(shortcut_distance)
-			)
-			var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
-			var shortcut_target := centerline[index] + normal * shortcut_inside_sign * SHORTCUT_LANE_OFFSET
-			shortcut_points[index] = shortcut_points[index].lerp(shortcut_target, influence)
+		var shortcut_points := _racing_line_points(centerline, moments, true)
 		var shortcut_line := _add_hidden_racing_line(root, "ShortcutRacingLine", shortcut_points)
 		shortcut_line.set_meta("role", &"shortcut")
 		shortcut_line.set_meta("centerline_index", shortcut_index)
 		shortcut_line.set_meta("ai_path_clear", true)
+
+
+static func _racing_line_points(centerline: PackedVector2Array, moments: Dictionary, use_shortcut: bool) -> PackedVector2Array:
+	var count := centerline.size()
+	var points := _curvature_apex_line(centerline)
+	var shortcut_index := int(moments.get("shortcut", -1))
+	if shortcut_index < 0:
+		return points
+	var inside_sign := float(_shortcut_lane_geometry(centerline, shortcut_index)["inside_sign"])
+	var taper_span := SHORTCUT_HALF_SPAN + (8 if use_shortcut else 6)
+	for index in count:
+		var shortcut_distance := _cyclic_index_distance(index, shortcut_index, count)
+		if shortcut_distance > taper_span:
+			continue
+		var influence := 1.0 - smoothstep(float(SHORTCUT_HALF_SPAN), float(taper_span), float(shortcut_distance))
+		var normal := _sample_tangent(centerline, index).rotated(PI * 0.5)
+		var lane_offset := inside_sign * SHORTCUT_LANE_OFFSET if use_shortcut else -inside_sign * SAFE_RACING_LINE_OFFSET
+		points[index] = points[index].lerp(centerline[index] + normal * lane_offset, influence)
+	return points
 
 
 static func _add_hidden_racing_line(parent: Node2D, line_name: String, points: PackedVector2Array) -> Line2D:
@@ -4304,6 +4587,7 @@ static func _prop_visual_size(texture_path: String, fallback_diameter: float) ->
 
 static func _mark_solid_body(body: CollisionObject2D, texture_path: String, solid_class: StringName) -> void:
 	body.set_meta("collision_contract", COLLISION_SOLID)
+	VISUAL_ROLE_CONTRACT.assign(body, VISUAL_ROLE_SOLID)
 	body.set_meta("solid_class", solid_class)
 	if not texture_path.is_empty():
 		body.set_meta("asset_path", texture_path)
@@ -4311,6 +4595,7 @@ static func _mark_solid_body(body: CollisionObject2D, texture_path: String, soli
 
 static func _mark_solid_visual(visual: CanvasItem, texture_path: String, solid_class: StringName) -> void:
 	visual.set_meta("collision_contract", COLLISION_SOLID)
+	VISUAL_ROLE_CONTRACT.assign(visual, VISUAL_ROLE_SOLID)
 	visual.set_meta("solid_class", solid_class)
 	if not texture_path.is_empty():
 		visual.set_meta("asset_path", texture_path)
@@ -4318,6 +4603,7 @@ static func _mark_solid_visual(visual: CanvasItem, texture_path: String, solid_c
 
 static func _mark_flat_visual(visual: CanvasItem, texture_path: String, flat_class: StringName) -> void:
 	visual.set_meta("collision_contract", COLLISION_FLAT)
+	VISUAL_ROLE_CONTRACT.assign(visual, VISUAL_ROLE_FLAT)
 	visual.set_meta("flat_class", flat_class)
 	if not texture_path.is_empty():
 		visual.set_meta("asset_path", texture_path)
@@ -4810,6 +5096,78 @@ static func _add_directional_shadow(
 	parent.add_child(cast)
 
 
+static func _build_generated_obstacles(root: Node2D, spec: Dictionary) -> void:
+	var container := Node2D.new()
+	container.name = "PermanentObstacles"
+	container.set_meta("seed", int(spec.get("obstacle_seed", 0)))
+	container.set_meta("enabled", bool(spec.get("obstacles_enabled", true)))
+	container.set_meta("role", &"permanent_obstacle_set")
+	root.add_child(container)
+	var plan: Array = spec.get("obstacle_plan", [])
+	var minimum_clearance := INF
+	for entry_value: Variant in plan:
+		var entry := entry_value as Dictionary
+		_add_planned_obstacle(container, entry)
+		minimum_clearance = minf(minimum_clearance, float(entry.get("viable_corridor_width", 0.0)))
+	container.set_meta("placed_count", container.get_child_count())
+	container.set_meta("minimum_viable_corridor_width", minimum_clearance if not plan.is_empty() else HALF_WIDTH * 2.0)
+	root.set_meta("minimum_obstacle_corridor_width", minimum_clearance if not plan.is_empty() else HALF_WIDTH * 2.0)
+
+
+static func _add_planned_obstacle(parent: Node2D, data: Dictionary) -> void:
+	var obstacle := StaticBody2D.new()
+	obstacle.name = String(data.get("instance_id", data.get("id", "Obstacle"))).to_pascal_case()
+	obstacle.position = data["position"]
+	obstacle.rotation = float(data.get("rotation", 0.0))
+	obstacle.collision_layer = 16
+	var asset_path := String(data["asset"])
+	_mark_solid_body(obstacle, asset_path, &"permanent_obstacle")
+	for key: String in ["id", "instance_id", "role", "footprint_kind", "footprint_size", "visual_bounds", "clearance", "centerline_index", "side", "lateral_footprint_extent", "lateral_center_offset", "viable_corridor_width", "validated_ai_routes"]:
+		if data.has(key):
+			obstacle.set_meta(key, data[key])
+	parent.add_child(obstacle)
+	var footprint_size: Vector2 = data["footprint_size"]
+	var shape_kind := StringName(data["footprint_kind"])
+	var collision := CollisionShape2D.new()
+	collision.name = "ObstacleCollision"
+	if shape_kind == &"circle":
+		var circle := CircleShape2D.new()
+		circle.radius = maxf(footprint_size.x, footprint_size.y) * 0.5
+		collision.shape = circle
+		_record_shape_probe_points(obstacle, Vector2.ZERO, Vector2.ONE * circle.radius * 2.0, &"circle")
+	else:
+		var rectangle := RectangleShape2D.new()
+		rectangle.size = footprint_size
+		collision.shape = rectangle
+		_record_shape_probe_points(obstacle, Vector2.ZERO, footprint_size, &"rect")
+	collision.set_meta("footprint_kind", shape_kind)
+	collision.set_meta("footprint_size", footprint_size)
+	obstacle.set_meta("collision_footprint_size", footprint_size)
+	obstacle.set_meta("collision_shape_kind", shape_kind)
+	obstacle.set_meta("collision_footprint_rotation", 0.0)
+	obstacle.add_child(collision)
+	var visual_size: Vector2 = data["visual_size"]
+	_add_directional_shadow(obstacle, asset_path, maxf(visual_size.x, visual_size.y), 1.0, footprint_size)
+	var texture := load(asset_path) as Texture2D
+	if texture == null:
+		return
+	var sprite_scale := maxf(visual_size.x, visual_size.y) / maxf(texture.get_width(), texture.get_height())
+	var visual_footprint := _texture_collision_footprint(texture, shape_kind)
+	var canvas_size := Vector2(texture.get_width(), texture.get_height())
+	var visual_center_offset := ((visual_footprint["center"] as Vector2) - canvas_size * 0.5) * sprite_scale
+	var sprite := Sprite2D.new()
+	sprite.name = "Sprite"
+	sprite.texture = texture
+	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
+	sprite.scale = Vector2.ONE * sprite_scale
+	sprite.rotation = -float(visual_footprint["rotation"])
+	sprite.position = -visual_center_offset.rotated(sprite.rotation)
+
+	_mark_solid_visual(sprite, asset_path, &"permanent_obstacle")
+	sprite.set_meta("visual_bounds", data["visual_bounds"])
+	obstacle.add_child(sprite)
+
+
 static func _add_obstacle(parent: Node, node_name: String, position: Vector2, radius: float, texture_path: String) -> void:
 	var obstacle := StaticBody2D.new()
 	obstacle.name = node_name
@@ -4949,6 +5307,7 @@ static func _add_start_banner(parent: Node, start: Vector2, tangent: Vector2, co
 			center + tangent * 22.0 + along * 11.0,
 			center - tangent * 22.0 + along * 11.0,
 		]), Color("f2ead7") if block % 2 == 0 else Color("c94f38"), -8)
+		_mark_flat_visual(parent.get_node("BannerBlock%d" % block) as Polygon2D, "", &"start_banner")
 
 
 static func _add_corridor_patterning(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
@@ -4962,7 +5321,7 @@ static func _add_corridor_patterning(root: Node2D, spec: Dictionary, centerline:
 	container.z_index = -8
 	root.add_child(container)
 	var rng := RandomNumberGenerator.new()
-	rng.seed = _mix_seed(int(spec.get("requested_seed", 0)), "corridor_pattern:%s" % String(spec.get("story_id", "")))
+	rng.seed = _mix_seed(int(spec.get("material_seed", spec.get("requested_seed", 0))), "corridor_pattern:%s" % String(spec.get("story_id", "")))
 	var target := 32
 	var placed := 0
 	for attempt in 220:
