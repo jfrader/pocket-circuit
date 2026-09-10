@@ -104,14 +104,20 @@ func _draw_position_cluster(font: Font, layout: Dictionary) -> void:
 		for column in 4:
 			if (row + column) % 2 == 0:
 				draw_rect(Rect2(origin + Vector2(16 + column * 5, 29 + row * 5), Vector2(5, 5)), INK)
-	_text(font, origin + Vector2(48, 24), "POSITION", 11, INK)
-	_text(font, origin + Vector2(48, 57), str(race_position), 34, INK)
-	_text(font, origin + Vector2(89, 57), "/ %d" % racer_count, 20, INK)
+	if racer_count <= 1:
+		_text(font, origin + Vector2(48, 24), "TIME TRIAL", 11, INK)
+		_text(font, origin + Vector2(48, 57), "SOLO", 28, INK)
+	else:
+		_text(font, origin + Vector2(48, 24), "POSITION", 11, INK)
+		_text(font, origin + Vector2(48, 57), str(race_position), 34, INK)
+		_text(font, origin + Vector2(89, 57), "/ %d" % racer_count, 20, INK)
 	var lap_rect: Rect2 = layout["lap"]
 	draw_style_box(_instrument_plate, lap_rect)
 	_text(font, lap_rect.position + Vector2(16, 28), "LAP", 12, MUTED)
 	_text(font, lap_rect.position + Vector2(67, 29), "%d / %d" % [current_lap, lap_total], 22, PAPER)
-	_text(font, lap_rect.position + Vector2(16, 55), "FINISH GATE" if next_checkpoint == 0 else "NEXT GATE %d" % next_checkpoint, 12, AMBER)
+	var lap_hint := "TO FINISH" if next_checkpoint == 0 else ("FINAL LAP" if current_lap == lap_total else "")
+	if not lap_hint.is_empty():
+		_text(font, lap_rect.position + Vector2(16, 55), lap_hint, 12, AMBER)
 
 
 func _draw_clock_cluster(font: Font, rect: Rect2) -> void:

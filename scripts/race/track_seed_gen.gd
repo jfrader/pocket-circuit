@@ -25,6 +25,8 @@ const BYPASS_MAX_ARC := 3000.0
 const BYPASS_MIN_SAVING := 220.0
 const BYPASS_MIN_RATIO := 1.40
 
+# Seed-stable labels only. Geometry comes from TrackRouteGrammar programs, not
+# these names. Do not reorder: championship identity hashes this list.
 const FAMILY_NAMES: Array[StringName] = [
 	&"speed_loop",
 	&"kidney",
