@@ -30,10 +30,26 @@ static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictio
 		anchors = _endurance(anchors, length_bias)
 	else:
 		anchors = _apply_length_bias(anchors, length_bias)
+	var mirrored := _roll_int(seed, 0x11A4D, 2) == 1
+	if mirrored:
+		for anchor_index in anchors.size():
+			var point := anchors[anchor_index]
+			point.x *= -1.0
+			anchors[anchor_index] = point
+	var kinked := false
+	if program != &"endurance":
+		var with_kink := _maybe_chicane(anchors, seed)
+		kinked = with_kink.size() != anchors.size()
+		anchors = with_kink
 	var length_mode := "_extended" if length_bias > 0.20 and program != &"endurance" else ""
+	var recipe := "%s_section_%d_extent_%d%s" % [program, section, extent, length_mode]
+	if mirrored:
+		recipe += "_mirror"
+	if kinked:
+		recipe += "_kink"
 	return {
 		"program": program,
-		"recipe": StringName("%s_section_%d_extent_%d%s" % [program, section, extent, length_mode]),
+		"recipe": StringName(recipe),
 		"anchors": anchors,
 	}
 
@@ -99,6 +115,37 @@ static func _insert_optional_section(points: PackedVector2Array, section: int, s
 		var weight := 1.0 if offset == 0 else 0.42
 		var index := posmod(segment + offset, result.size())
 		result[index] += inward * depth * weight
+	return result
+
+
+static func _maybe_chicane(points: PackedVector2Array, seed: int) -> PackedVector2Array:
+	if _roll_int(seed, 0xC41CE, 5) == 0:
+		return points
+	var best := -1
+	var best_length := 0.0
+	for index in points.size():
+		var length := points[index].distance_squared_to(points[(index + 1) % points.size()])
+		if length > best_length:
+			best_length = length
+			best = index
+	if best < 0 or best_length < 0.22:
+		return points
+	var from := points[best]
+	var to := points[(best + 1) % points.size()]
+	var along := to - from
+	var normal := Vector2(-along.y, along.x).normalized()
+	var side := -1.0 if _roll_int(seed, 0x51DE, 2) == 0 else 1.0
+	var amplitude := _roll(seed, 0xA11E, 0.10, 0.18)
+	var first := from.lerp(to, 0.34) + normal * amplitude * side
+	var second := from.lerp(to, 0.66) + normal * amplitude * -side
+	first = Vector2(clampf(first.x, -0.96, 0.96), clampf(first.y, -0.92, 0.92))
+	second = Vector2(clampf(second.x, -0.96, 0.96), clampf(second.y, -0.92, 0.92))
+	var result := PackedVector2Array()
+	for index in points.size():
+		result.append(points[index])
+		if index == best:
+			result.append(first)
+			result.append(second)
 	return result
 
 
