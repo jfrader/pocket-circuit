@@ -1,10 +1,14 @@
 extends SceneTree
 
 const APP_SHELL_SCRIPT := preload("res://scripts/ui/app_shell.gd")
+const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
 
 class TestApp extends Node:
 	var save_read_only := false
 	var launched_vehicle := ""
+	var mastery_event := ""
+	var mastery_vehicle := ""
+	var mastery_calibrating := false
 	var save_data := {
 		"best_event_finishes": {
 			"kitchen_crumb_rush": 1,
@@ -54,17 +58,61 @@ class TestApp extends Node:
 	func get_save_data() -> Dictionary:
 		return save_data
 
+	func get_mastery_state(event_id: String, vehicle_id: String = "") -> Dictionary:
+		if mastery_calibrating:
+			return {
+				"available": false,
+				"calibrating": true,
+				"vehicle_id": vehicle_id if not vehicle_id.is_empty() else save_data["selected_vehicle"],
+				"record": {},
+				"targets": {},
+			}
+		return {
+			"available": event_id in save_data["completed_events"],
+			"calibrating": false,
+			"vehicle_id": vehicle_id if not vehicle_id.is_empty() else save_data["selected_vehicle"],
+			"record": {
+				"best_lap": 39.0,
+				"best_race": 82.0,
+				"medal": "gold",
+			},
+			"targets": {"gold": 92.0, "silver": 104.0, "bronze": 118.0},
+		}
+
 	func start_race(_event_id: String, _vehicle_id: String, _quick_race: bool) -> void:
 		launched_vehicle = _vehicle_id
 
+	func start_mastery_run(event_id: String, vehicle_id: String) -> void:
+		mastery_event = event_id
+		mastery_vehicle = vehicle_id
+
 	func random_circuit_seed(theme: StringName) -> Dictionary:
-		return {"theme": String(theme), "room": "classic", "seed": 24680}
+		return {"theme": String(theme), "room": String(GENERATED_CIRCUITS.room_for_route_seed(24680)), "seed": 24680}
 
-	func circuit_room_for_seed(_seed: int) -> StringName:
-		return &"classic"
+	func circuit_room_for_seed(seed: int) -> StringName:
+		return GENERATED_CIRCUITS.room_for_route_seed(seed)
 
-	func start_circuit_race(_theme: StringName, _room: StringName, _seed: int, _vehicle_id: String) -> void:
+	func start_circuit_race(_theme: StringName, _room: StringName, _seed: int, _vehicle_id: String, _reverse: bool = false) -> void:
 		launched_vehicle = _vehicle_id
+
+	func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false) -> Dictionary:
+		return GENERATED_CIRCUITS.create(theme, room, seed, reverse)
+
+	func get_circuit_library() -> Dictionary:
+		return {"history": [], "favorites": []}
+
+	func decode_circuit_share_code(code: String) -> Dictionary:
+		return GENERATED_CIRCUITS.decode_share_code(code)
+
+	func circuit_share_code(identity: Dictionary) -> Dictionary:
+		return GENERATED_CIRCUITS.encode_share_code(identity)
+
+	func set_circuit_favorite(_identity: Dictionary, _favorite: bool) -> bool:
+		return true
+
+	func prepare_circuit_preview(_identity: Dictionary) -> Dictionary:
+		await get_tree().process_frame
+		return {}
 
 
 func _initialize() -> void:
@@ -83,6 +131,32 @@ func _run_test() -> void:
 	var focus_owner := root.get_viewport().gui_get_focus_owner()
 	if focus_owner == null or focus_owner.name != "Vehicle_pinbolt":
 		push_error("APP_SHELL_FOCUS_TEST FAIL: persisted selected vehicle should receive focus")
+		quit(1)
+		return
+	app.mastery_calibrating = true
+	shell.call("show_briefing", "kitchen_crumb_rush")
+	await process_frame
+	await process_frame
+	var mastery_button := shell.find_child("MasteryRun", true, false) as Button
+	var stable_focus: Button
+	for node: Node in shell.find_children("*", "Button", true, false):
+		var button := node as Button
+		if button.text == "CHOOSE VEHICLE":
+			stable_focus = button
+			break
+	if stable_focus == null:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: calibration fixture needs a stable neighboring action")
+		quit(1)
+		return
+	stable_focus.grab_focus()
+	if not mastery_button.disabled or not (shell.find_child("MasteryTargets", true, false) as Label).text.contains("CALIBRATING"):
+		push_error("APP_SHELL_FOCUS_TEST FAIL: migrated briefings should expose a clear non-blocking calibration state")
+		quit(1)
+		return
+	app.mastery_calibrating = false
+	shell.call("refresh_mastery_calibration", "kitchen_crumb_rush")
+	if root.get_viewport().gui_get_focus_owner() != stable_focus or mastery_button.disabled or (shell.find_child("MasteryTargets", true, false) as Label).text.contains("CALIBRATING"):
+		push_error("APP_SHELL_FOCUS_TEST FAIL: completed calibration should refresh targets without rebuilding controls or moving focus")
 		quit(1)
 		return
 	shell.call("show_title")
@@ -108,6 +182,11 @@ func _run_test() -> void:
 	shell.call("show_quick_race")
 	await process_frame
 	await process_frame
+	var quick_summary := shell.find_child("QuickCircuitSummary", true, false) as Label
+	if quick_summary == null or quick_summary.autowrap_mode == TextServer.AUTOWRAP_OFF or quick_summary.custom_minimum_size.y < 76.0:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should reserve enough wrapped height for its complete identity summary")
+		quit(1)
+		return
 	focus_owner = root.get_viewport().gui_get_focus_owner()
 	if focus_owner == null or focus_owner.name != "QuickRaceRoom_workshop":
 		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should open with the selected room focused")
@@ -144,6 +223,11 @@ func _run_test() -> void:
 	shell.call("show_map", {}, 3)
 	await process_frame
 	await process_frame
+	var completed_event := shell.find_child("Event_office_last_light", true, false) as Button
+	if completed_event == null or not completed_event.text.contains("1ST · 10 PTS") or not completed_event.text.contains("MASTERY GOLD"):
+		push_error("APP_SHELL_FOCUS_TEST FAIL: completed map events should retain championship finish and points alongside mastery status")
+		quit(1)
+		return
 	for _step in 2:
 		await _tap_action(&"ui_down")
 	focus_owner = root.get_viewport().gui_get_focus_owner()
@@ -185,8 +269,18 @@ func _run_test() -> void:
 	await process_frame
 	await process_frame
 	focus_owner = root.get_viewport().gui_get_focus_owner()
-	if focus_owner == null or focus_owner.get("text") != "PLAY" or scroll.scroll_vertical != 0:
-		push_error("APP_SHELL_FOCUS_TEST FAIL: briefing should offer Play with the saved vehicle without requiring another selection")
+	if focus_owner == null or focus_owner.get("text") != "REPLAY EVENT" or scroll.scroll_vertical != 0:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: completed briefing should offer an immediate replay with the saved vehicle")
+		quit(1)
+		return
+	mastery_button = shell.find_child("MasteryRun", true, false) as Button
+	if mastery_button == null or mastery_button.disabled:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: completed briefing should expose a controller-focusable Mastery Run action")
+		quit(1)
+		return
+	mastery_button.pressed.emit()
+	if app.mastery_event != "kitchen_crumb_rush" or app.mastery_vehicle != "pinbolt":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Mastery Run should launch the completed event with the selected saved car")
 		quit(1)
 		return
 	for node: Node in shell.find_children("*", "Label", true, false):
@@ -212,6 +306,7 @@ func _run_test() -> void:
 		func() -> void: shell.call("show_quick_race", 1),
 		func() -> void: shell.call("show_quick_race", 2),
 		func() -> void: shell.call("show_quick_race", 3),
+		func() -> void: shell.call("show_discovery"),
 		func() -> void:
 			app.save_data["completed_events"] = []
 			shell.call("show_quick_race", 1),

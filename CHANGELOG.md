@@ -33,9 +33,33 @@
 - Adaptive music follows race phase when the live engine is loaded (grid on
   countdown, "race" at start with speed-normalized intensity and standing
   pressure, final-lap flag, finish+win result).
+- Completed championship events now open solo Mastery Runs against a compatible
+  personal-best ghost, with transparent circuit-shape-calibrated bronze, silver,
+  and gold targets plus configuration-specific lap and race records.
+  Medals never affect story points or unlocks.
+- Generated circuits now have readable deterministic names and complete compact
+  identity summaries. Offline share codes open a verified route preview before
+  an exhibition race, while bounded recent history and favorites survive
+  restarts without affecting championship progress, mastery records, or ghosts.
 
 ### Changed
 
+- Generated finish lines now span the full racing corridor and use symmetric
+  household landmarks that read clearly in forward and reverse races. Moving
+  hazard artwork is no longer reused as static scenery.
+- Generated circuits now compose different straight extents, headings and turn
+- Generated circuits now add progression-scaled permanent obstacles with
+  AI-validated passing space. Occasional moving hazards telegraph their origin,
+  path, timing, and danger before physically entering and leaving the course.
+- Generated finish lines now span the full racing corridor and use symmetric
+  household landmarks that read clearly in forward and reverse races. Moving
+  hazard artwork is no longer reused as static generated scenery.
+- Generated finish lines now span the full racing corridor and use symmetric
+  household landmarks that read clearly in forward and reverse races. Moving
+  hazard artwork is no longer reused as static scenery.
+- Generated finish lines now span the full racing corridor and use symmetric
+  household landmarks that read clearly in forward and reverse races. Moving
+  hazard artwork is no longer reused as static scenery.
 - Generated circuits now compose different straight extents, headings and turn
   sections within each route program, with broader minimum corner radii.
 - Scenery collision footprints are prepared off the main thread before race
@@ -92,8 +116,9 @@
 - Starting-grid physics no longer displaces rivals into the island before
   they launch. Following cars now respect the leader's speed and distance
   rather than accelerating into a slow queue.
-- Quick Race now accepts arbitrary seeds, and championship events draw a fresh
-  seed and deterministic room canvas whenever a race starts.
+- Quick Race now accepts arbitrary seeds, while each new championship keeps a
+  versioned circuit identity for every event so retries, replays, reverse races,
+  saves, and resumes retain the same generated route and room canvas.
 - Generated circuits now use larger 1.75x room canvases, longer absolute laps,
   and fewer broad corner complexes separated by multiple setup straights. Route
   validation rejects direct chords that replace an entire corner sequence.

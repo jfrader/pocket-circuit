@@ -2,6 +2,9 @@ extends SceneTree
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
+const CIRCUIT_IDENTITIES := preload("res://scripts/progression/championship_circuit_identity.gd")
+const MASTERY := preload("res://scripts/progression/mastery_run.gd")
+const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
 const TEST_PATH := "user://tests/pocket_circuit_save_store_test.json"
 
 
@@ -14,6 +17,8 @@ func _run_test() -> void:
 	store.remove_save()
 	var data := store.default_data()
 	if not _expect(not bool(data["championship_started"]), "new saves should not start a championship implicitly"):
+		return
+	if not _expect(int(data["version"]) == 4 and int(data["championship_circuit"]["seed"]) == 665001 and data["championship_circuit"]["events"].size() == CATALOG.EVENTS.size() and (data["mastery_circuit_metrics"] as Dictionary).is_empty() and data["circuit_history"].is_empty() and data["favorite_circuits"].is_empty(), "new saves should carry complete circuit identity and empty mastery/discovery collections"):
 		return
 	if not _expect(not bool(data["reduced_motion"]), "reduced motion should default off"):
 		return
@@ -31,6 +36,16 @@ func _run_test() -> void:
 	data["master_volume"] = 0.35
 	data["reduced_camera_shake"] = true
 	data["reduced_motion"] = true
+	var mastery_event := CIRCUIT_IDENTITIES.apply_to_event(CATALOG.get_event("kitchen_crumb_rush"), data["championship_circuit"]["events"]["kitchen_crumb_rush"])
+	var mastery_metrics := MASTERY.prepare_circuit_metrics(mastery_event)
+	var mastery_context := MASTERY.create_context(mastery_event, "rustbug", mastery_metrics)
+	var mastery_identity: Dictionary = mastery_context["identity"]
+	data["mastery_circuit_metrics"] = {MASTERY.circuit_metrics_key_for_event(mastery_event): mastery_metrics}
+	data["mastery_records"] = MASTERY.apply_result([], mastery_identity, mastery_context["targets"], 39.0, 82.0)["records"]
+	data["personal_ghosts"] = PERSONAL_GHOST.store_best([], mastery_identity, 82.0, [
+		PERSONAL_GHOST.sample(0.0, Transform2D(0.0, Vector2.ZERO)),
+		PERSONAL_GHOST.sample(82.0, Transform2D(0.5, Vector2(20.0, 40.0))),
+	])["ghosts"]
 	if not _expect(store.save_data(data), "round-trip fixture should save: %s" % store.last_save_error):
 		return
 	var loaded := store.load_data()
@@ -42,6 +57,17 @@ func _run_test() -> void:
 		return
 	if not _expect(loaded["difficulty"] == "clockwork" and is_equal_approx(float(loaded["master_volume"]), 0.35) and loaded["reduced_camera_shake"] and loaded["reduced_motion"], "settings should round-trip"):
 		return
+	if not _expect(loaded["championship_circuit"] == data["championship_circuit"], "championship circuit identities should round-trip without changing"):
+		return
+	if not _expect(loaded["mastery_circuit_metrics"] == data["mastery_circuit_metrics"] and loaded["mastery_records"] == data["mastery_records"] and loaded["personal_ghosts"] == data["personal_ghosts"], "derived circuit metrics, mastery records, and bounded ghost samples should round-trip"):
+		return
+	var reboot_metrics := MASTERY.metrics_for_event(loaded["mastery_circuit_metrics"], mastery_event)
+	if not _expect(not reboot_metrics.is_empty() and not (MASTERY.create_context(mastery_event, "rustbug", reboot_metrics)["targets"] as Dictionary).is_empty(), "persisted metrics should make post-boot target lookup immediately ready without route preparation"):
+		return
+	loaded["personal_ghosts"][0]["samples"][0][1] = 999.0
+	if not _expect(float(store.load_data()["personal_ghosts"][0]["samples"][0][1]) == 0.0, "loaded nested ghost data should not alias a later load"):
+		return
+	loaded = store.load_data()
 
 	var replacement := loaded.duplicate(true)
 	replacement["difficulty"] = "sunday_drive"
@@ -106,6 +132,18 @@ func _run_test() -> void:
 	if not _expect(loaded["completed_events"] == ["kitchen_crumb_rush"] and int(loaded["best_event_points"]["kitchen_crumb_rush"]) == 7, "older saves should derive current progress fields from finishes"):
 		return
 	if not _expect(bool(loaded["championship_started"]) and loaded.has("music_volume") and loaded.has("first_run") and not bool(loaded["reduced_motion"]), "older raced saves should merge the current reduced-motion default"):
+		return
+	var migrated_identity: Dictionary = loaded["championship_circuit"]
+	if not _expect(int(loaded["version"]) == 4 and int(migrated_identity["seed"]) == 665001 and migrated_identity["events"].size() == CATALOG.EVENTS.size() and loaded["mastery_records"].is_empty() and loaded["personal_ghosts"].is_empty() and loaded["circuit_history"].is_empty() and loaded["favorite_circuits"].is_empty(), "version 1 saves should receive deterministic identity and empty mastery/discovery archives in memory"):
+		return
+	if not _expect(int(_read_json(TEST_PATH)["version"]) == 1, "loading a legacy save should not rewrite it before a validated save action"):
+		return
+	if not _expect(store.save_data(loaded), "a migrated save should persist safely: %s" % store.last_save_error):
+		return
+	var migrated_on_disk := _read_json(TEST_PATH)
+	if not _expect(int(migrated_on_disk["version"]) == 4 and int(migrated_on_disk["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "persisting migration should upgrade the schema without changing player progress"):
+		return
+	if not _expect(store.load_data()["championship_circuit"] == migrated_identity, "reloading a persisted migration should retain the exact generated identity"):
 		return
 	if not _test_legacy_vehicle_selections(store):
 		return
