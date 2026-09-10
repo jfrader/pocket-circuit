@@ -719,8 +719,20 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 		)
 	var candidate: Dictionary = summary["save"]
 	if candidate != _save_data and not _save_candidate(candidate):
-		current_race_session["save_error"] = _last_save_error
-		return false
+		if mode == "mastery":
+			var records_only: Dictionary = candidate.duplicate(true)
+			records_only["personal_ghosts"] = (_save_data.get("personal_ghosts", []) as Array).duplicate(true)
+			summary["ghost_saved"] = false
+			if records_only != _save_data and _save_candidate(records_only):
+				candidate = records_only
+			else:
+				current_race_session["save_error"] = _last_save_error
+				current_race_session["result_summary"] = summary
+				current_race_session["post_race_destination"] = "map"
+				return false
+		else:
+			current_race_session["save_error"] = _last_save_error
+			return false
 	_save_data = candidate
 	current_race_session["result_summary"] = summary
 	current_race_session["post_race_destination"] = "ending" if mode == "championship" and CATALOG.is_ending_pending(candidate) else "map"
@@ -749,6 +761,12 @@ func continue_after_race(transition_scene: bool = true) -> void:
 		current_race_session.clear()
 		_destination = "discovery" if return_mode == "discovery" else "title"
 		get_tree().change_scene_to_file(BOOT_SCENE)
+		return
+	if String(current_race_session.get("mode", "")) == "mastery" and not bool(current_race_session.get("result_committed", false)):
+		current_race_session.clear()
+		_destination = "map"
+		if transition_scene:
+			get_tree().change_scene_to_file(BOOT_SCENE)
 		return
 	if not bool(current_race_session.get("result_committed", false)):
 		return

@@ -713,9 +713,9 @@ func _update_results(results: Array) -> void:
 			lines.append("TARGETS  G %s · S %s · B %s" % [_format_time(float(targets["gold"])), _format_time(float(targets["silver"])), _format_time(float(targets["bronze"]))])
 		if bool(summary.get("ghost_saved", false)):
 			lines.append("PERSONAL BEST GHOST SAVED")
-		final_prompt = "MASTERY DNF · NO RECORD SAVED" if bool(summary.get("mastery_dnf", false)) else "MASTERY SAVED · CONTINUE OR RETRY"
+		final_prompt = "NO TIME SAVED · CONTINUE OR RETRY" if bool(summary.get("mastery_dnf", false)) else "TIME TRIAL SAVED · CONTINUE OR RETRY"
 	if not _save_error.is_empty():
-		final_prompt = "SAVE FAILED · RETRY SAVE BEFORE CONTINUING"
+		final_prompt = "Couldn't save this time trial. Championship is unchanged — continue anytime." if String(_session.get("mode", "")) == "mastery" else "Couldn't save. Retry save, or continue without it."
 	lines.append("FINALIZING..." if not _results_finalized else final_prompt)
 	_results_label.text = "\n".join(lines)
 
@@ -969,7 +969,7 @@ func _create_phase_one_ui() -> void:
 	_retry_button.pressed.connect(_on_retry_pressed)
 	_results_panel.add_child(_retry_button)
 	_mastery_button = MENU_BUTTON_SCRIPT.new() as Button
-	_mastery_button.text = "MASTERY RUN"
+	_mastery_button.text = "SOLO TIME TRIAL"
 	_mastery_button.position = Vector2(225.0, 340.0)
 	_mastery_button.size = Vector2(170.0, 48.0)
 	_mastery_button.disabled = true
@@ -1187,9 +1187,10 @@ func _on_mastery_pressed() -> void:
 
 func _attempt_result_commit(results: Array) -> void:
 	var committed := _report_result_to_app(results)
+	var mastery_mode := String(_session.get("mode", "")) == "mastery"
 	_retry_button.disabled = false
-	_continue_button.disabled = not committed
-	_retry_button.text = ("RETRY MASTERY" if String(_session.get("mode", "")) == "mastery" else "RETRY") if committed else "RETRY SAVE"
+	_continue_button.disabled = not committed and not mastery_mode
+	_retry_button.text = "RETRY" if committed else "RETRY SAVE"
 	var app := get_node_or_null("/root/App")
 	var mastery_available := committed and app and app.has_method("can_start_mastery_rematch") and bool(app.call("can_start_mastery_rematch"))
 	_mastery_button.visible = mastery_available

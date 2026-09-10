@@ -154,6 +154,15 @@ func _run_test() -> void:
 	app.call("report_race_result", 1, 90.0, [], false, {"best_lap": 42.0, "ghost_samples": [[0.0, 0.0, 0.0, 0.0], [90.0, 20.0, 30.0, 0.3]]})
 	if not _expect(store.save_count == mastery_saves and is_equal_approx(float(app.call("get_save_data")["mastery_records"][0]["best_race"]), 80.0), "a slower Mastery retry should not rewrite the save or replace its best"):
 		return
+	store.should_fail = true
+	app.call("retry_race", false)
+	if not _expect(not bool(app.call("report_race_result", 1, 70.0, [], false, {"best_lap": 34.0, "ghost_samples": mastery_samples})), "a failed Mastery save should still report failure"):
+		return
+	app.call("continue_after_race", false)
+	if not _expect(app.current_race_session.is_empty() and int(app.call("get_save_data")["best_event_finishes"]["kitchen_crumb_rush"]) == 2 and is_equal_approx(float(app.call("get_save_data")["mastery_records"][0]["best_race"]), 80.0), "a failed Mastery save must not trap the player or rewrite championship or medal progress"):
+		return
+	store.should_fail = false
+	mastery_saves = store.save_count
 
 	progress = app.call("get_save_data")
 	progress["difficulty"] = "clockwork"

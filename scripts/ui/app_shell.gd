@@ -255,10 +255,10 @@ func show_briefing(event_id: String) -> void:
 		mastery_status_label.name = "MasteryStatus"
 		var target_copy := _add_copy(_briefing_mastery_targets(mastery_state), AMBER)
 		target_copy.name = "MasteryTargets"
-		_add_copy("Personal medals and ghosts never change championship points or unlocks.", MUTED)
+		_add_copy("A solo time trial against your ghost. It never changes championship points or unlocks.", MUTED)
 	_add_big_play_button(Callable(self, "_start_current_selected_vehicle"), false).text = "REPLAY EVENT" if completed else "PLAY"
 	if completed:
-		var mastery_action := "RETRY MASTERY CALIBRATION" if mastery_calibration_failed else "MASTERY RUN · %s" % String(CATALOG.get_vehicle(_current_vehicle_select_id).get("name", "Rustbug")).to_upper()
+		var mastery_action := "RETRY MASTERY CALIBRATION" if mastery_calibration_failed else "SOLO TIME TRIAL · %s" % String(CATALOG.get_vehicle(_current_vehicle_select_id).get("name", "Rustbug")).to_upper()
 		_add_button(mastery_action, Callable(self, "_start_mastery_selected_vehicle"), CORAL, mastery_calibrating, "MasteryRun")
 	_add_button("CHOOSE VEHICLE", Callable(self, "show_vehicle_select").bind(event_id, false), AMBER)
 	_add_button("BACK TO MAP", Callable(self, "show_map"), CREAM)
@@ -286,7 +286,7 @@ func refresh_mastery_calibration(event_id: String) -> void:
 	if targets_label:
 		targets_label.text = _briefing_mastery_targets(state)
 	if mastery_button:
-		mastery_button.text = "RETRY MASTERY CALIBRATION" if bool(state.get("calibration_failed", false)) else "MASTERY RUN · %s" % String(CATALOG.get_vehicle(_current_vehicle_select_id).get("name", "Rustbug")).to_upper()
+		mastery_button.text = "RETRY MASTERY CALIBRATION" if bool(state.get("calibration_failed", false)) else "SOLO TIME TRIAL · %s" % String(CATALOG.get_vehicle(_current_vehicle_select_id).get("name", "Rustbug")).to_upper()
 		mastery_button.disabled = bool(state.get("calibrating", false))
 
 
