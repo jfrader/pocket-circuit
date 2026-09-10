@@ -170,29 +170,27 @@ func _check_built_metadata() -> bool:
 		track.free()
 		return false
 	for obstacle: StaticBody2D in container.get_children():
-		var collision := obstacle.get_node_or_null("ObstacleCollision") as CollisionShape2D
+		var collisions := obstacle.find_children("*", "CollisionShape2D", true, false)
+		var collision := collisions[0] as CollisionShape2D if not collisions.is_empty() else null
 		var sprite := obstacle.get_node_or_null("Sprite") as Sprite2D
 		var entry: Dictionary = plan_by_id.get(String(obstacle.get_meta("instance_id", "")), {})
 		var footprint_size: Vector2 = entry.get("footprint_size", Vector2.ZERO)
 		var footprint_kind := StringName(entry.get("footprint_kind", &""))
-		var shape_matches := false
-		if collision and footprint_kind == &"circle" and collision.shape is CircleShape2D:
-			shape_matches = is_equal_approx((collision.shape as CircleShape2D).radius * 2.0, maxf(footprint_size.x, footprint_size.y))
-		elif collision and footprint_kind == &"rect" and collision.shape is RectangleShape2D:
-			shape_matches = (collision.shape as RectangleShape2D).size.is_equal_approx(footprint_size)
+		var has_fitted_shape := collision != null and (
+			(footprint_kind == &"circle" and collision.shape is CircleShape2D)
+			or (footprint_kind == &"rect" and collision.shape is RectangleShape2D)
+		)
 		if not _expect(
-			collision != null
+			has_fitted_shape
 			and sprite != null
 			and not entry.is_empty()
-			and shape_matches
 			and collision.position.is_zero_approx()
-			and is_zero_approx(collision.rotation)
 			and obstacle.position.is_equal_approx(entry["position"])
 			and is_equal_approx(obstacle.rotation, float(entry["rotation"]))
 			and obstacle.get_meta("collision_footprint_size", Vector2.ZERO) == footprint_size
 			and VISUAL_ROLE.read(obstacle) == VISUAL_ROLE.SOLID
 			and VISUAL_ROLE.read(sprite) == VISUAL_ROLE.SOLID,
-			"realized obstacle collision type, dimensions, and root transform should exactly match its planned footprint"
+			"realized obstacles should keep planned placement while fitting collision to visible art"
 		):
 			track.free()
 			return false
