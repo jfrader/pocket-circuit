@@ -17,6 +17,7 @@ const TRACK_BUILDER_STORY := preload("res://scripts/race/track_builder_story.gd"
 const TRACK_BUILDER_DRESSING := preload("res://scripts/race/track_builder_dressing.gd")
 const TRACK_BUILDER_BOUNDARY := preload("res://scripts/race/track_builder_boundary.gd")
 const TRACK_BUILDER_NODES := preload("res://scripts/race/track_builder_nodes.gd")
+const TRACK_BUILDER_PLACEMENT := preload("res://scripts/race/track_builder_placement.gd")
 const HALF_WIDTH := 125.0
 const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
@@ -776,11 +777,7 @@ static func _placement_is_safe(
 		allowed_polygon: PackedVector2Array,
 		occupied: Array[Dictionary]
 ) -> bool:
-	if not _inside_polygon_with_radius(candidate, radius, room_polygon):
-		return false
-	if not _inside_polygon_with_radius(candidate, radius, allowed_polygon):
-		return false
-	return _clear_of_occupied(candidate, radius, occupied)
+	return TRACK_BUILDER_PLACEMENT.placement_is_safe(candidate, radius, room_polygon, allowed_polygon, occupied)
 
 
 static func _best_island_position(
@@ -790,24 +787,7 @@ static func _best_island_position(
 		island_polygon: PackedVector2Array,
 		occupied: Array[Dictionary]
 ) -> Dictionary:
-	var bounds := _polygon_bounds_rect(island_polygon)
-	var best_position := Vector2.ZERO
-	var best_score := INF
-	# A deterministic dense scan is the final placement path for strongly
-	# concave islands where an authored local formation lands in a bay or waist.
-	for x in 17:
-		for y in 17:
-			var candidate := bounds.position + Vector2(
-				bounds.size.x * (float(x) + 0.5) / 17.0,
-				bounds.size.y * (float(y) + 0.5) / 17.0
-			)
-			if not _placement_is_safe(candidate, radius, room_polygon, island_polygon, occupied):
-				continue
-			var score := candidate.distance_squared_to(preferred)
-			if score < best_score:
-				best_score = score
-				best_position = candidate
-	return {"found": best_score < INF, "position": best_position}
+	return TRACK_BUILDER_PLACEMENT.best_island_position(preferred, radius, room_polygon, island_polygon, occupied)
 
 
 static func _best_offtrack_position(
@@ -818,22 +798,7 @@ static func _best_offtrack_position(
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary]
 ) -> Dictionary:
-	var bounds := _polygon_bounds_rect(room_polygon)
-	var best_position := Vector2.ZERO
-	var best_score := INF
-	for x in 25:
-		for y in 17:
-			var candidate := bounds.position + Vector2(
-				bounds.size.x * (float(x) + 0.5) / 25.0,
-				bounds.size.y * (float(y) + 0.5) / 17.0
-			)
-			if not _trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
-				continue
-			var score := candidate.distance_squared_to(preferred)
-			if score < best_score:
-				best_score = score
-				best_position = candidate
-	return {"found": best_score < INF, "position": best_position}
+	return TRACK_BUILDER_PLACEMENT.best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied)
 
 
 static func _best_giant_position(
@@ -847,27 +812,7 @@ static func _best_giant_position(
 		occupied: Array[Dictionary],
 		committed_racing_lines: Array[PackedVector2Array] = []
 ) -> Dictionary:
-	var bounds := _polygon_bounds_rect(room_polygon)
-	var preferred := centerline[preferred_index]
-	var best := {}
-	var best_score := INF
-	for x in 29:
-		for y in 19:
-			var candidate := bounds.position + Vector2(
-				bounds.size.x * (float(x) + 0.5) / 29.0,
-				bounds.size.y * (float(y) + 0.5) / 19.0
-			)
-			var closest: Dictionary = _closest_point_on_loop(candidate, centerline)
-			var centerline_index := int(closest["index"])
-			var tangent_angle := _sample_tangent(centerline, centerline_index).angle()
-			var rotation := tangent_angle - local_footprint_rotation if size.x >= size.y else tangent_angle - PI * 0.5 - local_footprint_rotation
-			if not _giant_placement_is_safe(candidate, size, shape_kind, rotation + local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines):
-				continue
-			var score := candidate.distance_squared_to(preferred)
-			if score < best_score:
-				best_score = score
-				best = {"found": true, "position": candidate, "rotation": rotation}
-	return best if not best.is_empty() else {"found": false}
+	return TRACK_BUILDER_PLACEMENT.best_giant_position(preferred_index, size, shape_kind, local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines)
 
 
 static func _giant_placement_is_safe(
@@ -881,34 +826,7 @@ static func _giant_placement_is_safe(
 		occupied: Array[Dictionary],
 		committed_racing_lines: Array[PackedVector2Array] = []
 ) -> bool:
-	var bounding_radius := size.length() * 0.5
-	if not _clear_of_occupied(candidate, bounding_radius, occupied):
-		return false
-	if shape_kind == &"circle":
-		var radius := maxf(size.x, size.y) * 0.5
-		if not _inside_polygon_with_radius(candidate, radius, room_polygon):
-			return false
-		if not _line_sweep_clears_footprint(centerline, candidate, size, shape_kind, rotation, HALF_WIDTH + APRON_COLLIDER_CLEARANCE):
-			return false
-		for gate: Vector2 in gate_samples:
-			if candidate.distance_to(gate) < radius + 82.0:
-				return false
-		return _committed_lines_clear_giant(committed_racing_lines, candidate, size, shape_kind, rotation)
-	var half_size := size * 0.5
-	for corner: Vector2 in [
-		Vector2(-half_size.x, -half_size.y),
-		Vector2(half_size.x, -half_size.y),
-		Vector2(half_size.x, half_size.y),
-		Vector2(-half_size.x, half_size.y),
-	]:
-		if not Geometry2D.is_point_in_polygon(candidate + corner.rotated(rotation), room_polygon):
-			return false
-	if not _line_sweep_clears_footprint(centerline, candidate, size, shape_kind, rotation, HALF_WIDTH + APRON_COLLIDER_CLEARANCE):
-		return false
-	for gate: Vector2 in gate_samples:
-		if _point_to_oriented_rect_distance(gate, candidate, size, rotation) < 82.0:
-			return false
-	return _committed_lines_clear_giant(committed_racing_lines, candidate, size, shape_kind, rotation)
+	return TRACK_BUILDER_PLACEMENT.giant_placement_is_safe(candidate, size, shape_kind, rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines)
 
 
 static func _committed_lines_clear_giant(
@@ -918,10 +836,7 @@ static func _committed_lines_clear_giant(
 		shape_kind: StringName,
 		rotation: float
 ) -> bool:
-	for line: PackedVector2Array in committed_racing_lines:
-		if not _line_sweep_clears_footprint(line, candidate, size, shape_kind, rotation, RACING_LINE_HULL_RADIUS):
-			return false
-	return true
+	return TRACK_BUILDER_PLACEMENT.committed_lines_clear_giant(committed_racing_lines, candidate, size, shape_kind, rotation)
 
 
 static func _line_sweep_clears_footprint(
@@ -940,19 +855,11 @@ static func _segment_intersects_axis_rect(from: Vector2, to: Vector2, half_size:
 
 
 static func _oriented_rect_inside_polygon(center: Vector2, size: Vector2, rotation: float, polygon: PackedVector2Array) -> bool:
-	var half_size := size * 0.5
-	return (
-		Geometry2D.is_point_in_polygon(center + Vector2(-half_size.x, -half_size.y).rotated(rotation), polygon)
-		and Geometry2D.is_point_in_polygon(center + Vector2(half_size.x, -half_size.y).rotated(rotation), polygon)
-		and Geometry2D.is_point_in_polygon(center + Vector2(half_size.x, half_size.y).rotated(rotation), polygon)
-		and Geometry2D.is_point_in_polygon(center + Vector2(-half_size.x, half_size.y).rotated(rotation), polygon)
-	)
+	return TRACK_BUILDER_PLACEMENT.oriented_rect_inside_polygon(center, size, rotation, polygon)
 
 
 static func _point_to_oriented_rect_distance(point: Vector2, center: Vector2, size: Vector2, rotation: float) -> float:
-	var local := (point - center).rotated(-rotation)
-	var outside := Vector2(maxf(absf(local.x) - size.x * 0.5, 0.0), maxf(absf(local.y) - size.y * 0.5, 0.0))
-	return outside.length()
+	return TRACK_BUILDER_PLACEMENT.point_to_oriented_rect_distance(point, center, size, rotation)
 
 
 static func _trackside_placement_is_safe(
@@ -963,17 +870,7 @@ static func _trackside_placement_is_safe(
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary]
 ) -> bool:
-	if not _inside_polygon_with_radius(candidate, radius, room_polygon):
-		return false
-	if _distance_to_centerline(candidate, centerline) < HALF_WIDTH + radius + APRON_COLLIDER_CLEARANCE:
-		return false
-	if candidate.distance_to(centerline[0]) < 245.0 + radius:
-		return false
-	if not _clear_of_points(candidate, gate_samples, 24.0 + radius):
-		return false
-	if not _clear_of_recovery_lanes(candidate, radius, centerline, gate_samples):
-		return false
-	return _clear_of_occupied(candidate, radius, occupied)
+	return TRACK_BUILDER_PLACEMENT.trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied)
 
 
 static func _best_trackside_position(
@@ -985,33 +882,11 @@ static func _best_trackside_position(
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary]
 ) -> Dictionary:
-	var best_position := Vector2.ZERO
-	var best_index := 0
-	var best_score := INF
-	for index in range(0, centerline.size(), 2):
-		var outward := (outer_loop[index] - centerline[index]).normalized()
-		for attempt in 8:
-			var side := 1.0 if attempt % 2 == 0 else -1.0
-			var offset := HALF_WIDTH + radius + APRON_COLLIDER_CLEARANCE + float(attempt / 2) * 8.0
-			var candidate := centerline[index] + outward * side * offset
-			if not _trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
-				continue
-			var score := float(_cyclic_index_distance(index, posmod(preferred_index, centerline.size()), centerline.size())) + float(attempt) * 0.01
-			if score < best_score:
-				best_score = score
-				best_position = candidate
-				best_index = index
-	return {"found": best_score < INF, "position": best_position, "index": best_index}
+	return TRACK_BUILDER_PLACEMENT.best_trackside_position(preferred_index, radius, centerline, outer_loop, room_polygon, gate_samples, occupied)
 
 
 static func _inside_polygon_with_radius(point: Vector2, radius: float, polygon: PackedVector2Array) -> bool:
-	if polygon.is_empty() or not Geometry2D.is_point_in_polygon(point, polygon):
-		return false
-	for sample in 8:
-		var test_point := point + Vector2.RIGHT.rotated(TAU * float(sample) / 8.0) * radius
-		if not Geometry2D.is_point_in_polygon(test_point, polygon):
-			return false
-	return true
+	return TRACK_BUILDER_PLACEMENT.inside_polygon_with_radius(point, radius, polygon)
 
 
 static func _clear_of_points(point: Vector2, points: PackedVector2Array, clearance: float) -> bool:
@@ -1024,20 +899,7 @@ static func _clear_of_recovery_lanes(
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array
 ) -> bool:
-	for gate: Vector2 in gate_samples:
-		var nearest_index := 0
-		var nearest_distance := INF
-		for index in centerline.size():
-			var distance := gate.distance_squared_to(centerline[index])
-			if distance < nearest_distance:
-				nearest_distance = distance
-				nearest_index = index
-		var tangent := _sample_tangent(centerline, nearest_index)
-		var lane_from := gate - tangent * RECOVERY_LANE_HALF_LENGTH
-		var lane_to := gate + tangent * RECOVERY_LANE_HALF_LENGTH
-		if _point_to_segment_distance(point, lane_from, lane_to) < RECOVERY_LANE_HALF_WIDTH + radius:
-			return false
-	return true
+	return TRACK_BUILDER_PLACEMENT.clear_of_recovery_lanes(point, radius, centerline, gate_samples)
 
 
 static func _point_to_segment_distance(point: Vector2, from: Vector2, to: Vector2) -> float:
@@ -1049,8 +911,7 @@ static func _clear_of_occupied(point: Vector2, radius: float, occupied: Array[Di
 
 
 static func _asset_radius(texture_path: String, fallback_radius: float) -> float:
-	var radius := _prop_visual_size(texture_path, fallback_radius * 2.0) * 0.5
-	return radius if bool(PROP_SHAPES.get(texture_path.get_file(), {}).get("large_focal", false)) else minf(radius, 96.0)
+	return TRACK_BUILDER_PLACEMENT.asset_radius(texture_path, fallback_radius)
 
 
 static func _add_generated_prop(
@@ -1064,40 +925,11 @@ static func _add_generated_prop(
 		formation_index: int,
 		size_scale: float = 1.0
 ) -> void:
-	var prop := StaticBody2D.new()
-	prop.name = node_name
-	prop.position = position
-	prop.rotation = rotation
-	prop.collision_layer = 16
-	_mark_solid_body(prop, texture_path, moment_kind)
-	prop.set_meta("moment_kind", moment_kind)
-	prop.set_meta("semantic_quantity", quantity)
-	prop.set_meta("formation_index", formation_index)
-	prop.set_meta("size_scale", size_scale)
-	parent.add_child(prop)
-	var radius := _asset_radius(texture_path, 24.0) * size_scale
-	_add_directional_shadow(prop, texture_path, radius * 2.0, size_scale)
-	var texture := load(texture_path) as Texture2D
-	if texture:
-		var longest := maxf(texture.get_width(), texture.get_height())
-		var sprite_scale := _prop_visual_size(texture_path, 48.0) * size_scale / maxf(longest, 1.0)
-		var entry: Dictionary = PROP_SHAPES.get(texture_path.get_file(), {})
-		var offset := _add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
-		var sprite := Sprite2D.new()
-		sprite.name = "Sprite"
-		sprite.texture = texture
-		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		sprite.scale = Vector2.ONE * sprite_scale
-		sprite.position = -offset
-		_mark_solid_visual(sprite, texture_path, moment_kind)
-		prop.add_child(sprite)
+	TRACK_BUILDER_PLACEMENT.add_generated_prop(parent, node_name, position, texture_path, rotation, moment_kind, quantity, formation_index, size_scale)
 
 
 static func _mix_seed(seed: int, stream: String) -> int:
-	var value := (seed ^ int(stream.hash()) ^ 0x6D2B79F5) & 0x7FFFFFFF
-	value = ((value ^ (value >> 16)) * 0x45D9F3B) & 0x7FFFFFFF
-	value = ((value ^ (value >> 15)) * 0x45D9F3B) & 0x7FFFFFFF
-	return (value ^ (value >> 16)) & 0x7FFFFFFF
+	return TRACK_BUILDER_PLACEMENT.mix_seed(seed, stream)
 
 
 static func _fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
