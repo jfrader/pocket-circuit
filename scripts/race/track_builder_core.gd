@@ -184,6 +184,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["route_program"] = StringName(gen.get("route_program", gen["family"]))
 		spec["route_recipe"] = StringName(gen.get("route_recipe", gen["family"]))
 		spec["route_sequence"] = String(gen.get("route_sequence", ""))
+		spec["pockets"] = gen.get("pockets", [])
 		spec["generation_attempt"] = int(gen.get("attempt", 0))
 		spec["generation_fallback"] = bool(gen.get("fallback", false))
 		spec["loop_length"] = float(gen["length"])
@@ -1106,6 +1107,10 @@ static func _add_obstacle(parent: Node, node_name: String, position: Vector2, ra
 
 static func _add_prop_with_collision(parent: Node, position: Vector2, radius: float, texture_path: String) -> void:
 	TRACK_BUILDER_COLLISION.add_prop_with_collision(parent, position, radius, texture_path)
+
+
+static func _seal_pockets(root: Node2D, spec: Dictionary) -> void:
+	TRACK_BUILDER_COLLISION.seal_pockets(root, spec)
 
 
 static func _add_textured_polygon(

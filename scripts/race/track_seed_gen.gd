@@ -166,8 +166,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var last_reason := "no candidate"
 
 	for attempt in MAX_VARIANTS:
+		var attempt_pockets: Array = []
 		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance) \
-			if room_shape == &"el" else _family_controls(family, family, seed, attempt, usable_rect, target_length, min_self_distance)
+			if room_shape == &"el" else _family_controls(family, family, seed, attempt, usable_rect, target_length, min_self_distance, attempt_pockets)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
@@ -199,6 +200,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"target_length": target_length,
 				"attempt": attempt,
 				"fallback": false,
+				"pockets": attempt_pockets,
 				"realization": &"el_safe" if room_shape == &"el" else family,
 				"route_recipe": &"el_safe" if room_shape == &"el" else _route_name(seed, attempt, target_length),
 				"route_program": &"el_safe" if room_shape == &"el" else _route_program_name(seed, attempt, target_length),
@@ -209,8 +211,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	# The fallback is deterministic and never changes the requested seed or its
 	# selected family metadata. EL rooms retain their dedicated L-safe route.
 	for fallback_attempt in 4:
+		var fallback_pockets: Array = []
 		var controls := _el_controls(family, seed, MAX_VARIANTS + fallback_attempt, source_rect, target_length, min_self_distance) \
-			if room_shape == &"el" else _family_controls(&"conservative", family, seed, fallback_attempt, usable_rect, target_length, min_self_distance)
+			if room_shape == &"el" else _family_controls(&"conservative", family, seed, fallback_attempt, usable_rect, target_length, min_self_distance, fallback_pockets)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
@@ -242,6 +245,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"target_length": target_length,
 				"attempt": MAX_VARIANTS + fallback_attempt,
 				"fallback": true,
+				"pockets": fallback_pockets,
 				"realization": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
 				"route_recipe": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
 				"route_program": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
@@ -282,7 +286,8 @@ static func _family_controls(
 	attempt: int,
 	usable_rect: Rect2,
 	target_length: float,
-	min_self_distance: float
+	min_self_distance: float,
+	pockets: Array = []
 ) -> PackedVector2Array:
 	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length)
 	if str(definition.get("program", "")) == "serpentine":
@@ -315,6 +320,7 @@ static func _family_controls(
 	var mapped_vertices := _map_to_rect(anchors, usable_rect)
 	if mapped_vertices.is_empty():
 		return PackedVector2Array()
+	pockets.append_array(_detect_pockets(mapped_vertices))
 	# Per-corner fillet radii: base +24 margin plus 0..40 roll gives tight hairpins (near 147-171)
 	# next to big sweepers on same route; tangent clamp still self-limits on short edges.
 	var radii := _per_corner_fillet_radii(seed, attempt, mapped_vertices.size())
@@ -464,16 +470,17 @@ static func _serpentine_controls(
 	var room_h := usable_rect.size.y if long_axis else usable_rect.size.x
 	if room_w < 1050.0 or room_h < 660.0:
 		return PackedVector2Array()
-	var arc_radius := clampf(minf(room_w, room_h) * 0.242, 150.0, 172.0)
-	# Crossings sit near the room edges; the arcs reach inward from them. The
-	# two arc tips stay at least min_self_distance apart along the short axis.
-	var crossing_out := room_h * 0.5 - 8.0
-	if (crossing_out - arc_radius) * 2.0 < _min_self_distance:
-		return PackedVector2Array()
+	# Seed-rolled S proportions: the two arc tips must stay min_self_distance
+	# apart, which bounds the arc radius against the crossing depth.
+	var crossing_out := room_h * 0.5 - lerpf(8.0, 26.0, _hash_unit(seed, ROUTE_SALT + 0x51 + attempt * 31))
+	var arc_radius := clampf(crossing_out - 165.0, 150.0, 169.0)
 	var side_u := room_w * 0.5 - arc_radius
 	var crossing_half := side_u - arc_radius
 	if crossing_half < MIN_SETUP_DISTANCE * 0.5:
 		return PackedVector2Array()
+	var dip_fraction := lerpf(0.55, 0.70, _hash_unit(seed, ROUTE_SALT + 0x52 + attempt * 31))
+	var dip_angle := lerpf(0.28, 0.42, _hash_unit(seed, ROUTE_SALT + 0x53 + attempt * 31))
+	var dip_leg := lerpf(45.0, 75.0, _hash_unit(seed, ROUTE_SALT + 0x54 + attempt * 31))
 	var points := PackedVector2Array()
 	# Traversal: up the right side, left across the top, down the left side,
 	# right across the bottom. Clockwise in screen space. Arc loops start at
@@ -490,12 +497,27 @@ static func _serpentine_controls(
 		var angle := -PI * 0.5 * float(a) / float(arc_steps)
 		var local := Vector2(side_u - arc_radius, -crossing_out + arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
 		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	# Top crossing (left).
+	# Top crossing (left) with a gentle interior dip after the leading straight:
+	# two opposite 20-degree turns flip the turn direction so the S mixes hands,
+	# while the 480u straight before them keeps the literal-straight window.
 	var crossing_left := -crossing_half
 	var crossing_right := crossing_half
-	var crossing_steps := maxi(16, ceili((crossing_right - crossing_left) / 30.0))
-	for step in range(1, crossing_steps):
-		points.append(_serpentine_frame(Vector2(lerpf(crossing_right, crossing_left, float(step) / float(crossing_steps)), -crossing_out), long_axis, usable_rect))
+	var crossing_span := crossing_right - crossing_left
+	var dip_start_u := crossing_right - crossing_span * dip_fraction
+	var dip_dir := Vector2(-cos(dip_angle), sin(dip_angle))
+	var dip_up := Vector2(-cos(dip_angle), -sin(dip_angle))
+	var straight_before := maxi(4, ceili((crossing_right - dip_start_u) / 30.0))
+	for step in range(1, straight_before):
+		points.append(_serpentine_frame(Vector2(lerpf(crossing_right, dip_start_u, float(step) / float(straight_before)), -crossing_out), long_axis, usable_rect))
+	var dip_mid := Vector2(dip_start_u, -crossing_out) + dip_dir * dip_leg
+	var dip_end := dip_mid + dip_up * dip_leg
+	for step in [1, 2]:
+		points.append(_serpentine_frame(Vector2(dip_start_u, -crossing_out) + dip_dir * dip_leg * float(step) / 2.0, long_axis, usable_rect))
+	for step in [1, 2]:
+		points.append(_serpentine_frame(dip_mid + dip_up * dip_leg * float(step) / 2.0, long_axis, usable_rect))
+	var straight_after := maxi(2, ceili((dip_end.x - crossing_left) / 30.0))
+	for step in range(1, straight_after):
+		points.append(_serpentine_frame(Vector2(lerpf(dip_end.x, crossing_left, float(step) / float(straight_after)), -crossing_out), long_axis, usable_rect))
 	# Top-left arc.
 	for a in range(1, arc_steps):
 		var angle := -PI * 0.5 + -PI * 0.5 * float(a) / float(arc_steps)
@@ -510,9 +532,10 @@ static func _serpentine_controls(
 		var angle := -PI + -PI * 0.5 * float(a) / float(arc_steps)
 		var local := Vector2(-side_u + arc_radius, crossing_out - arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
 		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	# Bottom crossing (right).
-	for step in range(1, crossing_steps):
-		points.append(_serpentine_frame(Vector2(lerpf(crossing_left, crossing_right, float(step) / float(crossing_steps)), crossing_out), long_axis, usable_rect))
+	# Bottom crossing (right), pure straight — the second literal straight.
+	var bottom_steps := maxi(16, ceili((crossing_right - crossing_left) / 30.0))
+	for step in range(1, bottom_steps):
+		points.append(_serpentine_frame(Vector2(lerpf(crossing_left, crossing_right, float(step) / float(bottom_steps)), crossing_out), long_axis, usable_rect))
 	# Bottom-right arc (stops short of the right-side tangent point so the
 	# closing segment stays smooth instead of duplicating it).
 	for a in range(1, arc_steps - 1):
@@ -650,6 +673,61 @@ static func _validate_controls(
 			"reason": "driveable chord saves %.0fu over %.0fu" % [float(bypass["saving"]), float(bypass["arc"])],
 		}
 	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius, "literal_straight_count": literal_straight_count}
+
+
+static func _detect_pockets(mapped_vertices: PackedVector2Array) -> Array:
+	# Concave runs of the mapped polygon deeper than the threshold are bay
+	# pockets the scene builder seals. A run counts only when its chord midpoint
+	# lies outside the loop (open floor); waist pinches sit inside the hole and
+	# are already blocked by the raised island.
+	var pockets: Array = []
+	var count := mapped_vertices.size()
+	if count < 5:
+		return pockets
+	var orientation_sum := 0.0
+	for index in count:
+		orientation_sum += (mapped_vertices[index] - mapped_vertices[(index - 1 + count) % count]).cross(mapped_vertices[(index + 1) % count] - mapped_vertices[index])
+	var clockwise := orientation_sum > 0.0
+	var in_run := false
+	var run_start := 0
+	for i in count + 1:
+		var index := i % count
+		var prev := mapped_vertices[(index - 1 + count) % count]
+		var next := mapped_vertices[(index + 1) % count]
+		var turn := (mapped_vertices[index] - prev).cross(next - mapped_vertices[index])
+		var concave := (turn > 0.0) != clockwise
+		if concave and not in_run:
+			in_run = true
+			run_start = index
+		elif not concave and in_run:
+			in_run = false
+			var run_end := (index - 1 + count) % count
+			var chord_from := mapped_vertices[(run_start - 1 + count) % count]
+			var chord_to := mapped_vertices[(run_end + 1) % count]
+			var chord := chord_to - chord_from
+			if chord.length_squared() < 1600.0:
+				continue
+			var max_depth := 0.0
+			var cursor := run_start
+			while true:
+				var point := mapped_vertices[cursor]
+				var depth: float = absf(chord.cross(point - chord_from)) / chord.length()
+				max_depth = maxf(max_depth, depth)
+				if cursor == run_end:
+					break
+				cursor = (cursor + 1) % count
+			if max_depth < 180.0:
+				continue
+			var chord_mid := chord_from.lerp(chord_to, 0.5)
+			if Geometry2D.is_point_in_polygon(chord_mid, mapped_vertices):
+				continue
+			var side := mapped_vertices[run_start] - chord_mid
+			var along := chord / chord.length()
+			side -= along * side.dot(along)
+			if side.length_squared() > 1.0:
+				side = side.normalized()
+			pockets.append({"from": chord_from, "to": chord_to, "side": side, "depth": max_depth})
+	return pockets
 
 
 static func _corridor_boundary_loops(centerline: PackedVector2Array) -> Dictionary:
