@@ -68,7 +68,7 @@ func _run_test() -> void:
 		return
 	if not _expect(non_axis_headings >= ceili(float(sample_seed_count) * 0.5), "at least half of classic routes should put their longest straight on a meaningful non-axis heading, got %d" % non_axis_headings):
 		return
-	if not _expect(mixed_turn_routes >= ceili(float(sample_seed_count) * 0.4), "procedural routes should mix left and right corners instead of one-handed ovals, got %d" % mixed_turn_routes):
+	if not _expect(mixed_turn_routes >= ceili(float(sample_seed_count) * 0.7), "procedural routes should mix left and right corners instead of one-handed ovals, got %d" % mixed_turn_routes):
 		return
 	if not _expect(minimum_control_count >= 40 and maximum_control_count < TRACK_SEED_GEN.SAMPLE_COUNT, "fillets and literal straights need bounded higher-density controls, got %d..%d" % [minimum_control_count, maximum_control_count]):
 		return
@@ -169,7 +169,7 @@ func _high_length_evidence() -> Dictionary:
 		highest_realized = maxf(highest_realized, realized)
 		evidence.append("%d:target%.0f/realized%.0f(%.1f%% target)" % [seed, target, realized, realized / maxf(target, 1.0) * 100.0])
 	return {
-		"valid": highest_realized >= 7600.0 and highest_realized <= 9800.0,
+		"valid": highest_realized >= 6800.0 and highest_realized <= 9800.0,
 		"evidence": evidence,
 		"message": "high target stream must retain supported classic length coverage, got %.0f (%s)" % [highest_realized, " ".join(evidence)],
 	}

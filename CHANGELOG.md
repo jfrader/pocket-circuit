@@ -50,6 +50,8 @@
   validation check.
 - Generated circuits mix left and right corners instead of one-way ovals, and
   workshop wood no longer sits under a grey racing-surface wash.
+- Long championship seeds keep mixed corners instead of collapsing into a
+  simple oval. Share codes from generator v2 no longer load.
 - Race HUD calls a solo run a time trial instead of 1st of 1, drops invisible
   gate numbers, and the personal ghost is easier to see. Championship results
   say saved instead of filed.

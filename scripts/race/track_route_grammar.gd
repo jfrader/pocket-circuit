@@ -36,11 +36,9 @@ static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictio
 			var point := anchors[anchor_index]
 			point.x *= -1.0
 			anchors[anchor_index] = point
-	var kinked := false
-	if program != &"endurance":
-		var with_kink := _maybe_chicane(anchors, seed)
-		kinked = with_kink.size() != anchors.size()
-		anchors = with_kink
+	var with_kink := _maybe_chicane(anchors, seed)
+	var kinked := with_kink.size() != anchors.size()
+	anchors = with_kink
 	var length_mode := "_extended" if length_bias > 0.20 and program != &"endurance" else ""
 	var recipe := "%s_section_%d_extent_%d%s" % [program, section, extent, length_mode]
 	if mirrored:
@@ -119,7 +117,7 @@ static func _insert_optional_section(points: PackedVector2Array, section: int, s
 
 
 static func _maybe_chicane(points: PackedVector2Array, seed: int) -> PackedVector2Array:
-	if _roll_int(seed, 0xC41CE, 5) == 0:
+	if _roll_int(seed, 0xC41CE, 8) == 0:
 		return points
 	var best := -1
 	var best_length := 0.0
