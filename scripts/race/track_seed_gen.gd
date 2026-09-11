@@ -285,7 +285,7 @@ static func _family_controls(
 	min_self_distance: float
 ) -> PackedVector2Array:
 	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length)
-	var anchors := _technical_perimeter_template() if template_family == &"conservative" else definition["anchors"] as PackedVector2Array
+	var anchors := _technical_perimeter_template() if template_family == &"conservative" else (definition.get("anchors", PackedVector2Array()) as PackedVector2Array)
 	if anchors.is_empty():
 		return PackedVector2Array()
 
@@ -311,8 +311,12 @@ static func _family_controls(
 	# Collinear controls remain between fillets so Catmull sampling cannot turn a
 	# declared straight into the blanket-smoothed bends used by the old generator.
 	var mapped_vertices := _map_to_rect(anchors, usable_rect)
-	var fillet_radius := MIN_DRIVE_RADIUS + FILLET_RADIUS_MARGIN + lerpf(0.0, 24.0, _hash_unit(seed, ROUTE_SALT + 0xD7 + attempt * 37))
-	var full_controls := _filleted_controls(mapped_vertices, fillet_radius)
+	if mapped_vertices.is_empty():
+		return PackedVector2Array()
+	# Per-corner fillet radii: base +24 margin plus 0..40 roll gives tight hairpins (near 147-171)
+	# next to big sweepers on same route; tangent clamp still self-limits on short edges.
+	var radii := _per_corner_fillet_radii(seed, attempt, mapped_vertices.size())
+	var full_controls := _filleted_controls(mapped_vertices, radii)
 	var full_centerline := _sample_centerline(full_controls)
 	var full_length := _polyline_length(full_centerline)
 	if full_length < 1.0:
@@ -335,12 +339,23 @@ static func _family_controls(
 	)
 	for index in mapped_vertices.size():
 		mapped_vertices[index] = center + (mapped_vertices[index] - center) * length_scale + offset
-	return _filleted_controls(mapped_vertices, fillet_radius)
+	return _filleted_controls(mapped_vertices, radii)
 
 
-static func _filleted_controls(vertices: PackedVector2Array, desired_radius: float) -> PackedVector2Array:
+static func _filleted_controls(vertices: PackedVector2Array, desired_radii: Variant) -> PackedVector2Array:
 	if vertices.size() < 3:
 		return PackedVector2Array()
+	var radii: PackedFloat32Array = PackedFloat32Array()
+	if typeof(desired_radii) == TYPE_FLOAT or typeof(desired_radii) == TYPE_INT:
+		for i in vertices.size():
+			radii.append(float(desired_radii))
+	elif desired_radii is PackedFloat32Array:
+		radii = desired_radii
+	else:
+		for r in desired_radii:
+			radii.append(float(r))
+	while radii.size() < vertices.size():
+		radii.append(MIN_DRIVE_RADIUS + FILLET_RADIUS_MARGIN)
 	var entries := PackedVector2Array()
 	var exits := PackedVector2Array()
 	for index in vertices.size():
@@ -351,7 +366,9 @@ static func _filleted_controls(vertices: PackedVector2Array, desired_radius: flo
 		var outgoing := corner.direction_to(following)
 		var turn := absf(incoming.angle_to(outgoing))
 		var half_turn := turn * 0.5
-		var tangent := desired_radius * sin(half_turn) / maxf(cos(half_turn) * cos(half_turn), 0.08)
+		var desired_radius: float = radii[index]
+		desired_radius = maxf(desired_radius, MIN_DRIVE_RADIUS)
+		var tangent: float = desired_radius * sin(half_turn) / maxf(cos(half_turn) * cos(half_turn), 0.08)
 		tangent = minf(tangent, minf(previous.distance_to(corner), corner.distance_to(following)) * 0.42)
 		entries.append(corner - incoming * tangent)
 		exits.append(corner + outgoing * tangent)
@@ -373,6 +390,18 @@ static func _filleted_controls(vertices: PackedVector2Array, desired_radius: flo
 		for step in range(1, subdivisions):
 			result.append(exit.lerp(next_entry, float(step) / float(subdivisions)))
 	return result
+
+
+static func _per_corner_fillet_radii(seed: int, attempt: int, vertex_count: int) -> PackedFloat32Array:
+	var radii: PackedFloat32Array = PackedFloat32Array()
+	var base := MIN_DRIVE_RADIUS + FILLET_RADIUS_MARGIN
+	for v in vertex_count:
+		var salt := ROUTE_SALT + 0xD7 + attempt * 37 + v * 19
+		var roll := _hash_unit(seed, salt)
+		var extra := lerpf(5.0, 25.0, roll)
+		var r := base + extra
+		radii.append(r)
+	return radii
 
 
 static func _route_index(seed: int, attempt: int) -> int:

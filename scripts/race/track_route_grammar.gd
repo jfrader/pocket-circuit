@@ -3,7 +3,7 @@ class_name TrackRouteGrammar
 ## seed streams choose straight extents, bay/waist dimensions, and optional
 ## sections. The output is a new route skeleton, not displaced control points.
 
-const NAMES: Array[StringName] = [&"perimeter", &"lobes", &"wedge"]
+const NAMES: Array[StringName] = [&"perimeter", &"lobes", &"wedge", &"serpentine"]
 const MACRO_SALT := 0x36D1A77
 
 
@@ -14,7 +14,7 @@ static func count() -> int:
 static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictionary:
 	var program_index := posmod(index, NAMES.size())
 	var program := NAMES[program_index]
-	var section := _roll_int(seed, 0x51A7 + program_index * 97, 3)
+	var section := _roll_int(seed, 0x51A7 + program_index * 97, 4)
 	var extent := _roll_int(seed, 0x62B9 + program_index * 131, 2)
 	var anchors := PackedVector2Array()
 	match program:
@@ -22,6 +22,8 @@ static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictio
 			anchors = _perimeter(seed, section)
 		&"lobes":
 			anchors = _lobes(seed, section)
+		&"serpentine":
+			anchors = _serpentine(seed, section)
 		_:
 			anchors = _wedge(seed, section)
 	anchors = _apply_extent(anchors, extent)
@@ -30,6 +32,7 @@ static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictio
 		anchors = _endurance(anchors, length_bias)
 	else:
 		anchors = _apply_length_bias(anchors, length_bias)
+	anchors = _apply_radial_jitter(anchors, seed)
 	var mirrored := _roll_int(seed, 0x11A4D, 2) == 1
 	if mirrored:
 		for anchor_index in anchors.size():
@@ -96,28 +99,64 @@ static func _wedge(seed: int, section: int) -> PackedVector2Array:
 	return _insert_optional_section(points, section, seed, [1, 3, 5])
 
 
+static func _serpentine(seed: int, section: int) -> PackedVector2Array:
+	# Closed S/Z that crosses the room twice through interior waists. The two
+	# long sides are the literal straights; the crossings mix left and right.
+	var top_waist := _roll(seed, 201, -0.34, 0.10)
+	var bottom_waist := _roll(seed, 203, -0.10, 0.34)
+	var left_x := _roll(seed, 205, -0.94, -0.86)
+	var right_x := _roll(seed, 207, 0.86, 0.94)
+	var top_y := _roll(seed, 209, -0.88, -0.80)
+	var bottom_y := _roll(seed, 211, 0.80, 0.88)
+	var points := PackedVector2Array([
+		Vector2(left_x, 0.68), Vector2(left_x, -0.68),
+		Vector2(top_waist, top_y), Vector2(right_x, -0.62),
+		Vector2(right_x, 0.68), Vector2(bottom_waist, bottom_y),
+	])
+	return _insert_optional_section(points, section, seed, [0, 2, 4])
+
+
 static func _insert_optional_section(points: PackedVector2Array, section: int, seed: int, segment_choices: Array[int]) -> PackedVector2Array:
 	if section == 0:
 		return points
-	var segment := segment_choices[section - 1]
-	var from := points[segment]
-	var to := points[(segment + 1) % points.size()]
+	var result := points.duplicate()
 	var center := Vector2.ZERO
 	for point: Vector2 in points:
 		center += point
 	center /= float(points.size())
-	var inward := (center - from.lerp(to, 0.5)).normalized()
-	var depth := _roll(seed, 131 + section * 11, 0.36, 0.52)
-	var result := points.duplicate()
-	for offset in range(-1, 2):
-		var weight := 1.0 if offset == 0 else 0.42
-		var index := posmod(segment + offset, result.size())
-		result[index] += inward * depth * weight
+	var is_double := section >= 3
+	var segments: Array[int] = []
+	var depths: Array[float] = []
+	if is_double:
+		# second optional bay: two segments at smaller depths to stay inside bypass/self-distance limits
+		var idx1 := section % segment_choices.size()
+		var idx2 := (section + 2) % segment_choices.size()
+		if idx2 == idx1:
+			idx2 = (section + 1) % segment_choices.size()
+		segments = [segment_choices[idx1], segment_choices[idx2]]
+		depths = [
+			_roll(seed, 131 + section * 11, 0.08, 0.16),
+			_roll(seed, 137 + section * 13, 0.10, 0.18)
+		]
+	else:
+		var segment := segment_choices[section - 1]
+		segments = [segment]
+		depths = [_roll(seed, 131 + section * 11, 0.28, 0.44)]
+	for k in segments.size():
+		var segment := segments[k]
+		var depth := depths[k]
+		var from := points[segment]
+		var to := points[(segment + 1) % points.size()]
+		var inward := (center - from.lerp(to, 0.5)).normalized()
+		for offset in range(-1, 2):
+			var weight := 1.0 if offset == 0 else 0.42
+			var index := posmod(segment + offset, result.size())
+			result[index] += inward * depth * weight
 	return result
 
 
 static func _maybe_chicane(points: PackedVector2Array, seed: int) -> PackedVector2Array:
-	if _roll_int(seed, 0xC41CE, 8) == 0:
+	if _roll_int(seed, 0xC41CE, 6) == 0:
 		return points
 	var best := -1
 	var best_length := 0.0
@@ -126,14 +165,16 @@ static func _maybe_chicane(points: PackedVector2Array, seed: int) -> PackedVecto
 		if length > best_length:
 			best_length = length
 			best = index
-	if best < 0 or best_length < 0.22:
+	if best < 0 or best_length < 0.42:
 		return points
 	var from := points[best]
 	var to := points[(best + 1) % points.size()]
 	var along := to - from
 	var normal := Vector2(-along.y, along.x).normalized()
 	var side := -1.0 if _roll_int(seed, 0x51DE, 2) == 0 else 1.0
-	var amplitude := _roll(seed, 0xA11E, 0.10, 0.18)
+	# Amplitude grows with the square of edge length so the S kinks always hold
+	# MIN_DRIVE_RADIUS in the tightest room; validation remains the final gate.
+	var amplitude := minf(0.20, 0.105 * best_length * best_length)
 	var first := from.lerp(to, 0.34) + normal * amplitude * side
 	var second := from.lerp(to, 0.66) + normal * amplitude * -side
 	first = Vector2(clampf(first.x, -0.96, 0.96), clampf(first.y, -0.92, 0.92))
@@ -206,6 +247,29 @@ static func _apply_length_bias(points: PackedVector2Array, length_bias: float) -
 			lengthened.append(from.lerp(to, 0.50) + inward * depth)
 			lengthened.append(from.lerp(to, 0.72) + inward * depth * 0.45)
 	return lengthened
+
+
+static func _apply_radial_jitter(points: PackedVector2Array, seed: int) -> PackedVector2Array:
+	if points.size() < 3:
+		return points
+	var center := Vector2.ZERO
+	for p: Vector2 in points:
+		center += p
+	center /= float(points.size())
+	var result := PackedVector2Array()
+	for i in points.size():
+		var p := points[i]
+		var rad_dir := (p - center)
+		if rad_dir.length_squared() < 0.0001:
+			rad_dir = Vector2(1, 0)
+		else:
+			rad_dir = rad_dir.normalized()
+		var j := _roll(seed, 0x7A11 + i * 5, -0.02, 0.02)
+		var jp := p + rad_dir * j
+		jp.x = clampf(jp.x, -0.96, 0.96)
+		jp.y = clampf(jp.y, -0.92, 0.92)
+		result.append(jp)
+	return result
 
 
 static func _roll(seed: int, salt: int, minimum: float, maximum: float) -> float:
