@@ -3,7 +3,7 @@ class_name TrackRouteGrammar
 ## seed streams choose straight extents, bay/waist dimensions, and optional
 ## sections. The output is a new route skeleton, not displaced control points.
 
-const NAMES: Array[StringName] = [&"perimeter", &"lobes", &"wedge", &"serpentine"]
+const NAMES: Array[StringName] = [&"perimeter", &"lobes", &"wedge", &"diagonal"]
 const MACRO_SALT := 0x36D1A77
 
 
@@ -22,8 +22,8 @@ static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictio
 			anchors = _perimeter(seed, section)
 		&"lobes":
 			anchors = _lobes(seed, section)
-		&"serpentine":
-			anchors = _serpentine(seed, section)
+		&"diagonal":
+			anchors = _diagonal(seed, section)
 		_:
 			anchors = _wedge(seed, section)
 	anchors = _apply_extent(anchors, extent)
@@ -99,21 +99,17 @@ static func _wedge(seed: int, section: int) -> PackedVector2Array:
 	return _insert_optional_section(points, section, seed, [1, 3, 5])
 
 
-static func _serpentine(seed: int, section: int) -> PackedVector2Array:
-	# Closed S/Z that crosses the room twice through interior waists. The two
-	# long sides are the literal straights; the crossings mix left and right.
-	var top_waist := _roll(seed, 201, -0.34, 0.10)
-	var bottom_waist := _roll(seed, 203, -0.10, 0.34)
-	var left_x := _roll(seed, 205, -0.94, -0.86)
-	var right_x := _roll(seed, 207, 0.86, 0.94)
-	var top_y := _roll(seed, 209, -0.88, -0.80)
-	var bottom_y := _roll(seed, 211, 0.80, 0.88)
-	var points := PackedVector2Array([
-		Vector2(left_x, 0.68), Vector2(left_x, -0.68),
-		Vector2(top_waist, top_y), Vector2(right_x, -0.62),
-		Vector2(right_x, 0.68), Vector2(bottom_waist, bottom_y),
-	])
-	return _insert_optional_section(points, section, seed, [0, 2, 4])
+static func _diagonal(seed: int, section: int) -> PackedVector2Array:
+	# One of the base templates rotated well off-axis. Rotation preserves every
+	# validity property (radius, straights, self-distance, chords), so diagonal
+	# routes are legal by construction and put their straights on slanted lines.
+	var angle := _roll(seed, 221, 0.42, 0.78)
+	if _roll_int(seed, 227, 2) == 0:
+		angle = -angle
+	var points := _perimeter(seed, section) if _roll_int(seed, 223, 2) == 0 else _wedge(seed, section)
+	for index in points.size():
+		points[index] = points[index].rotated(angle)
+	return points
 
 
 static func _insert_optional_section(points: PackedVector2Array, section: int, seed: int, segment_choices: Array[int]) -> PackedVector2Array:
@@ -135,13 +131,13 @@ static func _insert_optional_section(points: PackedVector2Array, section: int, s
 			idx2 = (section + 1) % segment_choices.size()
 		segments = [segment_choices[idx1], segment_choices[idx2]]
 		depths = [
-			_roll(seed, 131 + section * 11, 0.08, 0.16),
-			_roll(seed, 137 + section * 13, 0.10, 0.18)
+			_roll(seed, 131 + section * 11, 0.14, 0.24),
+			_roll(seed, 137 + section * 13, 0.12, 0.22)
 		]
 	else:
 		var segment := segment_choices[section - 1]
 		segments = [segment]
-		depths = [_roll(seed, 131 + section * 11, 0.28, 0.44)]
+		depths = [_roll(seed, 131 + section * 11, 0.36, 0.56)]
 	for k in segments.size():
 		var segment := segments[k]
 		var depth := depths[k]
