@@ -52,6 +52,9 @@
   workshop wood no longer sits under a grey racing-surface wash.
 - Long championship seeds keep mixed corners instead of collapsing into a
   simple oval. Share codes from generator v2 no longer load.
+- Generated circuits vary corner sharpness per corner and add a serpentine
+  program that crosses the room twice, so layouts read like real circuits
+  instead of rounded rectangles.
 - Race HUD calls a solo run a time trial instead of 1st of 1, drops invisible
   gate numbers, and the personal ghost is easier to see. Championship results
   say saved instead of filed.
