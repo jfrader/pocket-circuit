@@ -53,8 +53,9 @@
 - Long championship seeds keep mixed corners instead of collapsing into a
   simple oval. Share codes from generator v2 no longer load.
 - Generated circuits vary corner sharpness per corner, fold deeper sections
-  into the room, and add a diagonal program whose straights run off-axis, so
-  layouts read like real circuits instead of rounded rectangles.
+  into the room, and add a serpentine program whose route crosses the middle
+  of the room on long straights, so layouts read like real circuits instead
+  of rounded rectangles.
 - Race HUD calls a solo run a time trial instead of 1st of 1, drops invisible
   gate numbers, and the personal ghost is easier to see. Championship results
   say saved instead of filed.

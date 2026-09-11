@@ -285,6 +285,8 @@ static func _family_controls(
 	min_self_distance: float
 ) -> PackedVector2Array:
 	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length)
+	if str(definition.get("program", "")) == "serpentine":
+		return _serpentine_controls(seed, attempt, usable_rect, target_length, min_self_distance)
 	var anchors := _technical_perimeter_template() if template_family == &"conservative" else (definition.get("anchors", PackedVector2Array()) as PackedVector2Array)
 	if anchors.is_empty():
 		return PackedVector2Array()
@@ -445,6 +447,109 @@ static func _smooth_controls(points: PackedVector2Array, passes: int) -> PackedV
 			)
 		result = smoothed
 	return result
+
+
+static func _serpentine_controls(
+	seed: int,
+	attempt: int,
+	usable_rect: Rect2,
+	target_length: float,
+	_min_self_distance: float
+) -> PackedVector2Array:
+	# World-space S: two long collinear crossings (the literal straights) joined
+	# by 90-degree arcs of generous radius. The raised island fills the hole, so
+	# a cut across the middle is solid — no shortcut rule is weakened.
+	var long_axis := usable_rect.size.x >= usable_rect.size.y
+	var room_w := usable_rect.size.x if long_axis else usable_rect.size.y
+	var room_h := usable_rect.size.y if long_axis else usable_rect.size.x
+	if room_w < 1050.0 or room_h < 660.0:
+		return PackedVector2Array()
+	var arc_radius := clampf(minf(room_w, room_h) * 0.242, 150.0, 172.0)
+	# Crossings sit near the room edges; the arcs reach inward from them. The
+	# two arc tips stay at least min_self_distance apart along the short axis.
+	var crossing_out := room_h * 0.5 - 8.0
+	if (crossing_out - arc_radius) * 2.0 < _min_self_distance:
+		return PackedVector2Array()
+	var side_u := room_w * 0.5 - arc_radius
+	var crossing_half := side_u - arc_radius
+	if crossing_half < MIN_SETUP_DISTANCE * 0.5:
+		return PackedVector2Array()
+	var points := PackedVector2Array()
+	# Traversal: up the right side, left across the top, down the left side,
+	# right across the bottom. Clockwise in screen space. Arc loops start at
+	# step 1 so they never duplicate the tangent point the straight ends on.
+	var side_bottom := crossing_out - arc_radius
+	var side_top := -crossing_out + arc_radius
+	var subdivisions := maxi(8, ceili((side_bottom - side_top) / 30.0))
+	for step in range(subdivisions + 1):
+		var fraction := float(step) / float(subdivisions)
+		points.append(_serpentine_frame(Vector2(side_u, lerpf(side_bottom, side_top, fraction)), long_axis, usable_rect))
+	# Top-right arc.
+	var arc_steps := maxi(9, ceili(arc_radius * PI * 0.5 / 30.0))
+	for a in range(1, arc_steps):
+		var angle := -PI * 0.5 * float(a) / float(arc_steps)
+		var local := Vector2(side_u - arc_radius, -crossing_out + arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
+		points.append(_serpentine_frame(local, long_axis, usable_rect))
+	# Top crossing (left).
+	var crossing_left := -crossing_half
+	var crossing_right := crossing_half
+	var crossing_steps := maxi(16, ceili((crossing_right - crossing_left) / 30.0))
+	for step in range(1, crossing_steps):
+		points.append(_serpentine_frame(Vector2(lerpf(crossing_right, crossing_left, float(step) / float(crossing_steps)), -crossing_out), long_axis, usable_rect))
+	# Top-left arc.
+	for a in range(1, arc_steps):
+		var angle := -PI * 0.5 + -PI * 0.5 * float(a) / float(arc_steps)
+		var local := Vector2(-side_u + arc_radius, -crossing_out + arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
+		points.append(_serpentine_frame(local, long_axis, usable_rect))
+	# Left side (down).
+	for step in range(1, subdivisions + 1):
+		var fraction := float(step) / float(subdivisions)
+		points.append(_serpentine_frame(Vector2(-side_u, lerpf(side_top, side_bottom, fraction)), long_axis, usable_rect))
+	# Bottom-left arc.
+	for a in range(1, arc_steps):
+		var angle := -PI + -PI * 0.5 * float(a) / float(arc_steps)
+		var local := Vector2(-side_u + arc_radius, crossing_out - arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
+		points.append(_serpentine_frame(local, long_axis, usable_rect))
+	# Bottom crossing (right).
+	for step in range(1, crossing_steps):
+		points.append(_serpentine_frame(Vector2(lerpf(crossing_left, crossing_right, float(step) / float(crossing_steps)), crossing_out), long_axis, usable_rect))
+	# Bottom-right arc (stops short of the right-side tangent point so the
+	# closing segment stays smooth instead of duplicating it).
+	for a in range(1, arc_steps - 1):
+		var angle := -PI * 1.5 + -PI * 0.5 * float(a) / float(arc_steps)
+		var local := Vector2(side_u - arc_radius, crossing_out - arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
+		points.append(_serpentine_frame(local, long_axis, usable_rect))
+	if points.size() < 16:
+		return PackedVector2Array()
+	# Small deterministic translation so two serpentine variants never overlap
+	# exactly even with identical rolls, plus a slight tilt so the crossings sit
+	# off-axis like the rest of the grammar.
+	var jitter := Vector2(
+		(_hash_unit(seed, ROUTE_SALT + 0x6D + attempt * 7) - 0.5) * 18.0,
+		(_hash_unit(seed, ROUTE_SALT + 0x6E + attempt * 7) - 0.5) * 18.0
+	)
+	var tilt := lerpf(0.05, 0.09, _hash_unit(seed, ROUTE_SALT + 0x6F + attempt * 7))
+	if _hash_unit(seed, ROUTE_SALT + 0x70 + attempt * 7) < 0.5:
+		tilt = -tilt
+	var pivot := usable_rect.get_center()
+	for index in points.size():
+		points[index] = pivot + (points[index] - pivot).rotated(tilt) + jitter
+	var full_length := _polyline_length(_sample_centerline(points))
+	if full_length < 1.0:
+		return PackedVector2Array()
+	var length_scale := clampf(target_length / full_length, 0.62, 1.02)
+	if length_scale < 0.999:
+		var center := usable_rect.get_center()
+		for index in points.size():
+			points[index] = center + (points[index] - center) * length_scale
+	return points
+
+
+static func _serpentine_frame(local: Vector2, long_axis: bool, usable_rect: Rect2) -> Vector2:
+	var center := usable_rect.get_center()
+	if long_axis:
+		return center + local
+	return center + Vector2(-local.y, local.x)
 
 
 static func _el_controls(
