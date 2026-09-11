@@ -162,7 +162,7 @@ func _run_test() -> void:
 				return
 			if not _expect(not bool((gameplay.get("complex_bypass", {}) as Dictionary).get("found", false)), "%s seed %d must resist a straight chord replacing a whole complex" % [room_name, seed]):
 				return
-			var physical_bypass := _physical_complex_bypass(TRACK_SEED_GEN.centerline_checkpoints(controls))
+			var physical_bypass := _physical_complex_bypass(TRACK_SEED_GEN.centerline_checkpoints(controls), result.get("pockets", []))
 			if not _expect(not bool(physical_bypass.get("found", false)), "%s seed %d route geometry must reject a %.0fu route-to-chord bypass (arc=%.0f chord=%.0f samples=%d->%d)" % [room_name, seed, float(physical_bypass.get("saving", 0.0)), float(physical_bypass.get("arc", 0.0)), float(physical_bypass.get("chord", 0.0)), int(physical_bypass.get("start", -1)), int(physical_bypass.get("finish", -1))]):
 				return
 			total_setup_straight_regions += setup_straight_regions
@@ -269,7 +269,7 @@ func _broad_turn_complex_count(points: PackedVector2Array) -> int:
 	return maxi(separated_gaps, 1)
 
 
-func _physical_complex_bypass(centerline: PackedVector2Array) -> Dictionary:
+func _physical_complex_bypass(centerline: PackedVector2Array, pockets: Array = []) -> Dictionary:
 	var edges: Dictionary = TRACK_BUILDER._corridor_edges(centerline)
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
@@ -295,10 +295,23 @@ func _physical_complex_bypass(centerline: PackedVector2Array) -> Dictionary:
 			var unvalidated_long_bypass := route_arc > TRACK_SEED_GEN.BYPASS_MAX_ARC and saving >= TRACK_SEED_GEN.BYPASS_MIN_SAVING and ratio >= TRACK_SEED_GEN.BYPASS_MIN_RATIO
 			if not egregious_bypass and not unvalidated_long_bypass:
 				continue
+			if _chord_matches_pocket(centerline[start], centerline[finish], pockets):
+				continue
 			if _segment_touches_loop(centerline[start], centerline[finish], outer_boundary, 22.0) or _segment_touches_loop(centerline[start], centerline[finish], inner_boundary, 22.0):
 				continue
 			return {"found": true, "saving": saving, "arc": route_arc, "chord": chord, "start": start, "finish": finish}
 	return {"found": false, "saving": 0.0}
+
+
+func _chord_matches_pocket(from: Vector2, to: Vector2, pockets: Array) -> bool:
+	# A chord is excused when it matches a declared pocket mouth: the scene
+	# builder seals those with solid walls.
+	for pocket: Dictionary in pockets:
+		if from.distance_to(pocket.get("from", Vector2.ZERO)) < 40.0 and to.distance_to(pocket.get("to", Vector2.ZERO)) < 40.0:
+			return true
+		if from.distance_to(pocket.get("to", Vector2.ZERO)) < 40.0 and to.distance_to(pocket.get("from", Vector2.ZERO)) < 40.0:
+			return true
+	return false
 
 
 func _segment_touches_loop(from: Vector2, to: Vector2, loop: PackedVector2Array, clearance: float) -> bool:

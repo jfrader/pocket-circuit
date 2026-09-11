@@ -137,7 +137,7 @@ static func _insert_optional_section(points: PackedVector2Array, section: int, s
 	else:
 		var segment := segment_choices[section - 1]
 		segments = [segment]
-		depths = [_roll(seed, 131 + section * 11, 0.36, 0.56)]
+		depths = [_roll(seed, 131 + section * 11, 0.46, 0.66)]
 	for k in segments.size():
 		var segment := segments[k]
 		var depth := depths[k]

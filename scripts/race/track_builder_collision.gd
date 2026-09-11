@@ -786,3 +786,42 @@ static func add_boundary_worn_hint(container: Node2D, centerline: PackedVector2A
 	container.add_child(spr)
 
 
+
+
+static func seal_pockets(root: Node2D, spec: Dictionary) -> void:
+	# Deep interior bays declare pockets in the route spec. Each pocket mouth is
+	# sealed with a solid themed wall so cutting across it is physically
+	# impossible; the wall sits on the far side of the mouth, clear of the
+	# racing line, and its ends overlap the arm corridors by a car width.
+	var pockets: Array = spec.get("pockets", [])
+	if pockets.is_empty():
+		return
+	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
+	var container := Node2D.new()
+	container.name = "PocketSeals"
+	root.add_child(container)
+	for pocket_index in pockets.size():
+		var pocket: Dictionary = pockets[pocket_index]
+		var from: Vector2 = pocket.get("from", Vector2.ZERO)
+		var to: Vector2 = pocket.get("to", Vector2.ZERO)
+		var chord := to - from
+		var length := chord.length()
+		if length < 60.0:
+			continue
+		var direction := chord / length
+		var floor_side := Vector2(-direction.y, direction.x)
+		var declared_side: Vector2 = pocket.get("side", Vector2.ZERO)
+		if declared_side.length_squared() > 1.0:
+			floor_side = declared_side.normalized()
+		# The wall hugs the room-wall margin (165u off the mouth): its outer face
+		# meets the wall margin so no car fits behind it, and its ends stop short
+		# of the racing line's corner arcs.
+		var wall_position := from.lerp(to, 0.5) - floor_side * 165.0
+		TrackBuilderCore._add_wall_segment(
+			container,
+			"Seal%02d" % pocket_index,
+			wall_position,
+			length + 240.0,
+			direction.angle(),
+			edge_texture
+		)
