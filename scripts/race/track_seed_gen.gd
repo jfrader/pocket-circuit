@@ -162,7 +162,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var physical_self_distance := maxf(HALF_WIDTH * 2.0, minf(usable_rect.size.x, usable_rect.size.y) * 0.55)
 	var min_self_distance := minf(requested_self_distance, physical_self_distance)
 	var room_check_margin := maxf(float(params.get("room_check_margin", 0.0)), CORRIDOR_CLEARANCE)
-	var minimum_length := float(params.get("min_loop_length", 1900.0 * WORLD_SCALE))
+	var minimum_length := float(params.get("min_loop_length", 1500.0 * WORLD_SCALE))
 	var last_reason := "no candidate"
 
 	for attempt in MAX_VARIANTS:
@@ -290,8 +290,13 @@ static func _family_controls(
 	pockets: Array = []
 ) -> PackedVector2Array:
 	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length)
-	if str(definition.get("program", "")) == "serpentine":
+	var program := str(definition.get("program", ""))
+	if program == "serpentine":
 		return _serpentine_controls(seed, attempt, usable_rect, target_length, min_self_distance)
+	if program == "wedge" or program == "diagonal":
+		return _triangle_controls(seed, attempt, usable_rect, target_length)
+	if program == "perimeter":
+		return _hairpin_controls(seed, attempt, usable_rect, target_length)
 	var anchors := _technical_perimeter_template() if template_family == &"conservative" else (definition.get("anchors", PackedVector2Array()) as PackedVector2Array)
 	if anchors.is_empty():
 		return PackedVector2Array()
@@ -413,12 +418,12 @@ static func _per_corner_fillet_radii(seed: int, attempt: int, vertex_count: int)
 
 
 static func _route_index(seed: int, attempt: int) -> int:
-	# Uniform two-of-eight slots per program: the serpentine keeps a healthy
-	# share so interior crossings show up regularly, and concave programs like
-	# lobes keep enough presence to stay visibly varied.
 	var slot := posmod(_hash32(seed ^ ROUTE_SALT), 8)
-	var program := slot / 2
-	return posmod(program + attempt, ROUTE_GRAMMAR.count())
+	if slot < 4:
+		return posmod(3 + attempt, ROUTE_GRAMMAR.count())
+	if slot < 6:
+		return posmod(attempt, ROUTE_GRAMMAR.count())
+	return posmod(2 + attempt, ROUTE_GRAMMAR.count())
 
 
 static func _route_name(seed: int, attempt: int, target_length: float) -> StringName:
@@ -584,6 +589,144 @@ static func _serpentine_frame(local: Vector2, long_axis: bool, usable_rect: Rect
 	if long_axis:
 		return center + local
 	return center + Vector2(-local.y, local.x)
+
+
+static func _hairpin_controls(
+	seed: int,
+	attempt: int,
+	usable_rect: Rect2,
+	target_length: float
+) -> PackedVector2Array:
+	# Out-and-back capsule along one long edge. The rest of the table stays
+	# empty, so the silhouette is a sausage, not a room-filling oval.
+	var long_axis := usable_rect.size.x >= usable_rect.size.y
+	var room_w := usable_rect.size.x if long_axis else usable_rect.size.y
+	var room_h := usable_rect.size.y if long_axis else usable_rect.size.x
+	if room_w < 1100.0 or room_h < 520.0:
+		return PackedVector2Array()
+	var gap := lerpf(330.0, 400.0, _hash_unit(seed, ROUTE_SALT + 0x81 + attempt * 31))
+	var radius := gap * 0.5
+	var inset := radius + 10.0
+	var u_left := -room_w * 0.5 + inset
+	var u_right := room_w * 0.5 - inset
+	if u_right - u_left < MIN_SETUP_DISTANCE * 2.0:
+		return PackedVector2Array()
+	var side := 1.0 if _hash_unit(seed, ROUTE_SALT + 0x82 + attempt * 31) < 0.5 else -1.0
+	var v_outer := side * (room_h * 0.5 - 20.0)
+	var v_inner := v_outer - side * gap
+	var points := PackedVector2Array()
+	var straight := maxi(16, ceili((u_right - u_left) / 30.0))
+	for step in range(straight + 1):
+		var u := lerpf(u_left, u_right, float(step) / float(straight))
+		points.append(_serpentine_frame(Vector2(u, v_outer), long_axis, usable_rect))
+	var arc_steps := maxi(8, ceili(radius * PI / 30.0))
+	var right_center := Vector2(u_right, (v_outer + v_inner) * 0.5)
+	for a in range(1, arc_steps):
+		var angle := side * PI * 0.5 - side * PI * float(a) / float(arc_steps)
+		var local := right_center + Vector2(cos(angle), sin(angle)) * radius
+		points.append(_serpentine_frame(local, long_axis, usable_rect))
+	var empty := -side
+	for step in range(1, straight):
+		var t := float(step) / float(straight)
+		var u := lerpf(u_right, u_left, t)
+		var v := v_inner
+		if t > 0.28 and t < 0.62:
+			v += empty * 70.0 * sin((t - 0.28) / 0.34 * PI)
+		points.append(_serpentine_frame(Vector2(u, v), long_axis, usable_rect))
+	var left_center := Vector2(u_left, (v_outer + v_inner) * 0.5)
+	for a in range(1, arc_steps - 1):
+		var angle := -side * PI * 0.5 - side * PI * float(a) / float(arc_steps)
+		var local := left_center + Vector2(cos(angle), sin(angle)) * radius
+		points.append(_serpentine_frame(local, long_axis, usable_rect))
+	return _finish_world_route(points, seed, attempt, usable_rect, target_length, false)
+
+
+static func _triangle_controls(
+	seed: int,
+	attempt: int,
+	usable_rect: Rect2,
+	target_length: float
+) -> PackedVector2Array:
+	# Three long sides with drive-radius corners. The outer hull is a triangle,
+	# so it cannot read as a rounded rectangle even after filleting.
+	var long_axis := usable_rect.size.x >= usable_rect.size.y
+	var room_w := usable_rect.size.x if long_axis else usable_rect.size.y
+	var room_h := usable_rect.size.y if long_axis else usable_rect.size.x
+	if room_w < 1100.0 or room_h < 620.0:
+		return PackedVector2Array()
+	var radius := 160.0
+	var inset := radius + 12.0
+	var base_left := Vector2(-room_w * 0.5 + inset, room_h * 0.5 - inset)
+	var base_right := Vector2(room_w * 0.5 - inset, room_h * 0.5 - inset)
+	var apex := Vector2(
+		lerpf(-room_w * 0.22, room_w * 0.22, _hash_unit(seed, ROUTE_SALT + 0x91 + attempt * 31)),
+		-room_h * 0.5 + inset
+	)
+	if _hash_unit(seed, ROUTE_SALT + 0x92 + attempt * 31) < 0.5:
+		base_left.y *= -1.0
+		base_right.y *= -1.0
+		apex.y *= -1.0
+	var vertices := PackedVector2Array([base_left, base_right, apex])
+	var longest := 0
+	var longest_len := 0.0
+	for index in 3:
+		var length := vertices[index].distance_to(vertices[(index + 1) % 3])
+		if length > longest_len:
+			longest_len = length
+			longest = index
+	var from := vertices[longest]
+	var to := vertices[(longest + 1) % 3]
+	var inward := ((vertices[(longest + 2) % 3] - from.lerp(to, 0.5))).normalized()
+	var kink := PackedVector2Array([
+		from.lerp(to, 0.38) + inward * 80.0,
+		from.lerp(to, 0.50) + inward * 120.0,
+		from.lerp(to, 0.62) + inward * 80.0,
+	])
+	var world := PackedVector2Array()
+	for index in 3:
+		world.append(_serpentine_frame(vertices[index], long_axis, usable_rect))
+		if index == longest:
+			for kink_point: Vector2 in kink:
+				world.append(_serpentine_frame(kink_point, long_axis, usable_rect))
+	var controls := _filleted_controls(world, radius)
+	return _finish_world_route(controls, seed, attempt, usable_rect, target_length)
+
+
+static func _finish_world_route(
+	points: PackedVector2Array,
+	seed: int,
+	attempt: int,
+	usable_rect: Rect2,
+	target_length: float,
+	apply_tilt: bool = true
+) -> PackedVector2Array:
+	if points.size() < 16:
+		return PackedVector2Array()
+	var jitter := Vector2(
+		(_hash_unit(seed, ROUTE_SALT + 0x6D + attempt * 7) - 0.5) * 10.0,
+		(_hash_unit(seed, ROUTE_SALT + 0x6E + attempt * 7) - 0.5) * 10.0
+	)
+	var pivot := usable_rect.get_center()
+	for index in points.size():
+		points[index] = points[index] + jitter
+	if apply_tilt:
+		var tilt := lerpf(0.14, 0.22, _hash_unit(seed, ROUTE_SALT + 0x6F + attempt * 7))
+		if _hash_unit(seed, ROUTE_SALT + 0x70 + attempt * 7) < 0.5:
+			tilt = -tilt
+		var fit := 0.90
+		for index in points.size():
+			points[index] = pivot + (points[index] - pivot) * fit
+		for index in points.size():
+			points[index] = pivot + (points[index] - pivot).rotated(tilt)
+	var full_length := _polyline_length(_sample_centerline(points))
+	if full_length < 1.0:
+		return PackedVector2Array()
+	var length_scale := clampf(target_length / full_length, 0.62, 1.02)
+	if length_scale < 0.999:
+		var center := usable_rect.get_center()
+		for index in points.size():
+			points[index] = center + (points[index] - center) * length_scale
+	return points
 
 
 static func _el_controls(

@@ -154,7 +154,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 			"min_point_distance": 210.0,
 			"max_angle_deg": 80.0,
 			"min_self_distance": 320.0,
-			"min_loop_length": 1900.0 * WORLD_SCALE,
+			"min_loop_length": 1500.0 * WORLD_SCALE,
 			"room_polygon": room_polygon,
 			"room_shape": room_shape,
 		}
