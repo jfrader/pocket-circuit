@@ -53,9 +53,9 @@
 - Long championship seeds keep mixed corners instead of collapsing into a
   simple oval. Share codes from generator v2 no longer load.
 - Generated circuits vary corner sharpness per corner, fold deeper sections
-  into the room, and add a serpentine program whose route crosses the middle
-  of the room on long straights, so layouts read like real circuits instead
-  of rounded rectangles.
+  into the room, and add serpentine and diagonal programs whose routes cross
+  the room interior and run straights off-axis, so layouts read like real
+  circuits instead of rounded rectangles.
 - Deep interior bays get their mouths sealed with solid themed walls, so
   cutting across them is physically impossible and the shortcut rules never
   need to be relaxed.

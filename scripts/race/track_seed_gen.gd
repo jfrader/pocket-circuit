@@ -413,8 +413,12 @@ static func _per_corner_fillet_radii(seed: int, attempt: int, vertex_count: int)
 
 
 static func _route_index(seed: int, attempt: int) -> int:
-	var base := posmod(_hash32(seed ^ ROUTE_SALT), ROUTE_GRAMMAR.count())
-	return posmod(base + attempt, ROUTE_GRAMMAR.count())
+	# Uniform two-of-eight slots per program: the serpentine keeps a healthy
+	# share so interior crossings show up regularly, and concave programs like
+	# lobes keep enough presence to stay visibly varied.
+	var slot := posmod(_hash32(seed ^ ROUTE_SALT), 8)
+	var program := slot / 2
+	return posmod(program + attempt, ROUTE_GRAMMAR.count())
 
 
 static func _route_name(seed: int, attempt: int, target_length: float) -> StringName:
@@ -471,16 +475,17 @@ static func _serpentine_controls(
 	if room_w < 1050.0 or room_h < 660.0:
 		return PackedVector2Array()
 	# Seed-rolled S proportions: the two arc tips must stay min_self_distance
-	# apart, which bounds the arc radius against the crossing depth.
-	var crossing_out := room_h * 0.5 - lerpf(8.0, 26.0, _hash_unit(seed, ROUTE_SALT + 0x51 + attempt * 31))
-	var arc_radius := clampf(crossing_out - 165.0, 150.0, 169.0)
+	# apart, which bounds the arc radius against the crossing depth. The spread
+	# is wide enough to cross a fingerprint bucket so serpentines stay distinct.
+	var crossing_out := room_h * 0.5 - lerpf(8.0, 27.0, _hash_unit(seed, ROUTE_SALT + 0x51 + attempt * 31))
+	var arc_radius := clampf(crossing_out - 160.0, 147.0, 169.0)
 	var side_u := room_w * 0.5 - arc_radius
 	var crossing_half := side_u - arc_radius
 	if crossing_half < MIN_SETUP_DISTANCE * 0.5:
 		return PackedVector2Array()
 	var dip_fraction := lerpf(0.55, 0.70, _hash_unit(seed, ROUTE_SALT + 0x52 + attempt * 31))
-	var dip_angle := lerpf(0.28, 0.42, _hash_unit(seed, ROUTE_SALT + 0x53 + attempt * 31))
-	var dip_leg := lerpf(45.0, 75.0, _hash_unit(seed, ROUTE_SALT + 0x54 + attempt * 31))
+	var dip_angle := lerpf(0.32, 0.46, _hash_unit(seed, ROUTE_SALT + 0x53 + attempt * 31))
+	var dip_leg := lerpf(90.0, 120.0, _hash_unit(seed, ROUTE_SALT + 0x54 + attempt * 31))
 	var points := PackedVector2Array()
 	# Traversal: up the right side, left across the top, down the left side,
 	# right across the bottom. Clockwise in screen space. Arc loops start at
@@ -497,9 +502,9 @@ static func _serpentine_controls(
 		var angle := -PI * 0.5 * float(a) / float(arc_steps)
 		var local := Vector2(side_u - arc_radius, -crossing_out + arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
 		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	# Top crossing (left) with a gentle interior dip after the leading straight:
-	# two opposite 20-degree turns flip the turn direction so the S mixes hands,
-	# while the 480u straight before them keeps the literal-straight window.
+	# Top crossing (left) with an interior dip after the leading straight: the
+	# down-kink and up-kink are opposite turns so the S mixes hands, while the
+	# leading straight keeps the literal-straight window.
 	var crossing_left := -crossing_half
 	var crossing_right := crossing_half
 	var crossing_span := crossing_right - crossing_left
@@ -565,7 +570,13 @@ static func _serpentine_controls(
 		var center := usable_rect.get_center()
 		for index in points.size():
 			points[index] = center + (points[index] - center) * length_scale
-	return points
+	# Rotate the cyclic order so the reorder-to-longest-straight tie-break lands
+	# on a different seam per seed: serpentine fingerprints stay distinct.
+	var rotation := posmod(_hash32(seed ^ (ROUTE_SALT + attempt * 0x5F1)), points.size())
+	var rotated := PackedVector2Array()
+	for index in points.size():
+		rotated.append(points[(rotation + index) % points.size()])
+	return rotated
 
 
 static func _serpentine_frame(local: Vector2, long_axis: bool, usable_rect: Rect2) -> Vector2:
@@ -716,7 +727,7 @@ static func _detect_pockets(mapped_vertices: PackedVector2Array) -> Array:
 				if cursor == run_end:
 					break
 				cursor = (cursor + 1) % count
-			if max_depth < 180.0:
+			if max_depth < 130.0:
 				continue
 			var chord_mid := chord_from.lerp(chord_to, 0.5)
 			if Geometry2D.is_point_in_polygon(chord_mid, mapped_vertices):
