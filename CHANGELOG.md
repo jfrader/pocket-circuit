@@ -52,10 +52,8 @@
   workshop wood no longer sits under a grey racing-surface wash.
 - Long championship seeds keep mixed corners instead of collapsing into a
   simple oval. Share codes from generator v2 no longer load.
-- Generated circuits vary corner sharpness per corner, fold deeper sections
-  into the room, and add serpentine and diagonal programs whose routes cross
-  the room interior and run straights off-axis, so layouts read like real
-  circuits instead of rounded rectangles.
+- Generated circuits are hairpins, triangles, and interior S routes instead
+  of room-filling ovals. Share codes from generator v3 no longer load.
 - Deep interior bays get their mouths sealed with solid themed walls, so
   cutting across them is physically impossible and the shortcut rules never
   need to be relaxed.
