@@ -3,7 +3,7 @@ class_name TrackRouteGrammar
 ## seed streams choose straight extents, bay/waist dimensions, and optional
 ## sections. The output is a new route skeleton, not displaced control points.
 
-const NAMES: Array[StringName] = [&"perimeter", &"lobes", &"wedge", &"serpentine"]
+const NAMES: Array[StringName] = [&"perimeter", &"diagonal", &"wedge", &"serpentine"]
 const MACRO_SALT := 0x36D1A77
 
 
@@ -20,16 +20,18 @@ static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictio
 	match program:
 		&"perimeter":
 			anchors = _perimeter(seed, section)
-		&"lobes":
-			anchors = _lobes(seed, section)
+		&"diagonal":
+			anchors = _diagonal(seed, section)
 		&"serpentine":
 			anchors = _serpentine(seed, section)
 		_:
 			anchors = _wedge(seed, section)
 	anchors = _apply_extent(anchors, extent)
 	if length_bias > 0.50:
-		program = &"endurance"
-		anchors = _endurance(anchors, length_bias)
+		# Long routes get the interior-crossing S instead of the old plain oval;
+		# the seed-side builder owns the world-space geometry.
+		program = &"serpentine"
+		anchors = _serpentine(seed, section)
 	else:
 		anchors = _apply_length_bias(anchors, length_bias)
 	anchors = _apply_radial_jitter(anchors, seed)
@@ -70,19 +72,17 @@ static func _perimeter(seed: int, section: int) -> PackedVector2Array:
 	return _insert_optional_section(points, section, seed, [2, 5, 7])
 
 
-static func _lobes(seed: int, section: int) -> PackedVector2Array:
-	var waist_x := _roll(seed, 71, -0.14, 0.16)
-	var upper_waist := _roll(seed, 73, -0.48, -0.30)
-	var lower_waist := _roll(seed, 79, 0.30, 0.50)
-	var left_size := _roll(seed, 83, 0.62, 0.82)
-	var right_size := _roll(seed, 89, 0.62, 0.84)
-	var points := PackedVector2Array([
-		Vector2(-0.94, -0.14), Vector2(-0.68, -left_size), Vector2(-0.06, -0.70),
-		Vector2(waist_x + 0.20, upper_waist), Vector2(0.70, -right_size),
-		Vector2(0.94, -0.10), Vector2(0.70, right_size), Vector2(0.08, 0.72),
-		Vector2(waist_x - 0.20, lower_waist), Vector2(-0.68, left_size), Vector2(-0.94, 0.22),
-	])
-	return _insert_optional_section(points, section, seed, [1, 5, 8])
+static func _diagonal(seed: int, section: int) -> PackedVector2Array:
+	# A base template rotated well off-axis. Rotation preserves every validity
+	# property (radius, straights, self-distance, chords), so diagonal routes
+	# stay legal by construction while their straights run on slanted lines.
+	var angle := _roll(seed, 221, 0.38, 0.78)
+	if _roll_int(seed, 227, 2) == 0:
+		angle = -angle
+	var points := _perimeter(seed, section) if _roll_int(seed, 223, 2) == 0 else _wedge(seed, section)
+	for index in points.size():
+		points[index] = points[index].rotated(angle)
+	return points
 
 
 static func _wedge(seed: int, section: int) -> PackedVector2Array:
@@ -112,9 +112,7 @@ static func _serpentine(seed: int, section: int) -> PackedVector2Array:
 	])
 
 
-static func _insert_optional_section(points: PackedVector2Array, section: int, seed: int, segment_choices: Array[int]) -> PackedVector2Array:
-	if section == 0:
-		return points
+static func _insert_optional_section(points: PackedVector2Array, section: int, seed: int, segment_choices: Array[int], depth_scale: float = 1.0) -> PackedVector2Array:
 	var result := points.duplicate()
 	var center := Vector2.ZERO
 	for point: Vector2 in points:
@@ -135,19 +133,33 @@ static func _insert_optional_section(points: PackedVector2Array, section: int, s
 			_roll(seed, 137 + section * 13, 0.12, 0.22)
 		]
 	else:
+		# Section 0 keeps the plain base shape so concave programs like lobes
+		# always have a safe fallback; deeper sections fold a bay inward that
+		# the scene builder seals.
+		if section == 0:
+			return points
 		var segment := segment_choices[section - 1]
 		segments = [segment]
-		depths = [_roll(seed, 131 + section * 11, 0.46, 0.66)]
+		depths = [_roll(seed, 131 + section * 11, 0.46, 0.66) * depth_scale]
 	for k in segments.size():
 		var segment := segments[k]
 		var depth := depths[k]
 		var from := points[segment]
 		var to := points[(segment + 1) % points.size()]
 		var inward := (center - from.lerp(to, 0.5)).normalized()
-		for offset in range(-1, 2):
-			var weight := 1.0 if offset == 0 else 0.42
-			var index := posmod(segment + offset, result.size())
-			result[index] += inward * depth * weight
+		if is_double:
+			# Two tight folds must stay short so they never overlap.
+			for offset in range(-1, 2):
+				var weight := 1.0 if offset == 0 else 0.42
+				var index := posmod(segment + offset, result.size())
+				result[index] += inward * depth * weight
+		else:
+			# A five-vertex fold keeps the apex gentle enough for the fillet pass.
+			var weights := [0.35, 0.7, 1.0, 0.7, 0.35]
+			for offset in range(-2, 3):
+				var weight: float = weights[offset + 2]
+				var index := posmod(segment + offset, result.size())
+				result[index] += inward * depth * weight
 	return result
 
 
@@ -196,17 +208,6 @@ static func _apply_extent(points: PackedVector2Array, extent: int) -> PackedVect
 		point.x = clampf(point.x, -0.96, 0.96)
 		result[index] = point
 	return result
-
-
-static func _endurance(source: PackedVector2Array, length_bias: float) -> PackedVector2Array:
-	var notch_x := clampf(source[0].x * 0.16, -0.14, 0.14)
-	var notch_depth := lerpf(0.48, 0.30, length_bias)
-	return PackedVector2Array([
-		Vector2(-0.96, -0.16), Vector2(-0.86, -0.86), Vector2(0.76, -0.90),
-		Vector2(0.96, -0.18), Vector2(0.88, 0.82), Vector2(0.48, 0.90),
-		Vector2(notch_x, notch_depth), Vector2(-0.48, 0.90),
-		Vector2(-0.86, 0.80), Vector2(-0.96, 0.18),
-	])
 
 
 static func _apply_length_bias(points: PackedVector2Array, length_bias: float) -> PackedVector2Array:
