@@ -35,9 +35,11 @@ func _run_test() -> void:
 	if not _expect(bool(shell.get("_quick_race")), "gamepad A should open the Quick Race builder"):
 		return
 	await _wait_until(func() -> bool: return root.get_viewport().gui_get_focus_owner() != null, 30)
-	await _tap_action(&"ui_down")
-	await _tap_action(&"ui_down")
-	await _tap_action(&"ui_down")
+	for _step in 10:
+		var focused := root.get_viewport().gui_get_focus_owner() as Button
+		if focused != null and focused.text == "PLAY":
+			break
+		await _tap_action(&"ui_down")
 	await _wait_until(func() -> bool:
 		var focused := root.get_viewport().gui_get_focus_owner() as Button
 		return focused != null and focused.text == "PLAY"
