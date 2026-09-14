@@ -1,0 +1,60 @@
+[gd_resource type="Resource" script_class="VehicleStats" format=3]
+
+[ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_lpw1f"]
+
+[resource]
+script = ExtResource("1_jdydk")
+physics_model_version = 1
+mass = 1.3
+wheelbase = 45.0
+front_weight_ratio = 0.57
+engine_force = 1290.0
+launch_torque_multiplier = 1.12
+torque_peak_ratio = 0.4
+torque_at_max_speed = 0.4
+torque_falloff_exponent = 1.3
+max_speed = 735.0
+reverse_speed = 215.0
+rolling_resistance = 30.0
+aero_drag_coefficient = 0.00072
+front_grip = 1.05
+rear_grip = 1.1
+front_cornering_stiffness = 4600.0
+rear_cornering_stiffness = 4700.0
+post_peak_grip_ratio = 0.7
+slip_falloff_rate = 0.2
+max_steer_angle_deg = 27.0
+steering_response = 5.2
+high_speed_steer_ratio = 0.42
+steer_fade_start_ratio = 0.23
+yaw_stability_rate = 3.5
+brake_force = 1350.0
+handbrake_force = 390.0
+drift_min_speed = 150.0
+drift_entry_steer = 0.42
+drift_rear_grip_ratio = 0.44
+drift_yaw_assist = 1.3
+drift_grip_recovery_rate = 4.2
+drift_optimal_slip_deg = 23.0
+drift_boost_max_reward = 11.0
+boost_power = 660.0
+boost_capacity = 92.0
+boost_recharge = 7.5
+boost_drain_rate = 29.0
+durability = 78.0
+engine_power = 820.0
+acceleration = 0.95
+steering_rate = 2.9
+grip = 0.88
+lateral_grip = 10.8
+drift_factor = 0.19
+legacy_mass = 1.25
+legacy_max_speed = 720.0
+legacy_reverse_speed = 235.0
+legacy_steering_response = 6.5
+legacy_brake_force = 1200.0
+legacy_handbrake_force = 310.0
+legacy_boost_power = 620.0
+legacy_boost_capacity = 92.0
+legacy_boost_recharge = 7.5
+legacy_durability = 78.0
