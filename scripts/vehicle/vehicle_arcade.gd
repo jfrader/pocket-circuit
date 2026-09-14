@@ -1,10 +1,12 @@
 class_name VehicleArcade
 extends RefCounted
 
-## Body-space arcade stepper. Live handling for physics_model_version 2.
-## Integrates with dt. Same model for player and AI. No Pacejka, no per-wheel.
+## Marco Monster 2D split: longitudinal drive vs lateral friction.
+## Forces go into RigidBody2D (do not overwrite velocity — that is ice).
+## Lateral damping rate does not fall with speed.
 
 const GRAVITY := 980.0
+const LAT_DAMP := 40.0
 
 
 static func get_effective_max_speed(stats: VehicleStats, surface_speed_mult: float) -> float:
@@ -28,8 +30,7 @@ static func get_safe_corner_speed(radius: float, effective_lat_accel: float) -> 
 	return sqrt(effective_lat_accel * radius)
 
 
-static func integrate(
-	dt: float,
+static func compute_forces(
 	steer: float,
 	throttle: float,
 	brake: float,
@@ -39,102 +40,67 @@ static func integrate(
 	lat: float,
 	yaw: float,
 	stats: VehicleStats,
+	mass: float,
 	surface_grip_mult: float,
 	surface_speed_mult: float,
 	external_power_mult: float,
 ) -> Dictionary:
-	dt = clampf(dt, 0.001, 0.05)
 	steer = clampf(steer, -1.0, 1.0)
 	throttle = clampf(throttle, 0.0, 1.0)
 	brake = clampf(brake, 0.0, 1.0)
-	var mass := maxf(stats.mass, 0.2)
+	mass = maxf(mass, 0.2)
 	var vmax := get_effective_max_speed(stats, surface_speed_mult)
 	var speed := absf(fwd)
 	var speed_ratio := clampf(speed / maxf(vmax, 1.0), 0.0, 1.2)
-
-	fwd = _integrate_longitudinal(
-		dt, fwd, throttle, brake, handbrake, boost_active,
-		stats, mass, vmax, surface_speed_mult, external_power_mult,
-	)
-	speed = absf(fwd)
-	speed_ratio = clampf(speed / maxf(vmax, 1.0), 0.0, 1.2)
-
-	var lock := deg_to_rad(stats.max_steer_angle_deg) * lerpf(
-		1.0,
-		stats.arcade_high_speed_steer_ratio,
-		smoothstep(0.28, 0.88, speed_ratio),
-	)
-	var steer_rad := steer * lock
-	var curvature := tan(steer_rad) / maxf(stats.wheelbase, 1.0)
-	var yaw_wanted := fwd * curvature
-
-	var over := 0.0
-	if speed > vmax * 0.32 and absf(steer) > 0.12 and throttle > 0.2:
-		over = stats.arcade_throttle_oversteer * throttle * smoothstep(0.32, 0.88, speed_ratio)
-	if handbrake and speed > stats.drift_min_speed * 0.7:
-		over = maxf(over, 0.78)
-
-	yaw_wanted *= 1.0 + 0.35 * over
-
-	var countering := absf(steer) > 0.12 and absf(yaw) > 0.08 and steer * yaw < 0.0
-	if countering:
-		yaw *= exp(-12.0 * dt)
-	elif handbrake:
-		yaw += steer * 8.0 * dt
-	else:
-		yaw = lerpf(yaw, yaw_wanted, 1.0 - exp(-stats.steering_response * dt))
-
-	# Velocity follows the nose. Soap was leaving leftover lateral speed.
-	if handbrake:
-		lat *= exp(-6.0 * dt * surface_grip_mult)
-	elif over > 0.15:
-		lat *= exp(-16.0 * dt * surface_grip_mult)
-	else:
-		lat = 0.0
-
-	var sliding := over > 0.12 and speed > 140.0 and absf(steer) > 0.15
-	var drifting := handbrake and speed >= stats.drift_min_speed and absf(steer) >= stats.drift_entry_steer
-	return {
-		"fwd": fwd,
-		"lat": lat,
-		"yaw": yaw,
-		"rack": steer_rad,
-		"is_sliding": sliding,
-		"is_drifting": drifting,
-	}
-
-
-static func _integrate_longitudinal(
-	dt: float,
-	fwd: float,
-	throttle: float,
-	brake: float,
-	handbrake: bool,
-	boost_active: bool,
-	stats: VehicleStats,
-	mass: float,
-	vmax: float,
-	surface_speed_mult: float,
-	external_power_mult: float,
-) -> float:
 	var curve := VehicleDynamics.get_engine_torque_curve(
-		absf(fwd), vmax,
+		speed, vmax,
 		stats.launch_torque_multiplier, stats.torque_peak_ratio,
 		stats.torque_at_max_speed, stats.torque_falloff_exponent,
 	)
+	var engine := 0.0
 	if throttle > 0.0 and fwd < vmax:
-		fwd += (throttle * stats.engine_force * curve * external_power_mult * surface_speed_mult / mass) * dt
-	if boost_active:
-		fwd += (stats.boost_power / mass) * dt
-	if brake > 0.0:
-		if fwd > 8.0:
-			fwd -= (stats.brake_force * brake / mass) * dt
-		elif fwd < -8.0:
-			fwd += (stats.brake_force * brake / mass) * dt
-		else:
-			fwd = move_toward(fwd, -stats.reverse_speed * brake * 0.55, (stats.engine_force * 0.4 / mass) * dt)
-	if handbrake:
-		fwd = move_toward(fwd, 0.0, (stats.handbrake_force / mass) * dt)
-	fwd -= (stats.aero_drag_coefficient * fwd * absf(fwd) / mass) * dt
-	fwd -= (stats.rolling_resistance * signf(fwd) / mass) * dt
-	return clampf(fwd, -stats.reverse_speed, vmax * 1.2)
+		engine = throttle * stats.engine_force * curve * external_power_mult * surface_speed_mult
+	var boost_f := stats.boost_power if boost_active else 0.0
+	var brake_f := 0.0
+	if brake > 0.0 and absf(fwd) > 6.0:
+		brake_f = stats.brake_force * brake * signf(fwd)
+	var hb_f := 0.0
+	if handbrake and absf(fwd) > 6.0:
+		hb_f = stats.handbrake_force * signf(fwd)
+	var drag := stats.aero_drag_coefficient * fwd * absf(fwd)
+	var roll := stats.rolling_resistance * signf(fwd)
+	var long_force := engine + boost_f - brake_f - hb_f - drag - roll
+	var over := 0.0
+	if speed > vmax * 0.42 and absf(steer) > 0.18 and throttle > 0.35:
+		over = stats.arcade_throttle_oversteer * throttle * smoothstep(0.42, 0.92, speed_ratio)
+	if handbrake and speed > stats.drift_min_speed * 0.65:
+		over = maxf(over, 0.62)
+	var damp := LAT_DAMP * surface_grip_mult * (1.0 - 0.45 * over)
+	var lat_force := -lat * mass * damp
+	var lock := deg_to_rad(stats.max_steer_angle_deg) * lerpf(
+		1.0,
+		stats.arcade_high_speed_steer_ratio,
+		smoothstep(0.30, 0.90, speed_ratio),
+	)
+	var steer_rad := steer * lock
+	var yaw_wanted := 0.0
+	if absf(fwd) > 5.0:
+		yaw_wanted = fwd * tan(steer_rad) / maxf(stats.wheelbase, 1.0)
+	yaw_wanted *= 1.0 + 0.30 * over
+	var inertia := mass * (stats.wheelbase * stats.wheelbase + 324.0) / 12.0
+	var yaw_torque := 0.0
+	var countering := absf(steer) > 0.12 and absf(yaw) > 0.08 and steer * yaw < 0.0
+	if countering:
+		yaw_torque = -yaw * inertia * 14.0
+	elif handbrake:
+		yaw_torque = steer * inertia * 8.0
+	else:
+		yaw_torque = (yaw_wanted - yaw) * inertia * stats.steering_response * 0.42
+	return {
+		"long_force": long_force,
+		"lat_force": lat_force,
+		"yaw_torque": yaw_torque,
+		"rack": steer_rad,
+		"is_sliding": over > 0.14 and speed > 150.0 and absf(steer) > 0.18,
+		"is_drifting": handbrake and speed >= stats.drift_min_speed and absf(steer) >= stats.drift_entry_steer,
+	}

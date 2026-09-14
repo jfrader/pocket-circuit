@@ -783,28 +783,30 @@ func _v1_apply_speed_caps() -> void:
 func _v2_physics_step(delta: float) -> void:
 	var forward := Vector2.UP.rotated(rotation)
 	var right := Vector2.RIGHT.rotated(rotation)
-	var stepped: Dictionary = ARCADE.integrate(
-		delta,
+	var fwd := linear_velocity.dot(forward)
+	var lat := linear_velocity.dot(right)
+	var forces: Dictionary = ARCADE.compute_forces(
 		_steer_input,
 		_throttle_input,
 		_brake_input,
 		_handbrake_input,
 		is_boost_active(),
-		linear_velocity.dot(forward),
-		linear_velocity.dot(right),
+		fwd,
+		lat,
 		angular_velocity,
 		stats,
+		mass,
 		surface_grip_multiplier,
 		surface_speed_multiplier,
 		_external_power_multiplier,
 	)
-	var fwd := float(stepped["fwd"])
-	linear_velocity = forward * fwd + right * float(stepped["lat"])
-	angular_velocity = float(stepped["yaw"])
-	_rack_angle = float(stepped["rack"])
+	apply_central_force(forward * float(forces["long_force"]))
+	apply_central_force(right * float(forces["lat_force"]))
+	apply_torque(float(forces["yaw_torque"]))
+	_rack_angle = float(forces["rack"])
 	angular_damp = 0.0
 	_v1_update_drift(delta, fwd)
-	is_sliding = bool(stepped["is_sliding"])
+	is_sliding = bool(forces["is_sliding"])
 	if is_boost_active():
 		boost_amount = maxf(0.0, boost_amount - stats.boost_drain_rate * delta)
 
