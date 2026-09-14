@@ -85,6 +85,27 @@ func _run_test() -> void:
 	):
 		return
 
+	# Phase B: 4 new quick-race-only chassis (GURI-734); progression asserts above are untouched
+	if not _expect(CATALOG.vehicle_ids().size() == 8, "catalog should list eight vehicles total"):
+		return
+	var quick_only := ["thimble", "spindle", "anvil", "dustmite"]
+	for nid: String in quick_only:
+		var v := CATALOG.get_vehicle(nid)
+		if not _expect(not v.is_empty() and String(v.get("unlock", "")) == "Quick Race", "%s should exist as Quick Race unlock" % nid):
+			return
+		var avail := String(v.get("availability", "championship"))
+		if not _expect(avail == "quick_race", "%s must carry quick_race availability" % nid):
+			return
+		if not _expect(nid in CATALOG.quick_race_vehicle_ids() and not nid in CATALOG.championship_vehicle_ids(), "%s must be quick-race only via accessors" % nid):
+			return
+	if not _expect(not ("thimble" in progress["unlocked_vehicles"] or "spindle" in progress["unlocked_vehicles"] or "anvil" in progress["unlocked_vehicles"] or "dustmite" in progress["unlocked_vehicles"]), "new chassis must never be added by championship act unlocks"):
+		return
+	# all 8 stats_path resources must validate (no hand-invented out-of-range values)
+	for vid: String in CATALOG.vehicle_ids():
+		var st := CATALOG.create_vehicle_stats(vid)
+		if not _expect(st.is_valid() and st.get_validation_errors().is_empty(), "vehicle %s stats_path must validate cleanly" % vid):
+			return
+
 	print("CHAMPIONSHIP_CATALOG_TEST PASS")
 	quit(0)
 
