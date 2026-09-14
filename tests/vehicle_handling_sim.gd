@@ -44,7 +44,7 @@ func _run() -> void:
 		return _fail("v2 fast slip %.3f is soap" % float(v2_fast["slip"]))
 	if float(v2_fast["speed"]) < float(v1_fast["speed"]) * 0.85:
 		return _fail("v2 fast speed %.1f < v1_fast*0.85=%.1f (killed speed)" % [float(v2_fast["speed"]), float(v1_fast["speed"])*0.85])
-	print("HANDLING_SIM PASS v1_mid_slip=%.3f v2_mid_slip=%.3f v2_fast_yaw=%.3f v1_fast_yaw=%.3f" % [
+	print("VEHICLE_HANDLING_SIM_TEST PASS v1_mid_slip=%.3f v2_mid_slip=%.3f v2_fast_yaw=%.3f v1_fast_yaw=%.3f" % [
 		float(v1_mid["slip"]), float(v2_mid["slip"]), float(v2_fast["yaw"]), float(v1_fast["yaw"]),
 	])
 	quit(0)
@@ -94,5 +94,5 @@ func _measure(name: String, ver: int, start_speed: float, throttle: float, steer
 
 
 func _fail(message: String) -> void:
-	push_error("HANDLING_SIM FAIL: " + message)
+	push_error("VEHICLE_HANDLING_SIM_TEST FAIL: " + message)
 	quit(1)
