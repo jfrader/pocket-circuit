@@ -115,6 +115,58 @@ func _initialize() -> void:
 			return
 		if not _expect(steered != texture, "%s steered front wheels should change the sprite" % vehicle_id):
 			return
+	# base chassis payloads remain byte-identical (pins protect GURI-659)
+	for vehicle_id: String in VEHICLE_IDS:
+		var base_payload := IDENTITIES.car_payload(vehicle_id)
+		if not _expect(_payload_hash(base_payload) == PINNED_CAR_PAYLOADS[vehicle_id], "%s base payload must remain byte-identical via car_payload" % vehicle_id):
+			return
+	# per-driver cosmetic overlays produce distinct looks for shared chassis
+	var rustbug_rae_key := IDENTITIES.resolve_visual_key("rustbug", "rae")
+	var rustbug_inez_key := IDENTITIES.resolve_visual_key("rustbug", "inez")
+	if not _expect(rustbug_rae_key != rustbug_inez_key, "rae/inez must resolve distinct visual keys on rustbug"):
+		return
+	var rae_tex := IDENTITIES.car_texture_for_key(rustbug_rae_key) if rustbug_rae_key.find("|") != -1 else IDENTITIES.car_texture(rustbug_rae_key)
+	var inez_tex := IDENTITIES.car_texture_for_key(rustbug_inez_key) if rustbug_inez_key.find("|") != -1 else IDENTITIES.car_texture(rustbug_inez_key)
+	if not _expect(rae_tex != null and inez_tex != null and _texture_hash(rae_tex) != _texture_hash(inez_tex), "rae and inez must have distinct generated car textures on shared chassis"):
+		return
+	var flicker_tess_key := IDENTITIES.resolve_visual_key("flicker", "tess")
+	var flicker_cass_key := IDENTITIES.resolve_visual_key("flicker", "cass")
+	if not _expect(flicker_tess_key != flicker_cass_key, "tess/cass must resolve distinct visual keys on flicker"):
+		return
+	var tess_tex := IDENTITIES.car_texture_for_key(flicker_tess_key) if flicker_tess_key.find("|") != -1 else IDENTITIES.car_texture(flicker_tess_key)
+	var cass_tex := IDENTITIES.car_texture_for_key(flicker_cass_key) if flicker_cass_key.find("|") != -1 else IDENTITIES.car_texture(flicker_cass_key)
+	if not _expect(tess_tex != null and cass_tex != null and _texture_hash(tess_tex) != _texture_hash(cass_tex), "tess and cass must have distinct generated car textures on shared chassis"):
+		return
+	# per-driver motion frames are native size
+	for driver_id: String in DRIVER_IDS:
+		var vid := String(CATALOG.get_driver(driver_id).get("vehicle_id", "rustbug"))
+		var dkey := IDENTITIES.resolve_visual_key(vid, driver_id)
+		var m0 := IDENTITIES.car_motion_texture_for_key(dkey, 0.0, 0.0) if dkey.find("|") != -1 else IDENTITIES.car_motion_texture(vid, 0.0, 0.0)
+		var mroll := IDENTITIES.car_motion_texture_for_key(dkey, IDENTITIES.RACE_WHEEL_ROLL_DISTANCE, 0.0) if dkey.find("|") != -1 else IDENTITIES.car_motion_texture(vid, IDENTITIES.RACE_WHEEL_ROLL_DISTANCE, 0.0)
+		if not _expect(m0 != null and m0.get_size() == Vector2(96.0, 128.0), "%s driver motion rest must be 96x128" % driver_id):
+			return
+		if not _expect(mroll != null and mroll.get_size() == Vector2(96.0, 128.0), "%s driver motion roll must be 96x128" % driver_id):
+			return
+	# within-field uniqueness + determinism (including shared chassis)
+	var field_a: Array[Dictionary] = [
+		{"vehicle_id": "flicker", "driver_id": "cass", "slot": 1},
+		{"vehicle_id": "flicker", "driver_id": "tess", "slot": 2},
+		{"vehicle_id": "rustbug", "driver_id": "rae", "slot": 0},
+	]
+	var keys_a := IDENTITIES.resolve_field_visual_keys(field_a)
+	if not _expect(String(keys_a[0]) != String(keys_a[1]), "field must disambiguate cass vs tess"):
+		return
+	var keys_a2 := IDENTITIES.resolve_field_visual_keys(field_a)
+	if not _expect(keys_a[0] == keys_a2[0] and keys_a[1] == keys_a2[1], "same field input must produce identical visual keys"):
+		return
+	# different order but same members should still unique (stable by process order + slot)
+	var field_b: Array[Dictionary] = [
+		{"vehicle_id": "flicker", "driver_id": "tess", "slot": 2},
+		{"vehicle_id": "flicker", "driver_id": "cass", "slot": 1},
+	]
+	var keys_b := IDENTITIES.resolve_field_visual_keys(field_b)
+	if not _expect(String(keys_b[0]) != String(keys_b[1]), "field_b must still produce distinct keys"):
+		return
 	print("PROCEDURAL_IDENTITY_LIBRARY_TEST PASS")
 	quit(0)
 
