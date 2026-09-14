@@ -204,6 +204,8 @@ func configure(
 	_reset_route_watchdog()
 	if not race_manager.race_started.is_connected(_restore_racing_collisions):
 		race_manager.race_started.connect(_restore_racing_collisions)
+	if not race_manager.racer_recovered.is_connected(_on_external_recovery):
+		race_manager.racer_recovered.connect(_on_external_recovery)
 
 
 func _cache_checkpoints() -> void:
@@ -1610,6 +1612,14 @@ func _restore_racing_collisions() -> void:
 		vehicle.collision_layer = _race_collision_layer
 		vehicle.collision_mask = _race_collision_mask
 	_reset_route_watchdog()
+
+
+func _on_external_recovery(racer: Node2D) -> void:
+	## A player-facing recovery (ResetManager) teleports the car without going
+	## through this controller's own _recover_vehicle. Re-anchor the route
+	## watchdog so the arc discontinuity is not charged as backward travel.
+	if racer == vehicle:
+		_reset_route_watchdog()
 
 
 func _nearest_line_index(position: Vector2) -> int:

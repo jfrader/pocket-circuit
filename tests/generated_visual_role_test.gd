@@ -166,7 +166,7 @@ func _check_moving_hazard(hazard: EnvironmentalHazard, theme: StringName) -> boo
 	if not _expect(VISUAL_ROLE.read(hazard) == VISUAL_ROLE.MOVING_HAZARD, "%s active hazard should declare MOVING_HAZARD" % theme):
 		return false
 	for node: Node in hazard.find_children("*", "", true, false):
-		if node is not Sprite2D and node is not Polygon2D and node is not Line2D and node.name not in [&"WarningTelegraph", &"MovingHazard"]:
+		if node is not Sprite2D and node is not Polygon2D and node is not Line2D and node.name not in [&"MovingHazard"]:
 			continue
 		if not _expect(VISUAL_ROLE.read(node) == VISUAL_ROLE.MOVING_HAZARD, "%s hazard visual %s should share the dynamic role" % [theme, hazard.get_path_to(node)]):
 			return false

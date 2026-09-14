@@ -148,8 +148,9 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 11 as playable geometry and mechanics:
 
 - `OpeningLandmark`: one household focal prop near the opening sector.
-- `EarlyConflictForward` and `EarlyConflictReverse`: a telegraphed moving
-  hazard crossing the corridor 12-25% into the lap in either direction.
+- `EarlyConflictForward` and `EarlyConflictReverse`: kitchen and workshop roll
+  a hazard across the corridor 12-25% into the lap in either direction. Office
+  parks a coiled cable at that pose. There is no countdown overlay.
 - `TechnicalSurfaceMoment`: a full-width low-grip or low-speed zone on a
   separated high-turn section.
 - `ShortcutDecision`: a visibly decaled inside lane that is geometrically
@@ -203,16 +204,9 @@ line.
   cloth/paper/cardboard ground sections, corridor material patterns, surface
   tints and grip decals, worn-floor hints, shadows, and checker paint. Solid
   objects must never use a sprite-only placement path. `MOVING_HAZARD` means a
-  warning-telegraphed dynamic obstacle whose active sensor, motion, and visible
-  asset travel together; hazard art is never reused as static scenery.
-  objects must never use a sprite-only placement path. `MOVING_HAZARD` means a
-  warning-telegraphed dynamic obstacle whose active sensor, motion, and visible
-  asset travel together; hazard art is never reused as static scenery. `MOVING_HAZARD` means a
-  warning-telegraphed dynamic obstacle whose active sensor, motion, and visible
-  asset travel together; hazard art is never reused as static scenery. `MOVING_HAZARD` means a
-  warning-telegraphed dynamic obstacle whose active sensor, motion, and visible
-  asset travel together; generated hazard art is never reused as static
-  scenery.
+  colliding hazard whose visible asset is the object itself: kitchen/workshop
+  pieces roll along a path; the office coiled cable stays put. Hazard art is
+  never reused as island or edge scenery.
 - The island is one visibly raised solid object. Its closed layer-2
   `ConcavePolygonShape2D` segment chain follows the outer contact edge of a dark
   side-face, tiled theme edge, and warm top lip. Two to four small visible

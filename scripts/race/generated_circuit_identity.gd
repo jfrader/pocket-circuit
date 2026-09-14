@@ -4,7 +4,7 @@ extends RefCounted
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const SCHEMA_VERSION := 1
-const GENERATOR_VERSION := 4
+const GENERATOR_VERSION := 6
 const MAX_SEED := 0x7FFFFFFF
 const SHARE_PREFIX := "PC1"
 const SHARE_ALPHABET := "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -36,11 +36,14 @@ static func create(
 		danger_level: int = 0,
 		explicit_material_id: String = "",
 		explicit_palette_id: String = "",
-		sub_seed_overrides: Dictionary = {}
+		sub_seed_overrides: Dictionary = {},
+		length_tier: String = "standard"
 ) -> Dictionary:
 	var theme_text := String(theme)
 	var room_text := String(room)
 	if not theme_text in THEMES or not room_text in ROOMS or not _is_seed(route_seed):
+		return {}
+	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
 		return {}
 	var level := clampi(danger_level if danger_level > 0 else GENERATED_RULES.default_act_for_theme(theme), 1, 3)
 	var seeds := {
@@ -56,7 +59,7 @@ static func create(
 			seeds[domain] = sub_seed_overrides[domain]
 	if int(seeds.get("route", -1)) != route_seed:
 		return {}
-	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds)
+	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds, length_tier)
 
 
 static func from_championship_event(event: Dictionary, championship_identity: Dictionary) -> Dictionary:
@@ -92,6 +95,9 @@ static func normalize(value: Variant) -> Dictionary:
 	var seeds: Variant = raw.get("sub_seeds")
 	if seeds is not Dictionary:
 		return {}
+	var length_tier: Variant = raw.get("length_tier", GENERATED_RULES.DEFAULT_LENGTH_TIER)
+	if length_tier is not String or not GENERATED_RULES.LENGTH_TIERS.has(length_tier as String):
+		return {}
 	var canonical := _canonical_identity(
 		String(raw.get("theme", "")),
 		String(raw.get("room", "")),
@@ -99,7 +105,8 @@ static func normalize(value: Variant) -> Dictionary:
 		int(raw.get("danger_level", 0)),
 		String(raw.get("material_id", "")),
 		String(raw.get("palette_id", "")),
-		seeds as Dictionary
+		seeds as Dictionary,
+		String(length_tier)
 	)
 	if canonical.is_empty():
 		return {}
@@ -125,6 +132,7 @@ static func apply_to_event(identity_value: Variant, vehicle_opponents: Array = [
 		"race_format": "circuit",
 		"reverse": bool(identity["reverse"]),
 		"act": int(identity["danger_level"]),
+		"length_tier": String(identity["length_tier"]),
 		"opponent_count": mini(3, vehicle_opponents.size()),
 		"opponents": vehicle_opponents.duplicate(),
 		"circuit_schema_version": SCHEMA_VERSION,
@@ -165,6 +173,7 @@ static func encode_share_code(identity_value: Variant) -> Dictionary:
 		ROOMS.find(String(identity["room"])),
 		1 if bool(identity["reverse"]) else 0,
 		int(identity["danger_level"]),
+		GENERATED_RULES.LENGTH_TIERS.find(String(identity["length_tier"])),
 	])
 	var seeds: Dictionary = identity["sub_seeds"]
 	for domain: String in DOMAINS:
@@ -195,7 +204,7 @@ static func decode_share_code(code: String) -> Dictionary:
 	if not bool(decoded.get("ok", false)):
 		return decoded
 	var bytes: PackedByteArray = decoded["bytes"]
-	if bytes.size() < 35:
+	if bytes.size() < 36:
 		return _error("truncated", "The share code is incomplete; enter every character.")
 	var body := bytes.slice(0, bytes.size() - 4)
 	if bytes.slice(bytes.size() - 4) != _checksum(body):
@@ -209,11 +218,14 @@ static func decode_share_code(code: String) -> Dictionary:
 	var room_index := int(body[offset + 1])
 	var reverse_byte := int(body[offset + 2])
 	var danger_level := int(body[offset + 3])
-	offset += 4
+	var tier_index := int(body[offset + 4])
+	offset += 5
 	if theme_index < 0 or theme_index >= THEMES.size() or room_index < 0 or room_index >= ROOMS.size():
 		return _error("invalid_fields", "The share code contains an unknown theme or room.")
 	if reverse_byte not in [0, 1] or danger_level < 1 or danger_level > 3:
 		return _error("invalid_fields", "The share code contains an invalid direction or danger profile.")
+	if tier_index < 0 or tier_index >= GENERATED_RULES.LENGTH_TIERS.size():
+		return _error("invalid_fields", "The share code contains an unknown length profile.")
 	var seeds := {}
 	for domain: String in DOMAINS:
 		if offset + 4 > body.size():
@@ -237,7 +249,8 @@ static func decode_share_code(code: String) -> Dictionary:
 		danger_level,
 		String(material_result["value"]),
 		String(palette_result["value"]),
-		seeds
+		seeds,
+		GENERATED_RULES.LENGTH_TIERS[tier_index]
 	)
 	if identity.is_empty():
 		return _error("invalid_fields", "The share code decoded, but its circuit identity is invalid.")
@@ -258,14 +271,17 @@ static func generation_options(identity_value: Variant) -> Dictionary:
 		return {}
 	return {
 		"act": int(identity["danger_level"]),
+		"length_tier": String(identity["length_tier"]),
 		"sub_seeds": (identity["sub_seeds"] as Dictionary).duplicate(true),
 		"material_id": String(identity["material_id"]),
 		"palette_id": String(identity["palette_id"]),
 	}
 
 
-static func _canonical_identity(theme: String, room: String, reverse: bool, danger_level: int, material_id: String, palette_id: String, seeds_value: Dictionary) -> Dictionary:
+static func _canonical_identity(theme: String, room: String, reverse: bool, danger_level: int, material_id: String, palette_id: String, seeds_value: Dictionary, length_tier: String = "standard") -> Dictionary:
 	if not theme in THEMES or not room in ROOMS or danger_level < 1 or danger_level > 3:
+		return {}
+	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
 		return {}
 	if not _valid_explicit_id(material_id) or not _valid_explicit_id(palette_id):
 		return {}
@@ -294,6 +310,7 @@ static func _canonical_identity(theme: String, room: String, reverse: bool, dang
 		"room": room,
 		"reverse": reverse,
 		"danger_level": danger_level,
+		"length_tier": length_tier,
 		"material_id": material_id,
 		"palette_id": palette_id,
 		"material_fallback_id": material_fallback,
@@ -353,6 +370,7 @@ static func _circuit_fingerprint(identity: Dictionary, include_direction: bool) 
 		String(identity["theme"]),
 		String(identity["room"]),
 		str(identity["danger_level"]),
+		String(identity["length_tier"]),
 		String(identity["material_id"]),
 		String(identity["palette_id"]),
 	])

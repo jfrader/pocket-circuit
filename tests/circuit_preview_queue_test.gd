@@ -32,11 +32,21 @@ func _run_test() -> void:
 		var key := "rapid_%d" % index
 		_capture(queue, identity, key)
 		_expected[key] = identity["fingerprint"]
-	for _frame in 600:
-		if _results.size() == _expected.size():
-			break
+	# 600 frames was written as a 10-second budget under the 60 fps assumption,
+	# but a headless run can elapse frames far faster (~7 ms), shrinking the real
+	# deadline to ~4 s. A monotonic 10 s deadline restores the intended budget
+	# without changing any correctness assertion (dedupe, cache, bounded-out, and
+	# single-worker serialization are still verified below).
+	var start_msec := Time.get_ticks_msec()
+	var deadline_msec := start_msec + 10000
+	while _results.size() < _expected.size() and Time.get_ticks_msec() < deadline_msec:
 		await process_frame
 	if not _expect(_results.size() == _expected.size(), "every completed, deduplicated, or bounded-out request should resolve"):
+		var unresolved: Array[String] = []
+		for key: String in _expected:
+			if not _results.has(key):
+				unresolved.append(key)
+		push_error("CIRCUIT_PREVIEW_QUEUE_TEST: unresolved=%s elapsed_ms=%d metrics=%s" % [str(unresolved), Time.get_ticks_msec() - start_msec, str(queue.call("get_debug_metrics"))])
 		return
 	for index in 3:
 		var shared_result: Dictionary = _results["shared_%d" % index]

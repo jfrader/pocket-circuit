@@ -447,7 +447,8 @@ At high speed:
 
 - reduced direct steering;
 - more lateral slip;
-- increased importance of braking and drift.
+- increased importance of braking and drift;
+- modest downforce that adds grip and brake capacity without locking the car down.
 
 This prevents twitchy high-speed movement.
 
@@ -473,6 +474,10 @@ During drift:
 - successful controlled drift can charge a small boost meter.
 
 Drift should not be optimal on every corner.
+
+A separate high-speed slide can start without the handbrake when a car is
+pushed past rear grip. It should look dramatic and be savable with
+counter-steer; it does not award boost and must not auto-spin into a crash.
 
 ## 9.5 Collision
 

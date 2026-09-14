@@ -656,11 +656,18 @@ static func build_giant_landmarks(
 			footprint = TrackBuilderCore._texture_collision_footprint(tex, StringName(shape_entry.get("shape", &"rect")))
 			var footprint_size: Vector2 = footprint["size"]
 			desired_size = rng.randf_range(300.0, float(shape_entry.get("giant_max_size", 600.0))) if asset_attempt == 0 else 300.0
-			sprite_scale = desired_size / maxf(footprint_size.x, footprint_size.y)
-			visual_center_offset = ((footprint["center"] as Vector2) - Vector2(tex.get_width(), tex.get_height()) * 0.5) * sprite_scale
-			world_shape_size = footprint_size * sprite_scale
-			local_footprint_rotation = float(footprint["rotation"])
-			placement = TrackBuilderCore._best_giant_position(pref_idx, world_shape_size, StringName(footprint["kind"]), local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines)
+			var sizes: Array[float] = [desired_size]
+			if desired_size > 300.0:
+				sizes.append(300.0)
+			for candidate_size in sizes:
+				desired_size = candidate_size
+				sprite_scale = desired_size / maxf(footprint_size.x, footprint_size.y)
+				visual_center_offset = ((footprint["center"] as Vector2) - Vector2(tex.get_width(), tex.get_height()) * 0.5) * sprite_scale
+				world_shape_size = footprint_size * sprite_scale
+				local_footprint_rotation = float(footprint["rotation"])
+				placement = TrackBuilderCore._best_giant_position(pref_idx, world_shape_size, StringName(footprint["kind"]), local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines)
+				if bool(placement.get("found", false)):
+					break
 			if bool(placement.get("found", false)):
 				break
 		if not bool(placement.get("found", false)) or tex == null:
@@ -1190,5 +1197,4 @@ static func build_finish_moments(parent: Node2D, centerline: PackedVector2Array)
 	finish.set_meta("corridor_span", TrackBuilderCore.HALF_WIDTH * 2.0)
 	finish.set_meta("bidirectional_landmarks", true)
 	parent.add_child(finish)
-
 

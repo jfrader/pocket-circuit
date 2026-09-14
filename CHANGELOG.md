@@ -11,8 +11,8 @@
   starting grids, countdowns, race position, finish order, results, and
   championship points.
 - Live generated household circuits for every Quick Race reroll and
-  championship event. Players can choose a theme and seed, while six route
-  silhouettes and six room canvases produce reproducible layouts without a
+  championship event. Players can choose a theme and seed, while seeded circuit
+  plans and six room canvases produce reproducible layouts without a
   curated circuit list.
 - Designed track moments on generated circuits: an iconic opening, an early
   crossing hazard in either race direction, a technical surface section, a
@@ -52,11 +52,25 @@
   workshop wood no longer sits under a grey racing-surface wash.
 - Long championship seeds keep mixed corners instead of collapsing into a
   simple oval. Share codes from generator v2 no longer load.
-- Generated circuits are hairpins, triangles, and interior S routes instead
-  of room-filling ovals. Share codes from generator v3 no longer load.
-- Deep interior bays get their mouths sealed with solid themed walls, so
-  cutting across them is physically impossible and the shortcut rules never
-  need to be relaxed.
+- Generated circuits now include deep infield sections, offset switchbacks,
+  doglegs and harbour loops, with seeded proportions and properly rounded
+  corners instead of rotated ovals. Generator v6 rejects older share codes.
+- Compound corners add diagonal connectors and independently varied approach
+  and exit angles while retaining deep infields and long braking straights.
+- Cars keep a readable toy-scale top speed. Pushing too hard at speed can
+  start a recoverable slide; counter-steer saves it, and handbrake drifts
+  still award boost.
+- Quick Race and Circuit Discovery now offer Compact, Standard, Long and
+  Endurance sizes. Larger circuits use expanded rooms and distance-aware curve
+  sampling; shared codes and favorites preserve the selected size.
+- Opening/tightening two-arc corners and safe section excursions add new turn
+  profiles. L-shaped rooms now vary their elbow and proportions by seed.
+- Correctly following a long curve no longer causes a false wrong-way reset,
+  and generated AI racing lines no longer fold at abrupt lateral transitions.
+- Deep bays contain visible raised pads that block cross-cuts throughout the
+  infield while preserving the driving corridor and an open apron sector.
+- Championships keep their master seed, rooms and story progress after the
+  geometry update; old-layout ghosts and mastery records no longer match new laps.
 - Race HUD calls a solo run a time trial instead of 1st of 1, drops invisible
   gate numbers, and the personal ghost is easier to see. Championship results
   say saved instead of filed.
@@ -66,19 +80,9 @@
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.
-- Generated circuits now compose different straight extents, headings and turn
 - Generated circuits now add progression-scaled permanent obstacles with
-  AI-validated passing space. Occasional moving hazards telegraph their origin,
-  path, timing, and danger before physically entering and leaving the course.
-- Generated finish lines now span the full racing corridor and use symmetric
-  household landmarks that read clearly in forward and reverse races. Moving
-  hazard artwork is no longer reused as static generated scenery.
-- Generated finish lines now span the full racing corridor and use symmetric
-  household landmarks that read clearly in forward and reverse races. Moving
-  hazard artwork is no longer reused as static scenery.
-- Generated finish lines now span the full racing corridor and use symmetric
-  household landmarks that read clearly in forward and reverse races. Moving
-  hazard artwork is no longer reused as static scenery.
+  AI-validated passing space. Kitchen and workshop hazards roll onto the course
+  without a countdown overlay; the office coiled cable stays put.
 - Generated circuits now compose different straight extents, headings and turn
   sections within each route program, with broader minimum corner radii.
 - Scenery collision footprints are prepared off the main thread before race

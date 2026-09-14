@@ -104,10 +104,16 @@ static func plan_hazard(theme: StringName, spec: Dictionary, centerline: PackedV
 	elif theme == &"office":
 		footprint_size = Vector2(60.0, 36.0)
 		footprint_kind = &"rect"
+	var motion := &"static" if theme == &"office" else &"rolling"
 	var paths := {}
 	for direction: String in ["forward", "reverse"]:
 		var index := int(moments["early_conflict_%s" % direction])
-		paths[direction] = GEOM.crossing_path(centerline, index, 96.0)
+		var crossing := GEOM.crossing_path(centerline, index, 96.0)
+		if motion == &"static":
+			var rest: Vector2 = crossing[0]
+			paths[direction] = PackedVector2Array([rest, rest])
+		else:
+			paths[direction] = crossing
 	return {
 		"version": 1,
 		"id": &"%s_crossing" % String(theme),
@@ -116,7 +122,8 @@ static func plan_hazard(theme: StringName, spec: Dictionary, centerline: PackedV
 		"theme": theme,
 		"present": GENERATED_RULES.roll_hazard_present(act, rng),
 		"presence_chance": GENERATED_RULES.hazard_chance(act),
-		"role": &"moving_hazard",
+		"role": &"moving_hazard" if motion != &"static" else &"static_hazard",
+		"motion": motion,
 		"visual_role": VISUAL_ROLE.MOVING_HAZARD,
 		"footprint_kind": footprint_kind,
 		"footprint_size": footprint_size,
@@ -130,5 +137,5 @@ static func plan_hazard(theme: StringName, spec: Dictionary, centerline: PackedV
 		"active_duration": rng.randf_range(1.35, 1.7),
 		"exit_duration": rng.randf_range(0.45, 0.7),
 		"cooldown_duration": rng.randf_range(3.1, 3.8) - float(act - 1) * 0.25,
-		"danger_states": PackedStringArray(["active", "exit"]),
+		"danger_states": PackedStringArray(["active"] if motion == &"static" else ["active", "exit"]),
 	}

@@ -41,11 +41,17 @@ func _test_theme(theme: StringName) -> bool:
 		return false
 	if not _expect(presenter.surface_zones.size() == int(expected["zones"]), "%s should create the documented surface zones (%d)" % [theme, presenter.surface_zones.size()]):
 		return false
-	if not _expect(presenter.hazard != null and presenter.hazard.name == String(expected["hazard"]) and presenter.hazard.get_state_name() == &"idle", "%s should create a deterministic hazard waiting at its physical origin" % theme):
+	if not _expect(presenter.hazard != null and presenter.hazard.name == String(expected["hazard"]) and presenter.hazard.get_node_or_null("WarningTelegraph") == null, "%s should create a deterministic hazard without a telegraph overlay" % theme):
 		return false
-	presenter.hazard.advance(presenter.hazard.idle_duration)
-	if not _expect(presenter.hazard.get_state_name() == &"warning" and presenter.hazard.get_node("WarningTelegraph").visible, "%s hazard should telegraph before entering" % theme):
-		return false
+	if theme == &"office":
+		if not _expect(presenter.hazard.is_static() and presenter.hazard.is_collision_active() and presenter.hazard.get_state_name() == &"active", "%s coiled cable should sit still and collide" % theme):
+			return false
+	else:
+		if not _expect(presenter.hazard.get_state_name() == &"idle", "%s rolling hazard should wait at its physical origin" % theme):
+			return false
+		presenter.hazard.advance(presenter.hazard.idle_duration)
+		if not _expect(presenter.hazard.get_state_name() == &"warning" and not presenter.hazard.is_collision_active(), "%s rolling hazard should approach before colliding, with no overlay" % theme):
+			return false
 	var art_surfaces := track.get_node_or_null("ArtSurfaces") as Node2D
 	if art_surfaces and not _expect(art_surfaces.visible, "%s should keep its authored art visible" % theme):
 		return false

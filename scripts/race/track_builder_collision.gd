@@ -788,40 +788,62 @@ static func add_boundary_worn_hint(container: Node2D, centerline: PackedVector2A
 
 
 
-static func seal_pockets(root: Node2D, spec: Dictionary) -> void:
-	# Deep interior bays declare pockets in the route spec. Each pocket mouth is
-	# sealed with a solid themed wall so cutting across it is physically
-	# impossible; the wall sits on the far side of the mouth, clear of the
-	# racing line, and its ends overlap the arm corridors by a car width.
+static func seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+	# A mouth-only wall leaves the rest of a deep bay cuttable. Fill the bay with
+	# a visible raised pad, subtracting the racing corridor and its full apron.
 	var pockets: Array = spec.get("pockets", [])
 	if pockets.is_empty():
 		return
-	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
 	var container := Node2D.new()
 	container.name = "PocketSeals"
 	root.add_child(container)
+	var clearance := TrackBuilderCore.HALF_WIDTH + TrackBuilderCore.APRON_COLLIDER_CLEARANCE + TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH
+	var contours := Geometry2D.offset_polyline(centerline, clearance, Geometry2D.JOIN_ROUND, Geometry2D.END_JOINED)
+	var exclusion := PackedVector2Array()
+	for contour: PackedVector2Array in contours:
+		if absf(TrackBuilderCore._polygon_area(contour)) > absf(TrackBuilderCore._polygon_area(exclusion)):
+			exclusion = contour
+	if exclusion.is_empty():
+		push_error("TrackBuilderCollision: cannot seal bays without a valid corridor exclusion")
+		return
+	# The corridor exclusion can carry hundreds of collinear round-join vertices;
+	# clip_polygons inherits them, and a stray one can land exactly on a ray that
+	# the pad-intrusion probe casts. Simplify it before clipping (self-union is
+	# harmless on an already-simple contour, and keeps the largest clean piece).
+	exclusion = TrackBuilderCore._simple_island_loop(exclusion)
 	for pocket_index in pockets.size():
 		var pocket: Dictionary = pockets[pocket_index]
-		var from: Vector2 = pocket.get("from", Vector2.ZERO)
-		var to: Vector2 = pocket.get("to", Vector2.ZERO)
-		var chord := to - from
-		var length := chord.length()
-		if length < 60.0:
-			continue
-		var direction := chord / length
-		var floor_side := Vector2(-direction.y, direction.x)
-		var declared_side: Vector2 = pocket.get("side", Vector2.ZERO)
-		if declared_side.length_squared() > 1.0:
-			floor_side = declared_side.normalized()
-		# The wall hugs the room-wall margin (165u off the mouth): its outer face
-		# meets the wall margin so no car fits behind it, and its ends stop short
-		# of the racing line's corner arcs.
-		var wall_position := from.lerp(to, 0.5) - floor_side * 165.0
-		TrackBuilderCore._add_wall_segment(
-			container,
-			"Seal%02d" % pocket_index,
-			wall_position,
-			length + 240.0,
-			direction.angle(),
-			edge_texture
-		)
+		var polygon: PackedVector2Array = pocket.get("polygon", PackedVector2Array())
+		for bounded: PackedVector2Array in Geometry2D.intersect_polygons(polygon, room_polygon):
+			for clipped: PackedVector2Array in Geometry2D.clip_polygons(bounded, exclusion):
+				# The corridor exclusion can double back on itself and leave a
+				# folded, self-intersecting contour. Flatten it before it becomes a
+				# raised pad or a collider outset (area-preserving self-union).
+				var region := TrackBuilderCore._simple_island_loop(clipped)
+				if region.size() < 3 or absf(TrackBuilderCore._polygon_area(region)) < 100.0:
+					continue
+				var body := StaticBody2D.new()
+				body.name = "Seal%02d" % pocket_index
+				body.collision_layer = 2
+				body.set_meta("pocket_index", pocket_index)
+				TrackBuilderCore._mark_solid_body(body, "", &"raised_island_rim")
+				container.add_child(body)
+				var collision_region := TrackBuilderCore._outset_polygon(region, TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH * 0.5)
+				var segments := PackedVector2Array()
+				for i in collision_region.size():
+					segments.append(collision_region[i])
+					segments.append(collision_region[(i + 1) % collision_region.size()])
+				var shape := ConcavePolygonShape2D.new()
+				shape.segments = segments
+				var collision := CollisionShape2D.new()
+				collision.shape = shape
+				body.add_child(collision)
+				body.set_meta("collision_boundary_polygon", collision_region)
+				var surface := Polygon2D.new()
+				surface.name = "RaisedPad"
+				surface.polygon = region
+				surface.color = spec["island"]
+				surface.z_index = -9
+				TrackBuilderCore._mark_solid_visual(surface, "", &"raised_island")
+				body.add_child(surface)
+				TrackBuilderIsland.build_raised_island_rim(body, spec, region)

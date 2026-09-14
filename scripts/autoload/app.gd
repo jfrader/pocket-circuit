@@ -9,6 +9,7 @@ const MASTERY := preload("res://scripts/progression/mastery_run.gd")
 const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
 const RACE_PREPARATION := preload("res://scripts/race/race_preparation.gd")
 const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
+const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
 const CIRCUIT_PREVIEW_QUEUE := preload("res://scripts/race/circuit_preview_queue.gd")
 
@@ -398,8 +399,8 @@ func _random_seed(maximum: int) -> int:
 	return random.randi_range(0, maximum)
 
 
-func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false) -> Dictionary:
-	return GENERATED_CIRCUITS.create(theme, room, seed, reverse)
+func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard") -> Dictionary:
+	return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
 
 
 func circuit_share_code(identity: Dictionary) -> Dictionary:
@@ -408,6 +409,29 @@ func circuit_share_code(identity: Dictionary) -> Dictionary:
 
 func decode_circuit_share_code(code: String) -> Dictionary:
 	return GENERATED_CIRCUITS.decode_share_code(code)
+
+
+func retier_circuit_identity(identity_value: Dictionary, length_tier: String) -> Dictionary:
+	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
+		return {}
+	var identity := GENERATED_CIRCUITS.normalize(identity_value)
+	if identity.is_empty():
+		return {}
+	var sub_seeds: Dictionary = identity["sub_seeds"]
+	var overrides := {}
+	for domain: String in ["room_composition", "material", "dressing", "obstacle", "hazard"]:
+		overrides[domain] = sub_seeds[domain]
+	return GENERATED_CIRCUITS.create(
+		StringName(identity["theme"]),
+		StringName(identity["room"]),
+		int(sub_seeds["route"]),
+		bool(identity["reverse"]),
+		int(identity["danger_level"]),
+		String(identity["material_id"]),
+		String(identity["palette_id"]),
+		overrides,
+		length_tier
+	)
 
 
 func get_circuit_library() -> Dictionary:
@@ -439,10 +463,12 @@ func prepare_circuit_preview(identity_value: Dictionary) -> Dictionary:
 	return await _circuit_preview_queue.request(identity)
 
 
-func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String, reverse: bool = false) -> bool:
+func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String, reverse: bool = false, length_tier: String = "standard") -> bool:
 	if _transitioning_to_race:
 		return false
-	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse)
+	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
+		return false
+	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
 	if identity.is_empty():
 		if not vehicle_id in _save_data["unlocked_vehicles"]:
 			vehicle_id = "rustbug"

@@ -481,6 +481,7 @@ func _track_generation_options(event: Dictionary) -> Dictionary:
 	var options := {
 		"act": int(event.get("act", 0)),
 		"obstacles_enabled": bool(event.get("obstacles_enabled", true)),
+		"length_tier": StringName(event.get("length_tier", &"standard")),
 	}
 	if int(options["act"]) <= 0:
 		options.erase("act")
@@ -534,6 +535,27 @@ func _apply_track_variant(requested_theme: StringName) -> void:
 		if child.is_in_group("track_checkpoints"):
 			discovered_checkpoints.append(child)
 	race_manager.configure_checkpoints(discovered_checkpoints)
+	_configure_route_reference()
+
+
+func _configure_route_reference() -> void:
+	# Route-reference seam: hand the race manager the actual drivable route once,
+	# so wrong-way detection follows the real route tangent instead of the
+	# checkpoint chord. Generated tracks expose a hidden RacingLine; older
+	# authored fixtures store ordered centerline samples as surface tiles.
+	# Without either, the manager falls back to the direct checkpoint chord.
+	var route := PackedVector2Array()
+	var racing_line := track_root.get_node_or_null("RacingLine") as Line2D
+	if racing_line != null:
+		for point: Vector2 in racing_line.points:
+			route.append(racing_line.to_global(point))
+	else:
+		var tiles := track_root.get_node_or_null("TrackSurfaceTiles") as Node2D
+		if tiles != null:
+			for tile: Node in tiles.get_children():
+				if tile is Node2D:
+					route.append((tile as Node2D).global_position)
+	race_manager.configure_route_reference(route)
 
 
 func _abort_failed_race() -> void:

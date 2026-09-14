@@ -40,6 +40,12 @@ static func build_generated_outer_boundary_visuals(
 	rng.seed = TrackBuilderCore._mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), "boundary_runs:%s" % String(spec["story_id"]))
 	var base_modes: Array[StringName] = [&"both", &"inner", &"both", &"outer", &"both", &"both", &"both", &"none"]
 	var mode_offset := rng.randi_range(0, base_modes.size() - 1)
+	for trial in base_modes.size():
+		var candidate_offset := (mode_offset + trial) % base_modes.size()
+		var open_run := posmod(base_modes.find(&"none") - candidate_offset, base_modes.size())
+		if _open_run_has_apron(open_run, centerline, inner_boundary, room_polygon, spec.get("pockets", [])):
+			mode_offset = candidate_offset
+			break
 	var swap_sides := rng.randf() < 0.5
 	var run_modes: Array[StringName] = []
 	var section_count := 0
@@ -199,6 +205,25 @@ static func build_generated_outer_boundary_visuals(
 		"accent_count": accent_count,
 		"run_modes": run_modes,
 	})
+
+
+static func _open_run_has_apron(run: int, centerline: PackedVector2Array, island: PackedVector2Array, room: PackedVector2Array, pockets: Array) -> bool:
+	var center := int((float(run) + 0.5) * float(centerline.size()) / 8.0)
+	for offset in range(-9, 10, 3):
+		var index := posmod(center + offset, centerline.size())
+		var normal := TrackBuilderCore._sample_tangent(centerline, index).orthogonal()
+		for side: float in [-1.0, 1.0]:
+			var target := centerline[index] + normal * side * 250.0
+			if not Geometry2D.is_point_in_polygon(target, room) or Geometry2D.is_point_in_polygon(target, island):
+				continue
+			var in_bay := false
+			for pocket: Dictionary in pockets:
+				if Geometry2D.is_point_in_polygon(target, pocket.get("polygon", PackedVector2Array())):
+					in_bay = true
+					break
+			if not in_bay:
+				return true
+	return false
 
 
 static func add_generated_boundary_section(
@@ -386,5 +411,4 @@ static func island_region(room_polygon: PackedVector2Array, ribbon: PackedVector
 			best_score = score
 			best = piece
 	return best
-
 

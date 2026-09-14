@@ -14,6 +14,7 @@ const DRIFT_EXIT_SLIP_DEG := 6.0
 const DRIFT_SPIN_SLIP_DEG := 60.0
 const DRIFT_GRACE_DURATION := 0.20  # seconds
 const DRIFT_MIN_QUALIFIED_TIME := 0.35  # seconds
+const ENGINE_CUT_RATIO := 1.02
 
 # ─── Torque curve ────────────────────────────────────────────────────
 
@@ -45,7 +46,7 @@ static func calculate_engine_force(
 	external_power_mult: float,
 ) -> float:
 	var eff_max := stats.max_speed * surface_speed_mult
-	if throttle <= 0.0 or forward_speed >= eff_max:
+	if throttle <= 0.0 or forward_speed >= eff_max * ENGINE_CUT_RATIO:
 		return 0.0
 	var curve := get_engine_torque_curve(
 		absf(forward_speed), eff_max,
@@ -94,6 +95,7 @@ static func calculate_brake_forces(
 	surface_grip_mult: float,
 	front_lateral_demand: float,
 	rear_lateral_demand: float,
+	downforce_q_value: float = 0.0,
 ) -> Dictionary:
 	## Returns {front_brake: float, rear_brake: float} accounting for
 	## 62/38 front/rear bias and friction-circle capacity.
@@ -105,8 +107,15 @@ static func calculate_brake_forces(
 	var raw_rear := total_brake * (1.0 - FRONT_BRAKE_BIAS)
 
 	# Friction circle: brake demand limited by remaining capacity after lateral
-	var front_normal := stats.mass * REFERENCE_GRAVITY * stats.front_weight_ratio
-	var rear_normal := stats.mass * REFERENCE_GRAVITY * (1.0 - stats.front_weight_ratio)
+	var loads := axle_loads_with_transfer(
+		stats.mass,
+		stats.front_weight_ratio,
+		-brake_input,
+		stats.weight_transfer_ratio,
+		downforce_q_value,
+	)
+	var front_normal := float(loads["front"])
+	var rear_normal := float(loads["rear"])
 	var front_peak := stats.front_grip * surface_grip_mult * front_normal
 	var rear_peak := stats.rear_grip * surface_grip_mult * rear_normal
 
@@ -164,6 +173,38 @@ static func calculate_axle_normal_load(
 ) -> float:
 	var ratio := front_weight_ratio if is_front else (1.0 - front_weight_ratio)
 	return mass * REFERENCE_GRAVITY * ratio
+
+
+static func car_length_wu(stats: VehicleStats) -> float:
+	return stats.wheelbase * 1.45
+
+
+static func car_lengths_per_second(stats: VehicleStats) -> float:
+	return stats.max_speed / maxf(car_length_wu(stats), 1.0)
+
+
+static func downforce_q(speed: float, max_speed: float, q_max: float) -> float:
+	var ratio := clampf(absf(speed) / maxf(max_speed, 0.001), 0.0, 1.0)
+	return clampf(q_max, 0.0, 0.6) * ratio * ratio
+
+
+static func axle_loads_with_transfer(
+	mass: float,
+	front_weight_ratio: float,
+	longitudinal_demand: float,
+	h_over_l: float,
+	q: float,
+) -> Dictionary:
+	var transfer := clampf(h_over_l * clampf(longitudinal_demand, -1.0, 1.0), -0.12, 0.12)
+	var front_ratio := clampf(front_weight_ratio - transfer, 0.40, 0.66)
+	var extra := clampf(q, 0.0, 0.6) * mass * REFERENCE_GRAVITY
+	var base := mass * REFERENCE_GRAVITY
+	return {
+		"front": (base + extra) * front_ratio,
+		"rear": (base + extra) * (1.0 - front_ratio),
+		"front_ratio": front_ratio,
+		"q": clampf(q, 0.0, 0.6),
+	}
 
 
 static func calculate_progressive_stiffness(surface_grip_mult: float) -> float:
