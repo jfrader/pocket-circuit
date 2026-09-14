@@ -1,10 +1,14 @@
 # Gamestruments (local)
 
 Runtime music is a Rust GDExtension. It is not committed as a 100MB debug
-`.so`. Sync it from the Gamestruments worktree:
+`.so`. Sync a release build (or packaged addon) with:
 
 ```bash
-./tools/sync_gamestruments.sh
+# release build from source
+GAMESTRUMENTS_ROOT=/path/to/gamestruments ./tools/sync_gamestruments.sh
+
+# or copy an already-packaged addon dir (contains .gdextension + lib)
+GAMESTRUMENTS_ADDON_DIR=/path/to/packaged-addon ./tools/sync_gamestruments.sh
 ```
 
 Then restart the Godot editor. `AudioDirector` uses `GamestrumentsPlayer` when

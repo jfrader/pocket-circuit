@@ -17,6 +17,9 @@ const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
 const PAUSED_MUSIC_DB := -9.0
 
+const LIVE_RECIPE := "racing"
+const LIVE_ARRANGEMENT := "extended"
+
 var _music_player: AudioStreamPlayer
 var _engine_player: AudioStreamPlayer
 var _sfx_players: Array[AudioStreamPlayer] = []
@@ -71,7 +74,13 @@ func ensure_buses() -> void:
 
 
 func play_menu_music() -> void:
-	if _play_live("menu", "garage", 0.35, 0.2, false, &"menu"):
+	if _live_music != null and _live_music.has_method("generate"):
+		if is_instance_valid(_music_player):
+			_music_player.stop()
+		_music_context = &"menu"
+		_live_music.set("autoplay", false)
+		_live_music.call("generate", "menu")
+		_live_music.call("set_race_state", "garage", 0.35, 0.2, false)
 		clear_local_vehicle()
 		set_race_paused(false)
 		return
@@ -87,7 +96,13 @@ func play_race_music() -> void:
 		var session: Variant = app.get("current_race_session")
 		if session is Dictionary and not (session as Dictionary).is_empty():
 			race_seed = String((session as Dictionary).get("event_id", "race"))
-	if _play_live(race_seed, "race", 0.72, 0.4, false, &"race"):
+	if _live_music != null and _live_music.has_method("generate"):
+		if is_instance_valid(_music_player):
+			_music_player.stop()
+		_music_context = &"race"
+		_live_music.set("autoplay", true)
+		_live_music.call("generate", race_seed)
+		_live_music.call("set_race_state", "grid", 0.35, 0.2, false)
 		set_race_paused(false)
 		return
 	_set_music(&"race", _race_loop)
@@ -148,11 +163,17 @@ func get_sfx_player_count() -> int:
 	return _sfx_players.size()
 
 
-func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool) -> void:
+func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result: String = "") -> void:
 	# Music-only adaptive state for the live procedural engine.
 	# WAV loop path remains completely unchanged (no calls to _set_music or players here).
 	if _live_music != null and _live_music.has_method("set_race_state"):
-		_live_music.call("set_race_state", phase, intensity, pressure, final_lap)
+		_live_music.call("set_race_state", phase, intensity, pressure, final_lap, finish_result)
+
+
+func cue_live_section(section: String) -> bool:
+	if _live_music != null and _live_music.has_method("cue_section"):
+		return _live_music.call("cue_section", section) as bool
+	return false
 
 
 func _bind_live_music() -> void:
@@ -161,30 +182,14 @@ func _bind_live_music() -> void:
 	_live_music = ClassDB.instantiate("GamestrumentsPlayer")
 	_live_music.name = "GamestrumentsPlayer"
 	_live_music.set("project_secret", "guri-pc-dev-salt")
+	_live_music.set("recipe", LIVE_RECIPE)
+	_live_music.set("arrangement", LIVE_ARRANGEMENT)
 	_live_music.set("style", "funk")
 	_live_music.set("melody_voice", "pluck")
 	_live_music.set("harmony_voice", "warm")
 	_live_music.set("drive_voice", "pluck")
 	_live_music.set("bass_voice", "bass")
 	add_child(_live_music)
-
-
-func _play_live(
-	seed: String,
-	phase: String,
-	intensity: float,
-	pressure: float,
-	final_lap: bool,
-	context: StringName,
-) -> bool:
-	if _live_music == null or not _live_music.has_method("generate"):
-		return false
-	if is_instance_valid(_music_player):
-		_music_player.stop()
-	_music_context = context
-	_live_music.call("generate", seed)
-	_live_music.call("set_race_state", phase, intensity, pressure, final_lap)
-	return true
 
 
 func _build_players() -> void:
