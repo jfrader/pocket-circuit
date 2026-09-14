@@ -9,7 +9,7 @@ const GRAVITY := 980.0
 const LAT_DAMP := 72.0
 const OVER_DAMP_REDUCE := 0.18
 const OVER_YAW_BOOST := 0.0
-const YAW_TORQUE_SCALE := 0.50
+const YAW_TORQUE_SCALE := 0.40
 const OVER_SPEED_START := 0.62
 
 
@@ -83,7 +83,7 @@ static func compute_forces(
 	var lat_force := -lat * mass * damp
 	var lock := deg_to_rad(stats.max_steer_angle_deg) * lerpf(
 		1.0,
-		0.64,
+		0.58,
 		smoothstep(0.28, 0.88, speed_ratio),
 	)
 	var steer_rad := steer * lock
