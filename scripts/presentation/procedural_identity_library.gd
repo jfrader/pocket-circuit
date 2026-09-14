@@ -299,7 +299,6 @@ static func _effective_livery_for(vehicle_id: String, driver_id: String) -> Dict
 		"wheels": String(parts.get("wheels", "")),
 		"spoiler": String(parts.get("spoiler", "")),
 	}
-}
 
 
 static func _shift_cosmetic(livery: Dictionary, shift: int) -> Dictionary:

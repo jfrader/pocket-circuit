@@ -67,11 +67,11 @@ var _last_output_velocity := Vector2.ZERO
 var last_collision_response: Dictionary = {}
 var has_static_contact := false
 var static_contact_normal := Vector2.ZERO
-	var _racer_tag: Label
-	var _racer_tag_offset := Vector2(-45.0, -64.0)
-	var _car_sprite: Sprite2D
-	var _visual_key := ""
-	var _wheel_travel := 0.0
+var _racer_tag: Label
+var _racer_tag_offset := Vector2(-45.0, -64.0)
+var _car_sprite: Sprite2D
+var _visual_key := ""
+var _wheel_travel := 0.0
 var _drift_boost_accumulated := 0.0
 var _drift_grace_timer := 0.0
 var _front_slip_angle := 0.0
@@ -79,7 +79,7 @@ var _rear_slip_angle := 0.0
 var _last_speed := 0.0
 var _drift_entry_speed := 0.0
 
-# ── v1 state ──
+	# ── v1 state ──
 var _rack_angle := 0.0  # persistent steering rack angle (radians)
 var _grid_transform_pending := false
 var _pending_grid_transform := Transform2D.IDENTITY
