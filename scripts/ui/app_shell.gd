@@ -7,6 +7,7 @@ const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MENU_BACKGROUND := preload("res://assets/ui/imagine/motorsport_garage.jpg")
 const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
+const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 
 const INK := Color("0e151f")
 const PAPER := Color("f5f0e3")
@@ -32,6 +33,7 @@ var _quick_race_theme: StringName = &"workshop"
 var _quick_race_room: StringName = &"classic"
 var _quick_race_seed := -1
 var _quick_race_reverse := false
+var _quick_race_length_tier: String = "standard"
 var _quick_identity_heading: Label
 var _quick_identity_summary: Label
 var _quick_direction_button: Button
@@ -184,10 +186,10 @@ func show_quick_race(_requested_act: int = 0) -> void:
 		)
 	var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
 	var seed_controls := _add_quick_race_seed_controls(seed_status)
+	var size_selector := _add_quick_race_size_direction_row()
 	for room_button: Button in room_buttons:
 		room_button.focus_neighbor_bottom = room_button.get_path_to(seed_controls[0])
-	_quick_direction_button = _add_button("DIRECTION · %s" % ("REVERSE" if _quick_race_reverse else "FORWARD"), _toggle_quick_race_direction, CREAM, false, "QuickRaceDirection")
-	_complete_focus_row(seed_controls, _quick_direction_button)
+	_complete_focus_row(seed_controls, size_selector)
 	var play_button := _add_big_play_button(Callable(self, "_start_quick_race"), false)
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_race_vehicle_id.is_empty():
@@ -1083,6 +1085,7 @@ func _reset_quick_race_state() -> void:
 	_quick_race_room = &"classic"
 	_quick_race_seed = -1
 	_quick_race_reverse = false
+	_quick_race_length_tier = "standard"
 	_quick_race_vehicle_id = ""
 	_quick_identity_heading = null
 	_quick_identity_summary = null
@@ -1129,7 +1132,7 @@ func _toggle_quick_race_direction() -> void:
 
 
 func _current_quick_identity() -> Dictionary:
-	return _app.call("generated_circuit_identity", _quick_race_theme, _quick_race_room, _quick_race_seed, _quick_race_reverse)
+	return _app.call("generated_circuit_identity", _quick_race_theme, _quick_race_room, _quick_race_seed, _quick_race_reverse, _quick_race_length_tier)
 
 
 func _refresh_quick_identity_labels() -> void:
@@ -1140,6 +1143,43 @@ func _refresh_quick_identity_labels() -> void:
 		_quick_identity_summary.text = String(identity.get("summary", ""))
 	if is_instance_valid(_quick_direction_button):
 		_quick_direction_button.text = "DIRECTION · %s" % ("REVERSE" if _quick_race_reverse else "FORWARD")
+
+
+func _add_quick_race_size_direction_row() -> OptionButton:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	_content.add_child(row)
+	var size_label := _label("SIZE", 16, CREAM)
+	size_label.custom_minimum_size = Vector2(52.0, 0.0)
+	row.add_child(size_label)
+	var size_selector := OptionButton.new()
+	size_selector.name = "QuickRaceSize"
+	size_selector.focus_mode = Control.FOCUS_ALL
+	size_selector.custom_minimum_size = Vector2(0.0, 44.0)
+	size_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	size_selector.add_theme_font_size_override("font_size", 18)
+	for tier: String in GENERATED_RULES.LENGTH_TIERS:
+		size_selector.add_item(String(GENERATED_RULES.length_profile(tier)["label"]))
+	var selected_index := GENERATED_RULES.LENGTH_TIERS.find(_quick_race_length_tier)
+	if selected_index >= 0:
+		size_selector.select(selected_index)
+	size_selector.item_selected.connect(_on_quick_race_size_selected)
+	row.add_child(size_selector)
+	_register_button_focus(size_selector)
+	_quick_direction_button = _make_button("DIRECTION · %s" % ("REVERSE" if _quick_race_reverse else "FORWARD"), _toggle_quick_race_direction, CREAM, false, "QuickRaceDirection")
+	_quick_direction_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_child(_quick_direction_button)
+	_register_button_focus(_quick_direction_button)
+	size_selector.focus_neighbor_right = size_selector.get_path_to(_quick_direction_button)
+	_quick_direction_button.focus_neighbor_left = _quick_direction_button.get_path_to(size_selector)
+	return size_selector
+
+
+func _on_quick_race_size_selected(index: int) -> void:
+	if index < 0 or index >= GENERATED_RULES.LENGTH_TIERS.size():
+		return
+	_quick_race_length_tier = String(GENERATED_RULES.LENGTH_TIERS[index])
+	_refresh_quick_identity_labels()
 
 
 func _random_quick_race_seed() -> int:
@@ -1153,7 +1193,7 @@ func _start_quick_race() -> void:
 	var vehicle_id := _quick_race_vehicle_id if not _quick_race_vehicle_id.is_empty() else String(progress.get("selected_vehicle", "rustbug"))
 	if not vehicle_id in progress.get("unlocked_vehicles", ["rustbug"]):
 		vehicle_id = "rustbug"
-	_app.call("start_circuit_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id, _quick_race_reverse)
+	_app.call("start_circuit_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id, _quick_race_reverse, _quick_race_length_tier)
 
 
 func _start_with_vehicle(vehicle_id: String) -> void:

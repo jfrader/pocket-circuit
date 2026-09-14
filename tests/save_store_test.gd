@@ -160,6 +160,8 @@ func _run_test() -> void:
 		return
 	if not _test_legacy_vehicle_selections(store):
 		return
+	if not _test_generator_version_migration(store):
+		return
 
 	store.remove_save()
 	print("SAVE_STORE_TEST PASS")
@@ -188,6 +190,55 @@ func _test_legacy_vehicle_selections(store: SaveStore) -> bool:
 		var loaded := store.load_data()
 		if not _expect(String(loaded["selected_vehicle"]) == vehicle_id, "legacy save should keep selected vehicle '%s' after catalog resource migration" % vehicle_id):
 			return false
+	return true
+
+
+func _test_generator_version_migration(store: SaveStore) -> bool:
+	# A pre-v6 championship record keeps its master seed and story progress, but
+	# its circuit fingerprints advance so old-geometry ghosts and mastery keys no
+	# longer compare as the current circuit.
+	_write_raw(TEST_PATH, JSON.stringify({
+		"version": 4,
+		"championship_started": true,
+		"championship_circuit": {
+			"schema_version": 1,
+			"generator_version": 1,
+			"seed": 123456789,
+			"events": {},
+			"fingerprint": "ba391b90f4c3f2b5",
+		},
+		"best_event_finishes": {
+			"kitchen_crumb_rush": 1,
+			"kitchen_mug_run": 1,
+			"kitchen_clean_line": 1,
+		},
+	}))
+	var loaded := store.load_data()
+	var migrated: Dictionary = loaded["championship_circuit"]
+	if not _expect(int(migrated["seed"]) == 123456789 and int(migrated["generator_version"]) == 6, "a pre-v6 championship save should keep its master seed while advancing the generator version"):
+		return false
+	if not _expect(
+			loaded["completed_events"] == ["kitchen_crumb_rush", "kitchen_mug_run", "kitchen_clean_line"]
+			and loaded["completed_acts"] == ["kitchen"]
+			and loaded["unlocked_vehicles"] == ["rustbug", "pinbolt"]
+			and loaded["best_event_points"] == {"kitchen_crumb_rush": 10, "kitchen_mug_run": 10, "kitchen_clean_line": 10},
+			"generator migration should preserve completed events, standings, and unlocks"
+	):
+		return false
+	var migrated_event := CIRCUIT_IDENTITIES.apply_to_event(CATALOG.get_event("kitchen_crumb_rush"), migrated["events"]["kitchen_crumb_rush"])
+	var migrated_identity := MASTERY.create_identity(migrated_event, "rustbug", MASTERY.prepare_circuit_metrics(migrated_event))
+	var legacy_identity := migrated_identity.duplicate(true)
+	legacy_identity["circuit"]["generator_version"] = 1
+	if not _expect(MASTERY.identity_key(legacy_identity) != MASTERY.identity_key(migrated_identity), "the generator version bump should change the lap/mastery identity key"):
+		return false
+	var legacy_ghost: Array = PERSONAL_GHOST.store_best([], legacy_identity, 30.0, [
+		PERSONAL_GHOST.sample(0.0, Transform2D(0.0, Vector2.ZERO)),
+		PERSONAL_GHOST.sample(30.0, Transform2D(0.5, Vector2(10.0, 10.0))),
+	])["ghosts"]
+	if not _expect(legacy_ghost.size() == 1, "the migration fixture must contain an actual old-geometry ghost"):
+		return false
+	if not _expect(PERSONAL_GHOST.compatible_best(legacy_ghost, migrated_identity).is_empty(), "a ghost recorded under the pre-v6 identity must not be accepted against the v6 circuit"):
+		return false
 	return true
 
 

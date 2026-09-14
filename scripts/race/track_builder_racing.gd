@@ -1,6 +1,18 @@
 class_name TrackBuilderRacing
 ## Canonical island fill, racing line, and leftover static-track dressing.
 
+## Maximum lateral offset change per unit of arc distance when building the
+## apex racing line. High enough to keep the entry->apex->exit envelope intact
+## on the tightest driveable corners, low enough to reject the abrupt
+## sign/amplitude jumps that fold the line back on itself.
+const APEX_OFFSET_RATE_LIMIT := 0.5
+
+## Final guidance-radius floor applied to the realized safe/shortcut line, after
+## the apex envelope, the lane override, and the slew bound. It sits above the
+## widest chassis's kinematic minimum turn radius (Scrapjaw: 43u wheelbase /
+## tan(28.5°) ≈ 79u) so every car can hold the racing line at full lock.
+const GUIDANCE_RADIUS_FLOOR := 90.0
+
 
 static func fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector2Array, centerline: PackedVector2Array) -> void:
 	# The island hosts one authored VIGNETTE per theme (a designed scene, not a
@@ -116,22 +128,26 @@ static func build_racing_line(root: Node2D, centerline: PackedVector2Array, mome
 
 
 static func racing_line_points(centerline: PackedVector2Array, moments: Dictionary, use_shortcut: bool) -> PackedVector2Array:
+	# The final line is assembled from a signed lateral offset per sample: the
+	# apex envelope first, then the shortcut/safe lane override, then a single
+	# arc-rate bound applied to the COMBINED offset. Bounding after the override
+	# is what guarantees the lane lerp cannot reintroduce a steep offset change.
 	var count := centerline.size()
-	var points := curvature_apex_line(centerline)
+	var offsets := _apex_signed_offsets(centerline)
 	var shortcut_index := int(moments.get("shortcut", -1))
-	if shortcut_index < 0:
-		return points
-	var inside_sign := float(TrackBuilderCore._shortcut_lane_geometry(centerline, shortcut_index)["inside_sign"])
-	var taper_span := TrackBuilderCore.SHORTCUT_HALF_SPAN + (8 if use_shortcut else 6)
-	for index in count:
-		var shortcut_distance := TrackBuilderCore._cyclic_index_distance(index, shortcut_index, count)
-		if shortcut_distance > taper_span:
-			continue
-		var influence := 1.0 - smoothstep(float(TrackBuilderCore.SHORTCUT_HALF_SPAN), float(taper_span), float(shortcut_distance))
-		var normal := TrackBuilderCore._sample_tangent(centerline, index).rotated(PI * 0.5)
-		var lane_offset := inside_sign * TrackBuilderCore.SHORTCUT_LANE_OFFSET if use_shortcut else -inside_sign * TrackBuilderCore.SAFE_RACING_LINE_OFFSET
-		points[index] = points[index].lerp(centerline[index] + normal * lane_offset, influence)
-	return points
+	if shortcut_index >= 0:
+		var inside_sign := float(TrackBuilderCore._shortcut_lane_geometry(centerline, shortcut_index)["inside_sign"])
+		var taper_span := TrackBuilderCore.SHORTCUT_HALF_SPAN + (8 if use_shortcut else 6)
+		for index in count:
+			var shortcut_distance := TrackBuilderCore._cyclic_index_distance(index, shortcut_index, count)
+			if shortcut_distance > taper_span:
+				continue
+			var influence := 1.0 - smoothstep(float(TrackBuilderCore.SHORTCUT_HALF_SPAN), float(taper_span), float(shortcut_distance))
+			var lane_offset := inside_sign * TrackBuilderCore.SHORTCUT_LANE_OFFSET if use_shortcut else -inside_sign * TrackBuilderCore.SAFE_RACING_LINE_OFFSET
+			offsets[index] = lerpf(offsets[index], lane_offset, influence)
+	offsets = _bounded_lateral_offsets(centerline, offsets)
+	offsets = _enforce_guidance_radius(centerline, offsets)
+	return _offsets_to_points(centerline, offsets)
 
 
 static func add_hidden_racing_line(parent: Node2D, line_name: String, points: PackedVector2Array) -> Line2D:
@@ -146,10 +162,20 @@ static func add_hidden_racing_line(parent: Node2D, line_name: String, points: Pa
 
 
 static func curvature_apex_line(centerline: PackedVector2Array) -> PackedVector2Array:
-	var line_points := PackedVector2Array()
+	# Apex-only line: bound the raw apex offsets and build points. Kept as the
+	# shared base for callers that do not layer the shortcut/safe override.
+	return _offsets_to_points(centerline, _bounded_lateral_offsets(centerline, _apex_signed_offsets(centerline)))
+
+
+static func _apex_signed_offsets(centerline: PackedVector2Array) -> PackedFloat32Array:
+	# Signed lateral offset from the corner apex/setup envelope, one per sample.
+	# Not yet rate-limited: the caller layers the shortcut/safe override on top
+	# and bounds the combined result.
 	var count := centerline.size()
+	var offsets := PackedFloat32Array()
+	offsets.resize(count)
 	if count < TrackBuilderCore.APEX_SAMPLE_SPAN * 2 + 1:
-		return centerline.duplicate()
+		return offsets
 	for index in count:
 		var local_turn := signed_turn_at(centerline, index, TrackBuilderCore.APEX_SAMPLE_SPAN)
 		var entry_turn := signed_turn_at(centerline, index + TrackBuilderCore.APEX_SAMPLE_SPAN, TrackBuilderCore.APEX_SAMPLE_SPAN)
@@ -161,16 +187,152 @@ static func curvature_apex_line(centerline: PackedVector2Array) -> PackedVector2
 			strongest_turn = exit_turn
 		var severity := clampf(absf(strongest_turn) / 0.78, 0.0, 1.0)
 		if severity < 0.04:
-			line_points.append(centerline[index])
+			offsets[index] = 0.0
 			continue
 		var apex_weight := clampf(absf(local_turn) / maxf(absf(strongest_turn), 0.001), 0.0, 1.0)
 		apex_weight = pow(apex_weight, 1.45)
 		var inward_offset := TrackBuilderCore.APEX_MAX_INWARD_OFFSET * severity * apex_weight
+		inward_offset = minf(inward_offset, _driveable_inward_cap(centerline, index))
 		var setup_offset := TrackBuilderCore.APEX_MAX_ENTRY_OFFSET * severity * (1.0 - apex_weight)
-		var signed_offset := signf(strongest_turn) * (inward_offset - setup_offset)
+		offsets[index] = signf(strongest_turn) * (inward_offset - setup_offset)
+	return _blend_s_curve_inflections(centerline, offsets)
+
+
+static func _blend_s_curve_inflections(centerline: PackedVector2Array, offsets: PackedFloat32Array) -> PackedFloat32Array:
+	# At an opposite-turn transition the outward setup offset flips sign while
+	# still near its maximum, which folds the line across the inflection. Blend
+	# the lateral offset back toward the centerline over the reversal window,
+	# with a taper that peaks where the local turn is straight and fades toward
+	# each half's apex. Single corners are untouched (their entry/exit turns
+	# share a sign, so the reversal test never fires).
+	var count := offsets.size()
+	var result := offsets.duplicate()
+	var span := TrackBuilderCore.APEX_SAMPLE_SPAN
+	for index in count:
+		var entry_turn := signed_turn_at(centerline, index + span, span)
+		var exit_turn := signed_turn_at(centerline, index - span, span)
+		if entry_turn * exit_turn >= 0.0:
+			continue
+		var local_turn := signed_turn_at(centerline, index, span)
+		var weight := clampf(1.0 - absf(local_turn) / 0.25, 0.0, 1.0)
+		result[index] = lerpf(result[index], 0.0, weight)
+	return result
+
+
+static func _driveable_inward_cap(centerline: PackedVector2Array, index: int) -> float:
+	# Cap only the LOCAL apex budget: the inward cut at this sample may not pull
+	# the apex below the geometry's own centerline floor. This bounds the apex
+	# magnitude but not the final curve's curvature — the offset's second
+	# derivative (setup flip, lane override) can still tighten it, which is what
+	# the guidance-radius guard below catches.
+	var radius := _centerline_radius(centerline, index)
+	return maxf(0.0, radius - TrackSeedGen.MIN_DRIVE_RADIUS)
+
+
+static func _centerline_radius(centerline: PackedVector2Array, index: int) -> float:
+	var count := centerline.size()
+	var span := TrackBuilderCore.APEX_SAMPLE_SPAN
+	var a := centerline[(index - span + count) % count]
+	var b := centerline[index]
+	var c := centerline[(index + span) % count]
+	var ab := a.distance_to(b)
+	var bc := b.distance_to(c)
+	var ac := a.distance_to(c)
+	if ab < 0.001 or bc < 0.001 or ac < 0.001:
+		return INF
+	var cross := absf((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x))
+	if cross < 0.001:
+		return INF
+	return ab * bc * ac / (2.0 * cross)
+
+
+static func _enforce_guidance_radius(centerline: PackedVector2Array, offsets: PackedFloat32Array) -> PackedFloat32Array:
+	# The apex cap and slew bound cannot alone guarantee the FINAL curve's local
+	# radius (offset second derivatives still tighten it). Enforce the floor by
+	# repeatedly relaxing the worst offending sample toward the centerline with an
+	# arc-length taper, then re-applying the slew bound, until every sample meets
+	# the floor. This keeps the correction inside the offending window instead of
+	# scaling the whole line, so the rest of the racing line — apex cut, lane
+	# override, straights — is preserved.
+	var result := offsets.duplicate()
+	var count := result.size()
+	var radius_span := 3
+	var relax_span := 6
+	for _iteration in 40:
+		var points := _offsets_to_points(centerline, result)
+		var worst_index := -1
+		var worst_radius := INF
+		for index in count:
+			var radius := _radius_at(points, index, radius_span)
+			if radius < worst_radius:
+				worst_radius = radius
+				worst_index = index
+		if worst_radius >= GUIDANCE_RADIUS_FLOOR - 1.0:
+			break
+		for offset in range(-relax_span, relax_span + 1):
+			var index := (worst_index + offset + count) % count
+			var taper := clampf(1.0 - absf(offset) / float(relax_span), 0.0, 1.0)
+			result[index] = lerpf(result[index], 0.0, 0.4 * taper)
+		result = _bounded_lateral_offsets(centerline, result)
+	return result
+
+
+static func _radius_at(points: PackedVector2Array, index: int, span: int) -> float:
+	var count := points.size()
+	var a := points[(index - span + count) % count]
+	var b := points[index]
+	var c := points[(index + span) % count]
+	var ab := a.distance_to(b)
+	var bc := b.distance_to(c)
+	var ac := a.distance_to(c)
+	if ab < 0.001 or bc < 0.001 or ac < 0.001:
+		return INF
+	var cross := absf((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x))
+	if cross < 0.001:
+		return INF
+	return ab * bc * ac / (2.0 * cross)
+
+
+static func _offsets_to_points(centerline: PackedVector2Array, offsets: PackedFloat32Array) -> PackedVector2Array:
+	var line_points := PackedVector2Array()
+	for index in centerline.size():
 		var normal := TrackBuilderCore._sample_tangent(centerline, index).rotated(PI * 0.5)
-		line_points.append(centerline[index] + normal * signed_offset)
+		line_points.append(centerline[index] + normal * offsets[index])
 	return line_points
+
+
+static func _bounded_lateral_offsets(centerline: PackedVector2Array, offsets: PackedFloat32Array) -> PackedFloat32Array:
+	# Bound the lateral-offset change per unit arc so an abrupt per-sample sign
+	# or amplitude transition cannot fold the racing line back on itself. The
+	# offset stays within the existing APEX_MAX_* envelope, so this only smooths
+	# the transition into/out of corners and never pushes the line through the
+	# island or outside the corridor. Forward/backward sweeps over the closed
+	# loop repeat until every edge satisfies the bound, including the wrap.
+	var count := offsets.size()
+	var result := offsets.duplicate()
+	var arc := PackedFloat32Array()
+	arc.resize(count)
+	for index in count:
+		arc[index] = centerline[index].distance_to(centerline[(index + 1) % count])
+	var changed := true
+	var iterations := 0
+	while changed and iterations < count * 2:
+		changed = false
+		iterations += 1
+		for index in count:
+			var previous_index := (index - 1 + count) % count
+			var limit := arc[previous_index] * APEX_OFFSET_RATE_LIMIT
+			var clamped := clampf(result[index], result[previous_index] - limit, result[previous_index] + limit)
+			if not is_equal_approx(clamped, result[index]):
+				changed = true
+			result[index] = clamped
+		for index in range(count - 1, -1, -1):
+			var limit := arc[index] * APEX_OFFSET_RATE_LIMIT
+			var clamped := clampf(result[index], result[(index + 1) % count] - limit, result[(index + 1) % count] + limit)
+			if not is_equal_approx(clamped, result[index]):
+				changed = true
+			result[index] = clamped
+	return result
 
 
 static func signed_turn_at(centerline: PackedVector2Array, index: int, span: int) -> float:

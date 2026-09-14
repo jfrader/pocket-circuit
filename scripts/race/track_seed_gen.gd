@@ -3,6 +3,10 @@ class_name TrackSeedGen
 ## Family, length, and route-program selection use independent hash streams.
 
 const ROUTE_GRAMMAR := preload("res://scripts/race/track_route_grammar.gd")
+const SECTIONS := preload("res://scripts/race/track_route_sections.gd")
+const CURVE_SAMPLING := preload("res://scripts/race/track_curve_sampling.gd")
+const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 
 const SAMPLE_COUNT := 260
 const HALF_WIDTH := 125.0
@@ -51,6 +55,10 @@ static func generate_with_retries(seed: int, room_rect: Rect2, params: Dictionar
 
 static func generate(seed: int, room_rect: Rect2, params: Dictionary = {}) -> PackedVector2Array:
 	return _generate_result(seed, room_rect, params)["points"] as PackedVector2Array
+
+
+static func length_profile(tier: StringName) -> Dictionary:
+	return GENERATED_RULES.length_profile(String(tier))
 
 
 static func centerline_checkpoints(controls: PackedVector2Array) -> PackedVector2Array:
@@ -140,11 +148,16 @@ static func _swap_turn_symbol(symbol: String) -> String:
 static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) -> Dictionary:
 	var family_index := posmod(_hash32(seed ^ FAMILY_SALT), FAMILY_NAMES.size())
 	var family: StringName = FAMILY_NAMES[family_index]
+	var tier := StringName(params.get("length_tier", &"standard"))
+	var profile := length_profile(tier)
+	if profile.is_empty():
+		return _empty_result(seed, family)
 	var length_roll := _hash_unit(seed, LENGTH_SALT)
-	var target_length := lerpf(2500.0, 5500.0, length_roll) * WORLD_SCALE
+	var target_length := lerpf(float(profile["min_length"]), float(profile["max_length"]), length_roll)
 	var configured_max := float(params.get("max_loop_length", 0.0))
 	if configured_max > 0.0:
 		target_length = minf(target_length, configured_max)
+	var max_length := float(profile["max_length"])
 
 	var room_polygon: PackedVector2Array = params.get("room_polygon", PackedVector2Array())
 	var room_shape := StringName(params.get("room_shape", &""))
@@ -162,13 +175,35 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var physical_self_distance := maxf(HALF_WIDTH * 2.0, minf(usable_rect.size.x, usable_rect.size.y) * 0.55)
 	var min_self_distance := minf(requested_self_distance, physical_self_distance)
 	var room_check_margin := maxf(float(params.get("room_check_margin", 0.0)), CORRIDOR_CLEARANCE)
-	var minimum_length := float(params.get("min_loop_length", 1500.0 * WORLD_SCALE))
+	var minimum_length := float(params.get("min_loop_length", 1900.0 * WORLD_SCALE))
+	# Large tiers honor their band floor as a validation minimum so a compact
+	# program cannot slip in below the selected band.
+	if tier != &"standard":
+		minimum_length = maxf(minimum_length, float(profile["min_length"]))
 	var last_reason := "no candidate"
+	# Profiles and the straight motif now run on every room; the shared sampler
+	# plus the corridor-boundary simplification keep long/tall loops valid, and
+	# the whole-loop validation still rejects any candidate that would tip a
+	# room's aspect or clearance, so no whole-category silence is needed.
+	var decorate_enabled := true
+	# The standard tier keeps its 0.78 aesthetic fit floor; non-standard tiers fit
+	# from the physical branch-gap and corner-radius constraints only.
+	var fit_floor := 0.78 if tier == &"standard" else 0.0
 
 	for attempt in MAX_VARIANTS:
 		var attempt_pockets: Array = []
-		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance) \
-			if room_shape == &"el" else _family_controls(family, family, seed, attempt, usable_rect, target_length, min_self_distance, attempt_pockets)
+		var attempt_profiles: Array = []
+		var generation_rect := usable_rect
+		var use_el_controls := room_shape == &"el"
+		if use_el_controls and tier == &"compact":
+			# Compact EL occupies one safe arm sub-rect (4-6k dogleg/U) rather than
+			# the whole L perimeter, which cannot shrink that far.
+			generation_rect = _el_compact_bounds(room_polygon, seed, attempt)
+			if generation_rect.size.x < 1.0:
+				generation_rect = usable_rect
+			use_el_controls = false
+		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"])) \
+			if use_el_controls else _family_controls(family, family, seed, attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, attempt_pockets, attempt_profiles, decorate_enabled)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
@@ -179,8 +214,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 		)
 		last_reason = String(validation.get("reason", "unknown"))
 		if bool(validation["valid"]):
-			var centerline: PackedVector2Array = validation["centerline"]
-			var ordered_controls := _reorder_to_longest_straight(controls, centerline)
+			var ordered_controls := _reorder_to_longest_straight(controls)
 			var ordered_validation := _validate_controls(
 				ordered_controls,
 				source_rect,
@@ -192,19 +226,37 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			if not bool(ordered_validation["valid"]):
 				last_reason = "post-order " + String(ordered_validation.get("reason", "unknown"))
 				continue
+			var motif := {"controls": ordered_controls, "motifs": [], "rejections": [], "length": float(ordered_validation["length"])}
+			if decorate_enabled:
+				motif = _apply_straight_motif(
+					ordered_controls, source_rect, room_polygon, room_check_margin,
+					min_self_distance, minimum_length, max_length, float(ordered_validation["length"])
+				)
+			var final_controls: PackedVector2Array = motif["controls"]
+			if float(motif["length"]) > max_length or float(motif["length"]) < minimum_length:
+				last_reason = "composed route outside requested length band"
+				continue
+			if tier == &"standard" and not _room_aspect_ok(final_controls, room_shape):
+				last_reason = "room aspect tipped by profile/motif"
+				continue
 			return {
-				"points": ordered_controls,
+				"points": final_controls,
 				"seed": seed,
 				"family": family,
-				"length": float(ordered_validation["length"]),
+				"length": float(motif["length"]),
 				"target_length": target_length,
+				"length_tier": tier,
+				"length_profile": String(profile["id"]),
 				"attempt": attempt,
 				"fallback": false,
-				"pockets": attempt_pockets,
-				"realization": &"el_safe" if room_shape == &"el" else family,
-				"route_recipe": &"el_safe" if room_shape == &"el" else _route_name(seed, attempt, target_length),
-				"route_program": &"el_safe" if room_shape == &"el" else _route_program_name(seed, attempt, target_length),
-				"route_sequence": normalized_route_sequence(ordered_controls),
+				"pockets": _detect_pockets(final_controls),
+				"realization": &"el_safe" if room_shape == &"el" and tier != &"compact" else family,
+				"route_recipe": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_name(seed, attempt, target_length),
+				"route_program": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_program_name(seed, attempt, target_length),
+				"route_sequence": normalized_route_sequence(final_controls),
+				"corner_profiles": _merge_profile_counts(attempt_profiles),
+				"motifs": motif["motifs"],
+				"motif_rejections": motif["rejections"],
 			}
 
 	var family_reason := last_reason
@@ -212,44 +264,70 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	# selected family metadata. EL rooms retain their dedicated L-safe route.
 	for fallback_attempt in 4:
 		var fallback_pockets: Array = []
-		var controls := _el_controls(family, seed, MAX_VARIANTS + fallback_attempt, source_rect, target_length, min_self_distance) \
-			if room_shape == &"el" else _family_controls(&"conservative", family, seed, fallback_attempt, usable_rect, target_length, min_self_distance, fallback_pockets)
+		var fallback_profiles: Array = []
+		var fallback_minimum := minf(minimum_length, target_length * 0.72) if tier == &"standard" else minimum_length
+		var generation_rect := usable_rect
+		var use_el_safe := room_shape == &"el"
+		if use_el_safe and tier == &"compact":
+			generation_rect = _el_compact_bounds(room_polygon, seed, MAX_VARIANTS + fallback_attempt)
+			if generation_rect.size.x < 1.0:
+				generation_rect = usable_rect
+			use_el_safe = false
+		var controls := _el_safe_controls(family, seed, fallback_attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"])) \
+			if use_el_safe else _family_controls(&"conservative", family, seed, fallback_attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, fallback_pockets, fallback_profiles, decorate_enabled)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
 			room_polygon,
 			room_check_margin,
 			min_self_distance,
-			minf(minimum_length, target_length * 0.72)
+			fallback_minimum
 		)
 		last_reason = String(validation.get("reason", "unknown"))
 		if bool(validation["valid"]):
-			var centerline: PackedVector2Array = validation["centerline"]
-			var ordered_controls := _reorder_to_longest_straight(controls, centerline)
+			var ordered_controls := _reorder_to_longest_straight(controls)
 			var ordered_validation := _validate_controls(
 				ordered_controls,
 				source_rect,
 				room_polygon,
 				room_check_margin,
 				min_self_distance,
-				minf(minimum_length, target_length * 0.72)
+				fallback_minimum
 			)
 			if not bool(ordered_validation["valid"]):
 				last_reason = "post-order " + String(ordered_validation.get("reason", "unknown"))
 				continue
+			var motif := {"controls": ordered_controls, "motifs": [], "rejections": [], "length": float(ordered_validation["length"])}
+			if decorate_enabled:
+				motif = _apply_straight_motif(
+					ordered_controls, source_rect, room_polygon, room_check_margin,
+					min_self_distance, fallback_minimum, max_length, float(ordered_validation["length"])
+				)
+			var final_controls: PackedVector2Array = motif["controls"]
+			if float(motif["length"]) > max_length or float(motif["length"]) < fallback_minimum:
+				last_reason = "fallback outside requested length band"
+				continue
+			if tier == &"standard" and not _room_aspect_ok(final_controls, room_shape):
+				last_reason = "room aspect tipped by profile/motif"
+				continue
 			return {
-				"points": ordered_controls,
+				"points": final_controls,
 				"seed": seed,
 				"family": family,
-				"length": float(ordered_validation["length"]),
+				"length": float(motif["length"]),
 				"target_length": target_length,
+				"length_tier": tier,
+				"length_profile": String(profile["id"]),
 				"attempt": MAX_VARIANTS + fallback_attempt,
 				"fallback": true,
-				"pockets": fallback_pockets,
-				"realization": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
-				"route_recipe": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
-				"route_program": &"el_safe" if room_shape == &"el" else &"technical_perimeter",
-				"route_sequence": normalized_route_sequence(ordered_controls),
+				"pockets": _detect_pockets(final_controls),
+				"realization": &"el_safe" if room_shape == &"el" and tier != &"compact" else &"technical_perimeter",
+				"route_recipe": &"el_safe" if room_shape == &"el" and tier != &"compact" else &"technical_perimeter",
+				"route_program": &"el_safe" if room_shape == &"el" and tier != &"compact" else &"technical_perimeter",
+				"route_sequence": normalized_route_sequence(final_controls),
+				"corner_profiles": _merge_profile_counts(fallback_profiles),
+				"motifs": motif["motifs"],
+				"motif_rejections": motif["rejections"],
 				"fallback_reason": family_reason,
 			}
 	var empty := _empty_result(seed, family)
@@ -286,17 +364,52 @@ static func _family_controls(
 	attempt: int,
 	usable_rect: Rect2,
 	target_length: float,
+	max_length: float,
 	min_self_distance: float,
-	pockets: Array = []
+	fit_floor: float = 0.78,
+	pockets: Array = [],
+	profile_summary: Array = [],
+	profiles_enabled: bool = true
 ) -> PackedVector2Array:
 	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length)
-	var program := str(definition.get("program", ""))
-	if program == "serpentine":
-		return _serpentine_controls(seed, attempt, usable_rect, target_length, min_self_distance)
-	if program == "wedge" or program == "diagonal":
-		return _triangle_controls(seed, attempt, usable_rect, target_length)
-	if program == "perimeter":
-		return _hairpin_controls(seed, attempt, usable_rect, target_length)
+	if template_family != &"conservative":
+		var tall := usable_rect.size.y > usable_rect.size.x
+		var size := Vector2(usable_rect.size.y, usable_rect.size.x) if tall else usable_rect.size
+		var bias := clampf(inverse_lerp(8500.0, 9600.0, target_length), 0.0, 1.0)
+		var rhythm_seed := _hash32(seed ^ (attempt * RHYTHM_SALT))
+		definition = ROUTE_GRAMMAR.construct(_route_index(seed, attempt), rhythm_seed, bias, Rect2(-size * 0.5, size))
+		var vertices: PackedVector2Array = definition["anchors"]
+		for i in vertices.size():
+			vertices[i] = usable_rect.get_center() + (vertices[i].rotated(PI * 0.5) if tall else vertices[i])
+		var rounded := _round_controls(vertices, definition["radii"], rhythm_seed if profiles_enabled else -1)
+		var controls: PackedVector2Array = rounded["controls"]
+		if controls.is_empty():
+			return controls
+		var full_line := _sample_centerline(controls)
+		var clearance := _minimum_branch_distance(full_line, min_self_distance)
+		# The standard tier keeps its 0.78 aesthetic floor; large/compact tiers fit
+		# from the physical branch-gap and corner-radius constraints only, so a
+		# wide full perimeter can shrink into its band instead of being clamped.
+		var minimum_scale := maxf(fit_floor, min_self_distance / maxf(clearance, 1.0)) if clearance < INF else fit_floor
+		for i in vertices.size():
+			var previous := vertices[posmod(i - 1, vertices.size())]
+			var next := vertices[(i + 1) % vertices.size()]
+			var half_turn := absf(previous.direction_to(vertices[i]).angle_to(vertices[i].direction_to(next))) * 0.5
+			var available := minf(previous.distance_to(vertices[i]), vertices[i].distance_to(next)) * 0.48
+			minimum_scale = maxf(minimum_scale, (ROUTE_GRAMMAR.CORNER_RADIUS + 1.0) * tan(half_turn) / available)
+		if minimum_scale > 1.0:
+			return PackedVector2Array()
+		var scale := clampf(target_length / maxf(_polyline_length(full_line), 1.0), minimum_scale, 1.0)
+		if scale < 0.999:
+			for i in vertices.size():
+				vertices[i] = usable_rect.get_center() + (vertices[i] - usable_rect.get_center()) * scale
+			rounded = _round_controls(vertices, definition["radii"], rhythm_seed if profiles_enabled else -1)
+			controls = rounded["controls"]
+		if _polyline_length(_sample_centerline(controls)) > max_length:
+			return PackedVector2Array()
+		pockets.append_array(_detect_pockets(vertices))
+		profile_summary.append(rounded["profiles"])
+		return controls
 	var anchors := _technical_perimeter_template() if template_family == &"conservative" else (definition.get("anchors", PackedVector2Array()) as PackedVector2Array)
 	if anchors.is_empty():
 		return PackedVector2Array()
@@ -325,7 +438,6 @@ static func _family_controls(
 	var mapped_vertices := _map_to_rect(anchors, usable_rect)
 	if mapped_vertices.is_empty():
 		return PackedVector2Array()
-	pockets.append_array(_detect_pockets(mapped_vertices))
 	# Per-corner fillet radii: base +24 margin plus 0..40 roll gives tight hairpins (near 147-171)
 	# next to big sweepers on same route; tangent clamp still self-limits on short edges.
 	var radii := _per_corner_fillet_radii(seed, attempt, mapped_vertices.size())
@@ -352,7 +464,26 @@ static func _family_controls(
 	)
 	for index in mapped_vertices.size():
 		mapped_vertices[index] = center + (mapped_vertices[index] - center) * length_scale + offset
+	pockets.append_array(_detect_pockets(mapped_vertices))
 	return _filleted_controls(mapped_vertices, radii)
+
+
+## Round grammar vertices with seeded two-arc profiles, falling back to plain
+## circular fillets when the profiles perturb the loop into self-intersection or
+## a folded corridor. Profiles are therefore compositional: they never invalidate
+## a route that the circular baseline would accept.
+static func _round_controls(vertices: PackedVector2Array, radii: PackedFloat32Array, rhythm_seed: int) -> Dictionary:
+	var rounded := ROUTE_GRAMMAR.round_corners_profiled(vertices, radii, rhythm_seed)
+	if (rounded["controls"] as PackedVector2Array).is_empty():
+		return rounded
+	if not _profile_geometry_safe(rounded["controls"]):
+		return ROUTE_GRAMMAR.round_corners_profiled(vertices, radii, -1)
+	return rounded
+
+
+static func _profile_geometry_safe(controls: PackedVector2Array) -> bool:
+	var centerline := _sample_centerline(controls)
+	return not _has_self_intersection(centerline)
 
 
 static func _filleted_controls(vertices: PackedVector2Array, desired_radii: Variant) -> PackedVector2Array:
@@ -418,12 +549,7 @@ static func _per_corner_fillet_radii(seed: int, attempt: int, vertex_count: int)
 
 
 static func _route_index(seed: int, attempt: int) -> int:
-	var slot := posmod(_hash32(seed ^ ROUTE_SALT), 8)
-	if slot < 4:
-		return posmod(3 + attempt, ROUTE_GRAMMAR.count())
-	if slot < 6:
-		return posmod(attempt, ROUTE_GRAMMAR.count())
-	return posmod(2 + attempt, ROUTE_GRAMMAR.count())
+	return posmod(_hash32(seed ^ ROUTE_SALT) + attempt, ROUTE_GRAMMAR.count())
 
 
 static func _route_name(seed: int, attempt: int, target_length: float) -> StringName:
@@ -464,269 +590,58 @@ static func _smooth_controls(points: PackedVector2Array, passes: int) -> PackedV
 	return result
 
 
-static func _serpentine_controls(
-	seed: int,
-	attempt: int,
-	usable_rect: Rect2,
-	target_length: float,
-	_min_self_distance: float
-) -> PackedVector2Array:
-	# World-space S: two long collinear crossings (the literal straights) joined
-	# by 90-degree arcs of generous radius. The raised island fills the hole, so
-	# a cut across the middle is solid — no shortcut rule is weakened.
-	var long_axis := usable_rect.size.x >= usable_rect.size.y
-	var room_w := usable_rect.size.x if long_axis else usable_rect.size.y
-	var room_h := usable_rect.size.y if long_axis else usable_rect.size.x
-	if room_w < 1050.0 or room_h < 660.0:
-		return PackedVector2Array()
-	# Seed-rolled S proportions: the two arc tips must stay min_self_distance
-	# apart, which bounds the arc radius against the crossing depth. The spread
-	# is wide enough to cross a fingerprint bucket so serpentines stay distinct.
-	var crossing_out := room_h * 0.5 - lerpf(8.0, 27.0, _hash_unit(seed, ROUTE_SALT + 0x51 + attempt * 31))
-	var arc_radius := clampf(crossing_out - 160.0, 147.0, 169.0)
-	var side_u := room_w * 0.5 - arc_radius
-	var crossing_half := side_u - arc_radius
-	if crossing_half < MIN_SETUP_DISTANCE * 0.5:
-		return PackedVector2Array()
-	var dip_fraction := lerpf(0.55, 0.70, _hash_unit(seed, ROUTE_SALT + 0x52 + attempt * 31))
-	var dip_angle := lerpf(0.32, 0.46, _hash_unit(seed, ROUTE_SALT + 0x53 + attempt * 31))
-	var dip_leg := lerpf(90.0, 120.0, _hash_unit(seed, ROUTE_SALT + 0x54 + attempt * 31))
-	var points := PackedVector2Array()
-	# Traversal: up the right side, left across the top, down the left side,
-	# right across the bottom. Clockwise in screen space. Arc loops start at
-	# step 1 so they never duplicate the tangent point the straight ends on.
-	var side_bottom := crossing_out - arc_radius
-	var side_top := -crossing_out + arc_radius
-	var subdivisions := maxi(8, ceili((side_bottom - side_top) / 30.0))
-	for step in range(subdivisions + 1):
-		var fraction := float(step) / float(subdivisions)
-		points.append(_serpentine_frame(Vector2(side_u, lerpf(side_bottom, side_top, fraction)), long_axis, usable_rect))
-	# Top-right arc.
-	var arc_steps := maxi(9, ceili(arc_radius * PI * 0.5 / 30.0))
-	for a in range(1, arc_steps):
-		var angle := -PI * 0.5 * float(a) / float(arc_steps)
-		var local := Vector2(side_u - arc_radius, -crossing_out + arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
-		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	# Top crossing (left) with an interior dip after the leading straight: the
-	# down-kink and up-kink are opposite turns so the S mixes hands, while the
-	# leading straight keeps the literal-straight window.
-	var crossing_left := -crossing_half
-	var crossing_right := crossing_half
-	var crossing_span := crossing_right - crossing_left
-	var dip_start_u := crossing_right - crossing_span * dip_fraction
-	var dip_dir := Vector2(-cos(dip_angle), sin(dip_angle))
-	var dip_up := Vector2(-cos(dip_angle), -sin(dip_angle))
-	var straight_before := maxi(4, ceili((crossing_right - dip_start_u) / 30.0))
-	for step in range(1, straight_before):
-		points.append(_serpentine_frame(Vector2(lerpf(crossing_right, dip_start_u, float(step) / float(straight_before)), -crossing_out), long_axis, usable_rect))
-	var dip_mid := Vector2(dip_start_u, -crossing_out) + dip_dir * dip_leg
-	var dip_end := dip_mid + dip_up * dip_leg
-	for step in [1, 2]:
-		points.append(_serpentine_frame(Vector2(dip_start_u, -crossing_out) + dip_dir * dip_leg * float(step) / 2.0, long_axis, usable_rect))
-	for step in [1, 2]:
-		points.append(_serpentine_frame(dip_mid + dip_up * dip_leg * float(step) / 2.0, long_axis, usable_rect))
-	var straight_after := maxi(2, ceili((dip_end.x - crossing_left) / 30.0))
-	for step in range(1, straight_after):
-		points.append(_serpentine_frame(Vector2(lerpf(dip_end.x, crossing_left, float(step) / float(straight_after)), -crossing_out), long_axis, usable_rect))
-	# Top-left arc.
-	for a in range(1, arc_steps):
-		var angle := -PI * 0.5 + -PI * 0.5 * float(a) / float(arc_steps)
-		var local := Vector2(-side_u + arc_radius, -crossing_out + arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
-		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	# Left side (down).
-	for step in range(1, subdivisions + 1):
-		var fraction := float(step) / float(subdivisions)
-		points.append(_serpentine_frame(Vector2(-side_u, lerpf(side_top, side_bottom, fraction)), long_axis, usable_rect))
-	# Bottom-left arc.
-	for a in range(1, arc_steps):
-		var angle := -PI + -PI * 0.5 * float(a) / float(arc_steps)
-		var local := Vector2(-side_u + arc_radius, crossing_out - arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
-		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	# Bottom crossing (right), pure straight — the second literal straight.
-	var bottom_steps := maxi(16, ceili((crossing_right - crossing_left) / 30.0))
-	for step in range(1, bottom_steps):
-		points.append(_serpentine_frame(Vector2(lerpf(crossing_left, crossing_right, float(step) / float(bottom_steps)), crossing_out), long_axis, usable_rect))
-	# Bottom-right arc (stops short of the right-side tangent point so the
-	# closing segment stays smooth instead of duplicating it).
-	for a in range(1, arc_steps - 1):
-		var angle := -PI * 1.5 + -PI * 0.5 * float(a) / float(arc_steps)
-		var local := Vector2(side_u - arc_radius, crossing_out - arc_radius) + Vector2(cos(angle), sin(angle)) * arc_radius
-		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	if points.size() < 16:
-		return PackedVector2Array()
-	# Small deterministic translation so two serpentine variants never overlap
-	# exactly even with identical rolls, plus a slight tilt so the crossings sit
-	# off-axis like the rest of the grammar.
-	var jitter := Vector2(
-		(_hash_unit(seed, ROUTE_SALT + 0x6D + attempt * 7) - 0.5) * 18.0,
-		(_hash_unit(seed, ROUTE_SALT + 0x6E + attempt * 7) - 0.5) * 18.0
+static func _el_step_corner(polygon: PackedVector2Array) -> Vector2:
+	# The EL L has exactly one reflex (concave) vertex: the inner step corner.
+	var winding := 1.0 if _polygon_area(polygon) > 0.0 else -1.0
+	for i in polygon.size():
+		var previous := polygon[posmod(i - 1, polygon.size())]
+		var current := polygon[i]
+		var next := polygon[(i + 1) % polygon.size()]
+		if (current - previous).cross(next - current) * winding < 0.0:
+			return current
+	return Vector2.ZERO
+
+
+static func _el_compact_bounds(room_polygon: PackedVector2Array, seed: int, attempt: int) -> Rect2:
+	# Compact EL occupies one safe axis-aligned arm of the L instead of the whole
+	# perimeter. The L has two arms: a bottom/wide arm (full width, below the
+	# step) and a left/tall arm (full height, left of the step). Prefer the tall
+	# arm — it is deep enough for a 4-6k dogleg/U to keep a real infield pocket,
+	# whereas the wide arm is too shallow for some programs and collapses them
+	# into the oval technical perimeter. Each arm is inset by the corridor
+	# clearance and capped to a compact size.
+	var bounds := _points_rect(room_polygon)
+	var step := _el_step_corner(room_polygon)
+	if step == Vector2.ZERO:
+		return bounds
+	var tall_arm := Rect2(bounds.position.x, bounds.position.y, step.x - bounds.position.x, bounds.size.y)
+	var wide_arm := Rect2(bounds.position.x, step.y, bounds.size.x, bounds.end.y - step.y)
+	var tall := _el_arm_compact_bounds(tall_arm, seed, attempt, 2000.0, 1400.0)
+	if tall.size.x >= 1.0:
+		return tall
+	return _el_arm_compact_bounds(
+		wide_arm, seed, attempt,
+		lerpf(1800.0, 2300.0, _hash_unit(seed, ROUTE_SALT + 0xE3 + attempt * 7)),
+		lerpf(900.0, 1300.0, _hash_unit(seed, ROUTE_SALT + 0xE5 + attempt * 7))
 	)
-	var tilt := lerpf(0.05, 0.09, _hash_unit(seed, ROUTE_SALT + 0x6F + attempt * 7))
-	if _hash_unit(seed, ROUTE_SALT + 0x70 + attempt * 7) < 0.5:
-		tilt = -tilt
-	var pivot := usable_rect.get_center()
-	for index in points.size():
-		points[index] = pivot + (points[index] - pivot).rotated(tilt) + jitter
-	var full_length := _polyline_length(_sample_centerline(points))
-	if full_length < 1.0:
-		return PackedVector2Array()
-	var length_scale := clampf(target_length / full_length, 0.62, 1.02)
-	if length_scale < 0.999:
-		var center := usable_rect.get_center()
-		for index in points.size():
-			points[index] = center + (points[index] - center) * length_scale
-	# Rotate the cyclic order so the reorder-to-longest-straight tie-break lands
-	# on a different seam per seed: serpentine fingerprints stay distinct.
-	var rotation := posmod(_hash32(seed ^ (ROUTE_SALT + attempt * 0x5F1)), points.size())
-	var rotated := PackedVector2Array()
-	for index in points.size():
-		rotated.append(points[(rotation + index) % points.size()])
-	return rotated
 
 
-static func _serpentine_frame(local: Vector2, long_axis: bool, usable_rect: Rect2) -> Vector2:
-	var center := usable_rect.get_center()
-	if long_axis:
-		return center + local
-	return center + Vector2(-local.y, local.x)
-
-
-static func _hairpin_controls(
-	seed: int,
-	attempt: int,
-	usable_rect: Rect2,
-	target_length: float
-) -> PackedVector2Array:
-	# Out-and-back capsule along one long edge. The rest of the table stays
-	# empty, so the silhouette is a sausage, not a room-filling oval.
-	var long_axis := usable_rect.size.x >= usable_rect.size.y
-	var room_w := usable_rect.size.x if long_axis else usable_rect.size.y
-	var room_h := usable_rect.size.y if long_axis else usable_rect.size.x
-	if room_w < 1100.0 or room_h < 520.0:
-		return PackedVector2Array()
-	var gap := lerpf(330.0, 400.0, _hash_unit(seed, ROUTE_SALT + 0x81 + attempt * 31))
-	var radius := gap * 0.5
-	var inset := radius + 10.0
-	var u_left := -room_w * 0.5 + inset
-	var u_right := room_w * 0.5 - inset
-	if u_right - u_left < MIN_SETUP_DISTANCE * 2.0:
-		return PackedVector2Array()
-	var side := 1.0 if _hash_unit(seed, ROUTE_SALT + 0x82 + attempt * 31) < 0.5 else -1.0
-	var v_outer := side * (room_h * 0.5 - 20.0)
-	var v_inner := v_outer - side * gap
-	var points := PackedVector2Array()
-	var straight := maxi(16, ceili((u_right - u_left) / 30.0))
-	for step in range(straight + 1):
-		var u := lerpf(u_left, u_right, float(step) / float(straight))
-		points.append(_serpentine_frame(Vector2(u, v_outer), long_axis, usable_rect))
-	var arc_steps := maxi(8, ceili(radius * PI / 30.0))
-	var right_center := Vector2(u_right, (v_outer + v_inner) * 0.5)
-	for a in range(1, arc_steps):
-		var angle := side * PI * 0.5 - side * PI * float(a) / float(arc_steps)
-		var local := right_center + Vector2(cos(angle), sin(angle)) * radius
-		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	var empty := -side
-	for step in range(1, straight):
-		var t := float(step) / float(straight)
-		var u := lerpf(u_right, u_left, t)
-		var v := v_inner
-		if t > 0.28 and t < 0.62:
-			v += empty * 70.0 * sin((t - 0.28) / 0.34 * PI)
-		points.append(_serpentine_frame(Vector2(u, v), long_axis, usable_rect))
-	var left_center := Vector2(u_left, (v_outer + v_inner) * 0.5)
-	for a in range(1, arc_steps - 1):
-		var angle := -side * PI * 0.5 - side * PI * float(a) / float(arc_steps)
-		var local := left_center + Vector2(cos(angle), sin(angle)) * radius
-		points.append(_serpentine_frame(local, long_axis, usable_rect))
-	return _finish_world_route(points, seed, attempt, usable_rect, target_length, false)
-
-
-static func _triangle_controls(
-	seed: int,
-	attempt: int,
-	usable_rect: Rect2,
-	target_length: float
-) -> PackedVector2Array:
-	# Three long sides with drive-radius corners. The outer hull is a triangle,
-	# so it cannot read as a rounded rectangle even after filleting.
-	var long_axis := usable_rect.size.x >= usable_rect.size.y
-	var room_w := usable_rect.size.x if long_axis else usable_rect.size.y
-	var room_h := usable_rect.size.y if long_axis else usable_rect.size.x
-	if room_w < 1100.0 or room_h < 620.0:
-		return PackedVector2Array()
-	var radius := 160.0
-	var inset := radius + 12.0
-	var base_left := Vector2(-room_w * 0.5 + inset, room_h * 0.5 - inset)
-	var base_right := Vector2(room_w * 0.5 - inset, room_h * 0.5 - inset)
-	var apex := Vector2(
-		lerpf(-room_w * 0.22, room_w * 0.22, _hash_unit(seed, ROUTE_SALT + 0x91 + attempt * 31)),
-		-room_h * 0.5 + inset
+static func _el_arm_compact_bounds(arm: Rect2, seed: int, attempt: int, cap_w: float, cap_h: float) -> Rect2:
+	arm = arm.grow(-CORRIDOR_CLEARANCE)
+	if arm.size.x < HALF_WIDTH * 2.0 or arm.size.y < HALF_WIDTH * 2.0:
+		return Rect2()
+	cap_w = minf(arm.size.x, cap_w)
+	cap_h = minf(arm.size.y, cap_h)
+	# Deterministic placement inside the arm so different seeds use different
+	# bounded candidate positions without leaving the room polygon.
+	var slack_x := arm.size.x - cap_w
+	var slack_y := arm.size.y - cap_h
+	var offset := Vector2(
+		(_hash_unit(seed, ROUTE_SALT + 0xE7 + attempt * 7) - 0.5) * slack_x,
+		(_hash_unit(seed, ROUTE_SALT + 0xE9 + attempt * 7) - 0.5) * slack_y
 	)
-	if _hash_unit(seed, ROUTE_SALT + 0x92 + attempt * 31) < 0.5:
-		base_left.y *= -1.0
-		base_right.y *= -1.0
-		apex.y *= -1.0
-	var vertices := PackedVector2Array([base_left, base_right, apex])
-	var longest := 0
-	var longest_len := 0.0
-	for index in 3:
-		var length := vertices[index].distance_to(vertices[(index + 1) % 3])
-		if length > longest_len:
-			longest_len = length
-			longest = index
-	var from := vertices[longest]
-	var to := vertices[(longest + 1) % 3]
-	var inward := ((vertices[(longest + 2) % 3] - from.lerp(to, 0.5))).normalized()
-	var kink := PackedVector2Array([
-		from.lerp(to, 0.38) + inward * 80.0,
-		from.lerp(to, 0.50) + inward * 120.0,
-		from.lerp(to, 0.62) + inward * 80.0,
-	])
-	var world := PackedVector2Array()
-	for index in 3:
-		world.append(_serpentine_frame(vertices[index], long_axis, usable_rect))
-		if index == longest:
-			for kink_point: Vector2 in kink:
-				world.append(_serpentine_frame(kink_point, long_axis, usable_rect))
-	var controls := _filleted_controls(world, radius)
-	return _finish_world_route(controls, seed, attempt, usable_rect, target_length)
-
-
-static func _finish_world_route(
-	points: PackedVector2Array,
-	seed: int,
-	attempt: int,
-	usable_rect: Rect2,
-	target_length: float,
-	apply_tilt: bool = true
-) -> PackedVector2Array:
-	if points.size() < 16:
-		return PackedVector2Array()
-	var jitter := Vector2(
-		(_hash_unit(seed, ROUTE_SALT + 0x6D + attempt * 7) - 0.5) * 10.0,
-		(_hash_unit(seed, ROUTE_SALT + 0x6E + attempt * 7) - 0.5) * 10.0
-	)
-	var pivot := usable_rect.get_center()
-	for index in points.size():
-		points[index] = points[index] + jitter
-	if apply_tilt:
-		var tilt := lerpf(0.14, 0.22, _hash_unit(seed, ROUTE_SALT + 0x6F + attempt * 7))
-		if _hash_unit(seed, ROUTE_SALT + 0x70 + attempt * 7) < 0.5:
-			tilt = -tilt
-		var fit := 0.90
-		for index in points.size():
-			points[index] = pivot + (points[index] - pivot) * fit
-		for index in points.size():
-			points[index] = pivot + (points[index] - pivot).rotated(tilt)
-	var full_length := _polyline_length(_sample_centerline(points))
-	if full_length < 1.0:
-		return PackedVector2Array()
-	var length_scale := clampf(target_length / full_length, 0.62, 1.02)
-	if length_scale < 0.999:
-		var center := usable_rect.get_center()
-		for index in points.size():
-			points[index] = center + (points[index] - center) * length_scale
-	return points
+	var position := arm.position + (arm.size - Vector2(cap_w, cap_h)) * 0.5 + offset
+	return Rect2(position, Vector2(cap_w, cap_h))
 
 
 static func _el_controls(
@@ -735,10 +650,85 @@ static func _el_controls(
 	attempt: int,
 	source_rect: Rect2,
 	target_length: float,
-	min_self_distance: float
+	min_self_distance: float,
+	room_scale: float
 ) -> PackedVector2Array:
-	# This route follows the eroded L footprint instead of pretending the room is
-	# its left rectangle. The rounded elbow stays clear of the concave corner.
+	# Seeded L footprint. The elbow (notch) position is parameterized per seed so
+	# the L shape genuinely varies (deep vs shallow notch) under a normalized shape
+	# comparison; the long edges keep only a small jitter so the 2-straight gate
+	# holds under arc-length-uniform sampling.
+	var elbow_x := lerpf(-0.20, 0.26, _hash_unit(seed, ROUTE_SALT + 0xC1 + attempt * 7))
+	var elbow_y := lerpf(-0.20, 0.16, _hash_unit(seed, ROUTE_SALT + 0xC3 + attempt * 7))
+	var anchors := PackedVector2Array([
+		Vector2(-0.84, -0.35), Vector2(-0.84, -0.58), Vector2(-0.74, -0.72),
+		Vector2(-0.50, -0.76), Vector2(-0.20, -0.76),
+		Vector2(elbow_x - 0.12, -0.70),
+		Vector2(elbow_x, -0.55),
+		Vector2(elbow_x, -0.30),
+		Vector2(elbow_x - 0.02, -0.12),
+		Vector2(elbow_x - 0.06, elbow_y),
+		Vector2(0.28, 0.16), Vector2(0.48, 0.24),
+		Vector2(0.70, 0.28), Vector2(0.84, 0.38), Vector2(0.84, 0.58),
+		Vector2(0.72, 0.70), Vector2(0.45, 0.76), Vector2(0.10, 0.76),
+		Vector2(-0.30, 0.76), Vector2(-0.65, 0.72), Vector2(-0.82, 0.60),
+		Vector2(-0.86, 0.35), Vector2(-0.86, 0.05), Vector2(-0.86, -0.20),
+	])
+	var jittered := PackedVector2Array()
+	# Per-seed aspect variation changes the L's proportions (a genuine normalized
+	# shape feature), so seeded EL routes are distinct beyond just elbow depth.
+	var x_stretch := lerpf(0.88, 1.12, _hash_unit(seed, ROUTE_SALT + 0xC5 + attempt * 7))
+	var y_stretch := 2.0 - x_stretch
+	for i in anchors.size():
+		# The elbow (indices 5..9) is already parameterized; keep its jitter small
+		# so the smoothing below does not erase the seeded notch depth.
+		var magnitude := 0.02 if i < 5 or i > 9 else 0.04
+		var jx := (_hash_unit(seed, ROUTE_SALT + 0xA1 + i * 5 + attempt * 7) - 0.5) * magnitude
+		var jy := (_hash_unit(seed, ROUTE_SALT + 0xB3 + i * 5 + attempt * 7) - 0.5) * magnitude
+		jittered.append(anchors[i] * Vector2(x_stretch, y_stretch) + Vector2(jx, jy))
+	# Round only the concave elbow (indices 5..9) so the road curves around the
+	# notch and a straight chord cannot cut it, while the long edges stay literal.
+	for _pass in 2:
+		var elbow := PackedVector2Array()
+		for i in range(5, 10):
+			var prev := jittered[(i - 1 + jittered.size()) % jittered.size()]
+			var cur := jittered[i]
+			var next := jittered[(i + 1) % jittered.size()]
+			elbow.append(prev * 0.25 + cur * 0.5 + next * 0.25)
+		for k in range(5, 10):
+			jittered[k] = elbow[k - 5]
+	var mapped := PackedVector2Array()
+	for point: Vector2 in jittered:
+		mapped.append(source_rect.get_center() + point * source_rect.size * 0.5)
+	var full_length := _polyline_length(_sample_centerline(mapped))
+	if full_length < 1.0:
+		return PackedVector2Array()
+	# The L footprint's shortest edge needs ~94% of its standard-room extent to
+	# keep two literal straights; scaled rooms (large tiers) can shrink further.
+	var minimum_scale := 0.94 / maxf(room_scale, 0.001)
+	var full_clearance := _minimum_branch_distance(_sample_centerline(mapped), min_self_distance)
+	if full_clearance < INF:
+		minimum_scale = maxf(minimum_scale, minf(1.0, min_self_distance / maxf(full_clearance, 1.0)))
+	var retry_ceiling := maxf(minimum_scale, 1.0 - float(mini(attempt, MAX_VARIANTS - 1)) * 0.006)
+	var length_scale := clampf(target_length / full_length, minimum_scale, retry_ceiling)
+	var center := source_rect.get_center()
+	for index in mapped.size():
+		mapped[index] = center + (mapped[index] - center) * length_scale
+	return mapped
+
+
+static func _el_safe_controls(
+	family: StringName,
+	seed: int,
+	attempt: int,
+	source_rect: Rect2,
+	target_length: float,
+	min_self_distance: float,
+	room_scale: float
+) -> PackedVector2Array:
+	# Legacy fixed L footprint: the rare failure fallback when the seeded EL route
+	# cannot honor the room polygon or the length budget. Always reported as
+	# `el_safe` / fallback=true, never presented as new seed variation. Raw
+	# anchors (no smoothing) keep the long edges literal under arc-length sampling.
 	var anchors := PackedVector2Array([
 		Vector2(-0.84, -0.35), Vector2(-0.84, -0.58), Vector2(-0.74, -0.72),
 		Vector2(-0.50, -0.76), Vector2(-0.20, -0.76), Vector2(0.02, -0.70),
@@ -749,14 +739,13 @@ static func _el_controls(
 		Vector2(-0.30, 0.76), Vector2(-0.65, 0.72), Vector2(-0.82, 0.60),
 		Vector2(-0.86, 0.35), Vector2(-0.86, 0.05), Vector2(-0.86, -0.20),
 	])
-	var normalized := _smooth_controls(anchors, 2)
 	var mapped := PackedVector2Array()
-	for point: Vector2 in normalized:
+	for point: Vector2 in anchors:
 		mapped.append(source_rect.get_center() + point * source_rect.size * 0.5)
 	var full_length := _polyline_length(_sample_centerline(mapped))
 	if full_length < 1.0:
 		return PackedVector2Array()
-	var minimum_scale := 0.94
+	var minimum_scale := 0.94 / maxf(room_scale, 0.001)
 	var full_clearance := _minimum_branch_distance(_sample_centerline(mapped), min_self_distance)
 	if full_clearance < INF:
 		minimum_scale = maxf(minimum_scale, minf(1.0, min_self_distance / maxf(full_clearance, 1.0)))
@@ -838,18 +827,34 @@ static func _detect_pockets(mapped_vertices: PackedVector2Array) -> Array:
 	var count := mapped_vertices.size()
 	if count < 5:
 		return pockets
-	var orientation_sum := 0.0
+	var positive_winding := _polygon_area(mapped_vertices) > 0.0
+	# Straight samples are neutral, not convex separators. Otherwise resampling
+	# a bay splits its two concave corners and makes the whole bay disappear.
+	var corners := PackedVector2Array()
+	var first_convex := -1
 	for index in count:
-		orientation_sum += (mapped_vertices[index] - mapped_vertices[(index - 1 + count) % count]).cross(mapped_vertices[(index + 1) % count] - mapped_vertices[index])
-	var clockwise := orientation_sum > 0.0
+		var incoming := mapped_vertices[posmod(index - 1, count)].direction_to(mapped_vertices[index])
+		var outgoing := mapped_vertices[index].direction_to(mapped_vertices[(index + 1) % count])
+		var angle := incoming.angle_to(outgoing)
+		if absf(angle) <= 0.001:
+			continue
+		if first_convex < 0 and (angle > 0.0) == positive_winding:
+			first_convex = corners.size()
+		corners.append(mapped_vertices[index])
+	if corners.size() < 5 or first_convex < 0:
+		return pockets
+	mapped_vertices = PackedVector2Array()
+	for index in corners.size():
+		mapped_vertices.append(corners[(first_convex + index) % corners.size()])
+	count = mapped_vertices.size()
 	var in_run := false
 	var run_start := 0
 	for i in count + 1:
 		var index := i % count
 		var prev := mapped_vertices[(index - 1 + count) % count]
 		var next := mapped_vertices[(index + 1) % count]
-		var turn := (mapped_vertices[index] - prev).cross(next - mapped_vertices[index])
-		var concave := (turn > 0.0) != clockwise
+		var turn := prev.direction_to(mapped_vertices[index]).angle_to(mapped_vertices[index].direction_to(next))
+		var concave := absf(turn) > 0.001 and (turn > 0.0) != positive_winding
 		if concave and not in_run:
 			in_run = true
 			run_start = index
@@ -862,11 +867,14 @@ static func _detect_pockets(mapped_vertices: PackedVector2Array) -> Array:
 			if chord.length_squared() < 1600.0:
 				continue
 			var max_depth := 0.0
+			var deepest_point := chord_from
 			var cursor := run_start
 			while true:
 				var point := mapped_vertices[cursor]
 				var depth: float = absf(chord.cross(point - chord_from)) / chord.length()
-				max_depth = maxf(max_depth, depth)
+				if depth > max_depth:
+					max_depth = depth
+					deepest_point = point
 				if cursor == run_end:
 					break
 				cursor = (cursor + 1) % count
@@ -875,12 +883,21 @@ static func _detect_pockets(mapped_vertices: PackedVector2Array) -> Array:
 			var chord_mid := chord_from.lerp(chord_to, 0.5)
 			if Geometry2D.is_point_in_polygon(chord_mid, mapped_vertices):
 				continue
-			var side := mapped_vertices[run_start] - chord_mid
+			var side := deepest_point - chord_mid
 			var along := chord / chord.length()
 			side -= along * side.dot(along)
 			if side.length_squared() > 1.0:
 				side = side.normalized()
-			pockets.append({"from": chord_from, "to": chord_to, "side": side, "depth": max_depth})
+			var polygon := PackedVector2Array([chord_from - side * 200.0, chord_from])
+			cursor = run_start
+			while true:
+				polygon.append(mapped_vertices[cursor])
+				if cursor == run_end:
+					break
+				cursor = (cursor + 1) % count
+			polygon.append(chord_to)
+			polygon.append(chord_to - side * 200.0)
+			pockets.append({"from": chord_from, "to": chord_to, "side": side, "depth": max_depth, "deepest": deepest_point, "polygon": polygon})
 	return pockets
 
 
@@ -900,7 +917,10 @@ static func _corridor_boundary_loops(centerline: PackedVector2Array) -> Dictiona
 		var resolved: Array[PackedVector2Array] = Geometry2D.intersect_polygons(contour, contour)
 		var pieces: Array[PackedVector2Array] = resolved if not resolved.is_empty() else [contour]
 		for piece: PackedVector2Array in pieces:
-			var cleaned := _deduplicate_loop(piece)
+			# The round-join offset densifies the contour with near-collinear
+			# points that read as self-intersections on long loops; simplify with
+			# the same error-bounded pass the builder uses before rejecting.
+			var cleaned := GEOMETRY.simplify_loop(_deduplicate_loop(piece), 0.05)
 			if cleaned.size() < 3 or _has_self_intersection(cleaned) or not _boundary_loop_hugs_centerline(cleaned, centerline):
 				continue
 			var area := absf(_polygon_area(cleaned))
@@ -1101,29 +1121,7 @@ static func _points_rect(points: PackedVector2Array) -> Rect2:
 
 
 static func _sample_centerline(controls: PackedVector2Array) -> PackedVector2Array:
-	var points := PackedVector2Array()
-	if controls.size() < 4:
-		return points
-	for index in SAMPLE_COUNT:
-		points.append(_catmull_rom_closed(controls, float(index) / float(SAMPLE_COUNT)))
-	return points
-
-
-static func _catmull_rom_closed(points: PackedVector2Array, t: float) -> Vector2:
-	var count := points.size()
-	var scaled := t * float(count)
-	var index := int(floor(scaled))
-	var local := scaled - float(index)
-	var p0: Vector2 = points[posmod(index - 1, count)]
-	var p1: Vector2 = points[posmod(index, count)]
-	var p2: Vector2 = points[posmod(index + 1, count)]
-	var p3: Vector2 = points[posmod(index + 2, count)]
-	return 0.5 * (
-		(2.0 * p1)
-		+ (-p0 + p2) * local
-		+ (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * local * local
-		+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * local * local * local
-	)
+	return CURVE_SAMPLING.sample(controls)
 
 
 static func _polyline_length(points: PackedVector2Array) -> float:
@@ -1167,22 +1165,42 @@ static func _has_self_intersection(points: PackedVector2Array) -> bool:
 	return false
 
 
-static func _reorder_to_longest_straight(controls: PackedVector2Array, centerline: PackedVector2Array) -> PackedVector2Array:
+static func _reorder_to_longest_straight(controls: PackedVector2Array) -> PackedVector2Array:
 	var count := controls.size()
-	var span := 28
+	var centerline := _sample_centerline(controls)
+	if centerline.size() < 8:
+		return controls
+	# Map each control to its centerline sample by nearest point (monotonic walk)
+	# rather than a control-count ratio. Arc-length-uniform samples from the
+	# shared sampler are not aligned with control indices, so the ratio mapping
+	# mis-locates a control's sample; nearest-sample is correct for both the
+	# legacy 260-point stream and the variable-count shared sampler.
+	var span := maxi(4, int(round(float(centerline.size()) * 28.0 / 260.0)))
+	var sample_count := centerline.size()
 	var best_control := 0
 	var best_straight := -1.0
+	var cursor := 0
 	for index in count:
-		var sample_index := int(round(float(index) * float(SAMPLE_COUNT) / float(count))) % centerline.size()
-		var ahead := centerline[(sample_index + span) % centerline.size()]
-		var behind := centerline[(sample_index + centerline.size() - span) % centerline.size()]
+		var point := controls[index]
+		var best_dist := point.distance_squared_to(centerline[cursor])
+		while true:
+			var next_cursor := (cursor + 1) % sample_count
+			var dist := point.distance_squared_to(centerline[next_cursor])
+			if dist < best_dist:
+				cursor = next_cursor
+				best_dist = dist
+			else:
+				break
+		var sample_index := cursor
+		var ahead := centerline[(sample_index + span) % sample_count]
+		var behind := centerline[(sample_index + sample_count - span) % sample_count]
 		var chord := behind.distance_to(ahead)
 		if chord < 380.0:
 			continue
 		var path := 0.0
 		for offset in range(1, span * 2 + 1):
-			var from := (sample_index + centerline.size() - span + offset - 1) % centerline.size()
-			var to := (sample_index + centerline.size() - span + offset) % centerline.size()
+			var from := (sample_index + sample_count - span + offset - 1) % sample_count
+			var to := (sample_index + sample_count - span + offset) % sample_count
 			path += centerline[from].distance_to(centerline[to])
 		var straightness := chord / maxf(path, 1.0)
 		if straightness > best_straight:
@@ -1192,6 +1210,125 @@ static func _reorder_to_longest_straight(controls: PackedVector2Array, centerlin
 	for index in count:
 		result.append(controls[(best_control + index) % count])
 	return result
+
+
+static func _merge_profile_counts(summaries: Array) -> Dictionary:
+	var merged := {"circular": 0, "tightening": 0, "opening": 0, "symmetric": 0}
+	for summary: Dictionary in summaries:
+		for key: String in summary:
+			merged[key] = int(merged.get(key, 0)) + int(summary[key])
+	return merged
+
+
+## Try to replace one non-protected straight run with a pose-preserving excursion
+## motif. The start straight (control 0) is protected. Candidates are the longest
+## interior straight runs; each splice is whole-loop validated and committed only
+## if it still clears every gate, otherwise the original loop is retained.
+static func _apply_straight_motif(
+	controls: PackedVector2Array,
+	source_rect: Rect2,
+	room_polygon: PackedVector2Array,
+	room_margin: float,
+	min_self_distance: float,
+	minimum_length: float,
+	max_length: float,
+	current_length: float
+) -> Dictionary:
+	var runs := _control_straight_runs(controls)
+	var candidates: Array = []
+	for run: Dictionary in runs:
+		if int(run["start"]) == 0:
+			continue
+		candidates.append(run)
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["length"]) > float(b["length"]))
+	var rejections: Array = []
+	var centroid := _controls_centroid(controls)
+	for k in mini(3, candidates.size()):
+		var run: Dictionary = candidates[k]
+		var start: Vector2 = controls[int(run["start"])]
+		var end: Vector2 = controls[int(run["end"])]
+		var run_length := start.distance_to(end)
+		var tangent := start.direction_to(end)
+		# Bulge toward the loop interior so the excursion never extends the
+		# track footprint (which would distort a room's aspect ratio).
+		var normal := tangent.rotated(PI * 0.5)
+		if (centroid - start).dot(normal) < 0.0:
+			normal = -normal
+		# Try a deeper excursion first (more added length), then shallower ones,
+		# so a motif is a real geometry change, not a 4% wiggle, whenever the free
+		# floor and the validator permit it.
+		var radii := PackedFloat32Array([
+			maxf(SECTIONS.MIN_MOTIF_RADIUS, run_length * 0.28),
+			maxf(SECTIONS.MIN_MOTIF_RADIUS, run_length * 0.5),
+			maxf(SECTIONS.MIN_MOTIF_RADIUS, run_length),
+		])
+		for radius: float in radii:
+			var motif := SECTIONS.straight_motif(start, tangent, run_length, radius, normal)
+			if not bool(motif["accepted"]):
+				rejections.append(String(motif["reason"]))
+				continue
+			var points: PackedVector2Array = motif["points"]
+			var spliced := PackedVector2Array()
+			for index in range(0, int(run["start"]) + 1):
+				spliced.append(controls[index])
+			for index in range(1, points.size()):
+				spliced.append(points[index])
+			for index in range(int(run["end"]) + 1, controls.size()):
+				spliced.append(controls[index])
+			var validation := _validate_controls(spliced, source_rect, room_polygon, room_margin, min_self_distance, minimum_length)
+			if not bool(validation["valid"]):
+				rejections.append("splice invalid")
+				continue
+			if float(validation["length"]) > max_length:
+				rejections.append("splice exceeds max length")
+				continue
+			return {"controls": spliced, "motifs": [String(motif["kind"])], "rejections": rejections, "length": float(validation["length"])}
+	return {"controls": controls, "motifs": [], "rejections": rejections, "length": current_length}
+
+
+## Maximal collinear control runs (straight sections) as [{start, end, length,
+## heading}]. start/end are control indices; the run spans controls[start..end].
+static func _control_straight_runs(controls: PackedVector2Array) -> Array:
+	var runs: Array = []
+	var count := controls.size()
+	if count < 4:
+		return runs
+	var dirs := PackedVector2Array()
+	for i in count:
+		dirs.append((controls[(i + 1) % count] - controls[i]).normalized())
+	var i := 0
+	while i <= count - 2:
+		var reference := dirs[i]
+		var j := i
+		# Segments 0..count-2 only; segment count-1 is the wrap-around back to the
+		# protected start control, so it never joins a linear run.
+		while j < count - 2 and absf(reference.angle_to(dirs[j + 1])) <= LITERAL_STRAIGHT_HEADING_TOLERANCE:
+			j += 1
+		if j >= i:
+			var length := controls[i].distance_to(controls[j + 1])
+			if length >= MIN_SETUP_DISTANCE:
+				runs.append({"start": i, "end": j + 1, "length": length, "heading": reference})
+		i = j + 1
+	return runs
+
+
+static func _controls_centroid(controls: PackedVector2Array) -> Vector2:
+	var centroid := Vector2.ZERO
+	for point: Vector2 in controls:
+		centroid += point
+	return centroid / float(controls.size())
+
+
+## Per-candidate orientation guard for the elongated rooms: a profile or motif may
+## nudge a marginal loop's aspect below the room's orientation gate, so reject
+## that candidate rather than silencing decoration for the whole room category.
+static func _room_aspect_ok(controls: PackedVector2Array, room_shape: StringName) -> bool:
+	if room_shape != &"long" and room_shape != &"tall":
+		return true
+	var bounds := _points_rect(controls)
+	if room_shape == &"long":
+		return bounds.size.x > bounds.size.y * 2.5
+	return bounds.size.y > bounds.size.x * 1.2
 
 
 static func _hash32(value: int) -> int:

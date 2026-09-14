@@ -125,7 +125,7 @@ func _check_hazard_progression(prepared: Dictionary, moments: Dictionary) -> boo
 		return false
 	var first := BUILDER._plan_generated_hazard(&"office", prepared["spec"], prepared["centerline"], moments)
 	var second := BUILDER._plan_generated_hazard(&"office", prepared["spec"], prepared["centerline"], moments)
-	return _expect(first == second and first["paths"] is Dictionary and (first["danger_states"] as PackedStringArray) == PackedStringArray(["active", "exit"]), "same hazard stream should reproduce its complete motion and collision plan")
+	return _expect(first == second and first["paths"] is Dictionary and StringName(first.get("motion", &"")) == &"static" and (first["danger_states"] as PackedStringArray) == PackedStringArray(["active"]), "office coiled-cable stream should reproduce a static collision pose")
 
 
 func _check_championship_identity() -> bool:

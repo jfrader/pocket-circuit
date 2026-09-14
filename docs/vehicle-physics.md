@@ -29,7 +29,10 @@ Per tick at 60 Hz:
    Surface stiffness scales by `sqrt(grip_multiplier)` (progressive).
 4. **Front force along steered axis** at front axle position; rear force
    along body lateral at rear axle → natural yaw torque/under/oversteer.
-5. **Load split**: front_weight_ratio distributes normal load between axles.
+5. **Load split**: front_weight_ratio plus a capped longitudinal transfer
+   (`h/L` ≈ 0.16, clamped ±0.12) and modest speed-squared downforce
+   (`q_max` ≈ 0.32, hard-capped at 0.6). Downforce raises axle load and
+   brake capacity at speed without eliminating slides.
 6. **Engine**: torque curve (launch_torque → peak → falloff to max_speed).
    Scaled by surface_speed_multiplier and external_power_multiplier.
 7. **Drag**: `aero_drag_coefficient × v × |v|`. Rolling:
@@ -70,6 +73,18 @@ NONE → ACTIVE → EXITING → NONE
   Recovery starts on handbrake release, not after the drift-state exit. A
   completed exit never drops the restored grip again. Neutral steering adds
   yaw damping without snapping velocity or changing the car's position.
+
+Unintentional **high-speed oversteer** is a reading of that same tire curve,
+not a second drift machine. At speed, `VehicleFeel` weakens rear µ first
+(arcade drive-circle) and plants more downforce on the nose, so a fast
+corner rotates instead of plowing. A small steer-directed yaw cue helps the
+tail step out; counter-steer cancels it. Rear demand (linear / peak) ≥ 0.85
+goes `LOOSE`; counter-steer enters `SAVING`; demand back through 0.72 is
+`CALM`. Handbrake drift still owns boost. Dust plays for either.
+
+Dry top speed stays in the 600–750 wu/s band (~9–15 car lengths per second
+using `wheelbase × 1.45`). Engine force is not zeroed at `max_speed`; drag
+and a 1.02 safety cut make the ceiling. No mode has its own cap.
 
 ## Boost (v1)
 

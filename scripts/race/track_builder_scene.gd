@@ -163,7 +163,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 			await stage.call("Placing landmarks")
 		await TrackBuilderCore._compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments, stage)
 		TrackBuilderCore._build_generated_obstacles(root, spec)
-		TrackBuilderCore._seal_pockets(root, spec)
+		TrackBuilderCore._seal_pockets(root, spec, centerline, room_polygon)
 	else:
 		# Canonical/static tracks retain their authored legacy dressing.
 		TrackBuilderCore._fill_island(root, spec, inner_loop, centerline)
@@ -211,4 +211,3 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	# directions. Canonical fixtures retain the older one-sided start banner.
 	if not spec.get("seed_obstacles", false):
 		TrackBuilderCore._add_start_banner(root, start, start_tangent, corridor)
-

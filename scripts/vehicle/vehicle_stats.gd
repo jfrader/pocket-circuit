@@ -13,6 +13,9 @@ const PARAMETER_RANGES := {
 	"torque_at_max_speed": [0.25, 0.45, "multiplier"],
 	"torque_falloff_exponent": [1.10, 2.50, "exponent"],
 	"max_speed": [600.0, 750.0, "wu/s"],
+	"downforce_q_max": [0.20, 0.55, "q"],
+	"weight_transfer_ratio": [0.12, 0.22, "h/L"],
+	"slide_min_speed_ratio": [0.62, 0.82, "speed ratio"],
 	"reverse_speed": [180.0, 280.0, "wu/s"],
 	"rolling_resistance": [10.0, 35.0, "sf"],
 	"aero_drag_coefficient": [0.00035, 0.00095, "sm/wu"],
@@ -59,6 +62,8 @@ const PARAMETER_RANGES := {
 @export_range(180.0, 280.0) var reverse_speed: float = 240.0
 @export_range(10.0, 35.0) var rolling_resistance: float = 18.0
 @export_range(0.00035, 0.00095, 0.000001) var aero_drag_coefficient: float = 0.000617
+@export_range(0.20, 0.55) var downforce_q_max: float = 0.32
+@export_range(0.12, 0.22) var weight_transfer_ratio: float = 0.16
 
 @export_category("Tires and steering")
 @export_range(0.85, 1.40) var front_grip: float = 1.15
@@ -83,6 +88,7 @@ const PARAMETER_RANGES := {
 @export_range(4.0, 11.0) var drift_grip_recovery_rate: float = 7.0
 @export_range(20.0, 36.0) var drift_optimal_slip_deg: float = 26.0
 @export_range(8.0, 30.0) var drift_boost_max_reward: float = 16.0
+@export_range(0.62, 0.82) var slide_min_speed_ratio: float = 0.72
 
 @export_category("Boost and durability")
 @export_range(450.0, 700.0) var boost_power: float = 560.0

@@ -26,7 +26,7 @@ static var GENERATED_OBSTACLE_TYPES := {
 
 
 ## `visual_role` is the player-facing contract: SOLID stops cars, FLAT is
-## drive-over presentation, and MOVING_HAZARD is a telegraphed dynamic threat.
+## drive-over presentation, and MOVING_HAZARD is a colliding hazard (rolling or parked).
 ## `collision_contract` remains as compatibility metadata for collision audits.
 static var SOLID_EDGE_SHAPES := {
 	"screw_small.png": &"rect",

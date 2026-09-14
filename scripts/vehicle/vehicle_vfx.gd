@@ -44,7 +44,7 @@ func _physics_process(delta: float) -> void:
 	_animation_time += delta
 	_skid_cooldown = maxf(0.0, _skid_cooldown - delta)
 	_impact_audio_cooldown = maxf(0.0, _impact_audio_cooldown - delta)
-	var drifting := bool(_vehicle.get("is_drifting"))
+	var drifting := bool(_vehicle.get("is_drifting")) or bool(_vehicle.get("is_sliding"))
 	var boosting := bool(_vehicle.call("is_boost_active"))
 	if _vehicle.is_in_group("player_vehicle"):
 		if drifting and not _was_drifting:

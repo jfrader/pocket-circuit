@@ -2,31 +2,13 @@ class_name TrackBuilderGeometry
 ## Pure loop/corridor math used by TrackBuilderCore. No nodes, no textures.
 
 const HALF_WIDTH := 125.0
-const SAMPLE_COUNT := 260
+const CURVE_SAMPLING := preload("res://scripts/race/track_curve_sampling.gd")
 
 
-static func sample_centerline(controls: Array) -> PackedVector2Array:
-	var points := PackedVector2Array()
-	for index in SAMPLE_COUNT:
-		points.append(catmull_rom_closed(controls, float(index) / float(SAMPLE_COUNT)))
-	return points
-
-
-static func catmull_rom_closed(points: Array, t: float) -> Vector2:
-	var count := points.size()
-	var scaled := t * float(count)
-	var i := int(floor(scaled))
-	var local := scaled - float(i)
-	var p0: Vector2 = points[posmod(i - 1, count)]
-	var p1: Vector2 = points[posmod(i, count)]
-	var p2: Vector2 = points[posmod(i + 1, count)]
-	var p3: Vector2 = points[posmod(i + 2, count)]
-	return 0.5 * (
-		(2.0 * p1)
-		+ (-p0 + p2) * local
-		+ (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * local * local
-		+ (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * local * local * local
-	)
+## Arc-length-uniform centerline via the shared sampler: variable count (>=260),
+## closed, no endpoint duplicate, maximum spacing 35.
+static func sample_centerline(controls: PackedVector2Array) -> PackedVector2Array:
+	return CURVE_SAMPLING.sample(controls)
 
 
 static func corridor_edges(centerline: PackedVector2Array) -> Dictionary:
@@ -68,26 +50,67 @@ static func outset_polygon(points: PackedVector2Array, distance: float) -> Packe
 	var largest := PackedVector2Array()
 	var largest_area := 0.0
 	for contour: PackedVector2Array in contours:
-		var area := absf(polygon_area(contour))
-		if contour.size() >= 3 and area > largest_area:
-			largest = contour
+		# An outward offset folds over a concave notch, and Clipper can hand that
+		# folded contour back self-intersecting. Flatten it before it feeds a
+		# ConcavePolygonShape2D or a raised rim.
+		var cleaned := simple_loop(contour)
+		if cleaned.is_empty():
+			continue
+		var area := absf(polygon_area(cleaned))
+		if area > largest_area:
+			largest = cleaned
 			largest_area = area
 	return largest if not largest.is_empty() else points
 
 
-static func simple_island_loop(points: PackedVector2Array) -> PackedVector2Array:
-	# Normal offsets fold over themselves at concave corners. Running the contour
-	# through Clipper splits those folds into simple polygons; the largest contour
-	# is the central island and the smaller pieces are offset artifacts.
-	var pieces: Array[PackedVector2Array] = Geometry2D.intersect_polygons(points, points)
-	var result := PackedVector2Array()
+static func simple_loop(points: PackedVector2Array) -> PackedVector2Array:
+	# Union a possibly self-intersecting loop with itself to split folds into
+	# simple pieces, drop near-duplicate points, then keep the largest clean piece
+	# (the smaller ones are offset/clip artifacts). Returns empty when nothing
+	# survives, so callers can fall back to their original contour.
+	var resolved: Array[PackedVector2Array] = Geometry2D.intersect_polygons(points, points)
+	var largest := PackedVector2Array()
 	var largest_area := 0.0
-	for piece: PackedVector2Array in pieces:
-		var area := absf(polygon_area(piece))
-		if piece.size() >= 3 and area > largest_area:
-			result = piece
+	for piece: PackedVector2Array in (resolved if not resolved.is_empty() else [points]):
+		var cleaned := simplify_loop(deduplicate_loop(piece))
+		if cleaned.size() < 3 or has_self_intersection(cleaned):
+			continue
+		var area := absf(polygon_area(cleaned))
+		if area > largest_area:
+			largest = cleaned
 			largest_area = area
-	return result if not result.is_empty() else points
+	return largest
+
+
+static func simplify_loop(points: PackedVector2Array, maximum_deviation: float = 0.05) -> PackedVector2Array:
+	# Bound error against every skipped point, not just its original neighbors:
+	# independently removing locally-flat vertices can erase an entire dense arc.
+	var count := points.size()
+	if count < 3:
+		return points
+	var result := PackedVector2Array([points[0]])
+	var skipped := PackedVector2Array()
+	for index in range(1, count):
+		var before := result[result.size() - 1]
+		var current := points[index]
+		var after := points[(index + 1) % count]
+		skipped.append(current)
+		var removable := (current - before).dot(after - current) > 0.0
+		for point: Vector2 in skipped:
+			if point_to_segment_distance(point, before, after) > maximum_deviation:
+				removable = false
+				break
+		if removable:
+			continue
+		result.append(current)
+		skipped.clear()
+	return result
+
+
+static func simple_island_loop(points: PackedVector2Array) -> PackedVector2Array:
+	# The central island can fold at concave corners; keep its largest simple piece.
+	var cleaned := simple_loop(points)
+	return cleaned if not cleaned.is_empty() else points
 
 
 static func simple_boundary_loop(points: PackedVector2Array, centerline: PackedVector2Array) -> PackedVector2Array:
@@ -116,7 +139,10 @@ static func simple_corridor_boundary_loop(_points: PackedVector2Array, centerlin
 	var result := PackedVector2Array()
 	var largest_area := 0.0
 	for piece: PackedVector2Array in pieces:
-		var cleaned := deduplicate_loop(piece)
+		# Round-join offset densifies the contour with near-collinear points that
+		# read as self-intersections on long loops; simplify first so the join
+		# does not fold a valid corridor into an empty boundary.
+		var cleaned := simplify_loop(deduplicate_loop(piece), 0.05)
 		if cleaned.size() < 3 or has_self_intersection(cleaned):
 			continue
 		var area := absf(polygon_area(cleaned))

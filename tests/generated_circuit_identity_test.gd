@@ -19,7 +19,7 @@ func _run_test() -> void:
 		return
 	if not _expect((identity["fingerprints"] as Dictionary).keys().size() == IDENTITIES.DOMAINS.size() + 1, "every domain and the complete circuit should have fingerprints"):
 		return
-	if not _expect(identity["sub_seeds"] == {"route": 246810, "room_composition": 1821677131, "material": 1916693968, "dressing": 493555838, "obstacle": 328509393, "hazard": 1746009985} and String(identity["fingerprint"]) == "114ca0ca39bec3a3" and String(identity["display_name"]) == "Clockwork Clamp Circuit" and String(identity["material_id"]) == "workshop_oiled" and String(identity["palette_id"]) == "oiled_espresso", "the v4 fixture identity, fingerprint, and every domain sub-seed should stay regression-pinned"):
+	if not _expect(identity["sub_seeds"] == {"route": 246810, "room_composition": 1821677131, "material": 1916693968, "dressing": 493555838, "obstacle": 328509393, "hazard": 1746009985} and String(identity["fingerprint"]) == "98fd871294e832f1" and String(identity["display_name"]) == "Clockwork Clamp Circuit" and String(identity["material_id"]) == "workshop_oiled" and String(identity["palette_id"]) == "oiled_espresso", "the v6 fixture identity, fingerprint, and every domain sub-seed should stay regression-pinned"):
 		return
 	for domain: String in IDENTITIES.DOMAINS:
 		if not _expect(String(identity["fingerprints"][domain]).length() == 16, "%s should have a stable inspectable fingerprint" % domain):
@@ -67,6 +67,24 @@ func _run_test() -> void:
 	if not _expect(not bool(generator_result.get("ok", false)) and generator_result.get("kind") == "unsupported_generator", "unknown generator versions should be rejected after checksum validation"):
 		return
 
+	var v5_body := payload.slice(0, payload.size() - 4)
+	v5_body[0] = 5
+	var v5_payload := v5_body.duplicate()
+	v5_payload.append_array(IDENTITIES._checksum(v5_body))
+	var v5_code := "PC1" + IDENTITIES._base32_encode(v5_payload)
+	var v5_result := IDENTITIES.decode_share_code(v5_code)
+	if not _expect(not bool(v5_result.get("ok", false)) and v5_result.get("kind") == "unsupported_generator", "the previous generator version should be rejected honestly as unsupported"):
+		return
+
+	var bad_tier_body := payload.slice(0, payload.size() - 4)
+	bad_tier_body[5] = 9
+	var bad_tier_payload := bad_tier_body.duplicate()
+	bad_tier_payload.append_array(IDENTITIES._checksum(bad_tier_body))
+	var bad_tier_code := "PC1" + IDENTITIES._base32_encode(bad_tier_payload)
+	var bad_tier_result := IDENTITIES.decode_share_code(bad_tier_code)
+	if not _expect(not bool(bad_tier_result.get("ok", false)) and bad_tier_result.get("kind") == "invalid_fields", "an out-of-range length profile index should be rejected after checksum validation"):
+		return
+
 	var explicit := IDENTITIES.create(&"office", &"wide", 42, true, 3, "cork_v2", "night_blue")
 	var explicit_decoded := IDENTITIES.decode_share_code(String(IDENTITIES.encode_share_code(explicit)["code"]))
 	if not _expect(explicit_decoded.get("identity", {}) == explicit and String(explicit["summary"]).contains("Material cork_v2 / palette night_blue") and not String(explicit["summary"]).contains("Material fallback"), "explicit material and palette IDs should survive codes and display as the actual identity"):
@@ -106,6 +124,33 @@ func _run_test() -> void:
 		var explicit_room := IDENTITIES.create(&"office", StringName(room), 0, false, 3)
 		if not _expect(not explicit_room.is_empty() and String(IDENTITIES.room_for_composition_seed(int(explicit_room["sub_seeds"]["room_composition"]))) == room, "an explicit generated-circuit room should receive consistent composition entropy for %s" % room):
 			return
+
+	var profile_fingerprints := {}
+	for tier: String in IDENTITIES.GENERATED_RULES.LENGTH_TIERS:
+		var profiled := IDENTITIES.create(&"workshop", &"wide", FIXTURE_SEED, false, 2, "", "", {}, tier)
+		if not _expect(not profiled.is_empty() and String(profiled["length_tier"]) == tier and String(profiled["room"]) == String(identity["room"]) and profiled["sub_seeds"] == identity["sub_seeds"], "length profile %s should reuse the same sub-seeds, room, and master seed" % tier):
+			return
+		profile_fingerprints[String(profiled["fingerprint"])] = true
+		var profile_code := IDENTITIES.encode_share_code(profiled)
+		if not _expect(bool(profile_code.get("ok", false)) and String(profile_code["code"]).length() < 80 and IDENTITIES.decode_share_code(String(profile_code["code"])).get("identity", {}) == profiled, "length profile %s should round-trip its compact share code exactly" % tier):
+			return
+	if not _expect(profile_fingerprints.size() == IDENTITIES.GENERATED_RULES.LENGTH_TIERS.size(), "identical seeds and rooms across length profiles should yield distinct fingerprints"):
+		return
+	if not _expect(IDENTITIES.create(&"workshop", &"wide", FIXTURE_SEED, false, 2, "", "", {}, "bogus").is_empty(), "an unknown length profile should be rejected by create"):
+		return
+	var unknown_tier := identity.duplicate(true)
+	unknown_tier["length_tier"] = "bogus"
+	unknown_tier.erase("fingerprint")
+	if not _expect(IDENTITIES.normalize(unknown_tier).is_empty(), "normalization must reject an unknown length profile"):
+		return
+	var long_identity := IDENTITIES.create(&"workshop", &"wide", FIXTURE_SEED, false, 2, "", "", {}, "long")
+	if not _expect(String(IDENTITIES.normalize(long_identity)["length_tier"]) == "long", "canonicalization must not silently drop a supplied length profile"):
+		return
+	var missing_tier := identity.duplicate(true)
+	missing_tier.erase("length_tier")
+	missing_tier.erase("fingerprint")
+	if not _expect(String(IDENTITIES.normalize(missing_tier)["length_tier"]) == "standard", "a current-version identity missing a length profile should default to standard"):
+		return
 
 	print("GENERATED_CIRCUIT_IDENTITY_TEST PASS")
 	quit(0)

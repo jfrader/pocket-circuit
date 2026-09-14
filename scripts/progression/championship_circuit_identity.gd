@@ -1,13 +1,15 @@
 class_name ChampionshipCircuitIdentity
 extends RefCounted
 
+const GENERATED_IDENTITY := preload("res://scripts/race/generated_circuit_identity.gd")
 const SCHEMA_VERSION := 1
-const GENERATOR_VERSION := 1
+# Keep seeds/rooms stable while geometry revisions invalidate lap artifacts.
+const SEED_VERSION := 1
+const GENERATOR_VERSION := GENERATED_IDENTITY.GENERATOR_VERSION
 const LEGACY_MIGRATION_SEED := 665001
 const MAX_SEED := 0x7FFFFFFF
 const CIRCUIT_SEED_RANGE := 1000000
 const CATALOG := preload("res://data/championship/catalog.gd")
-const GENERATED_IDENTITY := preload("res://scripts/race/generated_circuit_identity.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const ROOMS: Array[String] = GENERATED_RULES.ROOMS
 const DOMAINS: Array[String] = [
@@ -170,7 +172,7 @@ static func _normalize_event(value: Variant, event: Dictionary, championship_see
 static func _derive_sub_seed(championship_seed: int, event_id: String, domain: String) -> int:
 	var value := 0x13579BDF
 	var key := "pocket-circuit|championship-circuit|generator=%d|seed=%d|event=%s|domain=%s" % [
-		GENERATOR_VERSION,
+		SEED_VERSION,
 		championship_seed,
 		event_id,
 		domain,

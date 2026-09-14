@@ -9,8 +9,6 @@ enum HazardState { IDLE, WARNING, ACTIVE, EXIT, COOLDOWN }
 
 const INK := Color("172033")
 const CREAM := Color("fff8e8")
-const AMBER := Color("f4bf3a")
-const DANGER_RED := Color("e96b4c")
 const HAZARD_SPRITES := {
 	&"kitchen": preload("res://assets/textures/imagine/hazard_kitchen_apple.png"),
 	&"workshop": preload("res://assets/textures/imagine/hazard_workshop_socket.png"),
@@ -27,6 +25,7 @@ const HAZARD_SPRITES := {
 
 var theme: StringName = &"kitchen"
 var state: HazardState = HazardState.IDLE
+var motion: StringName = &"rolling"
 var start_position := Vector2.ZERO
 var end_position := Vector2.ZERO
 var entry_position := Vector2.ZERO
@@ -37,20 +36,24 @@ var footprint_kind: StringName = &"circle"
 var _state_elapsed := 0.0
 var _moving_visual: Node2D
 var _collision: CollisionShape2D
-var _warning_visual: Node2D
-var _warning_label: Label
+var _hazard_sprite: Sprite2D
 var _hit_body_ids: Dictionary = {}
 
 
 func configure(hazard_theme: StringName, travel_start: Vector2, travel_end: Vector2, plan: Dictionary = {}) -> void:
 	theme = hazard_theme
+	motion = StringName(plan.get("motion", &"static" if theme == &"office" else &"rolling"))
 	start_position = travel_start
-	end_position = travel_end
+	end_position = travel_end if not is_static() else travel_start
 	var travel_direction := start_position.direction_to(end_position)
 	if travel_direction.is_zero_approx():
 		travel_direction = Vector2.RIGHT
-	entry_position = start_position - travel_direction * float(plan.get("entry_distance", 72.0))
-	exit_position = end_position + travel_direction * float(plan.get("exit_distance", 84.0))
+	if is_static():
+		entry_position = start_position
+		exit_position = start_position
+	else:
+		entry_position = start_position - travel_direction * float(plan.get("entry_distance", 72.0))
+		exit_position = end_position + travel_direction * float(plan.get("exit_distance", 84.0))
 	idle_duration = maxf(0.0, float(plan.get("idle_duration", idle_duration)))
 	warning_duration = maxf(0.2, float(plan.get("warning_duration", warning_duration)))
 	active_duration = maxf(0.2, float(plan.get("active_duration", active_duration)))
@@ -76,19 +79,27 @@ func configure(hazard_theme: StringName, travel_start: Vector2, travel_end: Vect
 	set_meta("danger_path", PackedVector2Array([start_position, end_position]))
 	set_meta("exit_path", PackedVector2Array([end_position, exit_position]))
 	set_meta("motion_path", PackedVector2Array([entry_position, start_position, end_position, exit_position]))
-	set_meta("danger_states", PackedStringArray(["active", "exit"]))
+	set_meta("motion", motion)
+	set_meta("danger_states", PackedStringArray(["active"] if is_static() else ["active", "exit"]))
 	_build_visuals()
 	if not body_entered.is_connected(_on_body_entered):
 		body_entered.connect(_on_body_entered)
-	_set_state(HazardState.IDLE)
+	_set_state(HazardState.ACTIVE if is_static() else HazardState.IDLE)
 
 
 func _process(delta: float) -> void:
 	advance(delta)
 
 
+func is_static() -> bool:
+	return motion == &"static"
+
+
 func advance(delta: float) -> void:
 	if delta <= 0.0:
+		return
+	if is_static():
+		_apply_overlapping_bodies()
 		return
 	var remaining := delta
 	while remaining > 0.000001:
@@ -125,10 +136,16 @@ func get_local_hazard_position() -> Vector2:
 
 
 func is_collision_active() -> bool:
-	return state == HazardState.ACTIVE or state == HazardState.EXIT
+	return is_static() or state == HazardState.ACTIVE or state == HazardState.EXIT
 
 
 func get_prediction(seconds_ahead: float) -> Dictionary:
+	if is_static():
+		return {
+			"state": &"active",
+			"position": start_position,
+			"collision_active": true,
+		}
 	var predicted_state := state
 	var predicted_elapsed := _state_elapsed
 	var remaining := maxf(seconds_ahead, 0.0)
@@ -145,7 +162,7 @@ func get_prediction(seconds_ahead: float) -> Dictionary:
 	return {
 		"state": _state_name(predicted_state),
 		"position": _position_for(predicted_state, predicted_elapsed),
-		"collision_active": predicted_state == HazardState.ACTIVE or predicted_state == HazardState.EXIT,
+		"collision_active": is_static() or predicted_state == HazardState.ACTIVE or predicted_state == HazardState.EXIT,
 	}
 
 
@@ -234,15 +251,11 @@ func _set_state(next_state: HazardState) -> void:
 	state = next_state
 	if state == HazardState.ACTIVE:
 		_hit_body_ids.clear()
-	if is_instance_valid(_warning_visual):
-		_warning_visual.visible = state == HazardState.WARNING
 	if is_instance_valid(_moving_visual):
-		_moving_visual.visible = state != HazardState.COOLDOWN
+		_moving_visual.visible = is_static() or state != HazardState.COOLDOWN
 	if is_instance_valid(_collision):
 		_collision.disabled = not is_collision_active()
 	state_changed.emit(get_state_name())
-	if state == HazardState.WARNING:
-		_play_sfx(&"hazard_warning", 0.78)
 	_update_positions()
 
 
@@ -252,12 +265,9 @@ func _update_positions() -> void:
 	var moving_position := get_local_hazard_position()
 	_moving_visual.position = moving_position
 	_collision.position = moving_position
-	if is_instance_valid(_warning_label):
-		_warning_label.text = "DANGER · %.1fs" % maxf(warning_duration - _state_elapsed, 0.0)
-	if theme == &"office":
-		var cable := _moving_visual.get_node_or_null("Cable") as Line2D
-		if cable:
-			cable.points = PackedVector2Array([start_position - moving_position, Vector2.ZERO])
+	if is_instance_valid(_hazard_sprite) and not is_static() and footprint_kind == &"circle":
+		var radius := maxf(footprint_size.x, footprint_size.y) * 0.5
+		_hazard_sprite.rotation = _traveled_distance() / maxf(radius, 1.0)
 
 
 func _on_body_entered(body: Node2D) -> void:
@@ -288,50 +298,25 @@ func _apply_hit(body: Node2D) -> void:
 		_play_sfx(&"impact", 0.68)
 
 
-func _build_visuals() -> void:
-	_warning_visual = Node2D.new()
-	_warning_visual.name = "WarningTelegraph"
-	VISUAL_ROLE_CONTRACT.assign(_warning_visual, VISUAL_ROLE_CONTRACT.MOVING_HAZARD)
-	add_child(_warning_visual)
-	var warning_line := Line2D.new()
-	warning_line.width = 12.0
-	warning_line.default_color = Color(AMBER, 0.56)
-	warning_line.points = PackedVector2Array([entry_position, exit_position])
-	warning_line.antialiased = true
-	VISUAL_ROLE_CONTRACT.assign(warning_line, VISUAL_ROLE_CONTRACT.MOVING_HAZARD)
-	_warning_visual.add_child(warning_line)
-	var danger_line := Line2D.new()
-	danger_line.name = "DangerPath"
-	danger_line.width = 18.0
-	danger_line.default_color = Color(DANGER_RED, 0.72)
-	danger_line.points = PackedVector2Array([start_position, end_position])
-	danger_line.antialiased = true
-	VISUAL_ROLE_CONTRACT.assign(danger_line, VISUAL_ROLE_CONTRACT.MOVING_HAZARD)
-	_warning_visual.add_child(danger_line)
-	var origin := Polygon2D.new()
-	origin.name = "Origin"
-	origin.position = entry_position
-	origin.polygon = _regular_polygon(17.0, 12)
-	origin.color = Color(AMBER, 0.92)
-	VISUAL_ROLE_CONTRACT.assign(origin, VISUAL_ROLE_CONTRACT.MOVING_HAZARD)
-	_warning_visual.add_child(origin)
-	_warning_label = Label.new()
-	_warning_label.name = "Timing"
-	_warning_label.text = "DANGER · %.1fs" % warning_duration
-	_warning_label.position = start_position.lerp(end_position, 0.5) + Vector2(-54.0, -38.0)
-	_warning_label.add_theme_color_override("font_color", CREAM)
-	_warning_label.add_theme_color_override("font_outline_color", INK)
-	_warning_label.add_theme_constant_override("outline_size", 4)
-	_warning_label.add_theme_font_size_override("font_size", 16)
-	VISUAL_ROLE_CONTRACT.assign(_warning_label, VISUAL_ROLE_CONTRACT.MOVING_HAZARD)
-	_warning_visual.add_child(_warning_label)
-	_warning_visual.set_meta("origin", entry_position)
-	_warning_visual.set_meta("path", PackedVector2Array([entry_position, start_position, end_position, exit_position]))
-	_warning_visual.set_meta("warning_path", PackedVector2Array([entry_position, start_position]))
-	_warning_visual.set_meta("danger_path", PackedVector2Array([start_position, end_position]))
-	_warning_visual.set_meta("exit_path", PackedVector2Array([end_position, exit_position]))
-	_warning_visual.set_meta("warning_duration", warning_duration)
+func _traveled_distance() -> float:
+	var warning_length := entry_position.distance_to(start_position)
+	var active_length := start_position.distance_to(end_position)
+	var exit_length := end_position.distance_to(exit_position)
+	var progress := get_travel_progress()
+	match state:
+		HazardState.WARNING:
+			return warning_length * progress
+		HazardState.ACTIVE:
+			return warning_length + active_length * progress
+		HazardState.EXIT:
+			return warning_length + active_length + exit_length * progress
+		HazardState.COOLDOWN:
+			return warning_length + active_length + exit_length
+		_:
+			return 0.0
 
+
+func _build_visuals() -> void:
 	_moving_visual = Node2D.new()
 	_moving_visual.name = "MovingHazard"
 	_moving_visual.z_index = 3
@@ -386,6 +371,7 @@ func _build_visuals() -> void:
 		var longest := maxf(sprite_texture.get_width(), sprite_texture.get_height())
 		sprite.scale = Vector2.ONE * ((maxf(footprint_size.x, footprint_size.y) + 8.0) / maxf(longest, 1.0))
 		_moving_visual.add_child(sprite)
+		_hazard_sprite = sprite
 		polygon.visible = false
 		shine.visible = false
 		var cable := _moving_visual.get_node_or_null("Cable") as CanvasItem

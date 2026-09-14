@@ -21,7 +21,6 @@ const TRACK_BUILDER_PLACEMENT := preload("res://scripts/race/track_builder_place
 const TRACK_BUILDER_COLLISION := preload("res://scripts/race/track_builder_collision.gd")
 const TRACK_BUILDER_RACING := preload("res://scripts/race/track_builder_racing.gd")
 const HALF_WIDTH := 125.0
-const SAMPLE_COUNT := 260
 const GATE_COUNT := 8
 const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
 const DEFAULT_FLOOR_TILE_WORLD_SIZE := Vector2(512.0, 512.0)
@@ -149,14 +148,28 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape] if seed >= 0 else BASE_ROOM_SHAPES[room_shape]
 	var used_seed := seed
 	if seed >= 0:
+		var length_tier := StringName(generation_options.get("length_tier", &"standard"))
+		var profile := TrackSeedGen.length_profile(length_tier)
+		if profile.is_empty():
+			return {}
+		# Large tiers scale the room footprint (never the road width or corner
+		# radii), so the same road/radius constraints hold while the loop runs
+		# longer through more sections rather than a wider corridor.
+		var room_scale := float(profile.get("room_scale", 1.0))
+		if absf(room_scale - 1.0) > 0.001:
+			var scaled_room := PackedVector2Array()
+			for point: Vector2 in room_polygon:
+				scaled_room.append(point * room_scale)
+			room_polygon = scaled_room
 		var room_params := {
 			"margin": 190.0,
 			"min_point_distance": 210.0,
 			"max_angle_deg": 80.0,
 			"min_self_distance": 320.0,
-			"min_loop_length": 1500.0 * WORLD_SCALE,
+			"min_loop_length": 1900.0 * WORLD_SCALE,
 			"room_polygon": room_polygon,
 			"room_shape": room_shape,
+			"length_tier": length_tier,
 		}
 		match room_shape:
 			&"tall":
@@ -188,6 +201,10 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["generation_attempt"] = int(gen.get("attempt", 0))
 		spec["generation_fallback"] = bool(gen.get("fallback", false))
 		spec["loop_length"] = float(gen["length"])
+		spec["length_tier"] = String(gen.get("length_tier", "standard"))
+		spec["target_length"] = float(gen.get("target_length", gen["length"]))
+		spec["corner_profiles"] = gen.get("corner_profiles", {}).duplicate(true)
+		spec["motifs"] = gen.get("motifs", []).duplicate()
 		var sub_seeds: Dictionary = generation_options.get("sub_seeds", {})
 		spec["material_seed"] = int(generation_options.get("material_seed", sub_seeds.get("material", _mix_seed(seed, "material"))))
 		spec["dressing_seed"] = int(generation_options.get("dressing_seed", sub_seeds.get("dressing", _mix_seed(seed, String(theme)))))
@@ -285,6 +302,10 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 		root.set_meta("generation_fallback", bool(spec["generation_fallback"]))
 		root.set_meta("story_id", StringName(spec["story_id"]))
 		root.set_meta("loop_length", float(spec["loop_length"]))
+		root.set_meta("length_tier", spec.get("length_tier", "standard"))
+		root.set_meta("target_length", spec.get("target_length", spec["loop_length"]))
+		root.set_meta("corner_profiles", spec.get("corner_profiles", {}))
+		root.set_meta("motifs", spec.get("motifs", []))
 		root.set_meta("theme", prepared["theme"])
 		root.set_meta("room_shape", prepared["room_shape"])
 		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
@@ -306,12 +327,14 @@ static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable
 	await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage)
 
 
-static func _sample_centerline(controls: Array) -> PackedVector2Array:
-	return TRACK_BUILDER_GEOMETRY.sample_centerline(controls)
-
-
-static func _catmull_rom_closed(points: Array, t: float) -> Vector2:
-	return TRACK_BUILDER_GEOMETRY.catmull_rom_closed(points, t)
+static func _sample_centerline(controls: Variant) -> PackedVector2Array:
+	if controls is PackedVector2Array:
+		return TRACK_BUILDER_GEOMETRY.sample_centerline(controls)
+	var packed := PackedVector2Array()
+	if controls is Array:
+		for point: Vector2 in controls:
+			packed.append(point)
+	return TRACK_BUILDER_GEOMETRY.sample_centerline(packed)
 
 
 static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
@@ -1109,8 +1132,8 @@ static func _add_prop_with_collision(parent: Node, position: Vector2, radius: fl
 	TRACK_BUILDER_COLLISION.add_prop_with_collision(parent, position, radius, texture_path)
 
 
-static func _seal_pockets(root: Node2D, spec: Dictionary) -> void:
-	TRACK_BUILDER_COLLISION.seal_pockets(root, spec)
+static func _seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+	TRACK_BUILDER_COLLISION.seal_pockets(root, spec, centerline, room_polygon)
 
 
 static func _add_textured_polygon(

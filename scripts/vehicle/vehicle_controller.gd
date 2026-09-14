@@ -4,6 +4,7 @@ extends RigidBody2D
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
+const FEEL := preload("res://scripts/vehicle/vehicle_feel.gd")
 const CONTACT_RELEASE_GRACE := 0.12
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
@@ -38,6 +39,7 @@ var speed: float = 0.0
 var current_grip: float = 0.0
 var slip_angle: float = 0.0
 var is_drifting: bool = false
+var is_sliding: bool = false
 var boost_amount: float = 0.0
 var current_surface: StringName = &"polished counter"
 var surface_grip_multiplier: float = 1.0
@@ -91,6 +93,9 @@ var _drift_yaw_assist_scale := 1.0
 var _rear_grip_recovery := 1.0  # 0..1 interpolation factor during recovery
 var _front_lateral_force := 0.0  # cached for friction circle
 var _rear_lateral_force := 0.0  # cached for friction circle
+var _slide: Dictionary = {}
+var _feel_q := 0.0
+var _feel_rear_load := 0.0
 
 
 func _ready() -> void:
@@ -246,7 +251,9 @@ func add_boost(amount: float, source: String = "general") -> void:
 func reset_dynamics_state() -> void:
 	## Called on recovery/reset to clear all v1 transient state.
 	is_drifting = false
+	is_sliding = false
 	_drift_state = DriftState.NONE
+	_slide = FEEL.idle_slide()
 	_drift_boost_accumulated = 0.0
 	_drift_qualified_time = 0.0
 	_drift_boost_awarded = false
@@ -462,13 +469,14 @@ func _v1_physics_step(delta: float) -> void:
 	_front_slip_angle = float(slips["front"])
 	_rear_slip_angle = float(slips["rear"])
 
-	# ── Normal loads (load split) ──
-	var front_normal := DYNAMICS.calculate_axle_normal_load(
-		stats.mass, stats.front_weight_ratio, true,
-	)
-	var rear_normal := DYNAMICS.calculate_axle_normal_load(
-		stats.mass, stats.front_weight_ratio, false,
-	)
+	var long_demand := _throttle_input - _brake_input
+	if _handbrake_input:
+		long_demand -= 0.35
+	var chassis: Dictionary = FEEL.chassis(stats, fwd_speed, eff_max, long_demand)
+	var front_normal := float(chassis["front_load"])
+	var rear_normal := float(chassis["rear_load"])
+	_feel_q = float(chassis["q"])
+	_feel_rear_load = rear_normal
 
 	# ── Progressive stiffness scaling ──
 	var prog := DYNAMICS.calculate_progressive_stiffness(surface_grip_multiplier)
@@ -487,6 +495,7 @@ func _v1_physics_step(delta: float) -> void:
 		# Exponential recovery after drift exit
 		_rear_grip_recovery = minf(1.0, _rear_grip_recovery + (1.0 - _rear_grip_recovery) * (1.0 - exp(-stats.drift_grip_recovery_rate * delta)))
 		effective_rear_grip *= lerpf(stats.drift_rear_grip_ratio, 1.0, _rear_grip_recovery)
+	effective_rear_grip *= FEEL.rear_mu_scale(float(chassis["speed_ratio"]), _throttle_input, _steer_input)
 
 	# ── Tire lateral forces ──
 	_front_lateral_force = DYNAMICS.calculate_tire_lateral_force(
@@ -552,6 +561,14 @@ func _v1_physics_step(delta: float) -> void:
 	angular_damp = 0.0
 	if not _handbrake_input and absf(_steer_input) < 0.1:
 		angular_damp = stats.yaw_stability_rate * 2.0
+	var slide_damp := float(_slide.get("recover_damp", 0.0))
+	if slide_damp > 0.0:
+		angular_damp = maxf(angular_damp, stats.yaw_stability_rate * slide_damp)
+	if _drift_state != DriftState.ACTIVE:
+		var rotate := FEEL.corner_rotate(float(chassis["speed_ratio"]), _steer_input, yaw_rate)
+		if absf(rotate) > 0.001:
+			var rotate_limit := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.22
+			apply_torque(clampf(rotate * estimated_inertia * stats.yaw_stability_rate, -rotate_limit, rotate_limit))
 
 	# ── Drift yaw assist ──
 	if _drift_state == DriftState.ACTIVE:
@@ -636,6 +653,7 @@ func _v1_apply_braking(forward: Vector2, fwd_speed: float, front_pos: Vector2, r
 	var brakes := DYNAMICS.calculate_brake_forces(
 		_brake_input, fwd_speed, stats, surface_grip_multiplier,
 		_front_lateral_force, _rear_lateral_force,
+		_feel_q,
 	)
 	var front_forward := forward.rotated(_rack_angle)
 	apply_force(-front_forward * float(brakes["front_brake"]), front_pos)
@@ -659,10 +677,26 @@ func _v1_update_drift(delta: float, fwd_speed: float) -> void:
 			_v1_drift_during(delta, fwd_speed, rear_slip_deg)
 
 		DriftState.EXITING:
-			# Recovery interpolation handled by _rear_grip_recovery above
 			_drift_state = DriftState.NONE
 
+	var rear_demand := FEEL.rear_demand(
+		_rear_slip_angle,
+		stats.rear_cornering_stiffness * DYNAMICS.calculate_progressive_stiffness(surface_grip_multiplier),
+		stats.rear_grip * surface_grip_multiplier,
+		_feel_rear_load,
+	)
+	_slide = FEEL.step_slide(_slide, {
+		"speed_ratio": absf(fwd_speed) / maxf(get_effective_max_speed(), 1.0),
+		"min_speed_ratio": stats.slide_min_speed_ratio,
+		"rear_demand": rear_demand,
+		"steer": _steer_input,
+		"throttle": _throttle_input,
+		"handbrake": _handbrake_input or _drift_state == DriftState.ACTIVE,
+		"yaw_rate": angular_velocity,
+		"fwd_speed": fwd_speed,
+	}, delta)
 	is_drifting = _drift_state == DriftState.ACTIVE
+	is_sliding = int(_slide.get("mode", 0)) != 0
 
 
 func _v1_drift_try_entry(fwd_speed: float, _rear_slip_deg: float) -> void:

@@ -92,11 +92,11 @@ class TestApp extends Node:
 	func circuit_room_for_seed(seed: int) -> StringName:
 		return GENERATED_CIRCUITS.room_for_route_seed(seed)
 
-	func start_circuit_race(_theme: StringName, _room: StringName, _seed: int, _vehicle_id: String, _reverse: bool = false) -> void:
+	func start_circuit_race(_theme: StringName, _room: StringName, _seed: int, _vehicle_id: String, _reverse: bool = false, _length_tier: String = "standard") -> void:
 		launched_vehicle = _vehicle_id
 
-	func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false) -> Dictionary:
-		return GENERATED_CIRCUITS.create(theme, room, seed, reverse)
+	func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard") -> Dictionary:
+		return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
 
 	func get_circuit_library() -> Dictionary:
 		return {"history": [], "favorites": []}

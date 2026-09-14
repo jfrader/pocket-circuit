@@ -215,7 +215,23 @@ static func build_island_story(
 					placed = true
 					cluster.set_meta("placement_region", &"mixed")
 			if not placed and quantity == &"unique":
+				# A concave infield can have no room for the authored oversized
+				# focal. Keep the unique object readable rather than silently omit it.
+				for factor: float in [0.85, 0.70, 0.55]:
+					var fitted_radius := minf(radius, maxf(72.0, radius * factor))
+					var fitted_scale := size_scale * fitted_radius / radius
+					var fit := TrackBuilderCore._best_island_position(preferred, fitted_radius, room_polygon, inner_loop, occupied)
+					var region := &"island"
+					if not bool(fit["found"]):
+						fit = TrackBuilderCore._best_offtrack_position(preferred, fitted_radius, room_polygon, centerline, gate_samples, occupied)
+						region = &"apron"
+					if bool(fit["found"]):
+						TrackBuilderCore._add_generated_prop(formation, "Item%02d" % item_index, fit["position"], asset_path, scene_angle, region, quantity, item_index, fitted_scale)
+						occupied.append({"position": fit["position"], "radius": fitted_radius})
+						placed_count += 1
+						placed = true
+						cluster.set_meta("placement_region", &"mixed")
+						break
 				break
 		formation.set_meta("placed_count", placed_count)
-
 
