@@ -783,80 +783,30 @@ func _v1_apply_speed_caps() -> void:
 func _v2_physics_step(delta: float) -> void:
 	var forward := Vector2.UP.rotated(rotation)
 	var right := Vector2.RIGHT.rotated(rotation)
-	var fwd_speed := linear_velocity.dot(forward)
-	var lat_speed := linear_velocity.dot(right)
-	var yaw_rate := angular_velocity
-	var eff_max := get_effective_max_speed()
-
-	var forces := ARCADE.compute_forces(
-		_steer_input, _throttle_input, _brake_input, _handbrake_input,
+	var stepped: Dictionary = ARCADE.integrate(
 		delta,
-		fwd_speed, lat_speed, yaw_rate,
-		mass,
+		_steer_input,
+		_throttle_input,
+		_brake_input,
+		_handbrake_input,
+		is_boost_active(),
+		linear_velocity.dot(forward),
+		linear_velocity.dot(right),
+		angular_velocity,
 		stats,
 		surface_grip_multiplier,
 		surface_speed_multiplier,
 		_external_power_multiplier,
-		is_boost_active(),
 	)
-
-	# Longitudinal
-	if forces["engine_force"] != 0.0:
-		apply_central_force(forward * forces["engine_force"])
-	if forces["drag_force"] != 0.0 or forces["roll_force"] != 0.0:
-		apply_central_force(forward * (-float(forces["drag_force"]) - float(forces["roll_force"])))
-	if forces["brake_force"] != 0.0:
-		apply_central_force(-forward * forces["brake_force"])
-	if forces["hb_long_force"] != 0.0:
-		# rear biased
-		apply_force(-forward * forces["hb_long_force"], -forward * stats.wheelbase * 0.45)
-	if forces["boost_force"] != 0.0:
-		apply_central_force(forward * forces["boost_force"])
-
-	# Lateral + yaw from arcade
-	var lat_f := float(forces["lateral_force"])
-	if absf(lat_f) > 0.001:
-		var front_arm := stats.wheelbase * (1.0 - stats.front_weight_ratio)
-		var rear_arm := stats.wheelbase * stats.front_weight_ratio
-		var front_pos := forward * front_arm
-		var rear_pos := -forward * rear_arm
-		# Bias application toward front when rear_grip reduced (oversteer)
-		var rmult := float(forces.get("rear_grip_mult", 1.0))
-		var fshare := 0.62
-		var rshare := 0.38 * rmult
-		var tot := fshare + rshare
-		if tot > 0.001:
-			fshare /= tot
-			rshare /= tot
-		apply_force(right * lat_f * fshare, front_pos)
-		apply_force(right * lat_f * rshare, rear_pos)
-
-	var yt := float(forces["yaw_torque"])
-	if absf(yt) > 0.001:
-		apply_torque(yt)
-
-	# Neutral steer damps yaw when no input (saves spin without counter)
+	var fwd := float(stepped["fwd"])
+	linear_velocity = forward * fwd + right * float(stepped["lat"])
+	angular_velocity = float(stepped["yaw"])
+	_rack_angle = float(stepped["rack"])
 	angular_damp = 0.0
-	if not _handbrake_input and absf(_steer_input) < 0.1:
-		angular_damp = stats.yaw_stability_rate * 1.6
-
-	# Soft speed caps (same as v1)
-	_v1_apply_speed_caps()
-
-	# Drift state machine (shared, v2 entry relaxed)
-	_v1_update_drift(delta, fwd_speed)
-
-	# Expose slide/drift flags (arcade compute gives candidate, state owns is_drifting)
-	is_sliding = bool(forces["is_sliding"])
-	# is_drifting already set inside _v1_update_drift from _drift_state
-
-	# For v2 drift assist / recovery, set a proxy slip so existing during() logic works
-	# (the entry no longer requires it).
-	if absf(fwd_speed) > 10.0:
-		var ideal := float(forces.get("ideal_yaw", 0.0))
-		_rear_slip_angle = (yaw_rate - ideal) * 0.6   # rough rad proxy
-	else:
-		_rear_slip_angle = 0.0
+	_v1_update_drift(delta, fwd)
+	is_sliding = bool(stepped["is_sliding"])
+	if is_boost_active():
+		boost_amount = maxf(0.0, boost_amount - stats.boost_drain_rate * delta)
 
 
 # ═══════════════════════════════════════════════════════════════════════

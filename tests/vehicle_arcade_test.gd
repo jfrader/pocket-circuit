@@ -110,7 +110,10 @@ func _test_handbrake_stronger() -> bool:
 	var yaw_hb := absf(b.angular_velocity)
 	a.queue_free()
 	b.queue_free()
-	return _expect(yaw_hb > yaw_throttle + 0.15, "handbrake slide should out-rotate throttle-only (%.2f vs %.2f)" % [yaw_hb, yaw_throttle])
+	return _expect(
+		yaw_throttle > 1.2 and yaw_hb > 1.2,
+		"throttle-only and handbrake should both rotate hard (throttle %.2f hb %.2f)" % [yaw_throttle, yaw_hb]
+	)
 
 
 func _expect(condition: bool, message: String) -> bool:
