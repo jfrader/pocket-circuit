@@ -1,7 +1,8 @@
 extends SceneTree
 
 ## Side-by-side v1 (bicycle) vs v2 (arcade) measurements. This is the QA gate:
-## v2 must not be soap vs v1, and must still yaw at speed without handbrake.
+## v2 planted (low slip like v1 at mid), but more rotation at high speed+throttle (oversteer w/o hb).
+## Handbrake remains stronger drift. Tightened per GURI-739.
 
 const PHYSICS_HZ := 60
 const SCENE := "res://scenes/vehicles/rustbug.tscn"
@@ -32,14 +33,15 @@ func _run() -> void:
 	var v2_straight := _row(rows, "straight_280", 2)
 	var v2_fast := _row(rows, "steer_fast_throttle", 2)
 	var v1_fast := _row(rows, "steer_fast_throttle", 1)
-	if float(v2_straight["slip"]) > 0.05:
+	if float(v2_straight["slip"]) >= 0.04:
 		return _fail("v2 straight slip %.3f is soap" % float(v2_straight["slip"]))
-	if float(v2_mid["slip"]) > maxf(0.16, float(v1_mid["slip"]) * 1.35):
-		return _fail("v2 mid-steer slip %.3f vs v1 %.3f (soap vs bicycle)" % [float(v2_mid["slip"]), float(v1_mid["slip"])])
-	if float(v2_fast["heading"]) < 0.12:
-		return _fail("v2 fast throttle+steer heading %.3f — still a plow" % float(v2_fast["heading"]))
-	if float(v2_fast["yaw"]) < 0.35:
-		return _fail("v2 fast throttle+steer yaw %.3f — no oversteer" % float(v2_fast["yaw"]))
+	var max_mid_slip := maxf(0.045, float(v1_mid["slip"]) * 1.8)
+	if float(v2_mid["slip"]) > max_mid_slip:
+		return _fail("v2 mid-steer slip %.3f vs v1 %.3f (exceeds max(0.045, v1*1.8)=%.3f)" % [float(v2_mid["slip"]), float(v1_mid["slip"]), max_mid_slip])
+	if float(v2_fast["heading"]) < 0.20 or float(v2_fast["yaw"]) < float(v1_fast["yaw"]) * 1.15:
+		return _fail("v2 fast throttle+steer heading %.3f or yaw %.3f insufficient vs v1_yaw*1.15=%.3f (still plow or not enough oversteer)" % [float(v2_fast["heading"]), float(v2_fast["yaw"]), float(v1_fast["yaw"])*1.15])
+	if float(v2_fast["speed"]) < float(v1_fast["speed"]) * 0.85:
+		return _fail("v2 fast speed %.1f < v1_fast*0.85=%.1f (killed speed)" % [float(v2_fast["speed"]), float(v1_fast["speed"])*0.85])
 	print("HANDLING_SIM PASS v1_mid_slip=%.3f v2_mid_slip=%.3f v2_fast_yaw=%.3f v1_fast_yaw=%.3f" % [
 		float(v1_mid["slip"]), float(v2_mid["slip"]), float(v2_fast["yaw"]), float(v1_fast["yaw"]),
 	])
