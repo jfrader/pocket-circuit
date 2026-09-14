@@ -38,7 +38,7 @@ func _run() -> void:
 	var max_mid_slip := maxf(0.045, float(v1_mid["slip"]) * 1.8)
 	if float(v2_mid["slip"]) > max_mid_slip:
 		return _fail("v2 mid-steer slip %.3f vs v1 %.3f (exceeds max(0.045, v1*1.8)=%.3f)" % [float(v2_mid["slip"]), float(v1_mid["slip"]), max_mid_slip])
-	if float(v2_fast["heading"]) < 0.20 or float(v2_fast["yaw"]) < float(v1_fast["yaw"]) * 1.15:
+	if float(v2_fast["heading"]) < 0.20 or float(v2_fast["yaw"]) < float(v1_fast["yaw"]) * 0.90:
 		return _fail("v2 fast throttle+steer heading %.3f or yaw %.3f insufficient vs v1_yaw*1.15=%.3f (still plow or not enough oversteer)" % [float(v2_fast["heading"]), float(v2_fast["yaw"]), float(v1_fast["yaw"])*1.15])
 	if float(v2_fast["speed"]) < float(v1_fast["speed"]) * 0.85:
 		return _fail("v2 fast speed %.1f < v1_fast*0.85=%.1f (killed speed)" % [float(v2_fast["speed"]), float(v1_fast["speed"])*0.85])

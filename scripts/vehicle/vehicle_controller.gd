@@ -455,9 +455,12 @@ func _v1_physics_step(delta: float) -> void:
 	var yaw_rate := angular_velocity
 	var eff_max := get_effective_max_speed()
 
+	var lock_ratio := stats.high_speed_steer_ratio
+	if stats.physics_model_version == 2:
+		lock_ratio = clampf(lock_ratio + 0.10, 0.38, 0.62)
 	var target_steer := DYNAMICS.calculate_target_steer_angle(
 		_steer_input, stats.max_steer_angle_deg, fwd_speed, eff_max,
-		stats.high_speed_steer_ratio, stats.steer_fade_start_ratio,
+		lock_ratio, stats.steer_fade_start_ratio,
 	)
 	_rack_angle = DYNAMICS.update_rack_angle(
 		_rack_angle, target_steer, stats.steering_response, delta,
@@ -496,6 +499,14 @@ func _v1_physics_step(delta: float) -> void:
 		# Exponential recovery after drift exit
 		_rear_grip_recovery = minf(1.0, _rear_grip_recovery + (1.0 - _rear_grip_recovery) * (1.0 - exp(-stats.drift_grip_recovery_rate * delta)))
 		effective_rear_grip *= lerpf(stats.drift_rear_grip_ratio, 1.0, _rear_grip_recovery)
+	if (
+		stats.physics_model_version == 2
+		and not _handbrake_input
+		and absf(fwd_speed) > eff_max * 0.42
+		and _throttle_input > 0.35
+		and absf(_steer_input) > 0.18
+	):
+		effective_rear_grip *= 1.0 - stats.arcade_throttle_oversteer * 0.70
 
 	# ── Tire lateral forces ──
 	_front_lateral_force = DYNAMICS.calculate_tire_lateral_force(
@@ -600,6 +611,12 @@ func _v1_physics_step(delta: float) -> void:
 
 	# ── Drift state machine ──
 	_v1_update_drift(delta, fwd_speed)
+	if stats.physics_model_version == 2 and not is_drifting:
+		is_sliding = (
+			absf(fwd_speed) > eff_max * 0.42
+			and _throttle_input > 0.35
+			and absf(_steer_input) > 0.18
+		)
 
 	# ── Speed caps (soft + hard) ──
 	_v1_apply_speed_caps()
@@ -781,34 +798,9 @@ func _v1_apply_speed_caps() -> void:
 # ═══════════════════════════════════════════════════════════════════════
 
 func _v2_physics_step(delta: float) -> void:
-	var forward := Vector2.UP.rotated(rotation)
-	var right := Vector2.RIGHT.rotated(rotation)
-	var fwd := linear_velocity.dot(forward)
-	var lat := linear_velocity.dot(right)
-	var forces: Dictionary = ARCADE.compute_forces(
-		_steer_input,
-		_throttle_input,
-		_brake_input,
-		_handbrake_input,
-		is_boost_active(),
-		fwd,
-		lat,
-		angular_velocity,
-		stats,
-		mass,
-		surface_grip_multiplier,
-		surface_speed_multiplier,
-		_external_power_multiplier,
-	)
-	apply_central_force(forward * float(forces["long_force"]))
-	apply_central_force(right * float(forces["lat_force"]))
-	apply_torque(float(forces["yaw_torque"]))
-	_rack_angle = float(forces["rack"])
-	angular_damp = 0.0
-	_v1_update_drift(delta, fwd)
-	is_sliding = bool(forces["is_sliding"])
-	if is_boost_active():
-		boost_amount = maxf(0.0, boost_amount - stats.boost_drain_rate * delta)
+	# Live arcade is bicycle tires + more lock + a light throttle-on rear cut.
+	# A separate force stepper could not stay on the racing line.
+	_v1_physics_step(delta)
 
 
 # ═══════════════════════════════════════════════════════════════════════
