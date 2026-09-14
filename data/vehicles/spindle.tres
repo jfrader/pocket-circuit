@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="VehicleStats" format=3]
+[gd_resource type="Resource" script_class="VehicleStats" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_fuu76"]
+[ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_stats"]
 
 [resource]
-script = ExtResource("1_jdydk")
+script = ExtResource("1_stats")
 physics_model_version = 1
 mass = 0.76
 wheelbase = 38.0
