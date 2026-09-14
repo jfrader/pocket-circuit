@@ -233,7 +233,7 @@ func _cache_checkpoints() -> void:
 		if racing_line:
 			for point: Vector2 in racing_line.points:
 				_standard_racing_line.append(racing_line.to_global(point))
-		elif vehicle.stats.physics_model_version == VehicleStats.BICYCLE_MODEL_VERSION:
+		elif vehicle.stats.physics_model_version != VehicleStats.LEGACY_MODEL_VERSION:
 			# Older authored fixtures store ordered centerline samples as surface
 			# tiles, not RacingLine. Use that actual route rather than inventing
 			# axis-aligned turns between sparse checkpoint gates.
@@ -321,12 +321,12 @@ func _physics_process(delta: float) -> void:
 	var watchdog := _update_route_watchdog(delta, expected_index, heading_to_checkpoint > TURN_AROUND_HEADING)
 	if _recovering:
 		return
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		var route_error := float(_active_route_sample(expected_index)["distance"])
 		var correction := clampf(maxf(route_error / 70.0, absf(vehicle.slip_angle) / 20.0), 0.0, 1.0)
 		_tracking_grip_utilization = lerpf(CORNER_GRIP_UTILIZATION, CORRECTION_GRIP_UTILIZATION, correction)
 	var line_radius := _racing_line_radius(vehicle.global_position)
-	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version == 1 else {}
+	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version != 0 else {}
 	var pursuit_lookahead := _lookahead_distance()
 	if line_radius > 0.0:
 		# Steering follows local curvature. A future hairpin may constrain
@@ -364,7 +364,7 @@ func _physics_process(delta: float) -> void:
 	var pace_multiplier := float(tuning["pace"])
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var rack_max := 0.0
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		rack_max = DYNAMICS.calculate_target_steer_angle(
 			1.0,
 			vehicle.stats.max_steer_angle_deg,
@@ -374,7 +374,7 @@ func _physics_process(delta: float) -> void:
 			vehicle.stats.steer_fade_start_ratio,
 		)
 	var requested_steer: float
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		# Pure pursuit: curvature from the heading error to the projected goal
 		# and the exact look-ahead arc distance used to select that goal. The
 		# single consistent reference path (racing line, or checkpoint+guide
