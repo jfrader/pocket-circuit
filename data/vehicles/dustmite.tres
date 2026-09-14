@@ -1,9 +1,9 @@
-[gd_resource type="Resource" script_class="VehicleStats" format=3]
+[gd_resource type="Resource" script_class="VehicleStats" load_steps=2 format=3]
 
-[ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_n367w"]
+[ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_stats"]
 
 [resource]
-script = ExtResource("1_jdydk")
+script = ExtResource("1_stats")
 physics_model_version = 1
 mass = 0.71
 wheelbase = 35.5
@@ -34,6 +34,7 @@ drift_min_speed = 108.0
 drift_entry_steer = 0.26
 drift_rear_grip_ratio = 0.28
 drift_yaw_assist = 3.4
+drift_grip_recovery_rate = 7.6
 drift_optimal_slip_deg = 34.0
 drift_boost_max_reward = 30.0
 boost_power = 620.0

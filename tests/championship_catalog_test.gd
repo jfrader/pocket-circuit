@@ -100,8 +100,13 @@ func _run_test() -> void:
 			return
 	if not _expect(not ("thimble" in progress["unlocked_vehicles"] or "spindle" in progress["unlocked_vehicles"] or "anvil" in progress["unlocked_vehicles"] or "dustmite" in progress["unlocked_vehicles"]), "new chassis must never be added by championship act unlocks"):
 		return
-	# all 8 stats_path resources must validate (no hand-invented out-of-range values)
+	# all 8 stats_path resources must load and validate (a load failure would
+	# otherwise fall back to a default VehicleStats and pass unnoticed)
 	for vid: String in CATALOG.vehicle_ids():
+		var stats_path := String(CATALOG.get_vehicle(vid).get("stats_path", ""))
+		var loaded := ResourceLoader.load(stats_path)
+		if not _expect(loaded is VehicleStats, "vehicle %s stats_path must load as VehicleStats from %s" % [vid, stats_path]):
+			return
 		var st := CATALOG.create_vehicle_stats(vid)
 		if not _expect(st.is_valid() and st.get_validation_errors().is_empty(), "vehicle %s stats_path must validate cleanly" % vid):
 			return
