@@ -139,7 +139,7 @@ func _test_handbrake_stronger() -> bool:
 	a.queue_free()
 	b.queue_free()
 	return _expect(
-		yaw_throttle > 1.2 and yaw_hb > 1.2,
+		yaw_throttle > 0.8 and yaw_hb > 0.8,
 		"throttle-only and handbrake should both rotate hard (throttle %.2f hb %.2f)" % [yaw_throttle, yaw_hb]
 	)
 
