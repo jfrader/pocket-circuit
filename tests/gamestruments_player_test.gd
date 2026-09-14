@@ -18,6 +18,8 @@ func _run_test() -> void:
 	player.set("harmony_voice", "warm")
 	player.set("drive_voice", "pluck")
 	player.set("bass_voice", "bass")
+	player.set("recipe", "racing")
+	player.set("arrangement", "extended")
 	root.add_child(player)
 	await process_frame
 	player.call("generate", "menu")
@@ -27,6 +29,20 @@ func _run_test() -> void:
 	await process_frame
 	if player.get_child_count() < 1:
 		push_error("GAMESTRUMENTS_PLAYER_TEST FAIL: missing audio stream player")
+		quit(1)
+		return
+	# verify extended contains the four new sections (reached via cue_section)
+	for sec: String in ["ignition", "slipstream", "redline", "cooldown"]:
+		if not (player.call("cue_section", sec) as bool):
+			push_error("GAMESTRUMENTS_PLAYER_TEST FAIL: extended score missing or rejected section " + sec)
+			quit(1)
+			return
+	if not (player.call("cue_section", "redline") as bool):
+		push_error("GAMESTRUMENTS_PLAYER_TEST FAIL: cue_section(\"redline\") not accepted on extended")
+		quit(1)
+		return
+	if not (player.call("set_race_state", "finish", 0.0, 0.0, false, "win") as bool):
+		push_error("GAMESTRUMENTS_PLAYER_TEST FAIL: set_race_state with finish_result \"win\" not accepted")
 		quit(1)
 		return
 	root.remove_child(player)

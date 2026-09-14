@@ -37,6 +37,12 @@ func _run_test() -> void:
 		var live_stream := live.get_node_or_null("LiveStream") as AudioStreamPlayer
 		if not _expect(is_instance_valid(live_stream), "GamestrumentsPlayer/LiveStream must exist as AudioStreamPlayer on live path after play_menu_music()"):
 			return
+		if not _expect(String(live.get("recipe")) == "racing", "live music should use recipe \"racing\" after play_menu_music()"):
+			return
+		if not _expect(String(live.get("arrangement")) == "extended", "live music should use arrangement \"extended\" after play_menu_music()"):
+			return
+		if not _expect(live.get("autoplay") == false, "play_menu_music live path should use autoplay false for garage"):
+			return
 	var engine_stream: AudioStream = (director.get_node("EnginePlayer") as AudioStreamPlayer).stream
 	if live == null:
 		var menu_stream := music_player.stream as AudioStreamWAV
@@ -51,6 +57,10 @@ func _run_test() -> void:
 	if live == null:
 		if not _expect(_loop_spans_stream(music_player.stream as AudioStreamWAV), "race music should span decoded samples when import metadata is absent"):
 			return
+	elif not _expect(live.get("autoplay") == true, "play_race_music live path should use autoplay true for extended arc"):
+		return
+	if live != null and not _expect(director.cue_live_section("cooldown"), "cue_live_section should forward a known Extended section to the live player"):
+		return
 	director.set_race_paused(true)
 	if not _expect(is_equal_approx(music_player.volume_db, -9.0), "pausing should duck race music"):
 		return
@@ -75,6 +85,7 @@ func _run_test() -> void:
 		return
 	if not _expect(engine_player.pitch_scale >= 1.55, "wide-open throttle should sit near the high-rev ceiling"):
 		return
+	director.set_live_race_state("finish", 0.0, 0.0, false, "win")
 	idle.free()
 	revs.free()
 	root.remove_child(director)
