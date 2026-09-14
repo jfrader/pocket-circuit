@@ -1,13 +1,10 @@
 class_name VehicleArcade
 extends RefCounted
 
-## Pure functions for the arcade (v2) vehicle model.
-## Small interface, no state, no RigidBody, no Pacejka, no per-wheel.
-## Controller applies the returned forces/torques.
-## Tuned for toy-car arcade: low-speed tight, high-speed tail can step out on throttle+steer (no handbrake required),
-## handbrake is the strong committed drift for boost.
+## Body-space arcade stepper. Live handling for physics_model_version 2.
+## Integrates with dt. Same model for player and AI. No Pacejka, no per-wheel.
 
-const REFERENCE_GRAVITY := 980.0
+const GRAVITY := 980.0
 
 
 static func get_effective_max_speed(stats: VehicleStats, surface_speed_mult: float) -> float:
@@ -15,7 +12,6 @@ static func get_effective_max_speed(stats: VehicleStats, surface_speed_mult: flo
 
 
 static func get_effective_grip(stats: VehicleStats, surface_grip_mult: float) -> float:
-	# Weighted by axle for consistency with dynamics queries; v2 uses front/rear grip values.
 	return (
 		stats.front_grip * stats.front_weight_ratio
 		+ stats.rear_grip * (1.0 - stats.front_weight_ratio)
@@ -23,7 +19,7 @@ static func get_effective_grip(stats: VehicleStats, surface_grip_mult: float) ->
 
 
 static func get_effective_lat_accel(stats: VehicleStats, surface_grip_mult: float) -> float:
-	return get_effective_grip(stats, surface_grip_mult) * REFERENCE_GRAVITY
+	return get_effective_grip(stats, surface_grip_mult) * GRAVITY
 
 
 static func get_safe_corner_speed(radius: float, effective_lat_accel: float) -> float:
@@ -32,147 +28,112 @@ static func get_safe_corner_speed(radius: float, effective_lat_accel: float) -> 
 	return sqrt(effective_lat_accel * radius)
 
 
-static func calculate_engine_force(
-	throttle: float,
-	forward_speed: float,
-	stats: VehicleStats,
-	surface_speed_mult: float,
-	external_power_mult: float,
-) -> float:
-	# Reuse the v1 curve logic; longitudinal is shared.
-	if throttle <= 0.0:
-		return 0.0
-	var eff_max := get_effective_max_speed(stats, surface_speed_mult)
-	if forward_speed >= eff_max:
-		return 0.0
-	var curve := VehicleDynamics.get_engine_torque_curve(
-		absf(forward_speed), eff_max,
-		stats.launch_torque_multiplier, stats.torque_peak_ratio,
-		stats.torque_at_max_speed, stats.torque_falloff_exponent,
-	)
-	return throttle * stats.engine_force * curve * external_power_mult * surface_speed_mult
-
-
-static func calculate_drag_force(speed: float, drag_coeff: float) -> float:
-	return drag_coeff * speed * absf(speed)
-
-
-static func calculate_rolling_resistance(speed: float, rolling_res: float) -> float:
-	return rolling_res * signf(speed)
-
-
-# ─────────────────────────────────────────────────────────────────────────
-# Arcade step: computes forces and flags. Pure; caller applies to body.
-# Returns: {
-#   "engine_force": float, "drag_force": float, "brake_force": float, "boost_force": float,
-#   "lateral_force": float,   # signed in body-right
-#   "yaw_torque": float,
-#   "rear_force_offset": float,  # for apply pos
-#   "is_sliding": bool,
-#   "is_drifting": bool,
-# }
-# Controller decides positions and calls apply.
-static func compute_forces(
+static func integrate(
+	dt: float,
 	steer: float,
 	throttle: float,
 	brake: float,
 	handbrake: bool,
-	dt: float,
-	forward_vel: float,   # signed fwd speed
-	lat_vel: float,
-	yaw_rate: float,
-	mass: float,
+	boost_active: bool,
+	fwd: float,
+	lat: float,
+	yaw: float,
 	stats: VehicleStats,
 	surface_grip_mult: float,
 	surface_speed_mult: float,
 	external_power_mult: float,
-	boost_active: bool,
 ) -> Dictionary:
-	var eff_max := get_effective_max_speed(stats, surface_speed_mult)
-	var speed := absf(forward_vel)
-	var speed_ratio := clampf(speed / maxf(eff_max, 0.001), 0.0, 1.2)
+	dt = clampf(dt, 0.001, 0.05)
+	steer = clampf(steer, -1.0, 1.0)
+	throttle = clampf(throttle, 0.0, 1.0)
+	brake = clampf(brake, 0.0, 1.0)
+	var mass := maxf(stats.mass, 0.2)
+	var vmax := get_effective_max_speed(stats, surface_speed_mult)
+	var speed := absf(fwd)
+	var speed_ratio := clampf(speed / maxf(vmax, 1.0), 0.0, 1.2)
 
-	# 1. Longitudinal (reuse curve + drag/roll)
-	var engine := calculate_engine_force(throttle, forward_vel, stats, surface_speed_mult, external_power_mult)
-	var drag := calculate_drag_force(forward_vel, stats.aero_drag_coefficient)
-	var roll := calculate_rolling_resistance(forward_vel, stats.rolling_resistance)
-	var brake_f := 0.0
-	if brake > 0.0:
-		brake_f = stats.brake_force * brake
-	var boost_f := 0.0
-	if boost_active:
-		boost_f = stats.boost_power
+	fwd = _integrate_longitudinal(
+		dt, fwd, throttle, brake, handbrake, boost_active,
+		stats, mass, vmax, surface_speed_mult, external_power_mult,
+	)
+	speed = absf(fwd)
+	speed_ratio = clampf(speed / maxf(vmax, 1.0), 0.0, 1.2)
 
-	# Handbrake adds rear long brake
-	var hb_long := 0.0
-	if handbrake:
-		hb_long = VehicleDynamics.calculate_handbrake_force(true, forward_vel, stats)
+	var lock := deg_to_rad(stats.max_steer_angle_deg) * lerpf(
+		1.0,
+		stats.arcade_high_speed_steer_ratio,
+		smoothstep(0.28, 0.88, speed_ratio),
+	)
+	var steer_rad := steer * lock
+	var curvature := tan(steer_rad) / maxf(stats.wheelbase, 1.0)
+	var yaw_wanted := fwd * curvature
 
-	# 2. Steering: mild fade only (0.75-0.85 at top, default 0.82)
-	var hsr := stats.arcade_high_speed_steer_ratio
-	var fade := smoothstep(0.25, 0.85, speed_ratio)
-	var steer_lock := deg_to_rad(stats.max_steer_angle_deg) * lerpf(1.0, hsr, fade)
-	var steer_rad := clampf(steer, -1.0, 1.0) * steer_lock
+	var over := 0.0
+	if speed > vmax * 0.32 and absf(steer) > 0.12 and throttle > 0.2:
+		over = stats.arcade_throttle_oversteer * throttle * smoothstep(0.32, 0.88, speed_ratio)
+	if handbrake and speed > stats.drift_min_speed * 0.7:
+		over = maxf(over, 0.78)
 
-	# Ideal yaw for no-slip cornering (ackermann approx)
-	var ideal_yaw := 0.0
-	if speed > 5.0:
-		ideal_yaw = forward_vel * tan(steer_rad) / maxf(stats.wheelbase, 1.0)
+	yaw_wanted *= 1.0 + 0.7 * over
 
-	# 3. Single grip budget (use weighted grip for consistency)
-	var mu := get_effective_grip(stats, surface_grip_mult)
-	var max_lat_f := mu * mass * REFERENCE_GRAVITY
-
-	# Throttle oversteer: reduce rear grip share at speed+throttle+steer (no hb needed)
-	var rear_grip_mult := 1.0
-	if speed > eff_max * 0.45 and absf(steer) > 0.08 and throttle > 0.25:
-		var sw := smoothstep(0.45, 1.0, speed_ratio)
-		rear_grip_mult = clampf(1.0 - stats.arcade_throttle_oversteer * sw * throttle, 0.35, 1.0)
-
-	# Handbrake further reduces rear + adds committed yaw
-	if handbrake:
-		rear_grip_mult *= stats.drift_rear_grip_ratio
-
-	# Demanded lat from current slip + steering desire (yaw error drives correction)
-	var lat_demand := -lat_vel * 6.5   # base side-slip restoring stiffness (tuned for toy feel)
-	var yaw_error := ideal_yaw - yaw_rate
-	var yaw_correction := yaw_error * mass * stats.wheelbase * 0.55 * stats.steering_response * 0.08
-	var demanded_lat := lat_demand + yaw_correction
-
-	# Rear weakness shrinks the budget so throttle+steer at speed exceeds grip.
-	max_lat_f *= clampf(0.50 + 0.50 * rear_grip_mult, 0.45, 1.0)
-	var applied_lat := clampf(demanded_lat, -max_lat_f, max_lat_f)
-	var excess := demanded_lat - applied_lat
-
-	var inertia := mass * (stats.wheelbase * stats.wheelbase + 18.0 * 18.0) / 12.0
-	var countering := absf(steer) > 0.12 and absf(yaw_rate) > 0.05 and signf(steer) != signf(yaw_rate)
-	var yaw_torque := 0.0
+	var countering := absf(steer) > 0.12 and absf(yaw) > 0.08 and signf(steer) != signf(yaw)
 	if countering:
-		yaw_torque = -yaw_rate * inertia * stats.steering_response * 1.6
+		yaw = move_toward(yaw, 0.0, stats.steering_response * 2.4 * dt)
+	elif handbrake:
+		yaw += steer * 12.0 * dt
 	else:
-		yaw_torque = yaw_error * inertia * stats.steering_response * 0.55
-		yaw_torque += signf(steer) * absf(excess) * stats.wheelbase * 0.22
-		yaw_torque += steer * (1.0 - rear_grip_mult) * mass * stats.wheelbase * 2.8 * speed_ratio
-		if handbrake:
-			yaw_torque += stats.drift_yaw_assist * mass * 22.0 * steer
+		var rate := stats.steering_response * (0.42 if over > 0.12 else 1.0)
+		yaw = lerpf(yaw, yaw_wanted, 1.0 - exp(-rate * dt))
 
-	var over_grip := absf(demanded_lat) > max_lat_f * 0.88
-	var is_sliding := (over_grip or rear_grip_mult < 0.92) and speed > 120.0 and absf(steer) > 0.12
+	var mu := get_effective_grip(stats, surface_grip_mult) * (1.0 - 0.5 * over)
+	var lat_damp := mu * GRAVITY / maxf(speed, 90.0)
+	lat = move_toward(lat, 0.0, lat_damp * dt)
+	if over > 0.08 and not countering:
+		lat += -signf(steer) * over * speed * 0.12 * dt
 
-	# is_drifting only for committed handbrake (set by caller state machine too)
-	var is_drifting := handbrake and speed >= stats.drift_min_speed and absf(steer) >= stats.drift_entry_steer * 0.7
-
+	var sliding := over > 0.1 and speed > 110.0 and absf(steer) > 0.12
+	var drifting := handbrake and speed >= stats.drift_min_speed and absf(steer) >= stats.drift_entry_steer
 	return {
-		"engine_force": engine,
-		"drag_force": drag,
-		"roll_force": roll,
-		"brake_force": brake_f,
-		"hb_long_force": hb_long,
-		"boost_force": boost_f,
-		"lateral_force": applied_lat,
-		"yaw_torque": yaw_torque,
-		"is_sliding": is_sliding,
-		"is_drifting": is_drifting,
-		"rear_grip_mult": rear_grip_mult,  # informational
-		"ideal_yaw": ideal_yaw,
+		"fwd": fwd,
+		"lat": lat,
+		"yaw": yaw,
+		"rack": steer_rad,
+		"is_sliding": sliding,
+		"is_drifting": drifting,
 	}
+
+
+static func _integrate_longitudinal(
+	dt: float,
+	fwd: float,
+	throttle: float,
+	brake: float,
+	handbrake: bool,
+	boost_active: bool,
+	stats: VehicleStats,
+	mass: float,
+	vmax: float,
+	surface_speed_mult: float,
+	external_power_mult: float,
+) -> float:
+	var curve := VehicleDynamics.get_engine_torque_curve(
+		absf(fwd), vmax,
+		stats.launch_torque_multiplier, stats.torque_peak_ratio,
+		stats.torque_at_max_speed, stats.torque_falloff_exponent,
+	)
+	if throttle > 0.0 and fwd < vmax:
+		fwd += (throttle * stats.engine_force * curve * external_power_mult * surface_speed_mult / mass) * dt
+	if boost_active:
+		fwd += (stats.boost_power / mass) * dt
+	if brake > 0.0:
+		if fwd > 8.0:
+			fwd -= (stats.brake_force * brake / mass) * dt
+		elif fwd < -8.0:
+			fwd += (stats.brake_force * brake / mass) * dt
+		else:
+			fwd = move_toward(fwd, -stats.reverse_speed * brake * 0.55, (stats.engine_force * 0.4 / mass) * dt)
+	if handbrake:
+		fwd = move_toward(fwd, 0.0, (stats.handbrake_force / mass) * dt)
+	fwd -= (stats.aero_drag_coefficient * fwd * absf(fwd) / mass) * dt
+	fwd -= (stats.rolling_resistance * signf(fwd) / mass) * dt
+	return clampf(fwd, -stats.reverse_speed, vmax * 1.2)
