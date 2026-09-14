@@ -8,8 +8,8 @@ extends RefCounted
 const GRAVITY := 980.0
 const LAT_DAMP := 72.0
 const OVER_DAMP_REDUCE := 0.18
-const OVER_YAW_BOOST := 0.35
-const YAW_TORQUE_SCALE := 0.48
+const OVER_YAW_BOOST := 0.0
+const YAW_TORQUE_SCALE := 0.50
 const OVER_SPEED_START := 0.62
 
 
@@ -91,6 +91,8 @@ static func compute_forces(
 	if absf(fwd) > 5.0:
 		yaw_wanted = fwd * tan(steer_rad) / maxf(stats.wheelbase, 1.0)
 	yaw_wanted *= 1.0 + OVER_YAW_BOOST * over
+	if speed_ratio > 0.74:
+		yaw_wanted *= 0.52
 	var inertia := mass * (stats.wheelbase * stats.wheelbase + 324.0) / 12.0
 	var yaw_torque := 0.0
 	var countering := absf(steer) > 0.12 and absf(yaw) > 0.08 and steer * yaw < 0.0
