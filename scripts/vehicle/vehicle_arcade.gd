@@ -6,7 +6,7 @@ extends RefCounted
 ## Lateral damping rate does not fall with speed.
 
 const GRAVITY := 980.0
-const LAT_DAMP := 68.0
+const LAT_DAMP := 72.0
 const OVER_DAMP_REDUCE := 0.18
 const OVER_YAW_BOOST := 0.35
 const YAW_TORQUE_SCALE := 0.48
