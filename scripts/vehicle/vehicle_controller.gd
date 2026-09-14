@@ -38,6 +38,7 @@ var speed: float = 0.0
 var current_grip: float = 0.0
 var slip_angle: float = 0.0
 var is_drifting: bool = false
+var is_sliding: bool = false
 var boost_amount: float = 0.0
 var current_surface: StringName = &"polished counter"
 var surface_grip_multiplier: float = 1.0
@@ -91,6 +92,7 @@ var _drift_yaw_assist_scale := 1.0
 var _rear_grip_recovery := 1.0  # 0..1 interpolation factor during recovery
 var _front_lateral_force := 0.0  # cached for friction circle
 var _rear_lateral_force := 0.0  # cached for friction circle
+
 
 
 func _ready() -> void:
@@ -246,6 +248,7 @@ func add_boost(amount: float, source: String = "general") -> void:
 func reset_dynamics_state() -> void:
 	## Called on recovery/reset to clear all v1 transient state.
 	is_drifting = false
+	is_sliding = false
 	_drift_state = DriftState.NONE
 	_drift_boost_accumulated = 0.0
 	_drift_qualified_time = 0.0
@@ -462,7 +465,6 @@ func _v1_physics_step(delta: float) -> void:
 	_front_slip_angle = float(slips["front"])
 	_rear_slip_angle = float(slips["rear"])
 
-	# ── Normal loads (load split) ──
 	var front_normal := DYNAMICS.calculate_axle_normal_load(
 		stats.mass, stats.front_weight_ratio, true,
 	)
@@ -659,10 +661,10 @@ func _v1_update_drift(delta: float, fwd_speed: float) -> void:
 			_v1_drift_during(delta, fwd_speed, rear_slip_deg)
 
 		DriftState.EXITING:
-			# Recovery interpolation handled by _rear_grip_recovery above
 			_drift_state = DriftState.NONE
 
 	is_drifting = _drift_state == DriftState.ACTIVE
+	is_sliding = false
 
 
 func _v1_drift_try_entry(fwd_speed: float, _rear_slip_deg: float) -> void:
