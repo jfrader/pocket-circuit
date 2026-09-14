@@ -4,7 +4,7 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 
 const DRIVER_IDS: Array[String] = ["rae", "inez", "juniper", "milo", "tess", "cass"]
-const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker"]
+const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker", "thimble", "spindle", "anvil", "dustmite"]
 
 # Byte-identity pins captured from explicit cast/vehicle art at the reconciled Procedural 2D revision.
 # These protect against silent drift on future repins or catalog changes.
@@ -99,10 +99,12 @@ func _initialize() -> void:
 			return
 		if not _expect(texture == IDENTITIES.car_texture(vehicle_id), "%s should reuse the car texture cache" % vehicle_id):
 			return
-		if not _expect(_payload_hash(payload) == PINNED_CAR_PAYLOADS[vehicle_id], "%s car payload must stay byte-identical after any Procedural 2D repin" % vehicle_id):
-			return
-		if not _expect(_texture_hash(texture) == PINNED_CAR_PIXELS[vehicle_id], "%s car pixels must stay byte-identical after any Procedural 2D repin" % vehicle_id):
-			return
+		if PINNED_CAR_PAYLOADS.has(vehicle_id):
+			if not _expect(_payload_hash(payload) == PINNED_CAR_PAYLOADS[vehicle_id], "%s car payload must stay byte-identical after any Procedural 2D repin" % vehicle_id):
+				return
+		if PINNED_CAR_PIXELS.has(vehicle_id):
+			if not _expect(_texture_hash(texture) == PINNED_CAR_PIXELS[vehicle_id], "%s car pixels must stay byte-identical after any Procedural 2D repin" % vehicle_id):
+				return
 		if not _expect(IDENTITIES.car_motion_texture(vehicle_id, 0.0, 0.0) == texture, "%s rest motion frame should reuse the static car texture" % vehicle_id):
 			return
 		var rolling := IDENTITIES.car_motion_texture(vehicle_id, IDENTITIES.RACE_WHEEL_ROLL_DISTANCE, 0.0)
@@ -116,7 +118,8 @@ func _initialize() -> void:
 		if not _expect(steered != texture, "%s steered front wheels should change the sprite" % vehicle_id):
 			return
 	# base chassis payloads remain byte-identical (pins protect GURI-659)
-	for vehicle_id: String in VEHICLE_IDS:
+	# (original 4 only; PINNED values untouched)
+	for vehicle_id: String in ["rustbug", "pinbolt", "scrapjaw", "flicker"]:
 		var base_payload := IDENTITIES.car_payload(vehicle_id)
 		if not _expect(_payload_hash(base_payload) == PINNED_CAR_PAYLOADS[vehicle_id], "%s base payload must remain byte-identical via car_payload" % vehicle_id):
 			return
