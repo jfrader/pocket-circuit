@@ -30,7 +30,7 @@ SOFTWARE.
 
 Pocket Circuit includes adapted generator, renderer, and catalog source from
 the first-party Gurisitos Games Procedural 2D project, pinned to revision
-`cb4ae73df94b60590b7dea95f09a7209775be9e1` and distributed under the MIT
+`9fc832c9638471739a61aeac1e84fe44408212f5` and distributed under the MIT
 License.
 
 Copyright (c) 2026 Gurisitos Games
