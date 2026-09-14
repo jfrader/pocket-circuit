@@ -33,6 +33,8 @@
 - Adaptive music follows race phase when the live engine is loaded (grid on
   countdown, "race" at start with speed-normalized intensity and standing
   pressure, final-lap flag, finish+win result).
+- Race music now uses the full extended arc (menu/garage, grid, ignition,
+  slipstream, attack, redline, final lap, finish, cooldown).
 
 ### Changed
 

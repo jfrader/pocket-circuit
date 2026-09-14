@@ -500,6 +500,20 @@ func _on_race_finished(_total_time: float) -> void:
 	_retry_button.disabled = true
 	_continue_button.disabled = true
 	_update_results(race_manager.get_results())
+	_play_finish_cooldown()
+
+
+func _play_finish_cooldown() -> void:
+	# Let the victory sting play before the resolving cooldown under the results panel.
+	await get_tree().create_timer(4.0).timeout
+	if not _finished or not is_inside_tree():
+		return
+	var app := get_node_or_null("/root/App")
+	if app == null:
+		return
+	var director: Variant = app.get("audio_director")
+	if is_instance_valid(director) and (director is Node) and director.has_method("cue_live_section"):
+		(director as Node).call("cue_live_section", "cooldown")
 
 
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:
@@ -666,7 +680,7 @@ func _play_sfx(sound_name: StringName, volume_scale: float = 1.0) -> void:
 		app.call("play_sfx", sound_name, volume_scale)
 
 
-func _push_live_race_state(phase: String, final_lap: bool = false) -> void:
+func _push_live_race_state(phase: String, final_lap: bool = false, finish_result: String = "") -> void:
 	# Additive, music-only. Guarded by ClassDB + get_node_or_null so race logic and
 	# non-audio tests are completely unaffected. Uses App.get_current_race_session()
 	# access pattern that already exists in this file.
@@ -699,11 +713,10 @@ func _push_live_race_state(phase: String, final_lap: bool = false) -> void:
 	if cnt > 1:
 		# pressure from current standing (1=lead high pressure, higher numbers lower); mirrors progress/position math already in race_manager
 		pressure = clampf((float(cnt) - float(pos)) / float(cnt - 1), 0.0, 1.0)
-	(director as Node).call("set_live_race_state", phase, intensity, pressure, final_lap)
-	if phase == "finish" and pos == 1:
-		var live := (director as Node).get_node_or_null("GamestrumentsPlayer")
-		if is_instance_valid(live):
-			live.set("finishResult", "win")
+	var fr := finish_result
+	if phase == "finish":
+		fr = "win" if pos == 1 else "loss"
+	(director as Node).call("set_live_race_state", phase, intensity, pressure, final_lap, fr)
 
 
 func _ensure_debug_overlay() -> void:
