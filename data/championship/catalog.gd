@@ -241,6 +241,82 @@ const VEHICLES := [
 		"stats_path": "res://data/vehicles/flicker.tres",
 		"ratings": {"speed": 0.923611, "grip": 0.72, "mass": 0.60, "drift": 0.904762},
 	},
+	{
+		"id": "thimble",
+		"name": "Thimble",
+		"archetype": "Lightweight",
+		"strength": "Nimble acceleration and tight steering",
+		"tradeoff": "Lower top speed and crash durability",
+		"unlock": "Quick Race",
+		"tint": "ffd166",
+		"car_art": {
+			"seed": 92005, "type": "compact",
+			"options": {"palette": "citrus_pop", "parts": {
+				"hood": "flat", "cabin": "low", "bumpers": "slim",
+				"wheels": "spoke", "spoiler": "none", "livery": "hash_marks",
+			}},
+		},
+		"stats_path": "res://data/vehicles/thimble.tres",
+		"ratings": {"speed": 0.902778, "grip": 0.78, "mass": 0.541667, "drift": 0.714286},
+		"availability": "quick_race",
+	},
+	{
+		"id": "spindle",
+		"name": "Spindle",
+		"archetype": "Technical",
+		"strength": "Precision grip and confident braking",
+		"tradeoff": "Minimal drift assistance",
+		"unlock": "Quick Race",
+		"tint": "9ad1ff",
+		"car_art": {
+			"seed": 92006, "type": "coupe",
+			"options": {"palette": "midnight_teal", "parts": {
+				"hood": "ridged", "cabin": "fastback", "bumpers": "sport",
+				"wheels": "disc", "spoiler": "lip", "livery": "side_swoosh",
+			}},
+		},
+		"stats_path": "res://data/vehicles/spindle.tres",
+		"ratings": {"speed": 0.875, "grip": 0.98, "mass": 0.625, "drift": 0.428571},
+		"availability": "quick_race",
+	},
+	{
+		"id": "anvil",
+		"name": "Anvil",
+		"archetype": "Bruiser",
+		"strength": "Brute straight-line speed and collision resistance",
+		"tradeoff": "Sluggish steering and turn-in",
+		"unlock": "Quick Race",
+		"tint": "c98a6b",
+		"car_art": {
+			"seed": 92007, "type": "muscle",
+			"options": {"palette": "candy_red", "parts": {
+				"hood": "power_scoop", "cabin": "notched", "bumpers": "pipe",
+				"wheels": "beadlock", "spoiler": "none", "livery": "racing_stripe",
+			}},
+		},
+		"stats_path": "res://data/vehicles/anvil.tres",
+		"ratings": {"speed": 0.986111, "grip": 0.86, "mass": 1.0, "drift": 0.476190},
+		"availability": "quick_race",
+	},
+	{
+		"id": "dustmite",
+		"name": "Dustmite",
+		"archetype": "Off-Road",
+		"strength": "Wild boost and loose rotation",
+		"tradeoff": "Requires throttle discipline",
+		"unlock": "Quick Race",
+		"tint": "c9e07b",
+		"car_art": {
+			"seed": 92008, "type": "buggy",
+			"options": {"palette": "desert_sage", "parts": {
+				"hood": "dual_scoop", "cabin": "cage", "bumpers": "utility",
+				"wheels": "rugged", "spoiler": "hoop", "livery": "dust_kick",
+			}},
+		},
+		"stats_path": "res://data/vehicles/dustmite.tres",
+		"ratings": {"speed": 0.951389, "grip": 0.76, "mass": 0.583333, "drift": 0.857143},
+		"availability": "quick_race",
+	},
 ]
 
 const ACTS := [
@@ -374,6 +450,23 @@ static func event_ids() -> Array[String]:
 
 
 static func vehicle_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for vehicle: Dictionary in VEHICLES:
+		ids.append(String(vehicle["id"]))
+	return ids
+
+
+static func championship_vehicle_ids() -> Array[String]:
+	# availability missing or not "quick_race" => championship (existing 4 untouched)
+	var ids: Array[String] = []
+	for vehicle: Dictionary in VEHICLES:
+		var avail := String(vehicle.get("availability", "championship"))
+		if avail != "quick_race":
+			ids.append(String(vehicle["id"]))
+	return ids
+
+
+static func quick_race_vehicle_ids() -> Array[String]:
 	var ids: Array[String] = []
 	for vehicle: Dictionary in VEHICLES:
 		ids.append(String(vehicle["id"]))
