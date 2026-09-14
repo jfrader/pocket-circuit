@@ -1,19 +1,37 @@
 {
   "schema_version": 1,
+  "default_weights": {
+    "gender": {"male":1,"female":1},
+    "face_shape": {"oval":4,"square":3,"round":2,"long":1,"diamond":1,"heart":2,"soft_square":3,"tapered":2},
+    "skin_tone": {"porcelain":3,"ivory":8,"golden":6,"olive":5,"amber":2,"sienna":1,"umber":1,"cocoa":1,"deep":1,"ebony":1},
+    "hair_style": {"bald":3,"buzz":4,"crop":9,"undercut":8,"side_part":12,"curls":6,"afro":2,"braids":2,"locs":2,"ponytail":7,"top_knot":2,"long":8,"mohawk":1,"quiff":8,"curtains":6,"bob":6,"wavy":7,"pixie":5,"slick_back":5,"messy_crop":7},
+    "hair_color": {"black":5,"espresso":10,"chestnut":12,"auburn":4,"copper":2,"golden_blond":5,"platinum":1,"ash":2,"silver":2,"blue_black":1},
+    "brow_style": {"straight":5,"arched":4,"thick":2,"soft":5,"angled":1,"unibrow":1},
+    "eye_style": {"round":3,"narrow":1,"wide":2,"hooded":3,"upturned":1,"downturned":1},
+    "nose_style": {"straight":4,"broad":1,"short":2,"angular":1,"hooked":1,"button":2},
+    "mouth_style": {"neutral":5,"smile":6,"wide":2,"serious":2,"grin":1,"smirk":3,"open":1,"closed_smile":5,"skeptical":2},
+    "facial_hair": {"none":75,"stubble":15,"moustache":2,"goatee":1,"short_beard":6,"full_beard":1,"chinstrap":1,"soul_patch":1,"heavy_stubble":3},
+    "outfit": {"crew":8,"jacket":8,"turtleneck":3,"hoodie":6,"collared":7,"armor":1,"polo":6,"cardigan":5,"blazer":5,"denim":7}
+  },
+  "hair_weights_by_gender": {
+    "male": {"crop":12,"undercut":9,"side_part":14,"quiff":12,"curtains":7,"slick_back":8,"messy_crop":10,"ponytail":2,"top_knot":1,"braids":1,"locs":1},
+    "female": {"bob":14,"pixie":7,"long":14,"wavy":14,"ponytail":10,"curtains":8,"side_part":5,"crop":2,"undercut":2,"buzz":1,"bald":1,"mohawk":1}
+  },
   "traits": {
-    "face_shape": ["oval", "square", "round", "long", "diamond", "heart"],
+    "gender": ["male", "female"],
+    "face_shape": ["oval", "square", "round", "long", "diamond", "heart", "soft_square", "tapered"],
     "skin_tone": ["porcelain", "ivory", "golden", "olive", "amber", "sienna", "umber", "cocoa", "deep", "ebony"],
-    "hair_style": ["bald", "buzz", "crop", "undercut", "side_part", "curls", "afro", "braids", "locs", "ponytail", "top_knot", "long", "mohawk", "quiff"],
+    "hair_style": ["bald", "buzz", "crop", "undercut", "side_part", "curls", "afro", "braids", "locs", "ponytail", "top_knot", "long", "mohawk", "quiff", "curtains", "bob", "wavy", "pixie", "slick_back", "messy_crop"],
     "hair_color": ["black", "espresso", "chestnut", "auburn", "copper", "golden_blond", "platinum", "ash", "silver", "blue_black"],
     "brow_style": ["straight", "arched", "thick", "soft", "angled", "unibrow"],
     "eye_style": ["round", "narrow", "wide", "hooded", "upturned", "downturned"],
     "eye_color": ["coffee", "hazel", "amber", "moss", "slate", "sky", "violet"],
     "nose_style": ["straight", "broad", "short", "angular", "hooked", "button"],
-    "mouth_style": ["neutral", "smile", "wide", "serious", "grin", "smirk", "open"],
-    "facial_hair": ["none", "stubble", "moustache", "goatee", "short_beard", "full_beard", "chinstrap"],
-    "accessory": ["none", "glasses", "round_glasses", "earring", "headband", "hair_clip"],
-    "marking": ["none", "freckles", "cheek_scar", "brow_scar", "beauty_spot", "vitiligo"],
-    "outfit": ["crew", "jacket", "turtleneck", "hoodie", "collared", "armor"],
+    "mouth_style": ["neutral", "smile", "wide", "serious", "grin", "smirk", "open", "closed_smile", "skeptical"],
+    "facial_hair": ["none", "stubble", "moustache", "goatee", "short_beard", "full_beard", "chinstrap", "soul_patch", "heavy_stubble"],
+    "accessory": ["none", "glasses", "round_glasses", "earring", "headband", "hair_clip", "stud", "aviators"],
+    "marking": ["none", "freckles", "cheek_scar", "brow_scar", "beauty_spot", "vitiligo", "dimples", "smile_lines"],
+    "outfit": ["crew", "jacket", "turtleneck", "hoodie", "collared", "armor", "polo", "cardigan", "blazer", "denim"],
     "accent_palette": ["lagoon", "marigold", "berry", "moss", "cobalt", "orchid"],
     "facing": ["left", "right"]
   },
@@ -56,7 +74,11 @@
     {"id": "turtleneck", "colors": {"shadow": "#25282D", "base": "#41464D", "light": "#697078"}},
     {"id": "hoodie", "colors": {"shadow": "#26342E", "base": "#415C4F", "light": "#6E8376"}},
     {"id": "collared", "colors": {"shadow": "#35302A", "base": "#625849", "light": "#91816A"}},
-    {"id": "armor", "colors": {"shadow": "#2B3542", "base": "#526476", "light": "#8497A6"}}
+    {"id": "armor", "colors": {"shadow": "#2B3542", "base": "#526476", "light": "#8497A6"}},
+    {"id": "polo", "colors": {"shadow": "#2B3543", "base": "#526779", "light": "#8AA0AE"}},
+    {"id": "cardigan", "colors": {"shadow": "#3B3031", "base": "#70605C", "light": "#AC9786"}},
+    {"id": "blazer", "colors": {"shadow": "#252C3D", "base": "#424E66", "light": "#758399"}},
+    {"id": "denim", "colors": {"shadow": "#26384B", "base": "#46617D", "light": "#829CB5"}}
   ],
   "accent_palettes": [
     {"id": "lagoon", "colors": {"accent": "#27B6A6", "light": "#79E1D0"}},
