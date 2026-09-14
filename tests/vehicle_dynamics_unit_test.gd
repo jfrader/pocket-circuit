@@ -253,6 +253,27 @@ func _init() -> void:
 		passed += _assert_true("skidpad_sim_%s (%.3f vs %.3f)" % [vid4, sim_g, analytical_g],
 			absf(sim_g - analytical_g) < analytical_g * 0.10)
 
+	# ── Arcade downforce, transfer, and toy-scale speed ──
+	passed += _assert_near("downforce_q_rest", VehicleDynamics.downforce_q(0.0, 680.0, 0.32), 0.0)
+	passed += _assert_near("downforce_q_top", VehicleDynamics.downforce_q(680.0, 680.0, 0.32), 0.32)
+	passed += _assert_true("downforce_q_capped", VehicleDynamics.downforce_q(680.0, 680.0, 4.0) <= 0.6)
+	var coast_loads := VehicleDynamics.axle_loads_with_transfer(1.0, 0.52, 0.0, 0.16, 0.0)
+	var accel_loads := VehicleDynamics.axle_loads_with_transfer(1.0, 0.52, 1.0, 0.16, 0.0)
+	var brake_loads := VehicleDynamics.axle_loads_with_transfer(1.0, 0.52, -1.0, 0.16, 0.0)
+	passed += _assert_true("transfer_accel_unloads_front", float(accel_loads["front"]) < float(coast_loads["front"]))
+	passed += _assert_true("transfer_brake_loads_front", float(brake_loads["front"]) > float(coast_loads["front"]))
+	var aero_brake := VehicleDynamics.calculate_brake_forces(1.0, 1.0, _make_test_stats(), 1.0, 0.0, 0.0, 0.32)
+	var dry_brake := VehicleDynamics.calculate_brake_forces(1.0, 1.0, _make_test_stats(), 1.0, 0.0, 0.0, 0.0)
+	passed += _assert_true(
+		"downforce_boosts_brakes",
+		absf(float(aero_brake["front_brake"])) + absf(float(aero_brake["rear_brake"]))
+		> absf(float(dry_brake["front_brake"])) + absf(float(dry_brake["rear_brake"]))
+	)
+	for vid_len: String in VEHICLE_IDS:
+		var slen := CATALOG.create_vehicle_stats(vid_len)
+		var lps := VehicleDynamics.car_lengths_per_second(slen)
+		passed += _assert_true("toy_scale_speed_%s (%.2f lengths/s)" % [vid_len, lps], lps >= 9.0 and lps <= 15.0)
+
 	# ── Parameter range validation (all cars valid) ──
 	for vid5: String in VEHICLE_IDS:
 		var s5 := CATALOG.create_vehicle_stats(vid5)

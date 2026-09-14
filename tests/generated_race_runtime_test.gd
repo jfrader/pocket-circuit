@@ -42,6 +42,14 @@ func _run_test() -> void:
 		return
 	if not _expect(track.get_node_or_null("TrackSurface") is Line2D and track.get_node_or_null("TrackRibbon") == null, "generated runtime track should use the clean themed surface without the triangulating base ribbon"):
 		return
+	var track_surface: PackedVector2Array = (track.get_node_or_null("TrackSurface") as Line2D).points
+	if not _expect(track_surface.size() >= 260, "generated track surface should be arc-length-uniform at >=260 samples (got %d)" % track_surface.size()):
+		return
+	var surface_max_gap := 0.0
+	for index in track_surface.size():
+		surface_max_gap = maxf(surface_max_gap, track_surface[index].distance_to(track_surface[(index + 1) % track_surface.size()]))
+	if not _expect(surface_max_gap <= 35.0 + 1.0, "generated track surface should respect the shared sampler's 35u max spacing (got %.1f)" % surface_max_gap):
+		return
 	var boundary := track.get_node_or_null("InnerBarrier/BoundaryCollision") as CollisionShape2D
 	if not _expect(boundary != null and boundary.shape is ConcavePolygonShape2D and track.get_node_or_null("InnerBarrier/SideFace") is Line2D and track.get_node_or_null("InnerBarrier/TexturedRim") is Line2D and track.get_node_or_null("InnerBarrier/TopLip") is Line2D, "generated island should use a physical concave boundary backed by a raised visible rim"):
 		return
@@ -95,7 +103,7 @@ func _run_test() -> void:
 			if child is AIVehicleController:
 				ai_controller_count += 1
 				var racing_line: PackedVector2Array = child.get("_racing_line")
-				if not _expect(racing_line.size() == 260, "%s should cache the generated racing line" % vehicle.name):
+				if not _expect(racing_line.size() >= 260, "%s should cache the generated racing line at arc-length-uniform density (got %d)" % [vehicle.name, racing_line.size()]):
 					return
 				if child.uses_shortcut_line:
 					shortcut_controller_count += 1

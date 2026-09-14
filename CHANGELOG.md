@@ -11,8 +11,8 @@
   starting grids, countdowns, race position, finish order, results, and
   championship points.
 - Live generated household circuits for every Quick Race reroll and
-  championship event. Players can choose a theme and seed, while six route
-  silhouettes and six room canvases produce reproducible layouts without a
+  championship event. Players can choose a theme and seed, while seeded circuit
+  plans and six room canvases produce reproducible layouts without a
   curated circuit list.
 - Designed track moments on generated circuits: an iconic opening, an early
   crossing hazard in either race direction, a technical surface section, a
@@ -33,9 +33,56 @@
 - Adaptive music follows race phase when the live engine is loaded (grid on
   countdown, "race" at start with speed-normalized intensity and standing
   pressure, final-lap flag, finish+win result).
+- Completed championship events now open solo Mastery Runs against a compatible
+  personal-best ghost, with transparent circuit-shape-calibrated bronze, silver,
+  and gold targets plus configuration-specific lap and race records.
+  Medals never affect story points or unlocks.
+- Generated circuits now have readable deterministic names and complete compact
+  identity summaries. Offline share codes open a verified route preview before
+  an exhibition race, while bounded recent history and favorites survive
+  restarts without affecting championship progress, mastery records, or ghosts.
+- Kitchen, Workshop, and Office circuits now pick a room-story material family
+  and one of two curated palettes from a separate seed. Floor and racing surface
+  stay on one world-space pattern; the racing line does not change.
+- Solo time trials no longer trap you on Results if a save fails. Continue still
+  works, and championship progress stays unchanged.
+- Time-trial ghosts now save after a real race instead of failing a hidden
+  validation check.
+- Generated circuits mix left and right corners instead of one-way ovals, and
+  workshop wood no longer sits under a grey racing-surface wash.
+- Long championship seeds keep mixed corners instead of collapsing into a
+  simple oval. Share codes from generator v2 no longer load.
+- Generated circuits now include deep infield sections, offset switchbacks,
+  doglegs and harbour loops, with seeded proportions and properly rounded
+  corners instead of rotated ovals. Generator v6 rejects older share codes.
+- Compound corners add diagonal connectors and independently varied approach
+  and exit angles while retaining deep infields and long braking straights.
+- Cars keep a readable toy-scale top speed. Pushing too hard at speed can
+  start a recoverable slide; counter-steer saves it, and handbrake drifts
+  still award boost.
+- Quick Race and Circuit Discovery now offer Compact, Standard, Long and
+  Endurance sizes. Larger circuits use expanded rooms and distance-aware curve
+  sampling; shared codes and favorites preserve the selected size.
+- Opening/tightening two-arc corners and safe section excursions add new turn
+  profiles. L-shaped rooms now vary their elbow and proportions by seed.
+- Correctly following a long curve no longer causes a false wrong-way reset,
+  and generated AI racing lines no longer fold at abrupt lateral transitions.
+- Deep bays contain visible raised pads that block cross-cuts throughout the
+  infield while preserving the driving corridor and an open apron sector.
+- Championships keep their master seed, rooms and story progress after the
+  geometry update; old-layout ghosts and mastery records no longer match new laps.
+- Race HUD calls a solo run a time trial instead of 1st of 1, drops invisible
+  gate numbers, and the personal ghost is easier to see. Championship results
+  say saved instead of filed.
 
 ### Changed
 
+- Generated finish lines now span the full racing corridor and use symmetric
+  household landmarks that read clearly in forward and reverse races. Moving
+  hazard artwork is no longer reused as static scenery.
+- Generated circuits now add progression-scaled permanent obstacles with
+  AI-validated passing space. Kitchen and workshop hazards roll onto the course
+  without a countdown overlay; the office coiled cable stays put.
 - Generated circuits now compose different straight extents, headings and turn
   sections within each route program, with broader minimum corner radii.
 - Scenery collision footprints are prepared off the main thread before race
@@ -92,8 +139,9 @@
 - Starting-grid physics no longer displaces rivals into the island before
   they launch. Following cars now respect the leader's speed and distance
   rather than accelerating into a slow queue.
-- Quick Race now accepts arbitrary seeds, and championship events draw a fresh
-  seed and deterministic room canvas whenever a race starts.
+- Quick Race now accepts arbitrary seeds, while each new championship keeps a
+  versioned circuit identity for every event so retries, replays, reverse races,
+  saves, and resumes retain the same generated route and room canvas.
 - Generated circuits now use larger 1.75x room canvases, longer absolute laps,
   and fewer broad corner complexes separated by multiple setup straights. Route
   validation rejects direct chords that replace an entire corner sequence.

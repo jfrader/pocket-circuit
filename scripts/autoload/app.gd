@@ -4,7 +4,14 @@ const BOOT_SCENE := "res://scenes/boot/boot.tscn"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
-const PROCEDURAL_ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"long", &"square", &"el"]
+const CIRCUIT_IDENTITIES := preload("res://scripts/progression/championship_circuit_identity.gd")
+const MASTERY := preload("res://scripts/progression/mastery_run.gd")
+const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
+const RACE_PREPARATION := preload("res://scripts/race/race_preparation.gd")
+const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
+const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
+const CIRCUIT_PREVIEW_QUEUE := preload("res://scripts/race/circuit_preview_queue.gd")
 
 var current_race_session: Dictionary = {}
 var reduced_camera_shake := false
@@ -26,6 +33,11 @@ var _loading_screen: CanvasLayer
 var _loading_cancelled := false
 var _loading_failed := false
 var loading_metrics: Dictionary = {}
+var _mastery_calibration_queue: Array[String] = []
+var _mastery_calibration_active := false
+var _mastery_calibration_worker: Node
+var _mastery_calibration_failures: Dictionary = {}
+var _circuit_preview_queue: Node
 
 
 func _enter_tree() -> void:
@@ -46,6 +58,9 @@ func _ready() -> void:
 	audio_director = audio_script.new()
 	audio_director.name = "AudioDirector"
 	add_child(audio_director)
+	_circuit_preview_queue = CIRCUIT_PREVIEW_QUEUE.new()
+	_circuit_preview_queue.name = "CircuitPreviewQueue"
+	add_child(_circuit_preview_queue)
 	var active_save_path: String = "user://tests/pocket_circuit_app_autoload_test.json" if _test_mode else SaveStore.DEFAULT_PATH
 	_save_store = SAVE_STORE_SCRIPT.new(active_save_path)
 	if _test_mode:
@@ -121,11 +136,16 @@ func confirm_new_championship() -> bool:
 		"reduced_camera_shake": _save_data["reduced_camera_shake"],
 		"reduced_motion": _save_data["reduced_motion"],
 		"first_run": false,
+		"mastery_records": _save_data.get("mastery_records", []).duplicate(true),
+		"personal_ghosts": _save_data.get("personal_ghosts", []).duplicate(true),
+		"circuit_history": _save_data.get("circuit_history", []).duplicate(true),
+		"favorite_circuits": _save_data.get("favorite_circuits", []).duplicate(true),
 	}
 	var candidate := _save_store.default_data()
 	for key: String in preserved_settings:
 		candidate[key] = preserved_settings[key]
 	candidate["championship_started"] = true
+	candidate["championship_circuit"] = CIRCUIT_IDENTITIES.create_championship(_random_seed(CIRCUIT_IDENTITIES.MAX_SEED))
 	if not _save_candidate(candidate):
 		_show_save_error(
 			"Championship not started",
@@ -170,7 +190,11 @@ func open_quick_race() -> void:
 	_shell.call("show_quick_race")
 
 
-func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) -> void:
+func open_discovery() -> void:
+	_shell.call("show_discovery")
+
+
+func start_race(event_id: String, vehicle_id: String, quick_race: bool = false, mastery_run: bool = false) -> void:
 	if _transitioning_to_race:
 		return
 	var event := CATALOG.get_event(event_id)
@@ -178,71 +202,337 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false) 
 		return
 	if not quick_race and not CATALOG.is_event_unlocked(event_id, _save_data):
 		return
+	if mastery_run and not event_id in _save_data.get("completed_events", []):
+		return
 	var event_theme := StringName(event.get("theme", "kitchen"))
 	if event_theme in [&"kitchen", &"workshop", &"office"]:
-		var circuit_draw := random_circuit_seed(event_theme)
-		event = event.duplicate()
-		event["circuit"] = "generated"
-		event["room"] = String(circuit_draw.get("room", "classic"))
-		event["seed"] = int(circuit_draw.get("seed", 0))
+		if quick_race:
+			var circuit_draw := random_circuit_seed(event_theme)
+			var generated_identity := GENERATED_CIRCUITS.create(
+				event_theme,
+				StringName(circuit_draw.get("room", "classic")),
+				int(circuit_draw.get("seed", 0)),
+				bool(event.get("reverse", false)),
+				int(event.get("act", 0))
+			)
+			event = _event_with_generated_identity(event, generated_identity)
+		else:
+			var identity := get_championship_circuit_identity(event_id)
+			if identity.is_empty():
+				return
+			event = CIRCUIT_IDENTITIES.apply_to_event(event, identity)
 	if not vehicle_id in _save_data["unlocked_vehicles"]:
 		vehicle_id = "rustbug"
+	var mastery_context := {}
+	if mastery_run:
+		event = _mastery_solo_event(event)
+		var mastery_metrics := MASTERY.metrics_for_event(_save_data.get("mastery_circuit_metrics"), event)
+		if mastery_metrics.is_empty():
+			_queue_mastery_calibration(event_id)
+			return
+		mastery_context = MASTERY.create_context(event, vehicle_id, mastery_metrics)
+		if (mastery_context.get("identity", {}) as Dictionary).is_empty() or (mastery_context.get("targets", {}) as Dictionary).is_empty():
+			return
 	var candidate := _save_data.duplicate(true)
 	candidate["selected_vehicle"] = vehicle_id
+	if quick_race and event.has("generated_circuit_identity"):
+		candidate["circuit_history"] = CIRCUIT_LIBRARY.add_recent(candidate.get("circuit_history"), event["generated_circuit_identity"])
 	if candidate != _save_data:
 		if _save_candidate(candidate):
 			_save_data = candidate
 		elif not quick_race:
 			_show_save_error(
 				"Vehicle choice not saved",
-				Callable(self, "start_race").bind(event_id, vehicle_id, quick_race),
+				Callable(self, "start_race").bind(event_id, vehicle_id, quick_race, mastery_run),
 				Callable(_shell, "show_vehicle_select").bind(event_id, quick_race)
 			)
 			return
 	current_race_session = {
-		"mode": "quick" if quick_race else "championship",
+		"mode": "quick" if quick_race else ("mastery" if mastery_run else "championship"),
 		"event_id": event_id,
 		"event": event,
 		"vehicle_id": vehicle_id,
-		"difficulty": String(_save_data["difficulty"]),
+		"difficulty": "club_circuit" if mastery_run else String(_save_data["difficulty"]),
 		"result_committed": false,
 	}
+	if mastery_run:
+		var mastery_identity: Dictionary = mastery_context["identity"]
+		current_race_session["mastery_identity"] = mastery_identity
+		current_race_session["mastery_targets"] = (mastery_context["targets"] as Dictionary).duplicate(true)
+		current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), mastery_identity)
 	_begin_race_transition()
 
 
+func start_mastery_run(event_id: String, vehicle_id: String) -> void:
+	start_race(event_id, vehicle_id, false, true)
+
+
+func get_mastery_state(event_id: String, vehicle_id: String = "") -> Dictionary:
+	var event := CATALOG.get_event(event_id)
+	var available: bool = not event.is_empty() and event_id in _save_data.get("completed_events", [])
+	if event.is_empty():
+		return {"available": false, "identity": {}, "record": {}, "targets": {}}
+	var selected := vehicle_id if not vehicle_id.is_empty() else String(_save_data.get("selected_vehicle", "rustbug"))
+	if not selected in _save_data.get("unlocked_vehicles", ["rustbug"]):
+		selected = "rustbug"
+	var identity := get_championship_circuit_identity(event_id)
+	if identity.is_empty():
+		return {"available": false, "identity": {}, "record": {}, "targets": {}}
+	event = CIRCUIT_IDENTITIES.apply_to_event(event, identity)
+	var metrics := MASTERY.metrics_for_event(_save_data.get("mastery_circuit_metrics"), event)
+	if metrics.is_empty():
+		var calibration_failed := available and _mastery_calibration_failures.has(event_id)
+		if available and not calibration_failed:
+			_queue_mastery_calibration(event_id)
+		return {
+			"available": false,
+			"calibrating": available and not calibration_failed,
+			"calibration_failed": calibration_failed,
+			"identity": {},
+			"record": {},
+			"targets": {},
+			"vehicle_id": selected,
+			"ghost_available": false,
+		}
+	var context := MASTERY.create_context(event, selected, metrics)
+	var mastery_identity: Dictionary = context["identity"]
+	var state := MASTERY.state(_save_data.get("mastery_records"), mastery_identity, context["targets"])
+	state["available"] = available and not mastery_identity.is_empty()
+	state["calibrating"] = false
+	state["calibration_failed"] = false
+	state["vehicle_id"] = selected
+	state["ghost_available"] = not PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), mastery_identity).is_empty()
+	return state
+
+
+func record_prepared_mastery_metrics(event: Dictionary, prepared_metrics: Dictionary) -> bool:
+	var metrics := MASTERY.circuit_metrics_from_prepared(event, prepared_metrics)
+	if metrics.is_empty():
+		return false
+	current_race_session["mastery_circuit_metrics"] = metrics.duplicate(true)
+	return true
+
+
+func retry_mastery_calibration(event_id: String) -> void:
+	_queue_mastery_calibration(event_id)
+
+
+func _queue_mastery_calibration(event_id: String) -> void:
+	if event_id.is_empty() or event_id in _mastery_calibration_queue:
+		return
+	if _mastery_calibration_active and String(get_meta("mastery_calibration_event", "")) == event_id:
+		return
+	_mastery_calibration_failures.erase(event_id)
+	_mastery_calibration_queue.append(event_id)
+	call_deferred("_run_next_mastery_calibration")
+
+
+func _run_next_mastery_calibration() -> void:
+	if _mastery_calibration_active or _mastery_calibration_queue.is_empty():
+		return
+	_mastery_calibration_active = true
+	var event_id: String = _mastery_calibration_queue.pop_front()
+	set_meta("mastery_calibration_event", event_id)
+	var event := CATALOG.get_event(event_id)
+	var circuit_identity := get_championship_circuit_identity(event_id)
+	if event_id in _save_data.get("completed_events", []) and not event.is_empty() and not circuit_identity.is_empty():
+		event = CIRCUIT_IDENTITIES.apply_to_event(event, circuit_identity)
+		var worker := RACE_PREPARATION.new()
+		_mastery_calibration_worker = worker
+		add_child(worker)
+		var metrics: Dictionary = await worker.run_data_job(MASTERY.prepare_circuit_metrics.bind(event))
+		_mastery_calibration_worker.queue_free()
+		_mastery_calibration_worker = null
+		if _store_mastery_circuit_metrics(event, metrics):
+			_mastery_calibration_failures.erase(event_id)
+		else:
+			_mastery_calibration_failures[event_id] = true
+		if is_instance_valid(_shell) and _shell.has_method("refresh_mastery_calibration"):
+			_shell.call("refresh_mastery_calibration", event_id)
+	remove_meta("mastery_calibration_event")
+	_mastery_calibration_active = false
+	if not _mastery_calibration_queue.is_empty():
+		call_deferred("_run_next_mastery_calibration")
+
+
+func _store_mastery_circuit_metrics(event: Dictionary, metrics_value: Variant) -> bool:
+	var metrics := MASTERY.normalize_circuit_metrics(metrics_value, event)
+	if metrics.is_empty():
+		return false
+	var current_event := CATALOG.get_event(String(event.get("id", "")))
+	var current_identity := get_championship_circuit_identity(String(event.get("id", "")))
+	if current_event.is_empty() or current_identity.is_empty():
+		return false
+	current_event = CIRCUIT_IDENTITIES.apply_to_event(current_event, current_identity)
+	if MASTERY.circuit_metrics_key_for_event(current_event) != MASTERY.circuit_metrics_key_for_event(event):
+		return false
+	var key := MASTERY.circuit_metrics_key_for_event(event)
+	var metrics_map: Dictionary = _save_data.get("mastery_circuit_metrics", {}).duplicate(true)
+	if metrics_map.get(key) == metrics:
+		return true
+	metrics_map[key] = metrics.duplicate(true)
+	var candidate := _save_data.duplicate(true)
+	candidate["mastery_circuit_metrics"] = metrics_map
+	if not _save_candidate(candidate):
+		return false
+	_save_data = candidate
+	return true
+
+
 func random_circuit_seed(theme: StringName) -> Dictionary:
-	var random := RandomNumberGenerator.new()
-	random.randomize()
-	var seed_value := random.randi_range(0, 999999)
+	var seed_value := _random_seed(999999)
 	return {"theme": String(theme), "room": String(circuit_room_for_seed(seed_value)), "seed": seed_value}
 
 
+func get_championship_circuit_identity(event_id: String) -> Dictionary:
+	var championship: Variant = _save_data.get("championship_circuit")
+	return CIRCUIT_IDENTITIES.event_identity(championship, event_id) if championship is Dictionary else {}
+
+
 func circuit_room_for_seed(seed: int) -> StringName:
-	# Canvas choice is deterministic but uses a mixed stream instead of seed % N,
-	# so it is independent from route family and length selection.
-	var mixed := ((seed * 1103515245 + 12345) ^ (seed << 7)) & 0x7FFFFFFF
-	return PROCEDURAL_ROOMS[posmod(mixed, PROCEDURAL_ROOMS.size())]
+	return GENERATED_CIRCUITS.room_for_route_seed(seed)
 
 
-func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String) -> void:
-	if _transitioning_to_race:
-		return
-	var event := {
-		"id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
-		"name": "%s %s Circuit %d" % [String(theme).capitalize(), String(room).capitalize(), seed],
-		"theme": String(theme),
-		"room": String(room),
-		"seed": seed,
-		"circuit": "generated",
-		"race_format": "circuit",
-		"reverse": false,
-		"opponent_count": 3,
-		"opponents": ["juniper", "milo", "tess"],
+func _random_seed(maximum: int) -> int:
+	var random := RandomNumberGenerator.new()
+	random.randomize()
+	return random.randi_range(0, maximum)
+
+
+func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard") -> Dictionary:
+	return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
+
+
+func circuit_share_code(identity: Dictionary) -> Dictionary:
+	return GENERATED_CIRCUITS.encode_share_code(identity)
+
+
+func decode_circuit_share_code(code: String) -> Dictionary:
+	return GENERATED_CIRCUITS.decode_share_code(code)
+
+
+func retier_circuit_identity(identity_value: Dictionary, length_tier: String) -> Dictionary:
+	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
+		return {}
+	var identity := GENERATED_CIRCUITS.normalize(identity_value)
+	if identity.is_empty():
+		return {}
+	var sub_seeds: Dictionary = identity["sub_seeds"]
+	var overrides := {}
+	for domain: String in ["room_composition", "material", "dressing", "obstacle", "hazard"]:
+		overrides[domain] = sub_seeds[domain]
+	return GENERATED_CIRCUITS.create(
+		StringName(identity["theme"]),
+		StringName(identity["room"]),
+		int(sub_seeds["route"]),
+		bool(identity["reverse"]),
+		int(identity["danger_level"]),
+		String(identity["material_id"]),
+		String(identity["palette_id"]),
+		overrides,
+		length_tier
+	)
+
+
+func get_circuit_library() -> Dictionary:
+	return {
+		"history": CIRCUIT_LIBRARY.normalize_history(_save_data.get("circuit_history")).duplicate(true),
+		"favorites": CIRCUIT_LIBRARY.normalize_favorites(_save_data.get("favorite_circuits")).duplicate(true),
 	}
+
+
+func set_circuit_favorite(identity_value: Dictionary, favorite: bool) -> bool:
+	var identity := GENERATED_CIRCUITS.normalize(identity_value)
+	if identity.is_empty():
+		return false
+	var candidate := _save_data.duplicate(true)
+	var favorites: Variant = candidate.get("favorite_circuits")
+	candidate["favorite_circuits"] = CIRCUIT_LIBRARY.add_favorite(favorites, identity) if favorite else CIRCUIT_LIBRARY.remove_favorite(favorites, String(identity["fingerprint"]))
+	if candidate == _save_data:
+		return true
+	if not _save_candidate(candidate):
+		return false
+	_save_data = candidate
+	return true
+
+
+func prepare_circuit_preview(identity_value: Dictionary) -> Dictionary:
+	var identity := GENERATED_CIRCUITS.normalize(identity_value)
+	if identity.is_empty():
+		return {}
+	return await _circuit_preview_queue.request(identity)
+
+
+func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_id: String, reverse: bool = false, length_tier: String = "standard") -> bool:
+	if _transitioning_to_race:
+		return false
+	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
+		return false
+	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
+	if identity.is_empty():
+		if not vehicle_id in _save_data["unlocked_vehicles"]:
+			vehicle_id = "rustbug"
+		current_race_session = {
+			"mode": "quick",
+			"event_id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
+			"event": {
+				"id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
+				"name": "Invalid Circuit",
+				"theme": String(theme),
+				"room": String(room),
+				"seed": seed,
+				"circuit": "generated",
+				"race_format": "circuit",
+				"reverse": reverse,
+				"opponent_count": 3,
+				"opponents": ["juniper", "milo", "tess"],
+			},
+			"vehicle_id": vehicle_id,
+			"difficulty": String(_save_data["difficulty"]),
+			"result_committed": false,
+		}
+		_begin_race_transition()
+		return true
+	return _start_generated_identity_race(identity, vehicle_id, "quick")
+
+
+func start_discovery_race(identity_value: Dictionary, vehicle_id: String, preview_fingerprint: String = "") -> bool:
+	if _transitioning_to_race or preview_fingerprint.length() != 16:
+		return false
+	return _start_generated_identity_race(identity_value, vehicle_id, "discovery", preview_fingerprint)
+
+
+func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: String, mode: String, preview_fingerprint: String = "") -> bool:
+	var identity := GENERATED_CIRCUITS.normalize(identity_value)
+	if identity.is_empty() or not mode in ["quick", "discovery"]:
+		return false
+	var event := GENERATED_CIRCUITS.apply_to_event(identity)
+	if event.is_empty():
+		return false
+	if mode == "quick":
+		event["id"] = "circuit_%s_%s_%d" % [String(identity["theme"]), String(identity["room"]), int(identity["sub_seeds"]["route"])]
 	if not vehicle_id in _save_data["unlocked_vehicles"]:
 		vehicle_id = "rustbug"
+	var candidate := _save_data.duplicate(true)
+	candidate["circuit_history"] = CIRCUIT_LIBRARY.add_recent(candidate.get("circuit_history"), identity)
+	if candidate != _save_data:
+		if is_save_read_only():
+			candidate = _save_data
+		elif not _save_candidate(candidate):
+			if mode == "discovery":
+				_show_save_error(
+					"Circuit history not saved",
+					Callable(self, "_start_generated_identity_race").bind(identity, vehicle_id, mode, preview_fingerprint),
+					Callable(_shell, "show_discovery")
+				)
+				return false
+			candidate = _save_data
+		else:
+			_save_data = candidate
+	if not preview_fingerprint.is_empty():
+		event["preview_fingerprint"] = preview_fingerprint
 	current_race_session = {
-		"mode": "quick",
+		"mode": mode,
 		"event_id": event["id"],
 		"event": event,
 		"vehicle_id": vehicle_id,
@@ -250,6 +540,19 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 		"result_committed": false,
 	}
 	_begin_race_transition()
+	return true
+
+
+func _event_with_generated_identity(base_event: Dictionary, identity_value: Dictionary) -> Dictionary:
+	var generated := GENERATED_CIRCUITS.apply_to_event(identity_value, base_event.get("opponents", ["juniper", "milo", "tess"]))
+	if generated.is_empty():
+		return {}
+	var event := base_event.duplicate(true)
+	for key: Variant in generated:
+		event[key] = generated[key]
+	event["id"] = "circuit_%s_%s_%d" % [String(generated["theme"]), String(generated["room"]), int(generated["seed"])]
+	event["generated_circuit_identity"] = (generated["circuit_identity"] as Dictionary).duplicate(true)
+	return event
 
 
 func is_race_loading() -> bool:
@@ -373,12 +676,13 @@ func _leave_race_loading() -> void:
 	_loading_screen = null
 	_transitioning_to_race = false
 	_loading_failed = false
-	_destination = "title" if String(current_race_session.get("mode", "quick")) == "quick" else "map"
+	var mode := String(current_race_session.get("mode", "quick"))
+	_destination = "discovery" if mode == "discovery" else ("title" if mode == "quick" else "map")
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
 
 
-func report_race_result(player_position: int, total_time: float, results: Array, player_dnf: bool = false) -> bool:
+func report_race_result(player_position: int, total_time: float, results: Array, player_dnf: bool = false, performance: Dictionary = {}) -> bool:
 	if current_race_session.is_empty():
 		return false
 	if bool(current_race_session.get("result_committed", false)):
@@ -391,45 +695,104 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 		"results": results,
 		"dnf": player_dnf,
 	}
-	if String(current_race_session["mode"]) == "quick":
+	var mode := String(current_race_session["mode"])
+	if mode in ["quick", "discovery"]:
 		current_race_session["result_committed"] = true
 		current_race_session.erase("save_error")
 		return true
 
+	var result_save := _result_save_candidate_with_session_metrics(event) if not player_dnf else _save_data.duplicate(true)
 	var summary := {
-		"save": _save_data.duplicate(true),
+		"save": result_save,
 		"event_id": String(current_race_session["event_id"]),
 		"new_best": false,
 		"points_gained": 0,
 		"act_completed": false,
 		"ending_unlocked": false,
 		"unlocked_vehicles": [],
+		"mastery": mode == "mastery",
 	}
-	if not player_dnf:
+	if mode == "mastery":
+		summary["mastery_targets"] = (current_race_session.get("mastery_targets", {}) as Dictionary).duplicate(true)
+		summary["mastery_dnf"] = player_dnf
+	if mode == "mastery" and not player_dnf:
+		var identity: Dictionary = current_race_session.get("mastery_identity", {})
+		var targets: Dictionary = current_race_session.get("mastery_targets", {})
+		var laps := maxi(1, int(event.get("laps", 1)))
+		var best_lap := float(performance.get("best_lap", total_time / float(laps)))
+		var mastery_result := MASTERY.apply_result(result_save.get("mastery_records"), identity, targets, best_lap, total_time)
+		var candidate: Dictionary = summary["save"]
+		candidate["mastery_records"] = mastery_result["records"]
+		var ghost_result := PERSONAL_GHOST.store_best(
+			candidate.get("personal_ghosts"),
+			identity,
+			total_time,
+			performance.get("ghost_samples", [])
+		)
+		candidate["personal_ghosts"] = ghost_result["ghosts"]
+		summary["save"] = candidate
+		summary["mastery_record"] = mastery_result["record"]
+		summary["mastery_targets"] = (current_race_session.get("mastery_targets", {}) as Dictionary).duplicate(true)
+		summary["new_best_lap"] = mastery_result["new_best_lap"]
+		summary["new_best_race"] = mastery_result["new_best_race"]
+		summary["medal_improved"] = mastery_result["medal_improved"]
+		summary["ghost_saved"] = ghost_result["saved"]
+	elif mode == "championship" and not player_dnf:
 		summary = CATALOG.apply_event_result(
-			_save_data,
+			result_save,
 			String(current_race_session["event_id"]),
 			int(current_race_session["result"]["position"])
 		)
 	var candidate: Dictionary = summary["save"]
 	if candidate != _save_data and not _save_candidate(candidate):
-		current_race_session["save_error"] = _last_save_error
-		return false
+		if mode == "mastery":
+			var records_only: Dictionary = candidate.duplicate(true)
+			records_only["personal_ghosts"] = (_save_data.get("personal_ghosts", []) as Array).duplicate(true)
+			summary["ghost_saved"] = false
+			if records_only != _save_data and _save_candidate(records_only):
+				candidate = records_only
+			else:
+				current_race_session["save_error"] = _last_save_error
+				current_race_session["result_summary"] = summary
+				current_race_session["post_race_destination"] = "map"
+				return false
+		else:
+			current_race_session["save_error"] = _last_save_error
+			return false
 	_save_data = candidate
 	current_race_session["result_summary"] = summary
-	current_race_session["post_race_destination"] = "ending" if CATALOG.is_ending_pending(candidate) else "map"
+	current_race_session["post_race_destination"] = "ending" if mode == "championship" and CATALOG.is_ending_pending(candidate) else "map"
 	current_race_session["result_committed"] = true
 	current_race_session.erase("save_error")
 	return true
 
 
+func _result_save_candidate_with_session_metrics(event: Dictionary) -> Dictionary:
+	var candidate := _save_data.duplicate(true)
+	var metrics := MASTERY.normalize_circuit_metrics(current_race_session.get("mastery_circuit_metrics"), event)
+	if metrics.is_empty():
+		return candidate
+	var key := MASTERY.circuit_metrics_key_for_event(event)
+	var metrics_map: Dictionary = candidate.get("mastery_circuit_metrics", {}).duplicate(true)
+	metrics_map[key] = metrics.duplicate(true)
+	candidate["mastery_circuit_metrics"] = metrics_map
+	return candidate
+
+
 func continue_after_race(transition_scene: bool = true) -> void:
 	if current_race_session.is_empty() or not current_race_session.has("result"):
 		return
-	if String(current_race_session["mode"]) == "quick":
+	if String(current_race_session["mode"]) in ["quick", "discovery"]:
+		var return_mode := String(current_race_session["mode"])
 		current_race_session.clear()
-		_destination = "title"
+		_destination = "discovery" if return_mode == "discovery" else "title"
 		get_tree().change_scene_to_file(BOOT_SCENE)
+		return
+	if String(current_race_session.get("mode", "")) == "mastery" and not bool(current_race_session.get("result_committed", false)):
+		current_race_session.clear()
+		_destination = "map"
+		if transition_scene:
+			get_tree().change_scene_to_file(BOOT_SCENE)
 		return
 	if not bool(current_race_session.get("result_committed", false)):
 		return
@@ -442,19 +805,66 @@ func continue_after_race(transition_scene: bool = true) -> void:
 func retry_race(reload_scene: bool = true) -> void:
 	if current_race_session.is_empty() or _transitioning_to_race:
 		return
+	if String(current_race_session.get("mode", "")) == "mastery":
+		var identity: Dictionary = current_race_session.get("mastery_identity", {})
+		current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), identity)
+	_reset_race_attempt()
+	if reload_scene:
+		_begin_race_transition()
+
+
+func can_start_mastery_rematch() -> bool:
+	if current_race_session.is_empty() or not bool(current_race_session.get("result_committed", false)):
+		return false
+	if String(current_race_session.get("mode", "")) != "championship" or CATALOG.is_ending_pending(_save_data):
+		return false
+	return String(current_race_session.get("event_id", "")) in _save_data.get("completed_events", [])
+
+
+func start_mastery_rematch(reload_scene: bool = true) -> bool:
+	if not can_start_mastery_rematch() or _transitioning_to_race:
+		return false
+	var event := _mastery_solo_event(current_race_session.get("event", {}))
+	var vehicle_id := String(current_race_session.get("vehicle_id", "rustbug"))
+	var metrics: Dictionary = current_race_session.get("mastery_circuit_metrics", {})
+	if metrics.is_empty():
+		metrics = MASTERY.metrics_for_event(_save_data.get("mastery_circuit_metrics"), event)
+	var context := MASTERY.create_context(event, vehicle_id, metrics)
+	var identity: Dictionary = context["identity"]
+	if identity.is_empty():
+		return false
+	current_race_session["mode"] = "mastery"
+	current_race_session["event"] = event
+	current_race_session["difficulty"] = "club_circuit"
+	current_race_session["mastery_identity"] = identity
+	current_race_session["mastery_targets"] = (context["targets"] as Dictionary).duplicate(true)
+	current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), identity)
+	_reset_race_attempt()
+	if reload_scene:
+		_begin_race_transition()
+	return true
+
+
+func _reset_race_attempt() -> void:
 	current_race_session.erase("result")
 	current_race_session.erase("result_summary")
 	current_race_session.erase("post_race_destination")
 	current_race_session.erase("save_error")
 	current_race_session["result_committed"] = false
-	if reload_scene:
-		_begin_race_transition()
+
+
+func _mastery_solo_event(event: Dictionary) -> Dictionary:
+	var solo := event.duplicate(true)
+	solo["opponent_count"] = 0
+	solo["opponents"] = []
+	return solo
 
 
 func abandon_race() -> void:
 	if current_race_session.is_empty() or current_race_session.has("result"):
 		return
-	_destination = "title" if String(current_race_session.get("mode", "quick")) == "quick" else "map"
+	var mode := String(current_race_session.get("mode", "quick"))
+	_destination = "discovery" if mode == "discovery" else ("title" if mode == "quick" else "map")
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
 
@@ -532,6 +942,8 @@ func _sync_current_scene() -> void:
 		match _destination:
 			"map":
 				_shell.call("show_map", _last_result_summary)
+			"discovery":
+				_shell.call("show_discovery")
 			"ending":
 				_shell.call("show_ending")
 			_:
