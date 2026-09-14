@@ -190,6 +190,8 @@ static func car_steer_frames(payload: Dictionary, spin_frame: int = 0, pixel_sca
 
 
 static func car_pose_image(payload: Dictionary, spin_frame: int, steer_pose: int, pixel_scale: int = 1) -> Image:
+	# Local addition for Pocket Circuit motion-frame path (absent from upstream at the pinned rev).
+	# Preload paths in this file and procedural_avatar_sprites.gd are rewritten for the vendor/ tree.
 	return _render_car(payload, posmod(spin_frame, WHEEL_FRAME_COUNT), clampi(steer_pose, 0, 4) - 2, pixel_scale)
 
 
