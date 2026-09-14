@@ -82,6 +82,8 @@
 - Driving forward no longer teleports you back to the last gate after
   brushing a nearby checkpoint or leaving the racing line briefly. Recovery
   puts you back on the nearby route, facing the right way.
+- Player cars keep more steering at speed and can step the tail out in
+  fast corners without the handbrake. Opposite lock still saves a slide.
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.
