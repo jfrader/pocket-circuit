@@ -6,7 +6,11 @@ extends RefCounted
 ## Lateral damping rate does not fall with speed.
 
 const GRAVITY := 980.0
-const LAT_DAMP := 40.0
+const LAT_DAMP := 68.0
+const OVER_DAMP_REDUCE := 0.18
+const OVER_YAW_BOOST := 0.35
+const YAW_TORQUE_SCALE := 0.48
+const OVER_SPEED_START := 0.62
 
 
 static func get_effective_max_speed(stats: VehicleStats, surface_speed_mult: float) -> float:
@@ -71,22 +75,22 @@ static func compute_forces(
 	var roll := stats.rolling_resistance * signf(fwd)
 	var long_force := engine + boost_f - brake_f - hb_f - drag - roll
 	var over := 0.0
-	if speed > vmax * 0.42 and absf(steer) > 0.18 and throttle > 0.35:
-		over = stats.arcade_throttle_oversteer * throttle * smoothstep(0.42, 0.92, speed_ratio)
+	if speed > vmax * OVER_SPEED_START and absf(steer) > 0.18 and throttle > 0.35:
+		over = stats.arcade_throttle_oversteer * throttle * smoothstep(OVER_SPEED_START, 0.92, speed_ratio)
 	if handbrake and speed > stats.drift_min_speed * 0.65:
 		over = maxf(over, 0.62)
-	var damp := LAT_DAMP * surface_grip_mult * (1.0 - 0.45 * over)
+	var damp := LAT_DAMP * surface_grip_mult * (1.0 - OVER_DAMP_REDUCE * over)
 	var lat_force := -lat * mass * damp
 	var lock := deg_to_rad(stats.max_steer_angle_deg) * lerpf(
 		1.0,
 		stats.arcade_high_speed_steer_ratio,
-		smoothstep(0.30, 0.90, speed_ratio),
+		smoothstep(0.22, 0.85, speed_ratio),
 	)
 	var steer_rad := steer * lock
 	var yaw_wanted := 0.0
 	if absf(fwd) > 5.0:
 		yaw_wanted = fwd * tan(steer_rad) / maxf(stats.wheelbase, 1.0)
-	yaw_wanted *= 1.0 + 0.30 * over
+	yaw_wanted *= 1.0 + OVER_YAW_BOOST * over
 	var inertia := mass * (stats.wheelbase * stats.wheelbase + 324.0) / 12.0
 	var yaw_torque := 0.0
 	var countering := absf(steer) > 0.12 and absf(yaw) > 0.08 and steer * yaw < 0.0
@@ -95,7 +99,7 @@ static func compute_forces(
 	elif handbrake:
 		yaw_torque = steer * inertia * 8.0
 	else:
-		yaw_torque = (yaw_wanted - yaw) * inertia * stats.steering_response * 0.42
+		yaw_torque = (yaw_wanted - yaw) * inertia * stats.steering_response * YAW_TORQUE_SCALE
 	return {
 		"long_force": long_force,
 		"lat_force": lat_force,
