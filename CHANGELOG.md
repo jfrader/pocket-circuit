@@ -79,6 +79,10 @@
 
 ### Changed
 
+- Cars now receive distinct procedural liveries per driver. Rae, Inez, Tess,
+  Cass and rivals sharing a chassis get different palette/livery/wheel/spoiler
+  cosmetics; the same race field always produces the same looks via deterministic
+  slot disambiguation on collisions (including fallbacks).
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.
