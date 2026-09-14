@@ -85,7 +85,7 @@ func show_title(has_progress: bool, read_only: bool) -> void:
 	_focus_later(play if not play.disabled else second_row.back(), _generation)
 
 
-func show_garage(selected: String, unlocked: Array, context: String, next_text: String) -> void:
+func show_garage(selected: String, unlocked: Array, context: String, next_text: String, roster: Array = []) -> void:
 	_begin(GARAGE_ART)
 	_unlocked = unlocked
 	_label("SELECT YOUR CAR", Rect2(86, 65, 720, 58), 40, CREAM)
@@ -114,13 +114,31 @@ func show_garage(selected: String, unlocked: Array, context: String, next_text: 
 		_canvas.add_child(bar)
 		_ratings[key] = bar
 	var car_row: Array[Button] = []
-	for index in CATALOG.VEHICLES.size():
-		var vehicle: Dictionary = CATALOG.VEHICLES[index]
-		var id := String(vehicle["id"])
+	var display_ids: Array[String] = []
+	if roster.is_empty():
+		for v: Dictionary in CATALOG.VEHICLES:
+			display_ids.append(String(v["id"]))
+	else:
+		for item in roster:
+			display_ids.append(String(item))
+	var n := display_ids.size()
+	var base_x := 408
+	var spacing := 180
+	var btn_w := 166
+	if n > 4:
+		# center and tighten for up to 8; 4-car layout (base/spacing/w) left byte-close for n<=4
+		var avail := 1120.0
+		var pitch := avail / float(n)
+		btn_w = int(pitch - 14.0)
+		spacing = int(pitch)
+		base_x = int((1280.0 - avail) * 0.5 + (pitch - float(btn_w)) * 0.5)
+	for index in display_ids.size():
+		var id := display_ids[index]
+		var vehicle: Dictionary = CATALOG.get_vehicle(id)
 		var available := id in unlocked
-		var button := _button(String(vehicle["name"]).to_upper(), Rect2(408 + index * 180, 484, 166, 90), &"")
+		var button := _button(String(vehicle.get("name", id)).to_upper(), Rect2(base_x + index * spacing, 484, btn_w, 90), &"")
 		button.name = "Vehicle_" + id
-		button.text = String(vehicle["name"]).to_upper() + ("" if available else "\nLOCKED")
+		button.text = String(vehicle.get("name", id)).to_upper() + ("" if available else "\nLOCKED")
 		button.add_theme_font_size_override("font_size", 15)
 		button.icon = IDENTITIES.car_texture(id)
 		button.expand_icon = true
