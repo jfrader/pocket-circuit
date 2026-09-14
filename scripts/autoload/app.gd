@@ -221,7 +221,7 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false, 
 			if identity.is_empty():
 				return
 			event = CIRCUIT_IDENTITIES.apply_to_event(event, identity)
-	if not vehicle_id in _save_data["unlocked_vehicles"]:
+	if not quick_race and not vehicle_id in _save_data["unlocked_vehicles"]:
 		vehicle_id = "rustbug"
 	var mastery_context := {}
 	if mastery_run:
@@ -470,8 +470,6 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 		return false
 	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
 	if identity.is_empty():
-		if not vehicle_id in _save_data["unlocked_vehicles"]:
-			vehicle_id = "rustbug"
 		current_race_session = {
 			"mode": "quick",
 			"event_id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
@@ -511,8 +509,6 @@ func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: Stri
 		return false
 	if mode == "quick":
 		event["id"] = "circuit_%s_%s_%d" % [String(identity["theme"]), String(identity["room"]), int(identity["sub_seeds"]["route"])]
-	if not vehicle_id in _save_data["unlocked_vehicles"]:
-		vehicle_id = "rustbug"
 	var candidate := _save_data.duplicate(true)
 	candidate["circuit_history"] = CIRCUIT_LIBRARY.add_recent(candidate.get("circuit_history"), identity)
 	if candidate != _save_data:
