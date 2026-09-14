@@ -44,7 +44,14 @@ func _run_test() -> void:
 	store.remove_save()
 	_write_raw(JSON.stringify({"version": 3, "difficulty": "clockwork", "circuit_history": [repeated, repeated], "favorite_circuits": [repeated]}))
 	var migrated := store.load_data()
-	if not _expect(int(migrated["version"]) == 4 and migrated["circuit_history"].size() == 1 and migrated["favorite_circuits"].size() == 1 and migrated["circuit_history"][0] == repeated, "v3 saves should migrate valid discovery data to bounded canonical v4 records"):
+	if not _expect(
+		int(migrated["version"]) == 4
+		and migrated["circuit_history"].size() == 1
+		and migrated["favorite_circuits"].size() == 1
+		and String(migrated["circuit_history"][0]["fingerprint"]) == String(repeated["fingerprint"])
+		and String(migrated["favorite_circuits"][0]["fingerprint"]) == String(repeated["fingerprint"]),
+		"v3 saves should migrate valid discovery data to bounded canonical v4 records"
+	):
 		return
 	if not _expect(store.save_data(migrated), "migrated discovery data should persist: %s" % store.last_save_error):
 		return

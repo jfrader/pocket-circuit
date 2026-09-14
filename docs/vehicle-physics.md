@@ -75,12 +75,12 @@ NONE → ACTIVE → EXITING → NONE
   yaw damping without snapping velocity or changing the car's position.
 
 Unintentional **high-speed oversteer** is a reading of that same tire curve,
-not a second drift machine. At speed, `VehicleFeel` weakens rear µ first
-(arcade drive-circle) and plants more downforce on the nose, so a fast
-corner rotates instead of plowing. A small steer-directed yaw cue helps the
-tail step out; counter-steer cancels it. Rear demand (linear / peak) ≥ 0.85
-goes `LOOSE`; counter-steer enters `SAVING`; demand back through 0.72 is
-`CALM`. Handbrake drift still owns boost. Dust plays for either.
+not a second drift machine. `VehicleFeel` plants more downforce on the nose
+than the tail. Rear-µ cut and steer-directed yaw are parked (no-ops) because
+they pushed club AI through the 8-second post-winner cutoff on S-curves.
+Rear demand (linear / peak) ≥ 0.85 still goes `LOOSE`; counter-steer enters
+`SAVING`; demand back through 0.72 is `CALM`. Handbrake drift still owns
+boost. Dust plays for either.
 
 Dry top speed stays in the 600–750 wu/s band (~9–15 car lengths per second
 using `wheelbase × 1.45`). Engine force is not zeroed at `max_speed`; drag

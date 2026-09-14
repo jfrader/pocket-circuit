@@ -76,17 +76,9 @@ func _init() -> void:
 	}, 0.016)
 	if not _expect(int(blocked["mode"]) == FEEL.Slide.CALM, "handbrake drift owns the tires; slide stays out"):
 		return
-	if not _expect(is_equal_approx(FEEL.rear_mu_scale(0.0, 1.0, 1.0), 1.0), "low speed keeps full rear grip"):
+	if not _expect(is_equal_approx(FEEL.rear_mu_scale(0.95, 1.0, 1.0), 1.0), "rear mu scale is parked at 1 until the 8s finish window can absorb it"):
 		return
-	if not _expect(FEEL.rear_mu_scale(0.95, 0.2, 1.0) < FEEL.rear_mu_scale(0.2, 1.0, 1.0), "fast corners weaken the rear first"):
-		return
-	if not _expect(FEEL.rear_mu_scale(0.95, 1.0, 1.0) <= FEEL.rear_mu_scale(0.95, 0.0, 1.0), "throttle at speed eats a bit more rear"):
-		return
-	if not _expect(is_zero_approx(FEEL.corner_rotate(0.2, 1.0, 0.0)), "slow steering does not add rotation"):
-		return
-	if not _expect(FEEL.corner_rotate(0.9, 1.0, 0.2) > 0.0, "fast lock rotates the tail into the turn"):
-		return
-	if not _expect(is_zero_approx(FEEL.corner_rotate(0.9, -1.0, 1.0)), "counter-steer does not add spin"):
+	if not _expect(is_zero_approx(FEEL.corner_rotate(0.9, 1.0, 0.2)), "corner rotate is parked at 0 until the 8s finish window can absorb it"):
 		return
 	print("VEHICLE_FEEL_TEST PASS")
 	quit(0)

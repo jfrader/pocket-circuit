@@ -36,26 +36,14 @@ static func chassis(stats: VehicleStats, forward_speed: float, effective_max_spe
 	}
 
 
-static func rear_mu_scale(speed_ratio: float, throttle: float, steer: float) -> float:
-	# Arcade stand-in for rear drive eating the friction circle: at speed the
-	# tail is the weaker axle, more so with throttle and lock. Low speed is 1.
-	var turning := clampf(absf(steer), 0.0, 1.0)
-	var speed_w := smoothstep(0.48, 0.84, speed_ratio)
-	var cut := lerpf(1.0, 0.90, speed_w * lerpf(0.35, 1.0, turning))
-	cut *= lerpf(1.0, 0.94, speed_w * clampf(throttle, 0.0, 1.0))
-	return clampf(cut, REAR_MU_FLOOR, 1.0)
+static func rear_mu_scale(_speed_ratio: float, _throttle: float, _steer: float) -> float:
+	# High-speed rear cut made club AI miss the 8s finish window on S-curves.
+	# Keep the seam; do not bias the tail until that race rule is revisited.
+	return 1.0
 
 
-static func corner_rotate(speed_ratio: float, steer: float, yaw_rate: float) -> float:
-	# Unitless steer-directed yaw at speed. Zero when slow, straight, or
-	# counter-steering — recovery is damping, not more spin.
-	if absf(steer) < 0.16:
-		return 0.0
-	if absf(yaw_rate) > 0.05 and signf(steer) != signf(yaw_rate):
-		return 0.0
-	var speed_w := smoothstep(0.50, 0.86, speed_ratio)
-	var already := clampf(absf(yaw_rate) / 3.6, 0.0, 1.0)
-	return steer * speed_w * (1.0 - already * 0.7) * CORNER_ROTATE
+static func corner_rotate(_speed_ratio: float, _steer: float, _yaw_rate: float) -> float:
+	return 0.0
 
 
 static func rear_demand(slip_rad: float, cornering_stiffness: float, peak_grip: float, rear_load: float) -> float:
