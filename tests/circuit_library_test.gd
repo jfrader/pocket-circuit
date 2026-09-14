@@ -79,6 +79,7 @@ func _fingerprint_count(entries: Array, fingerprint: String) -> int:
 
 
 func _write_raw(text: String) -> void:
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path("user://tests"))
 	var file := FileAccess.open(TEST_PATH, FileAccess.WRITE)
 	if file:
 		file.store_string(text)

@@ -14,7 +14,6 @@ const DRIFT_EXIT_SLIP_DEG := 6.0
 const DRIFT_SPIN_SLIP_DEG := 60.0
 const DRIFT_GRACE_DURATION := 0.20  # seconds
 const DRIFT_MIN_QUALIFIED_TIME := 0.35  # seconds
-const ENGINE_CUT_RATIO := 1.02
 
 # ─── Torque curve ────────────────────────────────────────────────────
 
@@ -46,7 +45,7 @@ static func calculate_engine_force(
 	external_power_mult: float,
 ) -> float:
 	var eff_max := stats.max_speed * surface_speed_mult
-	if throttle <= 0.0 or forward_speed >= eff_max * ENGINE_CUT_RATIO:
+	if throttle <= 0.0 or forward_speed >= eff_max:
 		return 0.0
 	var curve := get_engine_torque_curve(
 		absf(forward_speed), eff_max,
