@@ -457,7 +457,7 @@ func _v1_physics_step(delta: float) -> void:
 
 	var lock_ratio := stats.high_speed_steer_ratio
 	if stats.physics_model_version == 2:
-		lock_ratio = clampf(lock_ratio - 0.04, 0.38, 0.62)
+		lock_ratio = clampf(lock_ratio + 0.06, 0.38, 0.68)
 	var target_steer := DYNAMICS.calculate_target_steer_angle(
 		_steer_input, stats.max_steer_angle_deg, fwd_speed, eff_max,
 		lock_ratio, stats.steer_fade_start_ratio,
@@ -502,11 +502,11 @@ func _v1_physics_step(delta: float) -> void:
 	if (
 		stats.physics_model_version == 2
 		and not _handbrake_input
-		and absf(fwd_speed) > eff_max * 0.32
-		and _throttle_input > 0.25
-		and absf(_steer_input) > 0.12
+		and absf(fwd_speed) > eff_max * 0.48
+		and _throttle_input > 0.45
+		and absf(_steer_input) > 0.22
 	):
-		effective_rear_grip *= 1.0 - stats.arcade_throttle_oversteer * 0.74
+		effective_rear_grip *= 1.0 - stats.arcade_throttle_oversteer * 0.50
 
 	# ── Tire lateral forces ──
 	_front_lateral_force = DYNAMICS.calculate_tire_lateral_force(
@@ -566,22 +566,16 @@ func _v1_physics_step(delta: float) -> void:
 		var k_torque := err * estimated_inertia * stats.steering_response * blend * 0.7
 		var k_lim := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.25
 		apply_torque(clampf(k_torque, -k_lim, k_lim))  # use torque (not direct vel set) to avoid timestep instability / vel override fights with applied forces
+	if stats.physics_model_version == 2 and not _handbrake_input and absf(_steer_input) > 0.08:
+		var follow := (target_yaw_rate - yaw_rate) * estimated_inertia * stats.steering_response * 0.20
+		var follow_lim := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.22
+		apply_torque(clampf(follow, -follow_lim, follow_lim))
 	# Releasing a slide is a request to regain control, not to keep spinning.
 	# Neutral steering damps residual yaw while ordinary cornering and
 	# deliberate held-handbrake slides remain tire-driven.
 	angular_damp = 0.0
 	if not _handbrake_input and absf(_steer_input) < 0.1:
 		angular_damp = stats.yaw_stability_rate * 2.0
-
-	if (
-		stats.physics_model_version == 2
-		and not _handbrake_input
-		and absf(fwd_speed) > eff_max * 0.32
-		and _throttle_input > 0.25
-		and absf(_steer_input) > 0.12
-		and not (absf(yaw_rate) > 0.08 and _steer_input * yaw_rate < 0.0)
-	):
-		apply_torque(signf(_steer_input) * stats.drift_yaw_assist * estimated_inertia * 0.72)
 
 	# ── Drift yaw assist ──
 	if _drift_state == DriftState.ACTIVE:
@@ -622,11 +616,7 @@ func _v1_physics_step(delta: float) -> void:
 	# ── Drift state machine ──
 	_v1_update_drift(delta, fwd_speed)
 	if stats.physics_model_version == 2 and not is_drifting:
-		is_sliding = (
-			absf(fwd_speed) > eff_max * 0.32
-			and _throttle_input > 0.25
-			and absf(_steer_input) > 0.12
-		)
+		is_sliding = rad_to_deg(absf(_rear_slip_angle)) > 11.0 and absf(_steer_input) > 0.15 and absf(fwd_speed) > 120.0
 
 	# ── Speed caps (soft + hard) ──
 	_v1_apply_speed_caps()
