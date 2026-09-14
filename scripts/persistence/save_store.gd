@@ -1,10 +1,14 @@
 class_name SaveStore
 extends RefCounted
 
-const CURRENT_VERSION := 1
+const CURRENT_VERSION := 4
 const DEFAULT_PATH := "user://pocket_circuit_save.json"
 const VALID_DIFFICULTIES := ["sunday_drive", "club_circuit", "clockwork"]
 const CATALOG := preload("res://data/championship/catalog.gd")
+const CIRCUIT_IDENTITIES := preload("res://scripts/progression/championship_circuit_identity.gd")
+const MASTERY := preload("res://scripts/progression/mastery_run.gd")
+const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
+const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
 
 var save_path: String
 var last_load_error: String = ""
@@ -20,12 +24,18 @@ func default_data() -> Dictionary:
 	return {
 		"version": CURRENT_VERSION,
 		"championship_started": false,
+		"championship_circuit": CIRCUIT_IDENTITIES.create_championship(CIRCUIT_IDENTITIES.LEGACY_MIGRATION_SEED),
 		"best_event_finishes": {},
 		"best_event_points": {},
 		"completed_events": [],
 		"completed_acts": [],
 		"unlocked_vehicles": ["rustbug"],
 		"selected_vehicle": "rustbug",
+		"mastery_circuit_metrics": {},
+		"mastery_records": [],
+		"personal_ghosts": [],
+		"circuit_history": [],
+		"favorite_circuits": [],
 		"ending_seen": false,
 		"difficulty": "club_circuit",
 		"master_volume": 1.0,
@@ -66,7 +76,10 @@ func save_data(data: Dictionary) -> bool:
 	if is_read_only:
 		last_save_error = "Saving is disabled because this file was created by a newer Pocket Circuit version"
 		return false
-	var normalized := _normalize(data)
+	var normalized := _canonicalize_for_disk(data)
+	if normalized.is_empty():
+		last_save_error = "Temporary save failed validation"
+		return false
 	var base_dir := save_path.get_base_dir()
 	if not base_dir.is_empty():
 		var directory_error := DirAccess.make_dir_recursive_absolute(_absolute_path(base_dir))
@@ -139,6 +152,14 @@ func remove_save() -> void:
 	is_read_only = false
 
 
+func _canonicalize_for_disk(raw: Dictionary) -> Dictionary:
+	var normalized := _normalize(raw)
+	var parsed: Variant = JSON.parse_string(JSON.stringify(normalized))
+	if parsed is not Dictionary:
+		return {}
+	return _normalize(parsed as Dictionary)
+
+
 func _normalize(raw: Dictionary) -> Dictionary:
 	var normalized := default_data()
 	var raw_finishes: Dictionary = {}
@@ -153,8 +174,17 @@ func _normalize(raw: Dictionary) -> Dictionary:
 		and bool(raw["ending_seen"])
 		and "office" in (derived["completed_acts"] as Array)
 	)
+	normalized["mastery_circuit_metrics"] = MASTERY.normalize_circuit_metrics_map(raw.get("mastery_circuit_metrics"))
+	normalized["mastery_records"] = MASTERY.normalize_records(raw.get("mastery_records"))
+	normalized["personal_ghosts"] = PERSONAL_GHOST.normalize_ghosts(raw.get("personal_ghosts"))
+	normalized["circuit_history"] = CIRCUIT_LIBRARY.normalize_history(raw.get("circuit_history"))
+	normalized["favorite_circuits"] = CIRCUIT_LIBRARY.normalize_favorites(raw.get("favorite_circuits"))
 	var started: Variant = raw.get("championship_started")
 	normalized["championship_started"] = (started is bool and bool(started)) or not derived["completed_events"].is_empty()
+	normalized["championship_circuit"] = CIRCUIT_IDENTITIES.normalize_championship(
+		raw.get("championship_circuit"),
+		CIRCUIT_IDENTITIES.LEGACY_MIGRATION_SEED
+	)
 
 	var unlocked: Array = normalized["unlocked_vehicles"]
 	var selected: Variant = raw.get("selected_vehicle", "rustbug")

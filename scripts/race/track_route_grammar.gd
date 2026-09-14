@@ -1,166 +1,174 @@
 class_name TrackRouteGrammar
-## Compositional macro-route grammar. Programs define an ordering rule while
-## seed streams choose straight extents, bay/waist dimensions, and optional
-## sections. The output is a new route skeleton, not displaced control points.
+## Circuit plans reserve full-width infield passages before rounding corners.
 
-const NAMES: Array[StringName] = [&"perimeter", &"lobes", &"wedge"]
+const NAMES: Array[StringName] = [&"infield", &"switchback", &"dogleg", &"harbour"]
 const MACRO_SALT := 0x36D1A77
+const CORNER_RADIUS := 180.0
+const CONTROL_SPACING := 55.0
+# Both legs of a convex corner must be at least this long before it can host a
+# chamfer; shorter legs belong to bays/notches that must stay untouched.
+const MIN_CHAMFER_LEG := 1000.0
+const SECTIONS := preload("res://scripts/race/track_route_sections.gd")
+# Both legs of a convex corner must be at least this long before it can host a
+# two-arc opening/tightening profile; shorter legs keep the plain circular fillet.
+const MIN_PROFILE_LEG := 700.0
 
 
 static func count() -> int:
 	return NAMES.size()
 
 
-static func construct(index: int, seed: int, length_bias: float = 0.0) -> Dictionary:
-	var program_index := posmod(index, NAMES.size())
-	var program := NAMES[program_index]
-	var section := _roll_int(seed, 0x51A7 + program_index * 97, 3)
-	var extent := _roll_int(seed, 0x62B9 + program_index * 131, 2)
-	var anchors := PackedVector2Array()
+static func construct(index: int, seed: int, length_bias: float = 0.0, bounds := Rect2(-1300, -800, 2600, 1600)) -> Dictionary:
+	var program := NAMES[posmod(index, count())]
+	var width := bounds.size.x * _roll(seed, 11, 0.83, 0.94)
+	var height := bounds.size.y * _roll(seed, 17, 0.78, 0.88)
+	var x := width * 0.5
+	var y := height * 0.5
+	var lane := maxf(400.0, height * _roll(seed, 19, 0.28, 0.39))
+	var vertices := PackedVector2Array()
 	match program:
-		&"perimeter":
-			anchors = _perimeter(seed, section)
-		&"lobes":
-			anchors = _lobes(seed, section)
-		_:
-			anchors = _wedge(seed, section)
-	anchors = _apply_extent(anchors, extent)
-	if length_bias > 0.50:
-		program = &"endurance"
-		anchors = _endurance(anchors, length_bias)
-	else:
-		anchors = _apply_length_bias(anchors, length_bias)
-	var length_mode := "_extended" if length_bias > 0.20 and program != &"endurance" else ""
-	return {
-		"program": program,
-		"recipe": StringName("%s_section_%d_extent_%d%s" % [program, section, extent, length_mode]),
-		"anchors": anchors,
-	}
+		&"infield":
+			var mouth := _roll(seed, 23, 0.25, 0.48) * width
+			var shift := _roll(seed, 29, -0.12, 0.12) * width
+			var left := maxf(-x + lane, shift - mouth * 0.5)
+			var right := minf(x - lane, shift + mouth * 0.5)
+			vertices = PackedVector2Array([
+				Vector2(-x, -y), Vector2(left, -y), Vector2(left, y - lane),
+				Vector2(right, y - lane), Vector2(right, -y), Vector2(x, -y),
+				Vector2(x, y), Vector2(-x, y),
+			])
+		&"switchback":
+			var spine := maxf(400.0, width * _roll(seed, 31, 0.15, 0.21))
+			var waist := maxf(400.0, width * _roll(seed, 37, 0.16, 0.25))
+			var depth := height * _roll(seed, 41, 0.50, 0.63)
+			vertices = PackedVector2Array([
+				Vector2(-x, -y), Vector2(-x + spine, -y), Vector2(-x + spine, -y + depth),
+				Vector2(-waist * 0.5, -y + depth), Vector2(-waist * 0.5, -y), Vector2(x, -y),
+				Vector2(x, y), Vector2(x - spine, y), Vector2(x - spine, y - depth),
+				Vector2(waist * 0.5, y - depth), Vector2(waist * 0.5, y), Vector2(-x, y),
+			])
+		&"dogleg":
+			var elbow := width * _roll(seed, 43, -0.25, -0.05)
+			var step := minf(y - 400.0, height * _roll(seed, 47, 0.06, 0.22))
+			vertices = PackedVector2Array([
+				Vector2(-x, -y), Vector2(elbow, -y), Vector2(elbow, step),
+				Vector2(x, step), Vector2(x, y), Vector2(-x, y),
+			])
+		&"harbour":
+			var end := width * _roll(seed, 53, 0.04, 0.27)
+			var upper := -y + maxf(400.0, height * _roll(seed, 59, 0.25, 0.34))
+			var lower := y - maxf(400.0, height * _roll(seed, 61, 0.25, 0.34))
+			vertices = PackedVector2Array([
+				Vector2(-x, -y), Vector2(x, -y), Vector2(x, y), Vector2(-x, y),
+				Vector2(-x, lower), Vector2(end, lower), Vector2(end, upper), Vector2(-x, upper),
+			])
+	# Cut one or two convex corners into unequal chamfers to add a diagonal stem.
+	vertices = _compound_chamfer(vertices, seed)
+	var heading := _roll(seed, 67, 0.06, 0.11)
+	if _roll_int(seed, 71, 2) == 0:
+		heading = -heading
+	var mirror := -1.0 if _roll_int(seed, 73, 2) == 0 else 1.0
+	for i in vertices.size():
+		vertices[i] = bounds.get_center() + Vector2(vertices[i].x * mirror, vertices[i].y).rotated(heading)
+	var radii := PackedFloat32Array()
+	for i in vertices.size():
+		radii.append(_roll(seed, 79 + i * 7, CORNER_RADIUS, 225.0 + 25.0 * length_bias))
+	return {"program": program, "recipe": StringName("%s_%08x" % [program, seed]), "anchors": vertices, "radii": radii}
 
 
-static func _perimeter(seed: int, section: int) -> PackedVector2Array:
-	var top_split := _roll(seed, 11, -0.24, 0.18)
-	var bottom_split := _roll(seed, 17, -0.20, 0.30)
-	var top_depth := _roll(seed, 23, 0.08, 0.24)
-	var lower_depth := _roll(seed, 29, 0.04, 0.20)
-	var points := PackedVector2Array([
-		Vector2(-0.94, -0.10), Vector2(-0.72, -0.68),
-		Vector2(top_split, -0.82 - top_depth * 0.25), Vector2(0.68, -0.68),
-		Vector2(0.94, -0.14), Vector2(0.78, 0.58),
-		Vector2(bottom_split, 0.80 + lower_depth * 0.20), Vector2(-0.70, 0.66),
-		Vector2(-0.94, 0.24),
-	])
-	return _insert_optional_section(points, section, seed, [2, 5, 7])
+static func round_corners(vertices: PackedVector2Array, radii: PackedFloat32Array) -> PackedVector2Array:
+	return round_corners_profiled(vertices, radii, -1)["controls"]
 
 
-static func _lobes(seed: int, section: int) -> PackedVector2Array:
-	var waist_x := _roll(seed, 71, -0.14, 0.16)
-	var upper_waist := _roll(seed, 73, -0.48, -0.30)
-	var lower_waist := _roll(seed, 79, 0.30, 0.50)
-	var left_size := _roll(seed, 83, 0.62, 0.82)
-	var right_size := _roll(seed, 89, 0.62, 0.84)
-	var points := PackedVector2Array([
-		Vector2(-0.94, -0.14), Vector2(-0.68, -left_size), Vector2(-0.06, -0.70),
-		Vector2(waist_x + 0.20, upper_waist), Vector2(0.70, -right_size),
-		Vector2(0.94, -0.10), Vector2(0.70, right_size), Vector2(0.08, 0.72),
-		Vector2(waist_x - 0.20, lower_waist), Vector2(-0.68, left_size), Vector2(-0.94, 0.22),
-	])
-	return _insert_optional_section(points, section, seed, [1, 5, 8])
-
-
-static func _wedge(seed: int, section: int) -> PackedVector2Array:
-	var apex_x := _roll(seed, 101, -0.24, 0.22)
-	var east_shoulder := _roll(seed, 103, 0.42, 0.62)
-	var south_split := _roll(seed, 107, -0.28, 0.28)
-	var west_kink := _roll(seed, 109, -0.16, 0.12)
-	var points := PackedVector2Array([
-		Vector2(apex_x, -0.90), Vector2(east_shoulder, -0.52),
-		Vector2(0.90, 0.28), Vector2(0.72, 0.68),
-		Vector2(south_split, 0.84), Vector2(-0.68, 0.66),
-		Vector2(-0.92, 0.18), Vector2(-0.58 + west_kink, -0.48),
-	])
-	return _insert_optional_section(points, section, seed, [1, 3, 5])
-
-
-static func _insert_optional_section(points: PackedVector2Array, section: int, seed: int, segment_choices: Array[int]) -> PackedVector2Array:
-	if section == 0:
-		return points
-	var segment := segment_choices[section - 1]
-	var from := points[segment]
-	var to := points[(segment + 1) % points.size()]
-	var center := Vector2.ZERO
-	for point: Vector2 in points:
-		center += point
-	center /= float(points.size())
-	var inward := (center - from.lerp(to, 0.5)).normalized()
-	var depth := _roll(seed, 131 + section * 11, 0.36, 0.52)
-	var result := points.duplicate()
-	for offset in range(-1, 2):
-		var weight := 1.0 if offset == 0 else 0.42
-		var index := posmod(segment + offset, result.size())
-		result[index] += inward * depth * weight
-	return result
-
-
-static func _apply_extent(points: PackedVector2Array, extent: int) -> PackedVector2Array:
-	var result := points.duplicate()
-	var delta := 0.14 if extent == 1 else -0.06
-	for index in result.size():
-		var point := result[index]
-		if point.y < -0.32:
-			point.x += delta
-		elif point.y > 0.32:
-			point.x -= delta * 0.65
-		point.x = clampf(point.x, -0.96, 0.96)
-		result[index] = point
-	return result
-
-
-static func _endurance(source: PackedVector2Array, length_bias: float) -> PackedVector2Array:
-	var notch_x := clampf(source[0].x * 0.16, -0.14, 0.14)
-	var notch_depth := lerpf(0.48, 0.30, length_bias)
-	return PackedVector2Array([
-		Vector2(-0.96, -0.16), Vector2(-0.86, -0.86), Vector2(0.76, -0.90),
-		Vector2(0.96, -0.18), Vector2(0.88, 0.82), Vector2(0.48, 0.90),
-		Vector2(notch_x, notch_depth), Vector2(-0.48, 0.90),
-		Vector2(-0.86, 0.80), Vector2(-0.96, 0.18),
-	])
-
-
-static func _apply_length_bias(points: PackedVector2Array, length_bias: float) -> PackedVector2Array:
-	var result := points.duplicate()
-	for index in result.size():
-		var point := result[index]
-		if absf(point.x) > 0.48:
-			point.x = signf(point.x) * lerpf(absf(point.x), minf(0.97, absf(point.x) + 0.18), length_bias)
-		if absf(point.y) > 0.48:
-			point.y = signf(point.y) * lerpf(absf(point.y), minf(0.92, absf(point.y) + 0.14), length_bias)
-		result[index] = point
-	if length_bias <= 0.20:
-		return result
-	var longest_segment := 0
-	var longest_length := 0.0
-	for index in result.size():
-		var length := result[index].distance_squared_to(result[(index + 1) % result.size()])
-		if length > longest_length:
-			longest_length = length
-			longest_segment = index
-	var from := result[longest_segment]
-	var to := result[(longest_segment + 1) % result.size()]
-	var center := Vector2.ZERO
-	for point: Vector2 in result:
-		center += point
-	center /= float(result.size())
-	var inward := (center - from.lerp(to, 0.5)).normalized()
-	var depth := lerpf(0.18, 0.58, length_bias)
-	var lengthened := PackedVector2Array()
-	for index in result.size():
-		lengthened.append(result[index])
-		if index == longest_segment:
-			lengthened.append(from.lerp(to, 0.28) + inward * depth * 0.45)
-			lengthened.append(from.lerp(to, 0.50) + inward * depth)
-			lengthened.append(from.lerp(to, 0.72) + inward * depth * 0.45)
-	return lengthened
+## Round every corner with a plain circular fillet, except convex corners whose
+## two legs are both at least MIN_PROFILE_LEG long: those get a seeded
+## tangent-continuous two-arc opening/tightening profile when it fits, falling
+## back to the circular fillet otherwise. Returns {controls, profiles} where
+## `profiles` is a compact per-kind count (never an unbounded debug history).
+static func round_corners_profiled(vertices: PackedVector2Array, radii: PackedFloat32Array, seed: int) -> Dictionary:
+	var counts := {"circular": 0, "tightening": 0, "opening": 0, "symmetric": 0}
+	var n := vertices.size()
+	var winding := 1.0 if _polygon_area(vertices) > 0.0 else -1.0
+	var leg_len: Array[float] = []
+	for i in n:
+		leg_len.append(vertices[i].distance_to(vertices[(i + 1) % n]))
+	var entries := PackedVector2Array()
+	var exits := PackedVector2Array()
+	# Per-corner arc data: baseline -> {center, radial, turn}; profile ->
+	# {center1, center2, join, phi, turn}. Both are resolved in a single pass so
+	# adjacent corner setbacks never overlap (both use <=0.48 of a shared leg).
+	var arcs: Array = []
+	for i in n:
+		var previous := vertices[posmod(i - 1, n)]
+		var corner := vertices[i]
+		var next := vertices[(i + 1) % n]
+		var incoming := previous.direction_to(corner)
+		var outgoing := corner.direction_to(next)
+		var turn := incoming.angle_to(outgoing)
+		var tangent_factor := tan(absf(turn) * 0.5)
+		if tangent_factor < 0.001 or absf(turn) > PI - 0.01:
+			return {"controls": PackedVector2Array(), "profiles": counts}
+		var in_leg := leg_len[posmod(i - 1, n)]
+		var out_leg := leg_len[i]
+		var convex := (corner - previous).cross(next - corner) * winding > 0.001
+		var profiled := false
+		if seed >= 0 and convex and in_leg >= MIN_PROFILE_LEG and out_leg >= MIN_PROFILE_LEG:
+			var base := maxf(radii[i], SECTIONS.MIN_PROFILE_RADIUS)
+			# Keep both arc radii within [MIN_PROFILE_RADIUS, base] so the compound
+			# curve never bulges further into the infield than the baseline
+			# circular fillet of `base` would. Tightening/opening comes from the
+			# radii differing, not from widening the corner.
+			var r1 := lerpf(SECTIONS.MIN_PROFILE_RADIUS, base, _roll(seed, 0x7E1 + i * 7, 0.0, 1.0))
+			var r2 := lerpf(SECTIONS.MIN_PROFILE_RADIUS, base, _roll(seed, 0x8F3 + i * 7, 0.0, 1.0))
+			var split := lerpf(0.30, 0.70, _roll(seed, 0x9A5 + i * 7, 0.0, 1.0))
+			var profile := SECTIONS.corner_profile(
+				corner, incoming, outgoing, r1, r2, split,
+				in_leg * 0.48, out_leg * 0.48
+			)
+			if bool(profile["accepted"]):
+				entries.append(profile["entry"])
+				exits.append(profile["exit"])
+				arcs.append({
+					"center1": profile["center1"],
+					"center2": profile["center2"],
+					"join": profile["join"],
+					"phi": profile["phi"],
+					"turn": profile["turn"],
+				})
+				counts[String(profile["kind"])] = int(counts.get(String(profile["kind"]), 0)) + 1
+				profiled = true
+		if not profiled:
+			var radius := minf(radii[i], minf(in_leg, out_leg) * 0.48 / tangent_factor)
+			if radius < CORNER_RADIUS:
+				return {"controls": PackedVector2Array(), "profiles": counts}
+			var entry := corner - incoming * radius * tangent_factor
+			var exit := corner + outgoing * radius * tangent_factor
+			entries.append(entry)
+			exits.append(exit)
+			arcs.append({
+				"center": entry + incoming.rotated(signf(turn) * PI * 0.5) * radius,
+				"radial": entry - (entry + incoming.rotated(signf(turn) * PI * 0.5) * radius),
+				"turn": turn,
+			})
+			counts["circular"] += 1
+	var controls := PackedVector2Array()
+	for i in n:
+		var arc: Dictionary = arcs[i]
+		if arc.has("center1"):
+			controls.append_array(SECTIONS.arc_samples(arc["center1"], entries[i], float(arc["phi"])))
+			controls.append_array(SECTIONS.arc_samples(arc["center2"], arc["join"], float(arc["turn"]) - float(arc["phi"])))
+		else:
+			var center: Vector2 = arc["center"]
+			var radial: Vector2 = arc["radial"]
+			var turn: float = arc["turn"]
+			var arc_steps := maxi(4, ceili(radial.length() * absf(turn) / CONTROL_SPACING))
+			for step in arc_steps:
+				controls.append(center + radial.rotated(turn * float(step) / float(arc_steps)))
+		var next_entry := entries[(i + 1) % n]
+		var line_steps := maxi(1, ceili(exits[i].distance_to(next_entry) / CONTROL_SPACING))
+		for step in line_steps:
+			controls.append(exits[i].lerp(next_entry, float(step) / float(line_steps)))
+	return {"controls": controls, "profiles": counts}
 
 
 static func _roll(seed: int, salt: int, minimum: float, maximum: float) -> float:
@@ -176,3 +184,62 @@ static func _hash32(value: int) -> int:
 	mixed = ((mixed ^ (mixed >> 16)) * 0x45D9F3B) & 0x7FFFFFFF
 	mixed = ((mixed ^ (mixed >> 16)) * 0x45D9F3B) & 0x7FFFFFFF
 	return (mixed ^ (mixed >> 16)) & 0x7FFFFFFF
+
+
+static func _compound_chamfer(vertices: PackedVector2Array, seed: int) -> PackedVector2Array:
+	# Cut 1-2 convex corners into unequal chamfers: corner -> entry vertex, a
+	# diagonal stem, an exit vertex. The diagonal gains a third heading family
+	# (>=11 deg off both legs) while the two longest straight corridors and the
+	# concave bays stay intact. Chosen corners never share an edge, so no single
+	# straight is cut from both ends.
+	var n := vertices.size()
+	if n < 4:
+		return vertices
+	var area := _polygon_area(vertices)
+	var winding := 1.0 if area > 0.0 else -1.0
+	var edge_len: Array[float] = []
+	for i in n:
+		edge_len.append(vertices[i].distance_to(vertices[(i + 1) % n]))
+	var eligible: Array[int] = []
+	for i in n:
+		var prev := vertices[posmod(i - 1, n)]
+		var corner := vertices[i]
+		var next := vertices[(i + 1) % n]
+		if (corner - prev).cross(next - corner) * winding <= 0.001:
+			continue
+		if edge_len[posmod(i - 1, n)] >= MIN_CHAMFER_LEG and edge_len[i] >= MIN_CHAMFER_LEG:
+			eligible.append(i)
+	if eligible.is_empty():
+		return vertices
+	var chosen: Dictionary = {}
+	var start := _roll_int(seed, 0x6D, eligible.size())
+	chosen[eligible[start]] = true
+	if _roll_int(seed, 0x6B, 2) == 1:
+		for k in range(1, eligible.size()):
+			var candidate: int = eligible[(start + k) % eligible.size()]
+			var circular := mini(absi(candidate - eligible[start]), n - absi(candidate - eligible[start]))
+			if circular >= 2:
+				chosen[candidate] = true
+				break
+	var result := PackedVector2Array()
+	for i in n:
+		if not chosen.has(i):
+			result.append(vertices[i])
+			continue
+		var prev := vertices[posmod(i - 1, n)]
+		var corner := vertices[i]
+		var next := vertices[(i + 1) % n]
+		var incoming := prev.direction_to(corner)
+		var outgoing := corner.direction_to(next)
+		var s_in := _roll(seed, 0x71 + i * 3, 0.24, 0.32) * edge_len[posmod(i - 1, n)]
+		var s_out := _roll(seed, 0x89 + i * 3, 0.28, 0.38) * edge_len[i]
+		result.append(corner - incoming * s_in)
+		result.append(corner + outgoing * s_out)
+	return result
+
+
+static func _polygon_area(points: PackedVector2Array) -> float:
+	var total := 0.0
+	for i in points.size():
+		total += points[i].cross(points[(i + 1) % points.size()])
+	return total * 0.5

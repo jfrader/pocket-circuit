@@ -84,11 +84,20 @@ func _create_surface_zones() -> void:
 func _create_hazard() -> void:
 	var travel_start: Vector2
 	var travel_end: Vector2
+	var plan: Dictionary = {}
 	var generated_path: Variant = null
+	var generated_plan: Variant = _track.get_meta("generated_hazard_plan") if is_instance_valid(_track) and _track.has_meta("generated_hazard_plan") else null
 	var generated_paths: Variant = _track.get_meta("generated_hazard_paths") if is_instance_valid(_track) and _track.has_meta("generated_hazard_paths") else null
 	var direction := "reverse" if _reverse_direction else "forward"
+	if generated_plan is Dictionary:
+		plan = (generated_plan as Dictionary).duplicate(true)
+		if not bool(plan.get("present", false)):
+			return
+		var planned_paths: Variant = plan.get("paths")
+		if planned_paths is Dictionary:
+			generated_path = (planned_paths as Dictionary).get(direction)
 	if generated_paths is Dictionary:
-		generated_path = (generated_paths as Dictionary).get(direction)
+		generated_path = generated_path if generated_path is PackedVector2Array else (generated_paths as Dictionary).get(direction)
 	elif is_instance_valid(_track) and _track.has_meta("generated_hazard_path"):
 		generated_path = _track.get_meta("generated_hazard_path")
 	if generated_path is PackedVector2Array and (generated_path as PackedVector2Array).size() >= 2:
@@ -108,8 +117,9 @@ func _create_hazard() -> void:
 	hazard = HAZARD_SCRIPT.new() as EnvironmentalHazard
 	hazard.name = "%sHazard" % String(theme).to_pascal_case()
 	hazard.set_meta("direction", StringName(direction))
+	hazard.set_meta("plan", plan.duplicate(true))
 	add_child(hazard)
-	hazard.configure(theme, travel_start, travel_end)
+	hazard.configure(theme, travel_start, travel_end, plan)
 
 
 func _add_line(parent: Node2D, points: PackedVector2Array, color: Color, width: float) -> Line2D:

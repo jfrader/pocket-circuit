@@ -27,8 +27,9 @@ func _run_test() -> void:
 			await process_frame
 			if not _expect(root.get_visible_rect().size == Vector2(1280, height), "the test must exercise the requested logical viewport"):
 				return
-			var primary := _button(shell, "PLAY")
-			if not _expect(primary != null and not primary.disabled, "%s must expose an enabled Play without additional selections at %dp" % [screen, height]):
+			var primary_text := "REPLAY EVENT" if screen == "briefing" else "PLAY"
+			var primary := _button(shell, primary_text)
+			if not _expect(primary != null and not primary.disabled, "%s must expose an enabled primary race action without additional selections at %dp" % [screen, height]):
 				return
 			for node: Node in shell.find_children("*", "Button", true, false):
 				var button := node as Button
