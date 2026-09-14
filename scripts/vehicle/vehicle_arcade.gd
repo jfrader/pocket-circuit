@@ -74,24 +74,25 @@ static func integrate(
 	if handbrake and speed > stats.drift_min_speed * 0.7:
 		over = maxf(over, 0.78)
 
-	yaw_wanted *= 1.0 + 0.7 * over
+	yaw_wanted *= 1.0 + 0.35 * over
 
-	var countering := absf(steer) > 0.12 and absf(yaw) > 0.08 and signf(steer) != signf(yaw)
+	var countering := absf(steer) > 0.12 and absf(yaw) > 0.08 and steer * yaw < 0.0
 	if countering:
-		yaw = move_toward(yaw, 0.0, stats.steering_response * 2.4 * dt)
+		yaw *= exp(-12.0 * dt)
 	elif handbrake:
-		yaw += steer * 12.0 * dt
+		yaw += steer * 8.0 * dt
 	else:
-		var rate := stats.steering_response * (0.42 if over > 0.12 else 1.0)
-		yaw = lerpf(yaw, yaw_wanted, 1.0 - exp(-rate * dt))
+		yaw = lerpf(yaw, yaw_wanted, 1.0 - exp(-stats.steering_response * dt))
 
-	var mu := get_effective_grip(stats, surface_grip_mult) * (1.0 - 0.5 * over)
-	var lat_damp := mu * GRAVITY / maxf(speed, 90.0)
-	lat = move_toward(lat, 0.0, lat_damp * dt)
-	if over > 0.08 and not countering:
-		lat += -signf(steer) * over * speed * 0.12 * dt
+	# Velocity follows the nose. Soap was leaving leftover lateral speed.
+	if handbrake:
+		lat *= exp(-6.0 * dt * surface_grip_mult)
+	elif over > 0.15:
+		lat *= exp(-16.0 * dt * surface_grip_mult)
+	else:
+		lat = 0.0
 
-	var sliding := over > 0.1 and speed > 110.0 and absf(steer) > 0.12
+	var sliding := over > 0.12 and speed > 140.0 and absf(steer) > 0.15
 	var drifting := handbrake and speed >= stats.drift_min_speed and absf(steer) >= stats.drift_entry_steer
 	return {
 		"fwd": fwd,
