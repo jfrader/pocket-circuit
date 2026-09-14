@@ -4,6 +4,8 @@ extends RigidBody2D
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
+const FEEL := preload("res://scripts/vehicle/vehicle_feel.gd")
+const PLAYER_HIGH_SPEED_STEER_BONUS := 0.18
 const CONTACT_RELEASE_GRACE := 0.12
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
@@ -92,6 +94,7 @@ var _drift_yaw_assist_scale := 1.0
 var _rear_grip_recovery := 1.0  # 0..1 interpolation factor during recovery
 var _front_lateral_force := 0.0  # cached for friction circle
 var _rear_lateral_force := 0.0  # cached for friction circle
+var _slide: Dictionary = {}
 
 
 
@@ -156,6 +159,10 @@ func set_player_controlled(player_controlled: bool) -> void:
 	control_mode = ControlMode.PLAYER if player_controlled else ControlMode.EXTERNAL
 	if player_controlled:
 		_external_power_multiplier = 1.0
+
+
+func _player_feel() -> bool:
+	return control_mode == ControlMode.PLAYER
 
 
 func set_controls_locked(locked: bool) -> void:
@@ -264,6 +271,7 @@ func reset_dynamics_state() -> void:
 	_rear_slip_angle = 0.0
 	_front_lateral_force = 0.0
 	_rear_lateral_force = 0.0
+	_slide = FEEL.idle_slide()
 
 
 func collision_snapshot() -> Dictionary:
@@ -448,10 +456,12 @@ func _v1_physics_step(delta: float) -> void:
 	var yaw_rate := angular_velocity
 	var eff_max := get_effective_max_speed()
 
-	# ── Steering rack (persistent angle with response rate) ──
+	var high_speed_ratio := stats.high_speed_steer_ratio
+	if _player_feel():
+		high_speed_ratio = clampf(high_speed_ratio + PLAYER_HIGH_SPEED_STEER_BONUS, 0.5, 0.84)
 	var target_steer := DYNAMICS.calculate_target_steer_angle(
 		_steer_input, stats.max_steer_angle_deg, fwd_speed, eff_max,
-		stats.high_speed_steer_ratio, stats.steer_fade_start_ratio,
+		high_speed_ratio, stats.steer_fade_start_ratio,
 	)
 	_rack_angle = DYNAMICS.update_rack_angle(
 		_rack_angle, target_steer, stats.steering_response, delta,
@@ -471,6 +481,15 @@ func _v1_physics_step(delta: float) -> void:
 	var rear_normal := DYNAMICS.calculate_axle_normal_load(
 		stats.mass, stats.front_weight_ratio, false,
 	)
+	var speed_ratio := clampf(absf(fwd_speed) / maxf(eff_max, 0.001), 0.0, 1.2)
+	if _player_feel():
+		var long_demand := _throttle_input - _brake_input
+		if _handbrake_input:
+			long_demand -= 0.35
+		var chassis: Dictionary = FEEL.chassis(stats, fwd_speed, eff_max, long_demand)
+		front_normal = float(chassis["front_load"])
+		rear_normal = float(chassis["rear_load"])
+		speed_ratio = float(chassis["speed_ratio"])
 
 	# ── Progressive stiffness scaling ──
 	var prog := DYNAMICS.calculate_progressive_stiffness(surface_grip_multiplier)
@@ -489,6 +508,8 @@ func _v1_physics_step(delta: float) -> void:
 		# Exponential recovery after drift exit
 		_rear_grip_recovery = minf(1.0, _rear_grip_recovery + (1.0 - _rear_grip_recovery) * (1.0 - exp(-stats.drift_grip_recovery_rate * delta)))
 		effective_rear_grip *= lerpf(stats.drift_rear_grip_ratio, 1.0, _rear_grip_recovery)
+	if _player_feel():
+		effective_rear_grip *= FEEL.rear_mu_scale(speed_ratio, _throttle_input, _steer_input)
 
 	# ── Tire lateral forces ──
 	_front_lateral_force = DYNAMICS.calculate_tire_lateral_force(
@@ -554,6 +575,14 @@ func _v1_physics_step(delta: float) -> void:
 	angular_damp = 0.0
 	if not _handbrake_input and absf(_steer_input) < 0.1:
 		angular_damp = stats.yaw_stability_rate * 2.0
+	if _player_feel() and _drift_state != DriftState.ACTIVE:
+		var rotate := FEEL.corner_rotate(speed_ratio, _steer_input, yaw_rate)
+		if absf(rotate) > 0.001:
+			var rotate_limit := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.28
+			apply_torque(clampf(rotate * estimated_inertia * stats.yaw_stability_rate, -rotate_limit, rotate_limit))
+		var slide_damp := float(_slide.get("recover_damp", 0.0))
+		if slide_damp > 0.0:
+			angular_damp = maxf(angular_damp, stats.yaw_stability_rate * slide_damp)
 
 	# ── Drift yaw assist ──
 	if _drift_state == DriftState.ACTIVE:
@@ -665,6 +694,25 @@ func _v1_update_drift(delta: float, fwd_speed: float) -> void:
 
 	is_drifting = _drift_state == DriftState.ACTIVE
 	is_sliding = false
+	if _player_feel() and _drift_state != DriftState.ACTIVE:
+		var rear_load := DYNAMICS.calculate_axle_normal_load(stats.mass, stats.front_weight_ratio, false)
+		var rear_demand := FEEL.rear_demand(
+			_rear_slip_angle,
+			stats.rear_cornering_stiffness * DYNAMICS.calculate_progressive_stiffness(surface_grip_multiplier),
+			stats.rear_grip * surface_grip_multiplier,
+			rear_load,
+		)
+		_slide = FEEL.step_slide(_slide, {
+			"speed_ratio": absf(fwd_speed) / maxf(get_effective_max_speed(), 1.0),
+			"min_speed_ratio": stats.slide_min_speed_ratio,
+			"rear_demand": rear_demand,
+			"steer": _steer_input,
+			"throttle": _throttle_input,
+			"handbrake": _handbrake_input,
+			"yaw_rate": angular_velocity,
+			"fwd_speed": fwd_speed,
+		}, delta)
+		is_sliding = int(_slide.get("mode", 0)) != 0
 
 
 func _v1_drift_try_entry(fwd_speed: float, _rear_slip_deg: float) -> void:
