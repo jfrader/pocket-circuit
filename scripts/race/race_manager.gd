@@ -13,6 +13,7 @@ signal racer_finished(racer: Node2D, position: int, total_time: float)
 signal position_changed(racer: Node2D, position: int, racer_count: int)
 signal wrong_way_changed(racer: Node2D, wrong_way: bool)
 signal results_ready(results: Array)
+signal racer_recovered(racer: Node2D)
 
 @export_range(1, 99) var laps_to_finish: int = 3
 @export_range(0.0, 30.0, 0.5) var finish_grace_seconds: float = 8.0
@@ -34,6 +35,18 @@ var _player_vehicle: Node2D
 var _prepared: bool = false
 var _finish_grace_remaining: float = -1.0
 var _results_finalized: bool = false
+
+# ── Route reference (wrong-way tangent seam) ─────────────────────────
+# A closed polyline describing the actual drivable route, in global coords and
+# forward (checkpoint-index) order. Populated once by the race scene from the
+# generated/authored racing line. Used to judge wrong-way motion against the
+# real route tangent instead of the checkpoint chord, which lies on long curved
+# sections and reverses on hairpins.
+var _route_points: PackedVector2Array = PackedVector2Array()
+var _route_cumulative: PackedFloat32Array = PackedFloat32Array()
+var _route_length := 0.0
+var _route_checkpoint_arc: Dictionary = {}
+const ROUTE_SECTION_MARGIN := 200.0
 
 
 func _ready() -> void:
@@ -71,6 +84,7 @@ func configure_checkpoints(ordered_checkpoints: Array) -> void:
 		_checkpoint_by_index[checkpoint_index] = checkpoint
 		_checkpoint_order[checkpoint_index] = order
 	_prepared = false
+	_refresh_route_checkpoint_arcs()
 
 
 func set_reverse_direction(enabled: bool) -> void:
@@ -315,6 +329,7 @@ func report_recovery(vehicle: Node2D) -> void:
 	state["wrong_way_time"] = 0.0
 	_set_wrong_way(vehicle, state, false)
 	_racers[vehicle] = state
+	racer_recovered.emit(vehicle)
 
 
 func finalize_remaining_racers_as_dnf() -> void:
@@ -340,6 +355,112 @@ func finalize_remaining_racers_as_dnf() -> void:
 
 func get_ordered_checkpoints() -> Array[Node]:
 	return checkpoints.duplicate()
+
+
+func configure_route_reference(points: PackedVector2Array) -> void:
+	## Route-reference seam. The race scene supplies the actual drivable route
+	## (generated/authored racing line in global coords, forward order) once.
+	## Wrong-way detection then follows the real route tangent within the active
+	## checkpoint section instead of the checkpoint chord, which lies on long
+	## curved sections and reverses across hairpins.
+	_route_points = PackedVector2Array()
+	_route_cumulative = PackedFloat32Array()
+	_route_length = 0.0
+	_route_checkpoint_arc.clear()
+	if points.size() < 2:
+		return
+	_route_points = points.duplicate()
+	_route_cumulative.resize(_route_points.size())
+	for index in _route_points.size():
+		_route_cumulative[index] = _route_length
+		_route_length += _route_points[index].distance_to(_route_points[(index + 1) % _route_points.size()])
+	_refresh_route_checkpoint_arcs()
+
+
+func has_route_reference() -> bool:
+	return _route_points.size() >= 2
+
+
+func _refresh_route_checkpoint_arcs() -> void:
+	_route_checkpoint_arc.clear()
+	if _route_points.size() < 2:
+		return
+	for checkpoint: Node in checkpoints:
+		var arc := _nearest_route_arc((checkpoint as Node2D).global_position)
+		if arc >= 0.0:
+			_route_checkpoint_arc[int(checkpoint.get("checkpoint_index"))] = arc
+
+
+func _nearest_route_arc(position: Vector2) -> float:
+	var nearest := _nearest_route_segment(position, 0.0, _route_length)
+	if int(nearest["index"]) < 0:
+		return -1.0
+	var index := int(nearest["index"])
+	var segment_length := _route_points[index].distance_to(_route_points[(index + 1) % _route_points.size()])
+	return fposmod(_route_cumulative[index] + segment_length * float(nearest["fraction"]), _route_length)
+
+
+func get_route_forward_direction(position: Vector2, previous_checkpoint_index: int, expected_checkpoint_index: int) -> Vector2:
+	## Forward (race-direction) unit tangent at the nearest route point inside
+	## the current checkpoint section. Vector2.ZERO when the section cannot be
+	## resolved, so the caller falls back to the direct checkpoint chord.
+	if _route_points.size() < 2:
+		return Vector2.ZERO
+	var previous_arc := float(_route_checkpoint_arc.get(previous_checkpoint_index, -1.0))
+	var expected_arc := float(_route_checkpoint_arc.get(expected_checkpoint_index, -1.0))
+	if previous_arc < 0.0 or expected_arc < 0.0:
+		return Vector2.ZERO
+	# Directed arc window from the previous checkpoint to the expected one in the
+	# race direction, expanded by the margin. Reverse races travel decreasing
+	# arc, so the window runs expected_arc -> previous_arc there.
+	var lo := previous_arc - ROUTE_SECTION_MARGIN
+	var hi := expected_arc + ROUTE_SECTION_MARGIN
+	if is_reverse_direction():
+		lo = expected_arc - ROUTE_SECTION_MARGIN
+		hi = previous_arc + ROUTE_SECTION_MARGIN
+	var nearest := _nearest_route_segment(position, lo, hi)
+	if int(nearest["index"]) < 0:
+		return Vector2.ZERO
+	var index := int(nearest["index"])
+	var tangent := (_route_points[(index + 1) % _route_points.size()] - _route_points[index]).normalized()
+	if is_reverse_direction():
+		tangent = -tangent
+	return tangent
+
+
+func _nearest_route_segment(position: Vector2, arc_lo: float, arc_hi: float) -> Dictionary:
+	## Nearest route segment whose arc falls within [arc_lo, arc_hi] on the
+	## closed loop (may wrap). A window spanning the whole loop searches it all.
+	var best_index := -1
+	var best_fraction := 0.0
+	var best_distance := INF
+	var count := _route_points.size()
+	for index in count:
+		if arc_hi - arc_lo < _route_length and not _arc_in_window(_route_cumulative[index], arc_lo, arc_hi):
+			continue
+		var from := _route_points[index]
+		var to := _route_points[(index + 1) % count]
+		var segment := to - from
+		var length_squared := segment.length_squared()
+		var fraction := 0.0
+		if length_squared > 0.001:
+			fraction = clampf((position - from).dot(segment) / length_squared, 0.0, 1.0)
+		var nearest := from + segment * fraction
+		var distance := position.distance_squared_to(nearest)
+		if distance < best_distance:
+			best_distance = distance
+			best_index = index
+			best_fraction = fraction
+	return {"index": best_index, "fraction": best_fraction, "distance_squared": best_distance}
+
+
+func _arc_in_window(arc: float, arc_lo: float, arc_hi: float) -> bool:
+	var lo := fposmod(arc_lo, _route_length)
+	var hi := fposmod(arc_hi, _route_length)
+	var a := fposmod(arc, _route_length)
+	if lo <= hi:
+		return a >= lo and a <= hi
+	return a >= lo or a <= hi
 
 
 func get_checkpoint_after(checkpoint_index: int) -> Node:
@@ -415,11 +536,11 @@ func _update_spatial_progress(vehicle: Node2D, state: Dictionary, delta: float) 
 		var segment := expected_checkpoint.global_position - previous_checkpoint.global_position
 		if segment.length_squared() > 0.001:
 			fraction = clampf((vehicle.global_position - previous_checkpoint.global_position).dot(segment) / segment.length_squared(), 0.0, 0.99)
-			_update_wrong_way_from_motion(vehicle, state, expected_checkpoint, delta)
+			_update_wrong_way_from_motion(vehicle, state, previous_checkpoint, expected_checkpoint, delta)
 	state["progress"] = float(int(state["lap"]) * checkpoint_count + previous_order) + fraction
 
 
-func _update_wrong_way_from_motion(vehicle: Node2D, state: Dictionary, expected_checkpoint: Node2D, delta: float) -> void:
+func _update_wrong_way_from_motion(vehicle: Node2D, state: Dictionary, previous_checkpoint: Node2D, expected_checkpoint: Node2D, delta: float) -> void:
 	if delta <= 0.0 or vehicle is not RigidBody2D:
 		return
 	var rigid_body := vehicle as RigidBody2D
@@ -427,8 +548,19 @@ func _update_wrong_way_from_motion(vehicle: Node2D, state: Dictionary, expected_
 	if velocity.length() < 80.0:
 		state["wrong_way_time"] = maxf(0.0, float(state["wrong_way_time"]) - delta)
 		return
-	var target_direction := vehicle.global_position.direction_to(expected_checkpoint.global_position)
-	var alignment := velocity.normalized().dot(target_direction)
+	# Judge alignment against the actual route tangent within the current
+	# checkpoint section. This keeps a car moving away from the next gate but
+	# still travelling along a curved section from being flagged wrong way,
+	# while a car genuinely driving backward on that same section is caught.
+	var forward_direction := get_route_forward_direction(
+		vehicle.global_position,
+		int(previous_checkpoint.get("checkpoint_index")),
+		int(expected_checkpoint.get("checkpoint_index"))
+	)
+	if forward_direction.length_squared() < 0.001:
+		# Legacy fallback: no route reference, judge against the direct chord.
+		forward_direction = vehicle.global_position.direction_to(expected_checkpoint.global_position)
+	var alignment := velocity.normalized().dot(forward_direction)
 	if alignment < -0.4:
 		state["wrong_way_time"] = float(state["wrong_way_time"]) + delta
 		if float(state["wrong_way_time"]) > 0.55:

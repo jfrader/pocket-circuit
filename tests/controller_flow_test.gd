@@ -35,8 +35,11 @@ func _run_test() -> void:
 	if not _expect(bool(shell.get("_quick_race")), "gamepad A should open the Quick Race builder"):
 		return
 	await _wait_until(func() -> bool: return root.get_viewport().gui_get_focus_owner() != null, 30)
-	await _tap_action(&"ui_down")
-	await _tap_action(&"ui_down")
+	for _step in 10:
+		var focused := root.get_viewport().gui_get_focus_owner() as Button
+		if focused != null and focused.text == "PLAY":
+			break
+		await _tap_action(&"ui_down")
 	await _wait_until(func() -> bool:
 		var focused := root.get_viewport().gui_get_focus_owner() as Button
 		return focused != null and focused.text == "PLAY"
@@ -62,6 +65,9 @@ func _run_test() -> void:
 			and String(session.get("event", {}).get("circuit", "")) == "generated",
 			"accepting PLAY should load a generated Quick Race and keep the tree alive"
 	):
+		return
+	var quick_library: Dictionary = app.call("get_circuit_library")
+	if not _expect(not (quick_library["history"] as Array).is_empty() and quick_library["history"][0] == session.get("event", {}).get("generated_circuit_identity", {}), "a launched generated Quick Race should enter bounded recent history with its complete identity"):
 		return
 	await _wait_until(func() -> bool: return race.get("_pause_overlay") != null and bool(race.get("_countdown_active")), 60)
 	await _tap_joypad_button(6)
