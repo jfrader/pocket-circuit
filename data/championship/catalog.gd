@@ -23,6 +23,12 @@ const CAST := [
 				"outfit": "jacket", "accent_palette": "marigold", "facing": "right",
 			},
 		},
+		"car_livery": {
+			"palette": "citrus_pop",
+			"livery": "center_stripe",
+			"wheels": "classic",
+			"spoiler": "none",
+		},
 	},
 	{
 		"id": "inez",
@@ -40,6 +46,12 @@ const CAST := [
 				"facial_hair": "none", "accessory": "earring", "marking": "beauty_spot",
 				"outfit": "collared", "accent_palette": "lagoon", "facing": "right",
 			},
+		},
+		"car_livery": {
+			"palette": "midnight_teal",
+			"livery": "two_tone",
+			"wheels": "classic",
+			"spoiler": "none",
 		},
 	},
 	{
@@ -63,6 +75,12 @@ const CAST := [
 				"outfit": "armor", "accent_palette": "cobalt", "facing": "left",
 			},
 		},
+		"car_livery": {
+			"palette": "marina_blue",
+			"livery": "twin_stripe",
+			"wheels": "mesh",
+			"spoiler": "lip",
+		},
 	},
 	{
 		"id": "milo",
@@ -84,6 +102,12 @@ const CAST := [
 				"facial_hair": "stubble", "accessory": "none", "marking": "cheek_scar",
 				"outfit": "armor", "accent_palette": "berry", "facing": "left",
 			},
+		},
+		"car_livery": {
+			"palette": "candy_red",
+			"livery": "solid",
+			"wheels": "rugged",
+			"spoiler": "none",
 		},
 	},
 	{
@@ -107,6 +131,12 @@ const CAST := [
 				"outfit": "turtleneck", "accent_palette": "orchid", "facing": "left",
 			},
 		},
+		"car_livery": {
+			"palette": "plum_soda",
+			"livery": "side_flash",
+			"wheels": "mesh",
+			"spoiler": "wing",
+		},
 	},
 	{
 		"id": "cass",
@@ -128,6 +158,12 @@ const CAST := [
 				"facial_hair": "stubble", "accessory": "none", "marking": "brow_scar",
 				"outfit": "collared", "accent_palette": "marigold", "facing": "left",
 			},
+		},
+		"car_livery": {
+			"palette": "desert_sage",
+			"livery": "hood_stripe",
+			"wheels": "mesh",
+			"spoiler": "wing",
 		},
 	},
 ]
