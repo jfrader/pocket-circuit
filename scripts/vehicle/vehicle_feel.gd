@@ -13,8 +13,8 @@ const DEMAND_SAVE := 0.72
 const DEMAND_SPIN := 2.35
 const SAVE_HOLD := 0.22
 const AERO_FRONT_SHARE := 0.62
-const REAR_MU_FLOOR := 0.78
-const CORNER_ROTATE := 0.55
+const REAR_MU_FLOOR := 0.86
+const CORNER_ROTATE := 0.28
 static func chassis(stats: VehicleStats, forward_speed: float, effective_max_speed: float, longitudinal_demand: float) -> Dictionary:
 	var q := VehicleDynamics.downforce_q(forward_speed, effective_max_speed, stats.downforce_q_max)
 	var loads := VehicleDynamics.axle_loads_with_transfer(
@@ -41,8 +41,8 @@ static func rear_mu_scale(speed_ratio: float, throttle: float, steer: float) -> 
 	# tail is the weaker axle, more so with throttle and lock. Low speed is 1.
 	var turning := clampf(absf(steer), 0.0, 1.0)
 	var speed_w := smoothstep(0.48, 0.84, speed_ratio)
-	var cut := lerpf(1.0, 0.86, speed_w * lerpf(0.35, 1.0, turning))
-	cut *= lerpf(1.0, 0.90, speed_w * clampf(throttle, 0.0, 1.0))
+	var cut := lerpf(1.0, 0.90, speed_w * lerpf(0.35, 1.0, turning))
+	cut *= lerpf(1.0, 0.94, speed_w * clampf(throttle, 0.0, 1.0))
 	return clampf(cut, REAR_MU_FLOOR, 1.0)
 
 
