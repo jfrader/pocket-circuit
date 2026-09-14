@@ -79,7 +79,7 @@ var _rear_slip_angle := 0.0
 var _last_speed := 0.0
 var _drift_entry_speed := 0.0
 
-	# ── v1 state ──
+# ── v1 state ──
 var _rack_angle := 0.0  # persistent steering rack angle (radians)
 var _grid_transform_pending := false
 var _pending_grid_transform := Transform2D.IDENTITY
@@ -322,17 +322,13 @@ func configure_visual_identity(identity: Variant) -> void:
 func _resolve_car_texture(key: String) -> Texture2D:
 	if key.is_empty():
 		return null
-	if key.find("|") != -1:
-		return IDENTITIES.car_texture_for_key(key)
-	return IDENTITIES.car_texture(key)
+	return IDENTITIES.car_texture_for_key(key)
 
 
 func _resolve_car_motion_texture(key: String, travel: float, steer: float) -> Texture2D:
 	if key.is_empty():
 		return null
-	if key.find("|") != -1:
-		return IDENTITIES.car_motion_texture_for_key(key, travel, steer)
-	return IDENTITIES.car_motion_texture(key, travel, steer)
+	return IDENTITIES.car_motion_texture_for_key(key, travel, steer)
 
 
 func _configure_racer_tag(driver_name: String) -> void:

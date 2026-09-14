@@ -337,7 +337,7 @@ func _configure_personal_ghost() -> void:
 	add_child(_personal_ghost)
 	var pvid := String(_session.get("vehicle_id", "rustbug"))
 	var pkey := IDENTITIES.resolve_visual_key(pvid, "rae")
-	var ptex := IDENTITIES.car_texture_for_key(pkey) if pkey.find("|") != -1 else IDENTITIES.car_texture(pkey)
+	var ptex := IDENTITIES.car_texture_for_key(pkey)
 	if not _personal_ghost.configure(ghost, ptex):
 		_personal_ghost.queue_free()
 		_personal_ghost = null

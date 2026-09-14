@@ -167,6 +167,20 @@ func _initialize() -> void:
 	var keys_b := IDENTITIES.resolve_field_visual_keys(field_b)
 	if not _expect(String(keys_b[0]) != String(keys_b[1]), "field_b must still produce distinct keys"):
 		return
+	# duplicate entries resolve to the same look and must still separate visually
+	var field_dup: Array[Dictionary] = [
+		{"vehicle_id": "flicker", "driver_id": "tess", "slot": 1},
+		{"vehicle_id": "flicker", "driver_id": "tess", "slot": 2},
+	]
+	var keys_dup := IDENTITIES.resolve_field_visual_keys(field_dup)
+	if not _expect(String(keys_dup[0]) != String(keys_dup[1]), "duplicate field entries must resolve distinct keys"):
+		return
+	var dup_texture_a := IDENTITIES.car_texture_for_key(String(keys_dup[0]))
+	var dup_texture_b := IDENTITIES.car_texture_for_key(String(keys_dup[1]))
+	if not _expect(dup_texture_a != null and dup_texture_b != null, "duplicate field entries must render"):
+		return
+	if not _expect(_texture_hash(dup_texture_a) != _texture_hash(dup_texture_b), "duplicate field entries must render distinct cars, not just distinct keys"):
+		return
 	print("PROCEDURAL_IDENTITY_LIBRARY_TEST PASS")
 	quit(0)
 

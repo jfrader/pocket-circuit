@@ -99,9 +99,9 @@ static func _texture_for_spin_pose(key: String, spin: int, pose: int) -> Texture
 	pose = clampi(pose, 0, textures.size() - 1)
 	if textures[pose] == null:
 		if spin == 0 and pose == REST_STEER_POSE:
-			textures[pose] = _get_car_texture(key)
+			textures[pose] = car_texture_for_key(key)
 			return textures[pose]
-		var payload := car_payload_for_key(key) if _is_visual_key(key) else car_payload(key)
+		var payload := car_payload_for_key(key)
 		if payload.is_empty():
 			return null
 		var image := CAR_SPRITES.car_pose_image(payload, spin, pose, NATIVE_PIXEL_SCALE)
@@ -146,59 +146,45 @@ static func install_motion_image_for_key(visual_key: String, frame: Vector2i, im
 
 static func resolve_visual_key(vehicle_id: String, driver_id: String = "") -> String:
 	if driver_id.is_empty():
-		var key := vehicle_id
-		if not _visual_resolutions.has(key):
-			_visual_resolutions[key] = {"vehicle_id": vehicle_id, "cosmetic": {}}
-		return key
-	var driver := CATALOG.get_driver(driver_id)
-	var livery: Dictionary = driver.get("car_livery", {})
-	if livery.is_empty():
-		var key := vehicle_id
-		if not _visual_resolutions.has(key):
-			_visual_resolutions[key] = {"vehicle_id": vehicle_id, "cosmetic": {}}
-		return key
-	var cosmetic := livery.duplicate()
-	var sig := _livery_signature(cosmetic)
-	var key := "%s|%s" % [vehicle_id, sig]
-	if not _visual_resolutions.has(key):
-		_visual_resolutions[key] = {"vehicle_id": vehicle_id, "cosmetic": cosmetic}
-	return key
-
-
-static func resolve_visual_key_with_disambig(vehicle_id: String, driver_id: String, disambig: int = 0) -> String:
-	var base_cosmetic := _effective_livery_for(vehicle_id, driver_id)
-	var use_cosmetic := base_cosmetic if disambig <= 0 else _shift_cosmetic(base_cosmetic, disambig)
-	var sig := _livery_signature(use_cosmetic)
-	var key := vehicle_id
-	if disambig > 0 or not use_cosmetic.is_empty():
-		var dis_prefix := ("d%d_" % disambig) if disambig > 0 else ""
-		key = "%s|%s%s" % [vehicle_id, dis_prefix, sig]
-	if not _visual_resolutions.has(key):
-		_visual_resolutions[key] = {"vehicle_id": vehicle_id, "cosmetic": use_cosmetic}
-	return key
+		return _register_visual_key(vehicle_id, {})
+	return _register_visual_key(vehicle_id, _effective_livery_for(vehicle_id, driver_id))
 
 
 static func resolve_field_visual_keys(racers: Array[Dictionary]) -> Dictionary:
 	# racers entries: {"vehicle_id": String, "driver_id": String, "slot": int (optional)}
+	# Uniqueness is tracked by the realised look (chassis + cosmetic signature), not
+	# by cache key, so two entries that would render identically still separate.
 	var result: Dictionary = {}
-	var used: Dictionary = {}
+	var used_looks: Dictionary = {}
 	for i in racers.size():
 		var r: Dictionary = racers[i]
 		var vid := String(r.get("vehicle_id", "rustbug"))
 		var did := String(r.get("driver_id", ""))
 		var slot := int(r.get("slot", i))
-		var ckey := resolve_visual_key(vid, did)
-		var final := ckey
-		var dis := 0
-		if used.has(ckey):
-			dis = slot if slot > 0 else (i + 1)
-			final = resolve_visual_key_with_disambig(vid, did, dis)
-			while used.has(final) and dis < 100:
-				dis += 1
-				final = resolve_visual_key_with_disambig(vid, did, dis)
-		used[final] = true
-		result[i] = final
+		var base_cosmetic := _effective_livery_for(vid, did)
+		var cosmetic := base_cosmetic
+		var look := _look_signature(vid, cosmetic)
+		var shift := maxi(1, slot if slot > 0 else i + 1)
+		while used_looks.has(look) and shift < 128:
+			cosmetic = _shift_cosmetic(base_cosmetic, shift)
+			look = _look_signature(vid, cosmetic)
+			shift += 1
+		used_looks[look] = true
+		result[i] = _register_visual_key(vid, cosmetic)
 	return result
+
+
+static func _register_visual_key(vehicle_id: String, cosmetic: Dictionary) -> String:
+	var key := vehicle_id
+	if not cosmetic.is_empty():
+		key = "%s|%s" % [vehicle_id, _livery_signature(cosmetic)]
+	if not _visual_resolutions.has(key):
+		_visual_resolutions[key] = {"vehicle_id": vehicle_id, "cosmetic": cosmetic.duplicate()}
+	return key
+
+
+static func _look_signature(vehicle_id: String, cosmetic: Dictionary) -> String:
+	return "%s|%s" % [vehicle_id, _livery_signature(cosmetic)]
 
 
 static func car_payload_for_key(visual_key: String) -> Dictionary:
@@ -260,16 +246,6 @@ static func motion_preparation_plan_for_key(visual_key: String) -> Dictionary:
 	return {"payload": car_payload_for_key(visual_key), "jobs": jobs}
 
 
-static func _is_visual_key(key: String) -> bool:
-	return key.find("|") != -1 or _visual_resolutions.has(key)
-
-
-static func _get_car_texture(key: String) -> Texture2D:
-	if _is_visual_key(key):
-		return car_texture_for_key(key)
-	return car_texture(key)
-
-
 static func _merge_cosmetic(base_options: Dictionary, cosmetic: Dictionary) -> Dictionary:
 	if cosmetic.is_empty():
 		return base_options.duplicate(true)
@@ -309,7 +285,7 @@ static func _shift_cosmetic(livery: Dictionary, shift: int) -> Dictionary:
 	if res.has("palette") and pals.size() > 0:
 		var cur := String(res["palette"])
 		var idx := pals.find(cur)
-		res["palette"] = pals[(idx if idx >= 0 else 0 + shift) % pals.size()]
+		res["palette"] = pals[(idx + shift) % pals.size()] if idx >= 0 else pals[shift % pals.size()]
 	var part_map: Dictionary = CAR_GENERATOR.available_parts()
 	for f in ["livery", "wheels", "spoiler"]:
 		if res.has(f):
@@ -317,7 +293,7 @@ static func _shift_cosmetic(livery: Dictionary, shift: int) -> Dictionary:
 			if allowed.size() > 0:
 				var cur := String(res[f])
 				var idx := allowed.find(cur)
-				res[f] = allowed[(idx if idx >= 0 else 0 + shift) % allowed.size()]
+				res[f] = allowed[(idx + shift) % allowed.size()] if idx >= 0 else allowed[shift % allowed.size()]
 	return res
 
 
