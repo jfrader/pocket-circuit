@@ -10,6 +10,11 @@
 - Four distinct machines and four-racer fields with legal lap validation,
   starting grids, countdowns, race position, finish order, results, and
   championship points.
+- Four new Quick Race / exhibition-only machines (Thimble, Spindle, Anvil,
+  Dustmite) — one per body type (compact/coupe/muscle/buggy) with dedicated
+  procedural car_art (seeds 92005–92008, palettes, parts) and retuned
+  VehicleStats (light agile, technical grip, heavy bruiser, loose off-road).
+  Championship acts, unlocks, and progression are unchanged.
 - Live generated household circuits for every Quick Race reroll and
   championship event. Players can choose a theme and seed, while seeded circuit
   plans and six room canvases produce reproducible layouts without a
