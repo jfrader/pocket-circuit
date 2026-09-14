@@ -83,16 +83,14 @@ static func compute_forces(
 	var lat_force := -lat * mass * damp
 	var lock := deg_to_rad(stats.max_steer_angle_deg) * lerpf(
 		1.0,
-		stats.arcade_high_speed_steer_ratio,
-		smoothstep(0.22, 0.85, speed_ratio),
+		0.64,
+		smoothstep(0.28, 0.88, speed_ratio),
 	)
 	var steer_rad := steer * lock
 	var yaw_wanted := 0.0
 	if absf(fwd) > 5.0:
 		yaw_wanted = fwd * tan(steer_rad) / maxf(stats.wheelbase, 1.0)
 	yaw_wanted *= 1.0 + OVER_YAW_BOOST * over
-	if speed_ratio > 0.74:
-		yaw_wanted *= 0.52
 	var inertia := mass * (stats.wheelbase * stats.wheelbase + 324.0) / 12.0
 	var yaw_torque := 0.0
 	var countering := absf(steer) > 0.12 and absf(yaw) > 0.08 and steer * yaw < 0.0
