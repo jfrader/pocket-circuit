@@ -82,9 +82,8 @@
 - Driving forward no longer teleports you back to the last gate after
   brushing a nearby checkpoint or leaving the racing line briefly. Recovery
   puts you back on the nearby route, facing the right way.
-- Cars use a new arcade handling model: more lock at speed, the tail can
-  step out in fast corners without the handbrake, and Space is still the
-  big committed drift. Opposite lock saves a slide.
+- Steering follows the stick more at speed. Fast throttle-on corners can
+  slide the rear a little without Space; Space is still the big drift.
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.

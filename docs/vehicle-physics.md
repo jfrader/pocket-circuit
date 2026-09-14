@@ -8,12 +8,10 @@
   lateral grip, and input-driven arcade drift.
 - **`1` (Bicycle)** — Two-axle tire forces, friction-circle braking, a
   speed-sensitive steering rack, and deliberate drift with qualified boost.
-- **`2` (Arcade)** — Live default. Forward drive vs drag, mild high-speed
-  steer fade (~82% lock retained), one grip budget. Throttle in a fast
-  corner reduces rear grip so the tail steps out without the handbrake.
-  Excess lateral demand becomes yaw (oversteer), not a plow. Handbrake is
-  the stronger committed drift and still awards boost. Player and AI share
-  this model.
+- **`2` (Arcade)** — Live default. Same bicycle tires as v1, with a bit more
+  high-speed lock, yaw that follows the stick, and a light throttle-on rear
+  cut so the tail can step out without Space. Handbrake is still the big
+  committed drift. Player and AI share this model.
 
 Canonical per-car values live in `data/vehicles/*.tres`; the championship
 catalog references those resources and keeps presentation ratings separate

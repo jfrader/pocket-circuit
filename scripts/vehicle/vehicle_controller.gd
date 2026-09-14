@@ -4,7 +4,6 @@ extends RigidBody2D
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
-const ARCADE := preload("res://scripts/vehicle/vehicle_arcade.gd")
 const CONTACT_RELEASE_GRACE := 0.12
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
