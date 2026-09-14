@@ -339,10 +339,16 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 		selected_vehicle = _quick_race_vehicle_id
 	_current_vehicle_select_id = selected_vehicle
 	var unlocked_vehicles: Array = progress.get("unlocked_vehicles", ["rustbug"])
+	var roster: Array = []
+	if quick_race:
+		roster = CATALOG.quick_race_vehicle_ids()
+		unlocked_vehicles = roster  # Quick Race accepts any in its roster; no championship unlock required
+	else:
+		roster = CATALOG.championship_vehicle_ids()
 	_page.hide()
 	_art_menu.set("reduced_motion", _reduced_motion_enabled())
 	var context := "QUICK RACE · YOUR MACHINE" if quick_race else String(event.get("name", "CHAMPIONSHIP")).to_upper()
-	_art_menu.call("show_garage", selected_vehicle, unlocked_vehicles, context, "NEXT: TRACK" if quick_race and event_id.is_empty() else "PLAY")
+	_art_menu.call("show_garage", selected_vehicle, unlocked_vehicles, context, "NEXT: TRACK" if quick_race and event_id.is_empty() else "PLAY", roster)
 
 
 func show_settings() -> void:
@@ -1191,8 +1197,9 @@ func _random_quick_race_seed() -> int:
 func _start_quick_race() -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	var vehicle_id := _quick_race_vehicle_id if not _quick_race_vehicle_id.is_empty() else String(progress.get("selected_vehicle", "rustbug"))
-	if not vehicle_id in progress.get("unlocked_vehicles", ["rustbug"]):
-		vehicle_id = "rustbug"
+	var qids := CATALOG.quick_race_vehicle_ids()
+	if not vehicle_id in qids:
+		vehicle_id = qids[0] if not qids.is_empty() else "rustbug"
 	_app.call("start_circuit_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id, _quick_race_reverse, _quick_race_length_tier)
 
 
