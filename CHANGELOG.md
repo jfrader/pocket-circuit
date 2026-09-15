@@ -79,6 +79,11 @@
 
 ### Changed
 
+- Music now plays at a normal listening level instead of sitting far below it.
+  Both loops are mastered to the same -14 LUFS target with a -1 dBTP ceiling the
+  Gamestruments library uses, the race loop is the catalogue's Cruise take
+  rather than a short motor hum, and the engine is balanced under the music
+  instead of over it. A Master-bus limiter keeps the summed mix below 0 dBFS.
 - Driving forward no longer teleports you back to the last gate after
   brushing a nearby checkpoint or leaving the racing line briefly. Recovery
   puts you back on the nearby route, facing the right way.
