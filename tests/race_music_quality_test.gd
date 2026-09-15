@@ -1,13 +1,13 @@
 extends SceneTree
 
-## Verifies the packaged menu loop against the same contract the Gamestruments
+## Verifies the packaged race loop against the same contract the Gamestruments
 ## library masters to: a -14.0 LUFS integrated target and a -1.0 dBTP ceiling.
-## Samples are read from the file's PCM data rather than the audio server so the
-## measurement describes the shipped asset, not a resampled playback of it.
+## This is the fallback heard when the live GDExtension is absent, which is what
+## shipped builds use, so it is the asset that must hold the ceiling.
 
 const AudioMastering := preload("res://tools/audio_mastering.gd")
 
-const MENU_PATH := "res://assets/audio/menu_loop.wav"
+const RACE_PATH := "res://assets/audio/race_loop.wav"
 const TARGET_LUFS := -14.0
 const LUFS_TOLERANCE := 1.5
 const CEILING_DBTP := -1.0
@@ -18,13 +18,13 @@ const MIN_HALF_SECOND_VARIATION := 0.08
 
 
 func _initialize() -> void:
-	var stream := load(MENU_PATH) as AudioStreamWAV
+	var stream := load(RACE_PATH) as AudioStreamWAV
 	if stream == null or stream.stereo:
-		_fail("menu music should import as mono audio")
+		_fail("race music should import as mono audio")
 		return
-	var samples := _decode_pcm(MENU_PATH)
+	var samples := _decode_pcm(RACE_PATH)
 	if samples.is_empty():
-		_fail("menu music should contain PCM samples")
+		_fail("race music should contain PCM samples")
 		return
 
 	var peak := 0.0
@@ -39,31 +39,31 @@ func _initialize() -> void:
 	var loudness := AudioMastering.measure_integrated_loudness(samples, stream.mix_rate)
 	var true_peak := AudioMastering.measure_true_peak_db(samples, stream.mix_rate)
 	print(
-		"MENU_MUSIC_METRICS duration=%.3f loudness=%.2f lufs true_peak=%.2f dbtp sample_peak=%.5f dc=%.6f seam=%.6f half_second_variation=%.4f"
+		"RACE_MUSIC_METRICS duration=%.3f loudness=%.2f lufs true_peak=%.2f dbtp sample_peak=%.5f dc=%.6f seam=%.6f half_second_variation=%.4f"
 		% [duration, loudness, true_peak, peak, dc_offset, seam_delta, half_second_variation]
 	)
 
 	var ceiling_linear := pow(10.0, CEILING_DBTP / 20.0)
 	var failures := PackedStringArray()
-	_check(duration >= MIN_DURATION_SECONDS, "menu music should run for at least 16 seconds before repeating", failures)
-	_check(peak <= ceiling_linear + 0.0001, "menu music should not exceed the true-peak ceiling", failures)
-	_check(true_peak <= CEILING_DBTP, "menu music true peak should stay at or below %.1f dBTP" % CEILING_DBTP, failures)
+	_check(duration >= MIN_DURATION_SECONDS, "race music should run for at least 16 seconds before repeating", failures)
+	_check(peak <= ceiling_linear + 0.0001, "race music should not exceed the true-peak ceiling", failures)
+	_check(true_peak <= CEILING_DBTP, "race music true peak should stay at or below %.1f dBTP" % CEILING_DBTP, failures)
 	_check(
 		absf(loudness - TARGET_LUFS) <= LUFS_TOLERANCE,
-		"menu music should sit within %.1f LU of %.1f LUFS" % [LUFS_TOLERANCE, TARGET_LUFS],
+		"race music should sit within %.1f LU of %.1f LUFS" % [LUFS_TOLERANCE, TARGET_LUFS],
 		failures
 	)
-	_check(absf(dc_offset) <= MAX_DC_OFFSET, "menu music should not carry audible DC offset", failures)
-	_check(seam_delta <= MAX_SEAM_DELTA, "menu music loop boundary should not click", failures)
+	_check(absf(dc_offset) <= MAX_DC_OFFSET, "race music should not carry audible DC offset", failures)
+	_check(seam_delta <= MAX_SEAM_DELTA, "race music loop boundary should not click", failures)
 	_check(
 		half_second_variation >= MIN_HALF_SECOND_VARIATION,
-		"menu music should not repeat the same short pulse every half second",
+		"race music should not be a short motor pulse under the engine",
 		failures
 	)
 	if not failures.is_empty():
 		_fail("; ".join(failures))
 		return
-	print("MENU_MUSIC_QUALITY_TEST PASS")
+	print("RACE_MUSIC_QUALITY_TEST PASS")
 	quit(0)
 
 
@@ -121,5 +121,5 @@ func _check(condition: bool, message: String, failures: PackedStringArray) -> vo
 
 
 func _fail(message: String) -> void:
-	push_error("MENU_MUSIC_QUALITY_TEST FAIL: " + message)
+	push_error("RACE_MUSIC_QUALITY_TEST FAIL: " + message)
 	quit(1)

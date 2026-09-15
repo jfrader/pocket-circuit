@@ -17,6 +17,11 @@ const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
 const PAUSED_MUSIC_DB := -9.0
 
+## Ceiling for the Master-bus hard limiter. Music and engine are mastered to
+## -1.0 dBTP individually, but their sum can exceed full scale, so the mix needs
+## its own ceiling to guarantee the output never reaches 0 dBFS.
+const MASTER_CEILING_DB := -1.0
+
 const LIVE_RECIPE := "racing"
 const LIVE_ARRANGEMENT := "extended"
 
@@ -71,6 +76,23 @@ func _exit_tree() -> void:
 func ensure_buses() -> void:
 	_ensure_bus(&"Music")
 	_ensure_bus(&"SFX")
+	_ensure_master_limiter()
+
+
+## The music loop and the engine loop each respect their own ceiling, but they
+## are summed at the Master bus and that sum can exceed full scale (a full-rev
+## simulated race mix peaks slightly above 0 dBTP). A hard limiter on Master is
+## the game-side guarantee that the output never reaches 0 dBFS.
+func _ensure_master_limiter() -> void:
+	var master := AudioServer.get_bus_index(&"Master")
+	if master < 0:
+		return
+	for index in AudioServer.get_bus_effect_count(master):
+		if AudioServer.get_bus_effect(master, index) is AudioEffectHardLimiter:
+			return
+	var limiter := AudioEffectHardLimiter.new()
+	limiter.ceiling_db = MASTER_CEILING_DB
+	AudioServer.add_bus_effect(master, limiter)
 
 
 func play_menu_music() -> void:
@@ -252,7 +274,15 @@ func _update_engine(delta: float = 1.0 / 60.0) -> void:
 	if _race_paused:
 		_engine_player.volume_db = SILENCE_DB
 	else:
-		_engine_player.volume_db = lerpf(-24.0, -3.5, rev)
+		# Music is mastered to -14 LUFS (Gamestruments 0.1.3) and lands near
+		# -15.9 LUFS after the default Music bus gain. The engine loop measures
+		# -16.7 LUFS, so this curve is set to sit roughly 4 dB under the music at
+		# full rev (about -19.6 LUFS) and fall away to near-silence when parked.
+		# Raising the old -24.0 floor was required: against the previously
+		# unmastered -30 LUFS music the engine dominated by ~12 dB, but once the
+		# music was mastered to a real level that same curve buried it instead.
+		# These are mix-balance values, tunable by ear.
+		_engine_player.volume_db = lerpf(-18.0, -2.0, rev)
 
 
 func _ensure_bus(bus_name: StringName) -> int:

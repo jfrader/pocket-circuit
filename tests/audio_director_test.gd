@@ -26,6 +26,16 @@ func _run_test() -> void:
 		return
 	if not _expect(_bus_occurrences(&"Music") == 1 and _bus_occurrences(&"SFX") == 1, "Music and SFX buses should each exist exactly once"):
 		return
+	var master := AudioServer.get_bus_index(&"Master")
+	var master_limiter_count := 0
+	for index in AudioServer.get_bus_effect_count(master):
+		var effect := AudioServer.get_bus_effect(master, index)
+		if effect is AudioEffectHardLimiter:
+			master_limiter_count += 1
+			if not _expect((effect as AudioEffectHardLimiter).ceiling_db <= -1.0, "Master hard limiter should keep the summed output below 0 dBFS"):
+				return
+	if not _expect(master_limiter_count == 1, "Master bus should carry exactly one hard limiter"):
+		return
 	var music_player := director.get_node("MusicPlayer") as AudioStreamPlayer
 	var music_player_id := music_player.get_instance_id()
 	director.play_menu_music()
