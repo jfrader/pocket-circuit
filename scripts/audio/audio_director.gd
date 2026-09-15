@@ -74,13 +74,7 @@ func ensure_buses() -> void:
 
 
 func play_menu_music() -> void:
-	if _live_music != null and _live_music.has_method("generate"):
-		if is_instance_valid(_music_player):
-			_music_player.stop()
-		_music_context = &"menu"
-		_live_music.set("autoplay", false)
-		_live_music.call("generate", "menu")
-		_live_music.call("set_race_state", "garage", 0.35, 0.2, false)
+	if _start_live_music("menu", "garage"):
 		clear_local_vehicle()
 		set_race_paused(false)
 		return
@@ -96,13 +90,7 @@ func play_race_music() -> void:
 		var session: Variant = app.get("current_race_session")
 		if session is Dictionary and not (session as Dictionary).is_empty():
 			race_seed = String((session as Dictionary).get("event_id", "race"))
-	if _live_music != null and _live_music.has_method("generate"):
-		if is_instance_valid(_music_player):
-			_music_player.stop()
-		_music_context = &"race"
-		_live_music.set("autoplay", true)
-		_live_music.call("generate", race_seed)
-		_live_music.call("set_race_state", "grid", 0.35, 0.2, false)
+	if _start_live_music(race_seed, "grid"):
 		set_race_paused(false)
 		return
 	_set_music(&"race", _race_loop)
@@ -189,7 +177,21 @@ func _bind_live_music() -> void:
 	_live_music.set("harmony_voice", "warm")
 	_live_music.set("drive_voice", "pluck")
 	_live_music.set("bass_voice", "bass")
+	_live_music.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_live_music)
+
+
+func _start_live_music(seed: String, phase: String) -> bool:
+	if _live_music == null or not _live_music.has_method("generate"):
+		return false
+	if not bool(_live_music.call("generate", seed)):
+		return false
+	if is_instance_valid(_music_player):
+		_music_player.stop()
+	_music_context = &"menu" if phase == "garage" else &"race"
+	_live_music.set("autoplay", phase != "garage")
+	_live_music.call("set_race_state", phase, 0.35, 0.2, false)
+	return true
 
 
 func _build_players() -> void:

@@ -181,6 +181,8 @@
 
 ### Fixed
 
+- Race music now plays a real Tiny Torque cruise loop. Without the live
+  engine it used to fall back to a quiet motor hum under the engine SFX.
 - Every solid generated object now stops cars across its visible footprint,
   including giant hammers, wrenches, utensils, desk props, and boundary accents;
   only ground-painted art remains drive-over.
