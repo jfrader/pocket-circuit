@@ -30,18 +30,12 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	# Only the music loops are generated here. The sound effects are the
+	# committed Kenney .ogg assets that AudioDirector preloads; the generated
+	# .wav twins they once had were never loaded and have been removed.
 	var definitions: Array[Dictionary] = [
 		{"name": "menu_loop", "duration": _menu_duration, "loop": true, "kind": "menu"},
 		{"name": "race_loop", "duration": _race_duration, "loop": true, "kind": "race"},
-		{"name": "engine_loop", "duration": 0.5, "loop": true, "kind": "engine"},
-		{"name": "countdown", "duration": 0.24, "loop": false, "kind": "countdown"},
-		{"name": "go", "duration": 0.46, "loop": false, "kind": "go"},
-		{"name": "ui_move", "duration": 0.075, "loop": false, "kind": "ui_move"},
-		{"name": "ui_confirm", "duration": 0.14, "loop": false, "kind": "ui_confirm"},
-		{"name": "drift", "duration": 0.34, "loop": false, "kind": "drift"},
-		{"name": "boost", "duration": 0.42, "loop": false, "kind": "boost"},
-		{"name": "impact", "duration": 0.28, "loop": false, "kind": "impact"},
-		{"name": "hazard_warning", "duration": 0.52, "loop": false, "kind": "hazard_warning"},
 	]
 
 	for definition: Dictionary in definitions:
@@ -135,11 +129,8 @@ func _render_sound(definition: Dictionary) -> Error:
 		samples = AudioMastering.master(samples, SAMPLE_RATE)
 	var pcm := PackedByteArray()
 	pcm.resize(sample_count * 2)
-	# Music is mastered and already bounded by its ceiling; the other sounds keep
-	# their historical clamp so regenerating music does not rewrite the SFX wavs.
-	var limit := 1.0 if (kind == "menu" or kind == "race") else 0.92
 	for index in sample_count:
-		var sample := clampf(samples[index], -limit, limit)
+		var sample := clampf(samples[index], -1.0, 1.0)
 		pcm.encode_s16(index * 2, int(round(sample * 32767.0)))
 
 	var stream := AudioStreamWAV.new()
@@ -160,34 +151,6 @@ func _sample(kind: String, time: float, duration: float, index: int) -> float:
 			return _score_music(_menu_events, _menu_phrase_seconds, time, duration, index)
 		"race":
 			return _score_music(_race_events, _race_phrase_seconds, time, duration, index)
-		"engine":
-			return (_sine(72.0, time) + 0.5 * _sine(144.0, time) + 0.22 * _sine(288.0, time)) * 0.105
-		"countdown":
-			var envelope := _attack_release(time, duration, 0.012, 0.09)
-			return (_sine(330.0, time) + 0.26 * _sine(660.0, time)) * envelope * 0.21
-		"go":
-			var envelope := _attack_release(time, duration, 0.018, 0.18)
-			var frequency := lerpf(280.0, 540.0, time / duration)
-			return (_sine(frequency, time) + 0.24 * _sine(frequency * 2.0, time)) * envelope * 0.23
-		"ui_move":
-			return _sine(510.0, time) * _attack_release(time, duration, 0.004, 0.045) * 0.12
-		"ui_confirm":
-			var envelope := _attack_release(time, duration, 0.005, 0.065)
-			return (_sine(420.0, time) + 0.38 * _sine(630.0, time)) * envelope * 0.16
-		"drift":
-			var envelope := _attack_release(time, duration, 0.025, 0.16)
-			return (_noise(index) * 0.7 + _sine(190.0, time) * 0.3) * envelope * 0.16
-		"boost":
-			var envelope := _attack_release(time, duration, 0.018, 0.2)
-			var sweep := _sine(lerpf(95.0, 310.0, time / duration), time)
-			return (sweep * 0.62 + _noise(index) * 0.38) * envelope * 0.2
-		"impact":
-			var envelope := exp(-18.0 * time) * minf(1.0, time / 0.003)
-			return (_sine(74.0, time) * 0.72 + _noise(index) * 0.28) * envelope * 0.3
-		"hazard_warning":
-			var envelope := _attack_release(time, duration, 0.012, 0.1)
-			var alternating := 360.0 if fmod(time, 0.24) < 0.12 else 270.0
-			return (_sine(alternating, time) + 0.22 * _sine(alternating * 2.0, time)) * envelope * 0.18
 	return 0.0
 
 

@@ -116,9 +116,7 @@ static func measure_true_peak_db(samples: PackedFloat32Array, sample_rate: int) 
 static func master(samples: PackedFloat32Array, sample_rate: int) -> PackedFloat32Array:
 	var loudness := measure_integrated_loudness(samples, sample_rate)
 	var gained := _apply_gain_db(samples, TARGET_LUFS - loudness)
-	print("DEBUG master loudness=%.3f gained_tp=%.3f" % [loudness, measure_true_peak_db(gained, sample_rate)])
 	var limited := _true_peak_limit(gained, sample_rate)
-	print("DEBUG master limited_tp=%.3f limited_i=%.3f" % [measure_true_peak_db(limited, sample_rate), measure_integrated_loudness(limited, sample_rate)])
 	return limited
 
 
