@@ -233,7 +233,7 @@ func _cache_checkpoints() -> void:
 		if racing_line:
 			for point: Vector2 in racing_line.points:
 				_standard_racing_line.append(racing_line.to_global(point))
-		elif vehicle.stats.physics_model_version == VehicleStats.BICYCLE_MODEL_VERSION:
+		elif vehicle.stats.physics_model_version != VehicleStats.LEGACY_MODEL_VERSION:
 			# Older authored fixtures store ordered centerline samples as surface
 			# tiles, not RacingLine. Use that actual route rather than inventing
 			# axis-aligned turns between sparse checkpoint gates.
@@ -321,12 +321,12 @@ func _physics_process(delta: float) -> void:
 	var watchdog := _update_route_watchdog(delta, expected_index, heading_to_checkpoint > TURN_AROUND_HEADING)
 	if _recovering:
 		return
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		var route_error := float(_active_route_sample(expected_index)["distance"])
 		var correction := clampf(maxf(route_error / 70.0, absf(vehicle.slip_angle) / 20.0), 0.0, 1.0)
 		_tracking_grip_utilization = lerpf(CORNER_GRIP_UTILIZATION, CORRECTION_GRIP_UTILIZATION, correction)
 	var line_radius := _racing_line_radius(vehicle.global_position)
-	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version == 1 else {}
+	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version != 0 else {}
 	var pursuit_lookahead := _lookahead_distance()
 	if line_radius > 0.0:
 		# Steering follows local curvature. A future hairpin may constrain
@@ -364,7 +364,7 @@ func _physics_process(delta: float) -> void:
 	var pace_multiplier := float(tuning["pace"])
 	var effective_max_speed := vehicle.get_effective_max_speed()
 	var rack_max := 0.0
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		rack_max = DYNAMICS.calculate_target_steer_angle(
 			1.0,
 			vehicle.stats.max_steer_angle_deg,
@@ -374,7 +374,7 @@ func _physics_process(delta: float) -> void:
 			vehicle.stats.steer_fade_start_ratio,
 		)
 	var requested_steer: float
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		# Pure pursuit: curvature from the heading error to the projected goal
 		# and the exact look-ahead arc distance used to select that goal. The
 		# single consistent reference path (racing line, or checkpoint+guide
@@ -415,7 +415,7 @@ func _physics_process(delta: float) -> void:
 	# Brake against the distance to the upcoming curvature hazard, not the
 	# checkpoint/gate target distance. v0 keeps its legacy planning path.
 	var hazard_distance := distance_to_target
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		var upcoming_radius := float(curvature_hazard["radius"])
 		hazard_distance = float(curvature_hazard["distance"])
 		corner_speed = float(curvature_hazard.get("speed_limit", _v1_speed_envelope(upcoming_radius, hazard_distance)))
@@ -430,7 +430,7 @@ func _physics_process(delta: float) -> void:
 			effective_max_speed
 		)
 
-	var target_speed := corner_speed if vehicle.stats.physics_model_version == 1 else minf(
+	var target_speed := corner_speed if vehicle.stats.physics_model_version != 0 else minf(
 		effective_max_speed * lerpf(0.98, float(tuning["sharp_corner_ratio"]), corner_ratio) * pace_multiplier,
 		corner_speed
 	)
@@ -447,11 +447,11 @@ func _physics_process(delta: float) -> void:
 		if turn_sine > 0.05:
 			var pursuit_radius := maxf(goal_chord, 5.0) / (2.0 * turn_sine)
 			target_speed = minf(target_speed, _v1_speed_envelope(pursuit_radius, 0.0))
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		target_speed = minf(target_speed, float(obstacle_plan["speed_limit"]))
 	else:
 		target_speed *= float(obstacle_plan["speed_scale"])
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		target_speed = minf(target_speed, float(traffic_plan["speed_limit"]))
 	else:
 		target_speed *= float(traffic_plan["speed_scale"])
@@ -466,7 +466,7 @@ func _physics_process(delta: float) -> void:
 		target_speed = minf(target_speed, effective_max_speed * 0.12)
 
 	var braking_distance := 0.0
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		var surface_grip := _planned_surface_grip(surface_plan)
 		var reaction_seconds := 0.34 if difficulty == "sunday_drive" else (0.15 if difficulty == "clockwork" else 0.22)
 		var reaction_margin := vehicle.speed * reaction_seconds
@@ -480,7 +480,7 @@ func _physics_process(delta: float) -> void:
 		) * float(personality["brake_timing"])
 
 	var should_brake := vehicle.speed > target_speed and hazard_distance < braking_distance
-	if vehicle.stats.physics_model_version == 1:
+	if vehicle.stats.physics_model_version != 0:
 		# The envelope already includes braking distance and reaction time.
 		should_brake = vehicle.speed > target_speed + 3.0
 		# A sharp heading change, wrong-way state, or an obstacle/low-grip
@@ -516,13 +516,13 @@ func _physics_process(delta: float) -> void:
 		)
 	# Boost gating uses local safe distance + curvature (not stale checkpoint dist/turn_severity) so clear straights get boosts.
 	var local_turn := planned_turn_severity
-	if vehicle.stats.physics_model_version == 1 and not curvature_hazard.is_empty():
+	if vehicle.stats.physics_model_version != 0 and not curvature_hazard.is_empty():
 		local_turn = 0.0
 		var hr := float(curvature_hazard.get("radius", 9999.0))
 		if hr < float(tuning["boost_radius"]):
 			local_turn = clampf((float(tuning["boost_radius"]) - hr) / 1400.0, 0.0, 1.3)
 	var boost_dist_clear := (hazard_distance > braking_distance * 1.25 / float(personality["boost_eagerness"]) or hazard_distance >= 800.0 or hazard_distance == INF)
-	var exit_acceleration_window := vehicle.stats.physics_model_version == 1 and target_speed > vehicle.speed + 120.0 and boost_dist_clear
+	var exit_acceleration_window := vehicle.stats.physics_model_version != 0 and target_speed > vehicle.speed + 120.0 and boost_dist_clear
 	var boost := (
 		absf(steering_angle) < 0.26
 		and (local_turn < float(tuning["boost_turn_threshold"]) * float(personality["boost_eagerness"]) or exit_acceleration_window)
@@ -1072,7 +1072,7 @@ func _configure_personality(driver_id: String, driver_style: Dictionary) -> void
 func _shortcut_route_is_suitable(track: Node) -> bool:
 	if difficulty == "sunday_drive" or _shortcut_racing_line.is_empty():
 		return false
-	if difficulty == "club_circuit" and vehicle.stats.physics_model_version == 1 and vehicle.stats.steering_rate < 3.25:
+	if difficulty == "club_circuit" and vehicle.stats.physics_model_version != 0 and vehicle.stats.steering_rate < 3.25:
 		return false
 	var definitions: Variant = track.get_meta("generated_surfaces", [])
 	if definitions is not Array:
@@ -1083,7 +1083,7 @@ func _shortcut_route_is_suitable(track: Node) -> bool:
 		if not bool(definition.get("ai_path_clear", false)):
 			return false
 		var preference := float(personality["shortcut_preference"])
-		if vehicle.stats.physics_model_version == 1:
+		if vehicle.stats.physics_model_version != 0:
 			var shortcut_grip := float(definition.get("grip", 0.0))
 			var dry_corner := vehicle.get_safe_corner_speed(300.0, 1.0)
 			var shortcut_corner := vehicle.get_safe_corner_speed(300.0, shortcut_grip)
@@ -1117,7 +1117,7 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 		var shortcut_risk := _surface_zone_risk(shortcut_zone)
 		plan["risk"] = shortcut_risk
 		plan["grip_scale"] = shortcut_zone.grip_multiplier
-		if vehicle.stats.physics_model_version == 1:
+		if vehicle.stats.physics_model_version != 0:
 			plan["speed_scale"] = _surface_driving_speed_scale(shortcut_zone.speed_multiplier, shortcut_zone.grip_multiplier, desired_direction)
 		else:
 			var combined_grip := vehicle.stats.grip * shortcut_zone.grip_multiplier
@@ -1129,7 +1129,7 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 	plan["grip_scale"] = float(center_model["grip"])
 	plan["speed_scale"] = (
 		_surface_driving_speed_scale(float(center_model["speed"]), float(center_model["grip"]), desired_direction)
-		if vehicle.stats.physics_model_version == 1
+		if vehicle.stats.physics_model_version != 0
 		else lerpf(1.0, 0.72, center_risk)
 	)
 	if center_risk < 0.12 or not _surface_route_can_avoid(desired_direction):

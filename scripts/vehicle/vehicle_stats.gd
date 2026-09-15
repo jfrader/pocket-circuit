@@ -3,6 +3,7 @@ extends Resource
 
 const LEGACY_MODEL_VERSION := 0
 const BICYCLE_MODEL_VERSION := 1
+const ARCADE_MODEL_VERSION := 2
 const PARAMETER_RANGES := {
 	"mass": [0.65, 1.30, "sm"],
 	"wheelbase": [34.0, 46.0, "wu"],
@@ -30,6 +31,8 @@ const PARAMETER_RANGES := {
 	"high_speed_steer_ratio": [0.38, 0.62, "ratio"],
 	"steer_fade_start_ratio": [0.22, 0.45, "speed ratio"],
 	"yaw_stability_rate": [3.0, 11.0, "1/s"],
+	"arcade_high_speed_steer_ratio": [0.70, 0.92, "ratio"],
+	"arcade_throttle_oversteer": [0.0, 0.55, "ratio"],
 	"brake_force": [800.0, 1400.0, "sf"],
 	"handbrake_force": [180.0, 420.0, "sf"],
 	"drift_min_speed": [100.0, 170.0, "wu/s"],
@@ -47,7 +50,7 @@ const PARAMETER_RANGES := {
 }
 
 @export_category("Physics model")
-@export_enum("Legacy:0", "Bicycle:1") var physics_model_version: int = BICYCLE_MODEL_VERSION
+@export_enum("Legacy:0", "Bicycle:1", "Arcade:2") var physics_model_version: int = ARCADE_MODEL_VERSION
 
 @export_category("Chassis and powertrain")
 @export_range(0.65, 1.30) var mass: float = 1.0
@@ -77,6 +80,8 @@ const PARAMETER_RANGES := {
 @export_range(0.38, 0.62) var high_speed_steer_ratio: float = 0.48
 @export_range(0.22, 0.45) var steer_fade_start_ratio: float = 0.30
 @export_range(3.0, 11.0) var yaw_stability_rate: float = 8.0
+@export_range(0.70, 0.92) var arcade_high_speed_steer_ratio: float = 0.82
+@export_range(0.0, 0.55) var arcade_throttle_oversteer: float = 0.32
 
 @export_category("Brakes and drift")
 @export_range(800.0, 1400.0) var brake_force: float = 1050.0
@@ -118,8 +123,8 @@ const PARAMETER_RANGES := {
 
 func get_validation_errors() -> PackedStringArray:
 	var errors := PackedStringArray()
-	if physics_model_version != LEGACY_MODEL_VERSION and physics_model_version != BICYCLE_MODEL_VERSION:
-		errors.append("physics_model_version must be 0 (legacy) or 1 (bicycle); got %d" % physics_model_version)
+	if physics_model_version != LEGACY_MODEL_VERSION and physics_model_version != BICYCLE_MODEL_VERSION and physics_model_version != ARCADE_MODEL_VERSION:
+		errors.append("physics_model_version must be 0 (legacy), 1 (bicycle) or 2 (arcade); got %d" % physics_model_version)
 	for property_name: String in PARAMETER_RANGES:
 		var bounds: Array = PARAMETER_RANGES[property_name]
 		var value := float(get(property_name))

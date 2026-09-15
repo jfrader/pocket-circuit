@@ -92,6 +92,7 @@ var _drift_yaw_assist_scale := 1.0
 var _rear_grip_recovery := 1.0  # 0..1 interpolation factor during recovery
 var _front_lateral_force := 0.0  # cached for friction circle
 var _rear_lateral_force := 0.0  # cached for friction circle
+var _slide: Dictionary = {}
 
 
 
@@ -99,7 +100,7 @@ func _ready() -> void:
 	apply_stats(stats)
 	gravity_scale = 0.0
 	linear_damp = 0.0
-	angular_damp = 0.0 if stats.physics_model_version == 1 else LEGACY_ANGULAR_DAMP
+	angular_damp = 0.0 if stats.physics_model_version != 0 else LEGACY_ANGULAR_DAMP
 	var physics_material := PhysicsMaterial.new()
 	physics_material.bounce = 0.0
 	physics_material.friction = 0.06
@@ -113,9 +114,13 @@ func _physics_process(delta: float) -> void:
 		_racer_tag.global_position = global_position + _racer_tag_offset
 	_read_input()
 	_update_car_animation(delta)
-	if stats.physics_model_version == 1:
+	var ver := stats.physics_model_version
+	if ver == 1:
 		_update_motion_state()
 		_v1_physics_step(delta)
+	elif ver == 2:
+		_update_motion_state()
+		_v2_physics_step(delta)
 	else:
 		_v0_update_motion_state()
 		_v0_physics_step(delta)
@@ -202,21 +207,21 @@ func get_engine_load() -> float:
 
 
 func get_effective_max_speed() -> float:
-	if stats.physics_model_version == 1:
-		return DYNAMICS.get_effective_max_speed(stats, surface_speed_multiplier)
-	return stats.get_legacy_max_speed() * surface_speed_multiplier
+	if stats.physics_model_version == 0:
+		return stats.get_legacy_max_speed() * surface_speed_multiplier
+	return DYNAMICS.get_effective_max_speed(stats, surface_speed_multiplier)
 
 
 func get_boost_capacity() -> float:
-	if stats.physics_model_version == 1:
-		return stats.boost_capacity
-	return stats.get_legacy_boost_capacity()
+	if stats.physics_model_version == 0:
+		return stats.get_legacy_boost_capacity()
+	return stats.boost_capacity
 
 
 func get_effective_grip() -> float:
-	if stats.physics_model_version == 1:
-		return DYNAMICS.get_effective_grip(stats, surface_grip_multiplier)
-	return stats.grip * surface_grip_multiplier
+	if stats.physics_model_version == 0:
+		return stats.grip * surface_grip_multiplier
+	return DYNAMICS.get_effective_grip(stats, surface_grip_multiplier)
 
 
 func get_safe_corner_speed(radius: float, surface_grip: float = -1.0) -> float:
@@ -229,17 +234,17 @@ func get_safe_corner_speed(radius: float, surface_grip: float = -1.0) -> float:
 func get_braking_distance(v_now: float, v_target: float, surface_grip: float = -1.0) -> float:
 	## AI/public query: braking distance from v_now to v_target.
 	var grip := surface_grip if surface_grip >= 0.0 else surface_grip_multiplier
-	if stats.physics_model_version == 1:
-		return DYNAMICS.predict_braking_distance(
-			v_now, v_target, stats, grip, surface_speed_multiplier,
-		)
-	var brake_accel := stats.get_legacy_brake_force() / maxf(stats.get_legacy_mass(), 0.001)
-	return DYNAMICS.get_braking_distance(v_now, v_target, brake_accel)
+	if stats.physics_model_version == 0:
+		var brake_accel := stats.get_legacy_brake_force() / maxf(stats.get_legacy_mass(), 0.001)
+		return DYNAMICS.get_braking_distance(v_now, v_target, brake_accel)
+	return DYNAMICS.predict_braking_distance(
+		v_now, v_target, stats, grip, surface_speed_multiplier,
+	)
 
 
 func add_boost(amount: float, source: String = "general") -> void:
 	## Unified boost entry point. Sources: "drift", "clean-line", "drafting", etc.
-	if stats.physics_model_version == 1 and is_boost_active() and source != "drift":
+	if stats.physics_model_version != 0 and is_boost_active() and source != "drift":
 		# No recharge while boosting (spec: "No recharge while boosting")
 		return
 	boost_amount = clampf(boost_amount + amount, 0.0, get_boost_capacity())
@@ -264,6 +269,7 @@ func reset_dynamics_state() -> void:
 	_rear_slip_angle = 0.0
 	_front_lateral_force = 0.0
 	_rear_lateral_force = 0.0
+	_slide = {}
 
 
 func collision_snapshot() -> Dictionary:
@@ -356,7 +362,7 @@ func _update_car_animation(delta: float) -> void:
 		return
 	_wheel_travel += linear_velocity.length() * delta
 	var steer := _steer_input
-	if stats != null and stats.physics_model_version == 1:
+	if stats != null and stats.physics_model_version != 0:
 		var max_rack := deg_to_rad(stats.max_steer_angle_deg)
 		if max_rack > 0.001:
 			steer = clampf(_rack_angle / max_rack, -1.0, 1.0)
@@ -369,7 +375,7 @@ func apply_stats(new_stats: VehicleStats) -> void:
 	if new_stats == null:
 		return
 	stats = new_stats
-	if stats.physics_model_version == 1:
+	if stats.physics_model_version != 0:
 		mass = stats.mass
 		angular_damp = 0.0
 		boost_amount = stats.boost_capacity * 0.35
@@ -448,10 +454,12 @@ func _v1_physics_step(delta: float) -> void:
 	var yaw_rate := angular_velocity
 	var eff_max := get_effective_max_speed()
 
-	# ── Steering rack (persistent angle with response rate) ──
+	var lock_ratio := stats.high_speed_steer_ratio
+	if stats.physics_model_version == 2:
+		lock_ratio = clampf(lock_ratio + 0.06, 0.38, 0.68)
 	var target_steer := DYNAMICS.calculate_target_steer_angle(
 		_steer_input, stats.max_steer_angle_deg, fwd_speed, eff_max,
-		stats.high_speed_steer_ratio, stats.steer_fade_start_ratio,
+		lock_ratio, stats.steer_fade_start_ratio,
 	)
 	_rack_angle = DYNAMICS.update_rack_angle(
 		_rack_angle, target_steer, stats.steering_response, delta,
@@ -471,6 +479,7 @@ func _v1_physics_step(delta: float) -> void:
 	var rear_normal := DYNAMICS.calculate_axle_normal_load(
 		stats.mass, stats.front_weight_ratio, false,
 	)
+	var speed_ratio := clampf(absf(fwd_speed) / maxf(eff_max, 0.001), 0.0, 1.2)
 
 	# ── Progressive stiffness scaling ──
 	var prog := DYNAMICS.calculate_progressive_stiffness(surface_grip_multiplier)
@@ -489,6 +498,14 @@ func _v1_physics_step(delta: float) -> void:
 		# Exponential recovery after drift exit
 		_rear_grip_recovery = minf(1.0, _rear_grip_recovery + (1.0 - _rear_grip_recovery) * (1.0 - exp(-stats.drift_grip_recovery_rate * delta)))
 		effective_rear_grip *= lerpf(stats.drift_rear_grip_ratio, 1.0, _rear_grip_recovery)
+	if (
+		stats.physics_model_version == 2
+		and not _handbrake_input
+		and absf(fwd_speed) > eff_max * 0.48
+		and _throttle_input > 0.45
+		and absf(_steer_input) > 0.22
+	):
+		effective_rear_grip *= 1.0 - stats.arcade_throttle_oversteer * 0.50
 
 	# ── Tire lateral forces ──
 	_front_lateral_force = DYNAMICS.calculate_tire_lateral_force(
@@ -548,6 +565,10 @@ func _v1_physics_step(delta: float) -> void:
 		var k_torque := err * estimated_inertia * stats.steering_response * blend * 0.7
 		var k_lim := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.25
 		apply_torque(clampf(k_torque, -k_lim, k_lim))  # use torque (not direct vel set) to avoid timestep instability / vel override fights with applied forces
+	if stats.physics_model_version == 2 and not _handbrake_input and absf(_steer_input) > 0.08:
+		var follow := (target_yaw_rate - yaw_rate) * estimated_inertia * stats.steering_response * 0.20
+		var follow_lim := (front_peak_grip * front_normal + effective_rear_grip * rear_normal) * stats.wheelbase * 0.22
+		apply_torque(clampf(follow, -follow_lim, follow_lim))
 	# Releasing a slide is a request to regain control, not to keep spinning.
 	# Neutral steering damps residual yaw while ordinary cornering and
 	# deliberate held-handbrake slides remain tire-driven.
@@ -593,6 +614,8 @@ func _v1_physics_step(delta: float) -> void:
 
 	# ── Drift state machine ──
 	_v1_update_drift(delta, fwd_speed)
+	if stats.physics_model_version == 2 and not is_drifting:
+		is_sliding = rad_to_deg(absf(_rear_slip_angle)) > 11.0 and absf(_steer_input) > 0.15 and absf(fwd_speed) > 120.0
 
 	# ── Speed caps (soft + hard) ──
 	_v1_apply_speed_caps()
@@ -665,6 +688,8 @@ func _v1_update_drift(delta: float, fwd_speed: float) -> void:
 
 	is_drifting = _drift_state == DriftState.ACTIVE
 	is_sliding = false
+	# v1 no longer runs the removed player-only VehicleFeel slide state (GURI-739);
+	# is_sliding remains false outside handbrake drift. Arcade v2 sets is_sliding on grip exceed.
 
 
 func _v1_drift_try_entry(fwd_speed: float, _rear_slip_deg: float) -> void:
@@ -682,7 +707,12 @@ func _v1_drift_try_entry(fwd_speed: float, _rear_slip_deg: float) -> void:
 		return
 	# With the body-right slip convention, rear slip during turn-in has the
 	# opposite sign to steering input while yaw grows into the corner.
-	var rear_slip_growing := signf(_steer_input) == -signf(_rear_slip_angle) and absf(_rear_slip_angle) > 0.01
+	# For v2 arcade (no _rear_slip computed from tire model) we accept on hand+steer+speed;
+	# v1 keeps the directional check when slip data present.
+	var has_slip_data := absf(_rear_slip_angle) > 0.01
+	var rear_slip_growing := true
+	if has_slip_data:
+		rear_slip_growing = signf(_steer_input) == -signf(_rear_slip_angle)
 	if not rear_slip_growing:
 		return
 
@@ -760,6 +790,16 @@ func _v1_apply_speed_caps() -> void:
 	var hard_limit := stats.max_speed * cap_mult
 	if linear_velocity.length() > hard_limit:
 		linear_velocity = linear_velocity.limit_length(hard_limit)
+
+
+# ═══════════════════════════════════════════════════════════════════════
+# V2 — Arcade toy-car model (live default, physics_model_version == 2)
+# ═══════════════════════════════════════════════════════════════════════
+
+func _v2_physics_step(delta: float) -> void:
+	# Live arcade is bicycle tires + more lock + a light throttle-on rear cut.
+	# A separate force stepper could not stay on the racing line.
+	_v1_physics_step(delta)
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -892,7 +932,7 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 				strongest_static_score = static_score
 				has_static_contact = true
 				static_contact_normal = world_normal
-				if stats.physics_model_version == 1 and _drift_state == DriftState.ACTIVE:
+				if _drift_state == DriftState.ACTIVE:
 					_drift_collision_cancel = true
 			continue
 		if not collider.has_method("collision_snapshot"):
@@ -938,8 +978,8 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		state.linear_velocity = last_collision_response["velocity"]
 		state.angular_velocity = float(last_collision_response["angular_velocity"])
 
-		# Collision invalidates active drift boost (v1)
-		if stats.physics_model_version == 1 and _drift_state == DriftState.ACTIVE:
+		# Collision invalidates active drift boost (v1+)
+		if _drift_state == DriftState.ACTIVE:
 			_drift_collision_cancel = true
 
 	_last_output_velocity = state.linear_velocity

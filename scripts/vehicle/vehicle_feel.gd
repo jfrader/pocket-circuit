@@ -13,8 +13,10 @@ const DEMAND_SAVE := 0.72
 const DEMAND_SPIN := 2.35
 const SAVE_HOLD := 0.22
 const AERO_FRONT_SHARE := 0.62
-const REAR_MU_FLOOR := 0.86
-const CORNER_ROTATE := 0.28
+const REAR_MU_FLOOR := 0.70
+const CORNER_ROTATE := 0.62
+
+
 static func chassis(stats: VehicleStats, forward_speed: float, effective_max_speed: float, longitudinal_demand: float) -> Dictionary:
 	var q := VehicleDynamics.downforce_q(forward_speed, effective_max_speed, stats.downforce_q_max)
 	var loads := VehicleDynamics.axle_loads_with_transfer(
@@ -36,14 +38,22 @@ static func chassis(stats: VehicleStats, forward_speed: float, effective_max_spe
 	}
 
 
-static func rear_mu_scale(_speed_ratio: float, _throttle: float, _steer: float) -> float:
-	# High-speed rear cut made club AI miss the 8s finish window on S-curves.
-	# Keep the seam; do not bias the tail until that race rule is revisited.
-	return 1.0
+static func rear_mu_scale(speed_ratio: float, throttle: float, steer: float) -> float:
+	var turning := clampf(absf(steer), 0.0, 1.0)
+	var speed_w := smoothstep(0.38, 0.78, speed_ratio)
+	var cut := lerpf(1.0, 0.74, speed_w * lerpf(0.40, 1.0, turning))
+	cut *= lerpf(1.0, 0.86, speed_w * clampf(throttle, 0.0, 1.0))
+	return clampf(cut, REAR_MU_FLOOR, 1.0)
 
 
-static func corner_rotate(_speed_ratio: float, _steer: float, _yaw_rate: float) -> float:
-	return 0.0
+static func corner_rotate(speed_ratio: float, steer: float, yaw_rate: float) -> float:
+	if absf(steer) < 0.14:
+		return 0.0
+	if absf(yaw_rate) > 0.05 and signf(steer) != signf(yaw_rate):
+		return 0.0
+	var speed_w := smoothstep(0.40, 0.82, speed_ratio)
+	var already := clampf(absf(yaw_rate) / 3.2, 0.0, 1.0)
+	return steer * speed_w * (1.0 - already * 0.65) * CORNER_ROTATE
 
 
 static func rear_demand(slip_rad: float, cornering_stiffness: float, peak_grip: float, rear_load: float) -> float:
