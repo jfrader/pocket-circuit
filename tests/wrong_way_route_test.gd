@@ -35,6 +35,10 @@ func _run_test() -> void:
 		return
 	if not _test_recovery_notification():
 		return
+	if not _test_unexpected_gate_does_not_flag_wrong_way():
+		return
+	if not _test_recovery_stays_near_car():
+		return
 	_cleanup()
 	print("WRONG_WAY_ROUTE_TEST PASS")
 	quit(0)
@@ -202,6 +206,29 @@ func _test_recovery_notification() -> bool:
 	if not _expect(float(controller.get("_route_progress_accumulator")) == 0.0, "external recovery should reset the route progress accumulator"):
 		return false
 	if not _expect(str(controller.get("_watchdog_target_key")) == "", "external recovery should re-anchor the watchdog target key"):
+		return false
+	return true
+
+
+func _test_unexpected_gate_does_not_flag_wrong_way() -> bool:
+	var manager := _overshoot_manager()
+	var racer := _registered_racer(manager, Vector2(1500, 0), Vector2(500, 0))
+	var stray := _checkpoint(2, false, Vector2(1500, 0))
+	if manager.report_checkpoint(stray, racer):
+		return _expect(false, "an unexpected gate must not count as progress")
+	if not _expect(not manager.is_racer_wrong_way(racer), "brushing a nearby unexpected gate must not mark wrong-way"):
+		return false
+	return true
+
+
+func _test_recovery_stays_near_car() -> bool:
+	var manager := _overshoot_manager()
+	var racer := _registered_racer(manager, Vector2(1500, 0), Vector2(500, 0))
+	var pose := manager.get_last_recovery_transform(racer)
+	if not _expect(pose.origin.distance_to(Vector2(1500, 0)) < 80.0, "recovery should snap onto the nearby route, not the previous gate"):
+		return false
+	var forward := Vector2.UP.rotated(pose.get_rotation())
+	if not _expect(forward.dot(Vector2(1, 0)) > 0.9, "nearby recovery should face along the route"):
 		return false
 	return true
 

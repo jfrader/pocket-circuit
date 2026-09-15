@@ -4,7 +4,7 @@
 
 [resource]
 script = ExtResource("1_stats")
-physics_model_version = 1
+physics_model_version = 2
 mass = 0.68
 wheelbase = 36.0
 front_weight_ratio = 0.48
@@ -26,6 +26,8 @@ slip_falloff_rate = 0.48
 max_steer_angle_deg = 35.0
 steering_response = 9.5
 high_speed_steer_ratio = 0.48
+arcade_high_speed_steer_ratio = 0.82
+arcade_throttle_oversteer = 0.32
 steer_fade_start_ratio = 0.28
 yaw_stability_rate = 6.0
 brake_force = 820.0
