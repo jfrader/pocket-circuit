@@ -12,6 +12,7 @@ const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identi
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
 const CIRCUIT_PREVIEW_QUEUE := preload("res://scripts/race/circuit_preview_queue.gd")
+const LOADING_FRAME_BUDGET_USEC := 50_000
 
 var current_race_session: Dictionary = {}
 var reduced_camera_shake := false
@@ -32,6 +33,7 @@ var _transitioning_to_race := false
 var _loading_screen: CanvasLayer
 var _loading_cancelled := false
 var _loading_failed := false
+var _last_loading_frame_yield := 0
 var loading_metrics: Dictionary = {}
 var _mastery_calibration_queue: Array[String] = []
 var _mastery_calibration_active := false
@@ -571,6 +573,23 @@ func set_loading_section(section: int) -> void:
 func loading_step(phase: String) -> void:
 	if is_instance_valid(_loading_screen):
 		_loading_screen.call("set_phase", phase)
+	await _yield_loading_frame()
+
+
+func _throttled_loading_step(phase: String) -> void:
+	# Dense per-resource loops update the phase text every iteration but only
+	# yield a rendered frame once the time budget is spent. This keeps the
+	# loading screen responsive and cancellable without paying a full frame
+	# (plus GPU sync) for every dependency or generated image.
+	if is_instance_valid(_loading_screen):
+		_loading_screen.call("set_phase", phase)
+	if Time.get_ticks_usec() - _last_loading_frame_yield < LOADING_FRAME_BUDGET_USEC:
+		return
+	await _yield_loading_frame()
+
+
+func _yield_loading_frame() -> void:
+	_last_loading_frame_yield = Time.get_ticks_usec()
 	await get_tree().process_frame
 	if DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
@@ -619,6 +638,12 @@ func _load_scene_resources(path: String, resources: Dictionary) -> bool:
 		return false
 	if resources.has(path):
 		return true
+	# Yield to the loading screen on a time budget (rather than once per
+	# dependency) so it stays responsive and can cancel without paying a
+	# rendered frame + GPU sync for every resource.
+	await _throttled_loading_step("Loading race resources")
+	if _loading_cancelled:
+		return false
 	resources[path] = null
 	var scripts: Array[String] = []
 	var assets: Array[String] = []
@@ -633,9 +658,9 @@ func _load_scene_resources(path: String, resources: Dictionary) -> bool:
 		if not await _load_scene_resources(dependency, resources):
 			return false
 	# Scene scripts can preload textures. Keep their compilation and GPU resource
-	# creation on the main thread, loading dependencies across rendered frames.
+	# creation on the main thread; the throttled yield above covers responsiveness
+	# while `change_scene_to_packed`'s own frame yield handles the final GPU sync.
 	resources[path] = load(path)
-	await loading_step("Loading race resources")
 	return resources[path] != null
 
 
