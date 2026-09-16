@@ -1,15 +1,22 @@
 extends SceneTree
 
+const AudioMastering := preload("res://tools/audio_mastering.gd")
+
 const SAMPLE_RATE := 22050
 const OUTPUT_DIR := "res://assets/audio"
 const MENU_SCORE_PATH := "res://data/music/tiny_torque_level_004.score.json"
 const MENU_SECTION_ID := "grid"
+const RACE_SECTION_ID := "cruise"
 const MENU_PHRASE_LOOPS := 3
+const RACE_PHRASE_LOOPS := 3
 const TAU_F := TAU
 
 var _menu_events: Array[Dictionary] = []
+var _race_events: Array[Dictionary] = []
 var _menu_phrase_seconds := 16.0
+var _race_phrase_seconds := 16.0
 var _menu_duration := 16.0
+var _race_duration := 16.0
 var _ticks_per_second := 2160.0
 
 
@@ -23,18 +30,12 @@ func _initialize() -> void:
 		quit(1)
 		return
 
+	# Only the music loops are generated here. The sound effects are the
+	# committed Kenney .ogg assets that AudioDirector preloads; the generated
+	# .wav twins they once had were never loaded and have been removed.
 	var definitions: Array[Dictionary] = [
 		{"name": "menu_loop", "duration": _menu_duration, "loop": true, "kind": "menu"},
-		{"name": "race_loop", "duration": 4.0, "loop": true, "kind": "race"},
-		{"name": "engine_loop", "duration": 0.5, "loop": true, "kind": "engine"},
-		{"name": "countdown", "duration": 0.24, "loop": false, "kind": "countdown"},
-		{"name": "go", "duration": 0.46, "loop": false, "kind": "go"},
-		{"name": "ui_move", "duration": 0.075, "loop": false, "kind": "ui_move"},
-		{"name": "ui_confirm", "duration": 0.14, "loop": false, "kind": "ui_confirm"},
-		{"name": "drift", "duration": 0.34, "loop": false, "kind": "drift"},
-		{"name": "boost", "duration": 0.42, "loop": false, "kind": "boost"},
-		{"name": "impact", "duration": 0.28, "loop": false, "kind": "impact"},
-		{"name": "hazard_warning", "duration": 0.52, "loop": false, "kind": "hazard_warning"},
+		{"name": "race_loop", "duration": _race_duration, "loop": true, "kind": "race"},
 	]
 
 	for definition: Dictionary in definitions:
@@ -63,25 +64,45 @@ func _load_menu_score() -> bool:
 		push_error("AUDIO_GENERATOR FAIL: menu score missing tempo")
 		return false
 	_ticks_per_second = bpm * ticks_per_beat / 60.0
-	var section: Dictionary = {}
-	for candidate: Variant in score.get("sections", []):
-		if typeof(candidate) == TYPE_DICTIONARY and String(candidate.get("id", "")) == MENU_SECTION_ID:
-			section = candidate
-			break
-	if section.is_empty():
-		push_error("AUDIO_GENERATOR FAIL: menu score missing section %s" % MENU_SECTION_ID)
+	_menu_events = _events_for_section(score, MENU_SECTION_ID)
+	_race_events = _events_for_section(score, RACE_SECTION_ID)
+	if _menu_events.is_empty() or _race_events.is_empty():
 		return false
-	_menu_phrase_seconds = float(section.get("lengthTicks", 0.0)) / _ticks_per_second
-	if _menu_phrase_seconds <= 0.0:
-		push_error("AUDIO_GENERATOR FAIL: menu phrase has no length")
+	_menu_phrase_seconds = _phrase_seconds_for_section(score, MENU_SECTION_ID)
+	_race_phrase_seconds = _phrase_seconds_for_section(score, RACE_SECTION_ID)
+	if _menu_phrase_seconds <= 0.0 or _race_phrase_seconds <= 0.0:
+		push_error("AUDIO_GENERATOR FAIL: catalog phrase has no length")
 		return false
 	_menu_duration = _menu_phrase_seconds * float(MENU_PHRASE_LOOPS)
-	_menu_events.clear()
+	_race_duration = _race_phrase_seconds * float(RACE_PHRASE_LOOPS)
+	return true
+
+
+func _section_named(score: Dictionary, section_id: String) -> Dictionary:
+	for candidate: Variant in score.get("sections", []):
+		if typeof(candidate) == TYPE_DICTIONARY and String(candidate.get("id", "")) == section_id:
+			return candidate
+	push_error("AUDIO_GENERATOR FAIL: catalog score missing section %s" % section_id)
+	return {}
+
+
+func _phrase_seconds_for_section(score: Dictionary, section_id: String) -> float:
+	var section := _section_named(score, section_id)
+	if section.is_empty():
+		return 0.0
+	return float(section.get("lengthTicks", 0.0)) / _ticks_per_second
+
+
+func _events_for_section(score: Dictionary, section_id: String) -> Array[Dictionary]:
+	var section := _section_named(score, section_id)
+	var events: Array[Dictionary] = []
+	if section.is_empty():
+		return events
 	for event_value: Variant in section.get("events", []):
 		if typeof(event_value) != TYPE_DICTIONARY:
 			continue
 		var event: Dictionary = event_value
-		_menu_events.append({
+		events.append({
 			"kind": String(event.get("kind", "")),
 			"voice": String(event.get("voice", "")),
 			"role": String(event.get("role", "")),
@@ -90,17 +111,26 @@ func _load_menu_score() -> bool:
 			"start": float(event.get("startTick", 0.0)) / _ticks_per_second,
 			"duration": maxf(0.04, float(event.get("durationTicks", 1.0)) / _ticks_per_second),
 		})
-	return not _menu_events.is_empty()
+	if events.is_empty():
+		push_error("AUDIO_GENERATOR FAIL: catalog section %s has no events" % section_id)
+	return events
 
 
 func _render_sound(definition: Dictionary) -> Error:
 	var duration := float(definition["duration"])
 	var sample_count := maxi(2, int(round(duration * SAMPLE_RATE)))
+	var kind := String(definition["kind"])
+	var samples := PackedFloat32Array()
+	samples.resize(sample_count)
+	for index in sample_count:
+		var time := float(index) / float(SAMPLE_RATE)
+		samples[index] = _sample(kind, time, duration, index)
+	if kind == "menu" or kind == "race":
+		samples = AudioMastering.master(samples, SAMPLE_RATE)
 	var pcm := PackedByteArray()
 	pcm.resize(sample_count * 2)
 	for index in sample_count:
-		var time := float(index) / float(SAMPLE_RATE)
-		var sample := clampf(_sample(String(definition["kind"]), time, duration, index), -0.92, 0.92)
+		var sample := clampf(samples[index], -1.0, 1.0)
 		pcm.encode_s16(index * 2, int(round(sample * 32767.0)))
 
 	var stream := AudioStreamWAV.new()
@@ -118,49 +148,18 @@ func _render_sound(definition: Dictionary) -> Error:
 func _sample(kind: String, time: float, duration: float, index: int) -> float:
 	match kind:
 		"menu":
-			return _menu_music(time, duration, index)
+			return _score_music(_menu_events, _menu_phrase_seconds, time, duration, index)
 		"race":
-			var drive := _sine(62.0, time) + 0.48 * _sine(124.0, time) + 0.16 * _sine(248.0, time)
-			var motor_gate := 0.52 + 0.48 * cos(TAU_F * 4.0 * time)
-			var grit := _sine(403.0, time) * _sine(17.0, time)
-			return drive * (0.055 + motor_gate * 0.045) + grit * 0.025
-		"engine":
-			return (_sine(72.0, time) + 0.5 * _sine(144.0, time) + 0.22 * _sine(288.0, time)) * 0.105
-		"countdown":
-			var envelope := _attack_release(time, duration, 0.012, 0.09)
-			return (_sine(330.0, time) + 0.26 * _sine(660.0, time)) * envelope * 0.21
-		"go":
-			var envelope := _attack_release(time, duration, 0.018, 0.18)
-			var frequency := lerpf(280.0, 540.0, time / duration)
-			return (_sine(frequency, time) + 0.24 * _sine(frequency * 2.0, time)) * envelope * 0.23
-		"ui_move":
-			return _sine(510.0, time) * _attack_release(time, duration, 0.004, 0.045) * 0.12
-		"ui_confirm":
-			var envelope := _attack_release(time, duration, 0.005, 0.065)
-			return (_sine(420.0, time) + 0.38 * _sine(630.0, time)) * envelope * 0.16
-		"drift":
-			var envelope := _attack_release(time, duration, 0.025, 0.16)
-			return (_noise(index) * 0.7 + _sine(190.0, time) * 0.3) * envelope * 0.16
-		"boost":
-			var envelope := _attack_release(time, duration, 0.018, 0.2)
-			var sweep := _sine(lerpf(95.0, 310.0, time / duration), time)
-			return (sweep * 0.62 + _noise(index) * 0.38) * envelope * 0.2
-		"impact":
-			var envelope := exp(-18.0 * time) * minf(1.0, time / 0.003)
-			return (_sine(74.0, time) * 0.72 + _noise(index) * 0.28) * envelope * 0.3
-		"hazard_warning":
-			var envelope := _attack_release(time, duration, 0.012, 0.1)
-			var alternating := 360.0 if fmod(time, 0.24) < 0.12 else 270.0
-			return (_sine(alternating, time) + 0.22 * _sine(alternating * 2.0, time)) * envelope * 0.18
+			return _score_music(_race_events, _race_phrase_seconds, time, duration, index)
 	return 0.0
 
 
-func _menu_music(time: float, duration: float, index: int) -> float:
-	var local := fmod(time, _menu_phrase_seconds)
+func _score_music(events: Array[Dictionary], phrase_seconds: float, time: float, duration: float, index: int) -> float:
+	var local := fmod(time, phrase_seconds)
 	if local < 0.0:
-		local += _menu_phrase_seconds
+		local += phrase_seconds
 	var mix := 0.0
-	for event: Dictionary in _menu_events:
+	for event: Dictionary in events:
 		mix += _render_menu_event(event, local, index)
 	var seam_fade := minf(smoothstep(0.0, 0.01, time), smoothstep(0.0, 0.01, duration - time))
 	return mix * seam_fade
