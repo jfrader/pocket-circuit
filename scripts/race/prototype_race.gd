@@ -246,7 +246,6 @@ func _prepare_race_async() -> void:
 				if not IDENTITIES.install_motion_image(vehicle_id, rendered["jobs"][index], rendered["images"][index]):
 					app.call("fail_race_loading", "Vehicle graphics could not be prepared")
 					return
-				await _loading_step("Preparing %s animation" % vehicle_id.capitalize())
 		if app.call("is_race_loading_cancelled"):
 			app.call("complete_race_loading")
 			return
