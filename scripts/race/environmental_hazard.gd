@@ -87,7 +87,7 @@ func configure(hazard_theme: StringName, travel_start: Vector2, travel_end: Vect
 	_set_state(HazardState.ACTIVE if is_static() else HazardState.IDLE)
 
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	advance(delta)
 
 
