@@ -94,12 +94,20 @@ func _run_theme(theme: StringName, room: StringName, seed: int) -> bool:
 			return false
 		checkpoint_history[racer] = []
 
-	for settle in 6:
-		await create_timer(0.1).timeout
+	# Deterministic settle: the old 6 x 0.1 s wall-clock timers covered 0.6 s of
+	# simulated time, which is 36 physics frames here (physics_ticks / time_scale
+	# = 60 frames per simulated second). Stepping physics frames directly keeps
+	# the settle independent of rendered frame rate, so the cars reach the start
+	# line in the same state every run.
+	for _settle in 36:
+		await physics_frame
 	paused = false
+	# Bounded condition wait: poll the manager's running state on physics frames
+	# instead of wall-clock timers, with the old 30 x 0.1 s = 3.0 s budget
+	# converted to 180 physics frames.
 	var startup_waits := 0
-	while not manager.is_running and startup_waits < 30:
-		await create_timer(0.1).timeout
+	while not manager.is_running and startup_waits < 180:
+		await physics_frame
 		startup_waits += 1
 	if not _expect(manager.is_running, "%s should finish its countdown (paused=%s countdown_active=%s race_time=%.2f)" % [theme, str(paused), str(prototype.get("_countdown_active")), manager.race_time]):
 		return false

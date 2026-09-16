@@ -47,6 +47,10 @@ const OFF_ROUTE_DISTANCE := 250.0
 const OFF_ROUTE_TIMEOUT := 1.25
 const NO_PROGRESS_TIMEOUT := 2.0
 const WRONG_WAY_PROGRESS_TIMEOUT := 0.75
+const SPIN_LIFT_SLIP_DEG := 40.0
+const SPIN_RECOVER_SLIP_DEG := 105.0
+const SPIN_MIN_SPEED := 80.0
+const SPIN_RECOVER_TIMEOUT := 0.3
 const ROUTE_PROGRESS_COMMIT_DISTANCE := 18.0
 const LOW_SPEED_FEELER_LENGTH := 72.0
 const STATIC_CONTACT_CLEARANCE_RATIO := 0.42
@@ -159,6 +163,7 @@ var _recovery_cooldown_remaining := 0.0
 var _off_route_time := 0.0
 var _no_progress_time := 0.0
 var _wrong_way_progress_time := 0.0
+var _spin_time := 0.0
 var _route_progress_accumulator := 0.0
 var _watchdog_target_key := ""
 var _last_route_arc := 0.0
@@ -320,6 +325,8 @@ func _physics_process(delta: float) -> void:
 	var heading_to_checkpoint := absf(forward.angle_to(vehicle.global_position.direction_to(checkpoint_position)))
 	var watchdog := _update_route_watchdog(delta, expected_index, heading_to_checkpoint > TURN_AROUND_HEADING)
 	if _recovering:
+		return
+	if _update_spin_recovery(delta):
 		return
 	if vehicle.stats.physics_model_version != 0:
 		var route_error := float(_active_route_sample(expected_index)["distance"])
@@ -546,6 +553,12 @@ func _physics_process(delta: float) -> void:
 			vehicle.stats.boost_recharge * float(tuning["clean_line_recharge"]) * delta,
 			"clean-line",
 		)
+	# Lift throttle while the body slides past a controlled drift so the arcade
+	# throttle-oversteer (throttle-on rear cut) does not escalate the slide into a
+	# full spin. Coasting lets the rear tyres regain grip.
+	if absf(vehicle.slip_angle) > SPIN_LIFT_SLIP_DEG and vehicle.speed > SPIN_MIN_SPEED:
+		throttle = 0.0
+		boost = false
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
 	_update_stuck_recovery(delta, stuck_target_key, distance_to_target)
@@ -1358,6 +1371,22 @@ func _single_ray_probe(
 	}
 
 
+func _update_spin_recovery(delta: float) -> bool:
+	## A car facing roughly the right way but sliding backward makes no route
+	## progress, and its heading-based steering will not correct the slide. The
+	## throttle lift in _physics_process usually catches the slide early; if the
+	## backward slide persists, reuse the standard recovery teleport instead of
+	## ploughing on for seconds.
+	if vehicle.speed > SPIN_MIN_SPEED and absf(vehicle.slip_angle) > SPIN_RECOVER_SLIP_DEG:
+		_spin_time += delta
+	else:
+		_spin_time = 0.0
+	if _spin_time >= SPIN_RECOVER_TIMEOUT and not _recovery_cooldown_active():
+		_recover_vehicle(&"spin")
+		return true
+	return false
+
+
 func _update_stuck_recovery(delta: float, target_key: String, distance_to_target: float) -> void:
 	if target_key != _stuck_target_key:
 		_stuck_target_key = target_key
@@ -1564,7 +1593,9 @@ func _recover_vehicle(reason: StringName = &"unknown") -> void:
 	vehicle.linear_velocity = recovery_forward * clampf(eff_max * 0.28, 170.0, 210.0)
 	vehicle.boost_amount = maxf(vehicle.boost_amount * 0.5, vehicle.get_boost_capacity() * 0.35)
 
-	await get_tree().create_timer(RECOVERY_GHOST_TIME, false).timeout
+	# process_in_physics keeps the recovery ghost on the fixed physics step so a
+	# recovery teleport is deterministic, matching the race-time determinism work.
+	await get_tree().create_timer(RECOVERY_GHOST_TIME, false, true).timeout
 	if is_instance_valid(vehicle) and is_instance_valid(race_manager) and not race_manager.is_racer_finished(vehicle):
 		vehicle.collision_layer = saved_layer
 		vehicle.collision_mask = saved_mask
@@ -1590,6 +1621,7 @@ func _reset_route_watchdog() -> void:
 	_off_route_time = 0.0
 	_no_progress_time = 0.0
 	_wrong_way_progress_time = 0.0
+	_spin_time = 0.0
 	_route_progress_accumulator = 0.0
 	_watchdog_target_key = ""
 	_last_route_arc = 0.0
