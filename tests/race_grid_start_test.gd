@@ -24,8 +24,12 @@ func _check_start(case: Array, reverse: bool) -> bool:
 	current_scene = race
 	var manager := race.get_node("RaceManager") as RaceManager
 	var expected: Array = race.call("_grid_transforms", reverse)
-	for settle in 6:
-		await create_timer(0.1).timeout
+	# Deterministic settle: the old 6 x 0.1 s wall-clock timers covered 0.6 s of
+	# simulated time, which is 36 physics frames here (60 frames per simulated
+	# second). Stepping physics frames keeps the settle independent of rendered
+	# frame rate.
+	for _settle in 36:
+		await physics_frame
 	paused = false
 	var racers := manager.get_rankings()
 	var starts: Dictionary = {}
@@ -43,10 +47,13 @@ func _check_start(case: Array, reverse: bool) -> bool:
 		query.collision_mask = 2 | 4 | 16
 		query.exclude = [(racer as RigidBody2D).get_rid()]
 		valid = _expect(racer.get_world_2d().direct_space_state.intersect_shape(query, 1).is_empty(), "%s grid footprint must not touch solid scenery" % racer.name) and valid
-	for wait in 30:
+	# Bounded condition wait: poll the manager's running state on physics frames
+	# instead of wall-clock timers, with the old 30 x 0.1 s = 3.0 s budget
+	# converted to 180 physics frames.
+	for _wait in 180:
 		if manager.is_running:
 			break
-		await create_timer(0.1).timeout
+		await physics_frame
 	valid = _expect(manager.is_running, "countdown must start the race") and valid
 	for frame in 6:
 		await physics_frame

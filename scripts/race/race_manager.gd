@@ -53,7 +53,7 @@ func _ready() -> void:
 	call_deferred("_initialize_race")
 
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	advance_race_time(delta)
 
 

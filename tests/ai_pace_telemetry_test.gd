@@ -170,13 +170,20 @@ func _race(case: Array, opponents: int) -> Dictionary:
 	if not _expect(racers.size() == opponents + 1, "pace fixture must contain the complete requested field"):
 		prototype.free()
 		return {}
-	for settle in 6:
-		await create_timer(0.1).timeout
+	# Deterministic settle: the old 6 x 0.1 s wall-clock timers covered 0.6 s of
+	# simulated time, which is 36 physics frames here (60 frames per simulated
+	# second). Stepping physics frames keeps the settle independent of rendered
+	# frame rate.
+	for _settle in 36:
+		await physics_frame
 	paused = false
-	for wait in 30:
+	# Bounded condition wait: poll the manager's running state on physics frames
+	# instead of wall-clock timers, with the old 30 x 0.1 s = 3.0 s budget
+	# converted to 180 physics frames.
+	for _wait in 180:
 		if manager.is_running:
 			break
-		await create_timer(0.1).timeout
+		await physics_frame
 	if not _expect(manager.is_running, "pace fixture must complete the real countdown"):
 		prototype.free()
 		return {}
