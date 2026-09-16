@@ -119,8 +119,12 @@ func _run_direction(reverse: bool) -> bool:
 		player.collision_layer = 0
 		player.collision_mask = 0
 
-	for settle in 6:
-		await create_timer(0.1).timeout
+	# Deterministic settle: the old 6 x 0.1 s wall-clock timers covered 0.6 s of
+	# simulated time, which is 36 physics frames here (60 frames per simulated
+	# second). Stepping physics frames keeps the settle independent of rendered
+	# frame rate.
+	for _settle in 36:
+		await physics_frame
 	paused = false
 
 	var checkpoint_counts: Dictionary = {}
