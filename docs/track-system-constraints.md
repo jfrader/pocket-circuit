@@ -72,6 +72,9 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   instead of the four standard programs, so the standard tiers' seed geometry
   is untouched. Marathon routes land 16–22 broad turn complexes (twice the
   standard bound below) at the same corridor width and corner rules.
+  L-shaped rooms keep their dedicated `el_safe` route, which lands fewer
+  complexes; a small number of wide/long seeds fall back to the technical
+  perimeter when the folded shape cannot reach the 32k band floor.
 - Corridor half-width is 125 units. Validation reserves the complete 250-unit
   nominal racing corridor for route fitting and prop placement, rejects
   centerline self-intersections, enforces nonlocal self-distance, and keeps the

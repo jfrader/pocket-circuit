@@ -124,7 +124,9 @@ static func construct_marathon(index: int, seed: int, length_bias: float = 0.0, 
 static func _double_switchback_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
 	var spine := maxf(400.0, x * _roll(seed, 0x411, 0.28, 0.34))
 	var waist := maxf(400.0, x * _roll(seed, 0x425, 0.14, 0.18))
-	var depth := height * _roll(seed, 0x43B, 0.40, 0.48)
+	# Depth is capped so the two opposing notch floors keep at least 0.2h
+	# (>> the 320u self-distance floor) between them.
+	var depth := height * _roll(seed, 0x43B, 0.30, 0.38)
 	return PackedVector2Array([
 		Vector2(-x, -y),
 		Vector2(-spine, -y),
@@ -149,33 +151,34 @@ static func _double_switchback_anchors(seed: int, x: float, y: float, height: fl
 	])
 
 
-## Deep comb: the double-switchback shape with the waist notches pushed much
-## deeper and staggered, so the two marathon programs read as distinct layouts
-## from the same bounds.
+## Asymmetric comb: the double-switchback topology with unequal notch depths
+## (one side bites much deeper than the other) so it reads as a distinct
+## layout. Kept inside the same self-distance limits the symmetric variant
+## proved: waist >= 0.14x and the two notch floors together stay well clear.
 static func _deep_comb_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
 	var spine := maxf(400.0, x * _roll(seed, 0x451, 0.28, 0.34))
-	var waist := maxf(400.0, x * _roll(seed, 0x465, 0.08, 0.12))
-	var depth := height * _roll(seed, 0x47B, 0.72, 0.80)
-	var stagger := height * _roll(seed, 0x491, 0.10, 0.16)
+	var waist := maxf(400.0, x * _roll(seed, 0x465, 0.15, 0.19))
+	var deep := height * _roll(seed, 0x47B, 0.30, 0.38)
+	var shallow := height * _roll(seed, 0x491, 0.16, 0.22)
 	return PackedVector2Array([
 		Vector2(-x, -y),
 		Vector2(-spine, -y),
-		Vector2(-spine, -y + depth),
-		Vector2(-waist * 0.5, -y + depth - stagger),
-		Vector2(-waist * 0.5, -y + stagger),
-		Vector2(waist * 0.5, -y + stagger),
-		Vector2(waist * 0.5, -y + depth + stagger),
-		Vector2(spine, -y + depth),
+		Vector2(-spine, -y + shallow),
+		Vector2(-waist * 0.5, -y + shallow),
+		Vector2(-waist * 0.5, -y),
+		Vector2(waist * 0.5, -y),
+		Vector2(waist * 0.5, -y + deep),
+		Vector2(spine, -y + deep),
 		Vector2(spine, -y),
 		Vector2(x, -y),
 		Vector2(x, y),
 		Vector2(spine, y),
-		Vector2(spine, y - depth),
-		Vector2(waist * 0.5, y - depth + stagger),
-		Vector2(waist * 0.5, y - stagger),
-		Vector2(-waist * 0.5, y - stagger),
-		Vector2(-waist * 0.5, y - depth - stagger),
-		Vector2(-spine, y - depth),
+		Vector2(spine, y - deep),
+		Vector2(waist * 0.5, y - deep),
+		Vector2(waist * 0.5, y),
+		Vector2(-waist * 0.5, y),
+		Vector2(-waist * 0.5, y - shallow),
+		Vector2(-spine, y - shallow),
 		Vector2(-spine, y),
 		Vector2(-x, y),
 	])
