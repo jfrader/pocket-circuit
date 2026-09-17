@@ -70,7 +70,7 @@ var static_contact_normal := Vector2.ZERO
 var _racer_tag: Label
 var _racer_tag_offset := Vector2(-45.0, -64.0)
 var _car_sprite: Sprite2D
-var _visual_vehicle_id := ""
+var _visual_key := ""
 var _wheel_travel := 0.0
 var _drift_boost_accumulated := 0.0
 var _drift_grace_timer := 0.0
@@ -289,22 +289,27 @@ func configure_identity(driver_name: String, racer_vehicle_name: String, vehicle
 	_configure_racer_tag(driver_name)
 
 
-func configure_visual_identity(vehicle_id: String) -> void:
+func configure_visual_identity(identity: Variant) -> void:
+	var visual_key := ""
+	if identity is String or identity is StringName:
+		visual_key = String(identity)
+	elif identity is Dictionary:
+		visual_key = String((identity as Dictionary).get("visual_key", (identity as Dictionary).get("vehicle_id", "")))
 	var visual_root := get_node_or_null("VisualRoot") as Node2D
 	if visual_root == null:
 		return
 	var existing := visual_root.get_node_or_null("IdentityAccents")
 	if existing:
 		existing.free()
-	if vehicle_id.is_empty():
-		_visual_vehicle_id = ""
+	if visual_key.is_empty():
+		_visual_key = ""
 		_car_sprite = null
 		_wheel_travel = 0.0
 		return
-	var texture := IDENTITIES.car_texture(vehicle_id)
+	var texture := _resolve_car_texture(visual_key)
 	var car_sprite := visual_root.get_node_or_null("CarSprite") as Sprite2D
 	if texture == null or car_sprite == null:
-		_visual_vehicle_id = ""
+		_visual_key = ""
 		_car_sprite = null
 		_wheel_travel = 0.0
 		return
@@ -313,11 +318,23 @@ func configure_visual_identity(vehicle_id: String) -> void:
 	car_sprite.self_modulate = Color.WHITE
 	car_sprite.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_car_sprite = car_sprite
-	_visual_vehicle_id = vehicle_id
+	_visual_key = visual_key
 	_wheel_travel = 0.0
 	var legacy_shadow := visual_root.get_node_or_null("ShadowSprite") as Sprite2D
 	if legacy_shadow:
 		legacy_shadow.visible = false
+
+
+func _resolve_car_texture(key: String) -> Texture2D:
+	if key.is_empty():
+		return null
+	return IDENTITIES.car_texture_for_key(key)
+
+
+func _resolve_car_motion_texture(key: String, travel: float, steer: float) -> Texture2D:
+	if key.is_empty():
+		return null
+	return IDENTITIES.car_motion_texture_for_key(key, travel, steer)
 
 
 func _configure_racer_tag(driver_name: String) -> void:
@@ -358,7 +375,7 @@ func configure_racer_marker(_marker_color: Color, racer_index: int = 0) -> void:
 
 
 func _update_car_animation(delta: float) -> void:
-	if _car_sprite == null or _visual_vehicle_id.is_empty():
+	if _car_sprite == null or _visual_key.is_empty():
 		return
 	_wheel_travel += linear_velocity.length() * delta
 	var steer := _steer_input
@@ -366,7 +383,7 @@ func _update_car_animation(delta: float) -> void:
 		var max_rack := deg_to_rad(stats.max_steer_angle_deg)
 		if max_rack > 0.001:
 			steer = clampf(_rack_angle / max_rack, -1.0, 1.0)
-	var texture := IDENTITIES.car_motion_texture(_visual_vehicle_id, _wheel_travel, steer)
+	var texture := _resolve_car_motion_texture(_visual_key, _wheel_travel, steer)
 	if texture != null and _car_sprite.texture != texture:
 		_car_sprite.texture = texture
 

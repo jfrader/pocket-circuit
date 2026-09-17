@@ -10,6 +10,11 @@
 - Four distinct machines and four-racer fields with legal lap validation,
   starting grids, countdowns, race position, finish order, results, and
   championship points.
+- Four new Quick Race / exhibition-only machines (Thimble, Spindle, Anvil,
+  Dustmite) — one per body type (compact/coupe/muscle/buggy) with dedicated
+  procedural car_art (seeds 92005–92008, palettes, parts) and retuned
+  VehicleStats (light agile, technical grip, heavy bruiser, loose off-road).
+  Championship acts, unlocks, and progression are unchanged.
 - Live generated household circuits for every Quick Race reroll and
   championship event. Players can choose a theme and seed, while seeded circuit
   plans and six room canvases produce reproducible layouts without a
@@ -79,6 +84,10 @@
 
 ### Changed
 
+- Cars now receive distinct procedural liveries per driver. Rae, Inez, Tess,
+  Cass and rivals sharing a chassis get different palette/livery/wheel/spoiler
+  cosmetics; the same race field always produces the same looks via deterministic
+  slot disambiguation on collisions (including fallbacks).
 - Music now plays at a normal listening level instead of sitting far below it.
   Both loops are mastered to the same -14 LUFS target with a -1 dBTP ceiling the
   Gamestruments library uses, the race loop is the catalogue's Cruise take
@@ -89,6 +98,7 @@
   puts you back on the nearby route, facing the right way.
 - Steering follows the stick more at speed. Fast throttle-on corners can
   slide the rear a little without Space; Space is still the big drift.
+>>>>>>> origin/dev
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.
