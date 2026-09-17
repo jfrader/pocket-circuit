@@ -38,6 +38,14 @@ Godot version pin: **4.7.2**. Do not change it without a Linear decision and
 matching export templates. Verify scripts with `validate_script` and check
 `get_errors` after scene changes.
 
+## Branches and CI
+
+- Feature branches PR into `dev`; `pr-smoke` runs cheap pure-Python release-tool
+  checks (seconds).
+- The full release gate runs only on pushes to `dev` and `main`.
+- `main` is the shipping branch; it only receives promotions from `dev`.
+- Commit style is unchanged.
+
 ## Godot conventions
 
 - Use the **Godot MCP** (`godot-dev` skill): never hand-edit `.tscn` as text;
