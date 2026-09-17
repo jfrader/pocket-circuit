@@ -64,31 +64,30 @@ func _run_test() -> void:
 			if not _expect(TRACK_SEED_GEN.generate(seed, ROOM_RECT, classic_params) == controls, "generate() and generate_with_retries() should agree for seed %d" % seed):
 				return
 
+	# All six families are reachable within the 12-seed minimum sample (family
+	# selection is a deterministic hash(seed) mod 6), so full coverage holds for
+	# every supported sweep size.
 	if not _expect(families.size() == 6, "representative seeds should exercise all six families (got %s)" % [families.keys()]):
 		return
-	if not _expect(fingerprints.size() >= 12, "representative seeds should produce many distinct shape fingerprints (got %d)" % fingerprints.size()):
+	# Variety floors scale with the sweep: the full 60-seed gate keeps today's
+	# thresholds exactly, while a smaller sample asserts a proportional share.
+	if not _expect(fingerprints.size() >= _variety_floor(sample_seed_count, 12), "representative seeds should produce many distinct shape fingerprints (got %d)" % fingerprints.size()):
 		return
-	if not _expect(route_recipes.size() >= 8, "independent route grammar should realize at least eight macro programs (got %s)" % [route_recipes.keys()]):
+	if not _expect(route_recipes.size() >= _variety_floor(sample_seed_count, 8), "independent route grammar should realize varied macro programs (got %s)" % [route_recipes.keys()]):
 		return
-	if not _expect(route_sequences.size() >= 8, "routes should expose varied normalized turn/straight sequences (got %d)" % route_sequences.size()):
+	if not _expect(route_sequences.size() >= _variety_floor(sample_seed_count, 8), "routes should expose varied normalized turn/straight sequences (got %d)" % route_sequences.size()):
 		return
-	if not _expect(length_buckets.size() >= 4, "independent length rolls should produce varied loop lengths (got %d buckets)" % length_buckets.size()):
+	if not _expect(length_buckets.size() >= _variety_floor(sample_seed_count, 4), "independent length rolls should produce varied loop lengths (got %d buckets)" % length_buckets.size()):
 		return
 	if not _expect(minimum_length >= 4200.0 and maximum_length >= 6800.0 and maximum_length <= 9800.0, "classic length stream should span the scaled 4.2k-9.8k world range (got %.0f..%.0f)" % [minimum_length, maximum_length]):
 		return
-	if not _expect(fallback_count <= 14, "classic seeds should usually retain their selected family while rejecting complex-bypass variants (fallbacks=%d)" % fallback_count):
+	if not _expect(fallback_count <= ceili(14 * sample_seed_count / float(SAMPLE_SEEDS)), "classic seeds should usually retain their selected family while rejecting complex-bypass variants (fallbacks=%d)" % fallback_count):
 		return
 
-	var representative_seeds := {
-		"speed_loop": 0,
-		"dogbone": 1,
-		"broad_triangle": 2,
-		"kidney": 3,
-		"deep_notch": 5,
-		"offset_s": 11,
-	}
-	for family_name: String in representative_seeds:
-		var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(int(representative_seeds[family_name]), ROOM_RECT, classic_params)
+	# Representatives are derived from the sweep (the first seed seen for each
+	# family) rather than hardcoded, so any sample size is covered.
+	for family_name: String in family_seeds:
+		var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(int(family_seeds[family_name]), ROOM_RECT, classic_params)
 		if not _expect(String(result["family"]) == family_name and not bool(result["fallback"]), "%s representative must retain family identity while using the route grammar" % family_name):
 			return
 		if not _expect(StringName(result.get("route_recipe", &"none")) != &"none", "%s representative should report its accepted macro route program" % family_name):
@@ -138,7 +137,7 @@ func _run_test() -> void:
 	var total_setup_straight_regions := 0
 	var minimum_setup_straight_regions := 999
 	var maximum_setup_straight_regions := 0
-	var matrix_seed_count := SAMPLE_SEEDS
+	var matrix_seed_count := sample_seed_count
 	if OS.get_environment("PC_TRACK_MATRIX_SEEDS").is_valid_int():
 		matrix_seed_count = clampi(int(OS.get_environment("PC_TRACK_MATRIX_SEEDS")), 1, sample_seed_count)
 	for room_name: String in ROOM_SHAPES:
@@ -177,13 +176,20 @@ func _run_test() -> void:
 					return
 			total_turn_complexes += turn_complexes
 			matrix_count += 1
-	if not _expect(matrix_fallbacks <= 96, "the 360-route matrix should retain selected-family geometry when it fits (fallbacks=%d)" % matrix_fallbacks):
+	if not _expect(matrix_fallbacks <= 96, "the route matrix should retain selected-family geometry when it fits (fallbacks=%d)" % matrix_fallbacks):
 		return
 	if not _expect(total_turn_complexes <= matrix_count * 8, "the richer route grammar should average no more than eight broad complexes (got %.1f)" % (float(total_turn_complexes) / float(matrix_count))):
 		return
 
 	print("TRACK_SEED_GEN_TEST PASS families=%d fingerprints=%d classic_fallbacks=%d matrix_fallbacks=%d broad_complexes_avg=%.1f setup_regions=%d..%d avg=%.1f classic_length=%.0f..%.0f" % [families.size(), fingerprints.size(), fallback_count, matrix_fallbacks, float(total_turn_complexes) / float(matrix_count), minimum_setup_straight_regions, maximum_setup_straight_regions, float(total_setup_straight_regions) / float(matrix_count), minimum_length, maximum_length])
 	quit(0)
+
+
+func _variety_floor(sample_seed_count: int, full_sweep_threshold: int) -> int:
+	# Variety thresholds scale with the sweep. The full 60-seed gate keeps
+	# today's floors exactly; a smaller sample asserts a proportional share with
+	# a floor of 2 so the check never degenerates into a skip.
+	return maxi(2, ceili(full_sweep_threshold * sample_seed_count / float(SAMPLE_SEEDS)))
 
 
 func _room_params(room_name: String) -> Dictionary:
