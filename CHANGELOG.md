@@ -70,6 +70,10 @@
 - Quick Race and Circuit Discovery now offer Compact, Standard, Long and
   Endurance sizes. Larger circuits use expanded rooms and distance-aware curve
   sampling; shared codes and favorites preserve the selected size.
+- A new Marathon size joins the tier list: a 4.5x room and a dedicated folded
+  grammar (`double_switchback` and `deep_comb`) produce circuits with roughly
+  twice the turns (16–22 broad complexes) at roughly twice the length
+  (32–48k world units), without touching the other tiers' seed geometry.
 - Opening/tightening two-arc corners and safe section excursions add new turn
   profiles. L-shaped rooms now vary their elbow and proportions by seed.
 - Correctly following a long curve no longer causes a false wrong-way reset,
