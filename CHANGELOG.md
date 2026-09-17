@@ -84,6 +84,9 @@
 
 ### Changed
 
+- Quick Race is now a one-click exhibition: a fixed Kitchen/Classic circuit
+  (seed 875, standard length, forward direction) with just PLAY, CHANGE CAR,
+  and BACK TO TITLE. Theme, size, and direction selectors are gone.
 - Cars now receive distinct procedural liveries per driver. Rae, Inez, Tess,
   Cass and rivals sharing a chassis get different palette/livery/wheel/spoiler
   cosmetics; the same race field always produces the same looks via deterministic

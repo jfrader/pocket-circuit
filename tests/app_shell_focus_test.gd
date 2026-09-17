@@ -188,8 +188,8 @@ func _run_test() -> void:
 		quit(1)
 		return
 	focus_owner = root.get_viewport().gui_get_focus_owner()
-	if focus_owner == null or focus_owner.name != "QuickRaceRoom_kitchen":
-		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should open with the selected room focused")
+	if focus_owner == null or focus_owner.get("text") != "PLAY":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should open with PLAY focused for a one-click start")
 		quit(1)
 		return
 	shell.call("go_back")
