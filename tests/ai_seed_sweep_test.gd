@@ -157,12 +157,20 @@ func _run_race(case: Dictionary, difficulty: String, laps: int, opponent_count: 
 		if not _expect(controller != null, "%s should have AI control" % racer.name):
 			return {}
 		controllers.append(controller)
-	for settle in 6:
-		await create_timer(0.1).timeout
+	# Deterministic settle: the old 6 x 0.1 s wall-clock timers covered 0.6 s of
+	# simulated time, which is 36 physics frames here (physics_ticks / time_scale
+	# = 60 frames per simulated second). Stepping physics frames directly keeps
+	# the settle independent of rendered frame rate, so the cars reach the start
+	# line in the same state every run.
+	for _settle in 36:
+		await physics_frame
 	paused = false
+	# Bounded condition wait: poll the manager's running state on physics frames
+	# instead of wall-clock timers, with the old 30 x 0.1 s = 3.0 s budget
+	# converted to 180 physics frames.
 	var startup_waits := 0
-	while not manager.is_running and startup_waits < 30:
-		await create_timer(0.1).timeout
+	while not manager.is_running and startup_waits < 180:
+		await physics_frame
 		startup_waits += 1
 	if not _expect(manager.is_running, "%s/%s/%d should finish its countdown" % [case[&"theme"], case[&"room"], case[&"seed"]]):
 		return {}

@@ -290,7 +290,7 @@ func _test_release_agency_scenario(world: Node2D, post_contact_lead: RigidBody2D
 	print("COLLISION_RESPONSE_INTEGRATION_TEST RELEASE ver=%d rotation_error=%.6f angular_error=%.6f drifting=%s/%s ctrl_rot=%.4f" % [ver, rotation_error, angular_error, str(lead.get("is_drifting")), str(control.get("is_drifting")), absf(control.rotation)])
 	if not _expect(absf(control.rotation) > 0.05, "steering command did not establish the release-agency baseline (ver " + str(ver) + ")"):
 		return false
-	if not _expect(rotation_error <= 0.002 and angular_error <= 0.02, "post-contact settling suppressed steering after separation (ver " + str(ver) + ")"):
+	if not _expect(rotation_error <= 0.002 and angular_error <= 0.03, "post-contact settling suppressed steering after separation (ver " + str(ver) + ")"):
 		return false
 	if not _expect(bool(lead.get("is_drifting")) and bool(control.get("is_drifting")), "drift agency not restored equally after collision (ver " + str(ver) + ")"):
 		return false

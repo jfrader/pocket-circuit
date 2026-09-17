@@ -153,12 +153,16 @@ func _run_parked_car_scenario() -> bool:
 
 
 func _wait_for_race(manager: RaceManager) -> bool:
-	for _settle in 6:
-		await create_timer(0.1).timeout
+	# Deterministic settle: the old 6 x 0.1 s wall-clock timers covered 0.6 s of
+	# simulated time, which is 36 physics frames here (60 frames per simulated
+	# second). Stepping physics frames keeps the settle independent of rendered
+	# frame rate.
+	for _settle in 36:
+		await physics_frame
 	paused = false
 	var waits := 0
-	while not manager.is_running and waits < 30:
-		await create_timer(0.1).timeout
+	while not manager.is_running and waits < 180:
+		await physics_frame
 		waits += 1
 	return manager.is_running
 

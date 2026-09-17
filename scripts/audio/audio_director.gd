@@ -17,6 +17,11 @@ const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
 const PAUSED_MUSIC_DB := -9.0
 
+## Ceiling for the Master-bus hard limiter. Music and engine are mastered to
+## -1.0 dBTP individually, but their sum can exceed full scale, so the mix needs
+## its own ceiling to guarantee the output never reaches 0 dBFS.
+const MASTER_CEILING_DB := -1.0
+
 const LIVE_RECIPE := "racing"
 const LIVE_ARRANGEMENT := "extended"
 
@@ -34,6 +39,11 @@ var _engine_loop: AudioStream
 var _engine_rpm := 0.08
 var _headless := false
 var _live_music: Node
+## True once the live player holds a generated score. A return to the menu
+## reuses that score so the music segues instead of restarting.
+var _live_score_loaded := false
+## Introspection for tests; counts how often a live score was generated.
+var _live_score_generations := 0
 
 
 func _ready() -> void:
@@ -71,6 +81,23 @@ func _exit_tree() -> void:
 func ensure_buses() -> void:
 	_ensure_bus(&"Music")
 	_ensure_bus(&"SFX")
+	_ensure_master_limiter()
+
+
+## The music loop and the engine loop each respect their own ceiling, but they
+## are summed at the Master bus and that sum can exceed full scale (a full-rev
+## simulated race mix peaks slightly above 0 dBTP). A hard limiter on Master is
+## the game-side guarantee that the output never reaches 0 dBFS.
+func _ensure_master_limiter() -> void:
+	var master := AudioServer.get_bus_index(&"Master")
+	if master < 0:
+		return
+	for index in AudioServer.get_bus_effect_count(master):
+		if AudioServer.get_bus_effect(master, index) is AudioEffectHardLimiter:
+			return
+	var limiter := AudioEffectHardLimiter.new()
+	limiter.ceiling_db = MASTER_CEILING_DB
+	AudioServer.add_bus_effect(master, limiter)
 
 
 func play_menu_music() -> void:
@@ -79,14 +106,27 @@ func play_menu_music() -> void:
 			_music_player.stop()
 		_music_context = &"menu"
 		_live_music.set("autoplay", false)
-		_live_music.call("generate", "menu")
-		_live_music.call("set_race_state", "garage", 0.35, 0.2, false)
+		_resume_menu_music()
 		clear_local_vehicle()
 		set_race_paused(false)
 		return
 	_set_music(&"menu", _menu_loop)
 	clear_local_vehicle()
 	set_race_paused(false)
+
+
+## Returning from a race, the score is already generated and holds the circuit's
+## music. Cueing its garage section moves the music home at a musical boundary,
+## so the end of a race segues into the menu instead of restarting. Only a cold
+## start, where no score exists yet, generates a fresh menu score.
+func _resume_menu_music() -> void:
+	if _live_score_loaded and bool(_live_music.call("cue_section", "garage")):
+		_live_music.call("set_form_hold", true)
+		return
+	_live_music.call("generate", "menu")
+	_live_music.call("set_race_state", "garage", 0.35, 0.2, false)
+	_live_score_loaded = true
+	_live_score_generations += 1
 
 
 func play_race_music() -> void:
@@ -101,8 +141,11 @@ func play_race_music() -> void:
 			_music_player.stop()
 		_music_context = &"race"
 		_live_music.set("autoplay", true)
+		_live_music.call("set_form_hold", false)
 		_live_music.call("generate", race_seed)
 		_live_music.call("set_race_state", "grid", 0.35, 0.2, false)
+		_live_score_loaded = true
+		_live_score_generations += 1
 		set_race_paused(false)
 		return
 	_set_music(&"race", _race_loop)
@@ -153,6 +196,16 @@ func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: fl
 	if not _headless:
 		player.play()
 	return true
+
+
+## Test introspection: how many times a live score has been generated this
+## session. A menu return that segues must not increase it.
+func get_live_score_generations() -> int:
+	return _live_score_generations
+
+
+func has_live_score() -> bool:
+	return _live_score_loaded
 
 
 func get_music_context() -> StringName:
@@ -252,7 +305,15 @@ func _update_engine(delta: float = 1.0 / 60.0) -> void:
 	if _race_paused:
 		_engine_player.volume_db = SILENCE_DB
 	else:
-		_engine_player.volume_db = lerpf(-24.0, -3.5, rev)
+		# Music is mastered to -14 LUFS (Gamestruments 0.1.3) and lands near
+		# -15.9 LUFS after the default Music bus gain. The engine loop measures
+		# -16.7 LUFS, so this curve is set to sit roughly 4 dB under the music at
+		# full rev (about -19.6 LUFS) and fall away to near-silence when parked.
+		# Raising the old -24.0 floor was required: against the previously
+		# unmastered -30 LUFS music the engine dominated by ~12 dB, but once the
+		# music was mastered to a real level that same curve buried it instead.
+		# These are mix-balance values, tunable by ear.
+		_engine_player.volume_db = lerpf(-18.0, -2.0, rev)
 
 
 func _ensure_bus(bus_name: StringName) -> int:

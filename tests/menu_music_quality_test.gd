@@ -1,10 +1,17 @@
 extends SceneTree
 
+## Verifies the packaged menu loop against the same contract the Gamestruments
+## library masters to: a -14.0 LUFS integrated target and a -1.0 dBTP ceiling.
+## Samples are read from the file's PCM data rather than the audio server so the
+## measurement describes the shipped asset, not a resampled playback of it.
+
+const AudioMastering := preload("res://tools/audio_mastering.gd")
+
 const MENU_PATH := "res://assets/audio/menu_loop.wav"
+const TARGET_LUFS := -14.0
+const LUFS_TOLERANCE := 1.5
+const CEILING_DBTP := -1.0
 const MIN_DURATION_SECONDS := 15.9
-const MAX_PEAK := 0.85
-const MIN_RMS := 0.015
-const MAX_RMS := 0.18
 const MAX_DC_OFFSET := 0.001
 const MAX_SEAM_DELTA := 0.01
 const MIN_HALF_SECOND_VARIATION := 0.08
@@ -15,32 +22,37 @@ func _initialize() -> void:
 	if stream == null or stream.stereo:
 		_fail("menu music should import as mono audio")
 		return
-	var samples := _decode_stream(stream)
+	var samples := _decode_pcm(MENU_PATH)
 	if samples.is_empty():
 		_fail("menu music should contain PCM samples")
 		return
 
 	var peak := 0.0
 	var total := 0.0
-	var square_total := 0.0
 	for sample: float in samples:
 		peak = maxf(peak, absf(sample))
 		total += sample
-		square_total += sample * sample
 	var duration := float(samples.size()) / float(stream.mix_rate)
 	var dc_offset := total / float(samples.size())
-	var rms := sqrt(square_total / float(samples.size()))
 	var seam_delta := absf(samples[0] - samples[samples.size() - 1])
 	var half_second_variation := _envelope_variation(samples, stream.mix_rate, 0.5)
+	var loudness := AudioMastering.measure_integrated_loudness(samples, stream.mix_rate)
+	var true_peak := AudioMastering.measure_true_peak_db(samples, stream.mix_rate)
 	print(
-		"MENU_MUSIC_METRICS duration=%.3f peak=%.5f rms=%.5f dc=%.6f seam=%.6f half_second_variation=%.4f"
-		% [duration, peak, rms, dc_offset, seam_delta, half_second_variation]
+		"MENU_MUSIC_METRICS duration=%.3f loudness=%.2f lufs true_peak=%.2f dbtp sample_peak=%.5f dc=%.6f seam=%.6f half_second_variation=%.4f"
+		% [duration, loudness, true_peak, peak, dc_offset, seam_delta, half_second_variation]
 	)
 
+	var ceiling_linear := pow(10.0, CEILING_DBTP / 20.0)
 	var failures := PackedStringArray()
 	_check(duration >= MIN_DURATION_SECONDS, "menu music should run for at least 16 seconds before repeating", failures)
-	_check(peak <= MAX_PEAK, "menu music should not clip", failures)
-	_check(rms >= MIN_RMS and rms <= MAX_RMS, "menu music should have a useful, controlled listening level", failures)
+	_check(peak <= ceiling_linear + 0.0001, "menu music should not exceed the true-peak ceiling", failures)
+	_check(true_peak <= CEILING_DBTP, "menu music true peak should stay at or below %.1f dBTP" % CEILING_DBTP, failures)
+	_check(
+		absf(loudness - TARGET_LUFS) <= LUFS_TOLERANCE,
+		"menu music should sit within %.1f LU of %.1f LUFS" % [LUFS_TOLERANCE, TARGET_LUFS],
+		failures
+	)
 	_check(absf(dc_offset) <= MAX_DC_OFFSET, "menu music should not carry audible DC offset", failures)
 	_check(seam_delta <= MAX_SEAM_DELTA, "menu music loop boundary should not click", failures)
 	_check(
@@ -55,16 +67,29 @@ func _initialize() -> void:
 	quit(0)
 
 
-func _decode_stream(stream: AudioStreamWAV) -> PackedFloat32Array:
-	var sample_count := roundi(stream.get_length() * float(stream.mix_rate))
-	var playback := stream.instantiate_playback()
-	playback.start()
-	var frames := playback.mix_audio(1.0, sample_count)
-	var samples := PackedFloat32Array()
-	samples.resize(frames.size())
-	for index in frames.size():
-		samples[index] = frames[index].x
-	return samples
+func _decode_pcm(path: String) -> PackedFloat32Array:
+	# Read the shipped WAV directly rather than through the imported resource:
+	# the importer may store a converted stream, and this measurement must
+	# describe the asset as shipped, not a decoded playback of it.
+	var file := FileAccess.open(path, FileAccess.READ)
+	if file == null:
+		return PackedFloat32Array()
+	var bytes := file.get_buffer(file.get_length())
+	file.close()
+	var offset := 12
+	while offset + 8 <= bytes.size():
+		var chunk_id := bytes.slice(offset, offset + 4).get_string_from_ascii()
+		var chunk_size := int(bytes.decode_u32(offset + 4))
+		if chunk_id == "data":
+			var start := offset + 8
+			var count := chunk_size / 2
+			var samples := PackedFloat32Array()
+			samples.resize(count)
+			for index in count:
+				samples[index] = float(bytes.decode_s16(start + index * 2)) / 32768.0
+			return samples
+		offset += 8 + chunk_size + (chunk_size % 2)
+	return PackedFloat32Array()
 
 
 func _envelope_variation(samples: PackedFloat32Array, sample_rate: int, lag_seconds: float) -> float:
