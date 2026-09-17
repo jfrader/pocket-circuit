@@ -6,9 +6,56 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const DRIVER_IDS: Array[String] = ["rae", "inez", "juniper", "milo", "tess", "cass"]
 const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker"]
 
+# Byte-identity pins captured from explicit cast/vehicle art at the reconciled Procedural 2D revision.
+# These protect against silent drift on future repins or catalog changes.
+const PINNED_AVATAR_PAYLOADS: Dictionary = {
+	"rae": "ba530833306e2f750a03f598f7b133c6de8bab3f5b29b51c24505289d521713c",
+	"inez": "e8e9d1b20a1e6f1dd2bf76a326983ca8ed72e330ac2e503ea2f8e63cce5778fe",
+	"juniper": "5741f2046792107f3b8b68e38dc97a5743857e7d647299e731d53f20dafff00e",
+	"milo": "a9abddf4d647867a4e44d22d231eb920443a7f591568d46145b95555f3d83885",
+	"tess": "1f4a41b05957760863a0bc5f4f041f6871427c384507e3f78c1f2a70603d473a",
+	"cass": "5c3c13937a90eba243d0011179b3e0158ae4ea1b675d57bb7ef08ea59c11777e",
+}
+const PINNED_AVATAR_PIXELS: Dictionary = {
+	"rae": "b59d5dd27637d2d4182c320bd241f62a3519474b25eef6f9de34d4f23359b371",
+	"inez": "9dbdcd5edc0bc64eb9d460075abfcb39a4ca76c6e2debde8ea723090e642f3f0",
+	"juniper": "1934a7fef2838f84085bc6460122d9d2f409f52a1d429c0ba3b6d0ac5379d7a0",
+	"milo": "95040d3d6ee5b2bad1b6a5bc312c8810193ed402a7089a838b9bbae128079479",
+	"tess": "77a64877bc83ed2314bdf120e5742ed2507f9b7f6d379d17ce3faa2f804ed9e9",
+	"cass": "1280674140232dcf3984c136fbf35a1c288558915d48872e3fcdfb78692129de",
+}
+const PINNED_CAR_PAYLOADS: Dictionary = {
+	"rustbug": "8c0f4560b370a657c9ddfd48bd482649541d556f4d9b686c4bb633b143c4ba5a",
+	"pinbolt": "9696556dcd4a8b305af87836230c5d0eae3c6f3f059e277876582612d3d6d47a",
+	"scrapjaw": "bf3dcd56c006369eb1f9c55c4082351c6aa7743d3efd6e0f6bb9954dfc8ce680",
+	"flicker": "2410a1e21a60d599207c8717bdd2f227dbeddf3769752e2107355e1af72de2e2",
+}
+const PINNED_CAR_PIXELS: Dictionary = {
+	"rustbug": "97fd1bf7966acc1b69231ee9759ca570e6431d811aa2d3afdf63cef6bfd150a3",
+	"pinbolt": "fbb10e7fae5cd57f359d5157825f75410a6bd5ed0394b872ce9ffd12fc5de5d2",
+	"scrapjaw": "6ec43665664dc554096741e062bb5bab3cd07e2b5ee61aa8108365f91499025e",
+	"flicker": "fa5d62930b2df9bda5a08bc6d223131136c8c9eb0542cd502e8ad7b1f98faec7",
+}
+
+
+func _payload_hash(payload: Dictionary) -> String:
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update(JSON.stringify(payload, "", false).to_utf8_buffer())
+	return context.finish().hex_encode()
+
+
+func _texture_hash(texture: Texture2D) -> String:
+	if texture == null:
+		return ""
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update(texture.get_image().save_png_to_buffer())
+	return context.finish().hex_encode()
+
 
 func _initialize() -> void:
-	if not _expect(IDENTITIES.SOURCE_REVISION == "d60ed1f95dc7154f7870c62d6058ed440ed3eb09", "the vendored source revision should stay pinned"):
+	if not _expect(IDENTITIES.SOURCE_REVISION == "9fc832c9638471739a61aeac1e84fe44408212f5", "the vendored source revision should stay pinned"):
 		return
 	for driver_id: String in DRIVER_IDS:
 		var mapping: Dictionary = CATALOG.get_driver(driver_id).get("avatar_art", {})
@@ -27,6 +74,10 @@ func _initialize() -> void:
 		if not _expect(texture != null and texture.get_size() == Vector2(128.0, 128.0), "%s should render a native 128x128 portrait" % driver_id):
 			return
 		if not _expect(texture == IDENTITIES.avatar_texture(driver_id), "%s should reuse the avatar texture cache" % driver_id):
+			return
+		if not _expect(_payload_hash(payload) == PINNED_AVATAR_PAYLOADS[driver_id], "%s avatar payload must stay byte-identical after any Procedural 2D repin" % driver_id):
+			return
+		if not _expect(_texture_hash(texture) == PINNED_AVATAR_PIXELS[driver_id], "%s avatar pixels must stay byte-identical after any Procedural 2D repin" % driver_id):
 			return
 	for vehicle_id: String in VEHICLE_IDS:
 		var mapping: Dictionary = CATALOG.get_vehicle(vehicle_id).get("car_art", {})
@@ -47,6 +98,10 @@ func _initialize() -> void:
 		if not _expect(texture != null and texture.get_size() == Vector2(96.0, 128.0), "%s should render a native 96x128 race sprite" % vehicle_id):
 			return
 		if not _expect(texture == IDENTITIES.car_texture(vehicle_id), "%s should reuse the car texture cache" % vehicle_id):
+			return
+		if not _expect(_payload_hash(payload) == PINNED_CAR_PAYLOADS[vehicle_id], "%s car payload must stay byte-identical after any Procedural 2D repin" % vehicle_id):
+			return
+		if not _expect(_texture_hash(texture) == PINNED_CAR_PIXELS[vehicle_id], "%s car pixels must stay byte-identical after any Procedural 2D repin" % vehicle_id):
 			return
 		if not _expect(IDENTITIES.car_motion_texture(vehicle_id, 0.0, 0.0) == texture, "%s rest motion frame should reuse the static car texture" % vehicle_id):
 			return
