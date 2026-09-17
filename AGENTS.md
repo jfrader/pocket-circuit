@@ -34,6 +34,11 @@ any MMO scaffolding. §124: testers voluntarily replay laps with no rewards.
 | `godot --path . --headless --script <test.gd>` | Run a GDScript test |
 | `godot --path . --headless --server` | Dedicated race server (Phase 2+) |
 
+**Session closeout:** after finishing a work or QA session, leave the game
+running for the operator to test: `nohup godot --path . &
+` (run the main scene, not `--editor`). A plain game run does not dirty the
+working tree; still verify `git status` is clean first.
+
 Godot version pin: **4.7.2**. Do not change it without a Linear decision and
 matching export templates. Verify scripts with `validate_script` and check
 `get_errors` after scene changes.
