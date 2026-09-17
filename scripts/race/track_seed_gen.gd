@@ -203,7 +203,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				generation_rect = usable_rect
 			use_el_controls = false
 		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"])) \
-			if use_el_controls else _family_controls(family, family, seed, attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, attempt_pockets, attempt_profiles, decorate_enabled)
+			if use_el_controls else _family_controls(family, family, seed, attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, attempt_pockets, attempt_profiles, decorate_enabled, tier)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
@@ -251,8 +251,8 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"fallback": false,
 				"pockets": _detect_pockets(final_controls),
 				"realization": &"el_safe" if room_shape == &"el" and tier != &"compact" else family,
-				"route_recipe": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_name(seed, attempt, target_length),
-				"route_program": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_program_name(seed, attempt, target_length),
+				"route_recipe": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_name(seed, attempt, target_length, tier),
+				"route_program": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_program_name(seed, attempt, target_length, tier),
 				"route_sequence": normalized_route_sequence(final_controls),
 				"corner_profiles": _merge_profile_counts(attempt_profiles),
 				"motifs": motif["motifs"],
@@ -274,7 +274,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				generation_rect = usable_rect
 			use_el_safe = false
 		var controls := _el_safe_controls(family, seed, fallback_attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"])) \
-			if use_el_safe else _family_controls(&"conservative", family, seed, fallback_attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, fallback_pockets, fallback_profiles, decorate_enabled)
+			if use_el_safe else _family_controls(&"conservative", family, seed, fallback_attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, fallback_pockets, fallback_profiles, decorate_enabled, tier)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
@@ -369,15 +369,19 @@ static func _family_controls(
 	fit_floor: float = 0.78,
 	pockets: Array = [],
 	profile_summary: Array = [],
-	profiles_enabled: bool = true
+	profiles_enabled: bool = true,
+	tier: StringName = &""
 ) -> PackedVector2Array:
-	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length)
+	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length, tier)
 	if template_family != &"conservative":
 		var tall := usable_rect.size.y > usable_rect.size.x
 		var size := Vector2(usable_rect.size.y, usable_rect.size.x) if tall else usable_rect.size
 		var bias := clampf(inverse_lerp(8500.0, 9600.0, target_length), 0.0, 1.0)
 		var rhythm_seed := _hash32(seed ^ (attempt * RHYTHM_SALT))
-		definition = ROUTE_GRAMMAR.construct(_route_index(seed, attempt), rhythm_seed, bias, Rect2(-size * 0.5, size))
+		if tier == &"marathon":
+			definition = ROUTE_GRAMMAR.construct_marathon(_route_index(seed, attempt, tier), rhythm_seed, bias, Rect2(-size * 0.5, size))
+		else:
+			definition = ROUTE_GRAMMAR.construct(_route_index(seed, attempt), rhythm_seed, bias, Rect2(-size * 0.5, size))
 		var vertices: PackedVector2Array = definition["anchors"]
 		for i in vertices.size():
 			vertices[i] = usable_rect.get_center() + (vertices[i].rotated(PI * 0.5) if tall else vertices[i])
@@ -548,20 +552,24 @@ static func _per_corner_fillet_radii(seed: int, attempt: int, vertex_count: int)
 	return radii
 
 
-static func _route_index(seed: int, attempt: int) -> int:
+static func _route_index(seed: int, attempt: int, tier: StringName = &"") -> int:
+	if tier == &"marathon":
+		return posmod(_hash32(seed ^ ROUTE_SALT ^ 0x6A4C1) + attempt, ROUTE_GRAMMAR.MARATHON_NAMES.size())
 	return posmod(_hash32(seed ^ ROUTE_SALT) + attempt, ROUTE_GRAMMAR.count())
 
 
-static func _route_name(seed: int, attempt: int, target_length: float) -> StringName:
-	return StringName(_route_definition(seed, attempt, target_length)["recipe"])
+static func _route_name(seed: int, attempt: int, target_length: float, tier: StringName = &"") -> StringName:
+	return StringName(_route_definition(seed, attempt, target_length, tier)["recipe"])
 
 
-static func _route_program_name(seed: int, attempt: int, target_length: float) -> StringName:
-	return StringName(_route_definition(seed, attempt, target_length)["program"])
+static func _route_program_name(seed: int, attempt: int, target_length: float, tier: StringName = &"") -> StringName:
+	return StringName(_route_definition(seed, attempt, target_length, tier)["program"])
 
 
-static func _route_definition(seed: int, attempt: int, target_length: float = 2500.0 * WORLD_SCALE) -> Dictionary:
+static func _route_definition(seed: int, attempt: int, target_length: float = 2500.0 * WORLD_SCALE, tier: StringName = &"") -> Dictionary:
 	var length_bias := clampf(inverse_lerp(8500.0, 9600.0, target_length), 0.0, 1.0)
+	if tier == &"marathon":
+		return ROUTE_GRAMMAR.construct_marathon(_route_index(seed, attempt, tier), _hash32(seed ^ (attempt * RHYTHM_SALT)), length_bias)
 	return ROUTE_GRAMMAR.construct(_route_index(seed, attempt), _hash32(seed ^ (attempt * RHYTHM_SALT)), length_bias)
 
 

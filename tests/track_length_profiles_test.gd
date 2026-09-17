@@ -37,7 +37,7 @@ func _run_test() -> void:
 
 
 func _test_profile_bands() -> bool:
-	for tier: String in ["compact", "standard", "long", "endurance"]:
+	for tier: String in ["compact", "standard", "long", "endurance", "marathon"]:
 		var profile := SEED_GEN.length_profile(StringName(tier))
 		if not _expect(not profile.is_empty(), "length_profile(%s) should resolve" % tier):
 			return false
@@ -51,8 +51,8 @@ func _test_profile_bands() -> bool:
 
 
 func _test_tier_coverage() -> bool:
-	# Each of the four tiers must land selected seeds in-band across the room set.
-	for tier: String in ["compact", "standard", "long", "endurance"]:
+	# Each of the five tiers must land selected seeds in-band across the room set.
+	for tier: String in ["compact", "standard", "long", "endurance", "marathon"]:
 		var profile := SEED_GEN.length_profile(StringName(tier))
 		var room_scale := float(profile["room_scale"])
 		for room_name: String in ROOM_SHAPES:
