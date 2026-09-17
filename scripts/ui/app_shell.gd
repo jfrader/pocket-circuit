@@ -7,7 +7,6 @@ const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MENU_BACKGROUND := preload("res://assets/ui/imagine/motorsport_garage.jpg")
 const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
-const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 
 const INK := Color("0e151f")
 const PAPER := Color("f5f0e3")
@@ -36,7 +35,6 @@ var _quick_race_reverse := false
 var _quick_race_length_tier: String = "standard"
 var _quick_identity_heading: Label
 var _quick_identity_summary: Label
-var _quick_direction_button: Button
 var _content_tween: Tween
 var _entrance_generation := 0
 var _save_error_back_action := Callable()
@@ -152,9 +150,14 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_screen = "quick_race"
 	_event_id = ""
 	_quick_race = true
+	_quick_race_theme = &"kitchen"
+	_quick_race_room = &"classic"
+	_quick_race_seed = 875
+	_quick_race_reverse = false
+	_quick_race_length_tier = "standard"
 	_clear_content()
 	_content.add_theme_constant_override("separation", 4)
-	_configure_stage(&"map", "rustbug", "rae", String(_quick_race_theme))
+	_configure_stage(&"map", "rustbug", "rae", "kitchen")
 	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, CREAM)
@@ -164,50 +167,21 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_quick_identity_summary.name = "QuickCircuitSummary"
 	_quick_identity_summary.add_theme_font_size_override("font_size", 13)
 	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
-	var room_status := _add_section("PICK A THEME", "CURRENT · %s" % String(_quick_race_theme).to_upper())
-	var room_themes: Array[StringName] = [&"kitchen", &"workshop", &"office"]
-	var room_buttons: Array[Button] = []
-	var selected_room_button: Button
-	for theme: StringName in room_themes:
-		var room_button := _add_button(
-			String(theme).to_upper(),
-			Callable(),
-			CORAL if theme == _quick_race_theme else CREAM,
-			false,
-			"QuickRaceRoom_%s" % String(theme)
-		)
-		room_buttons.append(room_button)
-		if theme == _quick_race_theme:
-			selected_room_button = room_button
-	for theme_index in room_themes.size():
-		room_buttons[theme_index].pressed.connect(
-			Callable(self, "_select_quick_race_theme").bind(room_themes[theme_index], room_buttons, room_status)
-		)
+	var play_button := _add_big_play_button(Callable(self, "_start_quick_race"), false)
 	var seed_controls: Array[Control] = []
 	if OS.is_debug_build():
 		var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
 		seed_controls = _add_quick_race_seed_controls(seed_status)
-	var size_selector := _add_quick_race_size_direction_row()
-	
-	if not seed_controls.is_empty():
-		for room_button: Button in room_buttons:
-			room_button.focus_neighbor_bottom = room_button.get_path_to(seed_controls[0])
-		_complete_focus_row(seed_controls, size_selector)
-	else:
-		for room_button: Button in room_buttons:
-			room_button.focus_neighbor_bottom = room_button.get_path_to(size_selector)
-	var play_button := _add_big_play_button(Callable(self, "_start_quick_race"), false)
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_race_vehicle_id.is_empty():
 		_quick_race_vehicle_id = String(progress.get("selected_vehicle", "rustbug"))
 	_add_button("CHANGE CAR · %s" % String(CATALOG.get_vehicle(_quick_race_vehicle_id).get("name", "Rustbug")).to_upper(), Callable(self, "show_vehicle_select").bind("", true), CREAM)
 	_add_button("BACK TO TITLE", Callable(self, "show_title"), CREAM)
 	_footer.text = "EXHIBITION RESULTS DO NOT SAVE  ·  ESC / B  BACK"
-	if selected_room_button:
-		_queue_content_entrance()
-		_grab_button_focus_after_layout(selected_room_button, _entrance_generation)
-	else:
-		_focus_first()
+	if not seed_controls.is_empty():
+		_complete_focus_row(seed_controls, play_button)
+	_queue_content_entrance()
+	_grab_button_focus_after_layout(play_button, _entrance_generation)
 
 
 func show_discovery() -> void:
@@ -1101,17 +1075,6 @@ func _reset_quick_race_state() -> void:
 	_quick_race_vehicle_id = ""
 	_quick_identity_heading = null
 	_quick_identity_summary = null
-	_quick_direction_button = null
-
-
-func _select_quick_race_theme(theme: StringName, room_buttons: Array[Button], room_status: Label) -> void:
-	_quick_race_theme = theme
-	room_status.text = "CURRENT · %s" % String(theme).to_upper()
-	for room_button: Button in room_buttons:
-		var room_theme := StringName(String(room_button.name).trim_prefix("QuickRaceRoom_"))
-		_apply_button_art(room_button, room_theme == theme)
-	_configure_stage(&"map", "rustbug", "rae", String(theme))
-	_refresh_quick_identity_labels()
 
 
 func _adjust_quick_race_seed(adjustment: int, seed_edit: LineEdit, seed_status: Label) -> void:
@@ -1138,11 +1101,6 @@ func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 	_refresh_quick_identity_labels()
 
 
-func _toggle_quick_race_direction() -> void:
-	_quick_race_reverse = not _quick_race_reverse
-	_refresh_quick_identity_labels()
-
-
 func _current_quick_identity() -> Dictionary:
 	return _app.call("generated_circuit_identity", _quick_race_theme, _quick_race_room, _quick_race_seed, _quick_race_reverse, _quick_race_length_tier)
 
@@ -1153,45 +1111,6 @@ func _refresh_quick_identity_labels() -> void:
 		_quick_identity_heading.text = String(identity.get("display_name", "Build a circuit"))
 	if is_instance_valid(_quick_identity_summary):
 		_quick_identity_summary.text = String(identity.get("summary", ""))
-	if is_instance_valid(_quick_direction_button):
-		_quick_direction_button.text = "DIRECTION · %s" % ("REVERSE" if _quick_race_reverse else "FORWARD")
-
-
-func _add_quick_race_size_direction_row() -> OptionButton:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
-	_content.add_child(row)
-	var size_label := _label("SIZE", 16, CREAM)
-	size_label.custom_minimum_size = Vector2(52.0, 0.0)
-	row.add_child(size_label)
-	var size_selector := OptionButton.new()
-	size_selector.name = "QuickRaceSize"
-	size_selector.focus_mode = Control.FOCUS_ALL
-	size_selector.custom_minimum_size = Vector2(0.0, 44.0)
-	size_selector.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	size_selector.add_theme_font_size_override("font_size", 18)
-	for tier: String in GENERATED_RULES.LENGTH_TIERS:
-		size_selector.add_item(String(GENERATED_RULES.length_profile(tier)["label"]))
-	var selected_index := GENERATED_RULES.LENGTH_TIERS.find(_quick_race_length_tier)
-	if selected_index >= 0:
-		size_selector.select(selected_index)
-	size_selector.item_selected.connect(_on_quick_race_size_selected)
-	row.add_child(size_selector)
-	_register_button_focus(size_selector)
-	_quick_direction_button = _make_button("DIRECTION · %s" % ("REVERSE" if _quick_race_reverse else "FORWARD"), _toggle_quick_race_direction, CREAM, false, "QuickRaceDirection")
-	_quick_direction_button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	row.add_child(_quick_direction_button)
-	_register_button_focus(_quick_direction_button)
-	size_selector.focus_neighbor_right = size_selector.get_path_to(_quick_direction_button)
-	_quick_direction_button.focus_neighbor_left = _quick_direction_button.get_path_to(size_selector)
-	return size_selector
-
-
-func _on_quick_race_size_selected(index: int) -> void:
-	if index < 0 or index >= GENERATED_RULES.LENGTH_TIERS.size():
-		return
-	_quick_race_length_tier = String(GENERATED_RULES.LENGTH_TIERS[index])
-	_refresh_quick_identity_labels()
 
 
 func _random_quick_race_seed() -> int:

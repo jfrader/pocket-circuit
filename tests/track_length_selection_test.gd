@@ -140,19 +140,20 @@ func _test_ui_selection() -> void:
 	shell.call("configure", mock)
 	shell.call("show_quick_race")
 	await _wait_frames(2)
-	var size_selector := shell.find_child("QuickRaceSize", true, false) as OptionButton
-	if not _expect(size_selector != null, "Quick Race should expose a size selector"):
+	if not _expect(String(shell.get("_quick_race_length_tier")) == "standard", "Quick Race should pin the standard length profile"):
 		return
-	size_selector.select(RULES.LENGTH_TIERS.find("long"))
-	size_selector.item_selected.emit(size_selector.selected)
-	await _wait_frames(1)
-	if not _expect(String(shell.get("_quick_race_length_tier")) == "long", "selecting Long should update the quick race profile"):
+	if not _expect(
+			String(shell.get("_quick_race_theme")) == "kitchen"
+			and String(shell.get("_quick_race_room")) == "classic"
+			and int(shell.get("_quick_race_seed")) == 875
+			and not bool(shell.get("_quick_race_reverse")),
+			"Quick Race should pin the fixed kitchen/classic seed 875 identity"
+	):
 		return
-	var quick_identity: Dictionary = shell.call("_current_quick_identity")
-	if not _expect(String(quick_identity.get("length_tier", "")) == "long", "the quick race preview identity should reflect the selected profile"):
+	if not _expect(shell.find_child("QuickRaceSize", true, false) == null, "Quick Race should not expose a size selector"):
 		return
 	shell.call("_start_quick_race")
-	if not _expect(mock.last_quick_tier == "long", "starting a quick race should forward the selected profile"):
+	if not _expect(mock.last_quick_tier == "standard", "starting a quick race should forward the pinned standard profile"):
 		return
 	root.remove_child(shell)
 	shell.free()
