@@ -61,6 +61,7 @@ func _run_benchmark() -> void:
 			_times_sum(times) / float(times.size()), times[times.size() - 1],
 			float(attempts_total) / float(times.size()),
 		])
+	print("TRACK_SEED_GEN_BENCHMARK PASS")
 	quit(0)
 
 
