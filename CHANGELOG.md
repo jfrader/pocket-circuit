@@ -88,6 +88,17 @@
   Cass and rivals sharing a chassis get different palette/livery/wheel/spoiler
   cosmetics; the same race field always produces the same looks via deterministic
   slot disambiguation on collisions (including fallbacks).
+- Music now plays at a normal listening level instead of sitting far below it.
+  Both loops are mastered to the same -14 LUFS target with a -1 dBTP ceiling the
+  Gamestruments library uses, the race loop is the catalogue's Cruise take
+  rather than a short motor hum, and the engine is balanced under the music
+  instead of over it. A Master-bus limiter keeps the summed mix below 0 dBFS.
+- Driving forward no longer teleports you back to the last gate after
+  brushing a nearby checkpoint or leaving the racing line briefly. Recovery
+  puts you back on the nearby route, facing the right way.
+- Steering follows the stick more at speed. Fast throttle-on corners can
+  slide the rear a little without Space; Space is still the big drift.
+>>>>>>> origin/dev
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.
@@ -182,6 +193,9 @@
   horizontal racer labels readable without covering the circuit.
 - Vehicle contact separates along the physics normal and restores steering as
   cars split, reducing prolonged collision lockups.
+- Quick Race now uses a single fixed household circuit (Kitchen, Classic canvas,
+  seed 875) instead of rerolling a fresh track each visit, and the title screen
+  preloads its route preview. The seed picker is reserved for debug builds.
 
 ### Fixed
 

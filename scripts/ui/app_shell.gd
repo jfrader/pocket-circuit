@@ -29,9 +29,9 @@ var _screen := "title"
 var _event_id := ""
 var _quick_race := false
 var _map_act_number := 1
-var _quick_race_theme: StringName = &"workshop"
+var _quick_race_theme: StringName = &"kitchen"
 var _quick_race_room: StringName = &"classic"
-var _quick_race_seed := -1
+var _quick_race_seed := 875
 var _quick_race_reverse := false
 var _quick_race_length_tier: String = "standard"
 var _quick_identity_heading: Label
@@ -63,6 +63,7 @@ func show_title() -> void:
 	_page.hide()
 	_art_menu.set("reduced_motion", _reduced_motion_enabled())
 	_art_menu.call("show_title", has_progress, save_read_only)
+	_app.call("prepare_circuit_preview", _current_quick_identity())
 
 
 func show_reset_confirmation() -> void:
@@ -151,8 +152,6 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_screen = "quick_race"
 	_event_id = ""
 	_quick_race = true
-	if _quick_race_seed < 0:
-		_quick_race_seed = _random_quick_race_seed()
 	_clear_content()
 	_content.add_theme_constant_override("separation", 4)
 	_configure_stage(&"map", "rustbug", "rae", String(_quick_race_theme))
@@ -184,12 +183,19 @@ func show_quick_race(_requested_act: int = 0) -> void:
 		room_buttons[theme_index].pressed.connect(
 			Callable(self, "_select_quick_race_theme").bind(room_themes[theme_index], room_buttons, room_status)
 		)
-	var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
-	var seed_controls := _add_quick_race_seed_controls(seed_status)
+	var seed_controls: Array[Control] = []
+	if OS.is_debug_build():
+		var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
+		seed_controls = _add_quick_race_seed_controls(seed_status)
 	var size_selector := _add_quick_race_size_direction_row()
-	for room_button: Button in room_buttons:
-		room_button.focus_neighbor_bottom = room_button.get_path_to(seed_controls[0])
-	_complete_focus_row(seed_controls, size_selector)
+	
+	if not seed_controls.is_empty():
+		for room_button: Button in room_buttons:
+			room_button.focus_neighbor_bottom = room_button.get_path_to(seed_controls[0])
+		_complete_focus_row(seed_controls, size_selector)
+	else:
+		for room_button: Button in room_buttons:
+			room_button.focus_neighbor_bottom = room_button.get_path_to(size_selector)
 	var play_button := _add_big_play_button(Callable(self, "_start_quick_race"), false)
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_race_vehicle_id.is_empty():
@@ -1087,9 +1093,9 @@ func _show_map_act(act_number: int) -> void:
 
 func _reset_quick_race_state() -> void:
 	_quick_race = false
-	_quick_race_theme = &"workshop"
+	_quick_race_theme = &"kitchen"
 	_quick_race_room = &"classic"
-	_quick_race_seed = -1
+	_quick_race_seed = 875
 	_quick_race_reverse = false
 	_quick_race_length_tier = "standard"
 	_quick_race_vehicle_id = ""

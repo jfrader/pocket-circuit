@@ -1047,6 +1047,9 @@ static func _best_complex_bypass(centerline: PackedVector2Array) -> Dictionary:
 	var best := {"found": false, "saving": 0.0}
 	var count := centerline.size()
 	var drive_radius := HALF_WIDTH - 22.0
+	# Exact centerline segment hash: each chord sample only tests the handful of
+	# segments that could lie within the drive radius instead of the whole loop.
+	var segment_hash := _centerline_segment_hash(centerline, drive_radius)
 	for start in range(0, count, 3):
 		var route_arc := 0.0
 		for step in range(1, count / 2):
@@ -1060,7 +1063,7 @@ static func _best_complex_bypass(centerline: PackedVector2Array) -> Dictionary:
 			var saving := route_arc - chord
 			if chord < 1.0 or saving < BYPASS_MIN_SAVING or route_arc / chord < BYPASS_MIN_RATIO:
 				continue
-			if not _chord_inside_corridor(centerline[start], centerline[finish], centerline, drive_radius):
+			if not _chord_inside_corridor(centerline[start], centerline[finish], centerline, drive_radius, segment_hash):
 				continue
 			if saving > float(best["saving"]):
 				best = {
@@ -1073,20 +1076,63 @@ static func _best_complex_bypass(centerline: PackedVector2Array) -> Dictionary:
 	return best
 
 
+## Grid over the centerline segments: each segment is registered in every cell
+## its bounding box overlaps, with cell size == drive radius. Any point within
+## `cell_size` of a segment therefore finds that segment in one of the 3x3 cells
+## around the point, so distance queries over those cells are exact.
+static func _centerline_segment_hash(centerline: PackedVector2Array, cell_size: float) -> Dictionary:
+	var hash: Dictionary = {}
+	var count := centerline.size()
+	for index in count:
+		var from := centerline[index]
+		var to := centerline[(index + 1) % count]
+		var min_x := int(floor(minf(from.x, to.x) / cell_size))
+		var max_x := int(floor(maxf(from.x, to.x) / cell_size))
+		var min_y := int(floor(minf(from.y, to.y) / cell_size))
+		var max_y := int(floor(maxf(from.y, to.y) / cell_size))
+		for cell_x in range(min_x, max_x + 1):
+			for cell_y in range(min_y, max_y + 1):
+				var key := Vector2i(cell_x, cell_y)
+				var bucket: Array[int] = hash.get(key, [] as Array[int])
+				bucket.append(index)
+				hash[key] = bucket
+	return hash
+
+
 static func _chord_inside_corridor(
 	from: Vector2,
 	to: Vector2,
 	centerline: PackedVector2Array,
-	drive_radius: float
+	drive_radius: float,
+	segment_hash: Dictionary
 ) -> bool:
 	for sample in range(1, 20):
 		var point := from.lerp(to, float(sample) / 20.0)
-		var nearest := INF
-		for index in centerline.size():
-			nearest = minf(nearest, _point_segment_distance(point, centerline[index], centerline[(index + 1) % centerline.size()]))
-		if nearest > drive_radius:
+		if not _point_within_centerline_radius(point, centerline, segment_hash, drive_radius):
 			return false
 	return true
+
+
+## Exact equivalent of scanning every centerline segment for a point whose
+## minimum distance is at most `cell_size`: the 3x3 window around the point's
+## cell covers its whole radius disk, and any segment within the disk is
+## registered in the cell holding its closest point.
+static func _point_within_centerline_radius(
+	point: Vector2,
+	centerline: PackedVector2Array,
+	segment_hash: Dictionary,
+	cell_size: float
+) -> bool:
+	var cell := Vector2i(int(floor(point.x / cell_size)), int(floor(point.y / cell_size)))
+	for offset_x in range(-1, 2):
+		for offset_y in range(-1, 2):
+			var bucket: Variant = segment_hash.get(cell + Vector2i(offset_x, offset_y))
+			if bucket == null:
+				continue
+			for index: int in bucket:
+				if _point_segment_distance(point, centerline[index], centerline[(index + 1) % centerline.size()]) <= cell_size:
+					return true
+	return false
 
 
 static func _inside_with_margin(point: Vector2, polygon: PackedVector2Array, margin: float) -> bool:

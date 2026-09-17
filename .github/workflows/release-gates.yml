@@ -2,9 +2,9 @@ name: Release gates
 
 on:
   push:
-    branches: [main]
+    branches: [main, dev]
   pull_request:
-    branches: [main]
+    branches: [dev]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   release:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request'
     runs-on: [self-hosted, pocket-circuit-ci]
     timeout-minutes: 240
     steps:
@@ -58,3 +58,20 @@ jobs:
             ${{ runner.temp }}/route-variety.svg
           if-no-files-found: warn
           retention-days: 7
+
+  pr-smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Static release-tool checks
+        shell: bash
+        # validate_release_config.py also shells out to ffprobe/ImageMagick for
+        # media checks, which ubuntu-latest does not ship; the full release gate
+        # covers those. pr-smoke stays pure-Python and seconds-fast.
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s tests -p test_release_tools.py -v

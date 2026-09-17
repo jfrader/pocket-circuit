@@ -53,7 +53,7 @@ func _ready() -> void:
 	call_deferred("_initialize_race")
 
 
-func _process(delta: float) -> void:
+func _physics_process(delta: float) -> void:
 	advance_race_time(delta)
 
 
@@ -226,8 +226,9 @@ func report_checkpoint(checkpoint: Area2D, body: Node2D) -> bool:
 		return false
 	var checkpoint_index := int(checkpoint.get("checkpoint_index"))
 	if checkpoint_index != int(state["expected_checkpoint"]):
-		_set_wrong_way(body, state, true)
-		_racers[body] = state
+		# Folded generated routes can brush a nearby gate sensor while still
+		# travelling forward. Ignore the extra contact; motion-based tangent
+		# detection catches genuine reverse driving.
 		return false
 
 	_set_wrong_way(body, state, false)
@@ -487,9 +488,31 @@ func get_checkpoint_count() -> int:
 
 func get_last_recovery_transform(vehicle: Node2D = null) -> Transform2D:
 	var racer := vehicle if vehicle else _player_vehicle
+	var fallback := last_recovery_transform
 	if racer and _racers.has(racer):
-		return _racers[racer]["recovery_transform"] as Transform2D
-	return last_recovery_transform
+		fallback = _racers[racer]["recovery_transform"] as Transform2D
+	if is_instance_valid(racer) and has_route_reference():
+		var on_route := _recovery_transform_on_route(racer.global_position)
+		if on_route.has("ok"):
+			return on_route["transform"] as Transform2D
+	return fallback
+
+
+func _recovery_transform_on_route(position: Vector2) -> Dictionary:
+	var nearest := _nearest_route_segment(position, 0.0, _route_length)
+	if int(nearest["index"]) < 0:
+		return {}
+	var index := int(nearest["index"])
+	var from := _route_points[index]
+	var to := _route_points[(index + 1) % _route_points.size()]
+	var origin: Vector2 = from.lerp(to, float(nearest["fraction"]))
+	var tangent := (to - from).normalized()
+	if tangent.length_squared() < 0.001:
+		return {}
+	if is_reverse_direction():
+		tangent = -tangent
+	var rotation := tangent.angle() - Vector2.UP.angle()
+	return {"ok": true, "transform": Transform2D(rotation, origin)}
 
 
 func _finish_racer(vehicle: Node2D, state: Dictionary) -> void:

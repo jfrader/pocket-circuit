@@ -248,7 +248,6 @@ func _prepare_race_async() -> void:
 				if not IDENTITIES.install_motion_image_for_key(visual_key, rendered["jobs"][index], rendered["images"][index]):
 					app.call("fail_race_loading", "Vehicle graphics could not be prepared")
 					return
-				await _loading_step("Preparing %s animation" % display.capitalize())
 		if app.call("is_race_loading_cancelled"):
 			app.call("complete_race_loading")
 			return
@@ -631,7 +630,10 @@ func _run_countdown() -> void:
 		_present_countdown(value)
 		_play_sfx(&"countdown", 0.82)
 		race_manager.report_countdown_tick(value)
-		await get_tree().create_timer(COUNTDOWN_STEP_SECONDS, false).timeout
+		# process_in_physics keeps the countdown on the fixed physics step so the
+		# race-start (and the hazard phase it fixes) is deterministic, instead of
+		# drifting with rendered frame rate.
+		await get_tree().create_timer(COUNTDOWN_STEP_SECONDS, false, true).timeout
 	_present_countdown("GO!")
 	_play_sfx(&"go", 0.92)
 	race_manager.report_countdown_tick("GO!")
@@ -640,7 +642,7 @@ func _run_countdown() -> void:
 	if "--media-capture" in OS.get_cmdline_user_args():
 		print("MEDIA_RACE_READY %s %s" % [String(_session.get("event_id", "unknown")), String(_session.get("vehicle_id", "unknown"))])
 	_countdown_active = false
-	await get_tree().create_timer(COUNTDOWN_STEP_SECONDS, false).timeout
+	await get_tree().create_timer(COUNTDOWN_STEP_SECONDS, false, true).timeout
 	_countdown_label.visible = false
 
 

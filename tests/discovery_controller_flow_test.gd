@@ -29,8 +29,8 @@ class TestApp extends Node:
 	func get_circuit_library() -> Dictionary:
 		return {"history": [identity.duplicate(true)], "favorites": [identity.duplicate(true)] if favorite else []}
 
-	func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false) -> Dictionary:
-		return IDENTITIES.create(theme, room, seed, reverse)
+	func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard") -> Dictionary:
+		return IDENTITIES.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
 
 	func decode_circuit_share_code(code: String) -> Dictionary:
 		return IDENTITIES.decode_share_code(code)

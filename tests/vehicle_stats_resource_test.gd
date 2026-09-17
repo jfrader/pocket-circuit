@@ -45,6 +45,8 @@ const TARGETS := {
 			"boost_recharge": 10,
 			"boost_drain_rate": 32,
 			"durability": 52,
+			"arcade_high_speed_steer_ratio": 0.82,
+			"arcade_throttle_oversteer": 0.32,
 		},
 	"pinbolt": {
 			"mass": 0.74,
@@ -87,6 +89,8 @@ const TARGETS := {
 			"boost_recharge": 7.5,
 			"boost_drain_rate": 34,
 			"durability": 46,
+			"arcade_high_speed_steer_ratio": 0.82,
+			"arcade_throttle_oversteer": 0.32,
 		},
 	"scrapjaw": {
 			"mass": 1.22,
@@ -129,6 +133,8 @@ const TARGETS := {
 			"boost_recharge": 8,
 			"boost_drain_rate": 30,
 			"durability": 75,
+			"arcade_high_speed_steer_ratio": 0.82,
+			"arcade_throttle_oversteer": 0.32,
 		},
 	"flicker": {
 			"mass": 0.68,
@@ -171,6 +177,8 @@ const TARGETS := {
 			"boost_recharge": 14,
 			"boost_drain_rate": 36,
 			"durability": 42,
+			"arcade_high_speed_steer_ratio": 0.82,
+			"arcade_throttle_oversteer": 0.32,
 		},
 }
 
@@ -195,7 +203,7 @@ func _test_catalog_resources() -> bool:
 		var source := load(stats_path) as VehicleStats
 		if not _expect(source != null, "%s stats resource should load" % vehicle_id):
 			return false
-		if not _expect(source.physics_model_version == VehicleStats.BICYCLE_MODEL_VERSION, "%s should be bicycle v1 (P3 default)" % vehicle_id):
+		if not _expect(source.physics_model_version == VehicleStats.ARCADE_MODEL_VERSION, "%s should be arcade v2 (live default)" % vehicle_id):
 			return false
 		if not _expect(source.get_validation_errors().is_empty(), "%s target parameters should pass schema validation: %s" % [vehicle_id, ", ".join(source.get_validation_errors())]):
 			return false
