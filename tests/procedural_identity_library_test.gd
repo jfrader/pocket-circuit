@@ -6,22 +6,6 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const DRIVER_IDS: Array[String] = ["rae", "inez", "juniper", "milo", "tess", "cass"]
 const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker", "thimble", "spindle", "anvil", "dustmite"]
 
-
-func _payload_hash(payload: Dictionary) -> String:
-	var context := HashingContext.new()
-	context.start(HashingContext.HASH_SHA256)
-	context.update(JSON.stringify(payload, "", false).to_utf8_buffer())
-	return context.finish().hex_encode()
-
-
-func _texture_hash(texture: Texture2D) -> String:
-	if texture == null:
-		return ""
-	var context := HashingContext.new()
-	context.start(HashingContext.HASH_SHA256)
-	context.update(texture.get_image().save_png_to_buffer())
-	return context.finish().hex_encode()
-
 # Byte-identity pins captured from explicit cast/vehicle art at the reconciled Procedural 2D revision.
 # These protect against silent drift on future repins or catalog changes.
 const PINNED_AVATAR_PAYLOADS: Dictionary = {
