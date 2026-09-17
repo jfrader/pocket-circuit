@@ -2,6 +2,10 @@ class_name TrackRouteGrammar
 ## Circuit plans reserve full-width infield passages before rounding corners.
 
 const NAMES: Array[StringName] = [&"infield", &"switchback", &"dogleg", &"harbour"]
+# Marathon-only programs: folded multi-spine layouts that pack roughly twice
+# the switchback's turn complexes into the same room bounds. Standard tiers
+# never select them, so their seed geometry is untouched.
+const MARATHON_NAMES: Array[StringName] = [&"double_switchback", &"deep_comb"]
 const MACRO_SALT := 0x36D1A77
 const CORNER_RADIUS := 180.0
 const CONTROL_SPACING := 55.0
@@ -74,6 +78,107 @@ static func construct(index: int, seed: int, length_bias: float = 0.0, bounds :=
 	for i in vertices.size():
 		radii.append(_roll(seed, 79 + i * 7, CORNER_RADIUS, 225.0 + 25.0 * length_bias))
 	return {"program": program, "recipe": StringName("%s_%08x" % [program, seed]), "anchors": vertices, "radii": radii}
+
+
+## Marathon entry point: same contract as construct, but selects among the
+## folded MARATHON_NAMES programs. Standard tiers never call this, so their
+## seed-to-program mapping is untouched.
+static func construct_marathon(index: int, seed: int, length_bias: float = 0.0, bounds := Rect2(-1300, -800, 2600, 1600)) -> Dictionary:
+	var program := MARATHON_NAMES[posmod(index, MARATHON_NAMES.size())]
+	var width := bounds.size.x * _roll(seed, 0x2A1, 0.83, 0.94)
+	var height := bounds.size.y * _roll(seed, 0x2B7, 0.78, 0.88)
+	var x := width * 0.5
+	var y := height * 0.5
+	var vertices := PackedVector2Array()
+	match program:
+		&"double_switchback":
+			vertices = _double_switchback_anchors(seed, x, y, height)
+		&"deep_comb":
+			vertices = _deep_comb_anchors(seed, x, y, height)
+	# No chamfer here: the marathon programs pack 90-degree corners along the
+	# spines, and a chamfer cut would land its stem collinear with the next
+	# corner, which the corner fitter rejects as a 180-degree turn. The seeded
+	# spine geometry already varies the rhythm.
+	var heading := _roll(seed, 0x2E9, 0.04, 0.08)
+	if _roll_int(seed, 0x2F5, 2) == 0:
+		heading = -heading
+	var mirror := -1.0 if _roll_int(seed, 0x301, 2) == 0 else 1.0
+	for i in vertices.size():
+		vertices[i] = bounds.get_center() + Vector2(vertices[i].x * mirror, vertices[i].y).rotated(heading)
+	# The folded programs share connector lines between adjacent legs, which
+	# leaves collinear or duplicated anchor points. The corner fitter rejects
+	# those as zero turns, so drop them after the transforms (collinearity is
+	# preserved by mirror/rotate) and before the radii are seeded.
+	vertices = _drop_collinear_anchors(vertices)
+	var radii := PackedFloat32Array()
+	for i in vertices.size():
+		radii.append(_roll(seed, 0x30D + i * 7, CORNER_RADIUS, 225.0 + 25.0 * length_bias))
+	return {"program": program, "recipe": StringName("%s_%08x" % [program, seed]), "anchors": vertices, "radii": radii}
+
+
+## Double switchback: two full-height switchback spines side by side, joined
+## through a narrow waist. Every anchor is a 90-degree corner (the switchback's
+## own proven shape), so no near-180-degree turn ever reaches the fitter. The
+## two spines plus the waist double the switchback's turn count inside the same
+## room bounds.
+static func _double_switchback_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var spine := maxf(400.0, x * _roll(seed, 0x411, 0.28, 0.34))
+	var waist := maxf(400.0, x * _roll(seed, 0x425, 0.14, 0.18))
+	var depth := height * _roll(seed, 0x43B, 0.40, 0.48)
+	return PackedVector2Array([
+		Vector2(-x, -y),
+		Vector2(-spine, -y),
+		Vector2(-spine, -y + depth),
+		Vector2(-waist * 0.5, -y + depth),
+		Vector2(-waist * 0.5, -y),
+		Vector2(waist * 0.5, -y),
+		Vector2(waist * 0.5, -y + depth),
+		Vector2(spine, -y + depth),
+		Vector2(spine, -y),
+		Vector2(x, -y),
+		Vector2(x, y),
+		Vector2(spine, y),
+		Vector2(spine, y - depth),
+		Vector2(waist * 0.5, y - depth),
+		Vector2(waist * 0.5, y),
+		Vector2(-waist * 0.5, y),
+		Vector2(-waist * 0.5, y - depth),
+		Vector2(-spine, y - depth),
+		Vector2(-spine, y),
+		Vector2(-x, y),
+	])
+
+
+## Deep comb: the double-switchback shape with the waist notches pushed much
+## deeper and staggered, so the two marathon programs read as distinct layouts
+## from the same bounds.
+static func _deep_comb_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var spine := maxf(400.0, x * _roll(seed, 0x451, 0.28, 0.34))
+	var waist := maxf(400.0, x * _roll(seed, 0x465, 0.08, 0.12))
+	var depth := height * _roll(seed, 0x47B, 0.72, 0.80)
+	var stagger := height * _roll(seed, 0x491, 0.10, 0.16)
+	return PackedVector2Array([
+		Vector2(-x, -y),
+		Vector2(-spine, -y),
+		Vector2(-spine, -y + depth),
+		Vector2(-waist * 0.5, -y + depth - stagger),
+		Vector2(-waist * 0.5, -y + stagger),
+		Vector2(waist * 0.5, -y + stagger),
+		Vector2(waist * 0.5, -y + depth + stagger),
+		Vector2(spine, -y + depth),
+		Vector2(spine, -y),
+		Vector2(x, -y),
+		Vector2(x, y),
+		Vector2(spine, y),
+		Vector2(spine, y - depth),
+		Vector2(waist * 0.5, y - depth + stagger),
+		Vector2(waist * 0.5, y - stagger),
+		Vector2(-waist * 0.5, y - stagger),
+		Vector2(-waist * 0.5, y - depth - stagger),
+		Vector2(-spine, y - depth),
+		Vector2(-spine, y),
+		Vector2(-x, y),
+	])
 
 
 static func round_corners(vertices: PackedVector2Array, radii: PackedFloat32Array) -> PackedVector2Array:
@@ -243,3 +348,28 @@ static func _polygon_area(points: PackedVector2Array) -> float:
 	for i in points.size():
 		total += points[i].cross(points[(i + 1) % points.size()])
 	return total * 0.5
+
+
+## Remove anchors whose position duplicates their predecessor or whose turn is
+## near-collinear, so the corner fitter only sees real corners. The folded
+## marathon programs emit both: shared connector lines and repeated leg ends.
+static func _drop_collinear_anchors(points: PackedVector2Array) -> PackedVector2Array:
+	if points.size() < 4:
+		return points
+	var deduped := PackedVector2Array()
+	for index in points.size():
+		var current := points[index]
+		if deduped.is_empty() or current.distance_squared_to(deduped[deduped.size() - 1]) > 0.01:
+			deduped.append(current)
+	var result := PackedVector2Array()
+	var count := deduped.size()
+	for index in count:
+		var previous := deduped[posmod(index - 1, count)]
+		var current := deduped[index]
+		var next := deduped[(index + 1) % count]
+		var turn := absf(previous.direction_to(current).angle_to(current.direction_to(next)))
+		if turn > 0.02:
+			result.append(current)
+	if result.size() < 4:
+		return points
+	return result
