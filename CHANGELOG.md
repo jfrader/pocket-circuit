@@ -183,6 +183,9 @@
   horizontal racer labels readable without covering the circuit.
 - Vehicle contact separates along the physics normal and restores steering as
   cars split, reducing prolonged collision lockups.
+- Quick Race now uses a single fixed household circuit (Kitchen, Classic canvas,
+  seed 875) instead of rerolling a fresh track each visit, and the title screen
+  preloads its route preview. The seed picker is reserved for debug builds.
 
 ### Fixed
 
