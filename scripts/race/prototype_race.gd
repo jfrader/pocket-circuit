@@ -228,22 +228,24 @@ func _prepare_race_async() -> void:
 		app.call("complete_race_loading")
 		return
 	app.call("set_loading_section", 2)
-	var vehicles: Array[String] = [String(_session.get("vehicle_id", "rustbug"))]
-	var opponents: Array = [] if String(_session.get("mode", "")) == "mastery" else event.get("opponents", FALLBACK_OPPONENTS)
-	for index in mini(int(event.get("opponent_count", opponents.size())), opponents.size()):
-		var vehicle_id := String(CATALOG.get_driver(String(opponents[index])).get("vehicle_id", "rustbug"))
-		if not vehicles.has(vehicle_id):
-			vehicles.append(vehicle_id)
-	for vehicle_id: String in vehicles:
-		await _loading_step("Preparing %s animation" % vehicle_id.capitalize())
-		var plan := IDENTITIES.motion_preparation_plan(vehicle_id)
+	var field_racers: Array[Dictionary] = _build_field_racers_for_preparation()
+	var resolved_keys: Dictionary = IDENTITIES.resolve_field_visual_keys(field_racers)
+	var keys_to_prepare: Array[String] = []
+	for k in resolved_keys.values():
+		var sk := String(k)
+		if not keys_to_prepare.has(sk):
+			keys_to_prepare.append(sk)
+	for visual_key: String in keys_to_prepare:
+		var display := visual_key.split("|", true, 1)[0] if visual_key.find("|") != -1 else visual_key
+		await _loading_step("Preparing %s animation" % display.capitalize())
+		var plan := IDENTITIES.motion_preparation_plan_for_key(visual_key)
 		if not (plan["jobs"] as Array).is_empty():
 			var rendered: Dictionary = await preparation.run_data_job(IDENTITIES.render_motion_plan.bind(plan))
 			if rendered.is_empty():
 				app.call("fail_race_loading", "Vehicle graphics could not be prepared")
 				return
 			for index in rendered["jobs"].size():
-				if not IDENTITIES.install_motion_image(vehicle_id, rendered["jobs"][index], rendered["images"][index]):
+				if not IDENTITIES.install_motion_image_for_key(visual_key, rendered["jobs"][index], rendered["images"][index]):
 					app.call("fail_race_loading", "Vehicle graphics could not be prepared")
 					return
 		if app.call("is_race_loading_cancelled"):
@@ -332,9 +334,32 @@ func _configure_personal_ghost() -> void:
 	_personal_ghost = PERSONAL_GHOST_SCRIPT.new() as PersonalGhost
 	_personal_ghost.name = "PersonalBestGhost"
 	add_child(_personal_ghost)
-	if not _personal_ghost.configure(ghost, IDENTITIES.car_texture(String(_session.get("vehicle_id", "rustbug")))):
+	var pvid := String(_session.get("vehicle_id", "rustbug"))
+	var pkey := IDENTITIES.resolve_visual_key(pvid, "rae")
+	var ptex := IDENTITIES.car_texture_for_key(pkey)
+	if not _personal_ghost.configure(ghost, ptex):
 		_personal_ghost.queue_free()
 		_personal_ghost = null
+
+
+func _build_field_racers_for_preparation() -> Array[Dictionary]:
+	var entries: Array[Dictionary] = []
+	var pvid := String(_session.get("vehicle_id", "rustbug"))
+	entries.append({"vehicle_id": pvid, "driver_id": "rae", "slot": 0})
+	var ev: Dictionary = _session.get("event", {})
+	var oids: Array = ev.get("opponents", FALLBACK_OPPONENTS) if not ev.is_empty() else FALLBACK_OPPONENTS
+	var ocnt := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(ev.get("opponent_count", oids.size())), 0, 3)
+	for i in mini(oids.size(), ocnt):
+		var did := String(oids[i])
+		var d := CATALOG.get_driver(did)
+		var vid := String(d.get("vehicle_id", "rustbug"))
+		entries.append({"vehicle_id": vid, "driver_id": did, "slot": i + 1})
+	return entries
+
+
+func _resolve_field_visual_keys() -> Dictionary:
+	var racers := _build_field_racers_for_preparation()
+	return IDENTITIES.resolve_field_visual_keys(racers)
 
 
 func _configure_racers() -> void:
@@ -343,7 +368,9 @@ func _configure_racers() -> void:
 		push_error("Prototype race requires a player Rustbug")
 		return
 	var player_vehicle_id := String(_session.get("vehicle_id", "rustbug"))
-	_configure_vehicle(_player_vehicle, 0, true, CATALOG.get_driver("rae"), player_vehicle_id)
+	var field_visuals := _resolve_field_visual_keys()
+	var player_key := String(field_visuals.get(0, player_vehicle_id))
+	_configure_vehicle(_player_vehicle, 0, true, CATALOG.get_driver("rae"), player_vehicle_id, player_key)
 	camera.call("set_target", _player_vehicle)
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("set_local_race_vehicle"):
@@ -358,6 +385,7 @@ func _configure_racers() -> void:
 		var driver_id := String(opponent_ids[ai_index])
 		var driver := CATALOG.get_driver(driver_id)
 		var ai_vehicle_id := String(driver.get("vehicle_id", "rustbug"))
+		var ai_visual_key := String(field_visuals.get(ai_index + 1, ai_vehicle_id))
 		var ai_vehicle := RUSTBUG_SCENE.instantiate() as VehicleController
 		ai_vehicle.name = "%sAI" % String(driver.get("name", "Racer%d" % (ai_index + 1))).replace(" ", "")
 		ai_vehicle.stats = CATALOG.create_vehicle_stats(ai_vehicle_id)
@@ -369,7 +397,7 @@ func _configure_racers() -> void:
 		# default origin inside the island followed by a live teleport.
 		ai_vehicle.transform = global_transform.affine_inverse() * grid[ai_index + 1]
 		add_child(ai_vehicle)
-		_configure_vehicle(ai_vehicle, ai_index + 1, false, driver, ai_vehicle_id)
+		_configure_vehicle(ai_vehicle, ai_index + 1, false, driver, ai_vehicle_id, ai_visual_key)
 		var ai_controller := AI_CONTROLLER_SCRIPT.new() as AIVehicleController
 		ai_vehicle.add_child(ai_controller)
 		ai_controller.configure(
@@ -387,7 +415,8 @@ func _configure_vehicle(
 		racer_index: int,
 		is_player: bool,
 		driver: Dictionary,
-		vehicle_id: String
+		vehicle_id: String,
+		visual_key: String = ""
 ) -> void:
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
 	vehicle.freeze = true
@@ -402,7 +431,8 @@ func _configure_vehicle(
 	var driver_name := String(driver.get("name", "Racer"))
 	var vehicle_data := CATALOG.get_vehicle(vehicle_id)
 	var vehicle_name := String(vehicle_data.get("name", "Rustbug"))
-	vehicle.configure_identity(driver_name, vehicle_name, vehicle_id)
+	var use_visual := visual_key if not visual_key.is_empty() else vehicle_id
+	vehicle.configure_identity(driver_name, vehicle_name, use_visual)
 	vehicle.configure_racer_marker(RACER_MARKER_COLORS[racer_index], racer_index)
 	race_manager.register_racer(vehicle, driver_name, vehicle_name, is_player)
 
