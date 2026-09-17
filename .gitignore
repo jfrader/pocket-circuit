@@ -3,7 +3,6 @@
 .godot/
 *.import
 .import/
-.uid
 
 # Godot export / build artifacts
 /builds/
