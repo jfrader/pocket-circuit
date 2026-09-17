@@ -12,6 +12,7 @@ const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identi
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
 const CIRCUIT_PREVIEW_QUEUE := preload("res://scripts/race/circuit_preview_queue.gd")
+const RACE_ASSET_PRELOADER := preload("res://scripts/race/race_asset_preloader.gd")
 const LOADING_FRAME_BUDGET_USEC := 50_000
 
 var current_race_session: Dictionary = {}
@@ -40,6 +41,7 @@ var _mastery_calibration_active := false
 var _mastery_calibration_worker: Node
 var _mastery_calibration_failures: Dictionary = {}
 var _circuit_preview_queue: Node
+var _race_asset_preloader: Node
 
 
 func _enter_tree() -> void:
@@ -63,6 +65,10 @@ func _ready() -> void:
 	_circuit_preview_queue = CIRCUIT_PREVIEW_QUEUE.new()
 	_circuit_preview_queue.name = "CircuitPreviewQueue"
 	add_child(_circuit_preview_queue)
+	_race_asset_preloader = RACE_ASSET_PRELOADER.new()
+	_race_asset_preloader.name = "RaceAssetPreloader"
+	add_child(_race_asset_preloader)
+	_race_asset_preloader.call("start", self)
 	var active_save_path: String = "user://tests/pocket_circuit_app_autoload_test.json" if _test_mode else SaveStore.DEFAULT_PATH
 	_save_store = SAVE_STORE_SCRIPT.new(active_save_path)
 	if _test_mode:
@@ -559,6 +565,20 @@ func _event_with_generated_identity(base_event: Dictionary, identity_value: Dict
 
 func is_race_loading() -> bool:
 	return _transitioning_to_race
+
+
+func is_menu_visible() -> bool:
+	return is_instance_valid(_shell) and _shell.visible
+
+
+func race_asset_precompute_finished() -> bool:
+	return is_instance_valid(_race_asset_preloader) and bool(_race_asset_preloader.call("is_finished"))
+
+
+func race_asset_precompute_metrics() -> Dictionary:
+	if not is_instance_valid(_race_asset_preloader):
+		return {}
+	return _race_asset_preloader.call("debug_metrics")
 
 
 func is_race_loading_cancelled() -> bool:
