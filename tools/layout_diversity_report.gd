@@ -3,14 +3,7 @@ extends SceneTree
 const TRACK_SEED_GEN = preload("res://scripts/race/track_seed_gen.gd")
 const ROOM_RECT = Rect2(-940.0, -540.0, 1880.0, 1080.0)
 const WORLD_SCALE = 1.75
-var ROOM_SHAPES := {
-	"classic": PackedVector2Array([Vector2(-875, -575) * WORLD_SCALE, Vector2(875, -575) * WORLD_SCALE, Vector2(875, 575) * WORLD_SCALE, Vector2(-875, 575) * WORLD_SCALE]),
-	"wide": PackedVector2Array([Vector2(-1175, -600) * WORLD_SCALE, Vector2(1175, -600) * WORLD_SCALE, Vector2(1175, 600) * WORLD_SCALE, Vector2(-1175, 600) * WORLD_SCALE]),
-	"tall": PackedVector2Array([Vector2(-575, -725) * WORLD_SCALE, Vector2(575, -725) * WORLD_SCALE, Vector2(575, 725) * WORLD_SCALE, Vector2(-575, 725) * WORLD_SCALE]),
-	"el": PackedVector2Array([Vector2(-1200, -700) * WORLD_SCALE, Vector2(360, -700) * WORLD_SCALE, Vector2(360, -60) * WORLD_SCALE, Vector2(1200, -60) * WORLD_SCALE, Vector2(1200, 700) * WORLD_SCALE, Vector2(-1200, 700) * WORLD_SCALE]),
-	"long": PackedVector2Array([Vector2(-1300, -550) * WORLD_SCALE, Vector2(1300, -550) * WORLD_SCALE, Vector2(1300, 550) * WORLD_SCALE, Vector2(-1300, 550) * WORLD_SCALE]),
-	"square": PackedVector2Array([Vector2(-750, -750) * WORLD_SCALE, Vector2(750, -750) * WORLD_SCALE, Vector2(750, 750) * WORLD_SCALE, Vector2(-750, 750) * WORLD_SCALE]),
-}
+const TRACK_BUILDER_CORE = preload("res://scripts/race/track_builder_core.gd")
 
 const LENGTH_TIERS = ["compact", "standard", "long", "endurance", "marathon"]
 const SEED_COUNT = 10
@@ -19,11 +12,20 @@ func _initialize():
 	call_deferred("_run_report")
 
 func _room_params(room_name: String, tier: String) -> Dictionary:
+	var room_polygon: PackedVector2Array = TRACK_BUILDER_CORE.ROOM_SHAPES[room_name]
+	var profile := TRACK_SEED_GEN.length_profile(StringName(tier))
+	var room_scale := float(profile.get("room_scale", 1.0))
+	if absf(room_scale - 1.0) > 0.001:
+		var scaled_room := PackedVector2Array()
+		for point: Vector2 in room_polygon:
+			scaled_room.append(point * room_scale)
+		room_polygon = scaled_room
+		
 	var params := {
 		"margin": 190.0,
 		"min_self_distance": 320.0,
 		"min_loop_length": 1900.0 * WORLD_SCALE,
-		"room_polygon": ROOM_SHAPES[room_name],
+		"room_polygon": room_polygon,
 		"room_shape": StringName(room_name),
 		"length_tier": tier,
 	}
@@ -138,7 +140,7 @@ func _run_report():
 	var fallbacks = 0
 	var genuine_sequences = {}
 	var raw_sequences = {}
-	for room_name in ROOM_SHAPES.keys():
+	for room_name in TRACK_BUILDER_CORE.ROOM_SHAPES.keys():
 		for tier in LENGTH_TIERS:
 			var params = _room_params(String(room_name), String(tier))
 			print("Generating ", room_name, " ", tier, " ...")
