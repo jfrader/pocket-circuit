@@ -142,6 +142,7 @@ func play_race_music() -> void:
 		_music_context = &"race"
 		_live_music.set("autoplay", true)
 		_live_music.call("set_form_hold", false)
+		_live_music.set("arrangement", "extended")
 		_live_music.call("generate", race_seed)
 		_live_music.call("set_race_state", "grid", 0.35, 0.2, false)
 		_live_score_loaded = true
