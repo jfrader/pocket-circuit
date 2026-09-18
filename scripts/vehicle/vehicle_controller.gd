@@ -206,6 +206,10 @@ func get_engine_load() -> float:
 	return maxf(_throttle_input, _brake_input * LEGACY_REVERSE_ENGINE_FACTOR)
 
 
+func get_throttle_input() -> float:
+	return _throttle_input
+
+
 func get_effective_max_speed() -> float:
 	if stats.physics_model_version == 0:
 		return stats.get_legacy_max_speed() * surface_speed_multiplier
