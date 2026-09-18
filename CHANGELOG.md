@@ -88,6 +88,8 @@
 
 ### Changed
 
+- Live race music now cycles through extended cruise and high-pressure sections, with grid reprises and a victory sting, replacing the previous repetitive loops.
+
 - Quick Race is now a one-click exhibition: a fixed Kitchen/Classic circuit
   (seed 875, standard length, forward direction) with just PLAY, CHANGE CAR,
   and BACK TO TITLE. Theme, size, and direction selectors are gone.

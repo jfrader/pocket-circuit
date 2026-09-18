@@ -99,6 +99,7 @@ var _pause_settings_status: Label
 var _session: Dictionary = {}
 var _save_error := ""
 var _results_finalized: bool = false
+var _player_took_lead := false
 var _track_variant_presenter: TrackVariantPresenter
 var _countdown_tween: Tween
 var _race_flash_tween: Tween
@@ -151,6 +152,7 @@ func _complete_race_setup(start_countdown: bool = true) -> void:
 	race_manager.wrong_way_changed.connect(_on_wrong_way_changed)
 	race_manager.lap_completed.connect(_on_lap_completed)
 	race_manager.racer_finished.connect(_on_racer_finished)
+	race_manager.racer_recovered.connect(_on_racer_recovered)
 	race_manager.results_ready.connect(_on_results_ready)
 	if OS.is_debug_build():
 		_ensure_debug_overlay()
@@ -263,6 +265,8 @@ func _prepare_race_async() -> void:
 	if director:
 		director.call("play_race_music")
 	for frame in 3:
+		if director.has_method("cue_live_section"):
+			director.call("cue_live_section", "ignition")
 		await _loading_step("Warming graphics for the starting grid")
 	if not app.call("complete_race_loading"):
 		return
@@ -625,6 +629,7 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 
 func _run_countdown() -> void:
 	_push_live_race_state("grid")
+	_cue_live_section("grid")
 	race_manager.begin_countdown()
 	for value in ["3", "2", "1"]:
 		_present_countdown(value)
@@ -696,8 +701,15 @@ func _play_finish_cooldown() -> void:
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:
 	if racer == _player_vehicle:
 		_update_race_hud()
+		if _position == 1 and not _player_took_lead:
+			_player_took_lead = true
+			_cue_live_section("grid")
+		if not _countdown_active and not _finished:
+			_push_live_race_state("race")
 
-
+func _on_racer_recovered(racer: Node2D) -> void:
+	if racer == _player_vehicle:
+		_cue_live_section("grid")
 func _on_wrong_way_changed(racer: Node2D, wrong_way: bool) -> void:
 	if racer == _player_vehicle and is_instance_valid(_race_hud):
 		_race_hud.set_wrong_way(wrong_way)
@@ -715,6 +727,9 @@ func _on_lap_completed(lap: int) -> void:
 	_race_flash_label.text = "FINAL LAP" if lap == race_manager.laps_to_finish - 1 else "LAP %d" % (lap + 1)
 	if lap == race_manager.laps_to_finish - 1:
 		_push_live_race_state("race", true)
+		_cue_live_section("grid")
+	else:
+		_push_live_race_state("race", false)
 	_race_flash_label.visible = true
 	_race_flash_label.modulate.a = 1.0
 	if _race_flash_tween and _race_flash_tween.is_valid():
@@ -886,6 +901,17 @@ func _play_sfx(sound_name: StringName, volume_scale: float = 1.0) -> void:
 		app.call("play_sfx", sound_name, volume_scale)
 
 
+func _cue_live_section(section: String) -> void:
+	if not ClassDB.class_exists("GamestrumentsPlayer"):
+		return
+	var app := get_node_or_null("/root/App")
+	if app == null:
+		return
+	var director: Variant = app.get("audio_director")
+	if is_instance_valid(director) and (director is Node) and director.has_method("cue_live_section"):
+		(director as Node).call("cue_live_section", section)
+
+
 func _push_live_race_state(phase: String, final_lap: bool = false, finish_result: String = "") -> void:
 	# Additive, music-only. Guarded by ClassDB + get_node_or_null so race logic and
 	# non-audio tests are completely unaffected. Uses App.get_current_race_session()
@@ -920,9 +946,23 @@ func _push_live_race_state(phase: String, final_lap: bool = false, finish_result
 		# pressure from current standing (1=lead high pressure, higher numbers lower); mirrors progress/position math already in race_manager
 		pressure = clampf((float(cnt) - float(pos)) / float(cnt - 1), 0.0, 1.0)
 	var fr := finish_result
+	var target_phase := phase
+	var extended_cue := ""
 	if phase == "finish":
+		target_phase = "victory"
 		fr = "win" if pos == 1 else "loss"
-	(director as Node).call("set_live_race_state", phase, intensity, pressure, final_lap, fr)
+	elif phase == "race":
+		if final_lap:
+			target_phase = "final-lap"
+		elif pressure > 0.5:
+			target_phase = "attack"
+			extended_cue = "redline"
+		else:
+			target_phase = "cruise"
+			extended_cue = "slipstream"
+	(director as Node).call("set_live_race_state", target_phase, intensity, pressure, final_lap, fr)
+	if extended_cue != "" and (director as Node).has_method("cue_live_section"):
+		(director as Node).call("cue_live_section", extended_cue)
 
 
 func _ensure_debug_overlay() -> void:
