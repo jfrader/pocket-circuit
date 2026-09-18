@@ -1,6 +1,9 @@
 # Changelog
 
-## Unreleased
+## [Unreleased]
+
+### Fixed
+- Fixed the race music hard-cutting at the instant a race begins by migrating the procedural score swap behind a short fade-out at the start of the loading screen. Retried races now segue seamlessly without regenerating the score.
 
 ### Added
 
