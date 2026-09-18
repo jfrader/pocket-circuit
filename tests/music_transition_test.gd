@@ -1,11 +1,15 @@
 extends SceneTree
 
-## A single live score must be shared globally across all contexts. Context
-## switches (like menu -> race and back) must cue sections instead of
-## regenerating the score, ensuring the engine's internal bar-quantized
-## crossfades work smoothly.
+## The live score is regenerated per circuit from the track identity, so the
+## same circuit always reproduces the same music while a different circuit gets
+## a different score. Menu and race are different seeds; re-entering either
+## reuses the loaded score instead of regenerating it.
 
 const AUDIO_DIRECTOR := preload("res://scripts/audio/audio_director.gd")
+
+
+class FakeApp extends Node:
+	var current_race_session: Dictionary = {}
 
 
 func _initialize() -> void:
@@ -42,32 +46,58 @@ func _run_test() -> void:
 
 	if not _expect(bool(director.call("has_live_score")), "a cold menu start should load a live score"):
 		return
-	var after_menu: int = director.call("get_live_score_generations")
-	if not _expect(after_menu == 1, "a cold start should generate exactly one score"):
+	var menu_seed := String(director.call("get_live_seed"))
+	if not _expect(int(director.call("get_live_score_generations")) == 1, "a cold start should generate exactly one score"):
 		return
 
+	_set_race_session(director, "kitchen", "classic", 4242, "standard")
 	director.call("play_race_music")
 	await process_frame
-	var after_race: int = director.call("get_live_score_generations")
-	if not _expect(after_race == after_menu, "starting a race must not regenerate the score"):
+	if not _expect(int(director.call("get_live_score_generations")) == 2, "a new circuit should generate its own score"):
+		return
+	var track_seed := String(director.call("get_live_seed"))
+	if not _expect(track_seed != menu_seed, "the circuit score seed should differ from the menu score"):
+		return
+	director.call("play_race_music")
+	await process_frame
+	if not _expect(int(director.call("get_live_score_generations")) == 2, "re-entering the same circuit must reuse its score"):
+		return
+	if not _expect(String(director.call("get_live_seed")) == track_seed, "a circuit score must be reproducible from its track identity"):
+		return
+
+	_set_race_session(director, "workshop", "wide", 4243, "long")
+	director.call("play_race_music")
+	await process_frame
+	if not _expect(int(director.call("get_live_score_generations")) == 3, "a different circuit should generate a different score"):
+		return
+	if not _expect(String(director.call("get_live_seed")) != track_seed, "different circuits must not share a seed"):
 		return
 
 	director.call("play_menu_music")
 	await process_frame
-	if not _expect(
-		director.call("get_live_score_generations") == after_race,
-		"returning to the menu must not regenerate the score; it should cue the garage section"
-	):
+	if not _expect(int(director.call("get_live_score_generations")) == 4, "returning to the menu should restore the menu score"):
 		return
-	if not _expect(bool(director.call("get_music_context") == &"menu"), "the menu return should report the menu context"):
-		return
-	if not _expect(bool(director.call("has_live_score")), "the score should still be loaded after the menu return"):
+	director.call("play_menu_music")
+	await process_frame
+	if not _expect(int(director.call("get_live_score_generations")) == 4, "re-entering the menu must reuse its score"):
 		return
 
 	director.queue_free()
 	await process_frame
 	print("MUSIC_TRANSITION_TEST PASS")
 	quit(0)
+
+
+func _set_race_session(_director: Node, theme: String, room: String, seed: int, tier: String) -> void:
+	var app := root.get_node_or_null("App")
+	if app == null:
+		app = FakeApp.new()
+		app.name = "App"
+		root.add_child(app)
+	app.set("current_race_session", {
+		"event_id": "circuit_%s_%s_%d" % [theme, room, seed],
+		"event": {"theme": theme, "room": room, "seed": seed, "length_tier": tier},
+	})
 
 
 func _expect(condition: bool, message: String) -> bool:
