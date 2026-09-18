@@ -1,4 +1,5 @@
 class_name TrackBuilderStory
+const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Generated story dressing: moment container, island focal cluster.
 
 

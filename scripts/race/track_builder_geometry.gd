@@ -1,4 +1,5 @@
 class_name TrackBuilderGeometry
+const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Pure loop/corridor math used by TrackBuilderCore. No nodes, no textures.
 
 const HALF_WIDTH := 125.0

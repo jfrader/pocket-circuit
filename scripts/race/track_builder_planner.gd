@@ -1,4 +1,5 @@
 class_name TrackBuilderPlanner
+const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Deterministic obstacle and hazard plans. Does not build nodes.
 
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")

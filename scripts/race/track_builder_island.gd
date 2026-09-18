@@ -1,4 +1,5 @@
 class_name TrackBuilderIsland
+const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Raised island visual, rim, and rim landmarks.
 
 

@@ -1,4 +1,5 @@
 class_name TrackBuilderBoundary
+const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Generated outer-boundary furniture and island-region clipping.
 
 

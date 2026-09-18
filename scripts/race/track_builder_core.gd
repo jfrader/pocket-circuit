@@ -1,4 +1,5 @@
 class_name TrackBuilderCore
+const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Runtime + headless track builder: builds a painted toy-racing circuit scene
 ## (spline corridor, island prop, walls, gates, grid, props) from a theme spec,
 ## a room shape, and a seed. Pure runtime code — no SceneTree/editor deps — so
@@ -22,6 +23,7 @@ const TRACK_BUILDER_COLLISION := preload("res://scripts/race/track_builder_colli
 const TRACK_BUILDER_RACING := preload("res://scripts/race/track_builder_racing.gd")
 const HALF_WIDTH := 125.0
 const GATE_COUNT := 8
+const TrackSeedGen = preload("res://scripts/race/track_seed_gen.gd")
 const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
 const DEFAULT_FLOOR_TILE_WORLD_SIZE := Vector2(512.0, 512.0)
 const WORLD_SURFACE_SHADER := preload("res://assets/shaders/world_surface.gdshader")
