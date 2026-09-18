@@ -101,10 +101,11 @@ static func construct_marathon(index: int, seed: int, length_bias: float = 0.0, 
 			vertices = _multi_comb_anchors(seed, x, y, height)
 		&"multi_lobe":
 			vertices = _multi_lobe_anchors(seed, x, y, height)
-	# No chamfer here: the marathon programs pack 90-degree corners along the
-	# spines, and a chamfer cut would land its stem collinear with the next
-	# corner, which the corner fitter rejects as a 180-degree turn. The seeded
-	# spine geometry already varies the rhythm.
+	# Cut several convex corners into chamfers so the folded programs carry a
+	# real angle mix instead of an all-90 spine. Corners are spaced at least one
+	# edge apart, so no single straight is cut from both ends; the shared fitter
+	# still rejects any stem that lands collinear with its neighbour.
+	vertices = _compound_chamfer(vertices, seed, 4, false)
 	var heading := _roll(seed, 0x2E9, 0.04, 0.08)
 	if _roll_int(seed, 0x2F5, 2) == 0:
 		heading = -heading
@@ -365,12 +366,13 @@ static func _hash32(value: int) -> int:
 	return (mixed ^ (mixed >> 16)) & 0x7FFFFFFF
 
 
-static func _compound_chamfer(vertices: PackedVector2Array, seed: int) -> PackedVector2Array:
-	# Cut 1-2 convex corners into unequal chamfers: corner -> entry vertex, a
+static func _compound_chamfer(vertices: PackedVector2Array, seed: int, maximum: int = 2, require_roll: bool = true) -> PackedVector2Array:
+	# Cut convex corners into unequal chamfers: corner -> entry vertex, a
 	# diagonal stem, an exit vertex. The diagonal gains a third heading family
 	# (>=11 deg off both legs) while the two longest straight corridors and the
 	# concave bays stay intact. Chosen corners never share an edge, so no single
-	# straight is cut from both ends.
+	# straight is cut from both ends. Standard programs use the legacy 1-2 cut;
+	# the folded marathon programs pass a higher `maximum` for a real angle mix.
 	var n := vertices.size()
 	if n < 4:
 		return vertices
@@ -393,13 +395,27 @@ static func _compound_chamfer(vertices: PackedVector2Array, seed: int) -> Packed
 	var chosen: Dictionary = {}
 	var start := _roll_int(seed, 0x6D, eligible.size())
 	chosen[eligible[start]] = true
-	if _roll_int(seed, 0x6B, 2) == 1:
-		for k in range(1, eligible.size()):
-			var candidate: int = eligible[(start + k) % eligible.size()]
-			var circular := mini(absi(candidate - eligible[start]), n - absi(candidate - eligible[start]))
-			if circular >= 2:
+	if require_roll:
+		if _roll_int(seed, 0x6B, 2) == 1:
+			for k in range(1, eligible.size()):
+				var candidate: int = eligible[(start + k) % eligible.size()]
+				var circular := mini(absi(candidate - eligible[start]), n - absi(candidate - eligible[start]))
+				if circular >= 2:
+					chosen[candidate] = true
+					break
+	else:
+		var offset := 1
+		while chosen.size() < maximum and offset < eligible.size():
+			var candidate: int = eligible[(start + offset) % eligible.size()]
+			offset += 1
+			var separated := true
+			for picked: int in chosen:
+				var circular := mini(absi(candidate - picked), n - absi(candidate - picked))
+				if circular < 2:
+					separated = false
+					break
+			if separated:
 				chosen[candidate] = true
-				break
 	var result := PackedVector2Array()
 	for i in n:
 		if not chosen.has(i):

@@ -737,6 +737,12 @@ static func _el_controls(
 		var mapped_poly := PackedVector2Array()
 		for point: Vector2 in poly:
 			mapped_poly.append(source_rect.get_center() + point * source_rect.size * 0.5)
+		# Cut a few convex corners so the folded L carries a real angle mix too,
+		# instead of a pure 90-degree comb.
+		mapped_poly = ROUTE_GRAMMAR._compound_chamfer(mapped_poly, seed, 4, false)
+		mapped_poly = ROUTE_GRAMMAR._drop_collinear_anchors(mapped_poly)
+		if mapped_poly.size() < 4:
+			return PackedVector2Array()
 		var radii := PackedFloat32Array()
 		for _index in mapped_poly.size():
 			radii.append(260.0)
