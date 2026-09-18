@@ -196,88 +196,63 @@ static func _deep_comb_anchors(seed: int, x: float, y: float, height: float) -> 
 
 
 
-static func _serpentine_anchors(seed: int, _x: float, _y: float, _height: float) -> PackedVector2Array:
+## Interlocking teeth on both sides: a barcode silhouette, distinct from the
+## double switchback. Anchors span the full room so the lap reaches the
+## marathon band; every leg clears the 375u the 180u fillet needs.
+static func _serpentine_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var teeth := 3
+	var pitch := (2.0 * x) / float(teeth + 1)
+	var half_slot := pitch * 0.22
+	var depth := height * _roll(seed, 0x5A1, 0.26, 0.32)
 	var pts := PackedVector2Array()
-	var w = 390.0
-	var x_ext = w * 3.0
-	var y_ext = 650.0
-	var depth = 400.0
-	var side_depth = 390.0
-	var side_w = 400.0
-	pts.append(Vector2(-x_ext, -y_ext))
-	pts.append(Vector2(-x_ext + w, -y_ext))
-	pts.append(Vector2(-x_ext + w, -y_ext + depth))
-	pts.append(Vector2(-x_ext + 2.0*w, -y_ext + depth))
-	pts.append(Vector2(-x_ext + 2.0*w, -y_ext))
-	pts.append(Vector2(-x_ext + 3.0*w, -y_ext))
-	pts.append(Vector2(-x_ext + 3.0*w, -y_ext + depth))
-	pts.append(Vector2(-x_ext + 4.0*w, -y_ext + depth))
-	pts.append(Vector2(-x_ext + 4.0*w, -y_ext))
-	pts.append(Vector2(x_ext, -y_ext))
-	var y_mid = 0.0
-	pts.append(Vector2(x_ext, y_mid - side_w*0.5))
-	pts.append(Vector2(x_ext - side_depth, y_mid - side_w*0.5))
-	pts.append(Vector2(x_ext - side_depth, y_mid + side_w*0.5))
-	pts.append(Vector2(x_ext, y_mid + side_w*0.5))
-	pts.append(Vector2(x_ext, y_ext))
-	pts.append(Vector2(x_ext - w, y_ext))
-	pts.append(Vector2(x_ext - w, y_ext - depth))
-	pts.append(Vector2(x_ext - 2.0*w, y_ext - depth))
-	pts.append(Vector2(x_ext - 2.0*w, y_ext))
-	pts.append(Vector2(x_ext - 3.0*w, y_ext))
-	pts.append(Vector2(x_ext - 3.0*w, y_ext - depth))
-	pts.append(Vector2(x_ext - 4.0*w, y_ext - depth))
-	pts.append(Vector2(x_ext - 4.0*w, y_ext))
-	pts.append(Vector2(-x_ext, y_ext))
-	pts.append(Vector2(-x_ext, y_mid + side_w*0.5))
-	pts.append(Vector2(-x_ext + side_depth, y_mid + side_w*0.5))
-	pts.append(Vector2(-x_ext + side_depth, y_mid - side_w*0.5))
-	pts.append(Vector2(-x_ext, y_mid - side_w*0.5))
+	pts.append(Vector2(-x, -y))
+	for i in teeth:
+		var cx := -x + pitch * float(i + 1)
+		pts.append(Vector2(cx - half_slot, -y))
+		pts.append(Vector2(cx - half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y))
+	pts.append(Vector2(x, -y))
+	pts.append(Vector2(x, y))
+	for i in range(teeth - 1, -1, -1):
+		var cx := -x + pitch * float(i + 1) + pitch * 0.5
+		pts.append(Vector2(cx + half_slot, y))
+		pts.append(Vector2(cx + half_slot, y - depth))
+		pts.append(Vector2(cx - half_slot, y - depth))
+		pts.append(Vector2(cx - half_slot, y))
+	pts.append(Vector2(-x, y))
 	return pts
 
-static func _multi_comb_anchors(seed: int, _x: float, y: float, height: float) -> PackedVector2Array:
+
+## One-sided comb: repeated rectangular teeth along the bottom, flat return.
+static func _multi_comb_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var teeth := 3
+	var pitch := (2.0 * x) / float(teeth + 1)
+	var half_slot := pitch * 0.26
+	var depth := height * _roll(seed, 0x6B1, 0.30, 0.38)
 	var pts := PackedVector2Array()
-	var x_ext = 1260.0
-	var outer_gap = 380.0
-	var slant_dx = 160.0
-	var flat_w = 160.0
-	var depth = 150.0
-	pts.append(Vector2(-x_ext, -y))
-	var cx = -x_ext + outer_gap
-	for i in range(3):
-		pts.append(Vector2(cx, -y))
-		cx += slant_dx
-		pts.append(Vector2(cx, -y + depth))
-		cx += flat_w
-		pts.append(Vector2(cx, -y + depth))
-		cx += slant_dx
-		pts.append(Vector2(cx, -y))
-		if i < 2:
-			cx += flat_w
-	pts.append(Vector2(x_ext, -y))
-	pts.append(Vector2(x_ext, y))
-	pts.append(Vector2(-x_ext, y))
+	pts.append(Vector2(-x, -y))
+	for i in teeth:
+		var cx := -x + pitch * float(i + 1)
+		pts.append(Vector2(cx - half_slot, -y))
+		pts.append(Vector2(cx - half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y))
+	pts.append(Vector2(x, -y))
+	pts.append(Vector2(x, y))
+	pts.append(Vector2(-x, y))
 	return pts
 
-static func _multi_lobe_anchors(seed: int, _x: float, _y: float, _height: float) -> PackedVector2Array:
-	var pts := PackedVector2Array()
-	var w = 220.0
-	var h = 220.0
-	var x_ext = 1000.0
-	var y_ext = 650.0
-	pts.append(Vector2(-w, -y_ext))
-	pts.append(Vector2(w, -y_ext))
-	pts.append(Vector2(w, -h))
-	pts.append(Vector2(x_ext, -h))
-	pts.append(Vector2(x_ext, h))
-	pts.append(Vector2(w, h))
-	pts.append(Vector2(w, y_ext))
-	pts.append(Vector2(-w, y_ext))
-	pts.append(Vector2(-w, h))
-	pts.append(Vector2(-x_ext, h))
-	pts.append(Vector2(-x_ext, -h))
-	pts.append(Vector2(-w, -h))
-	return pts
+
+## Four-lobe cross: deep pockets on every side, a silhouette no other program
+## produces. The arm half-width keeps every leg clear of the fillet floor.
+static func _multi_lobe_anchors(seed: int, x: float, y: float, _height: float) -> PackedVector2Array:
+	var arm := minf(x, y) * _roll(seed, 0x7C1, 0.34, 0.44)
+	return PackedVector2Array([
+		Vector2(-arm, -y), Vector2(arm, -y), Vector2(arm, -arm), Vector2(x, -arm),
+		Vector2(x, arm), Vector2(arm, arm), Vector2(arm, y), Vector2(-arm, y),
+		Vector2(-arm, arm), Vector2(-x, arm), Vector2(-x, -arm), Vector2(-arm, -arm),
+	])
 
 static func round_corners(vertices: PackedVector2Array, radii: PackedFloat32Array) -> PackedVector2Array:
 
