@@ -5,7 +5,7 @@ const NAMES: Array[StringName] = [&"infield", &"switchback", &"dogleg", &"harbou
 # Marathon-only programs: folded multi-spine layouts that pack roughly twice
 # the switchback's turn complexes into the same room bounds. Standard tiers
 # never select them, so their seed geometry is untouched.
-const MARATHON_NAMES: Array[StringName] = [&"double_switchback", &"deep_comb"]
+const MARATHON_NAMES: Array[StringName] = [&"double_switchback", &"deep_comb", &"serpentine", &"multi_comb", &"multi_lobe"]
 const MACRO_SALT := 0x36D1A77
 const CORNER_RADIUS := 180.0
 const CONTROL_SPACING := 55.0
@@ -95,6 +95,12 @@ static func construct_marathon(index: int, seed: int, length_bias: float = 0.0, 
 			vertices = _double_switchback_anchors(seed, x, y, height)
 		&"deep_comb":
 			vertices = _deep_comb_anchors(seed, x, y, height)
+		&"serpentine":
+			vertices = _serpentine_anchors(seed, x, y, height)
+		&"multi_comb":
+			vertices = _multi_comb_anchors(seed, x, y, height)
+		&"multi_lobe":
+			vertices = _multi_lobe_anchors(seed, x, y, height)
 	# No chamfer here: the marathon programs pack 90-degree corners along the
 	# spines, and a chamfer cut would land its stem collinear with the next
 	# corner, which the corner fitter rejects as a 180-degree turn. The seeded
@@ -126,7 +132,9 @@ static func _double_switchback_anchors(seed: int, x: float, y: float, height: fl
 	var waist := maxf(400.0, x * _roll(seed, 0x425, 0.14, 0.18))
 	# Depth is capped so the two opposing notch floors keep at least 0.2h
 	# (>> the 320u self-distance floor) between them.
-	var depth := height * _roll(seed, 0x43B, 0.30, 0.38)
+	var depth := maxf(380.0, height * _roll(seed, 0x43B, 0.30, 0.38))
+	if spine - waist * 0.5 < 380.0:
+		spine = waist * 0.5 + 380.0
 	return PackedVector2Array([
 		Vector2(-x, -y),
 		Vector2(-spine, -y),
@@ -158,8 +166,10 @@ static func _double_switchback_anchors(seed: int, x: float, y: float, height: fl
 static func _deep_comb_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
 	var spine := maxf(400.0, x * _roll(seed, 0x451, 0.28, 0.34))
 	var waist := maxf(400.0, x * _roll(seed, 0x465, 0.15, 0.19))
-	var deep := height * _roll(seed, 0x47B, 0.30, 0.38)
-	var shallow := height * _roll(seed, 0x491, 0.16, 0.22)
+	var deep := maxf(380.0, height * _roll(seed, 0x47B, 0.30, 0.38))
+	var shallow := maxf(380.0, height * _roll(seed, 0x491, 0.16, 0.22))
+	if spine - waist * 0.5 < 380.0:
+		spine = waist * 0.5 + 380.0
 	return PackedVector2Array([
 		Vector2(-x, -y),
 		Vector2(-spine, -y),
@@ -184,7 +194,93 @@ static func _deep_comb_anchors(seed: int, x: float, y: float, height: float) -> 
 	])
 
 
+
+
+static func _serpentine_anchors(seed: int, _x: float, _y: float, _height: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var w = 390.0
+	var x_ext = w * 3.0
+	var y_ext = 650.0
+	var depth = 400.0
+	var side_depth = 390.0
+	var side_w = 400.0
+	pts.append(Vector2(-x_ext, -y_ext))
+	pts.append(Vector2(-x_ext + w, -y_ext))
+	pts.append(Vector2(-x_ext + w, -y_ext + depth))
+	pts.append(Vector2(-x_ext + 2.0*w, -y_ext + depth))
+	pts.append(Vector2(-x_ext + 2.0*w, -y_ext))
+	pts.append(Vector2(-x_ext + 3.0*w, -y_ext))
+	pts.append(Vector2(-x_ext + 3.0*w, -y_ext + depth))
+	pts.append(Vector2(-x_ext + 4.0*w, -y_ext + depth))
+	pts.append(Vector2(-x_ext + 4.0*w, -y_ext))
+	pts.append(Vector2(x_ext, -y_ext))
+	var y_mid = 0.0
+	pts.append(Vector2(x_ext, y_mid - side_w*0.5))
+	pts.append(Vector2(x_ext - side_depth, y_mid - side_w*0.5))
+	pts.append(Vector2(x_ext - side_depth, y_mid + side_w*0.5))
+	pts.append(Vector2(x_ext, y_mid + side_w*0.5))
+	pts.append(Vector2(x_ext, y_ext))
+	pts.append(Vector2(x_ext - w, y_ext))
+	pts.append(Vector2(x_ext - w, y_ext - depth))
+	pts.append(Vector2(x_ext - 2.0*w, y_ext - depth))
+	pts.append(Vector2(x_ext - 2.0*w, y_ext))
+	pts.append(Vector2(x_ext - 3.0*w, y_ext))
+	pts.append(Vector2(x_ext - 3.0*w, y_ext - depth))
+	pts.append(Vector2(x_ext - 4.0*w, y_ext - depth))
+	pts.append(Vector2(x_ext - 4.0*w, y_ext))
+	pts.append(Vector2(-x_ext, y_ext))
+	pts.append(Vector2(-x_ext, y_mid + side_w*0.5))
+	pts.append(Vector2(-x_ext + side_depth, y_mid + side_w*0.5))
+	pts.append(Vector2(-x_ext + side_depth, y_mid - side_w*0.5))
+	pts.append(Vector2(-x_ext, y_mid - side_w*0.5))
+	return pts
+
+static func _multi_comb_anchors(seed: int, _x: float, y: float, height: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var x_ext = 1260.0
+	var outer_gap = 380.0
+	var slant_dx = 160.0
+	var flat_w = 160.0
+	var depth = 150.0
+	pts.append(Vector2(-x_ext, -y))
+	var cx = -x_ext + outer_gap
+	for i in range(3):
+		pts.append(Vector2(cx, -y))
+		cx += slant_dx
+		pts.append(Vector2(cx, -y + depth))
+		cx += flat_w
+		pts.append(Vector2(cx, -y + depth))
+		cx += slant_dx
+		pts.append(Vector2(cx, -y))
+		if i < 2:
+			cx += flat_w
+	pts.append(Vector2(x_ext, -y))
+	pts.append(Vector2(x_ext, y))
+	pts.append(Vector2(-x_ext, y))
+	return pts
+
+static func _multi_lobe_anchors(seed: int, _x: float, _y: float, _height: float) -> PackedVector2Array:
+	var pts := PackedVector2Array()
+	var w = 220.0
+	var h = 220.0
+	var x_ext = 1000.0
+	var y_ext = 650.0
+	pts.append(Vector2(-w, -y_ext))
+	pts.append(Vector2(w, -y_ext))
+	pts.append(Vector2(w, -h))
+	pts.append(Vector2(x_ext, -h))
+	pts.append(Vector2(x_ext, h))
+	pts.append(Vector2(w, h))
+	pts.append(Vector2(w, y_ext))
+	pts.append(Vector2(-w, y_ext))
+	pts.append(Vector2(-w, h))
+	pts.append(Vector2(-x_ext, h))
+	pts.append(Vector2(-x_ext, -h))
+	pts.append(Vector2(-w, -h))
+	return pts
+
 static func round_corners(vertices: PackedVector2Array, radii: PackedFloat32Array) -> PackedVector2Array:
+
 	return round_corners_profiled(vertices, radii, -1)["controls"]
 
 
