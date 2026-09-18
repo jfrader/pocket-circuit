@@ -90,9 +90,16 @@
 - Race HUD calls a solo run a time trial instead of 1st of 1, drops invisible
   gate numbers, and the personal ghost is easier to see. Championship results
   say saved instead of filed.
+- Marathon-length circuits are now genuinely folded instead of just longer:
+  the seeded route packs switchback spines, combs, a serpentine, and a
+  four-lobe cross into the room, and the L-shaped room gets its own folded
+  route with a combed lower arm.
 
 ### Changed
 
+- Existing shared marathon codes and any saved laps or ghosts keyed to the old
+  marathon geometry no longer match, because the generator version advanced.
+  Championship seeds, rooms, and story progress are kept.
 - Live race music now cycles through extended cruise and high-pressure sections, with grid reprises and a victory sting, replacing the previous repetitive loops.
 
 - Quick Race is now a one-click exhibition: a fixed Kitchen/Classic circuit

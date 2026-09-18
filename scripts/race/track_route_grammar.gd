@@ -5,7 +5,7 @@ const NAMES: Array[StringName] = [&"infield", &"switchback", &"dogleg", &"harbou
 # Marathon-only programs: folded multi-spine layouts that pack roughly twice
 # the switchback's turn complexes into the same room bounds. Standard tiers
 # never select them, so their seed geometry is untouched.
-const MARATHON_NAMES: Array[StringName] = [&"double_switchback", &"deep_comb"]
+const MARATHON_NAMES: Array[StringName] = [&"double_switchback", &"deep_comb", &"serpentine", &"multi_comb", &"multi_lobe"]
 const MACRO_SALT := 0x36D1A77
 const CORNER_RADIUS := 180.0
 const CONTROL_SPACING := 55.0
@@ -95,10 +95,17 @@ static func construct_marathon(index: int, seed: int, length_bias: float = 0.0, 
 			vertices = _double_switchback_anchors(seed, x, y, height)
 		&"deep_comb":
 			vertices = _deep_comb_anchors(seed, x, y, height)
-	# No chamfer here: the marathon programs pack 90-degree corners along the
-	# spines, and a chamfer cut would land its stem collinear with the next
-	# corner, which the corner fitter rejects as a 180-degree turn. The seeded
-	# spine geometry already varies the rhythm.
+		&"serpentine":
+			vertices = _serpentine_anchors(seed, x, y, height)
+		&"multi_comb":
+			vertices = _multi_comb_anchors(seed, x, y, height)
+		&"multi_lobe":
+			vertices = _multi_lobe_anchors(seed, x, y, height)
+	# Cut several convex corners into chamfers so the folded programs carry a
+	# real angle mix instead of an all-90 spine. Corners are spaced at least one
+	# edge apart, so no single straight is cut from both ends; the shared fitter
+	# still rejects any stem that lands collinear with its neighbour.
+	vertices = _compound_chamfer(vertices, seed, 4, false)
 	var heading := _roll(seed, 0x2E9, 0.04, 0.08)
 	if _roll_int(seed, 0x2F5, 2) == 0:
 		heading = -heading
@@ -126,7 +133,9 @@ static func _double_switchback_anchors(seed: int, x: float, y: float, height: fl
 	var waist := maxf(400.0, x * _roll(seed, 0x425, 0.14, 0.18))
 	# Depth is capped so the two opposing notch floors keep at least 0.2h
 	# (>> the 320u self-distance floor) between them.
-	var depth := height * _roll(seed, 0x43B, 0.30, 0.38)
+	var depth := maxf(380.0, height * _roll(seed, 0x43B, 0.30, 0.38))
+	if spine - waist * 0.5 < 380.0:
+		spine = waist * 0.5 + 380.0
 	return PackedVector2Array([
 		Vector2(-x, -y),
 		Vector2(-spine, -y),
@@ -158,8 +167,10 @@ static func _double_switchback_anchors(seed: int, x: float, y: float, height: fl
 static func _deep_comb_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
 	var spine := maxf(400.0, x * _roll(seed, 0x451, 0.28, 0.34))
 	var waist := maxf(400.0, x * _roll(seed, 0x465, 0.15, 0.19))
-	var deep := height * _roll(seed, 0x47B, 0.30, 0.38)
-	var shallow := height * _roll(seed, 0x491, 0.16, 0.22)
+	var deep := maxf(380.0, height * _roll(seed, 0x47B, 0.30, 0.38))
+	var shallow := maxf(380.0, height * _roll(seed, 0x491, 0.16, 0.22))
+	if spine - waist * 0.5 < 380.0:
+		spine = waist * 0.5 + 380.0
 	return PackedVector2Array([
 		Vector2(-x, -y),
 		Vector2(-spine, -y),
@@ -184,7 +195,68 @@ static func _deep_comb_anchors(seed: int, x: float, y: float, height: float) -> 
 	])
 
 
+
+
+## Interlocking teeth on both sides: a barcode silhouette, distinct from the
+## double switchback. Anchors span the full room so the lap reaches the
+## marathon band; every leg clears the 375u the 180u fillet needs.
+static func _serpentine_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var teeth := 3
+	var pitch := (2.0 * x) / float(teeth + 1)
+	var half_slot := pitch * 0.22
+	var depth := height * _roll(seed, 0x5A1, 0.26, 0.32)
+	var pts := PackedVector2Array()
+	pts.append(Vector2(-x, -y))
+	for i in teeth:
+		var cx := -x + pitch * float(i + 1)
+		pts.append(Vector2(cx - half_slot, -y))
+		pts.append(Vector2(cx - half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y))
+	pts.append(Vector2(x, -y))
+	pts.append(Vector2(x, y))
+	for i in range(teeth - 1, -1, -1):
+		var cx := -x + pitch * float(i + 1) + pitch * 0.5
+		pts.append(Vector2(cx + half_slot, y))
+		pts.append(Vector2(cx + half_slot, y - depth))
+		pts.append(Vector2(cx - half_slot, y - depth))
+		pts.append(Vector2(cx - half_slot, y))
+	pts.append(Vector2(-x, y))
+	return pts
+
+
+## One-sided comb: repeated rectangular teeth along the bottom, flat return.
+static func _multi_comb_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var teeth := 3
+	var pitch := (2.0 * x) / float(teeth + 1)
+	var half_slot := pitch * 0.26
+	var depth := height * _roll(seed, 0x6B1, 0.30, 0.38)
+	var pts := PackedVector2Array()
+	pts.append(Vector2(-x, -y))
+	for i in teeth:
+		var cx := -x + pitch * float(i + 1)
+		pts.append(Vector2(cx - half_slot, -y))
+		pts.append(Vector2(cx - half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y))
+	pts.append(Vector2(x, -y))
+	pts.append(Vector2(x, y))
+	pts.append(Vector2(-x, y))
+	return pts
+
+
+## Four-lobe cross: deep pockets on every side, a silhouette no other program
+## produces. The arm half-width keeps every leg clear of the fillet floor.
+static func _multi_lobe_anchors(seed: int, x: float, y: float, _height: float) -> PackedVector2Array:
+	var arm := minf(x, y) * _roll(seed, 0x7C1, 0.34, 0.44)
+	return PackedVector2Array([
+		Vector2(-arm, -y), Vector2(arm, -y), Vector2(arm, -arm), Vector2(x, -arm),
+		Vector2(x, arm), Vector2(arm, arm), Vector2(arm, y), Vector2(-arm, y),
+		Vector2(-arm, arm), Vector2(-x, arm), Vector2(-x, -arm), Vector2(-arm, -arm),
+	])
+
 static func round_corners(vertices: PackedVector2Array, radii: PackedFloat32Array) -> PackedVector2Array:
+
 	return round_corners_profiled(vertices, radii, -1)["controls"]
 
 
@@ -294,12 +366,13 @@ static func _hash32(value: int) -> int:
 	return (mixed ^ (mixed >> 16)) & 0x7FFFFFFF
 
 
-static func _compound_chamfer(vertices: PackedVector2Array, seed: int) -> PackedVector2Array:
-	# Cut 1-2 convex corners into unequal chamfers: corner -> entry vertex, a
+static func _compound_chamfer(vertices: PackedVector2Array, seed: int, maximum: int = 2, require_roll: bool = true) -> PackedVector2Array:
+	# Cut convex corners into unequal chamfers: corner -> entry vertex, a
 	# diagonal stem, an exit vertex. The diagonal gains a third heading family
 	# (>=11 deg off both legs) while the two longest straight corridors and the
 	# concave bays stay intact. Chosen corners never share an edge, so no single
-	# straight is cut from both ends.
+	# straight is cut from both ends. Standard programs use the legacy 1-2 cut;
+	# the folded marathon programs pass a higher `maximum` for a real angle mix.
 	var n := vertices.size()
 	if n < 4:
 		return vertices
@@ -322,13 +395,27 @@ static func _compound_chamfer(vertices: PackedVector2Array, seed: int) -> Packed
 	var chosen: Dictionary = {}
 	var start := _roll_int(seed, 0x6D, eligible.size())
 	chosen[eligible[start]] = true
-	if _roll_int(seed, 0x6B, 2) == 1:
-		for k in range(1, eligible.size()):
-			var candidate: int = eligible[(start + k) % eligible.size()]
-			var circular := mini(absi(candidate - eligible[start]), n - absi(candidate - eligible[start]))
-			if circular >= 2:
+	if require_roll:
+		if _roll_int(seed, 0x6B, 2) == 1:
+			for k in range(1, eligible.size()):
+				var candidate: int = eligible[(start + k) % eligible.size()]
+				var circular := mini(absi(candidate - eligible[start]), n - absi(candidate - eligible[start]))
+				if circular >= 2:
+					chosen[candidate] = true
+					break
+	else:
+		var offset := 1
+		while chosen.size() < maximum and offset < eligible.size():
+			var candidate: int = eligible[(start + offset) % eligible.size()]
+			offset += 1
+			var separated := true
+			for picked: int in chosen:
+				var circular := mini(absi(candidate - picked), n - absi(candidate - picked))
+				if circular < 2:
+					separated = false
+					break
+			if separated:
 				chosen[candidate] = true
-				break
 	var result := PackedVector2Array()
 	for i in n:
 		if not chosen.has(i):
