@@ -84,7 +84,6 @@ var _countdown_label: Label
 var _race_flash_label: Label
 var _race_hud: RaceHUD
 var _position_label: Label
-var _wrong_way_label: Label
 var _results_panel: Panel
 var _results_label: Label
 var _retry_button: Button
@@ -1026,21 +1025,6 @@ func _create_phase_one_ui() -> void:
 	_position_label.add_theme_constant_override("outline_size", 6)
 	_position_label.visible = false
 	hud.add_child(_position_label)
-
-	_wrong_way_label = Label.new()
-	_wrong_way_label.name = "WrongWayLabel"
-	_wrong_way_label.offset_left = 440.0
-	_wrong_way_label.offset_top = 118.0
-	_wrong_way_label.offset_right = 840.0
-	_wrong_way_label.offset_bottom = 170.0
-	_wrong_way_label.text = "WRONG WAY"
-	_wrong_way_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_wrong_way_label.add_theme_font_size_override("font_size", 34)
-	_wrong_way_label.add_theme_color_override("font_color", Color(1.0, 0.28, 0.18))
-	_wrong_way_label.add_theme_color_override("font_outline_color", Color(0.08, 0.09, 0.12))
-	_wrong_way_label.add_theme_constant_override("outline_size", 7)
-	_wrong_way_label.visible = false
-	hud.add_child(_wrong_way_label)
 
 	_results_panel = Panel.new()
 	_results_panel.name = "ResultsPanel"
