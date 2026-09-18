@@ -1,6 +1,5 @@
 extends SceneTree
 
-# GURI-929: Loading transition alpha bar met.
 # Note: Physical Steam Deck measurements are explicitly deferred to a later phase.
 
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
@@ -37,8 +36,20 @@ func _run_test() -> void:
 		if not _expect(app.call("get_current_race_session") == session, "a duplicate start must not change the active loading session"):
 			return
 		var deadline := Time.get_ticks_msec() + 45000
+		var max_loading_gap := 0.0
+		var last_loading_tick := Time.get_ticks_usec()
 		while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
 			await process_frame
+			var now := Time.get_ticks_usec()
+			max_loading_gap = maxf(max_loading_gap, (now - last_loading_tick) / 1000.0)
+			last_loading_tick = now
+		
+		print("RACE_START_LOADING retry=%s max_gap_ms=%.3f" % [retry, max_loading_gap])
+		# Cold start observed a ~182 ms maximum gap and warm/retry ~71 ms,
+		# so a bound of 250 ms safely bounds the frame gap and avoids user-perceptible
+		# lockups while leaving comfortable headroom for CI variance.
+		if not _expect(max_loading_gap < 250.0, "the loading transition must not contain a multi-frame preparation stall exceeding 250ms"):
+			return
 		if app.call("is_race_loading"):
 			print("RACE_START_STALLED ", (app.get("_loading_screen") as Node).call("metrics"))
 		if not _expect(not app.call("is_race_loading"), "loading must finish within the bounded startup deadline"):
