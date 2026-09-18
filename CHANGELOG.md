@@ -7,6 +7,7 @@
 
 ### Added
 
+- Championship events now use progressive track length tiers (from compact to marathon). Quick Race exhibition lengths now rotate across tiers per entry.
 - The complete nine-event Grand Household Circuit, with three story acts,
   recurring rivals, persistent standings, vehicle and event unlocks,
   replayable races, and a championship ending.

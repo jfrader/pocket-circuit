@@ -7,6 +7,7 @@ const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MENU_BACKGROUND := preload("res://assets/ui/imagine/motorsport_garage.jpg")
 const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
+const RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 
 const INK := Color("0e151f")
 const PAPER := Color("f5f0e3")
@@ -44,6 +45,7 @@ var _page: MarginContainer
 var _art_menu: Control
 var _discovery_panel: CircuitDiscoveryPanel
 
+static var _quick_race_entry_count := 0
 
 func configure(app: Node) -> void:
 	_app = app
@@ -154,7 +156,8 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_quick_race_room = &"classic"
 	_quick_race_seed = 875
 	_quick_race_reverse = false
-	_quick_race_length_tier = "standard"
+	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
+	_quick_race_entry_count += 1
 	_clear_content()
 	_content.add_theme_constant_override("separation", 4)
 	_configure_stage(&"map", "rustbug", "rae", "kitchen")

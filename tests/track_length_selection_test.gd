@@ -140,7 +140,8 @@ func _test_ui_selection() -> void:
 	shell.call("configure", mock)
 	shell.call("show_quick_race")
 	await _wait_frames(2)
-	if not _expect(String(shell.get("_quick_race_length_tier")) == "standard", "Quick Race should pin the standard length profile"):
+	var first_tier := String(shell.get("_quick_race_length_tier"))
+	if not _expect(not first_tier.is_empty(), "Quick Race should assign a tier"):
 		return
 	if not _expect(
 			String(shell.get("_quick_race_theme")) == "kitchen"
@@ -153,8 +154,18 @@ func _test_ui_selection() -> void:
 	if not _expect(shell.find_child("QuickRaceSize", true, false) == null, "Quick Race should not expose a size selector"):
 		return
 	shell.call("_start_quick_race")
-	if not _expect(mock.last_quick_tier == "standard", "starting a quick race should forward the pinned standard profile"):
+	if not _expect(mock.last_quick_tier == first_tier, "starting a quick race should forward the selected profile"):
 		return
+		
+	shell.call("show_quick_race")
+	await _wait_frames(2)
+	var second_tier := String(shell.get("_quick_race_length_tier"))
+	if not _expect(second_tier != first_tier, "a new Quick Race entry should rotate the tier"):
+		return
+	shell.call("_start_quick_race")
+	if not _expect(mock.last_quick_tier == second_tier, "starting the second quick race should forward the new profile"):
+		return
+		
 	root.remove_child(shell)
 	shell.free()
 
