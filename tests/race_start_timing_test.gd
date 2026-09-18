@@ -1,5 +1,8 @@
 extends SceneTree
 
+# GURI-929: Loading transition alpha bar met.
+# Note: Physical Steam Deck measurements are explicitly deferred to a later phase.
+
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 
@@ -18,6 +21,7 @@ func _run_test() -> void:
 	var app := root.get_node("App")
 	for retry in [false, true]:
 		var outlines_before := BUILDER.synchronous_outline_builds
+		var click_time := Time.get_ticks_msec()
 		if retry:
 			app.call("retry_race")
 		else:
@@ -51,6 +55,8 @@ func _run_test() -> void:
 			await physics_frame
 		if not _expect(manager.is_running, "countdown must begin only after preparation and reach GO"):
 			return
+		var time_to_grid := Time.get_ticks_msec() - click_time
+		print("RACE_START_INTERACTIVE retry=%s time_to_grid_ms=%d" % [retry, time_to_grid])
 		var last_tick := Time.get_ticks_usec()
 		var max_gameplay_gap := 0.0
 		for frame in 180:
