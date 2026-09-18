@@ -1,10 +1,8 @@
 class_name TrackBuilderCatalog
-const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Theme layouts, room compositions, prop contracts, and obstacle rosters.
 ## Construction stays in TrackBuilderCore.
 
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
-const TrackSeedGen = preload("res://scripts/race/track_seed_gen.gd")
 const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
 const VEHICLE_WIDTH := 44.0
 const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0

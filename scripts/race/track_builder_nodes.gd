@@ -1,5 +1,4 @@
 class_name TrackBuilderNodes
-const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Primitive track nodes: polygons, walls, gates, grid, decals.
 
 

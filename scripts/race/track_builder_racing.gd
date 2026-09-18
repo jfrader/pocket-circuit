@@ -1,6 +1,4 @@
 class_name TrackBuilderRacing
-const TrackSeedGen = preload("res://scripts/race/track_seed_gen.gd")
-const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Canonical island fill, racing line, and leftover static-track dressing.
 
 ## Maximum lateral offset change per unit of arc distance when building the

@@ -1,5 +1,4 @@
 class_name TrackBuilderDressing
-const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Generated dressing: moments, formations, giants, room details, surfaces.
 
 

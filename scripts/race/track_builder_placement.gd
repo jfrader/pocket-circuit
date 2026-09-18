@@ -1,5 +1,4 @@
 class_name TrackBuilderPlacement
-const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Prop placement safety, mix-seed, and generated prop spawn.
 
 

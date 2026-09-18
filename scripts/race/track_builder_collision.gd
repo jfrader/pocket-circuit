@@ -1,6 +1,4 @@
 class_name TrackBuilderCollision
-const TrackBuilderIsland = preload("res://scripts/race/track_builder_island.gd")
-const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Texture footprints, colliders, shadows, obstacles, and surface tiles.
 
 

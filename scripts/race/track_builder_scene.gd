@@ -1,5 +1,4 @@
 class_name TrackBuilderScene
-const TrackBuilderCore = preload("res://scripts/race/track_builder_core.gd")
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
 

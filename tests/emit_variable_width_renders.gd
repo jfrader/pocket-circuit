@@ -80,36 +80,47 @@ func _print_affordability_table():
 	print("| Room Shape | Tier | Max Half-Width |")
 	print("|------------|------|----------------|")
 	var shapes = ["classic", "wide", "tall", "long", "square", "el"]
-	var tiers = ["compact", "standard", "long"]
+	var tiers = ["compact", "standard", "long", "endurance", "marathon"]
 	for shape in shapes:
 		for tier in tiers:
 			if shape == "el" and tier == "long":
 				continue
-			var max_w = _find_max_affordable_width(shape, tier)
-			print("| %s | %s | %d |" % [shape, tier, int(max_w)])
+			var res = _find_max_affordable_width(shape, tier)
+			var max_w = res["success_w"]
+			var baseline_failed = res["baseline_failed"]
+			var extra = ""
+			if max_w == 0.0:
+				if baseline_failed:
+					extra = " (Baseline 125 also fails)"
+				else:
+					extra = " (Artefact)"
+			print("| %s | %s | %d%s |" % [shape, tier, int(max_w), extra])
 	print("---------------------------\n")
 
-func _find_max_affordable_width(shape: String, tier: String) -> float:
+func _find_max_affordable_width(shape: String, tier: String) -> Dictionary:
 	var w = 125.0
 	var step = 10.0
 	var success_w = 0.0
+	var baseline_failed_at_all = false
 	var rect = Rect2(0, 0, 4000, 4000)
 	if shape == "marathon" or tier == "marathon":
 		rect = Rect2(0, 0, 6000, 6000)
 		
 	while w <= 400.0:
 		var found = false
+		var all_seeds_failed = true
 		for s in range(5):
 			var params = {"room_shape": shape, "length_tier": tier, "forced_half_width": w}
 			var res = TrackSeedGen.generate_with_retries(s * 100, rect, params)
 			if not res.get("points", PackedVector2Array()).is_empty():
 				found = true
+				all_seeds_failed = false
 				break
-			else:
-				print("Fail w=", w, " seed=", s*100, " reason=", res.get("reason", "unknown"))
 		if found:
 			success_w = w
 			w += step
 		else:
+			if w == 125.0:
+				baseline_failed_at_all = true
 			break
-	return success_w
+	return {"success_w": success_w, "baseline_failed": baseline_failed_at_all}
