@@ -1,8 +1,9 @@
 extends SceneTree
 
-## A return to the menu must segue, not restart. The live player keeps the
-## generated score and cues its garage section, so the music moves home at a
-## musical boundary instead of rebuilding the score from scratch.
+## A single live score must be shared globally across all contexts. Context
+## switches (like menu -> race and back) must cue sections instead of
+## regenerating the score, ensuring the engine's internal bar-quantized
+## crossfades work smoothly.
 
 const AUDIO_DIRECTOR := preload("res://scripts/audio/audio_director.gd")
 
@@ -42,13 +43,13 @@ func _run_test() -> void:
 	if not _expect(bool(director.call("has_live_score")), "a cold menu start should load a live score"):
 		return
 	var after_menu: int = director.call("get_live_score_generations")
-	if not _expect(after_menu == 1, "a cold menu start should generate exactly one score"):
+	if not _expect(after_menu == 1, "a cold start should generate exactly one score"):
 		return
 
 	director.call("play_race_music")
 	await process_frame
 	var after_race: int = director.call("get_live_score_generations")
-	if not _expect(after_race == after_menu + 1, "starting a race should generate the circuit score"):
+	if not _expect(after_race == after_menu, "starting a race must not regenerate the score"):
 		return
 
 	director.call("play_menu_music")
@@ -61,20 +62,6 @@ func _run_test() -> void:
 	if not _expect(bool(director.call("get_music_context") == &"menu"), "the menu return should report the menu context"):
 		return
 	if not _expect(bool(director.call("has_live_score")), "the score should still be loaded after the menu return"):
-		return
-
-	# Test that prepare_race_music works during loading screen (Option 2)
-	director.call("prepare_race_music", "different_seed")
-	await create_timer(0.5).timeout
-	
-	var after_prepare: int = director.call("get_live_score_generations")
-	if not _expect(after_prepare == after_race + 1, "prepare_race_music should generate the score ahead of time"):
-		return
-		
-	# Test that it doesn't regenerate if already prepared
-	director.call("prepare_race_music", "different_seed")
-	await create_timer(0.5).timeout
-	if not _expect(director.call("get_live_score_generations") == after_prepare, "prepare_race_music should not regenerate if already prepared"):
 		return
 
 	director.queue_free()

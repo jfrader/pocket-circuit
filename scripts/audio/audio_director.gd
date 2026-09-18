@@ -42,11 +42,8 @@ var _live_music: Node
 ## True once the live player holds a generated score. A return to the menu
 ## reuses that score so the music segues instead of restarting.
 var _live_score_loaded := false
-var _live_score_seed := ""
-var _live_fade_tween: Tween
 ## Introspection for tests; counts how often a live score was generated.
 var _live_score_generations := 0
-
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -58,10 +55,8 @@ func _ready() -> void:
 	_build_players()
 	_bind_live_music()
 
-
 func _process(delta: float) -> void:
 	_update_engine(delta)
-
 
 func _exit_tree() -> void:
 	if is_instance_valid(_music_player):
@@ -79,12 +74,10 @@ func _exit_tree() -> void:
 	_race_loop = null
 	_engine_loop = null
 
-
 func ensure_buses() -> void:
 	_ensure_bus(&"Music")
 	_ensure_bus(&"SFX")
 	_ensure_master_limiter()
-
 
 ## The music loop and the engine loop each respect their own ceiling, but they
 ## are summed at the Master bus and that sum can exceed full scale (a full-rev
@@ -101,6 +94,11 @@ func _ensure_master_limiter() -> void:
 	limiter.ceiling_db = MASTER_CEILING_DB
 	AudioServer.add_bus_effect(master, limiter)
 
+func _ensure_global_score() -> void:
+	if not _live_score_loaded:
+		_live_music.call("generate", "pocket_circuit_global")
+		_live_score_loaded = true
+		_live_score_generations += 1
 
 func play_menu_music() -> void:
 	if _live_music != null and _live_music.has_method("generate"):
@@ -108,7 +106,9 @@ func play_menu_music() -> void:
 			_music_player.stop()
 		_music_context = &"menu"
 		_live_music.set("autoplay", false)
-		_resume_menu_music()
+		_ensure_global_score()
+		_live_music.call("cue_section", "garage")
+		_live_music.call("set_form_hold", true)
 		clear_local_vehicle()
 		set_race_paused(false)
 		return
@@ -116,74 +116,14 @@ func play_menu_music() -> void:
 	clear_local_vehicle()
 	set_race_paused(false)
 
-
-## Returning from a race, the score is already generated and holds the circuit's
-## music. Cueing its garage section moves the music home at a musical boundary,
-## so the end of a race segues into the menu instead of restarting. Only a cold
-## start, where no score exists yet, generates a fresh menu score.
-func _resume_menu_music() -> void:
-	if _live_score_loaded and bool(_live_music.call("cue_section", "garage")):
-		_live_music.call("set_form_hold", true)
-		return
-	_live_music.call("generate", "menu")
-	_live_music.call("set_race_state", "garage", 0.35, 0.2, false)
-	_live_score_loaded = true
-	_live_score_generations += 1
-	_live_score_seed = "menu"
-
-
-func prepare_race_music(race_seed: String) -> void:
-	if _live_music == null or not _live_music.has_method("generate"):
-		return
-	if _live_score_seed == race_seed and _live_score_loaded:
-		_music_context = &"race"
-		_live_music.set("autoplay", true)
-		_live_music.call("set_form_hold", false)
-		_live_music.set("arrangement", "extended")
-		_live_music.call("cue_section", "ignition")
-		return
-		
-	if is_instance_valid(_live_fade_tween):
-		_live_fade_tween.kill()
-	
-	var do_swap := func():
-		_music_context = &"race"
-		_live_music.set("autoplay", true)
-		_live_music.call("set_form_hold", false)
-		_live_music.set("arrangement", "extended")
-		_live_music.call("generate", race_seed)
-		_live_score_loaded = true
-		_live_score_generations += 1
-		_live_score_seed = race_seed
-		_live_music.call("cue_section", "ignition")
-
-	if _headless:
-		do_swap.call()
-	else:
-		_live_fade_tween = create_tween().bind_node(self)
-		_live_fade_tween.tween_method(_set_live_volume_linear, 1.0, 0.0, 0.15)
-		_live_fade_tween.tween_callback(do_swap)
-		_live_fade_tween.tween_method(_set_live_volume_linear, 0.0, 1.0, 0.15)
-
-
-func _set_live_volume_linear(linear: float) -> void:
-	var music_db := -80.0 if linear <= 0.0001 else linear_to_db(linear)
-	if is_instance_valid(_music_player):
-		_music_player.volume_db = music_db
-	if is_instance_valid(_live_music):
-		for child in _live_music.get_children():
-			if child is AudioStreamPlayer:
-				(child as AudioStreamPlayer).volume_db = music_db
-
-
-
 func play_race_music() -> void:
-	var race_seed := "race"
+	var event_id := "race"
 	var app := get_node_or_null("/root/App")
 	if app != null:
 		var session: Variant = app.get("current_race_session")
 		if session is Dictionary and not (session as Dictionary).is_empty():
-			race_seed = String((session as Dictionary).get("event_id", "race"))
+			event_id = String((session as Dictionary).get("event_id", "race"))
+			
 	if _live_music != null and _live_music.has_method("generate"):
 		if is_instance_valid(_music_player):
 			_music_player.stop()
@@ -192,18 +132,21 @@ func play_race_music() -> void:
 		_live_music.call("set_form_hold", false)
 		_live_music.set("arrangement", "extended")
 		
-		if not _live_score_loaded or _live_score_seed != race_seed:
-			_live_music.call("generate", race_seed)
-			_live_score_loaded = true
-			_live_score_generations += 1
-			_live_score_seed = race_seed
+		# Per-event musical identity is now expressed via engine knobs
+		# instead of regenerating the score.
+		if event_id.begins_with("kitchen"):
+			_live_music.set("style", "funk")
+		elif event_id.begins_with("workshop"):
+			_live_music.set("style", "rock")
+		else:
+			_live_music.set("style", "electronic")
 			
+		_ensure_global_score()
 		_live_music.call("set_race_state", "grid", 0.35, 0.2, false)
 		set_race_paused(false)
 		return
 	_set_music(&"race", _race_loop)
 	set_race_paused(false)
-
 
 func set_local_vehicle(vehicle: Node) -> void:
 	_local_vehicle = vehicle
@@ -215,14 +158,12 @@ func set_local_vehicle(vehicle: Node) -> void:
 		if not _headless and not _engine_player.playing:
 			_engine_player.play()
 
-
 func clear_local_vehicle() -> void:
 	_local_vehicle = null
 	_engine_rpm = 0.08
 	if is_instance_valid(_engine_player):
 		_engine_player.stop()
 		_engine_player.volume_db = SILENCE_DB
-
 
 func set_race_paused(paused: bool) -> void:
 	_race_paused = paused
@@ -235,7 +176,6 @@ func set_race_paused(paused: bool) -> void:
 				(child as AudioStreamPlayer).volume_db = music_db
 	if paused and is_instance_valid(_engine_player):
 		_engine_player.volume_db = SILENCE_DB
-
 
 func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: float = 1.0) -> bool:
 	if not SFX_STREAMS.has(sound_name) or _sfx_players.is_empty() or volume_scale <= 0.0:
@@ -250,24 +190,19 @@ func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: fl
 		player.play()
 	return true
 
-
 ## Test introspection: how many times a live score has been generated this
 ## session. A menu return that segues must not increase it.
 func get_live_score_generations() -> int:
 	return _live_score_generations
 
-
 func has_live_score() -> bool:
 	return _live_score_loaded
-
 
 func get_music_context() -> StringName:
 	return _music_context
 
-
 func get_sfx_player_count() -> int:
 	return _sfx_players.size()
-
 
 func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result: String = "") -> void:
 	# Music-only adaptive state for the live procedural engine.
@@ -275,12 +210,10 @@ func set_live_race_state(phase: String, intensity: float, pressure: float, final
 	if _live_music != null and _live_music.has_method("set_race_state"):
 		_live_music.call("set_race_state", phase, intensity, pressure, final_lap, finish_result)
 
-
 func cue_live_section(section: String) -> bool:
 	if _live_music != null and _live_music.has_method("cue_section"):
 		return _live_music.call("cue_section", section) as bool
 	return false
-
 
 func _bind_live_music() -> void:
 	if not ClassDB.class_exists("GamestrumentsPlayer"):
@@ -296,7 +229,6 @@ func _bind_live_music() -> void:
 	_live_music.set("drive_voice", "pluck")
 	_live_music.set("bass_voice", "bass")
 	add_child(_live_music)
-
 
 func _build_players() -> void:
 	if is_instance_valid(_music_player):
@@ -320,7 +252,6 @@ func _build_players() -> void:
 		add_child(player)
 		_sfx_players.append(player)
 
-
 func _set_music(context: StringName, stream: AudioStream) -> void:
 	if not is_instance_valid(_music_player):
 		return
@@ -332,7 +263,6 @@ func _set_music(context: StringName, stream: AudioStream) -> void:
 	_music_player.volume_db = 0.0
 	if not _headless:
 		_music_player.play()
-
 
 func _update_engine(delta: float = 1.0 / 60.0) -> void:
 	if not is_instance_valid(_engine_player):
@@ -368,7 +298,6 @@ func _update_engine(delta: float = 1.0 / 60.0) -> void:
 		# These are mix-balance values, tunable by ear.
 		_engine_player.volume_db = lerpf(-18.0, -2.0, rev)
 
-
 func _ensure_bus(bus_name: StringName) -> int:
 	var bus_index := AudioServer.get_bus_index(bus_name)
 	if bus_index >= 0:
@@ -377,7 +306,6 @@ func _ensure_bus(bus_name: StringName) -> int:
 	bus_index = AudioServer.bus_count - 1
 	AudioServer.set_bus_name(bus_index, bus_name)
 	return bus_index
-
 
 func _make_runtime_loop(source: AudioStream) -> AudioStream:
 	var looped := source.duplicate() as AudioStream
