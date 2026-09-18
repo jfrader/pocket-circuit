@@ -63,6 +63,20 @@ func _run_test() -> void:
 	if not _expect(bool(director.call("has_live_score")), "the score should still be loaded after the menu return"):
 		return
 
+	# Test that prepare_race_music works during loading screen (Option 2)
+	director.call("prepare_race_music", "different_seed")
+	await create_timer(0.5).timeout
+	
+	var after_prepare: int = director.call("get_live_score_generations")
+	if not _expect(after_prepare == after_race + 1, "prepare_race_music should generate the score ahead of time"):
+		return
+		
+	# Test that it doesn't regenerate if already prepared
+	director.call("prepare_race_music", "different_seed")
+	await create_timer(0.5).timeout
+	if not _expect(director.call("get_live_score_generations") == after_prepare, "prepare_race_music should not regenerate if already prepared"):
+		return
+
 	director.queue_free()
 	await process_frame
 	print("MUSIC_TRANSITION_TEST PASS")

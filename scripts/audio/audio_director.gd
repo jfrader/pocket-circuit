@@ -42,6 +42,8 @@ var _live_music: Node
 ## True once the live player holds a generated score. A return to the menu
 ## reuses that score so the music segues instead of restarting.
 var _live_score_loaded := false
+var _live_score_seed := ""
+var _live_fade_tween: Tween
 ## Introspection for tests; counts how often a live score was generated.
 var _live_score_generations := 0
 
@@ -127,6 +129,52 @@ func _resume_menu_music() -> void:
 	_live_music.call("set_race_state", "garage", 0.35, 0.2, false)
 	_live_score_loaded = true
 	_live_score_generations += 1
+	_live_score_seed = "menu"
+
+
+func prepare_race_music(race_seed: String) -> void:
+	if _live_music == null or not _live_music.has_method("generate"):
+		return
+	if _live_score_seed == race_seed and _live_score_loaded:
+		_music_context = &"race"
+		_live_music.set("autoplay", true)
+		_live_music.call("set_form_hold", false)
+		_live_music.set("arrangement", "extended")
+		_live_music.call("cue_section", "ignition")
+		return
+		
+	if is_instance_valid(_live_fade_tween):
+		_live_fade_tween.kill()
+	
+	var do_swap := func():
+		_music_context = &"race"
+		_live_music.set("autoplay", true)
+		_live_music.call("set_form_hold", false)
+		_live_music.set("arrangement", "extended")
+		_live_music.call("generate", race_seed)
+		_live_score_loaded = true
+		_live_score_generations += 1
+		_live_score_seed = race_seed
+		_live_music.call("cue_section", "ignition")
+
+	if _headless:
+		do_swap.call()
+	else:
+		_live_fade_tween = create_tween().bind_node(self)
+		_live_fade_tween.tween_method(_set_live_volume_linear, 1.0, 0.0, 0.15)
+		_live_fade_tween.tween_callback(do_swap)
+		_live_fade_tween.tween_method(_set_live_volume_linear, 0.0, 1.0, 0.15)
+
+
+func _set_live_volume_linear(linear: float) -> void:
+	var music_db := -80.0 if linear <= 0.0001 else linear_to_db(linear)
+	if is_instance_valid(_music_player):
+		_music_player.volume_db = music_db
+	if is_instance_valid(_live_music):
+		for child in _live_music.get_children():
+			if child is AudioStreamPlayer:
+				(child as AudioStreamPlayer).volume_db = music_db
+
 
 
 func play_race_music() -> void:
@@ -143,10 +191,14 @@ func play_race_music() -> void:
 		_live_music.set("autoplay", true)
 		_live_music.call("set_form_hold", false)
 		_live_music.set("arrangement", "extended")
-		_live_music.call("generate", race_seed)
+		
+		if not _live_score_loaded or _live_score_seed != race_seed:
+			_live_music.call("generate", race_seed)
+			_live_score_loaded = true
+			_live_score_generations += 1
+			_live_score_seed = race_seed
+			
 		_live_music.call("set_race_state", "grid", 0.35, 0.2, false)
-		_live_score_loaded = true
-		_live_score_generations += 1
 		set_race_paused(false)
 		return
 	_set_music(&"race", _race_loop)
