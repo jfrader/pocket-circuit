@@ -5,31 +5,33 @@ const TrackSeedGen = preload("res://scripts/race/track_seed_gen.gd")
 func _init():
 	print("Running variable width renders...")
 	
-	_render_shape("classic", "standard", 12345)
-	_render_shape("long", "marathon", 54321)
+	_render_shape("classic", "standard")
+	_render_shape("long", "marathon")
 	
 	_print_affordability_table()
 	
 	print("PASS")
 	quit()
 
-func _render_shape(shape_name: String, tier: String, seed: int):
+func _render_shape(shape_name: String, tier: String):
 	var amplitudes = [0.0, 40.0, 115.0]
-	
-	for A in amplitudes:
-		var rect = Rect2(0, 0, 4000, 4000)
-		if shape_name == "marathon":
-			rect = Rect2(0, 0, 6000, 6000)
-			
-		var params = {"room_shape": shape_name, "length_tier": tier, "width_amplitude": A}
-		var res = TrackSeedGen.generate_with_retries(seed, rect, params)
+	var rect = Rect2(0, 0, 4000, 4000)
+	if shape_name == "marathon" or tier == "marathon":
+		rect = Rect2(0, 0, 6000, 6000)
+		
+	var seeds = [1001, 1002]
+	for current_seed in seeds:
+		var params = {"room_shape": shape_name, "length_tier": tier}
+		var res = TrackSeedGen.generate_with_retries(current_seed, rect, params)
 		var centerline = res.get("points", PackedVector2Array())
 		if centerline.is_empty():
-			print("Could not generate centerline for ", shape_name, " with seed ", seed, " res: ", res)
 			continue
 			
-		var widths = TrackSeedGen.compute_width_profile(centerline, seed, A)
-		_draw_svg_render(shape_name, seed, A, centerline, widths)
+		for A in amplitudes:
+			var widths = TrackSeedGen.compute_width_profile(centerline, current_seed, A)
+			_draw_svg_render(shape_name, current_seed, A, centerline, widths)
+		print("Rendered shape ", shape_name, " with seed ", current_seed)
+
 
 func _draw_svg_render(shape_name: String, seed: int, A: float, centerline: PackedVector2Array, widths: PackedFloat32Array):
 	var n = centerline.size()
