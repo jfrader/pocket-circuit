@@ -334,6 +334,7 @@ const EVENTS := [
 		"story": "Inez rolls the repaired Rustbug onto the counter: one clean run before the kettle clicks off.",
 		"rival_line": "Juniper: Keep the crumbs behind you, rookie. They hide bad lines.",
 		"opponents": ["juniper", "milo", "tess"],
+		"length_tier": "compact",
 	},
 	{
 		"id": "kitchen_mug_run", "act": 1, "name": "Mug Run",
@@ -343,6 +344,7 @@ const EVENTS := [
 		"story": "The circuit turns back through the mug shadows, where every shortcut narrows to a saucer's edge.",
 		"rival_line": "Juniper: Reverse lines expose every lazy turn. Show me yours.",
 		"opponents": ["juniper", "milo", "cass"],
+		"length_tier": "standard",
 	},
 	{
 		"id": "kitchen_clean_line", "act": 1, "name": "The Clean Line",
@@ -352,6 +354,7 @@ const EVENTS := [
 		"story": "Juniper waits at the chalk line while Inez tightens one last wheel nut by hand.",
 		"rival_line": "Juniper: Beat my clean line and the Pinbolt is yours to understand.",
 		"opponents": ["juniper"],
+		"length_tier": "standard",
 	},
 	{
 		"id": "workshop_screw_loose", "act": 2, "name": "Screw Loose",
@@ -361,6 +364,7 @@ const EVENTS := [
 		"story": "The workshop league starts between loose washers and a drill bit still warm from the day shift.",
 		"rival_line": "Milo: If it rattles, it races. Try not to become another spare part.",
 		"opponents": ["milo", "juniper", "cass"],
+		"length_tier": "long",
 	},
 	{
 		"id": "workshop_ruler_drop", "act": 2, "name": "Ruler Drop",
@@ -370,6 +374,7 @@ const EVENTS := [
 		"story": "A steel ruler bridges the return route, flexing under four tiny machines and one enormous wager.",
 		"rival_line": "Milo: The ruler only feels narrow if you plan on braking.",
 		"opponents": ["milo", "tess", "juniper"],
+		"length_tier": "long",
 	},
 	{
 		"id": "workshop_heavy_metal", "act": 2, "name": "Heavy Metal",
@@ -379,6 +384,7 @@ const EVENTS := [
 		"story": "Milo parks the Scrapjaw across the start stripe, grinning as the bench lamps hum awake.",
 		"rival_line": "Milo: Win this and I stop calling that Rustbug a paperweight.",
 		"opponents": ["milo"],
+		"length_tier": "endurance",
 	},
 	{
 		"id": "office_paper_trail", "act": 3, "name": "Paper Trail",
@@ -388,6 +394,7 @@ const EVENTS := [
 		"story": "Rae reaches the silent office with sunrise paling the blinds and Cass already watching the clock.",
 		"rival_line": "Tess: Paper moves under pressure. So do drivers.",
 		"opponents": ["tess", "cass", "milo"],
+		"length_tier": "endurance",
 	},
 	{
 		"id": "office_keyboard_cut", "act": 3, "name": "Keyboard Cut",
@@ -397,6 +404,7 @@ const EVENTS := [
 		"story": "The reverse route dives between keycaps, each gap daring Rae to trade patience for speed.",
 		"rival_line": "Tess: Hold the drift past Enter. Lift early and Cass will notice.",
 		"opponents": ["tess", "cass", "juniper"],
+		"length_tier": "endurance",
 	},
 	{
 		"id": "office_last_light", "act": 3, "name": "Last Light Grand Final",
@@ -406,6 +414,7 @@ const EVENTS := [
 		"story": "The last desk lamp burns above the Grand Household Circuit. One race decides whether rookies keep a place on it.",
 		"rival_line": "Cass: You earned the grid, Rae. Now earn the circuit.",
 		"opponents": ["cass", "tess", "milo"],
+		"length_tier": "marathon",
 	},
 ]
 
