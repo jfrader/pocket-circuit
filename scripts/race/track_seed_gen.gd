@@ -216,7 +216,11 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			if generation_rect.size.x < 1.0:
 				generation_rect = usable_rect
 			use_el_controls = false
-		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"])) \
+		# The marathon L carries a combed fold on one arm so it is not a bare
+		# perimeter; every smaller tier keeps the plain seeded L footprint.
+		var el_folded := use_el_controls and tier == &"marathon"
+		var el_program: StringName = &"el_folded" if el_folded else &"el_safe"
+		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"]), el_folded) \
 			if use_el_controls else _family_controls(family, family, seed, attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, attempt_pockets, attempt_profiles, decorate_enabled, tier)
 		var validation := _validate_controls(
 			controls,
@@ -267,9 +271,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"attempt": attempt,
 				"fallback": false,
 				"pockets": _detect_pockets(final_controls),
-				"realization": &"el_safe" if room_shape == &"el" and tier != &"compact" else family,
-				"route_recipe": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_name(seed, attempt, target_length, tier),
-				"route_program": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_program_name(seed, attempt, target_length, tier),
+				"realization": el_program if room_shape == &"el" and tier != &"compact" else family,
+				"route_recipe": el_program if room_shape == &"el" and tier != &"compact" else _route_name(seed, attempt, target_length, tier),
+				"route_program": el_program if room_shape == &"el" and tier != &"compact" else _route_program_name(seed, attempt, target_length, tier),
 				"route_sequence": normalized_route_sequence(final_controls),
 				"corner_profiles": _merge_profile_counts(attempt_profiles),
 				"motifs": motif["motifs"],
@@ -679,7 +683,8 @@ static func _el_controls(
 	source_rect: Rect2,
 	target_length: float,
 	min_self_distance: float,
-	room_scale: float
+	room_scale: float,
+	folded: bool = false
 ) -> PackedVector2Array:
 	# Seeded L footprint. The elbow (notch) position is parameterized per seed so
 	# the L shape genuinely varies (deep vs shallow notch) under a normalized shape
@@ -701,6 +706,45 @@ static func _el_controls(
 		Vector2(-0.30, 0.76), Vector2(-0.65, 0.72), Vector2(-0.82, 0.60),
 		Vector2(-0.86, 0.35), Vector2(-0.86, 0.05), Vector2(-0.86, -0.20),
 	])
+	if folded:
+		# Marathon-only comb on the lower arm, built from corner vertices and
+		# filleted with the shared corner fitter so every tooth keeps a driveable
+		# radius after the uniform length fit. The teeth are wide and deep enough
+		# that no >220u-saving chord can stay inside the 103u drive corridor
+		# across a tooth, so `_best_complex_bypass` cannot replace it with a chord.
+		var fold_elbow_x := lerpf(0.06, 0.22, _hash_unit(seed, ROUTE_SALT + 0xD1 + attempt * 7))
+		var fold_step_y := lerpf(0.00, 0.14, _hash_unit(seed, ROUTE_SALT + 0xD3 + attempt * 7))
+		var comb_depth := lerpf(0.26, 0.34, _hash_unit(seed, ROUTE_SALT + 0xD5 + attempt * 7))
+		var teeth := 3
+		var half_slot := 0.10
+		var comb_right := 0.44
+		var comb_left := -0.42
+		var pitch := (comb_right - comb_left) / float(teeth)
+		var poly := PackedVector2Array()
+		poly.append(Vector2(-0.86, -0.76))
+		poly.append(Vector2(fold_elbow_x, -0.76))
+		poly.append(Vector2(fold_elbow_x, fold_step_y))
+		poly.append(Vector2(0.86, fold_step_y))
+		poly.append(Vector2(0.86, 0.76))
+		var base_y := 0.76
+		for i in teeth:
+			var cx := comb_right - pitch * (float(i) + 0.5)
+			poly.append(Vector2(cx + half_slot, base_y))
+			poly.append(Vector2(cx + half_slot, base_y - comb_depth))
+			poly.append(Vector2(cx - half_slot, base_y - comb_depth))
+			poly.append(Vector2(cx - half_slot, base_y))
+		poly.append(Vector2(-0.86, base_y))
+		var mapped_poly := PackedVector2Array()
+		for point: Vector2 in poly:
+			mapped_poly.append(source_rect.get_center() + point * source_rect.size * 0.5)
+		var radii := PackedFloat32Array()
+		for _index in mapped_poly.size():
+			radii.append(260.0)
+		var profiled: Dictionary = ROUTE_GRAMMAR.round_corners_profiled(mapped_poly, radii, -1)
+		var folded_controls: PackedVector2Array = profiled["controls"]
+		if folded_controls.is_empty():
+			return PackedVector2Array()
+		return _fit_length_scale(folded_controls, source_rect, target_length, min_self_distance, room_scale, attempt)
 	var jittered := PackedVector2Array()
 	# Per-seed aspect variation changes the L's proportions (a genuine normalized
 	# shape feature), so seeded EL routes are distinct beyond just elbow depth.
@@ -727,21 +771,38 @@ static func _el_controls(
 	var mapped := PackedVector2Array()
 	for point: Vector2 in jittered:
 		mapped.append(source_rect.get_center() + point * source_rect.size * 0.5)
-	var full_length := _polyline_length(_sample_centerline(mapped))
+	return _fit_length_scale(mapped, source_rect, target_length, min_self_distance, room_scale, attempt)
+
+
+## Uniformly scale a control loop about the room center so its sampled length
+## meets the requested target without dropping under the branch-clearance floor
+## or the per-attempt retry ceiling. Returns an empty loop when the input cannot
+## be sampled.
+static func _fit_length_scale(
+	controls: PackedVector2Array,
+	source_rect: Rect2,
+	target_length: float,
+	min_self_distance: float,
+	room_scale: float,
+	attempt: int
+) -> PackedVector2Array:
+	var centerline := _sample_centerline(controls)
+	var full_length := _polyline_length(centerline)
 	if full_length < 1.0:
 		return PackedVector2Array()
 	# The L footprint's shortest edge needs ~94% of its standard-room extent to
 	# keep two literal straights; scaled rooms (large tiers) can shrink further.
 	var minimum_scale := 0.94 / maxf(room_scale, 0.001)
-	var full_clearance := _minimum_branch_distance(_sample_centerline(mapped), min_self_distance)
+	var full_clearance := _minimum_branch_distance(centerline, min_self_distance)
 	if full_clearance < INF:
 		minimum_scale = maxf(minimum_scale, minf(1.0, min_self_distance / maxf(full_clearance, 1.0)))
 	var retry_ceiling := maxf(minimum_scale, 1.0 - float(mini(attempt, MAX_VARIANTS - 1)) * 0.006)
 	var length_scale := clampf(target_length / full_length, minimum_scale, retry_ceiling)
 	var center := source_rect.get_center()
-	for index in mapped.size():
-		mapped[index] = center + (mapped[index] - center) * length_scale
-	return mapped
+	var fitted := PackedVector2Array()
+	for point: Vector2 in controls:
+		fitted.append(center + (point - center) * length_scale)
+	return fitted
 
 
 static func _el_safe_controls(

@@ -31,6 +31,8 @@ func _run_test() -> void:
 		return
 	if not _test_generator_realises_new_programs():
 		return
+	if not _test_el_reaches_folded_program():
+		return
 	print("TRACK_MARATHON_PROGRAMS_TEST PASS")
 	quit(0)
 
@@ -86,6 +88,23 @@ func _test_generator_realises_new_programs() -> bool:
 	return true
 
 
+func _test_el_reaches_folded_program() -> bool:
+	var params := _el_marathon_params()
+	var folded := 0
+	var total := 0
+	for seed in range(100000, 100024):
+		var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, params)
+		var length := float(result.get("length", 0.0))
+		if not _expect(length >= MARATHON_BAND_FLOOR and length <= MARATHON_BAND_CEILING, "el marathon seed %d realised length %.0f outside the %d..%d band" % [seed, length, int(MARATHON_BAND_FLOOR), int(MARATHON_BAND_CEILING)]):
+			return false
+		total += 1
+		if String(result.get("route_recipe", "")).begins_with("el_folded"):
+			folded += 1
+	if not _expect(folded == total, "marathon el must realise the folded L program instead of the plain perimeter (folded %d/%d)" % [folded, total]):
+		return false
+	return true
+
+
 func _marathon_params() -> Dictionary:
 	var room: PackedVector2Array = TRACK_BUILDER.ROOM_SHAPES["classic"]
 	var profile := TRACK_SEED_GEN.length_profile(&"marathon")
@@ -99,6 +118,23 @@ func _marathon_params() -> Dictionary:
 		"min_loop_length": 1900.0 * 1.75,
 		"room_polygon": scaled,
 		"room_shape": &"classic",
+		"length_tier": &"marathon",
+	}
+
+
+func _el_marathon_params() -> Dictionary:
+	var room: PackedVector2Array = TRACK_BUILDER.ROOM_SHAPES["el"]
+	var profile := TRACK_SEED_GEN.length_profile(&"marathon")
+	var room_scale := float(profile.get("room_scale", 1.0))
+	var scaled := PackedVector2Array()
+	for point: Vector2 in room:
+		scaled.append(point * room_scale)
+	return {
+		"margin": 190.0,
+		"min_self_distance": 320.0,
+		"min_loop_length": 1900.0 * 1.75,
+		"room_polygon": scaled,
+		"room_shape": &"el",
 		"length_tier": &"marathon",
 	}
 
