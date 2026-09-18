@@ -6,12 +6,10 @@ extends Node
 @export var invalid_polygon := PackedVector2Array()
 @export var ghost_duration: float = 1.5
 @export var stuck_timeout: float = 2.4
-@export var wrong_way_timeout: float = 1.0
 
 var _vehicle: RigidBody2D
 var _race_manager: Node
 var _stuck_time: float = 0.0
-var _wrong_way_time: float = 0.0
 var _recovering: bool = false
 var _recovery_exceptions: Array[PhysicsBody2D] = []
 
@@ -25,31 +23,27 @@ func _physics_process(delta: float) -> void:
 		return
 	if not _can_recover():
 		_stuck_time = 0.0
-		_wrong_way_time = 0.0
 		return
 	if Input.is_action_just_pressed("reset") or not is_position_valid(_vehicle.global_position):
 		recover_vehicle()
 		return
-	var moving_wrong_way := (
-		_race_manager.has_method("is_racer_wrong_way")
-		and bool(_race_manager.call("is_racer_wrong_way", _vehicle))
-		and _vehicle.linear_velocity.length() >= 80.0
-	)
-	if moving_wrong_way:
-		_wrong_way_time += delta
-		if _wrong_way_time >= wrong_way_timeout:
-			recover_vehicle()
-			return
-	else:
-		_wrong_way_time = 0.0
-
-	var trying_to_move := Input.get_action_strength("accelerate") > 0.7
+	# Wrong-way is a warning, not a recovery trigger (design spec §9.6 lists
+	# fall/stuck/flip/invalid). ResetManager never teleports a car for it.
+	var trying_to_move := _is_trying_to_move()
 	if trying_to_move and _vehicle.linear_velocity.length() < 18.0:
 		_stuck_time += delta
 		if _stuck_time >= stuck_timeout:
 			recover_vehicle()
 	else:
 		_stuck_time = 0.0
+
+
+func _is_trying_to_move() -> bool:
+	# Ask the vehicle for its own throttle so locked controls and remapped
+	# bindings are respected; fall back to raw input for plain test bodies.
+	if _vehicle.has_method("get_throttle_input"):
+		return float(_vehicle.call("get_throttle_input")) > 0.7
+	return Input.get_action_strength("accelerate") > 0.7
 
 
 func is_position_valid(position: Vector2) -> bool:
@@ -86,7 +80,6 @@ func recover_vehicle() -> void:
 		return
 	_recovering = true
 	_stuck_time = 0.0
-	_wrong_way_time = 0.0
 	if _race_manager.has_method("report_recovery"):
 		_race_manager.call("report_recovery", _vehicle)
 
