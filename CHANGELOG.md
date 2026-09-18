@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
-- Fixed the race music hard-cutting at the instant a race begins by migrating the procedural score swap behind a short fade-out at the start of the loading screen. Retried races now segue seamlessly without regenerating the score.
+- Fixed the music transition by keeping a single live score across the entire game. Moving between menus and races now cues musical sections, ensuring perfectly smooth bar-quantized transitions without hard cuts or fade-outs.
 
 ### Added
 

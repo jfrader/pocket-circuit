@@ -617,7 +617,7 @@ func _begin_race_transition() -> void:
 	_loading_failed = false
 	get_tree().paused = false
 	if is_instance_valid(audio_director) and current_race_session.has("event_id"):
-		audio_director.prepare_race_music(String(current_race_session["event_id"]))
+		audio_director.cue_live_section("ignition")
 	if is_instance_valid(_loading_screen):
 		_loading_screen.queue_free()
 	_loading_screen = _loading_script.new()
