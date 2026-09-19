@@ -49,10 +49,13 @@ func _run_test() -> void:
 			return
 		if not _expect(String(live.get("recipe")) == "racing", "live music should use recipe \"racing\" after play_menu_music()"):
 			return
-		if not _expect(String(live.get("arrangement")) == "extended", "live music should use arrangement \"extended\" after play_menu_music()"):
+		if not _expect(String(live.get("arrangement")) == "seeded", "live music should use the seeded racing arrangement after play_menu_music()"):
 			return
-		if not _expect(live.get("autoplay") == false, "play_menu_music live path should use autoplay false for garage"):
+		if not _expect(live.get("autoplay") == false, "the live score should not autoplay its tour form; the game drives every phase"):
 			return
+		if not _expect(not String(director.call("get_live_seed")).is_empty(), "play_menu_music should load a live score with a seed"):
+			return
+	var menu_seed := String(director.call("get_live_seed")) if live != null else ""
 	var engine_stream: AudioStream = (director.get_node("EnginePlayer") as AudioStreamPlayer).stream
 	if live == null:
 		var menu_stream := music_player.stream as AudioStreamWAV
@@ -67,9 +70,17 @@ func _run_test() -> void:
 	if live == null:
 		if not _expect(_loop_spans_stream(music_player.stream as AudioStreamWAV), "race music should span decoded samples when import metadata is absent"):
 			return
-	elif not _expect(live.get("autoplay") == true, "play_race_music live path should use autoplay true for extended arc"):
-		return
-	if live != null and not _expect(director.cue_live_section("cooldown"), "cue_live_section should forward a known Extended section to the live player"):
+	else:
+		if not _expect(String(live.get("arrangement")) == "seeded", "play_race_music should keep the seeded racing arrangement"):
+			return
+		if not _expect(live.get("autoplay") == false, "play_race_music should not autoplay its tour form"):
+			return
+		if not _expect(
+			String(director.call("get_live_seed")) != menu_seed,
+			"a race should load a score seeded from the circuit, not the menu score"
+		):
+			return
+	if live != null and not _expect(director.cue_live_section("cooldown"), "cue_live_section should forward a known racing section to the live player"):
 		return
 	director.set_race_paused(true)
 	if not _expect(is_equal_approx(music_player.volume_db, -9.0), "pausing should duck race music"):

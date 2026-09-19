@@ -4,7 +4,7 @@
 
 ### Fixed
 - Fixed false "WRONG WAY" warnings and the resulting teleport reset when driving on the open apron beside a folded circuit. Wrong-way is now a warning only — the car is never reset for it.
-- Fixed the music transition by keeping a single live score across the entire game. Moving between menus and races now cues musical sections, ensuring perfectly smooth bar-quantized transitions without hard cuts or fade-outs.
+- Race music no longer loops one section or lags behind the race. Each circuit now generates its own score from the track seed, so a circuit always sounds the same while different circuits, tiers, and acts sound different, and the race rotates through the whole racing pool — grooves, peaks, the starting-grid reprise, a reset sting, the final lap, and the win/loss outros.
 
 ### Added
 

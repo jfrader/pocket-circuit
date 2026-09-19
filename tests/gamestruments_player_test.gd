@@ -45,6 +45,31 @@ func _run_test() -> void:
 		push_error("GAMESTRUMENTS_PLAYER_TEST FAIL: set_race_state with finish_result \"win\" not accepted")
 		quit(1)
 		return
+	# The game drives the seeded racing arrangement, which must carry the whole
+	# pool (including the drumless breather) and the incident/outro signals.
+	var seeded := ClassDB.instantiate("GamestrumentsPlayer") as Node
+	seeded.set("project_secret", "guri-pc-qa-salt")
+	seeded.set("style", "neon")
+	seeded.set("recipe", "racing")
+	seeded.set("arrangement", "seeded")
+	root.add_child(seeded)
+	await process_frame
+	if not (seeded.call("generate", "circuit") as bool):
+		push_error("GAMESTRUMENTS_PLAYER_TEST FAIL: seeded racing score failed to generate")
+		quit(1)
+		return
+	await process_frame
+	if not (seeded.call("set_form_hold", true) as bool):
+		push_error("GAMESTRUMENTS_PLAYER_TEST FAIL: seeded score should carry a holdable tour form")
+		quit(1)
+		return
+	for sec: String in ["breather", "ignition", "slipstream", "redline", "cooldown", "final-lap", "victory", "defeat", "recovery", "wrong-way"]:
+		if not (seeded.call("cue_section", sec) as bool):
+			push_error("GAMESTRUMENTS_PLAYER_TEST FAIL: seeded score missing or rejected section " + sec)
+			quit(1)
+			return
+	root.remove_child(seeded)
+	seeded.free()
 	root.remove_child(player)
 	player.free()
 	await process_frame
