@@ -29,7 +29,8 @@ else
 		echo "Or run from a checkout that has the source at ~/Workspace/gamestruments" >&2
 		exit 1
 	fi
-	cargo build -p gamestruments-godot --release --manifest-path "$SOURCE/Cargo.toml"
+	# Build from the source directory so gamestruments' pinned rust-toolchain.toml applies.
+	( cd "$SOURCE" && cargo build -p gamestruments-godot --release )
 	cp -f "$SOURCE/crates/godot/gamestruments.gdextension" "$DEST/gamestruments.gdextension"
 	cp -f "$SOURCE/target/release/libgamestruments_godot.so" "$BIN/libgamestruments_godot.so"
 	echo "Synced Gamestruments GDExtension (release) into $DEST"

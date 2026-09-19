@@ -28,20 +28,8 @@ func _run_test() -> void:
 		return
 
 	if not ClassDB.class_exists("GamestrumentsPlayer"):
-		# The packaged WAV fallback has no sections to cue, so only the context
-		# switch is asserted here.
-		director.call("play_race_music")
-		await process_frame
-		if not _expect(bool(director.call("get_music_context") == &"race"), "starting a race should report the race context"):
-			return
-		director.call("play_menu_music")
-		await process_frame
-		if not _expect(bool(director.call("get_music_context") == &"menu"), "returning to the menu should report the menu context"):
-			return
-		director.queue_free()
-		await process_frame
-		print("MUSIC_TRANSITION_TEST PASS packaged_wav_fallback_native_extension_absent")
-		quit(0)
+		push_error("MUSIC_TRANSITION_TEST FAIL: GamestrumentsPlayer extension is required; no WAV fallback")
+		quit(1)
 		return
 
 	if not _expect(bool(director.call("has_live_score")), "a cold menu start should load a live score"):
