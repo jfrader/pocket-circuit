@@ -465,6 +465,10 @@ def main() -> int:
         if not notice_path.is_file():
             errors.append(f"missing release notice: {notice_path.relative_to(ROOT)}")
 
+    # GURI-917: live Gamestruments engine is now wired into the gate and required;
+    # the rendered menu_loop.wav / race_loop.wav fallbacks (and their quality tests)
+    # have been removed. No silent-music mode is permitted.
+
     media_root = ROOT / "media" / "steam"
     validate_png_decoder(errors)
     for relative_path, expected_dimensions in EXPECTED_STEAM_MEDIA.items():
