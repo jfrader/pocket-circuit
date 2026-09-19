@@ -1,7 +1,5 @@
 extends Node
 
-const MENU_LOOP := preload("res://assets/audio/menu_loop.wav")
-const RACE_LOOP := preload("res://assets/audio/race_loop.wav")
 const ENGINE_LOOP := preload("res://assets/audio/engine_loop.ogg")
 const RaceMusicPlan := preload("res://scripts/audio/race_music_plan.gd")
 const SFX_STREAMS := {
@@ -41,8 +39,6 @@ var _music_context: StringName = &""
 var _local_vehicle: Node
 var _vehicle_max_speed := 680.0
 var _race_paused := false
-var _menu_loop: AudioStream
-var _race_loop: AudioStream
 var _engine_loop: AudioStream
 var _engine_rpm := 0.08
 var _headless := false
@@ -71,8 +67,6 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_headless = DisplayServer.get_name().to_lower() == "headless"
 	ensure_buses()
-	_menu_loop = _make_runtime_loop(MENU_LOOP)
-	_race_loop = _make_runtime_loop(RACE_LOOP)
 	_engine_loop = _make_runtime_loop(ENGINE_LOOP)
 	_build_players()
 	_bind_live_music()
@@ -94,8 +88,6 @@ func _exit_tree() -> void:
 			player.stop()
 			player.stream = null
 	_local_vehicle = null
-	_menu_loop = null
-	_race_loop = null
 	_engine_loop = null
 
 func ensure_buses() -> void:
@@ -119,31 +111,22 @@ func _ensure_master_limiter() -> void:
 	AudioServer.add_bus_effect(master, limiter)
 
 func play_menu_music() -> void:
-	if _live_music != null and _live_music.has_method("generate"):
-		if is_instance_valid(_music_player):
-			_music_player.stop()
-		_music_context = &"menu"
-		clear_local_vehicle()
-		set_race_paused(false)
-		_start_live_score(MENU_SEED, RaceMusicPlan.menu_profile(), "garage")
-		begin_live_rotation(RaceMusicPlan.menu_deck(), MENU_DWELL_SECONDS, "garage")
-		return
-	_set_music(&"menu", _menu_loop)
+	if is_instance_valid(_music_player):
+		_music_player.stop()
+	_music_context = &"menu"
 	clear_local_vehicle()
 	set_race_paused(false)
+	_start_live_score(MENU_SEED, RaceMusicPlan.menu_profile(), "garage")
+	begin_live_rotation(RaceMusicPlan.menu_deck(), MENU_DWELL_SECONDS, "garage")
 
 func play_race_music() -> void:
-	if _live_music != null and _live_music.has_method("generate"):
-		if is_instance_valid(_music_player):
-			_music_player.stop()
-		_music_context = &"race"
-		set_race_paused(false)
-		stop_live_rotation()
-		var event := _current_event()
-		_start_live_score(RaceMusicPlan.seed_for_event(event), RaceMusicPlan.race_profile(event), "ignition")
-		return
-	_set_music(&"race", _race_loop)
+	if is_instance_valid(_music_player):
+		_music_player.stop()
+	_music_context = &"race"
 	set_race_paused(false)
+	stop_live_rotation()
+	var event := _current_event()
+	_start_live_score(RaceMusicPlan.seed_for_event(event), RaceMusicPlan.race_profile(event), "ignition")
 
 ## Test/introspection: the generate seed backing the loaded score.
 func get_live_seed() -> String:
@@ -235,7 +218,6 @@ func get_sfx_player_count() -> int:
 
 func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result: String = "") -> void:
 	# Music-only adaptive state for the live procedural engine.
-	# WAV loop path remains completely unchanged (no calls to _set_music or players here).
 	if _live_music != null and _live_music.has_method("set_race_state"):
 		_live_music.call("set_race_state", phase, intensity, pressure, final_lap, finish_result)
 
@@ -256,8 +238,6 @@ func cue_live_section_timed(section: String, hold_seconds: float) -> bool:
 	return accepted
 
 func _bind_live_music() -> void:
-	if not ClassDB.class_exists("GamestrumentsPlayer"):
-		return
 	_live_music = ClassDB.instantiate("GamestrumentsPlayer")
 	_live_music.name = "GamestrumentsPlayer"
 	_live_music.set("project_secret", "guri-pc-dev-salt")
@@ -292,18 +272,6 @@ func _build_players() -> void:
 		player.bus = &"SFX"
 		add_child(player)
 		_sfx_players.append(player)
-
-func _set_music(context: StringName, stream: AudioStream) -> void:
-	if not is_instance_valid(_music_player):
-		return
-	if _music_context == context and _music_player.stream == stream and (_music_player.playing or _headless):
-		return
-	_music_context = context
-	_music_player.stop()
-	_music_player.stream = stream
-	_music_player.volume_db = 0.0
-	if not _headless:
-		_music_player.play()
 
 func _current_event() -> Dictionary:
 	var app := get_node_or_null("/root/App")
