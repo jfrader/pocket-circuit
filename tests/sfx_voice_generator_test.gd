@@ -5,6 +5,7 @@ const BOOST_GENERATOR := preload("res://scripts/audio/sfx/boost_voice_generator.
 const RUSTBUG := preload("res://data/vehicles/rustbug.tres")
 const ANVIL := preload("res://data/vehicles/anvil.tres")
 const FLICKER := preload("res://data/vehicles/flicker.tres")
+const UI_GENERATOR := preload("res://scripts/audio/sfx/ui_voice_generator.gd")
 
 
 func _initialize() -> void:
@@ -13,6 +14,7 @@ func _initialize() -> void:
 	errors.append_array(_check_crash_character())
 	errors.append_array(_check_crash_determinism())
 	errors.append_array(_check_boost())
+	errors.append_array(_check_interface())
 	if errors.is_empty():
 		print("SFX_VOICE_GENERATOR_TEST PASS")
 		quit(0)
@@ -77,6 +79,26 @@ func _check_boost() -> PackedStringArray:
 	var other := BOOST_GENERATOR.new().generate(ANVIL, "anvil")
 	errors.append_array(_expect(other.signature != voice.signature, "a stronger machine should have its own boost"))
 	errors.append_array(_expect(_digest(other.tiers[0]) != _digest(voice.tiers[0]), "boost_power must shape the boost"))
+	return errors
+
+
+func _check_interface() -> PackedStringArray:
+	var errors := PackedStringArray()
+	var generator = UI_GENERATOR.new()
+	var names: Array = generator.names()
+	errors.append_array(_expect(names.size() >= 4, "the interface set should cover move, confirm, countdown and go"))
+	for sound_name in names:
+		var voice = generator.generate(String(sound_name))
+		errors.append_array(_expect(voice.tiers.size() == 1, "%s should be a single voice" % sound_name))
+		var stats := _sample_stats(voice.tiers[0])
+		var seconds := float(voice.tiers[0].size()) / float(voice.mix_rate)
+		errors.append_array(_expect(bool(stats["finite"]), "%s must be finite" % sound_name))
+		errors.append_array(_expect(float(stats["peak"]) <= 1.0, "%s must stay inside full scale" % sound_name))
+		errors.append_array(_expect(float(stats["peak"]) > 0.7, "%s should reach a usable peak; got %.3f" % [sound_name, float(stats["peak"])]))
+		errors.append_array(_expect(seconds > 0.03 and seconds < 0.6, "%s should be a short blip; got %.2fs" % [sound_name, seconds]))
+		var again = generator.generate(String(sound_name))
+		errors.append_array(_expect(_digest(again.tiers[0]) == _digest(voice.tiers[0]), "%s must be deterministic" % sound_name))
+	errors.append_array(_expect(generator.generate("missing").signature.contains("unknown"), "an unknown blip name should be flagged, not crash"))
 	return errors
 
 

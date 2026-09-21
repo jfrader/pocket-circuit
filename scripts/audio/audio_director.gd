@@ -2,20 +2,12 @@ extends Node
 
 const ENGINE_LOOP := preload("res://assets/audio/engine_loop.ogg")
 const RaceMusicPlan := preload("res://scripts/audio/race_music_plan.gd")
-const SFX_STREAMS := {
-	&"countdown": preload("res://assets/audio/countdown.ogg"),
-	&"go": preload("res://assets/audio/go.ogg"),
-	&"ui_move": preload("res://assets/audio/ui_move.ogg"),
-	&"ui_confirm": preload("res://assets/audio/ui_confirm.ogg"),
-	&"boost": preload("res://assets/audio/boost.ogg"),
-	&"impact": preload("res://assets/audio/impact.ogg"),
-	&"hazard_warning": preload("res://assets/audio/hazard_warning.ogg"),
-}
 const EngineSoundPlayerScript := preload("res://scripts/audio/engine/engine_sound_player.gd")
 const EngineRecipeLibraryScript := preload("res://scripts/audio/engine/engine_recipe_library.gd")
 const DriftSoundPlayerScript := preload("res://scripts/audio/sfx/drift_sound_player.gd")
 const CrashVoiceGeneratorScript := preload("res://scripts/audio/sfx/crash_voice_generator.gd")
 const BoostVoiceGeneratorScript := preload("res://scripts/audio/sfx/boost_voice_generator.gd")
+const UiVoiceGeneratorScript := preload("res://scripts/audio/sfx/ui_voice_generator.gd")
 const ChampionshipCatalogScript := preload("res://data/championship/catalog.gd")
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
@@ -43,9 +35,10 @@ var _engine_player: AudioStreamPlayer
 var _engine_voice: EngineSoundPlayer
 ## Continuous tyre scrub for the local car, driven by its slip angle.
 var _drift_voice: DriftSoundPlayer
-## Generated one-shots for the current car, keyed by SFX name. A name present
-## here wins over its preloaded Kenney stream.
+## Generated one-shots keyed by SFX name: the global interface blips at boot,
+## plus the current car's crash and boost on vehicle handoff.
 var _generated_streams: Dictionary = {}
+var _generated_voices: Dictionary = {}
 var _crash_voice: OneShotVoice
 var _boost_voice: OneShotVoice
 ## Deterministic per-play pitch spread so repeats do not machine-gun.
@@ -88,6 +81,7 @@ func _ready() -> void:
 	ensure_buses()
 	_engine_loop = _make_runtime_loop(ENGINE_LOOP)
 	_build_players()
+	_build_interface_sfx()
 	_bind_live_music()
 
 func _process(delta: float) -> void:
@@ -200,6 +194,18 @@ func set_local_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 		_engine_player.play()
 
 
+## Interface and race blips are global and fixed, so they are built once at boot.
+func _build_interface_sfx() -> void:
+	var generator = UiVoiceGeneratorScript.new()
+	for sound_name in generator.names():
+		_register_voice(StringName(sound_name), generator.generate(String(sound_name)))
+
+
+func _register_voice(sound_name: StringName, voice: OneShotVoice) -> void:
+	_generated_voices[sound_name] = voice
+	_generated_streams[sound_name] = _make_tier_streams(voice)
+
+
 ## Generates this car's crash and boost one-shots. A few milliseconds of work, so
 ## it rides along with the vehicle handoff instead of needing its own warm step.
 func _prepare_vehicle_sfx(stats: VehicleStats, vehicle_id: String) -> void:
@@ -211,8 +217,8 @@ func _prepare_vehicle_sfx(stats: VehicleStats, vehicle_id: String) -> void:
 	_sfx_vehicle_id = resolved_id
 	_crash_voice = CrashVoiceGeneratorScript.new().generate(stats, resolved_id)
 	_boost_voice = BoostVoiceGeneratorScript.new().generate(stats, resolved_id)
-	_generated_streams[&"impact"] = _make_tier_streams(_crash_voice)
-	_generated_streams[&"boost"] = _make_tier_streams(_boost_voice)
+	_register_voice(&"impact", _crash_voice)
+	_register_voice(&"boost", _boost_voice)
 
 
 func _make_tier_streams(voice: OneShotVoice) -> Array[AudioStreamWAV]:
@@ -282,17 +288,13 @@ func set_race_paused(paused: bool) -> void:
 func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: float = 1.0) -> bool:
 	if _sfx_players.is_empty() or volume_scale <= 0.0:
 		return false
-	var generated := _generated_streams.has(sound_name)
-	if not generated and not SFX_STREAMS.has(sound_name):
+	if not _generated_streams.has(sound_name):
 		return false
 	var player := _sfx_players[_next_sfx_player]
 	_next_sfx_player = (_next_sfx_player + 1) % _sfx_players.size()
 	player.stop()
-	if generated:
-		var tiers: Array = _generated_streams[sound_name]
-		player.stream = tiers[_tier_index_for(sound_name, volume_scale)]
-	else:
-		player.stream = SFX_STREAMS[sound_name]
+	var tiers: Array = _generated_streams[sound_name]
+	player.stream = tiers[_tier_index_for(sound_name, volume_scale)]
 	player.volume_db = linear_to_db(clampf(volume_scale, 0.05, 1.0))
 	player.pitch_scale = clampf(pitch_scale * _next_variation(), 0.65, 1.5)
 	if not _headless:
@@ -303,7 +305,7 @@ func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: fl
 ## Generated one-shots carry strength tiers, so a light hit is duller and a heavy
 ## one rings longer instead of the same sound played louder.
 func _tier_index_for(sound_name: StringName, volume_scale: float) -> int:
-	var voice: OneShotVoice = _crash_voice if sound_name == &"impact" else _boost_voice
+	var voice: OneShotVoice = _generated_voices.get(sound_name)
 	if voice == null or voice.tiers.is_empty():
 		return 0
 	return clampi(voice.tier_for(volume_scale), 0, voice.tiers.size() - 1)
