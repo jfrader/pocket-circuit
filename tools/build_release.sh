@@ -68,8 +68,31 @@ run_godot_checked() {
 		rm -f -- "$command_log"
 		return 1
 	fi
-	rm -f -- "$command_log"
+  rm -f -- "$command_log"
 }
+
+export GAMESTRUMENTS_ADDON_DIR="${GAMESTRUMENTS_ADDON_DIR:-$PROJECT_ROOT/vendor/gamestruments}"
+printf 'Syncing Gamestruments live engine from %s...\n' "$GAMESTRUMENTS_ADDON_DIR"
+"$PROJECT_ROOT/tools/sync_gamestruments.sh"
+
+printf 'Verifying Gamestruments live engine is present and loadable (release gate has no silent-music WAV fallback mode)...\n'
+check_script="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-check-gamestruments.XXXXXX.gd")"
+cat > "$check_script" << 'EOGD'
+extends SceneTree
+func _initialize() -> void:
+	if ClassDB.class_exists("GamestrumentsPlayer"):
+		print("LIVE_GAMESTRUMENTS_ENGINE_PRESENT")
+		quit(0)
+	else:
+		push_error("LIVE_GAMESTRUMENTS_ENGINE_ABSENT: ClassDB.class_exists(\"GamestrumentsPlayer\") must be true; WAV fallbacks removed")
+		quit(1)
+EOGD
+if ! POCKET_CIRCUIT_EXPECT_OUTPUT="LIVE_GAMESTRUMENTS_ENGINE_PRESENT" run_godot_checked timeout 60 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "$check_script"; then
+	printf 'Gamestruments live engine missing or failed to load after sync. The release gate requires the native extension.\n' >&2
+	rm -f -- "$check_script"
+	exit 1
+fi
+rm -f -- "$check_script"
 
 python3 "$PROJECT_ROOT/tools/validate_release_config.py"
 python3 -m unittest discover -s "$PROJECT_ROOT/tests" -p 'test_*.py'
@@ -209,14 +232,16 @@ fi
 
 linux_binary="$linux_dir/pocket-circuit.x86_64"
 linux_pck="$linux_dir/pocket-circuit.pck"
+linux_library="$linux_dir/libgamestruments_godot.so"
 windows_binary="$windows_dir/pocket-circuit.exe"
 windows_pck="$windows_dir/pocket-circuit.pck"
+windows_library="$windows_dir/gamestruments_godot.dll"
 
 # Remove only the known outputs inside the selected output root. Other files
 # and directories are never recursively cleaned.
 rm -f -- \
-	"$linux_binary" "$linux_pck" "$linux_dir/SHA256SUMS" \
-	"$windows_binary" "$windows_pck" "$windows_dir/SHA256SUMS" \
+	"$linux_binary" "$linux_pck" "$linux_library" "$linux_dir/SHA256SUMS" \
+	"$windows_binary" "$windows_pck" "$windows_library" "$windows_dir/SHA256SUMS" \
 	"$output_root/SHA256SUMS"
 
 for platform_dir in "$linux_dir" "$windows_dir"; do
@@ -234,7 +259,7 @@ run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --export-releas
 printf 'Exporting Windows Desktop x86_64 release...\n'
 run_godot_checked "$godot_bin" --path "$PROJECT_ROOT" --headless --export-release "Windows Desktop x86_64" "$windows_binary"
 
-for artifact in "$linux_binary" "$linux_pck" "$windows_binary" "$windows_pck"; do
+for artifact in "$linux_binary" "$linux_pck" "$linux_library" "$windows_binary" "$windows_pck" "$windows_library"; do
   if [[ ! -s "$artifact" ]]; then
     printf 'Expected export artifact is missing or empty: %s\n' "$artifact" >&2
     exit 1
@@ -251,10 +276,14 @@ printf 'Smoke-testing the packaged Linux release...\n'
 
 printf 'Inspecting packaged release contents...\n'
 pack_check_dir="$(mktemp -d "${TMPDIR:-/tmp}/pocket-circuit-pack-check.XXXXXX")"
+pack_check_library_dir="$pack_check_dir/addons/gamestruments/bin"
 cleanup_pack_check() {
-  rmdir -- "$pack_check_dir" 2>/dev/null || true
+	rm -f -- "$pack_check_library_dir/libgamestruments_godot.so"
+	rmdir -- "$pack_check_library_dir" "$pack_check_dir/addons/gamestruments" "$pack_check_dir/addons" "$pack_check_dir" 2>/dev/null || true
 }
 trap cleanup_pack_check EXIT
+mkdir -p -- "$pack_check_library_dir"
+cp -f -- "$linux_library" "$pack_check_library_dir/libgamestruments_godot.so"
 (
 	cd -- "$pack_check_dir"
 	POCKET_CIRCUIT_EXPECT_OUTPUT="PACKAGED_CONTENT_TEST PASS" run_godot_checked timeout 120 "$godot_bin" --headless --main-pack "$linux_pck" --script "$PROJECT_ROOT/tools/inspect_release_pack.gd"
@@ -265,29 +294,29 @@ trap - EXIT
 
 (
   cd -- "$linux_dir"
-  LC_ALL=C sha256sum -- pocket-circuit.x86_64 pocket-circuit.pck > SHA256SUMS
+  LC_ALL=C sha256sum -- pocket-circuit.x86_64 pocket-circuit.pck libgamestruments_godot.so > SHA256SUMS
 )
 (
   cd -- "$windows_dir"
-  LC_ALL=C sha256sum -- pocket-circuit.exe pocket-circuit.pck > SHA256SUMS
+  LC_ALL=C sha256sum -- pocket-circuit.exe pocket-circuit.pck gamestruments_godot.dll > SHA256SUMS
 )
 (
 	cd -- "$output_root"
   LC_ALL=C sha256sum -- \
-    linux/pocket-circuit.x86_64 linux/pocket-circuit.pck \
-		windows/pocket-circuit.exe windows/pocket-circuit.pck > SHA256SUMS
+    linux/pocket-circuit.x86_64 linux/pocket-circuit.pck linux/libgamestruments_godot.so \
+		windows/pocket-circuit.exe windows/pocket-circuit.pck windows/gamestruments_godot.dll > SHA256SUMS
 )
 
 for platform_dir in "$linux_dir" "$windows_dir"; do
 	entries=("$platform_dir"/*)
-	if (( ${#entries[@]} != 3 )); then
+	if (( ${#entries[@]} != 4 )); then
 		printf 'Export directory contains an unexpected number of files: %s\n' "$platform_dir" >&2
 		exit 1
 	fi
 done
 for expected_path in \
-	"$linux_binary" "$linux_pck" "$linux_dir/SHA256SUMS" \
-	"$windows_binary" "$windows_pck" "$windows_dir/SHA256SUMS"; do
+	"$linux_binary" "$linux_pck" "$linux_library" "$linux_dir/SHA256SUMS" \
+	"$windows_binary" "$windows_pck" "$windows_library" "$windows_dir/SHA256SUMS"; do
 	if [[ ! -f "$expected_path" || -L "$expected_path" ]]; then
 		printf 'Export directory contains a missing or unsafe expected file: %s\n' "$expected_path" >&2
 		exit 1
