@@ -21,7 +21,6 @@ var _skid_cooldown: float = 0.0
 var _impact_time: float = 0.0
 var _impact_audio_cooldown: float = 0.0
 var _skid_marks: Array[Sprite2D] = []
-var _was_drifting := false
 var _was_boosting := false
 var _app: Node
 
@@ -46,12 +45,10 @@ func _physics_process(delta: float) -> void:
 	_impact_audio_cooldown = maxf(0.0, _impact_audio_cooldown - delta)
 	var drifting := bool(_vehicle.get("is_drifting")) or bool(_vehicle.get("is_sliding"))
 	var boosting := bool(_vehicle.call("is_boost_active"))
-	if _vehicle.is_in_group("player_vehicle"):
-		if drifting and not _was_drifting:
-			_play_sfx(&"drift", 0.72)
-		if boosting and not _was_boosting:
-			_play_sfx(&"boost", 0.82)
-	_was_drifting = drifting
+	# Boost is an event, so it fires once here. Drift is a sustained state and is
+	# voiced continuously by AudioDirector from the car's slip.
+	if _vehicle.is_in_group("player_vehicle") and boosting and not _was_boosting:
+		_play_sfx(&"boost", 0.82)
 	_was_boosting = boosting
 	_update_looping_effects(drifting, boosting)
 	if drifting and _skid_cooldown <= 0.0:

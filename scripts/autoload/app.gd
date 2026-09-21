@@ -641,14 +641,15 @@ func _begin_race_transition(vehicle_id: String = "") -> void:
 		fail_race_loading("Race resources could not be loaded")
 		return
 	var packed := resources.get(RACE_SCENE) as PackedScene
-	# Synthesize the engine voice behind the loading screen; the race scene would
-	# otherwise pay ~130 ms on its first live frame.
+	# Synthesize this car's engine voice and crash/boost one-shots behind the
+	# loading screen; the race scene would otherwise pay for them on its first
+	# live frame.
 	await loading_step("Tuning the engine")
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
 	if is_instance_valid(audio_director):
-		audio_director.call("warm_engine_voice", vehicle_id)
+		audio_director.call("warm_vehicle_audio", vehicle_id)
 	await loading_step("Opening the circuit")
 	if _loading_cancelled:
 		_leave_race_loading()

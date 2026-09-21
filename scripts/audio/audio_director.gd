@@ -7,13 +7,15 @@ const SFX_STREAMS := {
 	&"go": preload("res://assets/audio/go.ogg"),
 	&"ui_move": preload("res://assets/audio/ui_move.ogg"),
 	&"ui_confirm": preload("res://assets/audio/ui_confirm.ogg"),
-	&"drift": preload("res://assets/audio/drift.ogg"),
 	&"boost": preload("res://assets/audio/boost.ogg"),
 	&"impact": preload("res://assets/audio/impact.ogg"),
 	&"hazard_warning": preload("res://assets/audio/hazard_warning.ogg"),
 }
 const EngineSoundPlayerScript := preload("res://scripts/audio/engine/engine_sound_player.gd")
 const EngineRecipeLibraryScript := preload("res://scripts/audio/engine/engine_recipe_library.gd")
+const DriftSoundPlayerScript := preload("res://scripts/audio/sfx/drift_sound_player.gd")
+const CrashVoiceGeneratorScript := preload("res://scripts/audio/sfx/crash_voice_generator.gd")
+const BoostVoiceGeneratorScript := preload("res://scripts/audio/sfx/boost_voice_generator.gd")
 const ChampionshipCatalogScript := preload("res://data/championship/catalog.gd")
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
@@ -39,6 +41,17 @@ var _engine_player: AudioStreamPlayer
 ## Generated engine voice for the local car. Null stream player keeps the legacy
 ## pitched loop in charge, so the old path stays a real fallback.
 var _engine_voice: EngineSoundPlayer
+## Continuous tyre scrub for the local car, driven by its slip angle.
+var _drift_voice: DriftSoundPlayer
+## Generated one-shots for the current car, keyed by SFX name. A name present
+## here wins over its preloaded Kenney stream.
+var _generated_streams: Dictionary = {}
+var _crash_voice: OneShotVoice
+var _boost_voice: OneShotVoice
+## Deterministic per-play pitch spread so repeats do not machine-gun.
+var _sfx_variation := 0
+## Vehicle whose generated one-shots are currently loaded.
+var _sfx_vehicle_id := ""
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _next_sfx_player := 0
 var _music_context: StringName = &""
@@ -79,6 +92,7 @@ func _ready() -> void:
 
 func _process(delta: float) -> void:
 	_update_engine(delta)
+	_update_drift(delta)
 	_update_live_volume()
 	_update_live_rotation(delta)
 
@@ -91,6 +105,8 @@ func _exit_tree() -> void:
 		_engine_player.stream = null
 	if is_instance_valid(_engine_voice):
 		_engine_voice.stop()
+	if is_instance_valid(_drift_voice):
+		_drift_voice.stop()
 	for player: AudioStreamPlayer in _sfx_players:
 		if is_instance_valid(player):
 			player.stop()
@@ -178,8 +194,41 @@ func set_local_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 	var vehicle_stats: Variant = vehicle.get("stats")
 	if vehicle_stats is Object:
 		_vehicle_max_speed = maxf(1.0, float((vehicle_stats as Object).get("max_speed")))
+	if vehicle_stats is VehicleStats:
+		_prepare_vehicle_sfx(vehicle_stats, vehicle_id)
 	if not _prepare_engine_voice(vehicle, vehicle_id) and not _headless and not _engine_player.playing:
 		_engine_player.play()
+
+
+## Generates this car's crash and boost one-shots. A few milliseconds of work, so
+## it rides along with the vehicle handoff instead of needing its own warm step.
+func _prepare_vehicle_sfx(stats: VehicleStats, vehicle_id: String) -> void:
+	var resolved_id := vehicle_id
+	if resolved_id.is_empty():
+		resolved_id = EngineRecipeLibraryScript.UNIDENTIFIED_VEHICLE_ID
+	if resolved_id == _sfx_vehicle_id and _crash_voice != null:
+		return
+	_sfx_vehicle_id = resolved_id
+	_crash_voice = CrashVoiceGeneratorScript.new().generate(stats, resolved_id)
+	_boost_voice = BoostVoiceGeneratorScript.new().generate(stats, resolved_id)
+	_generated_streams[&"impact"] = _make_tier_streams(_crash_voice)
+	_generated_streams[&"boost"] = _make_tier_streams(_boost_voice)
+
+
+func _make_tier_streams(voice: OneShotVoice) -> Array[AudioStreamWAV]:
+	var streams: Array[AudioStreamWAV] = []
+	for tier in voice.tiers:
+		var pcm := PackedByteArray()
+		pcm.resize(tier.size() * 2)
+		for index in tier.size():
+			pcm.encode_s16(index * 2, int(round(clampf(tier[index], -1.0, 1.0) * 32767.0)))
+		var stream := AudioStreamWAV.new()
+		stream.format = AudioStreamWAV.FORMAT_16_BITS
+		stream.mix_rate = voice.mix_rate
+		stream.stereo = false
+		stream.data = pcm
+		streams.append(stream)
+	return streams
 
 
 ## Generates (or reuses) the local car's engine voice. Returns false when the
@@ -215,6 +264,8 @@ func clear_local_vehicle() -> void:
 		_engine_player.volume_db = SILENCE_DB
 	if is_instance_valid(_engine_voice):
 		_engine_voice.stop()
+	if is_instance_valid(_drift_voice):
+		_drift_voice.stop()
 
 func set_race_paused(paused: bool) -> void:
 	_race_paused = paused
@@ -229,17 +280,40 @@ func set_race_paused(paused: bool) -> void:
 	_update_live_volume()
 
 func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: float = 1.0) -> bool:
-	if not SFX_STREAMS.has(sound_name) or _sfx_players.is_empty() or volume_scale <= 0.0:
+	if _sfx_players.is_empty() or volume_scale <= 0.0:
+		return false
+	var generated := _generated_streams.has(sound_name)
+	if not generated and not SFX_STREAMS.has(sound_name):
 		return false
 	var player := _sfx_players[_next_sfx_player]
 	_next_sfx_player = (_next_sfx_player + 1) % _sfx_players.size()
 	player.stop()
-	player.stream = SFX_STREAMS[sound_name]
+	if generated:
+		var tiers: Array = _generated_streams[sound_name]
+		player.stream = tiers[_tier_index_for(sound_name, volume_scale)]
+	else:
+		player.stream = SFX_STREAMS[sound_name]
 	player.volume_db = linear_to_db(clampf(volume_scale, 0.05, 1.0))
-	player.pitch_scale = clampf(pitch_scale, 0.65, 1.5)
+	player.pitch_scale = clampf(pitch_scale * _next_variation(), 0.65, 1.5)
 	if not _headless:
 		player.play()
 	return true
+
+
+## Generated one-shots carry strength tiers, so a light hit is duller and a heavy
+## one rings longer instead of the same sound played louder.
+func _tier_index_for(sound_name: StringName, volume_scale: float) -> int:
+	var voice: OneShotVoice = _crash_voice if sound_name == &"impact" else _boost_voice
+	if voice == null or voice.tiers.is_empty():
+		return 0
+	return clampi(voice.tier_for(volume_scale), 0, voice.tiers.size() - 1)
+
+
+## Deterministic pitch spread of about +/-3.5%, so repeated hits vary without
+## giving up replay determinism.
+func _next_variation() -> float:
+	_sfx_variation = (_sfx_variation + 1) % 7
+	return 1.0 + (float(_sfx_variation) - 3.0) * 0.012
 
 ## Test introspection: how many times a live score has been generated this
 ## session. Re-entering a context with the same seed must not increase it.
@@ -308,6 +382,10 @@ func _build_players() -> void:
 	_engine_voice = EngineSoundPlayerScript.new()
 	_engine_voice.name = "EngineVoice"
 	add_child(_engine_voice)
+
+	_drift_voice = DriftSoundPlayerScript.new()
+	_drift_voice.name = "DriftVoice"
+	add_child(_drift_voice)
 
 	for index in SFX_PLAYER_COUNT:
 		var player := AudioStreamPlayer.new()
@@ -477,10 +555,42 @@ func has_engine_voice() -> bool:
 	return is_instance_valid(_engine_voice) and not _engine_voice.is_using_fallback()
 
 
-## Generates and caches a vehicle's voice ahead of the race scene, so the first
-## race frame never pays for synthesis. Headless runs generate nothing: there is
-## no listener and tests should not pay the cost.
-func warm_engine_voice(vehicle_id: String) -> bool:
+## Test introspection: true when this effect is voiced by a generated one-shot.
+func has_generated_sfx(sound_name: StringName) -> bool:
+	return _generated_streams.has(sound_name)
+
+
+## Test introspection: the local car's generated crash and boost identities.
+func get_crash_voice_signature() -> String:
+	return _crash_voice.signature if _crash_voice != null else ""
+
+
+func get_boost_voice_signature() -> String:
+	return _boost_voice.signature if _boost_voice != null else ""
+
+
+## Drives the continuous scrub from the local car's slip. Independent of the
+## engine voice, so a drift still sounds if the engine fell back to its loop.
+func _update_drift(delta: float) -> void:
+	if not is_instance_valid(_drift_voice):
+		return
+	if not is_instance_valid(_local_vehicle) or _race_paused:
+		_drift_voice.stop()
+		return
+	var intensity := 0.0
+	if _local_vehicle.has_method("get_slide_intensity"):
+		intensity = clampf(float(_local_vehicle.call("get_slide_intensity")), 0.0, 1.0)
+	var speed := maxf(0.0, float(_local_vehicle.get("speed")))
+	var grip := 1.15
+	if _local_vehicle.has_method("get_effective_grip"):
+		grip = float(_local_vehicle.call("get_effective_grip"))
+	_drift_voice.set_state(intensity, clampf(speed / _vehicle_max_speed, 0.0, 1.0), grip, delta)
+
+
+## Generates and caches a vehicle's engine voice and one-shots ahead of the race
+## scene, so the first race frame never pays for synthesis. Headless runs generate
+## nothing: there is no listener and tests should not pay the cost.
+func warm_vehicle_audio(vehicle_id: String) -> bool:
 	if _headless or vehicle_id.is_empty():
 		return false
 	var entry: Dictionary = ChampionshipCatalogScript.get_vehicle(vehicle_id)
@@ -490,7 +600,9 @@ func warm_engine_voice(vehicle_id: String) -> bool:
 	if stats == null:
 		return false
 	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
-	return EngineVoiceGenerator.generate_cached(recipe) != null
+	var warmed := EngineVoiceGenerator.generate_cached(recipe) != null
+	_prepare_vehicle_sfx(stats, vehicle_id)
+	return warmed
 
 
 func get_engine_voice_signature() -> String:
