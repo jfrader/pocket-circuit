@@ -13,17 +13,21 @@ const MAX_FRAMES_PER_FILL := 4096
 ## A queue with all but this many frames free has run dry; the priming frame is
 ## excluded.
 const STARVATION_SLACK_FRAMES := 8
-## Mix trim for the scrub bed, which sits under the engine and music.
-const MIX_DB := -8.0
+## Mix trim for the scrub bed. Measured against the engine voice at full chat
+## (-14.0 dBFS): a full slide lands just under it, a mid corner about 8 dB down,
+## and a gentle corner about 19 dB down.
+const MIX_DB := -4.0
 const SILENCE_DB := -80.0
-## Slip below this renders nothing at all, so a straight-line car costs no DSP.
+## Below this the voice renders nothing at all, so a car tracking straight costs
+## no DSP.
 const AUDIBLE_THRESHOLD := 0.01
 
 var _player: AudioStreamPlayer
 var _playback: AudioStreamGeneratorPlayback
 var _synth := DriftSynth.new()
 var _buffer := PackedVector2Array()
-var _intensity := 0.0
+var _scrub := 0.0
+var _screech := 0.0
 var _speed_ratio := 0.0
 var _grip := 1.15
 var _prepared := false
@@ -40,12 +44,13 @@ func _ready() -> void:
 
 
 ## Called by AudioDirector once per frame with the local car's state.
-func set_state(intensity: float, speed_ratio: float, grip: float, delta: float) -> void:
-	_intensity = clampf(intensity, 0.0, 1.0)
+func set_state(scrub: float, screech: float, speed_ratio: float, grip: float, delta: float) -> void:
+	_scrub = clampf(scrub, 0.0, 1.0)
+	_screech = clampf(screech, 0.0, 1.0)
 	_speed_ratio = clampf(speed_ratio, 0.0, 1.0)
 	_grip = grip
-	_synth.set_state(_intensity, _speed_ratio, _grip, delta)
-	if _synth.get_intensity() <= AUDIBLE_THRESHOLD:
+	_synth.set_state(_scrub, _screech, _speed_ratio, _grip, delta)
+	if _synth.get_level() <= AUDIBLE_THRESHOLD:
 		stop()
 		return
 	start()

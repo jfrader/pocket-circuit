@@ -579,14 +579,19 @@ func _update_drift(delta: float) -> void:
 	if not is_instance_valid(_local_vehicle) or _race_paused:
 		_drift_voice.stop()
 		return
-	var intensity := 0.0
-	if _local_vehicle.has_method("get_slide_intensity"):
-		intensity = clampf(float(_local_vehicle.call("get_slide_intensity")), 0.0, 1.0)
+	# Two layers: cornering scrub is present whenever the car is turning, and the
+	# screech only opens up once a tyre is actually sliding.
+	var scrub := 0.0
+	if _local_vehicle.has_method("get_tyre_scrub"):
+		scrub = clampf(float(_local_vehicle.call("get_tyre_scrub")), 0.0, 1.0)
+	var screech := 0.0
+	if _local_vehicle.has_method("get_tyre_screech"):
+		screech = clampf(float(_local_vehicle.call("get_tyre_screech")), 0.0, 1.0)
 	var speed := maxf(0.0, float(_local_vehicle.get("speed")))
 	var grip := 1.15
 	if _local_vehicle.has_method("get_effective_grip"):
 		grip = float(_local_vehicle.call("get_effective_grip"))
-	_drift_voice.set_state(intensity, clampf(speed / _vehicle_max_speed, 0.0, 1.0), grip, delta)
+	_drift_voice.set_state(scrub, screech, clampf(speed / _vehicle_max_speed, 0.0, 1.0), grip, delta)
 
 
 ## Generates and caches a vehicle's engine voice and one-shots ahead of the race

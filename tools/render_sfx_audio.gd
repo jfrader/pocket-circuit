@@ -51,9 +51,8 @@ func _render_drift() -> bool:
 	for index in count:
 		var time := float(index) / float(SAMPLE_RATE)
 		if index % BLOCK == 0:
-			var intensity := _drift_intensity(time)
-			var speed_ratio := _drift_speed(time)
-			synth.set_state(intensity, speed_ratio, 1.15, float(BLOCK) / float(SAMPLE_RATE))
+			var state := _drift_state(time)
+			synth.set_state(state.x, state.y, _drift_speed(time), 1.15, float(BLOCK) / float(SAMPLE_RATE))
 		samples[index] = synth.render_sample()
 	return _write("drift_arc.wav", samples, true)
 
@@ -88,12 +87,18 @@ func _render_interface() -> bool:
 	return true
 
 
-func _drift_intensity(time: float) -> float:
-	if time < 0.25:
-		return smoothstep(0.0, 0.25, time)
-	if time < 2.6:
-		return 0.72 + 0.28 * sin(TAU * 0.7 * time)
-	return maxf(0.0, 1.0 - smoothstep(2.6, 3.3, time))
+## (scrub, screech): a gentle corner, then a mid corner, then a full slide, then
+## a release — the arc the game actually produces.
+func _drift_state(time: float) -> Vector2:
+	if time < 0.4:
+		return Vector2(smoothstep(0.0, 0.4, time) * 0.12, 0.0)
+	if time < 1.4:
+		return Vector2(lerpf(0.12, 0.34, smoothstep(0.4, 1.4, time)), 0.0)
+	if time < 2.4:
+		return Vector2(lerpf(0.34, 1.0, smoothstep(1.4, 2.4, time)), 0.0)
+	if time < 3.2:
+		return Vector2(1.0, 0.9)
+	return Vector2(maxf(0.0, 1.0 - smoothstep(3.2, 3.8, time)), maxf(0.0, 0.9 - smoothstep(3.2, 3.7, time)))
 
 
 func _drift_speed(time: float) -> float:
