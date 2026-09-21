@@ -3,6 +3,7 @@ extends RefCounted
 
 const MODULES := preload("res://scripts/race/track_module_catalog.gd")
 const VALIDATION := preload("res://scripts/race/track_layout_validation.gd")
+const ROOM_MODEL := preload("res://scripts/race/track_room_model.gd")
 
 const CATALOG_KERNEL_FIXTURE := &"catalog_kernel"
 
@@ -14,8 +15,11 @@ static func generate(request: Dictionary) -> Dictionary:
 		return _error(&"fixture_room_mismatch", "The catalog_kernel development fixture is certified only in the EL room.")
 	if StringName((request.get("generation_options", {}) as Dictionary).get("length_tier", &"standard")) != &"standard":
 		return _error(&"fixture_tier_mismatch", "The catalog_kernel development fixture is certified only at the standard length tier.")
-	var room_polygon: PackedVector2Array = request.get("room_polygon", PackedVector2Array())
-	var route := catalog_kernel_fixture()
+	var room: Dictionary = request.get("room_model", {})
+	if not bool(room.get("valid", false)):
+		return _error(&"fixture_room_model", "The catalog_kernel development fixture requires a validated free-polygon room model.")
+	var room_polygon: PackedVector2Array = room["outer"]
+	var route := place_catalog_kernel(room)
 	if not bool(route.get("ok", false)):
 		return route
 	var continuous := VALIDATION.validate_continuous(route, room_polygon)
@@ -49,6 +53,8 @@ static func generate(request: Dictionary) -> Dictionary:
 		"analytic_validation": continuous,
 		"sampling": sampling,
 		"sampled_validation": sampled,
+		"room_model": room,
+		"room_placement": route["room_placement"],
 	}
 
 
@@ -64,6 +70,17 @@ static func catalog_kernel_fixture() -> Dictionary:
 		MODULES.instantiate(&"corner_medium", {"radius": 300.0, "angle_deg": 90.0, "hand": 1.0}),
 	]
 	return MODULES.compose(instances, Vector2(-800.0, 100.0), 0.0)
+
+
+static func place_catalog_kernel(room: Dictionary) -> Dictionary:
+	var route := catalog_kernel_fixture()
+	if not bool(route.get("ok", false)):
+		return route
+	var placement := ROOM_MODEL.route_fits(room, route, MODULES.RESERVED_RADIUS)
+	if not bool(placement.get("valid", false)):
+		return placement
+	route["room_placement"] = placement
+	return route
 
 
 static func _error(kind: StringName, message: String) -> Dictionary:

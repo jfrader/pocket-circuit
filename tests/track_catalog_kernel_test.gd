@@ -4,6 +4,7 @@ const MODULES := preload("res://scripts/race/track_module_catalog.gd")
 const VALIDATION := preload("res://scripts/race/track_layout_validation.gd")
 const V8_DEVELOPMENT_GENERATOR := preload("res://scripts/race/track_v8_development_generator.gd")
 const REGISTRY := preload("res://scripts/race/track_generator_registry.gd")
+const ROOM_MODEL := preload("res://scripts/race/track_room_model.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 
 
@@ -15,8 +16,11 @@ func _run_test() -> void:
 	if not _test_catalog_contract():
 		return
 	var room_polygon: PackedVector2Array = TRACK_BUILDER.ROOM_SHAPES["el"]
-	var route := V8_DEVELOPMENT_GENERATOR.catalog_kernel_fixture()
+	var room := ROOM_MODEL.legacy_fixture(&"el", TRACK_BUILDER.WORLD_SCALE)
+	var route := V8_DEVELOPMENT_GENERATOR.place_catalog_kernel(room)
 	if not _expect(bool(route.get("ok", false)), "hand-composed catalog route should close"):
+		return
+	if not _expect((route["room_placement"] as Dictionary).get("method") == &"eroded_free_polygon", "catalog fixture should be placed through the free-polygon erosion query"):
 		return
 	var continuous := VALIDATION.validate_continuous(route, room_polygon)
 	if not _expect(bool(continuous.get("valid", false)), "continuous validator should accept the fixture: %s" % continuous.get("reason", "unknown")):
@@ -29,12 +33,12 @@ func _run_test() -> void:
 		return
 	if not _expect(int(continuous["setup_straight_count"]) >= 2 and int(sampled["setup_straight_count"]) >= 2 and float(continuous["minimum_radius"]) >= 147.0 and float(continuous["minimum_nonlocal_distance"]) >= 320.0, "fixture should retain two setups, radius 147, and self-distance 320"):
 		return
-	var unavailable := REGISTRY.dispatch({"schema_version": 2, "generator_version": 8}, {"room_shape": &"el", "room_polygon": room_polygon}, Callable(), Callable(V8_DEVELOPMENT_GENERATOR, "generate"))
+	var unavailable := REGISTRY.dispatch({"schema_version": 2, "generator_version": 8}, {"room_shape": &"el", "room_polygon": room_polygon, "room_model": room}, Callable(), Callable(V8_DEVELOPMENT_GENERATOR, "generate"))
 	if not _expect(unavailable.get("kind") == &"v8_not_implemented", "v8 should remain unavailable without an explicit development fixture"):
 		return
 	var dispatched := REGISTRY.dispatch(
 		{"schema_version": 2, "generator_version": 8},
-		{"seed": 928, "room_shape": &"el", "room_polygon": room_polygon, "development_fixture": &"catalog_kernel", "generation_options": {"length_tier": &"standard"}},
+		{"seed": 928, "room_shape": &"el", "room_polygon": room_polygon, "room_model": room, "development_fixture": &"catalog_kernel", "generation_options": {"length_tier": &"standard"}},
 		Callable(),
 		Callable(V8_DEVELOPMENT_GENERATOR, "generate")
 	)
