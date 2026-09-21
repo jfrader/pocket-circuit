@@ -10,6 +10,7 @@ const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd"
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const GENERATOR_REGISTRY := preload("res://scripts/race/track_generator_registry.gd")
 const V8_DEVELOPMENT_GENERATOR := preload("res://scripts/race/track_v8_development_generator.gd")
+const TRACK_ROOM_MODEL := preload("res://scripts/race/track_room_model.gd")
 const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const TRACK_BUILDER_GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const TRACK_BUILDER_PLANNER := preload("res://scripts/race/track_builder_planner.gd")
@@ -195,12 +196,17 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		if generator_selection.get("path") == GENERATOR_REGISTRY.LEGACY_PATH:
 			gen = TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
 		else:
+			var room_model := TRACK_ROOM_MODEL.legacy_fixture(room_shape, WORLD_SCALE * room_scale)
+			if not bool(room_model.get("valid", false)):
+				push_error("TrackBuilderCore: %s" % String(room_model.get("error", "invalid v8 room model")))
+				return {}
 			gen = GENERATOR_REGISTRY.dispatch(
 				generation_options,
 				{
 					"seed": seed,
 					"room_shape": room_shape,
-					"room_polygon": room_polygon,
+					"room_polygon": room_model["outer"],
+					"room_model": room_model,
 					"development_fixture": generation_options.get("development_fixture", &""),
 					"generation_options": generation_options,
 				},
