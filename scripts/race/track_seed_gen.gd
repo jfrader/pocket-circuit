@@ -1019,6 +1019,50 @@ static func _validate_controls(
 	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius, "literal_straight_count": literal_straight_count, "setup_straight_count": setup_straight_count}
 
 
+## Existing gameplay validator seam for v8's authoritative analytic samples.
+## The legacy controls path remains untouched and continues to sample through
+## `_validate_controls`; this entry point never interprets samples as controls.
+static func validate_centerline_samples(
+	centerline: PackedVector2Array,
+	source_rect: Rect2,
+	room_polygon: PackedVector2Array,
+	room_margin: float,
+	min_self_distance: float,
+	minimum_length: float,
+	maximum_length: float
+) -> Dictionary:
+	if centerline.size() < 8:
+		return {"valid": false, "reason": "too few samples"}
+	if _has_self_intersection(centerline):
+		return {"valid": false, "reason": "self intersection"}
+	var branch_clearance := _minimum_branch_distance(centerline, min_self_distance)
+	if branch_clearance < min_self_distance:
+		return {"valid": false, "reason": "self distance %.1f < %.1f" % [branch_clearance, min_self_distance]}
+	if _corridor_boundary_loops(centerline).is_empty():
+		return {"valid": false, "reason": "corridor offset did not produce valid inner and outer contours"}
+	for point: Vector2 in centerline:
+		if not source_rect.has_point(point):
+			return {"valid": false, "reason": "outside source rect"}
+		if not room_polygon.is_empty() and not _inside_with_margin(point, room_polygon, room_margin):
+			return {"valid": false, "reason": "outside room margin"}
+	var loop_length := _polyline_length(centerline)
+	if loop_length < minimum_length or loop_length > maximum_length:
+		return {"valid": false, "reason": "outside requested length band"}
+	var setup_straight_count := _setup_straight_count(centerline)
+	if setup_straight_count < 2:
+		return {"valid": false, "reason": "only %d setup straight region(s)" % setup_straight_count}
+	var literal_straight_count := _literal_straight_count(centerline)
+	if literal_straight_count < 2:
+		return {"valid": false, "reason": "only %d literal straight region(s)" % literal_straight_count}
+	var bypass := _best_complex_bypass(centerline)
+	if bool(bypass.get("found", false)):
+		return {"valid": false, "reason": "driveable chord saves %.0fu over %.0fu" % [float(bypass["saving"]), float(bypass["arc"])]}
+	var minimum_turn_radius := _minimum_turn_radius(centerline)
+	if minimum_turn_radius < MIN_DRIVE_RADIUS:
+		return {"valid": false, "reason": "turn radius %.1f < %.1f" % [minimum_turn_radius, MIN_DRIVE_RADIUS]}
+	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius, "literal_straight_count": literal_straight_count, "setup_straight_count": setup_straight_count}
+
+
 static func _detect_pockets(mapped_vertices: PackedVector2Array) -> Array:
 	# Concave runs of the mapped polygon deeper than the threshold are bay
 	# pockets the scene builder seals. A run counts only when its chord midpoint

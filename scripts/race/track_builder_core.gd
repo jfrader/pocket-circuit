@@ -9,6 +9,7 @@ const VISUAL_ROLE_CONTRACT := preload("res://scripts/race/generated_world_visual
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const GENERATOR_REGISTRY := preload("res://scripts/race/track_generator_registry.gd")
+const V8_DEVELOPMENT_GENERATOR := preload("res://scripts/race/track_v8_development_generator.gd")
 const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const TRACK_BUILDER_GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const TRACK_BUILDER_PLANNER := preload("res://scripts/race/track_builder_planner.gd")
@@ -151,10 +152,6 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		if not bool(generator_selection.get("ok", false)):
 			push_error("TrackBuilderCore: %s" % String(generator_selection.get("error", "invalid generator request")))
 			return {}
-		if generator_selection.get("path") != GENERATOR_REGISTRY.LEGACY_PATH:
-			var unavailable := GENERATOR_REGISTRY.dispatch(generation_options, {}, Callable(), Callable())
-			push_error("TrackBuilderCore: %s" % String(unavailable.get("error", "generator unavailable")))
-			return {}
 	var spec: Dictionary = LAYOUTS[theme]
 	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape] if seed >= 0 else BASE_ROOM_SHAPES[room_shape]
 	var used_seed := seed
@@ -194,12 +191,33 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 			&"square":
 				room_params["displacement_scale"] = 1.0
 				room_params["min_loop_length"] = 2200.0 * WORLD_SCALE
-		var gen := TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
-		if gen["points"].is_empty():
-			push_error("TrackBuilderCore: could not generate a valid circuit near seed " + str(seed))
+		var gen: Dictionary
+		if generator_selection.get("path") == GENERATOR_REGISTRY.LEGACY_PATH:
+			gen = TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
+		else:
+			gen = GENERATOR_REGISTRY.dispatch(
+				generation_options,
+				{
+					"seed": seed,
+					"room_shape": room_shape,
+					"room_polygon": room_polygon,
+					"development_fixture": generation_options.get("development_fixture", &""),
+					"generation_options": generation_options,
+				},
+				Callable(),
+				Callable(V8_DEVELOPMENT_GENERATOR, "generate")
+			)
+		if not bool(gen.get("ok", true)) or (gen.get("points", PackedVector2Array()) as PackedVector2Array).is_empty():
+			push_error("TrackBuilderCore: %s" % String(gen.get("error", "could not generate a valid circuit near seed %d" % seed)))
 			return {}
 		spec = spec.duplicate()
 		spec["controls"] = gen["points"]
+		spec["centerline_is_sampled"] = bool(gen.get("centerline_is_sampled", false))
+		if spec["centerline_is_sampled"]:
+			spec["authoritative_centerline"] = gen["points"]
+			spec["analytic_route"] = gen.get("analytic_route", {})
+			spec["analytic_validation"] = gen.get("analytic_validation", {})
+			spec["sampled_validation"] = gen.get("sampled_validation", {})
 		spec["seed_obstacles"] = true
 		spec["seed"] = int(gen["seed"])
 		spec["requested_seed"] = seed
@@ -245,7 +263,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["act"] = clampi(int(generation_options.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
 		spec["obstacles_enabled"] = bool(generation_options.get("obstacles_enabled", true))
 		used_seed = int(gen["seed"])
-	var centerline := _sample_centerline(spec["controls"])
+	var centerline := _authoritative_centerline(spec)
 	var edges := _corridor_edges(centerline)
 	if spec.get("seed_obstacles", false):
 		var left: PackedVector2Array = edges["left"]
@@ -348,6 +366,12 @@ static func _sample_centerline(controls: Variant) -> PackedVector2Array:
 		for point: Vector2 in controls:
 			packed.append(point)
 	return TRACK_BUILDER_GEOMETRY.sample_centerline(packed)
+
+
+static func _authoritative_centerline(spec: Dictionary) -> PackedVector2Array:
+	if bool(spec.get("centerline_is_sampled", false)):
+		return spec.get("authoritative_centerline", PackedVector2Array())
+	return _sample_centerline(spec["controls"])
 
 
 static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
