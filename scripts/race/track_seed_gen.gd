@@ -149,11 +149,15 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var family_index := posmod(_hash32(seed ^ FAMILY_SALT), FAMILY_NAMES.size())
 	var family: StringName = FAMILY_NAMES[family_index]
 	var tier := StringName(params.get("length_tier", &"standard"))
+	var instrument_rejections := bool(params.get("instrument_rejections", false))
+	var rejection_attempts: Array[Dictionary] = []
+	var rejection_counts: Dictionary = {}
 	var profile := length_profile(tier)
 	if profile.is_empty():
 		var e = _empty_result(seed, family)
 		e["reason"] = "profile empty"
-		return e
+		_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, -1, &"setup", &"invalid_profile", e["reason"])
+		return _with_generation_diagnostics(e, params, tier, instrument_rejections, rejection_attempts, rejection_counts)
 	var length_roll := _hash_unit(seed, LENGTH_SALT)
 	var target_length := lerpf(float(profile["min_length"]), float(profile["max_length"]), length_roll)
 	var configured_max := float(params.get("max_loop_length", 0.0))
@@ -180,7 +184,8 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	if usable_rect.size.x < eff_half * 2.0 or usable_rect.size.y < eff_half * 2.0:
 		var e = _empty_result(seed, family)
 		e["reason"] = "usable rect too small"
-		return e
+		_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, -1, &"setup", &"room_too_small", e["reason"])
+		return _with_generation_diagnostics(e, params, tier, instrument_rejections, rejection_attempts, rejection_counts)
 
 	var requested_self_distance := maxf(float(params.get("min_self_distance", 250.0)), eff_half * 2.0)
 	# A narrow room cannot honor an arbitrarily large requested branch gap after
@@ -234,6 +239,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			forced_half
 		)
 		last_reason = String(validation.get("reason", "unknown"))
+		if not bool(validation["valid"]):
+			_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, attempt, &"primary", _rejection_category(last_reason), last_reason)
+			continue
 		if bool(validation["valid"]):
 			var ordered_controls := _reorder_to_longest_straight(controls)
 			var ordered_validation := _validate_controls(
@@ -246,6 +254,8 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			)
 			if not bool(ordered_validation["valid"]):
 				last_reason = "post-order " + String(ordered_validation.get("reason", "unknown"))
+				var post_order_category := StringName("post_order_" + String(_rejection_category(String(ordered_validation.get("reason", "unknown")))))
+				_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, attempt, &"primary", post_order_category, last_reason)
 				continue
 			var motif := {"controls": ordered_controls, "motifs": [], "rejections": [], "length": float(ordered_validation["length"])}
 			if decorate_enabled:
@@ -256,11 +266,13 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			var final_controls: PackedVector2Array = motif["controls"]
 			if float(motif["length"]) > max_length or float(motif["length"]) < minimum_length:
 				last_reason = "composed route outside requested length band"
+				_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, attempt, &"primary", &"length_band", last_reason)
 				continue
 			if tier == &"standard" and not _room_aspect_ok(final_controls, room_shape):
 				last_reason = "room aspect tipped by profile/motif"
+				_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, attempt, &"primary", &"room_aspect", last_reason)
 				continue
-			return {
+			var result := {
 				"points": final_controls,
 				"seed": seed,
 				"family": family,
@@ -279,6 +291,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"motifs": motif["motifs"],
 				"motif_rejections": motif["rejections"],
 			}
+			return _with_generation_diagnostics(result, params, tier, instrument_rejections, rejection_attempts, rejection_counts)
 
 	var family_reason := last_reason
 	# The fallback is deterministic and never changes the requested seed or its
@@ -308,6 +321,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			forced_half
 		)
 		last_reason = String(validation.get("reason", "unknown"))
+		if not bool(validation["valid"]):
+			_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, MAX_VARIANTS + fallback_attempt, &"fallback", _rejection_category(last_reason), last_reason)
+			continue
 		if bool(validation["valid"]):
 			var ordered_controls := _reorder_to_longest_straight(controls)
 			var ordered_validation := _validate_controls(
@@ -320,6 +336,8 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			)
 			if not bool(ordered_validation["valid"]):
 				last_reason = "post-order " + String(ordered_validation.get("reason", "unknown"))
+				var post_order_category := StringName("post_order_" + String(_rejection_category(String(ordered_validation.get("reason", "unknown")))))
+				_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, MAX_VARIANTS + fallback_attempt, &"fallback", post_order_category, last_reason)
 				continue
 			var motif := {"controls": ordered_controls, "motifs": [], "rejections": [], "length": float(ordered_validation["length"])}
 			if decorate_enabled:
@@ -330,11 +348,13 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			var final_controls: PackedVector2Array = motif["controls"]
 			if float(motif["length"]) > max_length or float(motif["length"]) < fallback_minimum:
 				last_reason = "fallback outside requested length band"
+				_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, MAX_VARIANTS + fallback_attempt, &"fallback", &"length_band", last_reason)
 				continue
 			if tier == &"standard" and not _room_aspect_ok(final_controls, room_shape):
 				last_reason = "room aspect tipped by profile/motif"
+				_record_rejection(instrument_rejections, rejection_attempts, rejection_counts, MAX_VARIANTS + fallback_attempt, &"fallback", &"room_aspect", last_reason)
 				continue
-			return {
+			var result := {
 				"points": final_controls,
 				"seed": seed,
 				"family": family,
@@ -354,9 +374,10 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"motif_rejections": motif["rejections"],
 				"fallback_reason": family_reason,
 			}
+			return _with_generation_diagnostics(result, params, tier, instrument_rejections, rejection_attempts, rejection_counts)
 	var empty := _empty_result(seed, family)
 	empty["reason"] = last_reason
-	return empty
+	return _with_generation_diagnostics(empty, params, tier, instrument_rejections, rejection_attempts, rejection_counts)
 
 
 static func _empty_result(seed: int, family: StringName) -> Dictionary:
@@ -373,6 +394,73 @@ static func _empty_result(seed: int, family: StringName) -> Dictionary:
 		"route_program": &"none",
 		"route_sequence": "",
 	}
+
+
+static func _record_rejection(
+	enabled: bool,
+	attempts: Array[Dictionary],
+	counts: Dictionary,
+	attempt: int,
+	phase: StringName,
+	category: StringName,
+	reason: String
+) -> void:
+	if not enabled:
+		return
+	attempts.append({
+		"attempt": attempt,
+		"phase": String(phase),
+		"category": String(category),
+		"reason": reason,
+	})
+	counts[String(category)] = int(counts.get(String(category), 0)) + 1
+
+
+static func _with_generation_diagnostics(
+	result: Dictionary,
+	params: Dictionary,
+	tier: StringName,
+	enabled: bool,
+	attempts: Array[Dictionary],
+	counts: Dictionary
+) -> Dictionary:
+	if enabled:
+		result["generation_diagnostics"] = {
+			"room": String(params.get("room_shape", "")),
+			"tier": String(tier),
+			"seed": int(result.get("seed", -1)),
+			"rejections": attempts,
+			"rejection_counts": counts,
+		}
+	return result
+
+
+static func _rejection_category(reason: String) -> StringName:
+	if reason == "too few controls":
+		return &"proposal_geometry"
+	if reason == "self intersection":
+		return &"self_intersection"
+	if reason.begins_with("self distance"):
+		return &"self_distance"
+	if reason.begins_with("corridor offset"):
+		return &"corridor_offset"
+	if reason == "outside source rect":
+		return &"source_bounds"
+	if reason == "outside room margin" or reason == "variable-width road edge outside room polygon":
+		return &"room_clearance"
+	if reason == "below minimum length":
+		return &"minimum_length"
+	if reason.begins_with("only") and reason.contains("setup straight"):
+		return &"setup_straights"
+	if reason.begins_with("only") and reason.contains("literal straight"):
+		return &"literal_straights"
+	if reason.begins_with("driveable chord"):
+		return &"driveable_bypass"
+	if reason.begins_with("turn radius") or reason == "local turn radius < w_local + hull":
+		return &"turn_radius"
+	if reason == "local branch w_a + w_b + gap violated":
+		return &"branch_spacing"
+	return &"validation_other"
 
 
 static func _generation_rect(room_rect: Rect2, params: Dictionary, room_polygon: PackedVector2Array) -> Rect2:
@@ -924,11 +1012,11 @@ static func _validate_controls(
 		var min_local_r := INF
 		for i in ws.size():
 			min_local_r = minf(min_local_r, ws[i] + VEHICLE_HULL_RADIUS)
-		return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": min_local_r, "literal_straight_count": literal_straight_count}
+		return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": min_local_r, "literal_straight_count": literal_straight_count, "setup_straight_count": setup_straight_count}
 	var minimum_turn_radius := _minimum_turn_radius(centerline)
 	if minimum_turn_radius < MIN_DRIVE_RADIUS:
 		return {"valid": false, "reason": "turn radius %.1f < %.1f" % [minimum_turn_radius, MIN_DRIVE_RADIUS]}
-	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius, "literal_straight_count": literal_straight_count}
+	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius, "literal_straight_count": literal_straight_count, "setup_straight_count": setup_straight_count}
 
 
 static func _detect_pockets(mapped_vertices: PackedVector2Array) -> Array:
@@ -1607,4 +1695,3 @@ static func _local_corridor_edges_inside_room(centerline: PackedVector2Array, ws
 		if not _inside_with_margin(p1 - right * w, room_polygon, 0.0):
 			return false
 	return true
-

@@ -1,12 +1,12 @@
 extends SceneTree
 
-## TrackSeedGen benchmark: times generate_with_retries across a seed sample
+## TrackSeedGen benchmark: times generate_with_retries across every length tier
 ## (classic room) and the full room-shape matrix, and can dump per-seed
 ## SHA-256 fingerprints of the canonical result for before/after byte-identity
 ## diffs.
 ##
 ## Knobs:
-##   PC_BENCH_SEEDS   seed count per room (default 60, min 1)
+##   PC_BENCH_SEEDS   seed count per room/tier cell (default 2, min 1)
 ##   PC_BENCH_MATRIX  0 to skip the room-shape matrix (default: run it)
 ##   PC_SEEDGEN_FP    1 to dump fingerprints instead of timing
 ##
@@ -15,6 +15,7 @@ extends SceneTree
 
 const TRACK_SEED_GEN := preload("res://scripts/race/track_seed_gen.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
+const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const ROOM_RECT := Rect2(-940.0, -540.0, 1880.0, 1080.0)
 
 static var ROOM_SHAPES := TRACK_BUILDER.ROOM_SHAPES
@@ -25,7 +26,9 @@ func _initialize() -> void:
 
 
 func _run_benchmark() -> void:
-	var seed_count := 60
+	# Two seeds in all 30 cells bounds the all-tier default at 60 generations.
+	# Larger timing or fingerprint windows remain opt-in.
+	var seed_count := 2
 	if OS.get_environment("PC_BENCH_SEEDS").is_valid_int():
 		seed_count = clampi(int(OS.get_environment("PC_BENCH_SEEDS")), 1, 1000)
 	var run_matrix := OS.get_environment("PC_BENCH_MATRIX") != "0"
@@ -37,30 +40,31 @@ func _run_benchmark() -> void:
 			if room_name != "classic":
 				rooms.append(room_name)
 
-	for room_name: String in rooms:
-		var params := _room_params(room_name)
-		var times := PackedFloat32Array()
-		var attempts_total := 0
-		for seed in seed_count:
-			var started := Time.get_ticks_usec()
-			var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, params)
-			var elapsed := (Time.get_ticks_usec() - started) / 1000.0
-			times.append(elapsed)
-			attempts_total += int(result.get("attempt", -1)) + 1
-			if fingerprint_mode:
-				print("SEEDGEN_FP %s %d %s" % [room_name, seed, _fingerprint(result)])
-			print("SEEDGEN_BENCH room=%s seed=%d ms=%.2f attempts=%d fallback=%s family=%s" % [
-				room_name, seed, elapsed,
-				int(result.get("attempt", -1)) + 1,
-				result.get("fallback", false),
-				result.get("family", "none"),
+	for tier: String in GENERATED_RULES.LENGTH_TIERS:
+		for room_name: String in rooms:
+			var params := _room_params(room_name, tier)
+			var times := PackedFloat32Array()
+			var attempts_total := 0
+			for seed in seed_count:
+				var started := Time.get_ticks_usec()
+				var result: Dictionary = TRACK_SEED_GEN.generate_with_retries(seed, ROOM_RECT, params)
+				var elapsed := (Time.get_ticks_usec() - started) / 1000.0
+				times.append(elapsed)
+				attempts_total += int(result.get("attempt", -1)) + 1
+				if fingerprint_mode:
+					print("SEEDGEN_FP %s %s %d %s" % [room_name, tier, seed, _fingerprint(result)])
+				print("SEEDGEN_BENCH room=%s tier=%s seed=%d ms=%.2f attempts=%d fallback=%s family=%s" % [
+					room_name, tier, seed, elapsed,
+					int(result.get("attempt", -1)) + 1,
+					result.get("fallback", false),
+					result.get("family", "none"),
+				])
+			times.sort()
+			print("SEEDGEN_BENCH room=%s tier=%s n=%d median_ms=%.2f mean_ms=%.2f max_ms=%.2f avg_attempts=%.2f" % [
+				room_name, tier, times.size(), times[times.size() / 2],
+				_times_sum(times) / float(times.size()), times[times.size() - 1],
+				float(attempts_total) / float(times.size()),
 			])
-		times.sort()
-		print("SEEDGEN_BENCH room=%s n=%d median_ms=%.2f mean_ms=%.2f max_ms=%.2f avg_attempts=%.2f" % [
-			room_name, times.size(), times[times.size() / 2],
-			_times_sum(times) / float(times.size()), times[times.size() - 1],
-			float(attempts_total) / float(times.size()),
-		])
 	print("TRACK_SEED_GEN_BENCHMARK PASS")
 	quit(0)
 
@@ -103,13 +107,18 @@ func _fingerprint(result: Dictionary) -> String:
 	return context.finish().hex_encode()
 
 
-func _room_params(room_name: String) -> Dictionary:
+func _room_params(room_name: String, tier: String) -> Dictionary:
+	var profile := TRACK_SEED_GEN.length_profile(StringName(tier))
+	var scaled_room := PackedVector2Array()
+	for point: Vector2 in ROOM_SHAPES[room_name]:
+		scaled_room.append(point * float(profile["room_scale"]))
 	var params := {
 		"margin": 190.0,
 		"min_self_distance": 320.0,
 		"min_loop_length": 1900.0 * TRACK_SEED_GEN.WORLD_SCALE,
-		"room_polygon": ROOM_SHAPES[room_name],
+		"room_polygon": scaled_room,
 		"room_shape": StringName(room_name),
+		"length_tier": StringName(tier),
 	}
 	match room_name:
 		"el":
