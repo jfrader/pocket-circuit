@@ -60,6 +60,13 @@ REQUIRED_RELEASE_NOTICES = {
     "data/vendor/**/LICENSE*",
     "data/vendor/procedural_2d/*.json",
 }
+EXPECTED_GAMESTRUMENTS_VENDOR_FILES = {
+    "LICENSE.md",
+    "README.md",
+    "bin/gamestruments_godot.dll",
+    "bin/libgamestruments_godot.so",
+    "gamestruments.gdextension",
+}
 EXPECTED_STEAM_MEDIA = {
     "capsules/community_icon.png": (184, 184),
     "capsules/header_capsule.png": (920, 430),
@@ -464,6 +471,25 @@ def main() -> int:
     ):
         if not notice_path.is_file():
             errors.append(f"missing release notice: {notice_path.relative_to(ROOT)}")
+
+    gamestruments_vendor = ROOT / "vendor/gamestruments"
+    actual_vendor_files = {
+        path.relative_to(gamestruments_vendor).as_posix()
+        for path in gamestruments_vendor.rglob("*")
+        if path.is_file()
+    }
+    if actual_vendor_files != EXPECTED_GAMESTRUMENTS_VENDOR_FILES:
+        missing = sorted(EXPECTED_GAMESTRUMENTS_VENDOR_FILES - actual_vendor_files)
+        unexpected = sorted(actual_vendor_files - EXPECTED_GAMESTRUMENTS_VENDOR_FILES)
+        errors.append(f"Gamestruments vendor contents differ (missing={missing}, unexpected={unexpected})")
+    if not (ROOT / "vendor/.gdignore").is_file():
+        errors.append("vendor/.gdignore must prevent Godot from loading the vendored descriptor beside the synced addon")
+    vendor_readme = gamestruments_vendor / "README.md"
+    if vendor_readme.is_file():
+        readme_text = vendor_readme.read_text(encoding="utf-8")
+        for required_text in ("v1.0.3", "credential-free", "fine-grained GitHub PAT", "Contents: read"):
+            if required_text not in readme_text:
+                errors.append(f"vendor/gamestruments/README.md must document {required_text}")
 
     media_root = ROOT / "media" / "steam"
     validate_png_decoder(errors)
