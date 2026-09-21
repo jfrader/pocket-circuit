@@ -56,6 +56,8 @@ func load_data() -> Dictionary:
 		return primary["data"] as Dictionary
 	if String(primary["status"]) == "future":
 		return _future_version_defaults(int(primary["version"]), "primary")
+	if String(primary["status"]) == "circuit_error":
+		return _unsupported_circuit_defaults(String(primary["diagnostic"]), "primary")
 
 	var backup_path := save_path + ".bak"
 	var backup := _read_candidate(backup_path)
@@ -64,6 +66,8 @@ func load_data() -> Dictionary:
 		return backup["data"] as Dictionary
 	if String(backup["status"]) == "future":
 		return _future_version_defaults(int(backup["version"]), "backup")
+	if String(backup["status"]) == "circuit_error":
+		return _unsupported_circuit_defaults(String(backup["diagnostic"]), "backup")
 	if String(primary["status"]) != "missing":
 		last_load_error = "%s; no valid backup was available" % String(primary["diagnostic"])
 	elif String(backup["status"]) != "missing":
@@ -153,6 +157,8 @@ func remove_save() -> void:
 
 
 func _canonicalize_for_disk(raw: Dictionary) -> Dictionary:
+	if not _circuit_persistence_error(raw).is_empty():
+		return {}
 	var normalized := _normalize(raw)
 	var parsed: Variant = JSON.parse_string(JSON.stringify(normalized))
 	if parsed is not Dictionary:
@@ -242,6 +248,9 @@ func _read_candidate(path: String) -> Dictionary:
 		var version := int(raw_version)
 		if version > CURRENT_VERSION:
 			return {"status": "future", "version": version, "diagnostic": "Unsupported save version %d" % version}
+	var circuit_error := _circuit_persistence_error(raw)
+	if not circuit_error.is_empty():
+		return {"status": "circuit_error", "diagnostic": circuit_error}
 	return {"status": "ok", "data": _normalize(raw)}
 
 
@@ -251,6 +260,29 @@ func _future_version_defaults(version: int, source: String) -> Dictionary:
 	var fallback := default_data()
 	fallback["first_run"] = false
 	return fallback
+
+
+func _unsupported_circuit_defaults(diagnostic: String, source: String) -> Dictionary:
+	is_read_only = true
+	last_load_error = "%s in %s; save was left unchanged" % [diagnostic, source]
+	var fallback := default_data()
+	fallback["first_run"] = false
+	return fallback
+
+
+func _circuit_persistence_error(raw: Dictionary) -> String:
+	var championship: Variant = raw.get("championship_circuit")
+	if championship is Dictionary:
+		var championship_result := CIRCUIT_IDENTITIES.normalize_championship_result(championship)
+		if not bool(championship_result.get("ok", false)):
+			return String(championship_result.get("error", "Championship circuit record is unsupported."))
+	for key: String in ["circuit_history", "favorite_circuits"]:
+		if not raw.has(key):
+			continue
+		var library_result := CIRCUIT_LIBRARY.normalize_history_result(raw[key]) if key == "circuit_history" else CIRCUIT_LIBRARY.normalize_favorites_result(raw[key])
+		if not bool(library_result.get("ok", false)):
+			return "%s: %s" % [key, String(library_result.get("error", "Circuit identity is unsupported."))]
+	return ""
 
 
 func _copy_file(source_path: String, destination_path: String) -> bool:

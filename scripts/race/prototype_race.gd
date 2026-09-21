@@ -521,11 +521,11 @@ func _track_generation_options(event: Dictionary) -> Dictionary:
 	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
 	if identity is Dictionary:
 		var identity_record := identity as Dictionary
-		var generated_options := GENERATED_CIRCUITS.generation_options(identity_record)
-		if generated_options.is_empty():
-			options["sub_seeds"] = (identity_record.get("sub_seeds", {}) as Dictionary).duplicate(true)
+		var options_result := GENERATED_CIRCUITS.generation_options_result(identity_record)
+		if not bool(options_result.get("ok", false)):
+			options["version_error"] = String(options_result.get("error", "Circuit identity is invalid."))
 		else:
-			options.merge(generated_options, true)
+			options.merge(options_result["options"], true)
 	return options
 
 

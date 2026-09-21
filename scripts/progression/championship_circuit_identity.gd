@@ -6,6 +6,8 @@ const SCHEMA_VERSION := 1
 # Keep seeds/rooms stable while geometry revisions invalidate lap artifacts.
 const SEED_VERSION := 1
 const GENERATOR_VERSION := GENERATED_IDENTITY.GENERATOR_VERSION
+const V8_SCHEMA_VERSION := GENERATED_IDENTITY.V8_SCHEMA_VERSION
+const V8_GENERATOR_VERSION := GENERATED_IDENTITY.V8_GENERATOR_VERSION
 const LEGACY_MIGRATION_SEED := 665001
 const MAX_SEED := 0x7FFFFFFF
 const CIRCUIT_SEED_RANGE := 1000000
@@ -22,23 +24,36 @@ const DOMAINS: Array[String] = [
 ]
 
 
-static func create_championship(championship_seed: int) -> Dictionary:
+static func create_championship(
+		championship_seed: int,
+		schema_version: int = SCHEMA_VERSION,
+		generator_version: int = GENERATOR_VERSION
+) -> Dictionary:
+	if not _supported_version(schema_version, generator_version):
+		return {}
 	var seed := clampi(championship_seed, 0, MAX_SEED)
 	var events := {}
 	for event: Dictionary in CATALOG.EVENTS:
 		var event_id := String(event["id"])
-		events[event_id] = create_event(seed, event)
+		events[event_id] = create_event(seed, event, schema_version, generator_version)
 	var identity := {
-		"schema_version": SCHEMA_VERSION,
-		"generator_version": GENERATOR_VERSION,
+		"schema_version": schema_version,
+		"generator_version": generator_version,
 		"seed": seed,
 		"events": events,
 	}
-	identity["fingerprint"] = _championship_fingerprint(identity)
+	identity["fingerprint"] = _championship_fingerprint(identity, generator_version)
 	return identity
 
 
-static func create_event(championship_seed: int, event: Dictionary) -> Dictionary:
+static func create_event(
+		championship_seed: int,
+		event: Dictionary,
+		schema_version: int = SCHEMA_VERSION,
+		generator_version: int = GENERATOR_VERSION
+) -> Dictionary:
+	if not _supported_version(schema_version, generator_version):
+		return {}
 	var event_id := String(event.get("id", ""))
 	var theme := String(event.get("theme", ""))
 	var sub_seeds := {}
@@ -46,10 +61,10 @@ static func create_event(championship_seed: int, event: Dictionary) -> Dictionar
 	for domain: String in DOMAINS:
 		var sub_seed := _derive_sub_seed(championship_seed, event_id, domain)
 		sub_seeds[domain] = sub_seed
-		fingerprints[domain] = _domain_fingerprint(championship_seed, event_id, domain, sub_seed)
+		fingerprints[domain] = _domain_fingerprint(championship_seed, event_id, domain, sub_seed, generator_version)
 	var identity := {
-		"schema_version": SCHEMA_VERSION,
-		"generator_version": GENERATOR_VERSION,
+		"schema_version": schema_version,
+		"generator_version": generator_version,
 		"championship_seed": championship_seed,
 		"event_id": event_id,
 		"theme": theme,
@@ -57,33 +72,52 @@ static func create_event(championship_seed: int, event: Dictionary) -> Dictionar
 		"sub_seeds": sub_seeds,
 		"fingerprints": fingerprints,
 	}
-	fingerprints["circuit"] = _event_fingerprint(identity)
+	if schema_version == V8_SCHEMA_VERSION:
+		var generated := GENERATED_IDENTITY.create_v8(
+			StringName(theme), StringName(identity["room"]), int(sub_seeds["route"]),
+			false, int(event.get("act", 1)), "", "", sub_seeds
+		)
+		if generated.is_empty():
+			return {}
+		identity["room_recipe_id"] = int(generated["room_recipe_id"])
+		identity["room_recipe_revision"] = int(generated["room_recipe_revision"])
+		identity["room_geometry_seed"] = int(generated["room_geometry_seed"])
+	fingerprints["circuit"] = _event_fingerprint(identity, generator_version)
 	return identity
 
 
 static func normalize_championship(value: Variant, fallback_seed: int = LEGACY_MIGRATION_SEED) -> Dictionary:
+	var result := normalize_championship_result(value, fallback_seed)
+	return (result.get("identity", {}) as Dictionary).duplicate(true) if bool(result.get("ok", false)) else {}
+
+
+static func normalize_championship_result(value: Variant, fallback_seed: int = LEGACY_MIGRATION_SEED) -> Dictionary:
 	if value is not Dictionary:
-		return create_championship(fallback_seed)
+		return {"ok": true, "identity": create_championship(fallback_seed)}
 	var raw := value as Dictionary
 	if not _is_seed(raw.get("seed")):
-		return create_championship(fallback_seed)
+		return _error("invalid_identity", "Championship circuit record has an invalid seed.")
 	var seed := int(raw["seed"])
-	if int(raw.get("schema_version", 0)) != SCHEMA_VERSION or int(raw.get("generator_version", 0)) != GENERATOR_VERSION:
-		return create_championship(seed)
+	if not _is_integral_number(raw.get("schema_version")) or not _is_integral_number(raw.get("generator_version")):
+		return _error("missing_version", "Championship circuit record requires explicit schema and generator versions.")
+	var schema_version := int(raw["schema_version"])
+	var generator_version := int(raw["generator_version"])
+	if not _supported_version(schema_version, generator_version):
+		return _error("unsupported_generator", "Championship circuit schema %d generator %d is not supported." % [schema_version, generator_version])
 	var raw_events: Dictionary = raw.get("events", {}) if raw.get("events") is Dictionary else {}
 	var events := {}
 	for event: Dictionary in CATALOG.EVENTS:
 		var event_id := String(event["id"])
-		var normalized_event := _normalize_event(raw_events.get(event_id), event, seed)
-		events[event_id] = normalized_event if not normalized_event.is_empty() else create_event(seed, event)
+		var normalized_event := _normalize_event(raw_events.get(event_id), event, seed, schema_version, generator_version)
+		events[event_id] = normalized_event if not normalized_event.is_empty() else create_event(seed, event, schema_version, generator_version)
 	var normalized := {
-		"schema_version": SCHEMA_VERSION,
-		"generator_version": GENERATOR_VERSION,
+		"schema_version": schema_version,
+		"generator_version": generator_version,
 		"seed": seed,
 		"events": events,
 	}
-	normalized["fingerprint"] = _championship_fingerprint(normalized)
-	return normalized
+	normalized["fingerprint"] = _championship_fingerprint(normalized, generator_version)
+	return {"ok": true, "identity": normalized}
 
 
 static func event_identity(championship: Dictionary, event_id: String) -> Dictionary:
@@ -119,11 +153,17 @@ static func room_for_seed(seed: int) -> String:
 	return String(GENERATED_RULES.room_for_composition_seed(seed))
 
 
-static func _normalize_event(value: Variant, event: Dictionary, championship_seed: int) -> Dictionary:
+static func _normalize_event(
+		value: Variant,
+		event: Dictionary,
+		championship_seed: int,
+		schema_version: int,
+		generator_version: int
+) -> Dictionary:
 	if value is not Dictionary:
 		return {}
 	var raw := value as Dictionary
-	if int(raw.get("schema_version", 0)) != SCHEMA_VERSION or int(raw.get("generator_version", 0)) != GENERATOR_VERSION:
+	if int(raw.get("schema_version", 0)) != schema_version or int(raw.get("generator_version", 0)) != generator_version:
 		return {}
 	if not _is_seed(raw.get("championship_seed")) or int(raw["championship_seed"]) != championship_seed:
 		return {}
@@ -145,7 +185,7 @@ static func _normalize_event(value: Variant, event: Dictionary, championship_see
 		var seed := int(seed_value)
 		if seed != _derive_sub_seed(championship_seed, String(event["id"]), domain):
 			return {}
-		var expected_fingerprint := _domain_fingerprint(championship_seed, String(event["id"]), domain, seed)
+		var expected_fingerprint := _domain_fingerprint(championship_seed, String(event["id"]), domain, seed, generator_version)
 		if String((raw_fingerprints as Dictionary).get(domain, "")) != expected_fingerprint:
 			return {}
 		sub_seeds[domain] = seed
@@ -153,8 +193,8 @@ static func _normalize_event(value: Variant, event: Dictionary, championship_see
 	if room != room_for_seed(int(sub_seeds["room_composition"])):
 		return {}
 	var normalized := {
-		"schema_version": SCHEMA_VERSION,
-		"generator_version": GENERATOR_VERSION,
+		"schema_version": schema_version,
+		"generator_version": generator_version,
 		"championship_seed": championship_seed,
 		"event_id": String(event["id"]),
 		"theme": String(event["theme"]),
@@ -162,7 +202,15 @@ static func _normalize_event(value: Variant, event: Dictionary, championship_see
 		"sub_seeds": sub_seeds,
 		"fingerprints": fingerprints,
 	}
-	var circuit_fingerprint := _event_fingerprint(normalized)
+	if schema_version == V8_SCHEMA_VERSION:
+		for field: String in ["room_recipe_id", "room_recipe_revision", "room_geometry_seed"]:
+			if not _is_integral_number(raw.get(field)):
+				return {}
+			normalized[field] = int(raw[field])
+		var generated := GENERATED_IDENTITY.from_championship_event(event, normalized)
+		if generated.is_empty():
+			return {}
+	var circuit_fingerprint := _event_fingerprint(normalized, generator_version)
 	if String((raw_fingerprints as Dictionary).get("circuit", "")) != circuit_fingerprint:
 		return {}
 	fingerprints["circuit"] = circuit_fingerprint
@@ -183,9 +231,9 @@ static func _derive_sub_seed(championship_seed: int, event_id: String, domain: S
 	return posmod(value, CIRCUIT_SEED_RANGE)
 
 
-static func _domain_fingerprint(championship_seed: int, event_id: String, domain: String, sub_seed: int) -> String:
+static func _domain_fingerprint(championship_seed: int, event_id: String, domain: String, sub_seed: int, generator_version: int = GENERATOR_VERSION) -> String:
 	return ("pc-circuit-domain-v%d|%d|%s|%s|%d" % [
-		GENERATOR_VERSION,
+		generator_version,
 		championship_seed,
 		event_id,
 		domain,
@@ -193,23 +241,26 @@ static func _domain_fingerprint(championship_seed: int, event_id: String, domain
 	]).sha256_text().substr(0, 16)
 
 
-static func _event_fingerprint(identity: Dictionary) -> String:
+static func _event_fingerprint(identity: Dictionary, generator_version: int = GENERATOR_VERSION) -> String:
 	var parts := PackedStringArray([
-		"pc-circuit-event-v%d" % GENERATOR_VERSION,
+		"pc-circuit-event-v%d" % generator_version,
 		str(identity["championship_seed"]),
 		String(identity["event_id"]),
 		String(identity["theme"]),
 		String(identity["room"]),
 	])
+	if generator_version == V8_GENERATOR_VERSION:
+		parts.append("recipe=%d:%d" % [int(identity["room_recipe_id"]), int(identity["room_recipe_revision"])])
+		parts.append("room_geometry=%d" % int(identity["room_geometry_seed"]))
 	var sub_seeds: Dictionary = identity["sub_seeds"]
 	for domain: String in DOMAINS:
 		parts.append("%s=%d" % [domain, int(sub_seeds[domain])])
 	return "|".join(parts).sha256_text().substr(0, 16)
 
 
-static func _championship_fingerprint(identity: Dictionary) -> String:
+static func _championship_fingerprint(identity: Dictionary, generator_version: int = GENERATOR_VERSION) -> String:
 	var parts := PackedStringArray([
-		"pc-championship-circuits-v%d" % GENERATOR_VERSION,
+		"pc-championship-circuits-v%d" % generator_version,
 		str(identity["seed"]),
 	])
 	var events: Dictionary = identity["events"]
@@ -225,3 +276,18 @@ static func _is_seed(value: Variant) -> bool:
 		return false
 	var seed := int(value)
 	return seed >= 0 and seed <= MAX_SEED and float(seed) == float(value)
+
+
+static func _supported_version(schema_version: int, generator_version: int) -> bool:
+	return (
+		(schema_version == SCHEMA_VERSION and generator_version == GENERATOR_VERSION)
+		or (schema_version == V8_SCHEMA_VERSION and generator_version == V8_GENERATOR_VERSION)
+	)
+
+
+static func _is_integral_number(value: Variant) -> bool:
+	return (value is int or value is float) and float(int(value)) == float(value)
+
+
+static func _error(kind: String, message: String) -> Dictionary:
+	return {"ok": false, "kind": kind, "error": message}

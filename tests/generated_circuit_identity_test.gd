@@ -42,6 +42,38 @@ func _run_test() -> void:
 	var decoded := IDENTITIES.decode_share_code(String(code_result["code"]))
 	if not _expect(bool(decoded.get("ok", false)) and decoded["identity"] == identity, "share codes should round-trip the complete canonical identity exactly"):
 		return
+	var v8_identity := IDENTITIES.create_v8(&"workshop", &"wide", FIXTURE_SEED, false, 2, "", "", {}, "long")
+	if not _expect(not v8_identity.is_empty() and int(v8_identity["schema_version"]) == 2 and int(v8_identity["generator_version"]) == 8 and int(v8_identity["room_recipe_id"]) == 1 and int(v8_identity["room_recipe_revision"]) == 1, "schema 2 identities should carry explicit v8 room recipe fields"):
+		return
+	var v8_code_result := IDENTITIES.encode_share_code(v8_identity)
+	var v8_code := String(v8_code_result.get("code", ""))
+	if not _expect(bool(v8_code_result.get("ok", false)) and v8_code.begins_with("PC2-") and IDENTITIES.decode_share_code(v8_code).get("identity", {}) == v8_identity, "PC2 should round-trip a complete schema 2 identity"):
+		return
+	var v8_payload_result := IDENTITIES._base32_decode(v8_code.replace("-", "").substr(3))
+	var v8_payload: PackedByteArray = v8_payload_result["bytes"]
+	var v8_body := v8_payload.slice(0, v8_payload.size() - 4)
+	if not _expect(
+		v8_body.size() >= 38
+		and int(v8_body[0]) == 8
+		and int(v8_body[1]) == IDENTITIES.THEMES.find("workshop")
+		and int(v8_body[2]) == IDENTITIES.ROOMS.find("wide")
+		and int(v8_body[5]) == IDENTITIES.GENERATED_RULES.LENGTH_TIERS.find("long")
+		and int(v8_body[6]) == int(v8_identity["room_recipe_id"])
+		and int(v8_body[7]) == int(v8_identity["room_recipe_revision"])
+		and IDENTITIES._read_u32(v8_body, 8) == int(v8_identity["room_geometry_seed"])
+		and IDENTITIES._read_u32(v8_body, 12) == FIXTURE_SEED,
+		"PC2 bytes should be header, recipe id/revision, big-endian room seed, then the six existing sub-seeds"
+	):
+		return
+	var v8_options_result := IDENTITIES.generation_options_result(v8_identity)
+	var v8_event := IDENTITIES.apply_to_event(v8_identity)
+	if not _expect(bool(v8_options_result.get("ok", false)) and int(v8_options_result["options"]["schema_version"]) == 2 and int(v8_options_result["options"]["generator_version"]) == 8 and int(v8_options_result["options"]["room_geometry_seed"]) == int(v8_identity["room_geometry_seed"]) and int(v8_event["circuit_schema_version"]) == 2 and int(v8_event["circuit_generator_version"]) == 8, "generation options and event conversion should retain the complete explicit v8 selection"):
+		return
+	var unsupported_identity := identity.duplicate(true)
+	unsupported_identity["generator_version"] = 6
+	var unsupported_identity_result := IDENTITIES.normalize_result(unsupported_identity)
+	if not _expect(unsupported_identity_result.get("kind") == "unsupported_generator" and String(unsupported_identity_result.get("error", "")).contains("version 6"), "generator versions at or below 6 should fail with an explicit unsupported error"):
+		return
 	var typed_lowercase := String(code_result["code"]).to_lower().replace("-", " ")
 	if not _expect(IDENTITIES.decode_share_code(typed_lowercase).get("identity", {}) == identity, "typing should tolerate case, spaces, and omitted grouping punctuation"):
 		return

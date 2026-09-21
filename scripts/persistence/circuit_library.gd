@@ -7,11 +7,19 @@ const FAVORITES_LIMIT := 20
 
 
 static func normalize_history(value: Variant) -> Array:
-	return _normalize_entries(value, HISTORY_LIMIT)
+	return normalize_history_result(value)["entries"]
+
+
+static func normalize_history_result(value: Variant) -> Dictionary:
+	return _normalize_entries_result(value, HISTORY_LIMIT)
 
 
 static func normalize_favorites(value: Variant) -> Array:
-	return _normalize_entries(value, FAVORITES_LIMIT)
+	return normalize_favorites_result(value)["entries"]
+
+
+static func normalize_favorites_result(value: Variant) -> Dictionary:
+	return _normalize_entries_result(value, FAVORITES_LIMIT)
 
 
 static func add_recent(history_value: Variant, identity_value: Variant) -> Array:
@@ -52,14 +60,26 @@ static func _prepend_unique(entries_value: Variant, identity_value: Variant, lim
 
 
 static func _normalize_entries(value: Variant, limit: int) -> Array:
+	return _normalize_entries_result(value, limit)["entries"]
+
+
+static func _normalize_entries_result(value: Variant, limit: int) -> Dictionary:
 	var output: Array = []
 	var seen := {}
 	if value is not Array:
-		return output
+		return {"ok": true, "entries": output}
 	for raw: Variant in value:
-		var identity := IDENTITIES.normalize(raw)
-		if identity.is_empty():
+		var normalized := IDENTITIES.normalize_result(raw)
+		if not bool(normalized.get("ok", false)):
+			if raw is Dictionary and (raw as Dictionary).has("schema_version") and (raw as Dictionary).has("generator_version"):
+				return {
+					"ok": false,
+					"kind": String(normalized.get("kind", "invalid_identity")),
+					"error": String(normalized.get("error", "Versioned circuit identity is invalid.")),
+					"entries": output,
+				}
 			continue
+		var identity: Dictionary = normalized["identity"]
 		var fingerprint := String(identity["fingerprint"])
 		if seen.has(fingerprint):
 			continue
@@ -67,4 +87,4 @@ static func _normalize_entries(value: Variant, limit: int) -> Array:
 		output.append(identity.duplicate(true))
 		if output.size() >= limit:
 			break
-	return output
+	return {"ok": true, "entries": output}

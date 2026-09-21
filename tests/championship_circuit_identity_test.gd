@@ -86,9 +86,23 @@ func _run_test() -> void:
 	if not _expect(IDENTITIES.create_championship(FIXTURE_SEED + 1)["fingerprint"] != championship["fingerprint"], "a different championship seed should produce a different circuit set"):
 		return
 
-	# A pre-v7 record (generator_version=1) keeps its master seed while its
-	# fingerprints advance, so old-geometry identities no longer compare as the
-	# current circuit.
+	var v8_championship := IDENTITIES.create_championship(FIXTURE_SEED, 2, 8)
+	var normalized_v8 := IDENTITIES.normalize_championship_result(v8_championship)
+	var v8_event: Dictionary = v8_championship["events"]["kitchen_crumb_rush"]
+	var applied_v8 := IDENTITIES.apply_to_event(CATALOG.get_event("kitchen_crumb_rush"), v8_event)
+	if not _expect(
+		bool(normalized_v8.get("ok", false))
+		and normalized_v8["identity"] == v8_championship
+		and int(v8_event["schema_version"]) == 2
+		and int(v8_event["generator_version"]) == 8
+		and int(v8_event["room_recipe_id"]) >= 0
+		and int(applied_v8["generated_circuit_identity"]["schema_version"]) == 2,
+		"schema 2/v8 championship records should normalize and convert to generated events without becoming v7"
+	):
+		return
+
+	# Historical generators were never shipped as reconstructable implementations.
+	# They remain unsupported instead of being rewritten as v7 records.
 	var legacy := {
 		"schema_version": 1,
 		"generator_version": 1,
@@ -96,8 +110,8 @@ func _run_test() -> void:
 		"events": {},
 		"fingerprint": "ba391b90f4c3f2b5",
 	}
-	var migrated := IDENTITIES.normalize_championship(legacy)
-	if not _expect(int(migrated["seed"]) == FIXTURE_SEED and int(migrated["generator_version"]) == 7 and String(migrated["fingerprint"]) != "ba391b90f4c3f2b5", "normalizing a pre-v7 championship should preserve the master seed while advancing the generator version and fingerprints"):
+	var legacy_result := IDENTITIES.normalize_championship_result(legacy)
+	if not _expect(legacy_result.get("kind") == "unsupported_generator" and String(legacy_result.get("error", "")).contains("generator 1") and IDENTITIES.normalize_championship(legacy).is_empty(), "normalizing a pre-v7 championship should fail explicitly without auto-migration"):
 		return
 
 	var app := root.get_node_or_null("App")
