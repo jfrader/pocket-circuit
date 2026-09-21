@@ -378,7 +378,7 @@ func _configure_racers() -> void:
 	camera.call("set_target", _player_vehicle)
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("set_local_race_vehicle"):
-		app.call("set_local_race_vehicle", _player_vehicle)
+		app.call("set_local_race_vehicle", _player_vehicle, player_vehicle_id)
 
 	var event: Dictionary = _session.get("event", {})
 	var opponent_ids: Array = event.get("opponents", FALLBACK_OPPONENTS) if not event.is_empty() else FALLBACK_OPPONENTS
