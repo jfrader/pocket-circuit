@@ -1,0 +1,18 @@
+[configuration]
+entry_symbol = "gdext_rust_init"
+compatibility_minimum = 4.7
+reloadable = true
+
+[libraries]
+linux.debug.x86_64 = "res://addons/gamestruments/bin/libgamestruments_godot.so"
+linux.release.x86_64 = "res://addons/gamestruments/bin/libgamestruments_godot.so"
+linux.x86_64 = "res://addons/gamestruments/bin/libgamestruments_godot.so"
+windows.debug.x86_64 = "res://addons/gamestruments/bin/gamestruments_godot.dll"
+windows.release.x86_64 = "res://addons/gamestruments/bin/gamestruments_godot.dll"
+windows.x86_64 = "res://addons/gamestruments/bin/gamestruments_godot.dll"
+macos.debug.x86_64 = "res://addons/gamestruments/bin/libgamestruments_godot.dylib"
+macos.release.x86_64 = "res://addons/gamestruments/bin/libgamestruments_godot.dylib"
+macos.x86_64 = "res://addons/gamestruments/bin/libgamestruments_godot.dylib"
+macos.debug.arm64 = "res://addons/gamestruments/bin/libgamestruments_godot.dylib"
+macos.release.arm64 = "res://addons/gamestruments/bin/libgamestruments_godot.dylib"
+macos.arm64 = "res://addons/gamestruments/bin/libgamestruments_godot.dylib"
