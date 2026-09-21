@@ -268,7 +268,7 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false, 
 		current_race_session["mastery_identity"] = mastery_identity
 		current_race_session["mastery_targets"] = (mastery_context["targets"] as Dictionary).duplicate(true)
 		current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), mastery_identity)
-	_begin_race_transition()
+	_begin_race_transition(vehicle_id)
 
 
 func start_mastery_run(event_id: String, vehicle_id: String) -> void:
@@ -497,7 +497,7 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 			"difficulty": String(_save_data["difficulty"]),
 			"result_committed": false,
 		}
-		_begin_race_transition()
+		_begin_race_transition(vehicle_id)
 		return true
 	return _start_generated_identity_race(identity, vehicle_id, "quick")
 
@@ -543,7 +543,7 @@ func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: Stri
 		"difficulty": String(_save_data["difficulty"]),
 		"result_committed": false,
 	}
-	_begin_race_transition()
+	_begin_race_transition(vehicle_id)
 	return true
 
 
@@ -611,7 +611,7 @@ func _yield_loading_frame() -> void:
 		await RenderingServer.frame_post_draw
 
 
-func _begin_race_transition() -> void:
+func _begin_race_transition(vehicle_id: String = "") -> void:
 	_transitioning_to_race = true
 	_loading_cancelled = false
 	_loading_failed = false
@@ -641,6 +641,14 @@ func _begin_race_transition() -> void:
 		fail_race_loading("Race resources could not be loaded")
 		return
 	var packed := resources.get(RACE_SCENE) as PackedScene
+	# Synthesize the engine voice behind the loading screen; the race scene would
+	# otherwise pay ~130 ms on its first live frame.
+	await loading_step("Tuning the engine")
+	if _loading_cancelled:
+		_leave_race_loading()
+		return
+	if is_instance_valid(audio_director):
+		audio_director.call("warm_engine_voice", vehicle_id)
 	await loading_step("Opening the circuit")
 	if _loading_cancelled:
 		_leave_race_loading()
@@ -851,7 +859,7 @@ func retry_race(reload_scene: bool = true) -> void:
 		current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), identity)
 	_reset_race_attempt()
 	if reload_scene:
-		_begin_race_transition()
+		_begin_race_transition(String(current_race_session.get("vehicle_id", "")))
 
 
 func can_start_mastery_rematch() -> bool:
@@ -882,7 +890,7 @@ func start_mastery_rematch(reload_scene: bool = true) -> bool:
 	current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), identity)
 	_reset_race_attempt()
 	if reload_scene:
-		_begin_race_transition()
+		_begin_race_transition(vehicle_id)
 	return true
 
 

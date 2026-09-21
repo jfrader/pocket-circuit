@@ -11,6 +11,18 @@ class FakeVehicle extends Node:
 		return engine_load
 
 
+class StatsVehicle extends Node:
+	var speed := 0.0
+	var engine_load := 0.0
+	var stats: VehicleStats = preload("res://data/vehicles/rustbug.tres")
+
+	func get_engine_load() -> float:
+		return engine_load
+
+	func get_throttle_input() -> float:
+		return engine_load
+
+
 func _initialize() -> void:
 	call_deferred("_run_test")
 
@@ -99,6 +111,26 @@ func _run_test() -> void:
 		return
 	if not _expect(engine_player.pitch_scale >= 1.55, "wide-open throttle should sit near the high-rev ceiling"):
 		return
+	var voiced := StatsVehicle.new()
+	voiced.speed = 300.0
+	voiced.engine_load = 1.0
+	director.set_local_vehicle(voiced)
+	if not _expect(director.has_engine_voice(), "a vehicle with stats should prepare the generated engine voice"):
+		return
+	if not _expect(not String(director.get_engine_voice_signature()).is_empty(), "the prepared voice should expose its signature"):
+		return
+	if not _expect(not engine_player.playing, "the legacy loop should yield to the generated voice"):
+		return
+	director.call("_update_engine", 1.0 / 60.0)
+	if not _expect(director.has_engine_voice(), "the generated voice should stay active while driving"):
+		return
+	director.set_race_paused(true)
+	if not _expect(director.has_engine_voice(), "pausing should not tear down the generated voice"):
+		return
+	director.set_race_paused(false)
+	director.clear_local_vehicle()
+	director.call("_update_engine", 1.0 / 60.0)
+	voiced.free()
 	director.set_live_race_state("finish", 0.0, 0.0, false, "win")
 	idle.free()
 	revs.free()
