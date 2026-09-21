@@ -5,6 +5,8 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const CONTACT_RELEASE_GRACE := 0.12
+## Slip angle where a tyre starts making noise, in degrees.
+const SLIDE_AUDIBLE_DEG := 8.0
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
 const LEGACY_ANGULAR_DAMP := 2.5
@@ -208,6 +210,15 @@ func get_engine_load() -> float:
 
 func get_throttle_input() -> float:
 	return _throttle_input
+
+
+## Normalised slide magnitude for audio and VFX: 0 while the car tracks straight,
+## 1 at or beyond the drift's optimal slip. Presentation-only — gameplay reads
+## is_drifting / is_sliding.
+func get_slide_intensity() -> float:
+	var slip_deg := rad_to_deg(absf(_rear_slip_angle))
+	var audible_span := maxf(stats.drift_optimal_slip_deg - SLIDE_AUDIBLE_DEG, 1.0)
+	return clampf((slip_deg - SLIDE_AUDIBLE_DEG) / audible_span, 0.0, 1.0)
 
 
 func get_effective_max_speed() -> float:

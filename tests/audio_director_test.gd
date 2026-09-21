@@ -121,6 +121,16 @@ func _run_test() -> void:
 		return
 	if not _expect(not engine_player.playing, "the legacy loop should yield to the generated voice"):
 		return
+	if not _expect(director.has_generated_sfx(&"impact") and director.has_generated_sfx(&"boost"), "the local car should generate its own crash and boost"):
+		return
+	if not _expect(not String(director.call("get_crash_voice_signature")).is_empty(), "the crash voice should carry a signature"):
+		return
+	if not _expect(director.get_node_or_null("DriftVoice") != null, "the drift voice node should exist"):
+		return
+	if not _expect(director.play_sfx(&"impact", 0.9), "a prepared car should play its generated crash"):
+		return
+	if not _expect(director.play_sfx(&"boost", 0.82), "a prepared car should play its generated boost"):
+		return
 	director.call("_update_engine", 1.0 / 60.0)
 	if not _expect(director.has_engine_voice(), "the generated voice should stay active while driving"):
 		return
