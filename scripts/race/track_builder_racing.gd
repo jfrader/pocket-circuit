@@ -371,7 +371,7 @@ static func add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: 
 			break
 		if Geometry2D.is_point_in_polygon(candidate, corridor):
 			continue
-		if TrackBuilderCore._distance_to_centerline(candidate, TrackBuilderCore._sample_centerline(spec["controls"])) < 200.0:
+		if TrackBuilderCore._distance_to_centerline(candidate, TrackBuilderCore._authoritative_centerline(spec)) < 200.0:
 			continue
 		var texture_path := String(giants[placed % giants.size()])
 		var texture := load(texture_path) as Texture2D
@@ -451,5 +451,3 @@ static func add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Packe
 			placed += 1
 		index = (index + 2) % count
 		attempts += 1
-
-
