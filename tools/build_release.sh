@@ -75,25 +75,6 @@ export GAMESTRUMENTS_ADDON_DIR="${GAMESTRUMENTS_ADDON_DIR:-$PROJECT_ROOT/vendor/
 printf 'Syncing Gamestruments live engine from %s...\n' "$GAMESTRUMENTS_ADDON_DIR"
 "$PROJECT_ROOT/tools/sync_gamestruments.sh"
 
-printf 'Verifying Gamestruments live engine is present and loadable (release gate has no silent-music WAV fallback mode)...\n'
-check_script="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-check-gamestruments.XXXXXX.gd")"
-cat > "$check_script" << 'EOGD'
-extends SceneTree
-func _initialize() -> void:
-	if ClassDB.class_exists("GamestrumentsPlayer"):
-		print("LIVE_GAMESTRUMENTS_ENGINE_PRESENT")
-		quit(0)
-	else:
-		push_error("LIVE_GAMESTRUMENTS_ENGINE_ABSENT: ClassDB.class_exists(\"GamestrumentsPlayer\") must be true; WAV fallbacks removed")
-		quit(1)
-EOGD
-if ! POCKET_CIRCUIT_EXPECT_OUTPUT="LIVE_GAMESTRUMENTS_ENGINE_PRESENT" run_godot_checked timeout 60 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "$check_script"; then
-	printf 'Gamestruments live engine missing or failed to load after sync. The release gate requires the native extension.\n' >&2
-	rm -f -- "$check_script"
-	exit 1
-fi
-rm -f -- "$check_script"
-
 python3 "$PROJECT_ROOT/tools/validate_release_config.py"
 python3 -m unittest discover -s "$PROJECT_ROOT/tests" -p 'test_*.py'
 
@@ -113,6 +94,25 @@ done
 
 printf 'Importing project with Godot %s...\n' "$godot_version"
 run_godot_checked timeout 300 "$godot_bin" --path "$PROJECT_ROOT" --headless --editor --import --quit
+
+printf 'Verifying Gamestruments live engine is present and loadable (release gate has no silent-music WAV fallback mode)...\n'
+check_script="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-check-gamestruments.XXXXXX.gd")"
+cat > "$check_script" << 'EOGD'
+extends SceneTree
+func _initialize() -> void:
+	if ClassDB.class_exists("GamestrumentsPlayer"):
+		print("LIVE_GAMESTRUMENTS_ENGINE_PRESENT")
+		quit(0)
+	else:
+		push_error("LIVE_GAMESTRUMENTS_ENGINE_ABSENT: ClassDB.class_exists(\"GamestrumentsPlayer\") must be true; WAV fallbacks removed")
+		quit(1)
+EOGD
+if ! POCKET_CIRCUIT_EXPECT_OUTPUT="LIVE_GAMESTRUMENTS_ENGINE_PRESENT" run_godot_checked timeout 60 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "$check_script"; then
+	printf 'Gamestruments live engine missing or failed to load after sync. The release gate requires the native extension.\n' >&2
+	rm -f -- "$check_script"
+	exit 1
+fi
+rm -f -- "$check_script"
 
 shopt -s nullglob dotglob
 tests=("$PROJECT_ROOT"/tests/*.gd)
