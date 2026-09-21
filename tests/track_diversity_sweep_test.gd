@@ -7,6 +7,10 @@ extends SceneTree
 ## distributions and any generation failures.
 ##
 ## Default 4 seeds per cell; PC_DIVERSITY_SEEDS=1..200 expands the baseline.
+## PC_DIVERSITY_GENERATOR=7, PC_DIVERSITY_START, PC_DIVERSITY_CELL=room/tier,
+## and PC_DIVERSITY_SHARD=index/count select reproducible farm slices.
+## PC_DIVERSITY_OUTPUT writes one JSON shard document. PC_DIVERSITY_INPUTS
+## (comma-separated documents) validates and aggregates a complete shard set.
 ## Sequence signatures are sampling-sensitive, NOT counts of macro topologies.
 ## Also report collapsed L/R/S rhythms and 128-point normalized shape clusters.
 ## Shape distance follows track_length_profiles_test, caching normalization and
@@ -29,6 +33,8 @@ const CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const SAMPLE_SEEDS := 4
 const SHAPE_SAMPLE_COUNT := 128
 const DISTINCT_SHAPE_DISTANCE := 0.055
+const FARM_FORMAT := "pocket-circuit-expressive-range-v1"
+const GENERATOR_VERSION := 7
 
 const ROOMS: Array[String] = GENERATED_RULES.ROOMS
 const TIERS: Array[String] = GENERATED_RULES.LENGTH_TIERS
@@ -42,6 +48,10 @@ func _run_test() -> void:
 	var started := Time.get_ticks_msec()
 	if not _test_measurements():
 		return
+	var aggregate_inputs := OS.get_environment("PC_DIVERSITY_INPUTS")
+	if not aggregate_inputs.is_empty():
+		_run_offline_aggregation(aggregate_inputs)
+		return
 	var seed_count: int = SAMPLE_SEEDS
 	var requested := OS.get_environment("PC_DIVERSITY_SEEDS")
 	if not requested.is_empty():
@@ -49,19 +59,29 @@ func _run_test() -> void:
 			return
 		seed_count = int(requested)
 
+	var config := _farm_config(seed_count)
+	if not _expect(bool(config.get("ok", false)), String(config.get("error", "invalid farm configuration"))):
+		return
+	var seed_start := int(config["seed_start"])
+	var selected_cell := String(config["cell"])
+	var shard_index := int(config["shard_index"])
+	var shard_count := int(config["shard_count"])
 	var per_cell: Dictionary = {}
+	var records: Array[Dictionary] = []
 	var total_fails: int = 0
 	var total_seq: int = 0
 	var total_shapes: int = 0
 	var total_invalid := 0
 	var all_failing_seeds: Dictionary = {}
 
-	print("TRACK_DIVERSITY_SWEEP seeds_per_cell=%d rooms=%d tiers=%d" % [seed_count, ROOMS.size(), TIERS.size()])
+	print("TRACK_DIVERSITY_SWEEP generator=%d seed_start=%d seeds_per_cell=%d cell=%s shard=%d/%d" % [GENERATOR_VERSION, seed_start, seed_count, selected_cell if not selected_cell.is_empty() else "all", shard_index, shard_count])
 	print("room/tier | seq | rhythms | shapes | fails | avg_L_runs | avg_R_runs | avg_literal_S | min_turn_runs | max_turn_runs")
 
 	for room: String in ROOMS:
 		for tier: String in TIERS:
 			var cell: String = "%s/%s" % [room, tier]
+			if not selected_cell.is_empty() and selected_cell != cell:
+				continue
 			var seq_set: Dictionary = {}
 			var rhythm_set: Dictionary = {}
 			var shape_reps: Array[PackedVector2Array] = []
@@ -93,6 +113,7 @@ func _run_test() -> void:
 				"room_polygon": scaled_poly,
 				"room_shape": StringName(room),
 				"length_tier": StringName(tier),
+				"instrument_rejections": true,
 			}
 			var room_rect: Rect2 = Rect2(-940.0, -540.0, 1880.0, 1080.0)
 			match room:
@@ -101,8 +122,13 @@ func _run_test() -> void:
 				"square": params["min_loop_length"] = 2200.0 * TRACK_SEED_GEN.WORLD_SCALE
 
 			for s in seed_count:
-				var seed: int = s
+				var case_ordinal := _case_ordinal(room, tier, s, seed_count, selected_cell)
+				if posmod(case_ordinal, shard_count) != shard_index:
+					continue
+				var seed: int = seed_start + s
+				var generation_started := Time.get_ticks_usec()
 				var res: Dictionary = TRACK_SEED_GEN.generate_with_retries(seed, room_rect, params)
+				var generation_ms := (Time.get_ticks_usec() - generation_started) / 1000.0
 				var pts: PackedVector2Array = res.get("points", PackedVector2Array())
 				if pts.is_empty():
 					fail_list.append(seed)
@@ -111,12 +137,15 @@ func _run_test() -> void:
 						all_failing_seeds[cell] = []
 					(all_failing_seeds[cell] as Array).append(seed)
 					print("GENERATION_FAIL %s seed=%d reason=%s" % [cell, seed, res.get("reason", "unknown")])
+					records.append(_case_record(room, tier, seed, scaled_poly, res, {}, PackedVector2Array(), generation_ms, 0.0, &"generation_failed"))
 					continue
 
+				var validation_started := Time.get_ticks_usec()
 				var validation := TRACK_SEED_GEN._validate_controls(
 					pts, TRACK_SEED_GEN._points_rect(scaled_poly), scaled_poly,
 					TRACK_SEED_GEN.CORRIDOR_CLEARANCE, 320.0, float(params["min_loop_length"])
 				)
+				var validation_ms := (Time.get_ticks_usec() - validation_started) / 1000.0
 				if not bool(validation["valid"]) or int(res.get("seed", -1)) != seed:
 					total_invalid += 1
 					print("INVALID_CIRCUIT %s seed=%d reason=%s" % [cell, seed, validation.get("reason", "seed identity changed")])
@@ -143,6 +172,11 @@ func _run_test() -> void:
 				n_samples += 1
 
 				var shape := _normalized_shape(centerline)
+				records.append(_case_record(
+					room, tier, seed, scaled_poly, res, validation, shape,
+					generation_ms, validation_ms,
+					&"ok" if bool(validation["valid"]) and int(res.get("seed", -1)) == seed and not seq.is_empty() else &"invalid"
+				))
 				var is_distinct: bool = true
 				for rep: PackedVector2Array in shape_reps:
 					if _shape_distance(shape, rep) < DISTINCT_SHAPE_DISTANCE:
@@ -201,11 +235,299 @@ func _run_test() -> void:
 			print("  %s: %s" % [cell, all_failing_seeds[cell]])
 
 	print("TRACK_DIVERSITY_SWEEP elapsed_ms=%d invalid=%d" % [Time.get_ticks_msec() - started, total_invalid])
+	var expected_cases := _expected_shard_cases(seed_count, selected_cell, shard_index, shard_count)
+	if not _expect(records.size() == expected_cases, "farm shard should retain every case, including failures (got %d/%d)" % [records.size(), expected_cases]):
+		return
+	var aggregation := _aggregate_records(records, GENERATOR_VERSION)
+	if not _expect(bool(aggregation.get("ok", false)), String(aggregation.get("error", "farm aggregation failed"))):
+		return
+	print("TRACK_DIVERSITY_AGGREGATE " + JSON.stringify(aggregation["summary"], "", true))
+	var output_path := OS.get_environment("PC_DIVERSITY_OUTPUT")
+	if not output_path.is_empty():
+		var document := {
+			"format": FARM_FORMAT,
+			"generator": GENERATOR_VERSION,
+			"seed_start": seed_start,
+			"seed_count": seed_count,
+			"cell": selected_cell,
+			"shard_index": shard_index,
+			"shard_count": shard_count,
+			"records": records,
+		}
+		if not _expect(_write_json(output_path, document), "could not write PC_DIVERSITY_OUTPUT to %s" % output_path):
+			return
+		print("TRACK_DIVERSITY_OUTPUT path=%s records=%d" % [output_path, records.size()])
 	if not _expect(total_fails == 0 and total_invalid == 0, "%d generation failures, %d invalid circuits" % [total_fails, total_invalid]):
 		return
 	print("TRACK_DIVERSITY_SWEEP_TEST PASS cells=%d seq=%d shapes=%d fails=%d seeds_per=%d" % [
 		per_cell.size(), total_seq, total_shapes, total_fails, seed_count
 	])
+	quit(0)
+
+
+func _farm_config(seed_count: int) -> Dictionary:
+	var generator_text := OS.get_environment("PC_DIVERSITY_GENERATOR")
+	if generator_text.is_empty():
+		generator_text = str(GENERATOR_VERSION)
+	if not generator_text.is_valid_int() or int(generator_text) != GENERATOR_VERSION:
+		return {"ok": false, "error": "PC_DIVERSITY_GENERATOR must be 7 (v8 is not available)"}
+	var start_text := OS.get_environment("PC_DIVERSITY_START")
+	if start_text.is_empty():
+		start_text = "0"
+	if not start_text.is_valid_int() or int(start_text) < 0 or int(start_text) + seed_count - 1 > GENERATED_RULES.MAX_SEED:
+		return {"ok": false, "error": "PC_DIVERSITY_START must keep the selected seed window within 0..%d" % GENERATED_RULES.MAX_SEED}
+	var cell := OS.get_environment("PC_DIVERSITY_CELL")
+	if not cell.is_empty():
+		var cell_parts := cell.split("/", false)
+		if cell_parts.size() != 2 or not ROOMS.has(cell_parts[0]) or not TIERS.has(cell_parts[1]):
+			return {"ok": false, "error": "PC_DIVERSITY_CELL must be room/tier using a supported value"}
+	var shard_text := OS.get_environment("PC_DIVERSITY_SHARD")
+	if shard_text.is_empty():
+		shard_text = "0/1"
+	var shard_parts := shard_text.split("/", false)
+	if shard_parts.size() != 2 or not shard_parts[0].is_valid_int() or not shard_parts[1].is_valid_int():
+		return {"ok": false, "error": "PC_DIVERSITY_SHARD must be index/count"}
+	var shard_index := int(shard_parts[0])
+	var shard_count := int(shard_parts[1])
+	if shard_count < 1 or shard_index < 0 or shard_index >= shard_count:
+		return {"ok": false, "error": "PC_DIVERSITY_SHARD requires 0 <= index < count"}
+	return {
+		"ok": true,
+		"seed_start": int(start_text),
+		"cell": cell,
+		"shard_index": shard_index,
+		"shard_count": shard_count,
+	}
+
+
+func _case_ordinal(room: String, tier: String, seed_offset: int, seed_count: int, selected_cell: String) -> int:
+	if not selected_cell.is_empty():
+		return seed_offset
+	return (ROOMS.find(room) * TIERS.size() + TIERS.find(tier)) * seed_count + seed_offset
+
+
+func _expected_shard_cases(seed_count: int, selected_cell: String, shard_index: int, shard_count: int) -> int:
+	var total := seed_count if not selected_cell.is_empty() else ROOMS.size() * TIERS.size() * seed_count
+	var count := 0
+	for ordinal in total:
+		count += int(posmod(ordinal, shard_count) == shard_index)
+	return count
+
+
+func _expected_identity_keys(seed_start: int, seed_count: int, selected_cell: String) -> Dictionary:
+	var expected := {}
+	for room: String in ROOMS:
+		for tier: String in TIERS:
+			if not selected_cell.is_empty() and selected_cell != "%s/%s" % [room, tier]:
+				continue
+			for seed_offset in seed_count:
+				expected["%d|%s|%s|%d" % [GENERATOR_VERSION, room, tier, seed_start + seed_offset]] = true
+	return expected
+
+
+func _case_record(
+	room: String,
+	tier: String,
+	seed: int,
+	room_polygon: PackedVector2Array,
+	result: Dictionary,
+	validation: Dictionary,
+	shape: PackedVector2Array,
+	generation_ms: float,
+	validation_ms: float,
+	status: StringName
+) -> Dictionary:
+	var diagnostics: Dictionary = result.get("generation_diagnostics", {})
+	var sequence := String(result.get("route_sequence", ""))
+	var turn_runs := _turn_runs(sequence)
+	return {
+		"identity": {"schema": 1, "generator": GENERATOR_VERSION, "room": room, "tier": tier, "seed": seed},
+		"generator": GENERATOR_VERSION,
+		"room": room,
+		"tier": tier,
+		"seed": seed,
+		"room_digest": _packed_points_digest(room_polygon),
+		"status": String(status),
+		"reason": String(result.get("reason", validation.get("reason", ""))),
+		"rejection_classes": (diagnostics.get("rejection_counts", {}) as Dictionary).duplicate(true),
+		"rejections": (diagnostics.get("rejections", []) as Array).duplicate(true),
+		"structural_signature": "",
+		"profile_signature": JSON.stringify(result.get("corner_profiles", {}), "", true),
+		"route_sequence": sequence,
+		"rhythm_signature": TRACK_SEED_GEN._canonical_symbol_sequence(turn_runs),
+		"primitive_count": null,
+		"semantic_count": null,
+		"control_count": (result.get("points", PackedVector2Array()) as PackedVector2Array).size(),
+		"signed_turn_runs": turn_runs,
+		"literal_straight_count": int(validation.get("literal_straight_count", 0)),
+		"setup_straight_count": int(validation.get("setup_straight_count", 0)),
+		"curvature_class_histogram": _curvature_class_histogram(sequence),
+		"length": float(result.get("length", 0.0)),
+		"region_occupancy": [],
+		"portal_traversals": [],
+		"minimum_portal_width": null,
+		"shape_descriptor": _shape_descriptor(shape),
+		"repair_count": 0,
+		"expansion_count": 0,
+		"attempt_count": int(result.get("attempt", -1)) + 1,
+		"stage_times_ms": {"generation": generation_ms, "validation": validation_ms},
+		"output_digest": _packed_points_digest(result.get("points", PackedVector2Array())),
+	}
+
+
+func _curvature_class_histogram(sequence: String) -> Dictionary:
+	var histogram := {"straight": 0, "gentle": 0, "medium": 0, "tight": 0}
+	for token: String in sequence.split(".", false):
+		if token == "S":
+			histogram["straight"] += 1
+		elif token.ends_with("1"):
+			histogram["gentle"] += 1
+		elif token.ends_with("2"):
+			histogram["medium"] += 1
+		elif token.ends_with("3"):
+			histogram["tight"] += 1
+	return histogram
+
+
+func _shape_descriptor(shape: PackedVector2Array) -> Array[float]:
+	var descriptor: Array[float] = []
+	for point: Vector2 in shape:
+		descriptor.append(point.x)
+		descriptor.append(point.y)
+	return descriptor
+
+
+func _shape_from_descriptor(descriptor: Array) -> PackedVector2Array:
+	var shape := PackedVector2Array()
+	for index in range(0, descriptor.size(), 2):
+		shape.append(Vector2(float(descriptor[index]), float(descriptor[index + 1])))
+	return shape
+
+
+func _packed_points_digest(value: Variant) -> String:
+	if value is not PackedVector2Array:
+		return ""
+	var points: PackedVector2Array = value
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update(points.to_byte_array())
+	return context.finish().hex_encode()
+
+
+func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> Dictionary:
+	var ordered: Array[Dictionary] = records.duplicate(true)
+	ordered.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var a_cell := ROOMS.find(String(a.get("room", ""))) * TIERS.size() + TIERS.find(String(a.get("tier", "")))
+		var b_cell := ROOMS.find(String(b.get("room", ""))) * TIERS.size() + TIERS.find(String(b.get("tier", "")))
+		return int(a.get("seed", -1)) < int(b.get("seed", -1)) if a_cell == b_cell else a_cell < b_cell
+	)
+	var identities := {}
+	var status_counts := {}
+	var rejection_counts := {}
+	var cells := {}
+	for record: Dictionary in ordered:
+		if int(record.get("generator", -1)) != expected_generator:
+			return {"ok": false, "error": "mismatched generator version in farm records"}
+		var cell := "%s/%s" % [record.get("room", ""), record.get("tier", "")]
+		if not ROOMS.has(String(record.get("room", ""))) or not TIERS.has(String(record.get("tier", ""))):
+			return {"ok": false, "error": "unsupported cell in farm records: %s" % cell}
+		var identity_key := "%d|%s|%s|%d" % [expected_generator, record.get("room", ""), record.get("tier", ""), int(record.get("seed", -1))]
+		if identities.has(identity_key):
+			return {"ok": false, "error": "duplicate farm identity: %s" % identity_key}
+		identities[identity_key] = true
+		_increment(status_counts, String(record.get("status", "unknown")))
+		if not cells.has(cell):
+			cells[cell] = {"cases": 0, "sequences": {}, "rhythms": {}, "shape_reps": [], "rejections": {}}
+		var aggregate: Dictionary = cells[cell]
+		aggregate["cases"] = int(aggregate["cases"]) + 1
+		var sequence := String(record.get("route_sequence", ""))
+		if not sequence.is_empty():
+			(aggregate["sequences"] as Dictionary)[sequence] = true
+		var rhythm := String(record.get("rhythm_signature", ""))
+		if not rhythm.is_empty():
+			(aggregate["rhythms"] as Dictionary)[rhythm] = true
+		for category: String in (record.get("rejection_classes", {}) as Dictionary):
+			var count := int((record["rejection_classes"] as Dictionary)[category])
+			(aggregate["rejections"] as Dictionary)[category] = int((aggregate["rejections"] as Dictionary).get(category, 0)) + count
+			rejection_counts[category] = int(rejection_counts.get(category, 0)) + count
+		var descriptor: Array = record.get("shape_descriptor", [])
+		if descriptor.size() == SHAPE_SAMPLE_COUNT * 2:
+			var shape := _shape_from_descriptor(descriptor)
+			var distinct := true
+			for representative: PackedVector2Array in aggregate["shape_reps"]:
+				if _shape_distance(shape, representative) < DISTINCT_SHAPE_DISTANCE:
+					distinct = false
+					break
+			if distinct:
+				(aggregate["shape_reps"] as Array).append(shape)
+	var cell_summaries := {}
+	for cell: String in cells:
+		var aggregate: Dictionary = cells[cell]
+		cell_summaries[cell] = {
+			"cases": aggregate["cases"],
+			"distinct_sequences": (aggregate["sequences"] as Dictionary).size(),
+			"distinct_rhythms": (aggregate["rhythms"] as Dictionary).size(),
+			"shape_clusters": (aggregate["shape_reps"] as Array).size(),
+			"rejections": aggregate["rejections"],
+		}
+	return {"ok": true, "summary": {"cases": ordered.size(), "statuses": status_counts, "rejections": rejection_counts, "cells": cell_summaries}}
+
+
+func _write_json(path: String, value: Variant) -> bool:
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	if file == null:
+		return false
+	file.store_string(JSON.stringify(value, "", true))
+	return true
+
+
+func _run_offline_aggregation(input_list: String) -> void:
+	var documents: Array[Dictionary] = []
+	for path: String in input_list.split(",", false):
+		var parsed: Variant = JSON.parse_string(FileAccess.get_file_as_string(path.strip_edges()))
+		if not _expect(parsed is Dictionary, "PC_DIVERSITY_INPUTS contains unreadable JSON: %s" % path):
+			return
+		documents.append(parsed)
+	if not _expect(not documents.is_empty(), "PC_DIVERSITY_INPUTS must name at least one shard document"):
+		return
+	var first: Dictionary = documents[0]
+	if not _expect(first.get("format") == FARM_FORMAT and int(first.get("generator", -1)) == GENERATOR_VERSION, "farm documents must use the v7 expressive-range format"):
+		return
+	var shard_count := int(first.get("shard_count", 0))
+	var seen_shards := {}
+	var records: Array[Dictionary] = []
+	for document: Dictionary in documents:
+		for key: String in ["format", "generator", "seed_start", "seed_count", "cell", "shard_count"]:
+			if not _expect(document.get(key) == first.get(key), "farm shard manifests disagree on %s" % key):
+				return
+		var index := int(document.get("shard_index", -1))
+		if not _expect(index >= 0 and index < shard_count and not seen_shards.has(index), "farm shard indexes must be unique and in range"):
+			return
+		seen_shards[index] = true
+		for record: Dictionary in document.get("records", []):
+			records.append(record)
+	if not _expect(seen_shards.size() == shard_count, "farm aggregation requires all %d shards (got %d)" % [shard_count, seen_shards.size()]):
+		return
+	var expected := int(first["seed_count"]) * (1 if not String(first["cell"]).is_empty() else ROOMS.size() * TIERS.size())
+	if not _expect(records.size() == expected, "farm aggregation is missing cases (got %d/%d)" % [records.size(), expected]):
+		return
+	var expected_identities := _expected_identity_keys(int(first["seed_start"]), int(first["seed_count"]), String(first["cell"]))
+	var actual_identities := {}
+	for record: Dictionary in records:
+		var identity_key := "%d|%s|%s|%d" % [int(record.get("generator", -1)), record.get("room", ""), record.get("tier", ""), int(record.get("seed", -1))]
+		if not _expect(expected_identities.has(identity_key), "farm aggregation contains an unexpected identity: %s" % identity_key):
+			return
+		actual_identities[identity_key] = true
+	if not _expect(actual_identities.size() == expected_identities.size(), "farm aggregation is missing expected identities"):
+		return
+	var aggregation := _aggregate_records(records, GENERATOR_VERSION)
+	if not _expect(bool(aggregation.get("ok", false)), String(aggregation.get("error", "farm aggregation failed"))):
+		return
+	var output_path := OS.get_environment("PC_DIVERSITY_OUTPUT")
+	if not output_path.is_empty() and not _expect(_write_json(output_path, {"format": FARM_FORMAT, "manifest": first, "summary": aggregation["summary"], "records": records}), "could not write aggregate output to %s" % output_path):
+		return
+	print("TRACK_DIVERSITY_AGGREGATE " + JSON.stringify(aggregation["summary"], "", true))
+	print("TRACK_DIVERSITY_SWEEP_TEST PASS aggregate_shards=%d cases=%d" % [documents.size(), records.size()])
 	quit(0)
 
 
@@ -297,7 +619,19 @@ func _test_measurements() -> bool:
 	var oval := PackedVector2Array()
 	for i in SHAPE_SAMPLE_COUNT:
 		oval.append(Vector2(cos(TAU * i / SHAPE_SAMPLE_COUNT) * 900, sin(TAU * i / SHAPE_SAMPLE_COUNT) * 600))
-	return _expect(_shape_distance(shape, _normalized_shape(oval)) > DISTINCT_SHAPE_DISTANCE, "shape metric must distinguish a dogleg from an oval")
+	if not _expect(_shape_distance(shape, _normalized_shape(oval)) > DISTINCT_SHAPE_DISTANCE, "shape metric must distinguish a dogleg from an oval"):
+		return false
+	var descriptor := _shape_descriptor(shape)
+	var synthetic: Array[Dictionary] = [
+		{"generator": 7, "room": "classic", "tier": "compact", "seed": 2, "status": "ok", "route_sequence": "L1.S.R1", "rhythm_signature": "L.S.R", "rejection_classes": {"self_distance": 1}, "shape_descriptor": descriptor},
+		{"generator": 7, "room": "classic", "tier": "compact", "seed": 1, "status": "ok", "route_sequence": "L1.S.R1", "rhythm_signature": "L.S.R", "rejection_classes": {}, "shape_descriptor": descriptor},
+	]
+	var aggregation := _aggregate_records(synthetic, 7)
+	if not _expect(bool(aggregation.get("ok", false)) and int(aggregation["summary"]["cases"]) == 2 and int(aggregation["summary"]["cells"]["classic/compact"]["shape_clusters"]) == 1, "farm aggregation should sort records and cluster cached shape descriptors"):
+		return false
+	var duplicate: Array[Dictionary] = synthetic.duplicate(true)
+	duplicate.append(synthetic[0].duplicate(true))
+	return _expect(not bool(_aggregate_records(duplicate, 7).get("ok", false)), "farm aggregation should reject duplicate identities")
 
 
 func _expect(condition: bool, message: String) -> bool:

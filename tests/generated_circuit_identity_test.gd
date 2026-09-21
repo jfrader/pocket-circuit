@@ -4,7 +4,16 @@ extends SceneTree
 const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 const PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
+const TRACK_SEED_GEN := preload("res://scripts/race/track_seed_gen.gd")
 const FIXTURE_SEED := 246810
+const FIXTURE_SHARE_CODE := "PC1-0W0G2-00204-007H0-TDJA9-CJVJ7-SPX07-BB21Z-17557-T5M13-ZW100-0FEZR-A00"
+const V7_ROUTE_DIGESTS := {
+	"compact": "0520d3bfc3f68deadf77e36b57c389c47be2eaf06c26d1ed246a7051234fdac3",
+	"standard": "762ee5843c037cc13700c1b88ef574e02be7cba7e96add07cda422aefa2f530e",
+	"long": "c5f5a6cf7856d65f434c644b25100efc0c82d33a6dca525c8be3563ef119bc60",
+	"endurance": "0388be1bdbc265e739195305f96c137e277c224d90ea89e180c743953ba45170",
+	"marathon": "7e11a3713d967843940d01e97f58a429afeb836043811f0fb1220cc333671e69",
+}
 
 
 func _initialize() -> void:
@@ -28,7 +37,7 @@ func _run_test() -> void:
 		return
 
 	var code_result := IDENTITIES.encode_share_code(identity)
-	if not _expect(bool(code_result.get("ok", false)) and String(code_result["code"]).begins_with("PC1-") and String(code_result["code"]).length() < 80, "a compatible identity should produce a compact versioned human-enterable code"):
+	if not _expect(bool(code_result.get("ok", false)) and String(code_result["code"]) == FIXTURE_SHARE_CODE, "the canonical PC1 share bytes should stay regression-pinned"):
 		return
 	var decoded := IDENTITIES.decode_share_code(String(code_result["code"]))
 	if not _expect(bool(decoded.get("ok", false)) and decoded["identity"] == identity, "share codes should round-trip the complete canonical identity exactly"):
@@ -95,7 +104,9 @@ func _run_test() -> void:
 
 	var preview := PREVIEW.prepare(identity)
 	var prepared := TRACK_BUILDER.prepare_layout(&"workshop", &"wide", FIXTURE_SEED, IDENTITIES.generation_options(identity))
-	if not _expect(not preview.is_empty() and String(preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(identity, prepared), "preview and loaded preparation should resolve to the same fingerprint"):
+	if not _expect(not preview.is_empty() and String(preview["loaded_fingerprint"]) == "ad67780bca692e31" and String(preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(identity, prepared), "preview and loaded preparation should resolve to the pinned v7 fingerprint"):
+		return
+	if not _expect(preview["points"] == PREVIEW._preview_points(prepared["centerline"], false), "preview points should be derived from the same prepared v7 centerline"):
 		return
 	if not _expect(String(prepared["spec"]["story_id"]) == String(identity["story_id"]) and int(prepared["spec"]["material_seed"]) == int(identity["sub_seeds"]["material"]) and int(prepared["spec"]["dressing_seed"]) == int(identity["sub_seeds"]["dressing"]) and int(prepared["spec"]["obstacle_seed"]) == int(identity["sub_seeds"]["obstacle"]) and int(prepared["spec"]["hazard_seed"]) == int(identity["sub_seeds"]["hazard"]), "route preparation should consume every composition seed in its matching domain"):
 		return
@@ -136,6 +147,21 @@ func _run_test() -> void:
 			return
 	if not _expect(profile_fingerprints.size() == IDENTITIES.GENERATED_RULES.LENGTH_TIERS.size(), "identical seeds and rooms across length profiles should yield distinct fingerprints"):
 		return
+	for tier: String in IDENTITIES.GENERATED_RULES.LENGTH_TIERS:
+		var profile := IDENTITIES.GENERATED_RULES.length_profile(tier)
+		var scaled_room := PackedVector2Array()
+		for point: Vector2 in TRACK_BUILDER.ROOM_SHAPES["wide"]:
+			scaled_room.append(point * float(profile["room_scale"]))
+		var generated := TRACK_SEED_GEN.generate_with_retries(FIXTURE_SEED, Rect2(-940.0, -540.0, 1880.0, 1080.0), {
+			"margin": 190.0,
+			"min_self_distance": 320.0,
+			"min_loop_length": 1900.0 * TRACK_SEED_GEN.WORLD_SCALE,
+			"room_polygon": scaled_room,
+			"room_shape": &"wide",
+			"length_tier": StringName(tier),
+		})
+		if not _expect(_route_digest(generated.get("points", PackedVector2Array())) == V7_ROUTE_DIGESTS[tier], "v7 %s route bytes should stay regression-pinned" % tier):
+			return
 	if not _expect(IDENTITIES.create(&"workshop", &"wide", FIXTURE_SEED, false, 2, "", "", {}, "bogus").is_empty(), "an unknown length profile should be rejected by create"):
 		return
 	var unknown_tier := identity.duplicate(true)
@@ -162,3 +188,10 @@ func _expect(condition: bool, message: String) -> bool:
 	push_error("GENERATED_CIRCUIT_IDENTITY_TEST FAIL: " + message)
 	quit(1)
 	return false
+
+
+func _route_digest(points: PackedVector2Array) -> String:
+	var context := HashingContext.new()
+	context.start(HashingContext.HASH_SHA256)
+	context.update(points.to_byte_array())
+	return context.finish().hex_encode()
