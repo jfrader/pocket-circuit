@@ -5,13 +5,15 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const CONTACT_RELEASE_GRACE := 0.12
-## Slip angle, in degrees, where cornering scrub reaches full level. Well below
-## the drift's optimal slip, so a normal corner is clearly audible but far from
-## saturated.
-const SCRUB_FULL_DEG := 25.0
+## Slip angle, in degrees, where cornering scrub reaches full level. This has to
+## sit inside the gripping range: this physics goes from about 1 degree of slip at
+## a light steer to a full slide past 0.25 steer, so a wider window maps ordinary
+## cornering to near silence.
+const SCRUB_FULL_DEG := 12.0
+const SCRUB_EXPONENT := 0.9
 ## Slip angle where a sliding tyre starts to screech, and where the screech peaks.
 const SCREECH_ONSET_DEG := 12.0
-const SCREECH_FULL_DEG := 40.0
+const SCREECH_FULL_DEG := 35.0
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
 const LEGACY_ANGULAR_DAMP := 2.5
@@ -223,7 +225,7 @@ func get_throttle_input() -> float:
 ## is_sliding.
 func get_tyre_scrub() -> float:
 	var slip_deg := maxf(rad_to_deg(absf(_front_slip_angle)), rad_to_deg(absf(_rear_slip_angle)))
-	return pow(clampf(slip_deg / SCRUB_FULL_DEG, 0.0, 1.0), 1.3)
+	return pow(clampf(slip_deg / SCRUB_FULL_DEG, 0.0, 1.0), SCRUB_EXPONENT)
 
 
 ## Screech level: silent until a tyre is genuinely sliding, which is what makes a
