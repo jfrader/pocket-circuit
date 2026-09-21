@@ -10,6 +10,7 @@ extends SceneTree
 const DriftSynthScript := preload("res://scripts/audio/sfx/drift_synth.gd")
 const CrashVoiceGeneratorScript := preload("res://scripts/audio/sfx/crash_voice_generator.gd")
 const BoostVoiceGeneratorScript := preload("res://scripts/audio/sfx/boost_voice_generator.gd")
+const UiVoiceGeneratorScript := preload("res://scripts/audio/sfx/ui_voice_generator.gd")
 
 const SAMPLE_RATE := 22050
 const BLOCK := 256
@@ -33,6 +34,8 @@ func _initialize() -> void:
 	if not _render_crashes():
 		return
 	if not _render_boost():
+		return
+	if not _render_interface():
 		return
 	print("SFX_RENDER COMPLETE -> " + _out_dir)
 	quit(0)
@@ -73,6 +76,16 @@ func _render_boost() -> bool:
 	var rustbug := load("res://data/vehicles/rustbug.tres") as VehicleStats
 	var voice := BoostVoiceGeneratorScript.new().generate(rustbug, "rustbug")
 	return _write("boost.wav", voice.tiers[0], true)
+
+
+## The global interface and race blips.
+func _render_interface() -> bool:
+	var generator = UiVoiceGeneratorScript.new()
+	for sound_name in generator.names():
+		var voice = generator.generate(String(sound_name))
+		if not _write("blip_%s.wav" % sound_name, voice.tiers[0], true):
+			return false
+	return true
 
 
 func _drift_intensity(time: float) -> float:

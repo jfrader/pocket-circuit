@@ -9,6 +9,12 @@
 
 ### Added
 
+- Drifting now makes a continuous tyre scrub that follows the slide instead of a
+  single scratch at the start of it, and it bites harder the faster and more
+  sideways you go. Crashes are built from the machine's own weight and
+  toughness, so a light tap, a hard hit and a heavy car all sound different.
+  Boost and the menu/race blips are generated too — the game no longer ships any
+  recorded sound effects.
 - Each machine now has its own engine voice, generated from the car's own stats
   instead of pitching one shared loop. A virtual gearbox pulls revs up and drops
   them on each shift, the note changes with throttle and load, and coasting
