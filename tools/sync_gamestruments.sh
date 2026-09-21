@@ -8,7 +8,7 @@ mkdir -p "$BIN"
 if [[ -n "${GAMESTRUMENTS_ADDON_DIR:-}" ]]; then
 	if [[ ! -f "$GAMESTRUMENTS_ADDON_DIR/gamestruments.gdextension" ]]; then
 		echo "ERROR: GAMESTRUMENTS_ADDON_DIR set but no gamestruments.gdextension found at $GAMESTRUMENTS_ADDON_DIR" >&2
-		echo "Set GAMESTRUMENTS_ADDON_DIR to a directory containing a packaged addon (gamestruments.gdextension + bin/ lib or sibling lib)." >&2
+		echo "Set GAMESTRUMENTS_ADDON_DIR to a packaged addon containing gamestruments.gdextension plus Linux and Windows libraries in bin/ or alongside." >&2
 		exit 1
 	fi
 	cp -f "$GAMESTRUMENTS_ADDON_DIR/gamestruments.gdextension" "$DEST/gamestruments.gdextension"
@@ -18,6 +18,14 @@ if [[ -n "${GAMESTRUMENTS_ADDON_DIR:-}" ]]; then
 		cp -f "$GAMESTRUMENTS_ADDON_DIR/libgamestruments_godot.so" "$BIN/libgamestruments_godot.so"
 	else
 		echo "ERROR: GAMESTRUMENTS_ADDON_DIR set but no libgamestruments_godot.so found (looked in bin/ and alongside)." >&2
+		exit 1
+	fi
+	if [[ -f "$GAMESTRUMENTS_ADDON_DIR/bin/gamestruments_godot.dll" ]]; then
+		cp -f "$GAMESTRUMENTS_ADDON_DIR/bin/gamestruments_godot.dll" "$BIN/gamestruments_godot.dll"
+	elif [[ -f "$GAMESTRUMENTS_ADDON_DIR/gamestruments_godot.dll" ]]; then
+		cp -f "$GAMESTRUMENTS_ADDON_DIR/gamestruments_godot.dll" "$BIN/gamestruments_godot.dll"
+	else
+		echo "ERROR: GAMESTRUMENTS_ADDON_DIR set but no gamestruments_godot.dll found (looked in bin/ and alongside)." >&2
 		exit 1
 	fi
 	echo "Synced packaged Gamestruments addon from $GAMESTRUMENTS_ADDON_DIR into $DEST"
