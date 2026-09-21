@@ -17,14 +17,15 @@ const SQUEAL_Q := 7.0
 ## entry, slow enough that per-block control updates cannot click.
 const FOLLOW_TAU := 0.05
 const DRIVE := 1.6
-const GAIN := 0.9
+const GAIN := 1.0
 
 var _sample_rate := 22050.0
 var _noise_state := 1
 var _scrub := BandPass.new()
 var _squeal := BandPass.new()
 var _rumble := LowPass.new()
-var _intensity := 0.0
+var _scrub_level := 0.0
+var _screech_level := 0.0
 var _speed_ratio := 0.0
 var _grip_ratio := 1.0
 
@@ -32,7 +33,8 @@ var _grip_ratio := 1.0
 func configure(sample_rate: int, seed_value: int = 1) -> void:
 	_sample_rate = float(maxi(sample_rate, 1))
 	_noise_state = maxi(1, seed_value)
-	_intensity = 0.0
+	_scrub_level = 0.0
+	_screech_level = 0.0
 	_speed_ratio = 0.0
 	_grip_ratio = 1.0
 	_scrub.configure(SCRUB_CUT_MIN, SCRUB_Q, _sample_rate)
@@ -40,31 +42,35 @@ func configure(sample_rate: int, seed_value: int = 1) -> void:
 	_rumble.configure(RUMBLE_CUT, _sample_rate)
 
 
-## `intensity` is 0..1 slip, `speed_ratio` 0..1 of top speed, `grip` is the
-## surface grip multiplier. `delta` is the block length in seconds.
-func set_state(intensity: float, speed_ratio: float, grip: float, delta: float) -> void:
+## `scrub` is cornering load, `screech` is how hard a tyre is sliding, `speed_ratio`
+## is 0..1 of top speed and `grip` the surface multiplier. `delta` is the block
+## length in seconds. Keeping the two levels separate is what lets a corner stay
+## subtle while a drift is loud.
+func set_state(scrub: float, screech: float, speed_ratio: float, grip: float, delta: float) -> void:
 	var blend := 1.0 - exp(-maxf(delta, 0.0) / FOLLOW_TAU)
-	_intensity += (clampf(intensity, 0.0, 1.0) - _intensity) * blend
+	_scrub_level += (clampf(scrub, 0.0, 1.0) - _scrub_level) * blend
+	_screech_level += (clampf(screech, 0.0, 1.0) - _screech_level) * blend
 	_speed_ratio += (clampf(speed_ratio, 0.0, 1.0) - _speed_ratio) * blend
 	_grip_ratio += (clampf(inverse_lerp(0.85, 1.40, grip), 0.0, 1.0) - _grip_ratio) * blend
 	_scrub.set_cutoff(lerpf(SCRUB_CUT_MIN, SCRUB_CUT_MAX, _speed_ratio) * lerpf(1.0, 1.15, _grip_ratio))
-	_squeal.set_cutoff(lerpf(SQUEAL_CUT_MIN, SQUEAL_CUT_MAX, _intensity))
+	_squeal.set_cutoff(lerpf(SQUEAL_CUT_MIN, SQUEAL_CUT_MAX, _screech_level))
 
 
 func render_sample() -> float:
 	_noise_state = int((1664525 * _noise_state + 1013904223) & 0xffffffff)
 	var noise := float(_noise_state) / 2147483647.5 - 1.0
-	var scrub_amp := pow(_intensity, 1.2) * (0.35 + 0.75 * _speed_ratio) * lerpf(0.85, 1.15, _grip_ratio)
-	var squeal_amp := pow(_intensity, 3.0) * (0.15 + 0.5 * _speed_ratio)
-	var rumble_amp := _intensity * _speed_ratio * 0.5
+	var scrub_amp := _scrub_level * (0.35 + 0.75 * _speed_ratio) * lerpf(0.85, 1.15, _grip_ratio)
+	var squeal_amp := _screech_level * (0.15 + 0.5 * _speed_ratio)
+	var rumble_amp := _scrub_level * _speed_ratio * 0.5
 	var mixed := _scrub.process(noise) * scrub_amp * 0.9
 	mixed += _squeal.process(noise) * squeal_amp * 0.5
 	mixed += _rumble.process(noise) * rumble_amp * 0.7
 	return tanh(mixed * DRIVE) * GAIN
 
 
-func get_intensity() -> float:
-	return _intensity
+## Loudest of the two layers, for deciding when the voice can stop rendering.
+func get_level() -> float:
+	return maxf(_scrub_level, _screech_level)
 
 
 ## Two-pole band-pass in transposed direct form II. Coefficients are rebuilt on

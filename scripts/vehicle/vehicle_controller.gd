@@ -5,8 +5,13 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const CONTACT_RELEASE_GRACE := 0.12
-## Slip angle where a tyre starts making noise, in degrees.
-const SLIDE_AUDIBLE_DEG := 8.0
+## Slip angle, in degrees, where cornering scrub reaches full level. Well below
+## the drift's optimal slip, so a normal corner is clearly audible but far from
+## saturated.
+const SCRUB_FULL_DEG := 25.0
+## Slip angle where a sliding tyre starts to screech, and where the screech peaks.
+const SCREECH_ONSET_DEG := 12.0
+const SCREECH_FULL_DEG := 40.0
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
 const LEGACY_ANGULAR_DAMP := 2.5
@@ -212,13 +217,21 @@ func get_throttle_input() -> float:
 	return _throttle_input
 
 
-## Normalised slide magnitude for audio and VFX: 0 while the car tracks straight,
-## 1 at or beyond the drift's optimal slip. Presentation-only — gameplay reads
-## is_drifting / is_sliding.
-func get_slide_intensity() -> float:
+## Cornering scrub for audio: rises from the larger of the two axle slip angles
+## on a soft curve, so an ordinary corner is subtle and a hard one is not
+## instantly pinned at full. Presentation-only — gameplay reads is_drifting and
+## is_sliding.
+func get_tyre_scrub() -> float:
+	var slip_deg := maxf(rad_to_deg(absf(_front_slip_angle)), rad_to_deg(absf(_rear_slip_angle)))
+	return pow(clampf(slip_deg / SCRUB_FULL_DEG, 0.0, 1.0), 1.3)
+
+
+## Screech level: silent until a tyre is genuinely sliding, which is what makes a
+## drift louder and harder than cornering.
+func get_tyre_screech() -> float:
 	var slip_deg := rad_to_deg(absf(_rear_slip_angle))
-	var audible_span := maxf(stats.drift_optimal_slip_deg - SLIDE_AUDIBLE_DEG, 1.0)
-	return clampf((slip_deg - SLIDE_AUDIBLE_DEG) / audible_span, 0.0, 1.0)
+	var span := maxf(SCREECH_FULL_DEG - SCREECH_ONSET_DEG, 1.0)
+	return pow(clampf((slip_deg - SCREECH_ONSET_DEG) / span, 0.0, 1.0), 1.2)
 
 
 func get_effective_max_speed() -> float:
