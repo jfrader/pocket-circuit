@@ -5,7 +5,6 @@
 ### Fixed
 - Fixed false "WRONG WAY" warnings and the resulting teleport reset when driving on the open apron beside a folded circuit. Wrong-way is now a warning only — the car is never reset for it.
 - Race music no longer loops one section or lags behind the race. Each circuit now generates its own score from the track seed, so a circuit always sounds the same while different circuits, tiers, and acts sound different, and the race rotates through the whole racing pool — grooves, peaks, the starting-grid reprise, a reset sting, the final lap, and the win/loss outros.
-- Shipped the live Gamestruments engine into the release gate (sync + hard `ClassDB.class_exists("GamestrumentsPlayer")` check at the start of `tools/build_release.sh`). Removed rendered WAV fallbacks (`assets/audio/menu_loop.wav`, `race_loop.wav` and their `.import`s); the live engine is now mandatory — there is no silent-music or WAV fallback mode.
 
 ### Added
 
@@ -120,6 +119,7 @@
   puts you back on the nearby route, facing the right way.
 - Steering follows the stick more at speed. Fast throttle-on corners can
   slide the rear a little without Space; Space is still the big drift.
+>>>>>>> origin/dev
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.
