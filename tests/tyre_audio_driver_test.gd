@@ -1,0 +1,82 @@
+extends SceneTree
+
+## Drives a real vehicle through a corner and a slide and checks the tyre-audio
+## driver against the physics. This exists because the driver was originally
+## calibrated against slip angles the car never produces in normal cornering:
+## the whole gripping range mapped to near silence, so the tyre voice was
+## inaudible even though the DSP behind it was correct.
+
+const VEHICLE_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
+const CATALOG := preload("res://data/championship/catalog.gd")
+const PHYSICS_HZ := 60
+## Scrub level a light corner must reach to be audible under the engine. The synth
+## renders about -29 dBFS raw at this level, roughly -31 dBFS in the mix.
+const AUDIBLE_SCRUB := 0.08
+
+var _world: Node2D
+var _errors := PackedStringArray()
+
+
+func _initialize() -> void:
+	Engine.physics_ticks_per_second = PHYSICS_HZ
+	call_deferred("_run_test")
+
+
+func _run_test() -> void:
+	_world = Node2D.new()
+	root.add_child(_world)
+	current_scene = _world
+	var vehicle := VEHICLE_SCENE.instantiate() as VehicleController
+	vehicle.stats = CATALOG.create_vehicle_stats("rustbug")
+	_world.add_child(vehicle)
+	vehicle.controls_locked = false
+	Input.action_press("accelerate")
+	for _frame in 150:
+		await physics_frame
+
+	_check("straight line makes no tyre sound", vehicle.call("get_tyre_scrub") < 0.02, "scrub %.3f" % float(vehicle.call("get_tyre_scrub")))
+	_check("straight line does not screech", vehicle.call("get_tyre_screech") < 0.02, "screech %.3f" % float(vehicle.call("get_tyre_screech")))
+
+	var light := await _steer_to(vehicle, 0.08)
+	var gentle := await _steer_to(vehicle, 0.16)
+	var firm := await _steer_to(vehicle, 0.25)
+	_check("a light corner is audible", light >= AUDIBLE_SCRUB, "scrub %.3f" % light)
+	_check("a firmer corner is louder than a light one", gentle > light, "%.3f vs %.3f" % [gentle, light])
+	_check("a firm corner is louder still", firm > gentle, "%.3f vs %.3f" % [firm, gentle])
+	_check("cornering alone does not screech", vehicle.call("get_tyre_screech") < 0.02, "screech %.3f" % float(vehicle.call("get_tyre_screech")))
+	_check("a firm corner stays below a slide", firm < 0.9, "scrub %.3f" % firm)
+
+	var slide := await _steer_to(vehicle, 0.45)
+	_check("a slide reaches full scrub", slide > 0.95, "scrub %.3f" % slide)
+	var screech := float(vehicle.call("get_tyre_screech"))
+	_check("a slide screeches", screech > 0.5, "screech %.3f" % screech)
+
+	Input.action_release("steer_right")
+	Input.action_release("accelerate")
+	for _frame in 120:
+		await physics_frame
+	_check("the slide clears when it ends", vehicle.call("get_tyre_screech") < 0.02, "screech %.3f" % float(vehicle.call("get_tyre_screech")))
+
+	_world.queue_free()
+	await process_frame
+	if _errors.is_empty():
+		print("TYRE_AUDIO_DRIVER_TEST PASS")
+		quit(0)
+		return
+	for error in _errors:
+		push_error("TYRE_AUDIO_DRIVER_TEST FAIL: " + error)
+	quit(1)
+
+
+## Holds a steering input long enough for the physics to settle, then reports the
+## resulting scrub level.
+func _steer_to(vehicle: VehicleController, steer: float) -> float:
+	Input.action_press("steer_right", steer)
+	for _frame in 70:
+		await physics_frame
+	return float(vehicle.call("get_tyre_scrub"))
+
+
+func _check(label: String, condition: bool, detail: String) -> void:
+	if not condition:
+		_errors.append("%s (%s)" % [label, detail])

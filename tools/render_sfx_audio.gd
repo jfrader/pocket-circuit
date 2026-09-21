@@ -87,18 +87,18 @@ func _render_interface() -> bool:
 	return true
 
 
-## (scrub, screech): a gentle corner, then a mid corner, then a full slide, then
-## a release — the arc the game actually produces.
+## (scrub, screech): a light corner, a firm corner, then a slide and release —
+## using the levels a real Rustbug produces, per tests/tyre_audio_driver_test.gd.
 func _drift_state(time: float) -> Vector2:
 	if time < 0.4:
-		return Vector2(smoothstep(0.0, 0.4, time) * 0.12, 0.0)
+		return Vector2(smoothstep(0.0, 0.4, time) * 0.11, 0.0)
 	if time < 1.4:
-		return Vector2(lerpf(0.12, 0.34, smoothstep(0.4, 1.4, time)), 0.0)
+		return Vector2(lerpf(0.11, 0.37, smoothstep(0.4, 1.4, time)), 0.0)
 	if time < 2.4:
-		return Vector2(lerpf(0.34, 1.0, smoothstep(1.4, 2.4, time)), 0.0)
+		return Vector2(lerpf(0.37, 0.55, smoothstep(1.4, 2.4, time)), 0.0)
 	if time < 3.2:
-		return Vector2(1.0, 0.9)
-	return Vector2(maxf(0.0, 1.0 - smoothstep(3.2, 3.8, time)), maxf(0.0, 0.9 - smoothstep(3.2, 3.7, time)))
+		return Vector2(1.0, 0.95)
+	return Vector2(maxf(0.0, 1.0 - smoothstep(3.2, 3.8, time)), maxf(0.0, 0.95 - smoothstep(3.2, 3.7, time)))
 
 
 func _drift_speed(time: float) -> float:
