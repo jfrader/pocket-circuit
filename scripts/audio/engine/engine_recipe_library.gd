@@ -8,6 +8,9 @@ extends RefCounted
 const RECIPE_PATHS := {
 	"rustbug": "res://data/audio/engine_recipes/rustbug.tres",
 }
+## Used when a car reaches the audio layer without an identity: the recipe still
+## derives a valid voice from its stats instead of dropping to the legacy loop.
+const UNIDENTIFIED_VEHICLE_ID := "unidentified"
 
 
 static func resolve(vehicle_id: String, stats: VehicleStats) -> EngineRecipe:

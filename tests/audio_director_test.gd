@@ -124,6 +124,21 @@ func _run_test() -> void:
 	director.call("_update_engine", 1.0 / 60.0)
 	if not _expect(director.has_engine_voice(), "the generated voice should stay active while driving"):
 		return
+	# Regression: the catalog hands out duplicated VehicleStats, whose
+	# resource_path is empty, so the race supplies the vehicle id instead.
+	var duplicated := StatsVehicle.new()
+	duplicated.stats = (preload("res://data/vehicles/anvil.tres") as VehicleStats).duplicate(true) as VehicleStats
+	duplicated.speed = 300.0
+	duplicated.engine_load = 1.0
+	director.set_local_vehicle(duplicated, "anvil")
+	if not _expect(director.has_engine_voice(), "duplicated stats must still prepare a voice when the race supplies the id"):
+		return
+	if not _expect(String(director.get_engine_voice_signature()).contains("anvil"), "the voice signature should carry the race's vehicle id"):
+		return
+	director.set_local_vehicle(duplicated)
+	if not _expect(director.has_engine_voice(), "a car with no id at all should still get a generated voice, not the legacy loop"):
+		return
+	duplicated.free()
 	director.set_race_paused(true)
 	if not _expect(director.has_engine_voice(), "pausing should not tear down the generated voice"):
 		return

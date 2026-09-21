@@ -170,7 +170,7 @@ func advance_live_rotation() -> void:
 	_live_deck_index = (_live_deck_index + 1) % _live_deck.size()
 	_cue_live_direct(_live_deck[_live_deck_index])
 
-func set_local_vehicle(vehicle: Node) -> void:
+func set_local_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 	_local_vehicle = vehicle
 	_vehicle_max_speed = 680.0
 	if not is_instance_valid(vehicle):
@@ -178,21 +178,28 @@ func set_local_vehicle(vehicle: Node) -> void:
 	var vehicle_stats: Variant = vehicle.get("stats")
 	if vehicle_stats is Object:
 		_vehicle_max_speed = maxf(1.0, float((vehicle_stats as Object).get("max_speed")))
-	if not _prepare_engine_voice(vehicle) and not _headless and not _engine_player.playing:
+	if not _prepare_engine_voice(vehicle, vehicle_id) and not _headless and not _engine_player.playing:
 		_engine_player.play()
 
 
 ## Generates (or reuses) the local car's engine voice. Returns false when the
 ## voice is unavailable, which leaves the legacy pitched loop in charge.
-func _prepare_engine_voice(vehicle: Node) -> bool:
+## `vehicle_id` comes from the race, not from the stats resource: the catalog
+## hands out duplicated VehicleStats whose resource_path is empty, so the file
+## name cannot identify the car.
+func _prepare_engine_voice(vehicle: Node, vehicle_id: String) -> bool:
 	if not is_instance_valid(_engine_voice) or not is_instance_valid(vehicle):
 		return false
 	var stats: Variant = vehicle.get("stats")
 	if not (stats is VehicleStats):
 		return false
-	var vehicle_id := String(EngineRecipeLibraryScript.vehicle_id_for(stats))
-	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
-	if not _engine_voice.prepare(recipe, vehicle_id):
+	var resolved_id := vehicle_id
+	if resolved_id.is_empty():
+		resolved_id = String(EngineRecipeLibraryScript.vehicle_id_for(stats))
+	if resolved_id.is_empty():
+		resolved_id = EngineRecipeLibraryScript.UNIDENTIFIED_VEHICLE_ID
+	var recipe := EngineRecipeLibraryScript.resolve(resolved_id, stats)
+	if not _engine_voice.prepare(recipe, resolved_id):
 		return false
 	_engine_voice.start()
 	if is_instance_valid(_engine_player) and _engine_player.playing:

@@ -961,9 +961,9 @@ func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: fl
 	return audio_director.play_sfx(sound_name, volume_scale, pitch_scale) if is_instance_valid(audio_director) else false
 
 
-func set_local_race_vehicle(vehicle: Node) -> void:
+func set_local_race_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 	if is_instance_valid(audio_director):
-		audio_director.set_local_vehicle(vehicle)
+		audio_director.set_local_vehicle(vehicle, vehicle_id)
 
 
 func set_race_audio_paused(paused: bool) -> void:
