@@ -3,6 +3,7 @@ extends SceneTree
 const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 const CIRCUIT_IDENTITIES := preload("res://scripts/progression/championship_circuit_identity.gd")
+const GENERATED_IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 const MASTERY := preload("res://scripts/progression/mastery_run.gd")
 const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
 const TEST_PATH := "user://tests/pocket_circuit_save_store_test.json"
@@ -81,6 +82,25 @@ func _run_test() -> void:
 	if not _expect(float(store.load_data()["personal_ghosts"][0]["samples"][0][1]) == 0.0, "loaded nested ghost data should not alias a later load"):
 		return
 	loaded = store.load_data()
+	var mixed_versions := loaded.duplicate(true)
+	var v7_library_identity := GENERATED_IDENTITIES.create(&"kitchen", GENERATED_IDENTITIES.room_for_route_seed(707), 707)
+	var v8_library_identity := GENERATED_IDENTITIES.create_v8(&"office", GENERATED_IDENTITIES.room_for_route_seed(808), 808, false, 3, "", "", {}, "long")
+	var v8_championship := CIRCUIT_IDENTITIES.create_championship(808080, 2, 8)
+	mixed_versions["circuit_history"] = [v7_library_identity, v8_library_identity]
+	mixed_versions["favorite_circuits"] = [v8_library_identity, v7_library_identity]
+	mixed_versions["championship_circuit"] = v8_championship
+	if not _expect(store.save_data(mixed_versions), "mixed v7/v8 persistence fixture should save: %s" % store.last_save_error):
+		return
+	var mixed_restarted := SAVE_STORE_SCRIPT.new(TEST_PATH).load_data()
+	if not _expect(
+		mixed_restarted["circuit_history"] == mixed_versions["circuit_history"]
+		and mixed_restarted["favorite_circuits"] == mixed_versions["favorite_circuits"]
+		and mixed_restarted["championship_circuit"] == v8_championship,
+		"mixed v7/v8 library entries and a v8 championship should survive save/restart without migration"
+	):
+		return
+	if not _expect(store.save_data(loaded), "the v7 fixture should restore after mixed-version persistence coverage"):
+		return
 
 	var replacement := loaded.duplicate(true)
 	replacement["difficulty"] = "sunday_drive"
@@ -194,9 +214,8 @@ func _test_legacy_vehicle_selections(store: SaveStore) -> bool:
 
 
 func _test_generator_version_migration(store: SaveStore) -> bool:
-	# A pre-v7 championship record keeps its master seed and story progress, but
-	# its circuit fingerprints advance so old-geometry ghosts and mastery keys no
-	# longer compare as the current circuit.
+	# Pre-v7 circuit geometry cannot be reconstructed. Keep the save untouched and
+	# surface the incompatibility instead of silently replacing it with v7.
 	_write_raw(TEST_PATH, JSON.stringify({
 		"version": 4,
 		"championship_started": true,
@@ -214,30 +233,14 @@ func _test_generator_version_migration(store: SaveStore) -> bool:
 		},
 	}))
 	var loaded := store.load_data()
-	var migrated: Dictionary = loaded["championship_circuit"]
-	if not _expect(int(migrated["seed"]) == 123456789 and int(migrated["generator_version"]) == 7, "a pre-v7 championship save should keep its master seed while advancing the generator version"):
+	if not _expect(store.is_read_only and store.last_load_error.contains("generator 1") and store.last_load_error.contains("left unchanged"), "a pre-v7 championship save should fail explicitly and remain read-only"):
 		return false
-	if not _expect(
-			loaded["completed_events"] == ["kitchen_crumb_rush", "kitchen_mug_run", "kitchen_clean_line"]
-			and loaded["completed_acts"] == ["kitchen"]
-			and loaded["unlocked_vehicles"] == ["rustbug", "pinbolt"]
-			and loaded["best_event_points"] == {"kitchen_crumb_rush": 10, "kitchen_mug_run": 10, "kitchen_clean_line": 10},
-			"generator migration should preserve completed events, standings, and unlocks"
-	):
+	var raw := _read_json(TEST_PATH)
+	if not _expect(int(raw["championship_circuit"]["generator_version"]) == 1 and int(raw["championship_circuit"]["seed"]) == 123456789, "unsupported championship data should not be auto-migrated on disk"):
 		return false
-	var migrated_event := CIRCUIT_IDENTITIES.apply_to_event(CATALOG.get_event("kitchen_crumb_rush"), migrated["events"]["kitchen_crumb_rush"])
-	var migrated_identity := MASTERY.create_identity(migrated_event, "rustbug", MASTERY.prepare_circuit_metrics(migrated_event))
-	var legacy_identity := migrated_identity.duplicate(true)
-	legacy_identity["circuit"]["generator_version"] = 1
-	if not _expect(MASTERY.identity_key(legacy_identity) != MASTERY.identity_key(migrated_identity), "the generator version bump should change the lap/mastery identity key"):
+	if not _expect(int(loaded["championship_circuit"]["generator_version"]) == 7 and loaded["best_event_finishes"].is_empty(), "runtime fallback data should be safe defaults, not a migrated copy of unsupported progress"):
 		return false
-	var legacy_ghost: Array = PERSONAL_GHOST.store_best([], legacy_identity, 30.0, [
-		PERSONAL_GHOST.sample(0.0, Transform2D(0.0, Vector2.ZERO)),
-		PERSONAL_GHOST.sample(30.0, Transform2D(0.5, Vector2(10.0, 10.0))),
-	])["ghosts"]
-	if not _expect(legacy_ghost.size() == 1, "the migration fixture must contain an actual old-geometry ghost"):
-		return false
-	if not _expect(PERSONAL_GHOST.compatible_best(legacy_ghost, migrated_identity).is_empty(), "a ghost recorded under the pre-v7 identity must not be accepted against the v7 circuit"):
+	if not _expect(not store.save_data(loaded) and int(_read_json(TEST_PATH)["championship_circuit"]["generator_version"]) == 1, "read-only protection should prevent overwriting the unsupported record"):
 		return false
 	return true
 

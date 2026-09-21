@@ -8,6 +8,7 @@ const CHECKPOINT_SCRIPT := preload("res://scripts/race/checkpoint.gd")
 const VISUAL_ROLE_CONTRACT := preload("res://scripts/race/generated_world_visual_role.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
+const GENERATOR_REGISTRY := preload("res://scripts/race/track_generator_registry.gd")
 const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const TRACK_BUILDER_GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const TRACK_BUILDER_PLANNER := preload("res://scripts/race/track_builder_planner.gd")
@@ -144,6 +145,16 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int, g
 static func prepare_layout(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
 	if not LAYOUTS.has(theme) or not ROOM_SHAPES.has(room_shape):
 		return {}
+	var generator_selection := {}
+	if seed >= 0:
+		generator_selection = GENERATOR_REGISTRY.resolve_options(generation_options)
+		if not bool(generator_selection.get("ok", false)):
+			push_error("TrackBuilderCore: %s" % String(generator_selection.get("error", "invalid generator request")))
+			return {}
+		if generator_selection.get("path") != GENERATOR_REGISTRY.LEGACY_PATH:
+			var unavailable := GENERATOR_REGISTRY.dispatch(generation_options, {}, Callable(), Callable())
+			push_error("TrackBuilderCore: %s" % String(unavailable.get("error", "generator unavailable")))
+			return {}
 	var spec: Dictionary = LAYOUTS[theme]
 	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape] if seed >= 0 else BASE_ROOM_SHAPES[room_shape]
 	var used_seed := seed
@@ -192,6 +203,8 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["seed_obstacles"] = true
 		spec["seed"] = int(gen["seed"])
 		spec["requested_seed"] = seed
+		spec["schema_version"] = int(generator_selection["schema_version"])
+		spec["generator_version"] = int(generator_selection["generator_version"])
 		spec["family"] = StringName(gen["family"])
 		spec["realization"] = StringName(gen.get("realization", gen["family"]))
 		spec["route_program"] = StringName(gen.get("route_program", gen["family"]))

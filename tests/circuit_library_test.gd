@@ -39,6 +39,15 @@ func _run_test() -> void:
 	var normalized := LIBRARY.normalize_history([_identity(2), _identity(2), {"fingerprint": "forged"}, "bad"])
 	if not _expect(normalized.size() == 1 and normalized[0] == _identity(2), "normalization should reject malformed entries and deduplicate valid fingerprints"):
 		return
+	var v8_identity := IDENTITIES.create_v8(&"office", IDENTITIES.room_for_route_seed(2026), 2026, false, 3, "", "", {}, "endurance")
+	var mixed_result := LIBRARY.normalize_history_result([repeated, v8_identity, repeated])
+	if not _expect(bool(mixed_result.get("ok", false)) and mixed_result["entries"] == [repeated, v8_identity], "mixed v7/v8 library records should retain both canonical identities without migration"):
+		return
+	var unsupported := repeated.duplicate(true)
+	unsupported["generator_version"] = 6
+	var unsupported_result := LIBRARY.normalize_history_result([repeated, unsupported])
+	if not _expect(unsupported_result.get("kind") == "unsupported_generator" and String(unsupported_result.get("error", "")).contains("version 6"), "a versioned unsupported library entry should fail explicitly instead of being silently dropped"):
+		return
 
 	var store := SAVE_STORE.new(TEST_PATH) as SaveStore
 	store.remove_save()
