@@ -12,6 +12,9 @@ const SFX_STREAMS := {
 	&"impact": preload("res://assets/audio/impact.ogg"),
 	&"hazard_warning": preload("res://assets/audio/hazard_warning.ogg"),
 }
+const EngineSoundPlayerScript := preload("res://scripts/audio/engine/engine_sound_player.gd")
+const EngineRecipeLibraryScript := preload("res://scripts/audio/engine/engine_recipe_library.gd")
+const ChampionshipCatalogScript := preload("res://data/championship/catalog.gd")
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
 const PAUSED_MUSIC_DB := -9.0
@@ -33,6 +36,9 @@ const MENU_DWELL_SECONDS := 20.0
 
 var _music_player: AudioStreamPlayer
 var _engine_player: AudioStreamPlayer
+## Generated engine voice for the local car. Null stream player keeps the legacy
+## pitched loop in charge, so the old path stays a real fallback.
+var _engine_voice: EngineSoundPlayer
 var _sfx_players: Array[AudioStreamPlayer] = []
 var _next_sfx_player := 0
 var _music_context: StringName = &""
@@ -83,6 +89,8 @@ func _exit_tree() -> void:
 	if is_instance_valid(_engine_player):
 		_engine_player.stop()
 		_engine_player.stream = null
+	if is_instance_valid(_engine_voice):
+		_engine_voice.stop()
 	for player: AudioStreamPlayer in _sfx_players:
 		if is_instance_valid(player):
 			player.stop()
@@ -165,12 +173,32 @@ func advance_live_rotation() -> void:
 func set_local_vehicle(vehicle: Node) -> void:
 	_local_vehicle = vehicle
 	_vehicle_max_speed = 680.0
-	if is_instance_valid(vehicle):
-		var vehicle_stats: Variant = vehicle.get("stats")
-		if vehicle_stats is Object:
-			_vehicle_max_speed = maxf(1.0, float((vehicle_stats as Object).get("max_speed")))
-		if not _headless and not _engine_player.playing:
-			_engine_player.play()
+	if not is_instance_valid(vehicle):
+		return
+	var vehicle_stats: Variant = vehicle.get("stats")
+	if vehicle_stats is Object:
+		_vehicle_max_speed = maxf(1.0, float((vehicle_stats as Object).get("max_speed")))
+	if not _prepare_engine_voice(vehicle) and not _headless and not _engine_player.playing:
+		_engine_player.play()
+
+
+## Generates (or reuses) the local car's engine voice. Returns false when the
+## voice is unavailable, which leaves the legacy pitched loop in charge.
+func _prepare_engine_voice(vehicle: Node) -> bool:
+	if not is_instance_valid(_engine_voice) or not is_instance_valid(vehicle):
+		return false
+	var stats: Variant = vehicle.get("stats")
+	if not (stats is VehicleStats):
+		return false
+	var vehicle_id := String(EngineRecipeLibraryScript.vehicle_id_for(stats))
+	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
+	if not _engine_voice.prepare(recipe, vehicle_id):
+		return false
+	_engine_voice.start()
+	if is_instance_valid(_engine_player) and _engine_player.playing:
+		_engine_player.stop()
+		_engine_player.volume_db = SILENCE_DB
+	return true
 
 func clear_local_vehicle() -> void:
 	_local_vehicle = null
@@ -178,6 +206,8 @@ func clear_local_vehicle() -> void:
 	if is_instance_valid(_engine_player):
 		_engine_player.stop()
 		_engine_player.volume_db = SILENCE_DB
+	if is_instance_valid(_engine_voice):
+		_engine_voice.stop()
 
 func set_race_paused(paused: bool) -> void:
 	_race_paused = paused
@@ -187,6 +217,8 @@ func set_race_paused(paused: bool) -> void:
 		_music_player.volume_db = music_db
 	if paused and is_instance_valid(_engine_player):
 		_engine_player.volume_db = SILENCE_DB
+	if is_instance_valid(_engine_voice):
+		_engine_voice.set_paused(paused)
 	_update_live_volume()
 
 func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: float = 1.0) -> bool:
@@ -265,6 +297,10 @@ func _build_players() -> void:
 	_engine_player.stream = _engine_loop
 	_engine_player.volume_db = SILENCE_DB
 	add_child(_engine_player)
+
+	_engine_voice = EngineSoundPlayerScript.new()
+	_engine_voice.name = "EngineVoice"
+	add_child(_engine_voice)
 
 	for index in SFX_PLAYER_COUNT:
 		var player := AudioStreamPlayer.new()
@@ -378,6 +414,11 @@ func _update_engine(delta: float = 1.0 / 60.0) -> void:
 	if not is_instance_valid(_local_vehicle):
 		if _engine_player.playing:
 			_engine_player.stop()
+		if is_instance_valid(_engine_voice):
+			_engine_voice.stop()
+		return
+	if is_instance_valid(_engine_voice) and not _engine_voice.is_using_fallback():
+		_drive_engine_voice(delta)
 		return
 	if not _headless and not _engine_player.playing:
 		_engine_player.play()
@@ -405,6 +446,51 @@ func _update_engine(delta: float = 1.0 / 60.0) -> void:
 		# music was mastered to a real level that same curve buried it instead.
 		# These are mix-balance values, tunable by ear.
 		_engine_player.volume_db = lerpf(-18.0, -2.0, rev)
+
+
+## Feeds the generated voice from the vehicle each frame. The player owns the
+## drivetrain model, the synth controls and its own loudness curve.
+func _drive_engine_voice(delta: float) -> void:
+	if _race_paused:
+		_engine_voice.set_paused(true)
+		return
+	_engine_voice.set_paused(false)
+	var speed := maxf(0.0, float(_local_vehicle.get("speed")))
+	var load := 0.0
+	if _local_vehicle.has_method("get_engine_load"):
+		load = clampf(float(_local_vehicle.call("get_engine_load")), 0.0, 1.0)
+	var throttle := load
+	if _local_vehicle.has_method("get_throttle_input"):
+		throttle = clampf(float(_local_vehicle.call("get_throttle_input")), 0.0, 1.0)
+	_engine_voice.set_vehicle_state(speed, _vehicle_max_speed, load, throttle, delta)
+
+
+## Test introspection: true while the local car runs the generated voice.
+func has_engine_voice() -> bool:
+	return is_instance_valid(_engine_voice) and not _engine_voice.is_using_fallback()
+
+
+## Generates and caches a vehicle's voice ahead of the race scene, so the first
+## race frame never pays for synthesis. Headless runs generate nothing: there is
+## no listener and tests should not pay the cost.
+func warm_engine_voice(vehicle_id: String) -> bool:
+	if _headless or vehicle_id.is_empty():
+		return false
+	var entry: Dictionary = ChampionshipCatalogScript.get_vehicle(vehicle_id)
+	if entry.is_empty():
+		return false
+	var stats := load(String(entry.get("stats_path", ""))) as VehicleStats
+	if stats == null:
+		return false
+	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
+	return EngineVoiceGenerator.generate_cached(recipe) != null
+
+
+func get_engine_voice_signature() -> String:
+	if not is_instance_valid(_engine_voice):
+		return ""
+	return _engine_voice.get_voice_signature()
+
 
 func _ensure_bus(bus_name: StringName) -> int:
 	var bus_index := AudioServer.get_bus_index(bus_name)

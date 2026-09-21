@@ -9,6 +9,10 @@
 
 ### Added
 
+- Each machine now has its own engine voice, generated from the car's own stats
+  instead of pitching one shared loop. A virtual gearbox pulls revs up and drops
+  them on each shift, the note changes with throttle and load, and coasting
+  sounds different from power.
 - Championship events now use progressive track length tiers (from compact to marathon). Quick Race exhibition lengths now rotate across tiers per entry.
 - The complete nine-event Grand Household Circuit, with three story acts,
   recurring rivals, persistent standings, vehicle and event unlocks,
