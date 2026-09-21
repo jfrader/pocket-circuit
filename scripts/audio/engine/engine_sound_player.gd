@@ -14,6 +14,9 @@ const SAMPLE_RATE := 22050
 const BUFFER_SECONDS := 0.12
 ## Bound one frame's fill so a stalled audio server cannot allocate unbounded.
 const MAX_FRAMES_PER_FILL := 4096
+## A buffer with all but this many frames free has run dry: the server drained
+## everything queued before this frame rendered. Slack absorbs the priming frame.
+const STARVATION_SLACK_FRAMES := 8
 ## Mix-balance curve, matching the range the legacy loop was tuned to.
 const IDLE_DB := -18.0
 const PEAK_DB := -2.0
@@ -31,6 +34,10 @@ var _fallback_reason := ""
 var _paused := false
 var _headless := false
 var _underruns := 0
+var _capacity := 0
+## True once the first buffer has been queued, so the priming frame is not
+## mistaken for a starvation event.
+var _primed := false
 var _state_speed := 0.0
 var _state_max_speed := 680.0
 var _state_load := 0.0
@@ -52,15 +59,17 @@ func _process(delta: float) -> void:
 	_drivetrain.step(_state_speed, _state_max_speed, _state_load, _state_throttle, delta)
 	_synth.set_controls(_drivetrain.get_rpm(), _drivetrain.get_load(), _drivetrain.get_throttle())
 	_player.volume_db = _current_volume_db()
-	var frames := mini(_playback.get_frames_available(), MAX_FRAMES_PER_FILL)
-	if frames <= 0:
+	var available := _playback.get_frames_available()
+	# get_frames_available() is free space: 0 means the queue is full, which is
+	# the healthy steady state, not a fault.
+	if _primed and available >= _capacity - STARVATION_SLACK_FRAMES:
 		_underruns += 1
 		buffer_underrun.emit(_underruns)
+	if available <= 0:
 		return
-	_fill_buffer(frames)
-	if not _playback.push_buffer(_buffer):
-		_underruns += 1
-		buffer_underrun.emit(_underruns)
+	_fill_buffer(mini(available, MAX_FRAMES_PER_FILL))
+	if _playback.push_buffer(_buffer):
+		_primed = true
 
 
 ## Generates the voice and wires the generator stream. Returns false (and leaves
@@ -159,6 +168,8 @@ func _ensure_player() -> bool:
 	var stream := AudioStreamGenerator.new()
 	stream.mix_rate = float(SAMPLE_RATE)
 	stream.buffer_length = BUFFER_SECONDS
+	_capacity = int(BUFFER_SECONDS * float(SAMPLE_RATE))
+	_primed = false
 	_player = AudioStreamPlayer.new()
 	_player.name = "EngineVoicePlayer"
 	_player.bus = &"SFX"
