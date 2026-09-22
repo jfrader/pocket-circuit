@@ -266,6 +266,9 @@ func _prepare_race_async() -> void:
 	if director:
 		# The director swaps in this circuit's score and opens on `ignition`.
 		director.call("play_race_music")
+		for entry: Dictionary in _build_field_racers_for_preparation():
+			director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")))
+			await _loading_step("Preparing race audio")
 	for frame in 3:
 		await _loading_step("Warming graphics for the starting grid")
 	if not app.call("complete_race_loading"):
@@ -400,6 +403,7 @@ func _configure_racers() -> void:
 		ai_vehicle.stats = CATALOG.create_vehicle_stats(ai_vehicle_id)
 		ai_vehicle.remove_from_group("player_vehicle")
 		ai_vehicle.add_to_group("race_vehicle")
+		ai_vehicle.set_meta("audio_vehicle_id", ai_vehicle_id)
 		ai_vehicle.set_player_controlled(false)
 		ai_vehicle.set_controls_locked(true)
 		# Register the rigid body at its actual spawn, not at the scene's
