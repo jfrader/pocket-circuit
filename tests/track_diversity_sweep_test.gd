@@ -24,7 +24,9 @@ extends SceneTree
 ## Output includes per-cell lines and a baseline table. Ends with
 ## TRACK_DIVERSITY_SWEEP_TEST PASS ...
 ##
-## Low diversity is diagnostic; generation or validation failures fail the test.
+## v8 windows of at least 12 seeds require multiple shapes and structures per
+## cell; a complete matrix must also exercise every accepted catalog class.
+## Smaller windows and v7 diversity remain diagnostic.
 
 const TRACK_SEED_GEN := preload("res://scripts/race/track_seed_gen.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
@@ -271,6 +273,10 @@ func _run_test() -> void:
 		print("TRACK_DIVERSITY_OUTPUT path=%s records=%d" % [output_path, records.size()])
 	if not _expect(total_fails == 0 and total_invalid == 0, "%d generation failures, %d invalid circuits" % [total_fails, total_invalid]):
 		return
+	if generator_version == 8 and seed_count >= 12 and shard_count == 1:
+		var variety_error := _accepted_variety_error(aggregation["summary"], selected_cell.is_empty())
+		if not _expect(variety_error.is_empty(), variety_error):
+			return
 	print("TRACK_DIVERSITY_SWEEP_TEST PASS cells=%d seq=%d shapes=%d fails=%d seeds_per=%d" % [
 		per_cell.size(), total_seq, total_shapes, total_fails, seed_count
 	])
@@ -587,6 +593,18 @@ func _write_json(path: String, value: Variant) -> bool:
 	return true
 
 
+func _accepted_variety_error(summary: Dictionary, complete_matrix: bool) -> String:
+	for cell: String in summary["cells"]:
+		var coverage: Dictionary = summary["cells"][cell]
+		if int(coverage["shape_clusters"]) < 2 or int(coverage["distinct_structures"]) < 2:
+			return "%s needs multiple accepted shapes AND structures (got %d shapes / %d structures)" % [cell, int(coverage["shape_clusters"]), int(coverage["distinct_structures"])]
+	if complete_matrix:
+		for definition: Dictionary in MODULES.definitions():
+			if int((summary["accepted_class_layouts"] as Dictionary).get(String(definition["id"]), 0)) == 0:
+				return "catalog class '%s' never occurs in accepted layouts" % definition["id"]
+	return ""
+
+
 func _run_offline_aggregation(input_list: String) -> void:
 	var documents: Array[Dictionary] = []
 	for path: String in input_list.split(",", false):
@@ -636,6 +654,10 @@ func _run_offline_aggregation(input_list: String) -> void:
 	print("TRACK_DIVERSITY_AGGREGATE " + JSON.stringify(aggregation["summary"], "", true))
 	if not _expect(int((aggregation["summary"]["statuses"] as Dictionary).get("ok", 0)) == expected, "farm contains generation failures or invalid circuits"):
 		return
+	if generator_version == 8 and int(first["seed_count"]) >= 12:
+		var variety_error := _accepted_variety_error(aggregation["summary"], String(first["cell"]).is_empty())
+		if not _expect(variety_error.is_empty(), variety_error):
+			return
 	print("TRACK_DIVERSITY_SWEEP_TEST PASS aggregate_shards=%d cases=%d" % [documents.size(), records.size()])
 	quit(0)
 
@@ -742,6 +764,16 @@ func _test_measurements() -> bool:
 	synthetic[1]["module_class_histogram"] = {"straight_link": 1}
 	var class_summary: Dictionary = _aggregate_records(synthetic, 7)["summary"]
 	if not _expect(class_summary["accepted_module_instances"] == {"straight_link": 4, "s_offset": 2} and class_summary["cells"]["classic/compact"]["accepted_class_layouts"] == {"straight_link": 2, "s_offset": 1}, "accepted class coverage must distinguish instances from layouts containing each class"):
+		return false
+	var coverage := {"cells": {"classic/compact": {"shape_clusters": 2, "distinct_structures": 1}}, "accepted_class_layouts": {}}
+	if not _expect(not _accepted_variety_error(coverage, false).is_empty(), "dimension-only changes must not pass the accepted topology gate"):
+		return false
+	coverage["cells"]["classic/compact"]["distinct_structures"] = 2
+	if not _expect(_accepted_variety_error(coverage, false).is_empty() and not _accepted_variety_error(coverage, true).is_empty(), "cell variety must not imply complete accepted catalog coverage"):
+		return false
+	for definition: Dictionary in MODULES.definitions():
+		coverage["accepted_class_layouts"][String(definition["id"])] = 1
+	if not _expect(_accepted_variety_error(coverage, true).is_empty(), "all accepted classes and multiple shapes/structures must pass the coverage gate"):
 		return false
 	var duplicate: Array[Dictionary] = synthetic.duplicate(true)
 	duplicate.append(synthetic[0].duplicate(true))
