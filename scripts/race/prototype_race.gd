@@ -283,6 +283,10 @@ func _exit_tree() -> void:
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("set_race_audio_paused"):
 		app.call("set_race_audio_paused", false)
+	var director := _audio_director()
+	if director and director.has_method("set_positional_vehicles"):
+		var no_vehicles: Array[Node] = []
+		director.call("set_positional_vehicles", no_vehicles)
 
 
 func _process(_delta: float) -> void:
@@ -385,6 +389,7 @@ func _configure_racers() -> void:
 	var opponent_count := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
 	var difficulty := String(_session.get("difficulty", "club_circuit"))
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
+	var positional_vehicles: Array[Node] = []
 	for ai_index in mini(opponent_ids.size(), opponent_count):
 		var driver_id := String(opponent_ids[ai_index])
 		var driver := CATALOG.get_driver(driver_id)
@@ -412,6 +417,10 @@ func _configure_racers() -> void:
 			driver_id,
 			driver.get("ai_style", {}) as Dictionary
 		)
+		positional_vehicles.append(ai_vehicle)
+	var director := _audio_director()
+	if director and director.has_method("set_positional_vehicles"):
+		director.call("set_positional_vehicles", positional_vehicles)
 
 
 func _configure_vehicle(

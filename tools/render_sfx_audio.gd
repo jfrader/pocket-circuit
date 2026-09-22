@@ -8,6 +8,8 @@ extends SceneTree
 ## Nothing is written into the repository.
 
 const DriftSynthScript := preload("res://scripts/audio/sfx/drift_synth.gd")
+const TyreSurfaceProfilesScript := preload("res://scripts/audio/sfx/tyre_surface_profiles.gd")
+const TyreLoopGeneratorScript := preload("res://scripts/audio/sfx/tyre_loop_generator.gd")
 const CrashVoiceGeneratorScript := preload("res://scripts/audio/sfx/crash_voice_generator.gd")
 const BoostVoiceGeneratorScript := preload("res://scripts/audio/sfx/boost_voice_generator.gd")
 const UiVoiceGeneratorScript := preload("res://scripts/audio/sfx/ui_voice_generator.gd")
@@ -30,6 +32,10 @@ func _initialize() -> void:
 		quit(1)
 		return
 	if not _render_drift():
+		return
+	if not _render_tyre_surfaces():
+		return
+	if not _render_opponent_tyre_loop():
 		return
 	if not _render_crashes():
 		return
@@ -55,6 +61,48 @@ func _render_drift() -> bool:
 			synth.set_state(state.x, state.y, _drift_speed(time), 1.15, float(BLOCK) / float(SAMPLE_RATE))
 		samples[index] = synth.render_sample()
 	return _write("drift_arc.wav", samples, true)
+
+
+func _render_tyre_surfaces() -> bool:
+	var surfaces := {
+		"tyre_polished_counter.wav": &"polished counter",
+		"tyre_workshop_wood.wav": &"workbench",
+		"tyre_office_carpet.wav": &"desktop",
+	}
+	for file_name: String in surfaces:
+		var synth = DriftSynthScript.new()
+		synth.configure(SAMPLE_RATE, 20260921)
+		synth.set_surface_profile(TyreSurfaceProfilesScript.profile_for(surfaces[file_name]))
+		var samples := _render_tyre_arc(synth)
+		if not _write(file_name, samples, false):
+			return false
+	return true
+
+
+func _render_tyre_arc(synth: RefCounted) -> PackedFloat32Array:
+	var count := int(DRIFT_SECONDS * float(SAMPLE_RATE))
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	var mix_gain := db_to_linear(-4.0)
+	for index in count:
+		var time := float(index) / float(SAMPLE_RATE)
+		if index % BLOCK == 0:
+			var state := _drift_state(time)
+			synth.set_state(state.x, state.y, _drift_speed(time), 1.0, float(BLOCK) / float(SAMPLE_RATE))
+		samples[index] = synth.render_sample() * mix_gain
+	return samples
+
+
+func _render_opponent_tyre_loop() -> bool:
+	var stream: AudioStreamWAV = TyreLoopGeneratorScript.generate(
+		TyreSurfaceProfilesScript.profile_for(&"workbench"),
+	)
+	var samples := PackedFloat32Array()
+	samples.resize(stream.data.size() / 2)
+	var gain := db_to_linear(-7.0) * 0.7
+	for index in samples.size():
+		samples[index] = float(stream.data.decode_s16(index * 2)) / 32767.0 * gain
+	return _write("tyre_opponent_near_loop.wav", samples, false)
 
 
 func _render_crashes() -> bool:

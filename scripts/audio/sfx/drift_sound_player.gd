@@ -43,11 +43,12 @@ func _ready() -> void:
 
 
 ## Called by AudioDirector once per frame with the local car's state.
-func set_state(scrub: float, screech: float, speed_ratio: float, grip: float, delta: float) -> void:
+func set_state(scrub: float, screech: float, speed_ratio: float, grip: float, surface_profile: Dictionary, delta: float) -> void:
 	_scrub = clampf(scrub, 0.0, 1.0)
 	_screech = clampf(screech, 0.0, 1.0)
 	_speed_ratio = clampf(speed_ratio, 0.0, 1.0)
 	_grip = grip
+	_synth.set_surface_profile(surface_profile)
 	_synth.set_state(_scrub, _screech, _speed_ratio, _grip, delta)
 	if _synth.get_level() <= AUDIBLE_THRESHOLD:
 		stop()
