@@ -91,11 +91,11 @@ func _render_interface() -> bool:
 ## using the levels a real Rustbug produces, per tests/tyre_audio_driver_test.gd.
 func _drift_state(time: float) -> Vector2:
 	if time < 0.4:
-		return Vector2(smoothstep(0.0, 0.4, time) * 0.11, 0.0)
+		return Vector2(smoothstep(0.0, 0.4, time) * 0.20, 0.0)
 	if time < 1.4:
-		return Vector2(lerpf(0.11, 0.37, smoothstep(0.4, 1.4, time)), 0.0)
+		return Vector2(lerpf(0.20, 0.49, smoothstep(0.4, 1.4, time)), 0.0)
 	if time < 2.4:
-		return Vector2(lerpf(0.37, 0.55, smoothstep(1.4, 2.4, time)), 0.0)
+		return Vector2(lerpf(0.49, 0.65, smoothstep(1.4, 2.4, time)), 0.0)
 	if time < 3.2:
 		return Vector2(1.0, 0.95)
 	return Vector2(maxf(0.0, 1.0 - smoothstep(3.2, 3.8, time)), maxf(0.0, 0.95 - smoothstep(3.2, 3.7, time)))

@@ -10,7 +10,9 @@ const CONTACT_RELEASE_GRACE := 0.12
 ## a light steer to a full slide past 0.25 steer, so a wider window maps ordinary
 ## cornering to near silence.
 const SCRUB_FULL_DEG := 12.0
-const SCRUB_EXPONENT := 0.9
+## Lifts the quiet end of the range. Ordinary cornering lives at 1-5 degrees of
+## slip, so a linear curve puts it far below the engine and it cannot be heard.
+const SCRUB_EXPONENT := 0.65
 ## Slip angle where a sliding tyre starts to screech, and where the screech peaks.
 const SCREECH_ONSET_DEG := 12.0
 const SCREECH_FULL_DEG := 35.0
