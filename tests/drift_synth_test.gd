@@ -10,6 +10,7 @@ func _initialize() -> void:
 	var errors := PackedStringArray()
 	errors.append_array(_check_silence())
 	errors.append_array(_check_response())
+	errors.append_array(_check_timbre())
 	errors.append_array(_check_bounds())
 	errors.append_array(_check_determinism())
 	if errors.is_empty():
@@ -48,6 +49,20 @@ func _check_response() -> PackedStringArray:
 	var low_grip := _render(0.6, 0.4, 0.7, 0.9)
 	var high_grip := _render(0.6, 0.4, 0.7, 1.4)
 	errors.append_array(_expect(float(high_grip["rms"]) != float(low_grip["rms"]), "surface grip must change the scrub"))
+	return errors
+
+
+func _check_timbre() -> PackedStringArray:
+	var errors := PackedStringArray()
+	var corner := _render_samples(0.5, 0.0, 0.8, 1.15)
+	var body_power := _tone_power(corner, 820.0) + _tone_power(corner, 1400.0)
+	var top_power := _tone_power(corner, 3200.0)
+	errors.append_array(_expect(body_power > top_power * 12.0, "cornering scrub must be resonant and rolled off, not broadband hiss"))
+	var squeal_onset := _render_samples(1.0, 0.25, 0.6, 1.15)
+	var full_squeal := _render_samples(1.0, 1.0, 0.6, 1.15)
+	var onset_pitch := _dominant_frequency(squeal_onset, 1200.0, 2050.0, 25.0)
+	var full_pitch := _dominant_frequency(full_squeal, 1200.0, 2050.0, 25.0)
+	errors.append_array(_expect(full_pitch > onset_pitch + 300.0, "the squeal formant must rise with slip; %.0f Hz vs %.0f Hz" % [onset_pitch, full_pitch]))
 	return errors
 
 
@@ -102,6 +117,48 @@ func _render(scrub: float, screech: float, speed_ratio: float, grip: float) -> D
 		"brightness": delta_sum / float(maxi(total, 1)),
 		"digest": "%08x" % digest,
 	}
+
+
+func _render_samples(scrub: float, screech: float, speed_ratio: float, grip: float) -> PackedFloat32Array:
+	var synth := DRIFT_SYNTH.new()
+	synth.configure(SAMPLE_RATE, 13)
+	var settle := SAMPLE_RATE
+	var count := 4096
+	var samples := PackedFloat32Array()
+	samples.resize(count)
+	for index in settle + count:
+		if index % BLOCK == 0:
+			synth.set_state(scrub, screech, speed_ratio, grip, BLOCK_SECONDS)
+		var sample := synth.render_sample()
+		if index >= settle:
+			samples[index - settle] = sample
+	return samples
+
+
+func _dominant_frequency(samples: PackedFloat32Array, minimum: float, maximum: float, step: float) -> float:
+	var strongest_frequency := minimum
+	var strongest_power := -1.0
+	var frequency := minimum
+	while frequency <= maximum:
+		var power := _tone_power(samples, frequency)
+		if power > strongest_power:
+			strongest_power = power
+			strongest_frequency = frequency
+		frequency += step
+	return strongest_frequency
+
+
+## Goertzel power at one frequency: enough to guard the voice's few intentional
+## formants without bringing an FFT implementation into the test suite.
+func _tone_power(samples: PackedFloat32Array, frequency: float) -> float:
+	var coefficient := 2.0 * cos(TAU * frequency / float(SAMPLE_RATE))
+	var previous := 0.0
+	var before_previous := 0.0
+	for sample in samples:
+		var current := sample + coefficient * previous - before_previous
+		before_previous = previous
+		previous = current
+	return previous * previous + before_previous * before_previous - coefficient * previous * before_previous
 
 
 func _digest(stats: Dictionary) -> String:
