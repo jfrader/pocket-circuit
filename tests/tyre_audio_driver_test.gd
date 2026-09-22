@@ -34,8 +34,10 @@ func _run_test() -> void:
 	for _frame in 150:
 		await physics_frame
 
-	_check("straight line makes no tyre sound", vehicle.call("get_tyre_scrub") < 0.02, "scrub %.3f" % float(vehicle.call("get_tyre_scrub")))
-	_check("straight line does not screech", vehicle.call("get_tyre_screech") < 0.02, "screech %.3f" % float(vehicle.call("get_tyre_screech")))
+	var straight_state: Dictionary = vehicle.call("get_tyre_state")
+	_check("straight line makes no tyre sound", float(straight_state["cornering"]) < 0.02, "scrub %.3f" % float(straight_state["cornering"]))
+	_check("straight line does not screech", float(straight_state["screech"]) < 0.02, "screech %.3f" % float(straight_state["screech"]))
+	_check("straight line agrees with gameplay grip", not bool(straight_state["sliding"]) and not vehicle.is_sliding and not vehicle.is_drifting, str(straight_state))
 
 	var light := await _steer_to(vehicle, 0.08)
 	var gentle := await _steer_to(vehicle, 0.16)
@@ -43,19 +45,25 @@ func _run_test() -> void:
 	_check("a light corner is audible", light >= AUDIBLE_SCRUB, "scrub %.3f" % light)
 	_check("a firmer corner is louder than a light one", gentle > light, "%.3f vs %.3f" % [gentle, light])
 	_check("a firm corner is louder still", firm > gentle, "%.3f vs %.3f" % [firm, gentle])
-	_check("cornering alone does not screech", vehicle.call("get_tyre_screech") < 0.02, "screech %.3f" % float(vehicle.call("get_tyre_screech")))
+	var gripping_state: Dictionary = vehicle.call("get_tyre_state")
+	_check("cornering alone does not screech", float(gripping_state["screech"]) < 0.02, "screech %.3f" % float(gripping_state["screech"]))
+	_check("audio cannot call a gripping car sliding", bool(gripping_state["sliding"]) == (vehicle.is_sliding or vehicle.is_drifting), str(gripping_state))
 	_check("a firm corner stays below a slide", firm < 0.9, "scrub %.3f" % firm)
 
 	var slide := await _steer_to(vehicle, 0.45)
 	_check("a slide reaches full scrub", slide > 0.95, "scrub %.3f" % slide)
-	var screech := float(vehicle.call("get_tyre_screech"))
+	var sliding_state: Dictionary = vehicle.call("get_tyre_state")
+	var screech := float(sliding_state["screech"])
+	_check("the real arcade state machine reports a slide", vehicle.is_sliding, str(sliding_state))
+	_check("audio reads the same sliding truth", bool(sliding_state["sliding"]) == (vehicle.is_sliding or vehicle.is_drifting), str(sliding_state))
 	_check("a slide screeches", screech > 0.5, "screech %.3f" % screech)
 
 	Input.action_release("steer_right")
 	Input.action_release("accelerate")
 	for _frame in 120:
 		await physics_frame
-	_check("the slide clears when it ends", vehicle.call("get_tyre_screech") < 0.02, "screech %.3f" % float(vehicle.call("get_tyre_screech")))
+	var released_state: Dictionary = vehicle.call("get_tyre_state")
+	_check("the slide clears when it ends", float(released_state["screech"]) < 0.02 and not bool(released_state["sliding"]), str(released_state))
 
 	_world.queue_free()
 	await process_frame

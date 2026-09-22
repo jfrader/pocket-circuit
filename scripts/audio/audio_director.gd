@@ -5,6 +5,9 @@ const RaceMusicPlan := preload("res://scripts/audio/race_music_plan.gd")
 const EngineSoundPlayerScript := preload("res://scripts/audio/engine/engine_sound_player.gd")
 const EngineRecipeLibraryScript := preload("res://scripts/audio/engine/engine_recipe_library.gd")
 const DriftSoundPlayerScript := preload("res://scripts/audio/sfx/drift_sound_player.gd")
+const TyreSurfaceProfilesScript := preload("res://scripts/audio/sfx/tyre_surface_profiles.gd")
+const TyreLoopGeneratorScript := preload("res://scripts/audio/sfx/tyre_loop_generator.gd")
+const VehicleLoopEmitterScript := preload("res://scripts/audio/vehicle_loop_emitter.gd")
 const CrashVoiceGeneratorScript := preload("res://scripts/audio/sfx/crash_voice_generator.gd")
 const BoostVoiceGeneratorScript := preload("res://scripts/audio/sfx/boost_voice_generator.gd")
 const UiVoiceGeneratorScript := preload("res://scripts/audio/sfx/ui_voice_generator.gd")
@@ -35,6 +38,10 @@ var _engine_player: AudioStreamPlayer
 var _engine_voice: EngineSoundPlayer
 ## Continuous tyre scrub for the local car, driven by its slip angle.
 var _drift_voice: DriftSoundPlayer
+## Positional WAV-loop voices for AI and remote cars. The local car alone keeps
+## the per-sample generator above.
+var _positional_tyre_emitters: Array[Node] = []
+var _tyre_loop_streams: Dictionary = {}
 ## Generated one-shots keyed by SFX name: the global interface blips at boot,
 ## plus the current car's crash and boost on vehicle handoff.
 var _generated_streams: Dictionary = {}
@@ -87,6 +94,7 @@ func _ready() -> void:
 func _process(delta: float) -> void:
 	_update_engine(delta)
 	_update_drift(delta)
+	_update_positional_tyres()
 	_update_live_volume()
 	_update_live_rotation(delta)
 
@@ -101,6 +109,7 @@ func _exit_tree() -> void:
 		_engine_voice.stop()
 	if is_instance_valid(_drift_voice):
 		_drift_voice.stop()
+	_clear_positional_tyre_emitters()
 	for player: AudioStreamPlayer in _sfx_players:
 		if is_instance_valid(player):
 			player.stop()
@@ -272,6 +281,19 @@ func clear_local_vehicle() -> void:
 		_engine_voice.stop()
 	if is_instance_valid(_drift_voice):
 		_drift_voice.stop()
+	_clear_positional_tyre_emitters()
+
+
+func set_positional_vehicles(vehicles: Array[Node]) -> void:
+	_clear_positional_tyre_emitters()
+	for vehicle: Node in vehicles:
+		if not is_instance_valid(vehicle) or not vehicle is Node2D or vehicle == _local_vehicle:
+			continue
+		var emitter := VehicleLoopEmitterScript.new()
+		emitter.name = "VehicleTyreEmitter%d" % _positional_tyre_emitters.size()
+		add_child(emitter)
+		emitter.configure(vehicle as Node2D)
+		_positional_tyre_emitters.append(emitter)
 
 func set_race_paused(paused: bool) -> void:
 	_race_paused = paused
@@ -579,19 +601,66 @@ func _update_drift(delta: float) -> void:
 	if not is_instance_valid(_local_vehicle) or _race_paused:
 		_drift_voice.stop()
 		return
-	# Two layers: cornering scrub is present whenever the car is turning, and the
-	# screech only opens up once a tyre is actually sliding.
-	var scrub := 0.0
-	if _local_vehicle.has_method("get_tyre_scrub"):
-		scrub = clampf(float(_local_vehicle.call("get_tyre_scrub")), 0.0, 1.0)
-	var screech := 0.0
-	if _local_vehicle.has_method("get_tyre_screech"):
-		screech = clampf(float(_local_vehicle.call("get_tyre_screech")), 0.0, 1.0)
+	if not _local_vehicle.has_method("get_tyre_state"):
+		_drift_voice.stop()
+		return
+	var tyre_state: Dictionary = _local_vehicle.call("get_tyre_state")
+	var scrub := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
+	var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
 	var speed := maxf(0.0, float(_local_vehicle.get("speed")))
-	var grip := 1.15
-	if _local_vehicle.has_method("get_effective_grip"):
-		grip = float(_local_vehicle.call("get_effective_grip"))
-	_drift_voice.set_state(scrub, screech, clampf(speed / _vehicle_max_speed, 0.0, 1.0), grip, delta)
+	var grip := float(tyre_state["grip"])
+	var surface_profile: Dictionary = TyreSurfaceProfilesScript.profile_for(tyre_state["surface"])
+	_drift_voice.set_state(scrub, screech, clampf(speed / _vehicle_max_speed, 0.0, 1.0), grip, surface_profile, delta)
+
+
+func _update_positional_tyres() -> void:
+	var listener_position := Vector2.ZERO
+	var listener_camera := get_viewport().get_camera_2d()
+	if is_instance_valid(listener_camera):
+		listener_position = listener_camera.global_position
+	elif is_instance_valid(_local_vehicle) and _local_vehicle is Node2D:
+		listener_position = (_local_vehicle as Node2D).global_position
+	for emitter: Node in _positional_tyre_emitters:
+		var vehicle := emitter.call("get_source") as Node
+		if not is_instance_valid(vehicle) or not vehicle.has_method("get_tyre_state"):
+			emitter.stop()
+			continue
+		var tyre_state: Dictionary = vehicle.call("get_tyre_state")
+		var profile: Dictionary = TyreSurfaceProfilesScript.profile_for(tyre_state["surface"])
+		emitter.set_stream(_tyre_loop_for(profile))
+		var cornering := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
+		var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
+		var speed := maxf(0.0, float(vehicle.get("speed")))
+		var max_speed := _max_speed_for(vehicle)
+		var speed_ratio := clampf(speed / max_speed, 0.0, 1.0)
+		var level := maxf(cornering * 0.62, screech)
+		var pitch := 0.80 + speed_ratio * 0.24 + screech * 0.12
+		emitter.update_voice(listener_position, level, pitch, not _race_paused)
+
+
+func _tyre_loop_for(profile: Dictionary) -> AudioStreamWAV:
+	var profile_id: StringName = profile["id"]
+	if not _tyre_loop_streams.has(profile_id):
+		_tyre_loop_streams[profile_id] = TyreLoopGeneratorScript.generate(profile, 1037 + _tyre_loop_streams.size() * 97)
+	return _tyre_loop_streams[profile_id] as AudioStreamWAV
+
+
+func _max_speed_for(vehicle: Node) -> float:
+	var vehicle_stats: Variant = vehicle.get("stats")
+	if vehicle_stats is Object:
+		return maxf(1.0, float((vehicle_stats as Object).get("max_speed")))
+	return 680.0
+
+
+func _clear_positional_tyre_emitters() -> void:
+	for emitter: Node in _positional_tyre_emitters:
+		if is_instance_valid(emitter):
+			emitter.queue_free()
+	_positional_tyre_emitters.clear()
+
+
+func get_positional_tyre_emitters() -> Array[Node]:
+	return _positional_tyre_emitters
 
 
 ## Generates and caches a vehicle's engine voice and one-shots ahead of the race

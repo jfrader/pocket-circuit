@@ -23,6 +23,21 @@ class StatsVehicle extends Node:
 		return engine_load
 
 
+class PositionalVehicle extends Node2D:
+	var speed := 320.0
+	var stats: VehicleStats = preload("res://data/vehicles/rustbug.tres")
+
+	func get_tyre_state() -> Dictionary:
+		return {
+			"cornering": 0.7,
+			"sliding": true,
+			"screech": 0.65,
+			"surface": &"workbench",
+			"grip": 1.15,
+			"surface_grip": 1.0,
+		}
+
+
 func _initialize() -> void:
 	call_deferred("_run_test")
 
@@ -131,6 +146,19 @@ func _run_test() -> void:
 		return
 	if not _expect(director.play_sfx(&"boost", 0.82), "a prepared car should play its generated boost"):
 		return
+	var opponent := PositionalVehicle.new()
+	root.add_child(opponent)
+	var opponents: Array[Node] = [opponent]
+	director.set_positional_vehicles(opponents)
+	director.call("_update_positional_tyres")
+	var emitters: Array[Node] = director.call("get_positional_tyre_emitters")
+	if not _expect(emitters.size() == 1, "each non-local vehicle should get one positional tyre emitter"):
+		return
+	var positional_player := emitters[0].call("get_player") as AudioStreamPlayer2D
+	if not _expect(positional_player != null and positional_player.stream is AudioStreamWAV, "opponent tyres should use a generated looping WAV on AudioStreamPlayer2D"):
+		return
+	if not _expect(not positional_player.stream is AudioStreamGenerator, "opponents must not run per-sample generator DSP"):
+		return
 	director.call("_update_engine", 1.0 / 60.0)
 	if not _expect(director.has_engine_voice(), "the generated voice should stay active while driving"):
 		return
@@ -149,6 +177,7 @@ func _run_test() -> void:
 	if not _expect(director.has_engine_voice(), "a car with no id at all should still get a generated voice, not the legacy loop"):
 		return
 	duplicated.free()
+	opponent.queue_free()
 	director.set_race_paused(true)
 	if not _expect(director.has_engine_voice(), "pausing should not tear down the generated voice"):
 		return

@@ -43,10 +43,11 @@ func _physics_process(delta: float) -> void:
 	_animation_time += delta
 	_skid_cooldown = maxf(0.0, _skid_cooldown - delta)
 	_impact_audio_cooldown = maxf(0.0, _impact_audio_cooldown - delta)
-	var drifting := bool(_vehicle.get("is_drifting")) or bool(_vehicle.get("is_sliding"))
+	var tyre_state: Dictionary = _vehicle.call("get_tyre_state")
+	var drifting := bool(tyre_state["sliding"])
 	var boosting := bool(_vehicle.call("is_boost_active"))
 	# Boost is an event, so it fires once here. Drift is a sustained state and is
-	# voiced continuously by AudioDirector from the car's slip.
+	# voiced continuously by AudioDirector from the same tyre state used here.
 	if _vehicle.is_in_group("player_vehicle") and boosting and not _was_boosting:
 		_play_sfx(&"boost", 0.82)
 	_was_boosting = boosting

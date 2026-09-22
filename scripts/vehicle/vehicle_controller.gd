@@ -5,14 +5,13 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const CONTACT_RELEASE_GRACE := 0.12
-## Slip angle, in degrees, where cornering scrub reaches full level. This has to
-## sit inside the gripping range: this physics goes from about 1 degree of slip at
-## a light steer to a full slide past 0.25 steer, so a wider window maps ordinary
-## cornering to near silence.
-const SCRUB_FULL_DEG := 12.0
-## Lifts the quiet end of the range. Ordinary cornering lives at 1-5 degrees of
-## slip, so a linear curve puts it far below the engine and it cannot be heard.
-const SCRUB_EXPONENT := 0.65
+## Tyre scrub follows steering because this physics saturates lateral force and
+## slip almost immediately. This maps the useful 0.0-0.5 steering range onto a
+## continuous bed while speed gating keeps stationary steering silent.
+const TYRE_FULL_STEER := 0.43
+const TYRE_STEER_EXPONENT := 0.75
+const TYRE_ROLLING_SPEED := 25.0
+const TYRE_FULL_SPEED := 120.0
 ## Slip angle where a sliding tyre starts to screech, and where the screech peaks.
 const SCREECH_ONSET_DEG := 12.0
 const SCREECH_FULL_DEG := 35.0
@@ -221,21 +220,37 @@ func get_throttle_input() -> float:
 	return _throttle_input
 
 
-## Cornering scrub for audio: rises from the larger of the two axle slip angles
-## on a soft curve, so an ordinary corner is subtle and a hard one is not
-## instantly pinned at full. Presentation-only — gameplay reads is_drifting and
-## is_sliding.
-func get_tyre_scrub() -> float:
-	var slip_deg := maxf(rad_to_deg(absf(_front_slip_angle)), rad_to_deg(absf(_rear_slip_angle)))
-	return pow(clampf(slip_deg / SCRUB_FULL_DEG, 0.0, 1.0), SCRUB_EXPONENT)
-
-
-## Screech level: silent until a tyre is genuinely sliding, which is what makes a
-## drift louder and harder than cornering.
-func get_tyre_screech() -> float:
-	var slip_deg := rad_to_deg(absf(_rear_slip_angle))
+## Presentation state shared by tyre audio and VFX. Gameplay's drift/slide flags
+## own the sliding truth; raw slip only shapes intensity after gameplay says the
+## tyres have broken away.
+func get_tyre_state() -> Dictionary:
+	var sliding := is_drifting or is_sliding
+	var speed_weight := smoothstep(TYRE_ROLLING_SPEED, TYRE_FULL_SPEED, speed)
+	var cornering := pow(
+		clampf(absf(_steer_input) / TYRE_FULL_STEER, 0.0, 1.0),
+		TYRE_STEER_EXPONENT,
+	) * speed_weight
+	var rear_slip_deg := rad_to_deg(absf(_rear_slip_angle))
 	var span := maxf(SCREECH_FULL_DEG - SCREECH_ONSET_DEG, 1.0)
-	return pow(clampf((slip_deg - SCREECH_ONSET_DEG) / span, 0.0, 1.0), 1.2)
+	var slip_intensity := pow(clampf((rear_slip_deg - SCREECH_ONSET_DEG) / span, 0.0, 1.0), 1.2)
+	return {
+		"cornering": maxf(cornering, 1.0 if sliding else 0.0),
+		"sliding": sliding,
+		"screech": maxf(0.55, slip_intensity) if sliding else 0.0,
+		"drift_state": _drift_state,
+		"surface": current_surface,
+		"grip": get_effective_grip(),
+		"surface_grip": surface_grip_multiplier,
+	}
+
+
+## Compatibility accessors for probes and presentation callers.
+func get_tyre_scrub() -> float:
+	return float(get_tyre_state()["cornering"])
+
+
+func get_tyre_screech() -> float:
+	return float(get_tyre_state()["screech"])
 
 
 func get_effective_max_speed() -> float:
