@@ -114,6 +114,15 @@ func _test_independent_recipes() -> bool:
 		var different_seed := ROOM_MODEL.generate_recipe(family, 929, &"marathon")
 		if not _expect(different_seed["polygon_digest"] != first_digests[family], "%s room seed should vary polygon geometry without consulting a route" % family):
 			return false
+		if family != &"el":
+			var boundary_styles := {}
+			for seed in 48:
+				var varied := ROOM_MODEL.generate_recipe(family, seed, &"compact")
+				if not _expect(bool(varied.get("valid", false)), "%s compact boundary variant %d should preserve its polygon and portals" % [family, seed]):
+					return false
+				boundary_styles[varied["boundary_style"]] = true
+			if not _expect(boundary_styles.size() == 3, "%s should expose all three authored boundary styles in the fixed development window" % family):
+				return false
 	return true
 
 

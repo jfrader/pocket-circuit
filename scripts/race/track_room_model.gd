@@ -55,6 +55,7 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 	var outer: PackedVector2Array
 	var regions: Array[Dictionary]
 	var portals: Array[Dictionary]
+	var boundary_style := &"el_notch" if family == &"el" else &"paired_bays"
 	if family == &"el":
 		var base_notch: Vector2 = definition["notch"]
 		var notch := Vector2(
@@ -79,24 +80,57 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 		portals = [_portal_definition(&"el_junction", &"vertical_arm", &"horizontal_arm", Vector2(portal_x, portal_center_y - 330.0), Vector2(portal_x, portal_center_y + 330.0), 2)]
 	else:
 		var bevel := float(definition["bevel"]) * minf(tier_size.x, tier_size.y)
-		var bay_half_height := maxf(330.0, half.y * lerpf(0.22, 0.30, _hash_unit(room_seed, 0xA1)))
-		var left_depth := maxf(360.0, half.x * 0.12) * lerpf(0.85, 1.20, _hash_unit(room_seed, 0xB3))
-		var right_depth := maxf(360.0, half.x * 0.12) * lerpf(0.85, 1.20, _hash_unit(room_seed, 0xD7))
+		var styles: Array = definition["boundary_styles"]
+		boundary_style = styles[mini(styles.size() - 1, floori(_hash_unit(room_seed, 0x8B) * styles.size()))]
+		var left_half_height := maxf(350.0, half.y * lerpf(0.34, 0.42, _hash_unit(room_seed, 0xA1)))
+		var right_half_height := maxf(350.0, half.y * lerpf(0.34, 0.42, _hash_unit(room_seed, 0xC5)))
+		var left_center_y := 0.0
+		var right_center_y := 0.0
+		var base_depth := maxf(380.0, half.x * 0.14)
+		var left_depth := base_depth * lerpf(0.85, 1.25, _hash_unit(room_seed, 0xB3))
+		var right_depth := base_depth * lerpf(0.85, 1.25, _hash_unit(room_seed, 0xD7))
+		match boundary_style:
+			&"offset_bays":
+				left_half_height = maxf(520.0, half.y * 0.56)
+				right_half_height = maxf(520.0, half.y * 0.56)
+				var offset := minf(half.y * 0.18, minf(left_half_height, right_half_height) - 320.0)
+				left_center_y = offset
+				right_center_y = -offset
+			&"asymmetric_bays":
+				left_half_height = maxf(620.0, half.y * 0.68)
+				right_half_height = maxf(350.0, half.y * 0.36)
+				if _hash_unit(room_seed, 0xE9) < 0.5:
+					var swapped_height := left_half_height
+					left_half_height = right_half_height
+					right_half_height = swapped_height
+					left_depth *= 0.72
+					right_depth *= 1.45
+				else:
+					left_depth *= 1.45
+					right_depth *= 0.72
+		left_half_height = minf(left_half_height, half.y - bevel - 20.0)
+		right_half_height = minf(right_half_height, half.y - bevel - 20.0)
+		left_center_y = clampf(left_center_y, -half.y + bevel + left_half_height, half.y - bevel - left_half_height)
+		right_center_y = clampf(right_center_y, -half.y + bevel + right_half_height, half.y - bevel - right_half_height)
+		var left_lower := left_center_y - left_half_height
+		var left_upper := left_center_y + left_half_height
+		var right_lower := right_center_y - right_half_height
+		var right_upper := right_center_y + right_half_height
 		outer = PackedVector2Array([
 			Vector2(-half.x + bevel, -half.y), Vector2(half.x - bevel, -half.y),
-			Vector2(half.x, -half.y + bevel), Vector2(half.x, -bay_half_height),
-			Vector2(half.x + right_depth, -bay_half_height), Vector2(half.x + right_depth, bay_half_height),
-			Vector2(half.x, bay_half_height), Vector2(half.x, half.y - bevel),
+			Vector2(half.x, -half.y + bevel), Vector2(half.x, right_lower),
+			Vector2(half.x + right_depth, right_lower), Vector2(half.x + right_depth, right_upper),
+			Vector2(half.x, right_upper), Vector2(half.x, half.y - bevel),
 			Vector2(half.x - bevel, half.y), Vector2(-half.x + bevel, half.y),
-			Vector2(-half.x, half.y - bevel), Vector2(-half.x, bay_half_height),
-			Vector2(-half.x - left_depth, bay_half_height), Vector2(-half.x - left_depth, -bay_half_height),
-			Vector2(-half.x, -bay_half_height), Vector2(-half.x, -half.y + bevel),
+			Vector2(-half.x, half.y - bevel), Vector2(-half.x, left_upper),
+			Vector2(-half.x - left_depth, left_upper), Vector2(-half.x - left_depth, left_lower),
+			Vector2(-half.x, left_lower), Vector2(-half.x, -half.y + bevel),
 		])
 		regions = [
 			_region(&"west", PackedVector2Array([Vector2(-half.x + bevel, -half.y + bevel), Vector2(0, -half.y + bevel), Vector2(0, half.y - bevel), Vector2(-half.x + bevel, half.y - bevel)]), true, half.x),
 			_region(&"east", PackedVector2Array([Vector2(0, -half.y + bevel), Vector2(half.x - bevel, -half.y + bevel), Vector2(half.x - bevel, half.y - bevel), Vector2(0, half.y - bevel)]), true, half.x),
-			_region(&"west_bay", _rectangle_ring(Vector2(-half.x - left_depth * 0.5, 0), Vector2(left_depth, bay_half_height * 2.0)), false, left_depth),
-			_region(&"east_bay", _rectangle_ring(Vector2(half.x + right_depth * 0.5, 0), Vector2(right_depth, bay_half_height * 2.0)), false, right_depth),
+			_region(&"west_bay", _rectangle_ring(Vector2(-half.x - left_depth * 0.5, left_center_y), Vector2(left_depth, left_half_height * 2.0)), false, left_depth),
+			_region(&"east_bay", _rectangle_ring(Vector2(half.x + right_depth * 0.5, right_center_y), Vector2(right_depth, right_half_height * 2.0)), false, right_depth),
 		]
 		portals = [
 			_portal_definition(&"core", &"west", &"east", Vector2(0, -310.0), Vector2(0, 310.0), 2),
@@ -110,6 +144,7 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 		"room_seed": room_seed,
 		"tier": tier,
 		"coordinate_scale": 1.0,
+		"boundary_style": boundary_style,
 		"outer": outer,
 		"solid_exclusions": [],
 		"regions": regions,
@@ -170,6 +205,7 @@ static func create(source: Dictionary) -> Dictionary:
 		"room_seed": int(source.get("room_seed", 0)),
 		"tier": StringName(source.get("tier", &"fixture")),
 		"coordinate_scale": float(source.get("coordinate_scale", 1.0)),
+		"boundary_style": StringName(source.get("boundary_style", &"fixture")),
 		"outer": outer,
 		"solid_exclusions": holes,
 		"regions": (source.get("regions", []) as Array).duplicate(true),
