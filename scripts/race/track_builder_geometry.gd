@@ -121,13 +121,13 @@ static func simple_inner_boundary_loop(points: PackedVector2Array, centerline: P
 	return simple_corridor_boundary_loop(points, centerline, false)
 
 
-static func simple_corridor_boundary_loop(_points: PackedVector2Array, centerline: PackedVector2Array, select_outer: bool) -> PackedVector2Array:
+static func simple_corridor_boundary_loop(_points: PackedVector2Array, centerline: PackedVector2Array, select_outer: bool, clearance: float = HALF_WIDTH) -> PackedVector2Array:
 	# Build the joined stroke through Clipper rather than trusting raw vertex
 	# normals. A closed polyline yields simple contours on both sides; comparing
 	# them with centerline area selects the matching physical road edge.
 	var stroke_contours: Array[PackedVector2Array] = Geometry2D.offset_polyline(
 		centerline,
-		HALF_WIDTH,
+		clearance,
 		Geometry2D.JOIN_ROUND,
 		Geometry2D.END_JOINED
 	)

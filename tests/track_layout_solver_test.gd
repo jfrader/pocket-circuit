@@ -20,7 +20,7 @@ func _initialize() -> void:
 func _run_test() -> void:
 	if not _test_signatures():
 		return
-	if not _test_catalog_search() or not _test_remaining_bounds() or not _test_frontier_budget():
+	if not _test_general_graphs() or not _test_catalog_search() or not _test_remaining_bounds() or not _test_frontier_budget():
 		return
 	for test_case: Dictionary in CASES:
 		var started := Time.get_ticks_usec()
@@ -176,6 +176,26 @@ func _test_catalog_search() -> bool:
 	return true
 
 
+func _test_general_graphs() -> bool:
+	var counts := {}
+	for family: String in SOLVER.GENERATED_RULES.ROOMS:
+		for tier: String in SOLVER.GENERATED_RULES.LENGTH_TIERS:
+			var room := ROOM_MODEL.generate_recipe(StringName(family), 928, StringName(tier))
+			var identity := {"room_shape": family, "length_tier": tier, "seed": 928}
+			var graphs := SOLVER._graph_candidates(room, identity)
+			if not _expect(graphs.size() == SOLVER.MAX_GRAPH_CANDIDATES, "%s/%s should enumerate the general graph budget" % [family, tier]):
+				return false
+			for graph: Dictionary in graphs:
+				if not bool(graph["ok"]):
+					if not _expect(graph.has("reason") and graph.get("kind") != &"unsupported_first_lap_cell", "graph failure must explain a geometric or budget constraint, never a cell whitelist"):
+						return false
+					continue
+				counts[(graph["slots"] as Array).size()] = true
+				if not _expect((graph["region_budgets"] as Array).size() == SOLVER._required_region_ids(room).size() and not (graph["portal_counts"] as Dictionary).is_empty(), "graph must retain its region allocation and portal reservations"):
+					return false
+	return _expect(counts.size() >= 3, "region and length budgets must produce variable cycle counts")
+
+
 func _test_remaining_bounds() -> bool:
 	var partial := {"length": 1000.0, "signed_turn": PI, "entry_port": {"position": Vector2.ZERO}, "exit_port": {"position": Vector2(1200, 0)}}
 	var slots: Array = [{"module_id": &"straight_link", "parameters": {"length": 1200.0}}]
@@ -186,7 +206,7 @@ func _test_remaining_bounds() -> bool:
 
 func _test_frontier_budget() -> bool:
 	var room := ROOM_MODEL.generate_recipe(&"classic", 1494245235, &"standard")
-	var graph := SOLVER._build_classic_graph(room, 180.0, {"room_shape": &"classic", "length_tier": &"standard", "seed": 928}, 0)
+	var graph := SOLVER._graph_candidates(room, {"room_shape": &"classic", "length_tier": &"standard", "seed": 928})[0]
 	var instances: Array[Dictionary] = []
 	for slot: Dictionary in graph["ordinary_slots"]:
 		instances.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))

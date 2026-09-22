@@ -6,6 +6,7 @@ const ROOM_MODEL := preload("res://scripts/race/track_room_model.gd")
 const VALIDATION := preload("res://scripts/race/track_layout_validation.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const SIGNATURES := preload("res://scripts/race/track_layout_signatures.gd")
+const GRAPHS := preload("res://scripts/race/track_layout_graph.gd")
 
 const MAX_GRAPH_CANDIDATES := 24
 const MAX_PLACEMENT_EXPANSIONS_PER_GRAPH := 2048
@@ -34,6 +35,7 @@ static func solve(request: Dictionary) -> Dictionary:
 		"narrow_phase_operations": 0,
 		"repair_passes": 0,
 		"last_rejection": &"none",
+		"graph_failure_reasons": {},
 		"limits": limits.duplicate(true),
 	}
 	var portal_check := _required_portals_are_feasible(room)
@@ -45,6 +47,10 @@ static func solve(request: Dictionary) -> Dictionary:
 		var graph: Dictionary = candidates[graph_index]
 		if not bool(graph.get("ok", false)):
 			counters["last_rejection"] = graph.get("kind", &"invalid_graph")
+			counters["last_reason"] = graph.get("reason", "Invalid graph.")
+			var failures: Dictionary = counters["graph_failure_reasons"]
+			var detail := String(counters["last_reason"])
+			failures[detail] = int(failures.get(detail, 0)) + 1
 			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
 			continue
 		var search := _place_graph(graph, room, band, counters, limits)
@@ -105,6 +111,8 @@ static func solve(request: Dictionary) -> Dictionary:
 			"profile_signature": signatures["profile"],
 		}
 	var reason := "No graph candidate produced a valid closed route within %d graphs, %d placements, %d closures, and %d narrow-phase operations (last rejection: %s)." % [int(counters["graph_candidates"]), int(counters["placement_expansions"]), int(counters["closure_candidates"]), int(counters["narrow_phase_operations"]), counters["last_rejection"]]
+	if counters.has("last_reason"):
+		reason += " " + String(counters["last_reason"])
 	return _failure(identity, &"candidate_search", &"no_feasible_layout", reason, counters)
 
 
@@ -166,112 +174,16 @@ static func _required_portals_are_feasible(room: Dictionary) -> Dictionary:
 
 static func _graph_candidates(room: Dictionary, identity: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
-	for variant: int in [0, 1]:
-		for radius: float in [240.0, 180.0]:
-			var graph := _build_el_graph(room, radius, identity, variant) if identity["room_shape"] == &"el" else _build_classic_graph(room, radius, identity, variant)
-			graph["candidate_index"] = result.size()
-			for key: String in ["seed", "room_shape", "length_tier"]:
-				graph[key] = identity[key]
-			result.append(graph)
+	var band := GENERATED_RULES.length_profile(String(identity["length_tier"]))
+	for candidate in MAX_GRAPH_CANDIDATES:
+		var graph := GRAPHS.build(room, band, identity, candidate)
+		if bool(graph.get("ok", false)):
+			graph.merge(_finalize_graph(graph["ordinary_slots"], graph["start_position"], graph["start_heading"], graph["closure_radius"], graph["id"]), true)
+		graph["candidate_index"] = candidate
+		for key: String in ["seed", "room_shape", "length_tier"]:
+			graph[key] = identity[key]
+		result.append(graph)
 	return result
-
-
-static func _build_classic_graph(room: Dictionary, radius: float, identity: Dictionary, variant: int) -> Dictionary:
-	if StringName(room.get("recipe_family", &"")) != &"classic" or StringName(room.get("tier", &"")) != &"standard":
-		return {"ok": false, "kind": &"unsupported_first_lap_cell"}
-	var bounds := _ring_bounds(room["outer"])
-	var center := bounds.get_center()
-	var half_x := minf(1200.0, bounds.size.x * 0.5 - 200.0)
-	var half_y := 300.0
-	var vertical := 2.0 * (half_y - radius)
-	if vertical < 180.0:
-		return {"ok": false, "kind": &"module_domain"}
-	var horizontal := 2.0 * (half_x - radius)
-	var chicane_radius := 180.0
-	var chicane_angle := 30.0
-	var chicane_distance := 180.0 + float(_hash_index(identity, "classic_chicane", 0, 9)) * 10.0
-	var chicane_advance := 4.0 * chicane_radius * sin(deg_to_rad(chicane_angle)) + chicane_distance
-	var first_setup := 1030.0 + float(_hash_index(identity, "classic_finish_approach", 0, 5)) * 10.0
-	var remaining_top := horizontal - first_setup - chicane_advance
-	if remaining_top < 180.0 or horizontal < 1000.0:
-		return {"ok": false, "kind": &"module_domain"}
-	var top_slots: Array[Dictionary] = [
-		_slot(&"straight_setup", {"length": first_setup}, &"opening"),
-		_slot(&"chicane_return", {"radius": chicane_radius, "angle_deg": chicane_angle, "distance": chicane_distance, "hand": -1.0}, &"technical"),
-		_slot(&"straight_link", {"length": remaining_top}, &"connection"),
-	]
-	if variant == 1:
-		var chicane: Dictionary = top_slots.pop_at(1)
-		top_slots.append(chicane)
-	var ordinary: Array[Dictionary] = top_slots
-	ordinary.append_array([
-		_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"conflict"),
-		_slot(&"straight_link", {"length": vertical}, &"connection"),
-		_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"technical"),
-		_slot(&"straight_setup", {"length": horizontal, "finish": true}, &"finish"),
-	])
-	return _finalize_graph(ordinary, center + Vector2(-half_x + radius, -half_y), 0.0, radius, StringName("classic_crossing_%d" % variant))
-
-
-static func _build_el_graph(room: Dictionary, radius: float, identity: Dictionary, variant: int) -> Dictionary:
-	if StringName(room.get("recipe_family", &"")) != &"el" or StringName(room.get("tier", &"")) != &"compact":
-		return {"ok": false, "kind": &"unsupported_first_lap_cell"}
-	var concave := _concave_vertex(room["outer"])
-	if not is_finite(concave.x):
-		return {"ok": false, "kind": &"missing_concavity"}
-	var inner := concave + Vector2(-520.0, 160.0)
-	var left_extent := 880.0 + float(_hash_index(identity, "el_vertical_arm", 0, 3)) * 10.0
-	var right_extent := 950.0 + float(_hash_index(identity, "el_horizontal_arm", 0, 6)) * 10.0
-	var vertices := PackedVector2Array([
-		inner + Vector2(-left_extent, -700.0),
-		inner + Vector2(0.0, -700.0),
-		inner,
-		inner + Vector2(right_extent, 0.0),
-		inner + Vector2(right_extent, 620.0),
-		inner + Vector2(-left_extent, 620.0),
-	])
-	var lengths := PackedFloat64Array()
-	for index in vertices.size():
-		lengths.append(vertices[index].distance_to(vertices[(index + 1) % vertices.size()]) - 2.0 * radius)
-	for length: float in lengths:
-		if length < 180.0:
-			return {"ok": false, "kind": &"module_domain"}
-	var ordinary: Array[Dictionary]
-	var start: Vector2
-	var heading: float
-	if variant == 0:
-		ordinary = [
-			_slot(&"straight_setup", {"length": lengths[0]}, &"opening"),
-			_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"conflict"),
-			_slot(&"straight_link", {"length": lengths[1]}, &"connection"),
-			_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": -1.0}, &"technical"),
-			_slot(&"straight_link", {"length": lengths[2]}, &"connection"),
-			_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"conflict"),
-			_slot(&"straight_link", {"length": lengths[3]}, &"connection"),
-			_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"technical"),
-			_slot(&"straight_setup", {"length": lengths[4], "finish": true}, &"finish"),
-		]
-		start = vertices[0] + Vector2(radius, 0.0)
-		heading = 0.0
-	else:
-		ordinary = [
-			_slot(&"straight_link", {"length": lengths[3]}, &"connection"),
-			_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"technical"),
-			_slot(&"straight_setup", {"length": lengths[4], "finish": true}, &"finish"),
-			_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"conflict"),
-			_slot(&"straight_setup", {"length": lengths[5]}, &"opening"),
-			_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"conflict"),
-			_slot(&"straight_setup", {"length": lengths[0]}, &"opening"),
-			_slot(&"corner_tight", {"radius": radius, "angle_deg": 90.0, "hand": 1.0}, &"conflict"),
-			_slot(&"straight_link", {"length": lengths[1]}, &"connection"),
-		]
-		start = vertices[3] + Vector2(0.0, radius)
-		heading = PI * 0.5
-	return _finalize_graph(ordinary, start, heading, radius, StringName("el_two_arm_%d" % variant))
-
-
-static func _slot(module_id: StringName, parameters: Dictionary, moment: StringName) -> Dictionary:
-	return {"module_id": module_id, "parameters": parameters, "moment": moment, "closure": false}
 
 
 static func _finalize_graph(ordinary: Array[Dictionary], start: Vector2, heading: float, closure_radius: float, graph_id: StringName) -> Dictionary:
@@ -648,22 +560,6 @@ static func _complete_cycle(graph: Dictionary, route: Dictionary) -> Array[Dicti
 			slots[index]["module_id"] = modules[index]["id"]
 			slots[index]["parameters"] = (modules[index]["parameters"] as Dictionary).duplicate(true)
 	return slots
-
-
-static func _ring_bounds(ring: PackedVector2Array) -> Rect2:
-	var bounds := Rect2(ring[0], Vector2.ZERO)
-	for point: Vector2 in ring:
-		bounds = bounds.expand(point)
-	return bounds
-
-
-static func _concave_vertex(ring: PackedVector2Array) -> Vector2:
-	for index in ring.size():
-		var incoming := (ring[index] - ring[posmod(index - 1, ring.size())]).normalized()
-		var outgoing := (ring[(index + 1) % ring.size()] - ring[index]).normalized()
-		if incoming.cross(outgoing) < -0.5:
-			return ring[index]
-	return Vector2(INF, INF)
 
 
 static func _hash_index(identity: Dictionary, domain: String, index: int, count: int) -> int:

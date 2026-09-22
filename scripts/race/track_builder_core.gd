@@ -297,6 +297,9 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		var outer := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
 		var inner := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
 		edges["inner_boundary"] = _simple_inner_boundary_loop(inner, centerline)
+		if not (spec.get("room_model", {}) as Dictionary).is_empty():
+			var rim_clearance := TRACK_ROOM_MODEL.CONSTRUCTION_MARGIN + ISLAND_TEXTURED_RIM_WIDTH * 0.5
+			edges["inner_boundary"] = TRACK_BUILDER_GEOMETRY.simple_corridor_boundary_loop(inner, centerline, false, rim_clearance)
 		edges["outer_boundary"] = _simple_boundary_loop(outer, centerline)
 		var gate_samples := _layout_gate_samples(centerline, spec)
 		var moments := _analyze_track_moments(centerline, gate_samples)
