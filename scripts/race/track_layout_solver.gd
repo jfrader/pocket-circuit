@@ -504,12 +504,14 @@ static func _assign_regions_and_portals(graph: Dictionary, room: Dictionary, rou
 	for portal: Dictionary in room.get("portals", []):
 		if not required_regions.has(portal["region_a"]) or not required_regions.has(portal["region_b"]):
 			continue
-		var crossings := _portal_crossings(route, portal)
-		if (crossings["points"] as PackedVector2Array).size() != 2:
+		var crossings := GRAPHS.portal_crossings(route, portal)
+		var expected := int((graph.get("portal_counts", {}) as Dictionary).get(portal["id"], 0))
+		if expected < 2 or expected % 2 != 0 or expected > int(portal["traversal_capacity"]) or (crossings["points"] as PackedVector2Array).size() != expected:
 			return {"ok": false, "kind": &"portal_traversal_count"}
 		var lanes: PackedVector2Array = crossings["points"]
-		if lanes[0].distance_to(lanes[1]) < ROOM_MODEL.LANE_SEPARATION:
-			return {"ok": false, "kind": &"portal_lane_spacing"}
+		for index in range(1, lanes.size()):
+			if lanes[index - 1].distance_to(lanes[index]) < ROOM_MODEL.LANE_SEPARATION:
+				return {"ok": false, "kind": &"portal_lane_spacing"}
 		traversals.append({
 			"portal_id": portal["id"],
 			"region_a": portal["region_a"],
@@ -527,29 +529,6 @@ static func _required_region_ids(room: Dictionary) -> Dictionary:
 		if bool(region.get("required", false)):
 			result[region["id"]] = true
 	return result
-
-
-static func _portal_crossings(route: Dictionary, portal: Dictionary) -> Dictionary:
-	var portal_line := {
-		"kind": &"line",
-		"start": portal["segment_from"],
-		"end": portal["segment_to"],
-	}
-	var records: Array[Dictionary] = []
-	var segment: Vector2 = portal["segment_to"] - portal["segment_from"]
-	for primitive: Dictionary in route["primitives"]:
-		for point: Vector2 in VALIDATION._primitive_intersections(primitive, portal_line):
-			var fraction := (point - (portal["segment_from"] as Vector2)).dot(segment) / segment.length_squared()
-			records.append({"point": point, "fraction": fraction, "module_index": int(primitive["module_index"])})
-	records.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["fraction"]) < float(b["fraction"]))
-	var points := PackedVector2Array()
-	var slots := PackedInt32Array()
-	for record: Dictionary in records:
-		if not points.is_empty() and points[points.size() - 1].distance_to(record["point"]) <= MODULES.POSITION_TOLERANCE:
-			continue
-		points.append(record["point"])
-		slots.append(int(record["module_index"]))
-	return {"points": points, "slot_indices": slots}
 
 
 static func _complete_cycle(graph: Dictionary, route: Dictionary) -> Array[Dictionary]:

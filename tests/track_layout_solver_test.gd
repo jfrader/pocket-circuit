@@ -178,6 +178,7 @@ func _test_catalog_search() -> bool:
 
 func _test_general_graphs() -> bool:
 	var counts := {}
+	var classes := {}
 	for family: String in SOLVER.GENERATED_RULES.ROOMS:
 		for tier: String in SOLVER.GENERATED_RULES.LENGTH_TIERS:
 			var room := ROOM_MODEL.generate_recipe(StringName(family), 928, StringName(tier))
@@ -191,9 +192,13 @@ func _test_general_graphs() -> bool:
 						return false
 					continue
 				counts[(graph["slots"] as Array).size()] = true
+				for slot: Dictionary in graph["ordinary_slots"]:
+					classes[slot["module_id"]] = true
+					if not _expect((MODULES.definition(slot["module_id"])["allowed_moment_tags"] as Array).has(slot["moment"]), "graph moments must obey the selected catalog class"):
+						return false
 				if not _expect((graph["region_budgets"] as Array).size() == SOLVER._required_region_ids(room).size() and not (graph["portal_counts"] as Dictionary).is_empty(), "graph must retain its region allocation and portal reservations"):
 					return false
-	return _expect(counts.size() >= 3, "region and length budgets must produce variable cycle counts")
+	return _expect(counts.size() >= 3, "region and length budgets must produce variable cycle counts") and _expect(classes.size() == MODULES.definitions().size(), "general graph proposals must reach all authored classes: %s" % [classes.keys()])
 
 
 func _test_remaining_bounds() -> bool:
