@@ -186,18 +186,24 @@ func _test_general_graphs() -> bool:
 			var graphs := SOLVER._graph_candidates(room, identity)
 			if not _expect(graphs.size() == SOLVER.MAX_GRAPH_CANDIDATES, "%s/%s should enumerate the general graph budget" % [family, tier]):
 				return false
+			var feasible := 0
 			for graph: Dictionary in graphs:
 				if not bool(graph["ok"]):
 					if not _expect(graph.has("reason") and graph.get("kind") != &"unsupported_first_lap_cell", "graph failure must explain a geometric or budget constraint, never a cell whitelist"):
 						return false
 					continue
+				feasible += 1
 				counts[(graph["slots"] as Array).size()] = true
 				for slot: Dictionary in graph["ordinary_slots"]:
 					classes[slot["module_id"]] = true
+					if not _expect(bool(MODULES.instantiate(slot["module_id"], slot["parameters"]).get("ok", false)), "region turns must leave links inside the strict catalog domain"):
+						return false
 					if not _expect((MODULES.definition(slot["module_id"])["allowed_moment_tags"] as Array).has(slot["moment"]), "graph moments must obey the selected catalog class"):
 						return false
 				if not _expect((graph["region_budgets"] as Array).size() == SOLVER._required_region_ids(room).size() and not (graph["portal_counts"] as Dictionary).is_empty(), "graph must retain its region allocation and portal reservations"):
 					return false
+			if not _expect(feasible > 0, "%s/%s must have a constructible region graph" % [family, tier]):
+				return false
 	return _expect(counts.size() >= 3, "region and length budgets must produce variable cycle counts") and _expect(classes.size() == MODULES.definitions().size(), "general graph proposals must reach all authored classes: %s" % [classes.keys()])
 
 

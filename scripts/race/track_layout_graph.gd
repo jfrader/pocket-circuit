@@ -72,9 +72,11 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 		var x1 := minf(right, bounds.end.x)
 		# Keep the two portal lanes free; excursions belong to one region side.
 		if bounds.get_center().x < 0.0:
-			x1 = minf(x1, -RADIUS - 10.0)
+			var junction_half := minf(CELL_MIN * 0.5, maxf(RADIUS + 10.0, -x0 - CELL_MIN - 1.0))
+			x1 = minf(x1, -junction_half)
 		else:
-			x0 = maxf(x0, RADIUS + 10.0)
+			var junction_half := minf(CELL_MIN * 0.5, maxf(RADIUS + 10.0, x1 - CELL_MIN - 1.0))
+			x0 = maxf(x0, junction_half)
 		var capacity := maxi(1, floori((x1 - x0 + CELL_MIN) / (2.0 * CELL_MIN)))
 		var depth_capacity := maxf(-half_height - bounds.position.y, bounds.end.y - half_height)
 		var count := clampi(ceili((target - estimate) / maxf(2.0 * depth_capacity, 1.0)), 1, capacity)
@@ -155,7 +157,7 @@ static func _embed_ring(ring: PackedVector2Array, identity: Dictionary, candidat
 		var direction := (ring[next] - ring[index]).normalized()
 		var outgoing := (ring[(index + 2) % ring.size()] - ring[next]).normalized()
 		var length := ring[index].distance_to(ring[next]) - trims[index].y - trims[next].x
-		if length < LINK_MIN - 0.01:
+		if length < LINK_MIN:
 			return _failure(&"cell_turn_envelope", "Region edge %.2f leaves a %.2f link after %.2f/%.2f turn trims; catalog minimum is %.2f." % [ring[index].distance_to(ring[next]), length, trims[index].y, trims[next].x, LINK_MIN])
 		var start := ring[index] + direction * trims[index].y
 		var count := ceili(length / 2400.0)
@@ -230,7 +232,7 @@ static func _corner_slot(hand: float, available: float, candidate: int, index: i
 		parameters["angle_deg"] = 90.0
 		var module := MODULES.instantiate(definition["id"], parameters)
 		var exit: Vector2 = module["exit_port"]["position"]
-		if maxf(exit.x, absf(exit.y)) <= available + 0.001:
+		if maxf(exit.x, absf(exit.y)) <= available:
 			choices.append(_slot(definition["id"], parameters, &"technical" if hand < 0.0 else &"conflict"))
 	if choices.is_empty() or candidate < 4:
 		return _slot(&"corner_tight", {"radius": RADIUS, "angle_deg": 90.0, "hand": hand}, &"technical" if hand < 0.0 else &"conflict")
