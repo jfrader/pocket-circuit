@@ -154,7 +154,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 			push_error("TrackBuilderCore: %s" % String(generator_selection.get("error", "invalid generator request")))
 			return {}
 	var spec: Dictionary = LAYOUTS[theme]
-	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape] if seed >= 0 else BASE_ROOM_SHAPES[room_shape]
+	var room_polygon: PackedVector2Array = PackedVector2Array()
 	var used_seed := seed
 	if seed >= 0:
 		var length_tier := StringName(generation_options.get("length_tier", &"standard"))
@@ -165,37 +165,41 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		# radii), so the same road/radius constraints hold while the loop runs
 		# longer through more sections rather than a wider corridor.
 		var room_scale := float(profile.get("room_scale", 1.0))
-		if absf(room_scale - 1.0) > 0.001:
-			var scaled_room := PackedVector2Array()
-			for point: Vector2 in room_polygon:
-				scaled_room.append(point * room_scale)
-			room_polygon = scaled_room
-		var room_params := {
-			"margin": 190.0,
-			"min_point_distance": 210.0,
-			"max_angle_deg": 80.0,
-			"min_self_distance": 320.0,
-			"min_loop_length": 1900.0 * WORLD_SCALE,
-			"room_polygon": room_polygon,
-			"room_shape": room_shape,
-			"length_tier": length_tier,
-		}
-		match room_shape:
-			&"tall":
-				room_params["displacement_scale"] = 0.55
-			&"el":
-				room_params["displacement_scale"] = 0.5
-				room_params["min_loop_length"] = 1500.0 * WORLD_SCALE
-			&"long":
-				room_params["displacement_scale"] = 1.0
-				room_params["min_loop_length"] = 2000.0 * WORLD_SCALE
-			&"square":
-				room_params["displacement_scale"] = 1.0
-				room_params["min_loop_length"] = 2200.0 * WORLD_SCALE
 		var gen: Dictionary
 		if generator_selection.get("path") == GENERATOR_REGISTRY.LEGACY_PATH:
+			# v7 path retains its AABB-fitted legacy room geometry and scaling exactly.
+			room_polygon = ROOM_SHAPES[room_shape]
+			if absf(room_scale - 1.0) > 0.001:
+				var scaled_room := PackedVector2Array()
+				for point: Vector2 in room_polygon:
+					scaled_room.append(point * room_scale)
+				room_polygon = scaled_room
+			var room_params := {
+				"margin": 190.0,
+				"min_point_distance": 210.0,
+				"max_angle_deg": 80.0,
+				"min_self_distance": 320.0,
+				"min_loop_length": 1900.0 * WORLD_SCALE,
+				"room_polygon": room_polygon,
+				"room_shape": room_shape,
+				"length_tier": length_tier,
+			}
+			match room_shape:
+				&"tall":
+					room_params["displacement_scale"] = 0.55
+				&"el":
+					room_params["displacement_scale"] = 0.5
+					room_params["min_loop_length"] = 1500.0 * WORLD_SCALE
+				&"long":
+					room_params["displacement_scale"] = 1.0
+					room_params["min_loop_length"] = 2000.0 * WORLD_SCALE
+				&"square":
+					room_params["displacement_scale"] = 1.0
+					room_params["min_loop_length"] = 2200.0 * WORLD_SCALE
 			gen = TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
 		else:
+			# v8: consume the v8 room model's polygon (doc §5.3, §6) and later the
+			# analytic route's sampled centerline as authoritative. Never AABB-fitted.
 			var room_model: Dictionary
 			if StringName(generation_options.get("development_fixture", &"")) == V8_DEVELOPMENT_GENERATOR.CATALOG_KERNEL_FIXTURE:
 				room_model = TRACK_ROOM_MODEL.legacy_fixture(room_shape, WORLD_SCALE * room_scale)
@@ -221,6 +225,12 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		if not bool(gen.get("ok", true)) or (gen.get("points", PackedVector2Array()) as PackedVector2Array).is_empty():
 			push_error("TrackBuilderCore: %s" % String(gen.get("error", "could not generate a valid circuit near seed %d" % seed)))
 			return {}
+		# Consume v8 room model's polygon from the real v8 output (outer only; no
+		# reservations/exclusions threaded to builders yet).
+		if generator_selection.get("path") != GENERATOR_REGISTRY.LEGACY_PATH:
+			var post_room: Dictionary = gen.get("room_model", {})
+			if post_room.has("outer") and post_room["outer"] is PackedVector2Array:
+				room_polygon = post_room["outer"]
 		spec = spec.duplicate()
 		spec["controls"] = gen["points"]
 		spec["centerline_is_sampled"] = bool(gen.get("centerline_is_sampled", false))
@@ -231,6 +241,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 			spec["sampled_validation"] = gen.get("sampled_validation", {})
 			spec["room_model"] = gen.get("room_model", {})
 			spec["solver_search"] = gen.get("search", {})
+			spec["sampling"] = gen.get("sampling", {})
 		spec["seed_obstacles"] = true
 		spec["seed"] = int(gen["seed"])
 		spec["requested_seed"] = seed
