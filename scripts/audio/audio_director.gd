@@ -12,6 +12,10 @@ const CrashVoiceGeneratorScript := preload("res://scripts/audio/sfx/crash_voice_
 const BoostVoiceGeneratorScript := preload("res://scripts/audio/sfx/boost_voice_generator.gd")
 const UiVoiceGeneratorScript := preload("res://scripts/audio/sfx/ui_voice_generator.gd")
 const ChampionshipCatalogScript := preload("res://data/championship/catalog.gd")
+## The engine ducks while the tyres slide. A broadband scrub at the same level as
+## the tonal engine is masked by it, and ducking reads better than raising the
+## tyre further.
+const ENGINE_SLIDE_DUCK_DB := -4.0
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
 const PAUSED_MUSIC_DB := -9.0
@@ -600,11 +604,17 @@ func _update_drift(delta: float) -> void:
 		return
 	if not is_instance_valid(_local_vehicle) or _race_paused:
 		_drift_voice.stop()
+		if is_instance_valid(_engine_voice):
+			_engine_voice.set_duck_db(0.0)
 		return
 	if not _local_vehicle.has_method("get_tyre_state"):
 		_drift_voice.stop()
+		if is_instance_valid(_engine_voice):
+			_engine_voice.set_duck_db(0.0)
 		return
 	var tyre_state: Dictionary = _local_vehicle.call("get_tyre_state")
+	if is_instance_valid(_engine_voice):
+		_engine_voice.set_duck_db(ENGINE_SLIDE_DUCK_DB if bool(tyre_state["sliding"]) else 0.0)
 	var scrub := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
 	var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
 	var speed := maxf(0.0, float(_local_vehicle.get("speed")))

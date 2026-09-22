@@ -22,6 +22,8 @@ const IDLE_DB := -18.0
 const PEAK_DB := -2.0
 const REV_EXPONENT := 0.68
 const SILENCE_DB := -80.0
+## How fast the duck follows the tyres, per frame. Smooth so it cannot click.
+const DUCK_SMOOTHING := 0.18
 
 var _player: AudioStreamPlayer
 var _playback: AudioStreamGeneratorPlayback
@@ -34,6 +36,8 @@ var _fallback_reason := ""
 var _paused := false
 var _headless := false
 var _underruns := 0
+var _duck_db := 0.0
+var _duck_target_db := 0.0
 var _capacity := 0
 ## True once the first buffer has been queued, so the priming frame is not
 ## mistaken for a starvation event.
@@ -58,6 +62,7 @@ func _process(delta: float) -> void:
 		return
 	_drivetrain.step(_state_speed, _state_max_speed, _state_load, _state_throttle, delta)
 	_synth.set_controls(_drivetrain.get_rpm(), _drivetrain.get_load(), _drivetrain.get_throttle())
+	_duck_db = lerpf(_duck_db, _duck_target_db, DUCK_SMOOTHING)
 	_player.volume_db = _current_volume_db()
 	var available := _playback.get_frames_available()
 	# get_frames_available() is free space: 0 means the queue is full, which is
@@ -105,6 +110,12 @@ func set_vehicle_state(speed: float, max_speed: float, load: float, throttle: fl
 	if _prepared and not _paused:
 		_drivetrain.step(_state_speed, _state_max_speed, _state_load, _state_throttle, delta)
 		_synth.set_controls(_drivetrain.get_rpm(), _drivetrain.get_load(), _drivetrain.get_throttle())
+
+
+## Duck applied while the tyres are sliding, so the scrub is not masked by the
+## engine sitting at the same level.
+func set_duck_db(decibels: float) -> void:
+	_duck_target_db = minf(decibels, 0.0)
 
 
 func start() -> void:
@@ -195,7 +206,7 @@ func _current_volume_db() -> float:
 	if _voice == null:
 		return SILENCE_DB
 	var rev := pow(clampf(_drivetrain.get_rpm() / maxf(_voice.recipe.redline_rpm, 1.0), 0.0, 1.0), REV_EXPONENT)
-	return lerpf(IDLE_DB, PEAK_DB, rev) + _voice.recipe.output_trim_db
+	return lerpf(IDLE_DB, PEAK_DB, rev) + _voice.recipe.output_trim_db + _duck_db
 
 
 func _activate_fallback(reason: String) -> void:
