@@ -407,22 +407,22 @@ static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
 	return TRACK_BUILDER_GEOMETRY.corridor_edges(centerline)
 
 static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
-	# room_model flows from prepare_layout/assembly for v8 (v7 passes {}); not forwarded to scene builder in this step
-	await TRACK_BUILDER_SCENE.build(root, spec, centerline, edges, room_polygon, theme, stage)
+	# room_model flows from prepare_layout/assembly for v8 (v7 passes {}); forwarded for gate-post and island-rim solid checks
+	await TRACK_BUILDER_SCENE.build(root, spec, centerline, edges, room_polygon, theme, stage, room_model)
 
 
 
 
-static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
-	await TRACK_BUILDER_ISLAND.build_island_prop(root, spec, region, inner_loop, centerline, stage)
+static func _build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
+	await TRACK_BUILDER_ISLAND.build_island_prop(root, spec, region, inner_loop, centerline, stage, room_model)
 
 
 static func _build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, points: PackedVector2Array) -> void:
 	TRACK_BUILDER_ISLAND.build_raised_island_rim(parent, spec, points)
 
 
-static func _add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
-	await TRACK_BUILDER_ISLAND.add_island_rim_landmarks(root, spec, boundary, centerline, stage)
+static func _add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
+	await TRACK_BUILDER_ISLAND.add_island_rim_landmarks(root, spec, boundary, centerline, stage, room_model)
 
 
 static func _build_generated_outer_boundary_visuals(
@@ -581,8 +581,8 @@ static func _nearest_gate_boundary(sample: Vector2, direction: Vector2, room_pol
 	return TRACK_BUILDER_NODES.nearest_gate_boundary(sample, direction, room_polygon, island_polygon)
 
 
-static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int) -> void:
-	TRACK_BUILDER_NODES.add_gate_posts(root, spec, sample, tangent, gate_index)
+static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int, room_model: Dictionary = {}) -> void:
+	TRACK_BUILDER_NODES.add_gate_posts(root, spec, sample, tangent, gate_index, room_model)
 
 
 static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float, span_endpoints: PackedVector2Array = PackedVector2Array()) -> void:
@@ -876,6 +876,10 @@ static func _placement_is_safe(
 		room_model: Dictionary = {}
 ) -> bool:
 	return TRACK_BUILDER_PLACEMENT.placement_is_safe(candidate, radius, room_polygon, allowed_polygon, occupied, room_model)
+
+
+static func _placement_clears_room_model(candidate: Vector2, radius: float, room_model: Dictionary) -> bool:
+	return TRACK_BUILDER_PLACEMENT._placement_clears_room_model(candidate, radius, room_model)
 
 
 static func _best_island_position(
