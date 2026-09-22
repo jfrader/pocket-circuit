@@ -14,9 +14,8 @@ const MAX_FRAMES_PER_FILL := 4096
 ## excluded.
 const STARVATION_SLACK_FRAMES := 8
 ## Mix trim for the scrub bed. Measured against the engine voice at full chat
-## (-14.0 dBFS): a full slide lands just under it, a mid corner about 8 dB down,
-## and a gentle corner about 19 dB down.
-const MIX_DB := -1.0
+## (-14.0 dBFS): a full slide lands with it while ordinary cornering stays below.
+const MIX_DB := -4.0
 const SILENCE_DB := -80.0
 ## Below this the voice renders nothing at all, so a car tracking straight costs
 ## no DSP.
