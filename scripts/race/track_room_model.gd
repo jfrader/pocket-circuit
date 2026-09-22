@@ -71,12 +71,12 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 			Vector2(half.x, half.y), Vector2(-half.x, half.y),
 		])
 		var portal_x := notch.x - 360.0
-		var portal_center_y := clampf(notch.y, -half.y + 330.0, half.y - 330.0)
+		var portal_center_y := clampf(notch.y + 470.0, -half.y + 310.0, half.y - 310.0)
 		regions = [
 			_region(&"vertical_arm", PackedVector2Array([Vector2(-half.x, -half.y), Vector2(notch.x, -half.y), Vector2(notch.x, half.y), Vector2(-half.x, half.y)]), true, half.y - notch.y),
 			_region(&"horizontal_arm", PackedVector2Array([Vector2(-half.x, notch.y), Vector2(half.x, notch.y), Vector2(half.x, half.y), Vector2(-half.x, half.y)]), true, half.x - notch.x),
 		]
-		portals = [_portal_definition(&"el_junction", &"vertical_arm", &"horizontal_arm", Vector2(portal_x, portal_center_y - 310.0), Vector2(portal_x, portal_center_y + 310.0), 2)]
+		portals = [_portal_definition(&"el_junction", &"vertical_arm", &"horizontal_arm", Vector2(portal_x, portal_center_y - 330.0), Vector2(portal_x, portal_center_y + 330.0), 2)]
 	else:
 		var bevel := float(definition["bevel"]) * minf(tier_size.x, tier_size.y)
 		var bay_half_height := maxf(330.0, half.y * lerpf(0.22, 0.30, _hash_unit(room_seed, 0xA1)))
