@@ -6,7 +6,6 @@ const EngineSoundPlayerScript := preload("res://scripts/audio/engine/engine_soun
 const EngineRecipeLibraryScript := preload("res://scripts/audio/engine/engine_recipe_library.gd")
 const EngineLoopGeneratorScript := preload("res://scripts/audio/engine/engine_loop_generator.gd")
 const EngineDrivetrainModelScript := preload("res://scripts/audio/engine/engine_drivetrain_model.gd")
-const DriftSoundPlayerScript := preload("res://scripts/audio/sfx/drift_sound_player.gd")
 const TyreSurfaceProfilesScript := preload("res://scripts/audio/sfx/tyre_surface_profiles.gd")
 const TyreLoopGeneratorScript := preload("res://scripts/audio/sfx/tyre_loop_generator.gd")
 const VehicleLoopEmitterScript := preload("res://scripts/audio/vehicle_loop_emitter.gd")
@@ -52,7 +51,6 @@ var _engine_player: AudioStreamPlayer
 ## pitched loop in charge, so the old path stays a real fallback.
 var _engine_voice: EngineSoundPlayer
 ## Continuous tyre scrub for the local car, driven by its slip angle.
-var _drift_voice: DriftSoundPlayer
 var _local_tyre_player: AudioStreamPlayer
 var _local_tyre_level := 0.0
 ## Positional WAV-loop voices for AI and remote cars. The local car alone keeps
@@ -132,8 +130,6 @@ func _exit_tree() -> void:
 		_engine_player.stream = null
 	if is_instance_valid(_engine_voice):
 		_engine_voice.stop()
-	if is_instance_valid(_drift_voice):
-		_drift_voice.stop()
 	_stop_local_tyre()
 	_clear_positional_emitters()
 	for player: AudioStreamPlayer in _sfx_players:
@@ -307,8 +303,6 @@ func clear_local_vehicle() -> void:
 		_engine_player.volume_db = SILENCE_DB
 	if is_instance_valid(_engine_voice):
 		_engine_voice.stop()
-	if is_instance_valid(_drift_voice):
-		_drift_voice.stop()
 	_stop_local_tyre()
 	_clear_positional_emitters()
 
@@ -449,12 +443,6 @@ func _build_players() -> void:
 	_engine_voice.name = "EngineVoice"
 	add_child(_engine_voice)
 
-	_drift_voice = DriftSoundPlayerScript.new()
-	_drift_voice.name = "DriftVoice"
-	add_child(_drift_voice)
-
-	# The local car uses the same looping WAV rivals use. The generator voice
-	# never reached the speakers in play, which is why only enemies were audible.
 	_local_tyre_player = AudioStreamPlayer.new()
 	_local_tyre_player.name = "LocalTyreVoice"
 	_local_tyre_player.bus = &"Tyre"
@@ -646,22 +634,17 @@ func get_boost_voice_signature() -> String:
 ## Drives the continuous scrub from the local car's slip. Independent of the
 ## engine voice, so a drift still sounds if the engine fell back to its loop.
 func _update_drift(_delta: float) -> void:
-	if not is_instance_valid(_drift_voice):
-		return
 	if not is_instance_valid(_local_vehicle) or _race_paused:
-		_drift_voice.stop()
 		_stop_local_tyre()
 		if is_instance_valid(_engine_voice):
 			_engine_voice.set_duck_db(0.0)
 		return
 	if not _local_vehicle.has_method("get_tyre_state"):
-		_drift_voice.stop()
 		_stop_local_tyre()
 		if is_instance_valid(_engine_voice):
 			_engine_voice.set_duck_db(0.0)
 		return
 	var tyre_state: Dictionary = _local_vehicle.call("get_tyre_state")
-	_drift_voice.stop()
 	_drive_local_tyre(tyre_state, maxf(0.0, float(_local_vehicle.get("speed"))), _delta)
 	if is_instance_valid(_engine_voice):
 		var duck := ENGINE_SLIDE_DUCK_DB * clampf(_local_tyre_level / TYRE_LEVEL_CEILING, 0.0, 1.0)
