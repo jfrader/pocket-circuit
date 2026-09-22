@@ -264,6 +264,7 @@ func _run_test() -> void:
 			"shard_index": shard_index,
 			"shard_count": shard_count,
 			"records": records,
+			"summary": aggregation["summary"],
 		}
 		if not _expect(_write_json(output_path, document), "could not write PC_DIVERSITY_OUTPUT to %s" % output_path):
 			return
@@ -425,6 +426,9 @@ func _case_record(
 	if generator_version == 8:
 		var search: Dictionary = result.get("search", {})
 		var route: Dictionary = result.get("analytic_route", {})
+		var classes := {}
+		for module: Dictionary in route.get("modules", []):
+			_increment(classes, String(module["id"]))
 		var curvature := {"straight": 0, "tight": 0, "medium": 0, "sweeper": 0}
 		for primitive: Dictionary in route.get("primitives", []):
 			var radius := float(primitive.get("radius", INF))
@@ -441,6 +445,7 @@ func _case_record(
 			"profile_signature": result.get("profile_signature", ""),
 			"primitive_count": (route.get("primitives", []) as Array).size(),
 			"module_count": (route.get("modules", []) as Array).size(),
+			"module_class_histogram": classes,
 			"semantic_count": SIGNATURES.describe(route)["semantic_count"],
 			"curvature_class_histogram": curvature,
 			"minimum_portal_width": minimum_width if is_finite(minimum_width) else null,
@@ -505,6 +510,8 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 	var status_counts := {}
 	var rejection_counts := {}
 	var cells := {}
+	var accepted_classes := {}
+	var class_layouts := {}
 	for record: Dictionary in ordered:
 		if int(record.get("generator", -1)) != expected_generator:
 			return {"ok": false, "error": "mismatched generator version in farm records"}
@@ -517,7 +524,7 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 		identities[identity_key] = true
 		_increment(status_counts, String(record.get("status", "unknown")))
 		if not cells.has(cell):
-			cells[cell] = {"cases": 0, "successes": 0, "structures": {}, "sequences": {}, "rhythms": {}, "shape_reps": [], "rejections": {}}
+			cells[cell] = {"cases": 0, "successes": 0, "structures": {}, "sequences": {}, "rhythms": {}, "shape_reps": [], "rejections": {}, "accepted_module_instances": {}, "accepted_class_layouts": {}}
 		var aggregate: Dictionary = cells[cell]
 		aggregate["cases"] = int(aggregate["cases"]) + 1
 		for category: String in (record.get("rejection_classes", {}) as Dictionary):
@@ -527,6 +534,15 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 		if record.get("status") != "ok":
 			continue
 		aggregate["successes"] = int(aggregate["successes"]) + int(record.get("status") == "ok")
+		for module_class: String in record.get("module_class_histogram", {}):
+			var count := int(record["module_class_histogram"][module_class])
+			if count <= 0:
+				continue
+			var instances: Dictionary = aggregate["accepted_module_instances"]
+			instances[module_class] = int(instances.get(module_class, 0)) + count
+			accepted_classes[module_class] = int(accepted_classes.get(module_class, 0)) + count
+			_increment(aggregate["accepted_class_layouts"], module_class)
+			_increment(class_layouts, module_class)
 		var structure := String(record.get("structural_signature", ""))
 		if not structure.is_empty():
 			(aggregate["structures"] as Dictionary)[structure] = true
@@ -557,8 +573,10 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 			"distinct_rhythms": (aggregate["rhythms"] as Dictionary).size(),
 			"shape_clusters": (aggregate["shape_reps"] as Array).size(),
 			"rejections": aggregate["rejections"],
+			"accepted_module_instances": aggregate["accepted_module_instances"],
+			"accepted_class_layouts": aggregate["accepted_class_layouts"],
 		}
-	return {"ok": true, "summary": {"cases": ordered.size(), "statuses": status_counts, "rejections": rejection_counts, "cells": cell_summaries}}
+	return {"ok": true, "summary": {"cases": ordered.size(), "statuses": status_counts, "rejections": rejection_counts, "cells": cell_summaries, "accepted_module_instances": accepted_classes, "accepted_class_layouts": class_layouts}}
 
 
 func _write_json(path: String, value: Variant) -> bool:
@@ -720,6 +738,11 @@ func _test_measurements() -> bool:
 	var aggregation := _aggregate_records(synthetic, 7)
 	if not _expect(bool(aggregation.get("ok", false)) and int(aggregation["summary"]["cases"]) == 2 and int(aggregation["summary"]["cells"]["classic/compact"]["shape_clusters"]) == 1, "farm aggregation should sort records and cluster cached shape descriptors"):
 		return false
+	synthetic[0]["module_class_histogram"] = {"straight_link": 3, "s_offset": 2}
+	synthetic[1]["module_class_histogram"] = {"straight_link": 1}
+	var class_summary: Dictionary = _aggregate_records(synthetic, 7)["summary"]
+	if not _expect(class_summary["accepted_module_instances"] == {"straight_link": 4, "s_offset": 2} and class_summary["cells"]["classic/compact"]["accepted_class_layouts"] == {"straight_link": 2, "s_offset": 1}, "accepted class coverage must distinguish instances from layouts containing each class"):
+		return false
 	var duplicate: Array[Dictionary] = synthetic.duplicate(true)
 	duplicate.append(synthetic[0].duplicate(true))
 	if not _expect(not bool(_aggregate_records(duplicate, 7).get("ok", false)), "farm aggregation should reject duplicate identities"):
@@ -730,7 +753,7 @@ func _test_measurements() -> bool:
 	for record: Dictionary in invalid:
 		record["status"] = "invalid"
 	var failed_summary: Dictionary = _aggregate_records(invalid, 7)["summary"]
-	return _expect(int(failed_summary["cases"]) == 2 and int(failed_summary["cells"]["classic/compact"]["shape_clusters"]) == 0 and int(failed_summary["cells"]["classic/compact"]["successes"]) == 0 and _packed_points_digest(PackedVector2Array()).is_empty(), "invalid cases must remain in denominators without earning diversity; empty output has no digest")
+	return _expect(int(failed_summary["cases"]) == 2 and int(failed_summary["cells"]["classic/compact"]["shape_clusters"]) == 0 and int(failed_summary["cells"]["classic/compact"]["successes"]) == 0 and (failed_summary["accepted_module_instances"] as Dictionary).is_empty() and _packed_points_digest(PackedVector2Array()).is_empty(), "invalid cases must remain in denominators without earning diversity or class coverage; empty output has no digest")
 
 
 func _expect(condition: bool, message: String) -> bool:

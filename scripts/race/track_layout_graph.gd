@@ -6,7 +6,7 @@ const ROOMS := preload("res://scripts/race/track_room_model.gd")
 const VALIDATION := preload("res://scripts/race/track_layout_validation.gd")
 const RADIUS := MODULES.MIN_CONSTRUCTION_RADIUS
 const LINK_MIN := 180.0
-const CELL_MIN := 2.0 * RADIUS + LINK_MIN
+const CELL_MIN := 2.0 * RADIUS + LINK_MIN + 1.0
 
 
 static func build(room: Dictionary, band: Dictionary, identity: Dictionary, candidate: int) -> Dictionary:
@@ -28,14 +28,27 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 	var across: Vector2 = (portal["segment_to"] - portal["segment_from"]).normalized()
 	var forward := Vector2(across.y, -across.x)
 	var cells: Array[Dictionary] = []
+	var free_room := ROOMS.erode(room, ROOMS.CONSTRUCTION_MARGIN + 2.0)
 	for region: Dictionary in required:
 		var polygon := PackedVector2Array()
 		for point: Vector2 in region["polygon"]:
 			var delta := point - origin
 			polygon.append(Vector2(delta.dot(forward), delta.dot(across)))
-		cells.append({"id": region["id"], "polygon": polygon, "bounds": _bounds(polygon).grow(-ROOMS.CONSTRUCTION_MARGIN - 2.0)})
+		var free_bounds := Rect2()
+		for component: Dictionary in free_room.get("free_components", []):
+			for intersection: PackedVector2Array in Geometry2D.intersect_polygons(region["polygon"], component["outer"]):
+				var free_points := PackedVector2Array()
+				for point: Vector2 in intersection:
+					var delta := point - origin
+					free_points.append(Vector2(delta.dot(forward), delta.dot(across)))
+				var bounds := _inscribed_bounds(free_points)
+				if bounds.get_area() > free_bounds.get_area():
+					free_bounds = bounds
+		if not free_bounds.has_area():
+			return _failure(&"region_budget", "Required region '%s' has no reserved-width free space." % region["id"])
+		cells.append({"id": region["id"], "polygon": polygon, "bounds": free_bounds})
 	var unit := _unit(identity, candidate)
-	var target := lerpf(float(band["min_length"]), float(band["max_length"]), 0.12 + unit * 0.30)
+	var target := lerpf(float(band["min_length"]), float(band["max_length"]), 0.08 + unit * 0.65)
 	var half_height := minf(300.0, (portal["segment_to"] as Vector2).distance_to(portal["segment_from"]) * 0.5 - 10.0)
 	var left := 0.0
 	var right := 0.0
@@ -58,7 +71,8 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 	var minimum_width := float(finish_domain[0]) + 2.0 * RADIUS
 	if right - left < minimum_width:
 		return _failure(&"finish_budget", "Region span %.2f is below the %.2f finish-and-turn envelope." % [right - left, minimum_width])
-	var width := clampf((target - 4.0 * half_height + (8.0 - TAU) * RADIUS - 2.0 * required_depth) * 0.5, minimum_width, right - left)
+	var width_share := 1.0 - 0.1 * float(candidate % 4)
+	var width := clampf((target - 4.0 * half_height + (8.0 - TAU) * RADIUS - 2.0 * required_depth) * 0.5 * width_share, minimum_width, right - left)
 	var left_share := clampf(-left / maxf(right - left, 1.0), 0.38, 0.62)
 	left = maxf(left, -width * left_share)
 	right = minf(right, width * (1.0 - left_share))
@@ -79,14 +93,14 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 			x0 = maxf(x0, junction_half)
 		var capacity := maxi(1, floori((x1 - x0 + CELL_MIN) / (2.0 * CELL_MIN)))
 		var depth_capacity := maxf(-half_height - bounds.position.y, bounds.end.y - half_height)
-		var count := clampi(ceili((target - estimate) / maxf(2.0 * depth_capacity, 1.0)), 1, capacity)
+		var count := clampi(ceili((target - estimate) / maxf(4.0 * depth_capacity, 1.0)), 1, capacity)
 		var allocated := 0
-		for index in count:
+		for index in count * 2:
 			var cell_width := (x1 - x0 - float(count - 1) * CELL_MIN) / float(count)
 			if cell_width < CELL_MIN:
 				continue
-			var from_x := x0 + float(index) * (cell_width + CELL_MIN)
-			var side := -1.0 if (candidate + cell_index + index) % 2 == 0 else 1.0
+			var from_x := x0 + float(index % count) * (cell_width + CELL_MIN)
+			var side := -1.0 if (candidate + cell_index + index / count) % 2 == 0 else 1.0
 			var mandatory := 0.0
 			for other: Dictionary in cells:
 				if other["id"] == cell["id"]:
@@ -200,7 +214,9 @@ static func _embed_ring(ring: PackedVector2Array, identity: Dictionary, candidat
 			var slot: Dictionary = ordinary[index]
 			if slot["module_id"] != &"straight_setup" or bool(slot["parameters"].get("finish", false)):
 				continue
-			var technical := _technical_slots(candidate, 180.0 + 80.0 * _unit(identity, candidate + index))
+			var technical := _technical_slots(identity, candidate, index, float(slot["parameters"]["length"]) - 520.0)
+			if technical.is_empty():
+				continue
 			var modules: Array[Dictionary] = []
 			for section: Dictionary in technical:
 				modules.append(MODULES.instantiate(section["module_id"], section["parameters"]))
@@ -239,8 +255,18 @@ static func _corner_slot(hand: float, available: float, candidate: int, index: i
 	return choices[(candidate + index) % choices.size()]
 
 
-static func _technical_slots(candidate: int, distance: float) -> Array[Dictionary]:
-	var parameters := {"radius": RADIUS, "angle_deg": 30.0, "distance": distance, "hand": -1.0}
+static func _technical_slots(identity: Dictionary, candidate: int, index: int, span: float) -> Array[Dictionary]:
+	var angles: Array[float] = []
+	for angle: float in [30.0, 45.0, 60.0]:
+		var distance_factor := 2.0 * cos(deg_to_rad(angle)) if candidate % 3 == 1 else 1.0
+		if 4.0 * RADIUS * sin(deg_to_rad(angle)) + 180.0 * distance_factor <= span:
+			angles.append(angle)
+	if angles.is_empty():
+		return []
+	var angle := angles[mini(angles.size() - 1, int(_unit(identity, candidate * 31 + index + 211) * angles.size()))]
+	var distance_factor := 2.0 * cos(deg_to_rad(angle)) if candidate % 3 == 1 else 1.0
+	var maximum_distance := minf(600.0, (span - 4.0 * RADIUS * sin(deg_to_rad(angle))) / distance_factor)
+	var parameters := {"radius": RADIUS, "angle_deg": angle, "distance": lerpf(180.0, maximum_distance, _unit(identity, candidate * 31 + index + 307)), "hand": -1.0}
 	match candidate % 3:
 		1:
 			var returning := parameters.duplicate(true)
@@ -301,6 +327,22 @@ static func _bounds(polygon: PackedVector2Array) -> Rect2:
 	var result := Rect2(polygon[0], Vector2.ZERO)
 	for point: Vector2 in polygon:
 		result = result.expand(point)
+	return result
+
+
+static func _inscribed_bounds(polygon: PackedVector2Array) -> Rect2:
+	var bounds := _bounds(polygon)
+	var lower := 0.0
+	var upper := minf(bounds.size.x, bounds.size.y) * 0.5
+	var result := Rect2()
+	for iteration in 16:
+		var inset := (lower + upper) * 0.5
+		var rectangle := bounds.grow(-inset)
+		if Geometry2D.clip_polygons(_rectangle(rectangle), polygon).is_empty():
+			result = rectangle
+			upper = inset
+		else:
+			lower = inset
 	return result
 
 

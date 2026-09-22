@@ -42,10 +42,16 @@ static func solve(request: Dictionary) -> Dictionary:
 	if not bool(portal_check.get("ok", false)):
 		return _failure(identity, &"region_assignment", portal_check.get("kind", &"portal_infeasible"), String(portal_check.get("reason", "Required room portal is infeasible.")), counters)
 	var candidates := _graph_candidates(room, identity)
-	for graph_index in mini(candidates.size(), int(limits["graph_candidates"])):
-		counters["graph_candidates"] = int(counters["graph_candidates"]) + 1
+	var graph_count := mini(candidates.size(), int(limits["graph_candidates"]))
+	for attempt in graph_count * 2:
+		var graph_index := attempt % graph_count
+		var target_pass := attempt < graph_count
+		if target_pass:
+			counters["graph_candidates"] = int(counters["graph_candidates"]) + 1
 		var graph: Dictionary = candidates[graph_index]
 		if not bool(graph.get("ok", false)):
+			if not target_pass:
+				continue
 			counters["last_rejection"] = graph.get("kind", &"invalid_graph")
 			counters["last_reason"] = graph.get("reason", "Invalid graph.")
 			var failures: Dictionary = counters["graph_failure_reasons"]
@@ -53,7 +59,7 @@ static func solve(request: Dictionary) -> Dictionary:
 			failures[detail] = int(failures.get(detail, 0)) + 1
 			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
 			continue
-		var search := _place_graph(graph, room, band, counters, limits)
+		var search := _place_targets(graph, room, band, counters, limits) if target_pass else _place_graph(graph, room, band, counters, limits)
 		if bool(search.get("budget_exhausted", false)):
 			return _failure(identity, StringName(search.get("stage", &"placement")), &"search_budget_exhausted", String(search.get("reason", "The deterministic search budget was exhausted.")), counters)
 		if not bool(search.get("ok", false)):
@@ -183,6 +189,9 @@ static func _graph_candidates(room: Dictionary, identity: Dictionary) -> Array[D
 		for key: String in ["seed", "room_shape", "length_tier"]:
 			graph[key] = identity[key]
 		result.append(graph)
+	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		return _hash_index(identity, "composition_order", int(a["candidate_index"]), 2147483647) < _hash_index(identity, "composition_order", int(b["candidate_index"]), 2147483647)
+	)
 	return result
 
 
@@ -217,7 +226,7 @@ static func _place_graph(graph: Dictionary, room: Dictionary, band: Dictionary, 
 		"budget_exhausted": false,
 		"stage": &"placement",
 		"reason": "",
-		"placement_start": int(counters["placement_expansions"]),
+		"placement_start": int(counters["placement_expansions"]) - int(graph.get("target_expansions", 0)),
 	}
 	var placed := _place_slot_recursive(graph, room, band, counters, limits, 0, modules, state)
 	if bool(state["budget_exhausted"]):
@@ -225,6 +234,21 @@ static func _place_graph(graph: Dictionary, room: Dictionary, band: Dictionary, 
 	if not bool(placed.get("ok", false)):
 		return {"ok": false}
 	return placed
+
+
+static func _place_targets(graph: Dictionary, room: Dictionary, band: Dictionary, counters: Dictionary, limits: Dictionary) -> Dictionary:
+	# Try each complete embedding before spending the shared budget on a deep
+	# parameter subtree. These targets already account for neighboring turn trims.
+	var modules: Array[Dictionary] = []
+	for slot: Dictionary in graph["ordinary_slots"]:
+		if modules.size() >= int(limits["placement_expansions_per_graph"]):
+			return {"budget_exhausted": true, "stage": &"placement", "reason": "Placement reached its bounded expansion cap."}
+		counters["placement_expansions"] = int(counters["placement_expansions"]) + 1
+		modules.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+	graph["target_expansions"] = modules.size()
+	var state := {"budget_exhausted": false}
+	var result := _solve_closure(graph, room, band, counters, limits, modules, state)
+	return state if bool(state["budget_exhausted"]) else result
 
 
 static func _place_slot_recursive(graph: Dictionary, room: Dictionary, band: Dictionary, counters: Dictionary, limits: Dictionary, slot_index: int, modules: Array[Dictionary], state: Dictionary) -> Dictionary:

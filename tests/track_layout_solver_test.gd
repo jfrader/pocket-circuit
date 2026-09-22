@@ -77,7 +77,7 @@ func _verify_case(test_case: Dictionary, generated: Dictionary, elapsed_ms: floa
 		if not _expect(slots.size() == 2 and slots[0] != slots[1] and lanes.size() == 2 and lanes[0].distance_to(lanes[1]) >= 320.0 and float(traversal["clear_width"]) >= 590.0, "%s should reserve two distinct full-width portal traversals" % label):
 			return false
 	var search: Dictionary = generated["search"]
-	if not _expect(int(search["graph_candidates"]) <= SOLVER.MAX_GRAPH_CANDIDATES and int(search["placement_expansions"]) <= SOLVER.MAX_PLACEMENT_EXPANSIONS_PER_GRAPH and int(search["closure_candidates"]) <= SOLVER.MAX_CLOSURE_CANDIDATES and int(search["narrow_phase_operations"]) <= SOLVER.MAX_NARROW_PHASE_OPERATIONS, "%s should stay inside every deterministic work cap" % label):
+	if not _expect(int(search["graph_candidates"]) <= SOLVER.MAX_GRAPH_CANDIDATES and int(search["placement_expansions"]) <= SOLVER.MAX_PLACEMENT_EXPANSIONS_PER_GRAPH * int(search["graph_candidates"]) and int(search["closure_candidates"]) <= SOLVER.MAX_CLOSURE_CANDIDATES * int(search["placement_expansions"]) and int(search["narrow_phase_operations"]) <= SOLVER.MAX_NARROW_PHASE_OPERATIONS, "%s should stay inside the per-graph placement, per-frontier closure, and shared narrow-phase caps" % label):
 		return false
 	var metrics: Dictionary = generated["metrics"]
 	if not _expect(float(metrics["closure_position_residual"]) <= 0.01 and float(metrics["closure_heading_residual"]) <= 0.0001 and absf(absf(float(metrics["signed_turn"])) - TAU) <= 0.0001, "%s should close analytically at the exact pose with +/-2PI winding" % label):
@@ -217,10 +217,10 @@ func _test_remaining_bounds() -> bool:
 
 func _test_frontier_budget() -> bool:
 	var room := ROOM_MODEL.generate_recipe(&"classic", 1494245235, &"standard")
-	var graph := SOLVER._graph_candidates(room, {"room_shape": &"classic", "length_tier": &"standard", "seed": 928})[0]
-	var instances: Array[Dictionary] = []
-	for slot: Dictionary in graph["ordinary_slots"]:
-		instances.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+	var graph := {"start_position": Vector2(-800, -300), "start_heading": 0.0}
+	var corner := MODULES.instantiate(&"corner_tight", {"radius": 180.0, "angle_deg": 90.0, "hand": 1.0})
+	var straight := MODULES.instantiate(&"straight_setup", {"length": 1600.0})
+	var instances: Array[Dictionary] = [straight, corner, MODULES.instantiate(&"straight_link", {"length": 240.0}), corner, straight]
 	var counters := {"closure_candidates": SOLVER.MAX_CLOSURE_CANDIDATES, "closure_rejections": 0, "narrow_phase_operations": 0}
 	var state := {"budget_exhausted": false, "closure_start": 0}
 	var closed := SOLVER._solve_closure(graph, room, {"min_length": 4375.0, "max_length": 9625.0}, counters, SOLVER._limits({}), instances, state)
