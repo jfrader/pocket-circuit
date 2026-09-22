@@ -2,7 +2,7 @@ class_name TrackBuilderIsland
 ## Raised island visual, rim, and rim landmarks.
 
 
-static func build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
+static func build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
 	var expanded := PackedVector2Array()
 	if spec.get("seed_obstacles", false):
 		# Geometry2D already returns a simple central polygon. Procedural concave
@@ -90,7 +90,7 @@ static func build_island_prop(root: Node2D, spec: Dictionary, region: PackedVect
 	TrackBuilderCore._mark_solid_visual(visual, prop_texture, &"raised_island")
 	root.add_child(visual)
 	if spec.get("seed_obstacles", false):
-		await add_island_rim_landmarks(root, spec, expanded, centerline, stage)
+		await add_island_rim_landmarks(root, spec, expanded, centerline, stage, room_model)
 
 
 static func build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, points: PackedVector2Array) -> void:
@@ -141,7 +141,7 @@ static func build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, poin
 	parent.add_child(lip)
 
 
-static func add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
+static func add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
 	var assets: Array = spec.get("island_fill_textures", [])
 	if assets.is_empty() or boundary.size() < 12:
 		return
@@ -161,6 +161,10 @@ static func add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: P
 		var position := boundary_point + inward * 22.0
 		var next_point := boundary[(boundary_index + 1) % boundary.size()]
 		var texture_path := String(assets[posmod(seed + landmark_index * 5, assets.size())])
+		var rm: Dictionary = room_model if not room_model.is_empty() else (spec.get("room_model", {}) if spec is Dictionary else {})
+		var radius := TrackBuilderCore._asset_radius(texture_path, 24.0) * 0.72
+		if not TrackBuilderCore._placement_clears_room_model(position, radius, rm):
+			continue
 		TrackBuilderCore._add_generated_prop(container, "Landmark%02d" % landmark_index, position, texture_path, (next_point - boundary_point).angle(), &"island_rim", &"few", landmark_index, 0.72)
 
 

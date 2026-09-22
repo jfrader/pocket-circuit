@@ -2,7 +2,7 @@ class_name TrackBuilderScene
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
 
-static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable()) -> void:
+static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
@@ -68,7 +68,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	# ribbon as nested outer/hole polygons and can otherwise select the whole room
 	# as a solid collision body.
 	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) else TrackBuilderCore._island_region(room_polygon, clipped, inner_loop)
-	await TrackBuilderCore._build_island_prop(root, spec, island_region, inner_loop, centerline, stage)
+	await TrackBuilderCore._build_island_prop(root, spec, island_region, inner_loop, centerline, stage, room_model)
 	if stage.is_valid():
 		await stage.call("Placing room edges and checkpoints")
 
@@ -114,7 +114,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 			span_endpoints = TrackBuilderCore._gate_span_endpoints(sample, tangent, room_polygon, island_region)
 		TrackBuilderCore._add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y), span_endpoints)
 		if spec.get("seed_obstacles", false):
-			TrackBuilderCore._add_gate_posts(root, spec, sample, tangent, gate_index)
+			TrackBuilderCore._add_gate_posts(root, spec, sample, tangent, gate_index, room_model)
 
 	# The checker spans the complete nominal corridor. Each color cell is its own
 	# simple polygon so disconnected checks never become a self-crossing polygon.

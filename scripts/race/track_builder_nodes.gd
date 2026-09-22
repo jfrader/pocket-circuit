@@ -152,7 +152,7 @@ static func nearest_gate_boundary(sample: Vector2, direction: Vector2, room_poly
 	return nearest
 
 
-static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int) -> void:
+static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int, room_model: Dictionary = {}) -> void:
 	var container := root.get_node_or_null("GatePosts") as Node2D
 	if container == null:
 		container = Node2D.new()
@@ -169,11 +169,18 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 		var texture := load(asset_path) as Texture2D
 		if texture == null:
 			continue
+		var post_offset := TrackBuilderCore.FINISH_LANDMARK_OFFSET if gate_index == 0 else TrackBuilderCore.GATE_POST_OFFSET
+		var post_pos := sample + normal * post_offset * float(side)
+		var rm: Dictionary = room_model if not room_model.is_empty() else (spec.get("room_model", {}) if spec is Dictionary else {})
+		var post_radius := 30.0
+		if gate_index == 0:
+			post_radius = 40.0
+		if not TrackBuilderCore._placement_clears_room_model(post_pos, post_radius, rm):
+			continue
 		var post := StaticBody2D.new()
 		post.name = "Gate%02d%s" % [gate_index, "Right" if side > 0 else "Left"]
 		var post_size := TrackBuilderCore.FINISH_LANDMARK_SIZE if gate_index == 0 else TrackBuilderCore.GATE_POST_SIZE
-		var post_offset := TrackBuilderCore.FINISH_LANDMARK_OFFSET if gate_index == 0 else TrackBuilderCore.GATE_POST_OFFSET
-		post.position = sample + normal * post_offset * float(side)
+		post.position = post_pos
 		post.rotation = tangent.angle()
 		post.collision_layer = 16
 		post.z_index = -1 if gate_index == 0 else -2
