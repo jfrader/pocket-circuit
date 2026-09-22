@@ -83,6 +83,33 @@ static func instantiate(module_id: StringName, parameters: Dictionary, options: 
 	return module
 
 
+static func proposal_parameters(module_id: StringName, target: Dictionary, units: Dictionary) -> Dictionary:
+	var data := definition(module_id)
+	if data.is_empty():
+		return {}
+	var domains: Dictionary = data["parameter_domains"]
+	var result := target.duplicate(true)
+	var keys := domains.keys()
+	keys.sort()
+	for key: String in keys:
+		if key in ["finish_length", "ratio_min"]:
+			continue
+		var parameter := "angle_deg" if key == "angles_deg" else key
+		var unit := clampf(float(units.get(parameter, 0.5)), 0.0, 1.0)
+		var domain: Array = domains["finish_length"] if key == "length" and bool(target.get("finish", false)) else domains[key]
+		if key in ["angles_deg", "split"]:
+			result[parameter] = domain[mini(int(unit * domain.size()), domain.size() - 1)]
+			continue
+		var minimum := float(domain[0])
+		var maximum := float(domain[1])
+		if (data["exclusive_maxima"] as Array).has(StringName(key)):
+			maximum -= 1.0 / 16.0
+		if key == "outer_radius":
+			minimum = maxf(minimum, ceilf(float(result["inner_radius"]) * float(domains["ratio_min"]) * 16.0) / 16.0)
+		result[parameter] = snappedf(lerpf(minimum, maximum, unit), 1.0 / 16.0)
+	return result
+
+
 static func instantiate_closure_arc(radius: float, signed_turn: float) -> Dictionary:
 	if radius < MIN_CONSTRUCTION_RADIUS or radius > 1000.0 or absf(signed_turn) <= HEADING_TOLERANCE or absf(signed_turn) > PI + HEADING_TOLERANCE:
 		return _error("closure_parameter_domain", "A closure arc needs radius 180..1000 and a nonzero turn no greater than 180 degrees.")

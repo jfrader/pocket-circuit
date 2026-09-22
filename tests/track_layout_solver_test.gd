@@ -20,6 +20,8 @@ func _initialize() -> void:
 func _run_test() -> void:
 	if not _test_signatures():
 		return
+	if not _test_catalog_search() or not _test_remaining_bounds() or not _test_frontier_budget():
+		return
 	for test_case: Dictionary in CASES:
 		var started := Time.get_ticks_usec()
 		var generated := GENERATOR.generate_route(test_case["room"], test_case["tier"], int(test_case["seed"]))
@@ -146,6 +148,52 @@ func _test_signatures() -> bool:
 	var original := MODULES.compose([MODULES.instantiate(&"corner_opening", opening)])
 	var reversed := MODULES.compose([MODULES.instantiate(&"corner_opening", opening, {"reverse": true})])
 	return _expect(SIGNATURES.describe(original) == SIGNATURES.describe(reversed), "profile canonicalization must exchange opening and tightening under reversal")
+
+
+func _test_catalog_search() -> bool:
+	for definition: Dictionary in MODULES.definitions():
+		var id: StringName = definition["id"]
+		var target := MODULES.proposal_parameters(id, {"hand": -1.0}, {})
+		var slot := {"module_id": id, "parameters": target}
+		var graph := {"id": "catalog_search", "seed": 928}
+		var options := SOLVER._slot_options(slot, graph, 0)
+		if not _expect(options.size() >= 3 and options.size() <= 8 and options == SOLVER._slot_options(slot, graph, 0), "%s needs bounded deterministic parameter alternatives" % id):
+			return false
+		if not _expect(options != SOLVER._slot_options(slot, {"id": "catalog_search", "seed": 929}, 0), "%s alternatives must consume the requested route seed" % id):
+			return false
+		for parameters: Dictionary in options:
+			if not _expect(bool(MODULES.instantiate(id, parameters).get("ok", false)), "%s search option must be inside its authored domain: %s" % [id, parameters]):
+				return false
+		slot["options"] = options
+		var bounds := SOLVER._option_bounds(slot)
+		for parameters: Dictionary in options:
+			var instance := MODULES.instantiate(id, parameters)
+			if not _expect(float(instance["length"]) >= float(bounds["min_length"]) and float(instance["length"]) <= float(bounds["max_length"]) and float(instance["signed_turn"]) >= float(bounds["min_turn"]) and float(instance["signed_turn"]) <= float(bounds["max_turn"]), "%s bounds must enclose every actual search option" % id):
+				return false
+		if id in [&"s_offset", &"chicane_return", &"switchback"]:
+			if not _expect(absf(float(bounds["min_turn"])) < 0.000001 and absf(float(bounds["max_turn"])) < 0.000001, "%s must not be budgeted as a corner" % id):
+				return false
+	return true
+
+
+func _test_remaining_bounds() -> bool:
+	var partial := {"length": 1000.0, "signed_turn": PI, "entry_port": {"position": Vector2.ZERO}, "exit_port": {"position": Vector2(1200, 0)}}
+	var slots: Array = [{"module_id": &"straight_link", "parameters": {"length": 1200.0}}]
+	if not _expect(SOLVER._remaining_feasible(partial, slots, 0, {"min_length": 0.0, "max_length": 2300.0}), "suffix progress toward the start must not be charged again as closure distance"):
+		return false
+	return _expect(not SOLVER._remaining_feasible(partial, slots, 0, {"min_length": 0.0, "max_length": 2100.0}), "the exact remaining slot minimum must still prune an over-length branch")
+
+
+func _test_frontier_budget() -> bool:
+	var room := ROOM_MODEL.generate_recipe(&"classic", 1494245235, &"standard")
+	var graph := SOLVER._build_classic_graph(room, 180.0, {"room_shape": &"classic", "length_tier": &"standard", "seed": 928}, 0)
+	var instances: Array[Dictionary] = []
+	for slot: Dictionary in graph["ordinary_slots"]:
+		instances.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+	var counters := {"closure_candidates": SOLVER.MAX_CLOSURE_CANDIDATES, "closure_rejections": 0, "narrow_phase_operations": 0}
+	var state := {"budget_exhausted": false, "closure_start": 0}
+	var closed := SOLVER._solve_closure(graph, room, {"min_length": 4375.0, "max_length": 9625.0}, counters, SOLVER._limits({}), instances, state)
+	return _expect(bool(closed.get("ok", false)) and not bool(state["budget_exhausted"]) and int(counters["closure_candidates"]) == SOLVER.MAX_CLOSURE_CANDIDATES + 1, "a new frontier must get its own closure allowance after a previous frontier consumed 24 candidates")
 
 
 func _expect(condition: bool, message: String) -> bool:

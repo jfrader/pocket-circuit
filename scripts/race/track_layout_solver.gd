@@ -44,6 +44,7 @@ static func solve(request: Dictionary) -> Dictionary:
 		counters["graph_candidates"] = int(counters["graph_candidates"]) + 1
 		var graph: Dictionary = candidates[graph_index]
 		if not bool(graph.get("ok", false)):
+			counters["last_rejection"] = graph.get("kind", &"invalid_graph")
 			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
 			continue
 		var search := _place_graph(graph, room, band, counters, limits)
@@ -169,6 +170,8 @@ static func _graph_candidates(room: Dictionary, identity: Dictionary) -> Array[D
 		for radius: float in [240.0, 180.0]:
 			var graph := _build_el_graph(room, radius, identity, variant) if identity["room_shape"] == &"el" else _build_classic_graph(room, radius, identity, variant)
 			graph["candidate_index"] = result.size()
+			for key: String in ["seed", "room_shape", "length_tier"]:
+				graph[key] = identity[key]
 			result.append(graph)
 	return result
 
@@ -292,13 +295,17 @@ static func _finalize_graph(ordinary: Array[Dictionary], start: Vector2, heading
 
 
 static func _place_graph(graph: Dictionary, room: Dictionary, band: Dictionary, counters: Dictionary, limits: Dictionary) -> Dictionary:
+	graph = graph.duplicate(true)
+	for index in (graph["ordinary_slots"] as Array).size():
+		var slot: Dictionary = graph["ordinary_slots"][index]
+		slot["options"] = _slot_options(slot, graph, index)
+		slot["bounds"] = _option_bounds(slot)
 	var modules: Array[Dictionary] = []
 	var state := {
 		"budget_exhausted": false,
 		"stage": &"placement",
 		"reason": "",
 		"placement_start": int(counters["placement_expansions"]),
-		"closure_start": int(counters["closure_candidates"]),
 	}
 	var placed := _place_slot_recursive(graph, room, band, counters, limits, 0, modules, state)
 	if bool(state["budget_exhausted"]):
@@ -316,7 +323,7 @@ static func _place_slot_recursive(graph: Dictionary, room: Dictionary, band: Dic
 		state.merge({"budget_exhausted": true, "stage": &"placement", "reason": "Placement reached its bounded expansion cap."}, true)
 		return {}
 	var slot: Dictionary = ordinary[slot_index]
-	for option: Dictionary in _slot_options(slot, graph, slot_index):
+	for option: Dictionary in slot["options"]:
 		counters["placement_expansions"] = int(counters["placement_expansions"]) + 1
 		var module := MODULES.instantiate(slot["module_id"], option)
 		if not bool(module.get("ok", false)):
@@ -342,46 +349,18 @@ static func _slot_options(slot: Dictionary, graph: Dictionary, slot_index: int) 
 	var target: Dictionary = slot["parameters"]
 	var options: Array[Dictionary] = [target.duplicate(true)]
 	var module_id: StringName = slot["module_id"]
-	if module_id in [&"straight_link", &"straight_setup"]:
-		var minimum := 1000.0 if bool(target.get("finish", false)) else (520.0 if module_id == &"straight_setup" else 180.0)
-		var maximum := 2400.0
-		for length: float in [minimum, (minimum + maximum) * 0.5, maximum]:
-			var parameters := target.duplicate(true)
-			parameters["length"] = length
-			options.append(parameters)
-		for draw in 4:
-			var parameters := target.duplicate(true)
-			var unit := float(_hash_index(graph, "slot_length", slot_index * 8 + draw, 35521)) / 35520.0
-			parameters["length"] = snappedf(lerpf(minimum, maximum, unit), 1.0 / 16.0)
-			options.append(parameters)
-	elif module_id.begins_with("corner_"):
-		var bounds := {&"corner_tight": Vector2(180.0, 259.9375), &"corner_medium": Vector2(260.0, 519.9375), &"corner_sweeper": Vector2(520.0, 1000.0)}[module_id] as Vector2
-		for candidate_radius: float in [bounds.x, (bounds.x + bounds.y) * 0.5, bounds.y]:
-			var parameters := target.duplicate(true)
-			parameters["radius"] = snappedf(candidate_radius, 1.0 / 16.0)
-			options.append(parameters)
-		for draw in 4:
-			var parameters := target.duplicate(true)
-			var unit := float(_hash_index(graph, "slot_radius", slot_index * 8 + draw, 4161)) / 4160.0
-			parameters["radius"] = snappedf(lerpf(bounds.x, bounds.y, unit), 1.0 / 16.0)
-			options.append(parameters)
-	elif module_id == &"chicane_return":
-		for tuple: Dictionary in [
-			{"radius": 180.0, "angle_deg": 30.0, "distance": 180.0},
-			{"radius": 350.0, "angle_deg": 45.0, "distance": 540.0},
-			{"radius": 520.0, "angle_deg": 60.0, "distance": 900.0},
-		]:
-			var parameters := target.duplicate(true)
-			parameters.merge(tuple, true)
-			options.append(parameters)
-		for draw in 4:
-			var parameters := target.duplicate(true)
-			var radius_unit := float(_hash_index(graph, "slot_chicane_radius", slot_index * 8 + draw, 5441)) / 5440.0
-			var distance_unit := float(_hash_index(graph, "slot_chicane_distance", slot_index * 8 + draw, 11521)) / 11520.0
-			parameters["radius"] = snappedf(lerpf(180.0, 520.0, radius_unit), 1.0 / 16.0)
-			parameters["distance"] = snappedf(lerpf(180.0, 900.0, distance_unit), 1.0 / 16.0)
-			parameters["angle_deg"] = [30.0, 45.0, 60.0][_hash_index(graph, "slot_chicane_angle", slot_index * 8 + draw, 3)]
-			options.append(parameters)
+	var definition := MODULES.definition(module_id)
+	if definition.is_empty():
+		return []
+	var keys: Array = (definition["parameter_domains"] as Dictionary).keys()
+	keys.sort()
+	for draw in 7:
+		var units := {}
+		for key: String in keys:
+			var parameter := "angle_deg" if key == "angles_deg" else key
+			var draw_index := int(graph.get("candidate_index", 0)) * MAX_PLACEMENT_EXPANSIONS_PER_GRAPH * 8 + slot_index * 8 + draw
+			units[parameter] = float(draw) * 0.5 if draw < 3 else float(_hash_index(graph, "slot_" + parameter, draw_index, 65537)) / 65536.0
+		options.append(MODULES.proposal_parameters(module_id, target, units))
 	return _deduplicate_options(options)
 
 
@@ -403,39 +382,53 @@ static func _remaining_feasible(partial: Dictionary, slots: Array, next_slot: in
 	var maximum_turn := 0.0
 	for index in range(next_slot, slots.size()):
 		var slot: Dictionary = slots[index]
-		var parameters: Dictionary = slot["parameters"]
-		if slot["module_id"] in [&"straight_link", &"straight_setup"]:
-			minimum_remaining += 180.0 if slot["module_id"] == &"straight_link" else (1000.0 if bool(parameters.get("finish", false)) else 520.0)
-			maximum_remaining += 2400.0
-		elif slot["module_id"] == &"chicane_return":
-			minimum_remaining += 4.0 * 180.0 * deg_to_rad(30.0) + 180.0
-			maximum_remaining += 4.0 * 520.0 * deg_to_rad(60.0) + 900.0
-		else:
-			var turn := deg_to_rad(float(parameters.get("angle_deg", 90.0))) * signf(float(parameters.get("hand", 1.0)))
-			minimum_remaining += 180.0 * absf(turn)
-			maximum_remaining += 1000.0 * absf(turn)
-			minimum_turn += turn
-			maximum_turn += turn
+		var bounds: Dictionary = slot["bounds"] if slot.has("bounds") else _option_bounds(slot)
+		if not bool(bounds["ok"]):
+			return false
+		minimum_remaining += float(bounds["min_length"])
+		maximum_remaining += float(bounds["max_length"])
+		minimum_turn += float(bounds["min_turn"])
+		maximum_turn += float(bounds["max_turn"])
 	var exit: Dictionary = partial["exit_port"]
 	var entry: Dictionary = partial["entry_port"]
 	var closure_lower := (exit["position"] as Vector2).distance_to(entry["position"])
-	minimum_remaining += closure_lower
-	maximum_remaining += 2.0 * PI * 1000.0 + 2400.0
+	# The suffix itself can move toward the start. Adding both lower bounds
+	# would count that distance twice and incorrectly prune feasible cycles.
+	minimum_remaining = maxf(minimum_remaining, closure_lower)
+	maximum_remaining += 3.0 * PI * CLOSURE_RADII[-1] + 2400.0
 	var current_length := float(partial["length"])
 	if current_length + minimum_remaining > float(band["max_length"]) or current_length + maximum_remaining < float(band["min_length"]):
 		return false
 	var current_turn := float(partial["signed_turn"])
 	var closure_turn_allowance := 3.0 * PI
-	return current_turn + minimum_turn - closure_turn_allowance <= TAU and current_turn + maximum_turn + closure_turn_allowance >= TAU
+	for winding: float in [TAU, -TAU]:
+		if current_turn + minimum_turn - closure_turn_allowance <= winding and current_turn + maximum_turn + closure_turn_allowance >= winding:
+			return true
+	return false
+
+
+static func _option_bounds(slot: Dictionary) -> Dictionary:
+	var bounds := {"ok": false, "min_length": INF, "max_length": 0.0, "min_turn": INF, "max_turn": -INF}
+	for parameters: Dictionary in slot.get("options", [slot["parameters"]]):
+		var instance := MODULES.instantiate(slot["module_id"], parameters)
+		if not bool(instance.get("ok", false)):
+			continue
+		bounds["ok"] = true
+		bounds["min_length"] = minf(float(bounds["min_length"]), float(instance["length"]))
+		bounds["max_length"] = maxf(float(bounds["max_length"]), float(instance["length"]))
+		bounds["min_turn"] = minf(float(bounds["min_turn"]), float(instance["signed_turn"]))
+		bounds["max_turn"] = maxf(float(bounds["max_turn"]), float(instance["signed_turn"]))
+	return bounds
 
 
 static func _solve_closure(graph: Dictionary, room: Dictionary, band: Dictionary, counters: Dictionary, limits: Dictionary, modules: Array[Dictionary], state: Dictionary) -> Dictionary:
 	var partial := MODULES.compose(modules, graph["start_position"], float(graph["start_heading"]))
 	var frontier: Dictionary = partial["exit_port"]
 	var target: Dictionary = partial["entry_port"]
+	var closure_start := int(counters["closure_candidates"])
 	for radius: float in CLOSURE_RADII:
 		for family: StringName in CLOSURE_FAMILIES:
-			if int(counters["closure_candidates"]) - int(state["closure_start"]) >= int(limits["closure_candidates_per_frontier"]):
+			if int(counters["closure_candidates"]) - closure_start >= int(limits["closure_candidates_per_frontier"]):
 				state.merge({"budget_exhausted": true, "stage": &"closure", "reason": "Closure reached its bounded candidate cap."}, true)
 				return {}
 			counters["closure_candidates"] = int(counters["closure_candidates"]) + 1
