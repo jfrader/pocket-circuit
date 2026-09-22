@@ -15,7 +15,12 @@ const ChampionshipCatalogScript := preload("res://data/championship/catalog.gd")
 ## The engine ducks while the tyres slide. A broadband scrub at the same level as
 ## the tonal engine is masked by it, and ducking reads better than raising the
 ## tyre further.
-const ENGINE_SLIDE_DUCK_DB := -4.0
+const ENGINE_SLIDE_DUCK_DB := -1.5
+## Settled tyre level. A slide sits under the engine; a small steer stays silent.
+const TYRE_LEVEL_CEILING := 0.16
+const TYRE_RISE_PER_SEC := 0.12
+const TYRE_FALL_PER_SEC := 0.45
+const TYRE_PLAY_THRESHOLD := 0.045
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
 const PAUSED_MUSIC_DB := -9.0
@@ -43,6 +48,7 @@ var _engine_voice: EngineSoundPlayer
 ## Continuous tyre scrub for the local car, driven by its slip angle.
 var _drift_voice: DriftSoundPlayer
 var _local_tyre_player: AudioStreamPlayer
+var _local_tyre_level := 0.0
 ## Positional WAV-loop voices for AI and remote cars. The local car alone keeps
 ## the per-sample generator above.
 var _positional_tyre_emitters: Array[Node] = []
@@ -626,23 +632,29 @@ func _update_drift(_delta: float) -> void:
 			_engine_voice.set_duck_db(0.0)
 		return
 	var tyre_state: Dictionary = _local_vehicle.call("get_tyre_state")
-	if is_instance_valid(_engine_voice):
-		_engine_voice.set_duck_db(ENGINE_SLIDE_DUCK_DB if bool(tyre_state["sliding"]) else 0.0)
-	# Rivals are audible because they play a looping WAV. The local generator
-	# was a different player and did not come through. Same stream, no distance
-	# cut, no -7 dB rival trim.
 	_drift_voice.stop()
-	_drive_local_tyre(tyre_state, maxf(0.0, float(_local_vehicle.get("speed"))))
+	_drive_local_tyre(tyre_state, maxf(0.0, float(_local_vehicle.get("speed"))), _delta)
+	if is_instance_valid(_engine_voice):
+		var duck := ENGINE_SLIDE_DUCK_DB * clampf(_local_tyre_level / TYRE_LEVEL_CEILING, 0.0, 1.0)
+		_engine_voice.set_duck_db(duck)
 
 
-func _drive_local_tyre(tyre_state: Dictionary, speed: float) -> void:
+func _tyre_target_level(tyre_state: Dictionary) -> float:
+	var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
+	if bool(tyre_state["sliding"]):
+		return clampf(0.05 + screech * 0.11, 0.0, TYRE_LEVEL_CEILING)
+	var cornering := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
+	return clampf(maxf(cornering - 0.72, 0.0) * 0.04, 0.0, 0.04)
+
+
+func _drive_local_tyre(tyre_state: Dictionary, speed: float, delta: float) -> void:
 	if not is_instance_valid(_local_tyre_player):
 		return
-	var cornering := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
-	var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
-	var level := maxf(cornering * 0.62, screech)
-	if level <= 0.01:
-		_stop_local_tyre()
+	var target := _tyre_target_level(tyre_state)
+	var rate := TYRE_RISE_PER_SEC if target > _local_tyre_level else TYRE_FALL_PER_SEC
+	_local_tyre_level = move_toward(_local_tyre_level, target, rate * maxf(delta, 0.0))
+	if _local_tyre_level <= TYRE_PLAY_THRESHOLD:
+		_silence_local_tyre()
 		return
 	var profile: Dictionary = TyreSurfaceProfilesScript.profile_for(tyre_state["surface"])
 	var stream := _tyre_loop_for(profile)
@@ -651,17 +663,24 @@ func _drive_local_tyre(tyre_state: Dictionary, speed: float) -> void:
 		_local_tyre_player.stream = stream
 	var max_speed := _max_speed_for(_local_vehicle)
 	var speed_ratio := clampf(speed / max_speed, 0.0, 1.0)
-	_local_tyre_player.volume_db = linear_to_db(clampf(level, 0.01, 1.0))
-	_local_tyre_player.pitch_scale = clampf(0.80 + speed_ratio * 0.24 + screech * 0.12, 0.65, 1.5)
+	var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
+	_local_tyre_player.volume_db = linear_to_db(clampf(_local_tyre_level, 0.01, 1.0))
+	_local_tyre_player.pitch_scale = clampf(0.70 + speed_ratio * 0.08 + screech * 0.06, 0.65, 1.15)
 	if not _headless and not _local_tyre_player.playing:
 		_local_tyre_player.play()
 
 
-func _stop_local_tyre() -> void:
+func _silence_local_tyre() -> void:
 	if not is_instance_valid(_local_tyre_player):
 		return
-	_local_tyre_player.stop()
+	if _local_tyre_player.playing:
+		_local_tyre_player.stop()
 	_local_tyre_player.volume_db = SILENCE_DB
+
+
+func _stop_local_tyre() -> void:
+	_silence_local_tyre()
+	_local_tyre_level = 0.0
 
 
 func _update_positional_tyres() -> void:
@@ -679,13 +698,12 @@ func _update_positional_tyres() -> void:
 		var tyre_state: Dictionary = vehicle.call("get_tyre_state")
 		var profile: Dictionary = TyreSurfaceProfilesScript.profile_for(tyre_state["surface"])
 		emitter.set_stream(_tyre_loop_for(profile))
-		var cornering := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
 		var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
 		var speed := maxf(0.0, float(vehicle.get("speed")))
 		var max_speed := _max_speed_for(vehicle)
 		var speed_ratio := clampf(speed / max_speed, 0.0, 1.0)
-		var level := maxf(cornering * 0.62, screech)
-		var pitch := 0.80 + speed_ratio * 0.24 + screech * 0.12
+		var level := _tyre_target_level(tyre_state)
+		var pitch := 0.70 + speed_ratio * 0.08 + screech * 0.06
 		emitter.update_voice(listener_position, level, pitch, not _race_paused)
 
 

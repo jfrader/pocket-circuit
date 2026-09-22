@@ -147,11 +147,14 @@ func _run_test() -> void:
 	director.set_local_vehicle(local_car)
 	director.call("_update_drift", 1.0 / 60.0)
 	var local_tyre := director.get_node_or_null("LocalTyreVoice") as AudioStreamPlayer
-	if not _expect(local_tyre != null and local_tyre.stream is AudioStreamWAV, "the local car must play the same tyre loop rivals use"):
+	if not _expect(local_tyre != null and local_tyre.volume_db <= -40.0, "one frame of steer must not open the tyre loop, got %.1f dB" % local_tyre.volume_db):
+		return
+	director.call("_update_drift", 4.0)
+	if not _expect(local_tyre.stream is AudioStreamWAV, "the local car must play the same tyre loop rivals use"):
 		return
 	if not _expect(not local_tyre.stream is AudioStreamGenerator, "the local tyre voice must not be an AudioStreamGenerator"):
 		return
-	if not _expect(local_tyre.volume_db > -12.0, "a sliding local car must sit above the engine, got %.1f dB" % local_tyre.volume_db):
+	if not _expect(local_tyre.volume_db < -12.0 and local_tyre.volume_db > -28.0, "a held slide should be subtle, got %.1f dB" % local_tyre.volume_db):
 		return
 	local_car.free()
 	if not _expect(director.play_sfx(&"impact", 0.9), "a prepared car should play its generated crash"):

@@ -5,11 +5,11 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const CONTACT_RELEASE_GRACE := 0.12
-## Tyre scrub follows steering because this physics saturates lateral force and
-## slip almost immediately. This maps the useful 0.0-0.5 steering range onto a
-## continuous bed while speed gating keeps stationary steering silent.
-const TYRE_FULL_STEER := 0.43
-const TYRE_STEER_EXPONENT := 0.75
+## A small steer is not tyre sound. The bed stays at zero until the wheel is
+## well past a correction, then rises slowly toward full lock.
+const TYRE_STEER_ONSET := 0.28
+const TYRE_FULL_STEER := 0.85
+const TYRE_STEER_EXPONENT := 1.7
 const TYRE_ROLLING_SPEED := 25.0
 const TYRE_FULL_SPEED := 120.0
 ## Slip angle where a sliding tyre starts to screech, and where the screech peaks.
@@ -226,17 +226,18 @@ func get_throttle_input() -> float:
 func get_tyre_state() -> Dictionary:
 	var sliding := is_drifting or is_sliding
 	var speed_weight := smoothstep(TYRE_ROLLING_SPEED, TYRE_FULL_SPEED, speed)
+	var steer := maxf(absf(_steer_input) - TYRE_STEER_ONSET, 0.0)
 	var cornering := pow(
-		clampf(absf(_steer_input) / TYRE_FULL_STEER, 0.0, 1.0),
+		clampf(steer / maxf(TYRE_FULL_STEER - TYRE_STEER_ONSET, 0.01), 0.0, 1.0),
 		TYRE_STEER_EXPONENT,
 	) * speed_weight
 	var rear_slip_deg := rad_to_deg(absf(_rear_slip_angle))
 	var span := maxf(SCREECH_FULL_DEG - SCREECH_ONSET_DEG, 1.0)
-	var slip_intensity := pow(clampf((rear_slip_deg - SCREECH_ONSET_DEG) / span, 0.0, 1.0), 1.2)
+	var slip_intensity := pow(clampf((rear_slip_deg - SCREECH_ONSET_DEG) / span, 0.0, 1.0), 1.6)
 	return {
-		"cornering": maxf(cornering, 1.0 if sliding else 0.0),
+		"cornering": cornering,
 		"sliding": sliding,
-		"screech": maxf(0.55, slip_intensity) if sliding else 0.0,
+		"screech": slip_intensity if sliding else 0.0,
 		"drift_state": _drift_state,
 		"surface": current_surface,
 		"grip": get_effective_grip(),
