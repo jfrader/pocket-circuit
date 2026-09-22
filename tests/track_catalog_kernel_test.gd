@@ -68,6 +68,13 @@ func _test_catalog_contract() -> bool:
 	if not _expect(MODULES.definitions().size() == 11, "catalog should expose exactly eleven authored classes"):
 		return false
 	for module_id: StringName in fixtures:
+		for unit: float in [0.0, 0.5, 1.0]:
+			var units := {}
+			for key: String in MODULES.definition(module_id)["parameter_domains"]:
+				units["angle_deg" if key == "angles_deg" else key] = unit
+			var proposal := MODULES.proposal_parameters(module_id, fixtures[module_id], units)
+			if not _expect(bool(MODULES.instantiate(module_id, proposal).get("ok", false)), "%s minimum/midpoint/maximum proposals must respect the catalog domain: %s" % [module_id, proposal]):
+				return false
 		var module := MODULES.instantiate(module_id, fixtures[module_id])
 		if not _expect(bool(module.get("ok", false)), "%s should instantiate inside its authored domain: %s" % [module_id, module.get("reason", "unknown")]):
 			return false
@@ -81,6 +88,9 @@ func _test_catalog_contract() -> bool:
 			return false
 	var rejected := MODULES.instantiate(&"corner_tight", {"radius": 146.9, "angle_deg": 90.0, "hand": 1.0})
 	if not _expect(not bool(rejected.get("ok", false)) and rejected.get("kind") == "parameter_domain", "sub-domain radius should fail before composition"):
+		return false
+	var asymmetric := MODULES.proposal_parameters(&"switchback", fixtures[&"switchback"], {"depth_1": 0.0, "depth_2": 1.0})
+	if not _expect(float(asymmetric["depth_1"]) == 450.0 and float(asymmetric["depth_2"]) == 1600.0, "switchback limb depths must vary independently"):
 		return false
 	var merged_links := MODULES.compose([
 		MODULES.instantiate(&"straight_link", {"length": 180.0}),
