@@ -208,9 +208,11 @@ static func _embed_ring(ring: PackedVector2Array, identity: Dictionary, candidat
 	var ordinary: Array[Dictionary] = []
 	for offset in range(slots.size() - 3):
 		ordinary.append(slots[(seam + offset) % slots.size()])
-	if not mixed:
+	if not mixed or _unit(identity, candidate + 419) < 0.5:
 		var inserted := false
-		for index in ordinary.size():
+		var first_slot := int(_unit(identity, candidate + 503) * ordinary.size()) % ordinary.size()
+		for step in ordinary.size():
+			var index := (first_slot + step) % ordinary.size()
 			var slot: Dictionary = ordinary[index]
 			if slot["module_id"] != &"straight_setup" or bool(slot["parameters"].get("finish", false)):
 				continue
@@ -229,7 +231,7 @@ static func _embed_ring(ring: PackedVector2Array, identity: Dictionary, candidat
 				ordinary.insert(index + 1 + offset, technical[offset])
 			inserted = true
 			break
-		if not inserted:
+		if not inserted and not mixed:
 			return _failure(&"technical_budget", "No unprotected link fits a mixed-handed module and a second setup interval.")
 	if candidate % 4 == 3:
 		_compact_returns(ordinary)
@@ -266,14 +268,15 @@ static func _technical_slots(identity: Dictionary, candidate: int, index: int, s
 	var angle := angles[mini(angles.size() - 1, int(_unit(identity, candidate * 31 + index + 211) * angles.size()))]
 	var distance_factor := 2.0 * cos(deg_to_rad(angle)) if candidate % 3 == 1 else 1.0
 	var maximum_distance := minf(600.0, (span - 4.0 * RADIUS * sin(deg_to_rad(angle))) / distance_factor)
-	var parameters := {"radius": RADIUS, "angle_deg": angle, "distance": lerpf(180.0, maximum_distance, _unit(identity, candidate * 31 + index + 307)), "hand": -1.0}
+	var hand := -1.0 if _unit(identity, candidate * 31 + index + 601) < 0.5 else 1.0
+	var parameters := {"radius": RADIUS, "angle_deg": angle, "distance": lerpf(180.0, maximum_distance, _unit(identity, candidate * 31 + index + 307)), "hand": hand}
 	match candidate % 3:
 		1:
 			var returning := parameters.duplicate(true)
-			returning["hand"] = 1.0
+			returning["hand"] = -hand
 			return [_slot(&"s_offset", parameters, &"opening"), _slot(&"s_offset", returning, &"technical")]
 		2:
-			return [_slot(&"switchback", {"radius": RADIUS, "depth_1": 450.0, "depth_2": 450.0, "width": 400.0, "hand": -1.0}, &"technical")]
+			return [_slot(&"switchback", {"radius": RADIUS, "depth_1": 450.0, "depth_2": 450.0, "width": 400.0, "hand": hand}, &"technical")]
 	return [_slot(&"chicane_return", parameters, &"technical")]
 
 

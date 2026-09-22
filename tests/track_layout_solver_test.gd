@@ -20,7 +20,7 @@ func _initialize() -> void:
 func _run_test() -> void:
 	if not _test_signatures():
 		return
-	if not _test_general_graphs() or not _test_catalog_search() or not _test_remaining_bounds() or not _test_frontier_budget():
+	if not _test_general_graphs() or not _test_catalog_search() or not _test_technical_embeds() or not _test_remaining_bounds() or not _test_frontier_budget():
 		return
 	for test_case: Dictionary in CASES:
 		var started := Time.get_ticks_usec()
@@ -213,6 +213,24 @@ func _test_remaining_bounds() -> bool:
 	if not _expect(SOLVER._remaining_feasible(partial, slots, 0, {"min_length": 0.0, "max_length": 2300.0}), "suffix progress toward the start must not be charged again as closure distance"):
 		return false
 	return _expect(not SOLVER._remaining_feasible(partial, slots, 0, {"min_length": 0.0, "max_length": 2100.0}), "the exact remaining slot minimum must still prune an over-length branch")
+
+
+func _test_technical_embeds() -> bool:
+	var hands := {}
+	var classes := {}
+	for seed in 12:
+		for candidate in 3:
+			var slots := SOLVER.GRAPHS._technical_slots({"seed": seed}, candidate, 0, 2000.0)
+			var modules: Array[Dictionary] = []
+			for slot: Dictionary in slots:
+				modules.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+				classes[slot["module_id"]] = true
+				hands[slot["parameters"]["hand"]] = true
+			var route := MODULES.compose(modules)
+			var exit: Vector2 = route["exit_port"]["position"]
+			if not _expect(absf(exit.y) <= MODULES.POSITION_TOLERANCE and exit.x <= 2000.0 and absf(float(route["signed_turn"])) <= MODULES.HEADING_TOLERANCE, "either-handed technical sections must return to the reserved straight pose within their span"):
+				return false
+	return _expect(hands.size() == 2 and classes.size() == 3, "seeded technical embeddings must exercise both hands and all three compound programs")
 
 
 func _test_frontier_budget() -> bool:
