@@ -652,12 +652,34 @@ func _begin_race_transition(vehicle_id: String = "") -> void:
 		return
 	if is_instance_valid(audio_director):
 		audio_director.call("warm_vehicle_audio", vehicle_id)
+		for opponent_id in _opponent_audio_vehicle_ids():
+			if _loading_cancelled:
+				_leave_race_loading()
+				return
+			await loading_step("Tuning the engine")
+			audio_director.call("warm_vehicle_audio", opponent_id)
 	await loading_step("Opening the circuit")
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
 	if packed == null or get_tree().change_scene_to_packed(packed) != OK:
 		fail_race_loading("The race scene could not be opened")
+
+
+func _opponent_audio_vehicle_ids() -> PackedStringArray:
+	var ids := PackedStringArray()
+	if String(current_race_session.get("mode", "")) == "mastery":
+		return ids
+	var event: Dictionary = current_race_session.get("event", {})
+	var opponent_ids: Array = event.get("opponents", [])
+	var count := clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
+	for index in mini(opponent_ids.size(), count):
+		var driver: Dictionary = CATALOG.get_driver(String(opponent_ids[index]))
+		var vehicle_id := String(driver.get("vehicle_id", ""))
+		if vehicle_id.is_empty() or vehicle_id in ids:
+			continue
+		ids.append(vehicle_id)
+	return ids
 
 
 func _load_scene_resources(path: String, resources: Dictionary) -> bool:

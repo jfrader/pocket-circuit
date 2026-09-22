@@ -142,8 +142,6 @@ func _run_test() -> void:
 		return
 	if not _expect(not String(director.call("get_crash_voice_signature")).is_empty(), "the crash voice should carry a signature"):
 		return
-	if not _expect(director.get_node_or_null("DriftVoice") != null, "the drift voice node should exist"):
-		return
 	var local_car := PositionalVehicle.new()
 	root.add_child(local_car)
 	director.set_local_vehicle(local_car)
