@@ -11,7 +11,8 @@ static func compose_generated_story(
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		moments: Dictionary,
-		stage: Callable = Callable()
+		stage: Callable = Callable(),
+		room_model: Dictionary = {}
 ) -> void:
 	var story: Dictionary = spec["story_kit"]
 	var container := Node2D.new()
@@ -51,7 +52,7 @@ static func compose_generated_story(
 	var opening := container.get_node("OpeningLandmark")
 	if int(opening.get_meta("placed_count", 0)) == 1:
 		reserved_unique_assets[String(opening.get_meta("asset_path", ""))] = true
-	await build_island_story(container, story, spec, centerline, inner_loop, room_polygon, gate_samples, occupied, stage)
+	await build_island_story(container, story, spec, centerline, inner_loop, room_polygon, gate_samples, occupied, stage, room_model)
 	if stage.is_valid():
 		await stage.call("Placing track objects")
 	TrackBuilderCore._build_track_formation(
@@ -133,7 +134,8 @@ static func build_island_story(
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		stage: Callable = Callable()
+		stage: Callable = Callable(),
+		room_model: Dictionary = {}
 ) -> void:
 	var cluster := Node2D.new()
 	cluster.name = "IslandFocalCluster"
@@ -152,9 +154,9 @@ static func build_island_story(
 	var focal_radius := focal_base_radius * focal_scale
 	var focal_offset: Vector2 = focal_data.get("offset", Vector2.ZERO)
 	var focal_preferred := anchor + focal_offset.rotated(scene_angle)
-	var island_fit := TrackBuilderCore._best_island_position(focal_preferred, focal_radius, room_polygon, inner_loop, occupied)
+	var island_fit := TrackBuilderPlacement.best_island_position(focal_preferred, focal_radius, room_polygon, inner_loop, occupied, room_model)
 	if not bool(island_fit["found"]):
-		var apron_fit := TrackBuilderCore._best_offtrack_position(focal_preferred, focal_radius, room_polygon, centerline, gate_samples, occupied)
+		var apron_fit := TrackBuilderPlacement.best_offtrack_position(focal_preferred, focal_radius, room_polygon, centerline, gate_samples, occupied, room_model)
 		if bool(apron_fit["found"]):
 			placement_region = &"apron"
 			anchor += (apron_fit["position"] as Vector2) - focal_preferred
@@ -189,7 +191,7 @@ static func build_island_story(
 				var fallback_angle := scene_angle + float(attempt) * 2.399963 + float(item_index) * 0.41
 				var fallback := Vector2.ZERO if attempt == 0 else Vector2.RIGHT.rotated(fallback_angle) * fallback_distance
 				var candidate := preferred + fallback
-				var safe := TrackBuilderCore._placement_is_safe(candidate, radius, room_polygon, inner_loop, occupied) if placement_region == &"island" else TrackBuilderCore._trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied)
+				var safe := TrackBuilderPlacement.placement_is_safe(candidate, radius, room_polygon, inner_loop, occupied, room_model) if placement_region == &"island" else TrackBuilderPlacement.trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied, room_model)
 				if not safe:
 					continue
 				TrackBuilderCore._add_generated_prop(formation, "Item%02d" % item_index, candidate, asset_path, scene_angle + float(item_index) * 0.17, placement_region, quantity, item_index, size_scale)
@@ -198,7 +200,7 @@ static func build_island_story(
 				placed = true
 				break
 			if not placed:
-				var exhaustive := TrackBuilderCore._best_island_position(preferred, radius, room_polygon, inner_loop, occupied) if placement_region == &"island" else TrackBuilderCore._best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied)
+				var exhaustive := TrackBuilderPlacement.best_island_position(preferred, radius, room_polygon, inner_loop, occupied, room_model) if placement_region == &"island" else TrackBuilderPlacement.best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied, room_model)
 				if bool(exhaustive["found"]):
 					var candidate: Vector2 = exhaustive["position"]
 					TrackBuilderCore._add_generated_prop(formation, "Item%02d" % item_index, candidate, asset_path, scene_angle + float(item_index) * 0.17, placement_region, quantity, item_index, size_scale)
@@ -206,7 +208,7 @@ static func build_island_story(
 					placed_count += 1
 					placed = true
 			if not placed and placement_region == &"island":
-				var apron_fit := TrackBuilderCore._best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied)
+				var apron_fit := TrackBuilderPlacement.best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied, room_model)
 				if bool(apron_fit["found"]):
 					var candidate: Vector2 = apron_fit["position"]
 					TrackBuilderCore._add_generated_prop(formation, "Item%02d" % item_index, candidate, asset_path, scene_angle + float(item_index) * 0.17, &"apron", quantity, item_index, size_scale)
@@ -220,10 +222,10 @@ static func build_island_story(
 				for factor: float in [0.85, 0.70, 0.55]:
 					var fitted_radius := minf(radius, maxf(72.0, radius * factor))
 					var fitted_scale := size_scale * fitted_radius / radius
-					var fit := TrackBuilderCore._best_island_position(preferred, fitted_radius, room_polygon, inner_loop, occupied)
+					var fit := TrackBuilderPlacement.best_island_position(preferred, fitted_radius, room_polygon, inner_loop, occupied, room_model)
 					var region := &"island"
 					if not bool(fit["found"]):
-						fit = TrackBuilderCore._best_offtrack_position(preferred, fitted_radius, room_polygon, centerline, gate_samples, occupied)
+						fit = TrackBuilderPlacement.best_offtrack_position(preferred, fitted_radius, room_polygon, centerline, gate_samples, occupied, room_model)
 						region = &"apron"
 					if bool(fit["found"]):
 						TrackBuilderCore._add_generated_prop(formation, "Item%02d" % item_index, fit["position"], asset_path, scene_angle, region, quantity, item_index, fitted_scale)
