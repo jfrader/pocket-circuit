@@ -759,9 +759,10 @@ static func _build_edge_and_apron_decor(
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		stage: Callable = Callable()
+		stage: Callable = Callable(),
+		room_model: Dictionary = {}
 ) -> void:
-	await TRACK_BUILDER_DRESSING.build_edge_and_apron_decor(parent, spec, centerline, room_polygon, gate_samples, occupied, stage)
+	await TRACK_BUILDER_DRESSING.build_edge_and_apron_decor(parent, spec, centerline, room_polygon, gate_samples, occupied, stage, room_model)
 
 
 static func _build_giant_landmarks(
