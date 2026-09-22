@@ -3,7 +3,6 @@ extends SceneTree
 const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
 const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 const GENERATOR := preload("res://scripts/race/track_v8_development_generator.gd")
-const TRACK_BUILDER_CORE := preload("res://scripts/race/track_builder_core.gd")
 const MAX_PHYSICS_FRAMES := 5000
 const MAX_RECOVERIES := 0
 
@@ -133,45 +132,27 @@ func _run_case(test_case: Dictionary) -> bool:
 	return true
 
 
-func _collect_solid_probes(node: Node, out: PackedVector2Array) -> void:
-	if node is Node2D:
-		var n2d := node as Node2D
-		if n2d.get_meta("collision_contract", &"") == TRACK_BUILDER_CORE.COLLISION_SOLID:
-			var center := n2d.global_position
-			out.append(center)
-			var rel: PackedVector2Array = n2d.get_meta("collision_probe_points", PackedVector2Array())
-			for rp: Vector2 in rel:
-				out.append(center + rp.rotated(n2d.global_rotation))
-	for child: Node in node.get_children():
-		_collect_solid_probes(child, out)
-
-
 func _count_blocked_passages(track: Node2D, centerline: PackedVector2Array, room_model: Dictionary) -> int:
 	if not is_instance_valid(track) or centerline.is_empty():
 		return 0
-	var probes := PackedVector2Array()
-	_collect_solid_probes(track, probes)
-	if probes.is_empty():
-		return 0
-	var lane_centers := PackedVector2Array()
+	var probes := centerline.duplicate()
 	for psg: Dictionary in room_model.get("reserved_passages", []) as Array:
-		lane_centers.append_array(psg.get("lane_centers", PackedVector2Array()) as PackedVector2Array)
-	var tube_radius := 125.0
+		probes.append_array(psg.get("lane_centers", PackedVector2Array()) as PackedVector2Array)
+	var shape := CircleShape2D.new()
+	shape.radius = 125.0
+	var query := PhysicsShapeQueryParameters2D.new()
+	query.shape = shape
+	var excluded: Array[RID] = []
+	for racer: Node in get_nodes_in_group("race_vehicle"):
+		if racer is CollisionObject2D:
+			excluded.append((racer as CollisionObject2D).get_rid())
+	query.exclude = excluded
+	var space := track.get_world_2d().direct_space_state
 	var blocked := 0
 	for probe: Vector2 in probes:
-		var intrudes := false
-		for cp: Vector2 in centerline:
-			if probe.distance_to(cp) < tube_radius:
-				intrudes = true
-				break
-		if intrudes:
-			blocked += 1
-			continue
-		for lp: Vector2 in lane_centers:
-			if probe.distance_to(lp) < tube_radius:
-				intrudes = true
-				break
-		if intrudes:
+		query.transform = Transform2D(0.0, probe)
+		var hits := space.intersect_shape(query, 1)
+		if not hits.is_empty():
 			blocked += 1
 	return blocked
 
