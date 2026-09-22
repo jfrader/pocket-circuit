@@ -9,6 +9,8 @@ extends SceneTree
 ## Default 4 seeds per cell; PC_DIVERSITY_SEEDS=1..200 expands the baseline.
 ## PC_DIVERSITY_GENERATOR=7|8, PC_DIVERSITY_START, PC_DIVERSITY_CELL=room/tier,
 ## and PC_DIVERSITY_SHARD=index/count select reproducible farm slices.
+## PC_DIVERSITY_HOLDOUT=0|1|2|3|remainder|all selects the committed v8 holdout
+## instead of a contiguous PC_DIVERSITY_START/PC_DIVERSITY_SEEDS window.
 ## PC_DIVERSITY_OUTPUT writes one JSON shard document. PC_DIVERSITY_INPUTS
 ## (comma-separated documents) validates and aggregates a complete shard set.
 ## Sequence signatures are sampling-sensitive, NOT counts of macro topologies.
@@ -38,12 +40,21 @@ const ROOM_MODEL := preload("res://scripts/race/track_room_model.gd")
 const VALIDATION := preload("res://scripts/race/track_layout_validation.gd")
 const SIGNATURES := preload("res://scripts/race/track_layout_signatures.gd")
 const MODULES := preload("res://scripts/race/track_module_catalog.gd")
+const V8_HOLDOUT := preload("res://tests/support/v8_holdout_seeds.gd")
 
 const SAMPLE_SEEDS := 4
 const SHAPE_SAMPLE_COUNT := 128
 const DISTINCT_SHAPE_DISTANCE := 0.055
-const FARM_FORMAT := "pocket-circuit-expressive-range-v1"
+const FARM_FORMAT := "pocket-circuit-expressive-range-v2"
 const GENERATOR_VERSION := 7
+const FULL_WINDOW_SIZE := 48
+const TIER_GATES := {
+	"compact": {"structures": 8, "shapes": 12, "largest_structure": 12, "semantic_counts": 3, "both_hands": 36},
+	"standard": {"structures": 12, "shapes": 20, "largest_structure": 10, "semantic_counts": 3, "both_hands": 36},
+	"long": {"structures": 16, "shapes": 24, "largest_structure": 8, "semantic_counts": 4, "both_hands": 40},
+	"endurance": {"structures": 18, "shapes": 26, "largest_structure": 8, "semantic_counts": 4, "both_hands": 40},
+	"marathon": {"structures": 20, "shapes": 28, "largest_structure": 8, "semantic_counts": 4, "both_hands": 40},
+}
 
 const ROOMS: Array[String] = GENERATED_RULES.ROOMS
 const TIERS: Array[String] = GENERATED_RULES.LENGTH_TIERS
@@ -74,6 +85,9 @@ func _run_test() -> void:
 	if not _expect(bool(config.get("ok", false)), String(config.get("error", "invalid farm configuration"))):
 		return
 	var seed_start := int(config["seed_start"])
+	var seed_mode := String(config["seed_mode"])
+	var seed_values: Array[int] = config["seeds"]
+	seed_count = seed_values.size()
 	generator_version = int(config["generator"])
 	var selected_cell := String(config["cell"])
 	var shard_index := int(config["shard_index"])
@@ -86,7 +100,7 @@ func _run_test() -> void:
 	var total_invalid := 0
 	var all_failing_seeds: Dictionary = {}
 
-	print("TRACK_DIVERSITY_SWEEP generator=%d seed_start=%d seeds_per_cell=%d cell=%s shard=%d/%d" % [generator_version, seed_start, seed_count, selected_cell if not selected_cell.is_empty() else "all", shard_index, shard_count])
+	print("TRACK_DIVERSITY_SWEEP generator=%d seed_mode=%s seed_start=%d seeds_per_cell=%d cell=%s shard=%d/%d" % [generator_version, seed_mode, seed_start, seed_count, selected_cell if not selected_cell.is_empty() else "all", shard_index, shard_count])
 	print("room/tier | seq | rhythms | shapes | fails | avg_L_runs | avg_R_runs | avg_literal_S | min_turn_runs | max_turn_runs")
 
 	for room: String in ROOMS:
@@ -137,7 +151,7 @@ func _run_test() -> void:
 				var case_ordinal := _case_ordinal(room, tier, s, seed_count, selected_cell)
 				if posmod(case_ordinal, shard_count) != shard_index:
 					continue
-				var seed: int = seed_start + s
+				var seed: int = seed_values[s]
 				var generation_started := Time.get_ticks_usec()
 				var res: Dictionary = _generate_v8(room, tier, seed) if generator_version == 8 else TRACK_SEED_GEN.generate_with_retries(seed, room_rect, params)
 				var case_polygon: PackedVector2Array = (res.get("room_model", {}) as Dictionary).get("outer", PackedVector2Array()) if generator_version == 8 else scaled_poly
@@ -261,6 +275,8 @@ func _run_test() -> void:
 			"format": FARM_FORMAT,
 			"generator": generator_version,
 			"seed_start": seed_start,
+			"seed_mode": seed_mode,
+			"seeds": seed_values,
 			"seed_count": seed_count,
 			"cell": selected_cell,
 			"shard_index": shard_index,
@@ -274,7 +290,7 @@ func _run_test() -> void:
 	if not _expect(total_fails == 0 and total_invalid == 0, "%d generation failures, %d invalid circuits" % [total_fails, total_invalid]):
 		return
 	if generator_version == 8 and seed_count >= 12 and shard_count == 1:
-		var variety_error := _accepted_variety_error(aggregation["summary"], selected_cell.is_empty())
+		var variety_error := _variety_error_for_records(records, selected_cell.is_empty(), seed_mode)
 		if not _expect(variety_error.is_empty(), variety_error):
 			return
 	print("TRACK_DIVERSITY_SWEEP_TEST PASS cells=%d seq=%d shapes=%d fails=%d seeds_per=%d" % [
@@ -289,11 +305,33 @@ func _farm_config(seed_count: int) -> Dictionary:
 		generator_text = str(GENERATOR_VERSION)
 	if not generator_text.is_valid_int() or int(generator_text) not in [7, 8]:
 		return {"ok": false, "error": "PC_DIVERSITY_GENERATOR must be 7 or 8"}
+	var holdout_text := OS.get_environment("PC_DIVERSITY_HOLDOUT")
 	var start_text := OS.get_environment("PC_DIVERSITY_START")
+	var seeds: Array[int] = []
+	var seed_mode := "window"
 	if start_text.is_empty():
 		start_text = "0"
-	if not start_text.is_valid_int() or int(start_text) < 0 or int(start_text) + seed_count - 1 > GENERATED_RULES.MAX_SEED:
-		return {"ok": false, "error": "PC_DIVERSITY_START must keep the selected seed window within 0..%d" % GENERATED_RULES.MAX_SEED}
+	if holdout_text.is_empty():
+		if not start_text.is_valid_int() or int(start_text) < 0 or int(start_text) + seed_count - 1 > GENERATED_RULES.MAX_SEED:
+			return {"ok": false, "error": "PC_DIVERSITY_START must keep the selected seed window within 0..%d" % GENERATED_RULES.MAX_SEED}
+		for offset in seed_count:
+			seeds.append(int(start_text) + offset)
+	else:
+		if int(generator_text) != 8:
+			return {"ok": false, "error": "PC_DIVERSITY_HOLDOUT requires PC_DIVERSITY_GENERATOR=8"}
+		if not OS.get_environment("PC_DIVERSITY_START").is_empty() or not OS.get_environment("PC_DIVERSITY_SEEDS").is_empty():
+			return {"ok": false, "error": "PC_DIVERSITY_HOLDOUT cannot be combined with PC_DIVERSITY_START or PC_DIVERSITY_SEEDS"}
+		var blocks := V8_HOLDOUT.get_holdout_blocks()
+		if holdout_text == "all":
+			seeds.assign(V8_HOLDOUT.SEEDS)
+		elif holdout_text == "remainder":
+			seeds.assign(blocks[4])
+		elif holdout_text.is_valid_int() and int(holdout_text) >= 0 and int(holdout_text) < 4:
+			seeds.assign(blocks[int(holdout_text)])
+		else:
+			return {"ok": false, "error": "PC_DIVERSITY_HOLDOUT must be 0, 1, 2, 3, remainder, or all"}
+		start_text = "-1"
+		seed_mode = "holdout:%s" % holdout_text
 	var cell := OS.get_environment("PC_DIVERSITY_CELL")
 	if not cell.is_empty():
 		var cell_parts := cell.split("/", false)
@@ -313,6 +351,8 @@ func _farm_config(seed_count: int) -> Dictionary:
 		"ok": true,
 		"generator": int(generator_text),
 		"seed_start": int(start_text),
+		"seed_mode": seed_mode,
+		"seeds": seeds,
 		"cell": cell,
 		"shard_index": shard_index,
 		"shard_count": shard_count,
@@ -333,14 +373,14 @@ func _expected_shard_cases(seed_count: int, selected_cell: String, shard_index: 
 	return count
 
 
-func _expected_identity_keys(seed_start: int, seed_count: int, selected_cell: String) -> Dictionary:
+func _expected_identity_keys(seeds: Array, selected_cell: String) -> Dictionary:
 	var expected := {}
 	for room: String in ROOMS:
 		for tier: String in TIERS:
 			if not selected_cell.is_empty() and selected_cell != "%s/%s" % [room, tier]:
 				continue
-			for seed_offset in seed_count:
-				expected["%d|%s|%s|%d" % [generator_version, room, tier, seed_start + seed_offset]] = true
+			for seed: int in seeds:
+				expected["%d|%s|%s|%d" % [generator_version, room, tier, seed]] = true
 	return expected
 
 
@@ -423,6 +463,10 @@ func _case_record(
 		"portal_traversals": [],
 		"minimum_portal_width": null,
 		"shape_descriptor": _shape_descriptor(shape),
+		"room_shape_descriptor": _shape_descriptor(_normalized_shape(room_polygon)) if not room_polygon.is_empty() else [],
+		"straight_length_fraction": null,
+		"required_regions_visited": true,
+		"operation_caps_exceeded": false,
 		"repair_count": 0,
 		"expansion_count": 0,
 		"attempt_count": int(result.get("attempt", -1)) + 1,
@@ -439,6 +483,10 @@ func _case_record(
 		for primitive: Dictionary in route.get("primitives", []):
 			var radius := float(primitive.get("radius", INF))
 			_increment(curvature, "straight" if primitive["kind"] == &"line" else ("tight" if radius < 260.0 else ("medium" if radius < 520.0 else "sweeper")))
+		var straight_length := 0.0
+		for primitive: Dictionary in route.get("primitives", []):
+			if primitive["kind"] == &"line":
+				straight_length += float(primitive["length"])
 		var minimum_width := INF
 		for traversal: Dictionary in result.get("portal_traversals", []):
 			minimum_width = minf(minimum_width, float(traversal["clear_width"]))
@@ -454,14 +502,34 @@ func _case_record(
 			"module_class_histogram": classes,
 			"semantic_count": SIGNATURES.describe(route)["semantic_count"],
 			"curvature_class_histogram": curvature,
+			"straight_length_fraction": straight_length / maxf(float(route.get("length", 0.0)), 0.001),
 			"minimum_portal_width": minimum_width if is_finite(minimum_width) else null,
 			"region_occupancy": result.get("region_visits", []),
 			"portal_traversals": result.get("portal_traversals", []),
+			"required_regions_visited": _required_regions_visited(result.get("region_visits", [])),
+			"operation_caps_exceeded": _operation_caps_exceeded(search),
 			"expansion_count": search.get("placement_expansions", 0),
 			"repair_count": search.get("repair_passes", 0),
 			"search": search,
 		}, true)
 	return record
+
+
+func _required_regions_visited(visits: Array) -> bool:
+	for visit: Dictionary in visits:
+		if bool(visit.get("required", false)) and (visit.get("slot_indices", PackedInt32Array()) as PackedInt32Array).is_empty():
+			return false
+	return true
+
+
+func _operation_caps_exceeded(search: Dictionary) -> bool:
+	var limits: Dictionary = search.get("limits", {})
+	# Placement and closure limits are per graph/frontier, while their diagnostics
+	# are cumulative. Successful solver return already proves those local caps.
+	for counter: String in ["graph_candidates", "narrow_phase_operations"]:
+		if int(search.get(counter, 0)) > int(limits.get(counter, 0)):
+			return true
+	return false
 
 
 func _curvature_class_histogram(sequence: String) -> Dictionary:
@@ -530,9 +598,16 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 		identities[identity_key] = true
 		_increment(status_counts, String(record.get("status", "unknown")))
 		if not cells.has(cell):
-			cells[cell] = {"cases": 0, "successes": 0, "structures": {}, "sequences": {}, "rhythms": {}, "shape_reps": [], "rejections": {}, "accepted_module_instances": {}, "accepted_class_layouts": {}}
+			cells[cell] = {
+				"cases": 0, "successes": 0, "structures": {}, "sequences": {}, "rhythms": {},
+				"shape_reps": [], "room_shape_reps": [], "rejections": {}, "accepted_module_instances": {},
+				"accepted_class_layouts": {}, "semantic_counts": {}, "both_turn_hands": 0,
+				"repaired_layouts": 0, "curvature_classes": {}, "joint_bins": {},
+				"contract_failures": 0, "operation_cap_exceeded": 0,
+			}
 		var aggregate: Dictionary = cells[cell]
 		aggregate["cases"] = int(aggregate["cases"]) + 1
+		var room_cluster_index := _room_cluster_index(aggregate["room_shape_reps"], record.get("room_shape_descriptor", []))
 		for category: String in (record.get("rejection_classes", {}) as Dictionary):
 			var count := int((record["rejection_classes"] as Dictionary)[category])
 			(aggregate["rejections"] as Dictionary)[category] = int((aggregate["rejections"] as Dictionary).get(category, 0)) + count
@@ -551,13 +626,34 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 			_increment(class_layouts, module_class)
 		var structure := String(record.get("structural_signature", ""))
 		if not structure.is_empty():
-			(aggregate["structures"] as Dictionary)[structure] = true
+			_increment(aggregate["structures"], structure)
+			if room_cluster_index >= 0:
+				(aggregate["room_shape_reps"][room_cluster_index]["structures"] as Dictionary)[structure] = true
 		var sequence := String(record.get("route_sequence", ""))
 		if not sequence.is_empty():
 			(aggregate["sequences"] as Dictionary)[sequence] = true
 		var rhythm := String(record.get("rhythm_signature", ""))
 		if not rhythm.is_empty():
 			(aggregate["rhythms"] as Dictionary)[rhythm] = true
+		var semantic_value: Variant = record.get("semantic_count", 0)
+		var semantic_count := 0 if semantic_value == null else int(semantic_value)
+		if semantic_count > 0:
+			(aggregate["semantic_counts"] as Dictionary)[semantic_count] = true
+		var signed_turn_runs: Array = record.get("signed_turn_runs", [])
+		if signed_turn_runs.has("L") and signed_turn_runs.has("R"):
+			aggregate["both_turn_hands"] = int(aggregate["both_turn_hands"]) + 1
+		if int(record.get("repair_count", 0)) > 0:
+			aggregate["repaired_layouts"] = int(aggregate["repaired_layouts"]) + 1
+		for curvature_class: String in ["tight", "medium", "sweeper"]:
+			if int((record.get("curvature_class_histogram", {}) as Dictionary).get(curvature_class, 0)) > 0:
+				(aggregate["curvature_classes"] as Dictionary)[curvature_class] = true
+		var joint_bin := _joint_distribution_bin(semantic_count, record.get("straight_length_fraction"))
+		if not joint_bin.is_empty():
+			(aggregate["joint_bins"] as Dictionary)[joint_bin] = true
+		if int(record.get("literal_straight_count", 0)) < 2 or int(record.get("setup_straight_count", 0)) < 2 or not bool(record.get("required_regions_visited", false)):
+			aggregate["contract_failures"] = int(aggregate["contract_failures"]) + 1
+		if bool(record.get("operation_caps_exceeded", false)):
+			aggregate["operation_cap_exceeded"] = int(aggregate["operation_cap_exceeded"]) + 1
 		var descriptor: Array = record.get("shape_descriptor", [])
 		if descriptor.size() == SHAPE_SAMPLE_COUNT * 2:
 			var shape := _shape_from_descriptor(descriptor)
@@ -571,6 +667,15 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 	var cell_summaries := {}
 	for cell: String in cells:
 		var aggregate: Dictionary = cells[cell]
+		var largest_structure_frequency := 0
+		for frequency: int in (aggregate["structures"] as Dictionary).values():
+			largest_structure_frequency = maxi(largest_structure_frequency, frequency)
+		var multi_structure_room_clusters := 0
+		var room_cluster_structure_counts: Array[int] = []
+		for room_cluster: Dictionary in aggregate["room_shape_reps"]:
+			var structure_count := (room_cluster["structures"] as Dictionary).size()
+			room_cluster_structure_counts.append(structure_count)
+			multi_structure_room_clusters += int(structure_count >= 2)
 		cell_summaries[cell] = {
 			"cases": aggregate["cases"],
 			"successes": aggregate["successes"],
@@ -578,11 +683,42 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 			"distinct_sequences": (aggregate["sequences"] as Dictionary).size(),
 			"distinct_rhythms": (aggregate["rhythms"] as Dictionary).size(),
 			"shape_clusters": (aggregate["shape_reps"] as Array).size(),
+			"largest_structure_frequency": largest_structure_frequency,
+			"distinct_semantic_counts": (aggregate["semantic_counts"] as Dictionary).size(),
+			"both_turn_hands": aggregate["both_turn_hands"],
+			"repaired_layouts": aggregate["repaired_layouts"],
+			"curvature_classes": (aggregate["curvature_classes"] as Dictionary).keys(),
+			"joint_distribution_bins": (aggregate["joint_bins"] as Dictionary).keys(),
+			"room_shape_clusters": (aggregate["room_shape_reps"] as Array).size(),
+			"room_cluster_structure_counts": room_cluster_structure_counts,
+			"room_clusters_with_multiple_structures": multi_structure_room_clusters,
+			"contract_failures": aggregate["contract_failures"],
+			"operation_cap_exceeded": aggregate["operation_cap_exceeded"],
 			"rejections": aggregate["rejections"],
 			"accepted_module_instances": aggregate["accepted_module_instances"],
 			"accepted_class_layouts": aggregate["accepted_class_layouts"],
 		}
 	return {"ok": true, "summary": {"cases": ordered.size(), "statuses": status_counts, "rejections": rejection_counts, "cells": cell_summaries, "accepted_module_instances": accepted_classes, "accepted_class_layouts": class_layouts}}
+
+
+func _room_cluster_index(representatives: Array, descriptor: Array) -> int:
+	if descriptor.size() != SHAPE_SAMPLE_COUNT * 2:
+		return -1
+	var shape := _shape_from_descriptor(descriptor)
+	for index in representatives.size():
+		if _shape_distance(shape, representatives[index]["shape"]) < DISTINCT_SHAPE_DISTANCE:
+			return index
+	representatives.append({"shape": shape, "structures": {}})
+	return representatives.size() - 1
+
+
+func _joint_distribution_bin(semantic_count: int, straight_fraction: Variant) -> String:
+	if straight_fraction == null or semantic_count < 6:
+		return ""
+	var count_bin := "6-11" if semantic_count < 12 else ("12-17" if semantic_count < 18 else ("18-23" if semantic_count < 24 else "24+"))
+	var fraction := float(straight_fraction)
+	var fraction_bin := "<0.35" if fraction < 0.35 else ("0.35-0.55" if fraction <= 0.55 else ">0.55")
+	return "%s|%s" % [count_bin, fraction_bin]
 
 
 func _write_json(path: String, value: Variant) -> bool:
@@ -605,6 +741,69 @@ func _accepted_variety_error(summary: Dictionary, complete_matrix: bool) -> Stri
 	return ""
 
 
+func _full_window_variety_error(summary: Dictionary, complete_matrix: bool) -> String:
+	var smoke_error := _accepted_variety_error(summary, complete_matrix)
+	if not smoke_error.is_empty():
+		return smoke_error
+	for cell: String in summary["cells"]:
+		var coverage: Dictionary = summary["cells"][cell]
+		var tier := cell.get_slice("/", 1)
+		var gate: Dictionary = TIER_GATES[tier]
+		if int(coverage["cases"]) != FULL_WINDOW_SIZE or int(coverage["successes"]) != FULL_WINDOW_SIZE:
+			return "%s requires %d/%d valid outputs (got %d/%d)" % [cell, FULL_WINDOW_SIZE, FULL_WINDOW_SIZE, int(coverage["successes"]), int(coverage["cases"])]
+		if int(coverage["distinct_structures"]) < int(gate["structures"]):
+			return "%s needs >=%d structural arrangements (got %d)" % [cell, int(gate["structures"]), int(coverage["distinct_structures"])]
+		if int(coverage["shape_clusters"]) < int(gate["shapes"]):
+			return "%s needs >=%d normalized shape clusters (got %d)" % [cell, int(gate["shapes"]), int(coverage["shape_clusters"])]
+		if int(coverage["largest_structure_frequency"]) > int(gate["largest_structure"]):
+			return "%s largest arrangement may appear at most %d times (got %d)" % [cell, int(gate["largest_structure"]), int(coverage["largest_structure_frequency"])]
+		if int(coverage["distinct_semantic_counts"]) < int(gate["semantic_counts"]):
+			return "%s needs >=%d distinct semantic section counts (got %d)" % [cell, int(gate["semantic_counts"]), int(coverage["distinct_semantic_counts"])]
+		if int(coverage["both_turn_hands"]) < int(gate["both_hands"]):
+			return "%s needs >=%d routes using both turn hands (got %d)" % [cell, int(gate["both_hands"]), int(coverage["both_turn_hands"])]
+		if int(coverage["repaired_layouts"]) > 12:
+			return "%s may repair at most 12 complete layouts (got %d)" % [cell, int(coverage["repaired_layouts"])]
+		if (coverage["curvature_classes"] as Array).size() < 3:
+			return "%s needs all three populated turn-curvature classes (got %s)" % [cell, coverage["curvature_classes"]]
+		if (coverage["joint_distribution_bins"] as Array).size() < 3:
+			return "%s needs >=3 occupied semantic-count/straight-fraction bins (got %s)" % [cell, coverage["joint_distribution_bins"]]
+		if int(coverage["room_shape_clusters"]) < 3:
+			return "%s needs >=3 normalized room-boundary clusters (got %d)" % [cell, int(coverage["room_shape_clusters"])]
+		if int(coverage["room_clusters_with_multiple_structures"]) < 3:
+			return "%s needs >=3 room clusters hosting >=2 route structures (got %d; clusters=%s)" % [cell, int(coverage["room_clusters_with_multiple_structures"]), coverage["room_cluster_structure_counts"]]
+		if int(coverage["contract_failures"]) > 0:
+			return "%s has %d outputs missing setup/literal straights or required regions" % [cell, int(coverage["contract_failures"])]
+		if int(coverage["operation_cap_exceeded"]) > 0:
+			return "%s has %d outputs exceeding deterministic operation caps" % [cell, int(coverage["operation_cap_exceeded"])]
+	return ""
+
+
+func _variety_error_for_records(records: Array[Dictionary], complete_matrix: bool, seed_mode: String) -> String:
+	var summary_result := _aggregate_records(records, 8)
+	if not bool(summary_result.get("ok", false)):
+		return String(summary_result.get("error", "farm aggregation failed"))
+	if seed_mode == "holdout:all":
+		var blocks := V8_HOLDOUT.get_holdout_blocks()
+		for block_index in 4:
+			var block_lookup := {}
+			for seed: int in blocks[block_index]:
+				block_lookup[seed] = true
+			var block_records: Array[Dictionary] = []
+			for record: Dictionary in records:
+				if block_lookup.has(int(record["seed"])):
+					block_records.append(record)
+			var block_summary := _aggregate_records(block_records, 8)
+			if not bool(block_summary.get("ok", false)):
+				return "holdout block %d: %s" % [block_index, block_summary.get("error", "farm aggregation failed")]
+			var block_error := _full_window_variety_error(block_summary["summary"], complete_matrix)
+			if not block_error.is_empty():
+				return "holdout block %d: %s" % [block_index, block_error]
+		return ""
+	if records.size() == FULL_WINDOW_SIZE * (30 if complete_matrix else 1):
+		return _full_window_variety_error(summary_result["summary"], complete_matrix)
+	return _accepted_variety_error(summary_result["summary"], complete_matrix)
+
+
 func _run_offline_aggregation(input_list: String) -> void:
 	var documents: Array[Dictionary] = []
 	for path: String in input_list.split(",", false):
@@ -622,7 +821,7 @@ func _run_offline_aggregation(input_list: String) -> void:
 	var seen_shards := {}
 	var records: Array[Dictionary] = []
 	for document: Dictionary in documents:
-		for key: String in ["format", "generator", "seed_start", "seed_count", "cell", "shard_count"]:
+		for key: String in ["format", "generator", "seed_start", "seed_mode", "seeds", "seed_count", "cell", "shard_count"]:
 			if not _expect(document.get(key) == first.get(key), "farm shard manifests disagree on %s" % key):
 				return
 		var index := int(document.get("shard_index", -1))
@@ -633,10 +832,11 @@ func _run_offline_aggregation(input_list: String) -> void:
 			records.append(record)
 	if not _expect(seen_shards.size() == shard_count, "farm aggregation requires all %d shards (got %d)" % [shard_count, seen_shards.size()]):
 		return
-	var expected := int(first["seed_count"]) * (1 if not String(first["cell"]).is_empty() else ROOMS.size() * TIERS.size())
+	var seeds: Array = first["seeds"]
+	var expected := seeds.size() * (1 if not String(first["cell"]).is_empty() else ROOMS.size() * TIERS.size())
 	if not _expect(records.size() == expected, "farm aggregation is missing cases (got %d/%d)" % [records.size(), expected]):
 		return
-	var expected_identities := _expected_identity_keys(int(first["seed_start"]), int(first["seed_count"]), String(first["cell"]))
+	var expected_identities := _expected_identity_keys(seeds, String(first["cell"]))
 	var actual_identities := {}
 	for record: Dictionary in records:
 		var identity_key := "%d|%s|%s|%d" % [int(record.get("generator", -1)), record.get("room", ""), record.get("tier", ""), int(record.get("seed", -1))]
@@ -654,8 +854,8 @@ func _run_offline_aggregation(input_list: String) -> void:
 	print("TRACK_DIVERSITY_AGGREGATE " + JSON.stringify(aggregation["summary"], "", true))
 	if not _expect(int((aggregation["summary"]["statuses"] as Dictionary).get("ok", 0)) == expected, "farm contains generation failures or invalid circuits"):
 		return
-	if generator_version == 8 and int(first["seed_count"]) >= 12:
-		var variety_error := _accepted_variety_error(aggregation["summary"], String(first["cell"]).is_empty())
+	if generator_version == 8 and seeds.size() >= 12:
+		var variety_error := _variety_error_for_records(records, String(first["cell"]).is_empty(), String(first["seed_mode"]))
 		if not _expect(variety_error.is_empty(), variety_error):
 			return
 	print("TRACK_DIVERSITY_SWEEP_TEST PASS aggregate_shards=%d cases=%d" % [documents.size(), records.size()])
@@ -774,6 +974,35 @@ func _test_measurements() -> bool:
 	for definition: Dictionary in MODULES.definitions():
 		coverage["accepted_class_layouts"][String(definition["id"])] = 1
 	if not _expect(_accepted_variety_error(coverage, true).is_empty(), "all accepted classes and multiple shapes/structures must pass the coverage gate"):
+		return false
+	var holdout_blocks := V8_HOLDOUT.get_holdout_blocks()
+	var holdout_seen := {}
+	for block_index in holdout_blocks.size():
+		var expected_size := 8 if block_index == 4 else FULL_WINDOW_SIZE
+		if not _expect(holdout_blocks[block_index].size() == expected_size, "holdout blocks must be four 48-case gates plus eight invariant cases"):
+			return false
+		for seed: int in holdout_blocks[block_index]:
+			if not _expect(not holdout_seen.has(seed) and not (seed <= 47 or (seed >= 100000 and seed <= 100047)), "holdout seeds must be unique and disjoint from development windows"):
+				return false
+			holdout_seen[seed] = true
+	if not _expect(holdout_seen.size() == 200, "holdout fixture must contain 200 seeds"):
+		return false
+	var compact_gate := TIER_GATES["compact"]
+	var passing_full_cell := {
+		"cases": FULL_WINDOW_SIZE, "successes": FULL_WINDOW_SIZE,
+		"shape_clusters": compact_gate["shapes"], "distinct_structures": compact_gate["structures"],
+		"largest_structure_frequency": compact_gate["largest_structure"],
+		"distinct_semantic_counts": compact_gate["semantic_counts"], "both_turn_hands": compact_gate["both_hands"],
+		"repaired_layouts": 12, "curvature_classes": ["tight", "medium", "sweeper"],
+		"joint_distribution_bins": ["6-11|<0.35", "12-17|0.35-0.55", "18-23|>0.55"],
+		"room_shape_clusters": 3, "room_clusters_with_multiple_structures": 3,
+		"room_cluster_structure_counts": [2, 2, 2], "contract_failures": 0, "operation_cap_exceeded": 0,
+	}
+	var full_summary := {"cells": {"classic/compact": passing_full_cell}, "accepted_class_layouts": coverage["accepted_class_layouts"]}
+	if not _expect(_full_window_variety_error(full_summary, false).is_empty(), "a cell exactly meeting every Section 7 floor must pass"):
+		return false
+	passing_full_cell["shape_clusters"] = int(compact_gate["shapes"]) - 1
+	if not _expect(not _full_window_variety_error(full_summary, false).is_empty(), "the full gate must reject a tier-specific shape-floor miss"):
 		return false
 	var duplicate: Array[Dictionary] = synthetic.duplicate(true)
 	duplicate.append(synthetic[0].duplicate(true))
