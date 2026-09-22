@@ -34,7 +34,7 @@ func _run_test() -> void:
 	if not _expect(int(continuous["setup_straight_count"]) >= 2 and int(sampled["setup_straight_count"]) >= 2 and float(continuous["minimum_radius"]) >= 147.0 and float(continuous["minimum_nonlocal_distance"]) >= 320.0, "fixture should retain two setups, radius 147, and self-distance 320"):
 		return
 	var unavailable := REGISTRY.dispatch({"schema_version": 2, "generator_version": 8}, {"room_shape": &"el", "room_polygon": room_polygon, "room_model": room}, Callable(), Callable(V8_DEVELOPMENT_GENERATOR, "generate"))
-	if not _expect(unavailable.get("kind") == &"v8_not_implemented", "v8 should remain unavailable without an explicit development fixture"):
+	if not _expect(unavailable.get("kind") == &"invalid_identity", "v8 should reject an incomplete explicit request instead of inferring a room identity or falling back to v7"):
 		return
 	var dispatched := REGISTRY.dispatch(
 		{"schema_version": 2, "generator_version": 8},

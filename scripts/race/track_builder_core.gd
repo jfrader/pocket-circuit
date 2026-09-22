@@ -196,10 +196,15 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		if generator_selection.get("path") == GENERATOR_REGISTRY.LEGACY_PATH:
 			gen = TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), room_params)
 		else:
-			var room_model := TRACK_ROOM_MODEL.legacy_fixture(room_shape, WORLD_SCALE * room_scale)
+			var room_model: Dictionary
+			if StringName(generation_options.get("development_fixture", &"")) == V8_DEVELOPMENT_GENERATOR.CATALOG_KERNEL_FIXTURE:
+				room_model = TRACK_ROOM_MODEL.legacy_fixture(room_shape, WORLD_SCALE * room_scale)
+			else:
+				room_model = TRACK_ROOM_MODEL.generate_recipe(room_shape, int(generation_options.get("room_geometry_seed", -1)), length_tier)
 			if not bool(room_model.get("valid", false)):
 				push_error("TrackBuilderCore: %s" % String(room_model.get("error", "invalid v8 room model")))
 				return {}
+			room_polygon = room_model["outer"]
 			gen = GENERATOR_REGISTRY.dispatch(
 				generation_options,
 				{
@@ -224,6 +229,8 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 			spec["analytic_route"] = gen.get("analytic_route", {})
 			spec["analytic_validation"] = gen.get("analytic_validation", {})
 			spec["sampled_validation"] = gen.get("sampled_validation", {})
+			spec["room_model"] = gen.get("room_model", {})
+			spec["solver_search"] = gen.get("search", {})
 		spec["seed_obstacles"] = true
 		spec["seed"] = int(gen["seed"])
 		spec["requested_seed"] = seed
@@ -330,6 +337,8 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 	if spec.get("seed_obstacles", false):
 		root.set_meta("generated_track", true)
 		root.set_meta("requested_seed", int(spec["requested_seed"]))
+		root.set_meta("schema_version", int(spec.get("schema_version", 1)))
+		root.set_meta("generator_version", int(spec.get("generator_version", 7)))
 		root.set_meta("family", StringName(spec["family"]))
 		root.set_meta("realization", StringName(spec["realization"]))
 		root.set_meta("route_program", spec["route_program"])

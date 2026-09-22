@@ -83,6 +83,30 @@ static func instantiate(module_id: StringName, parameters: Dictionary, options: 
 	return module
 
 
+static func instantiate_closure_arc(radius: float, signed_turn: float) -> Dictionary:
+	if radius < MIN_CONSTRUCTION_RADIUS or radius > 1000.0 or absf(signed_turn) <= HEADING_TOLERANCE or absf(signed_turn) > PI + HEADING_TOLERANCE:
+		return _error("closure_parameter_domain", "A closure arc needs radius 180..1000 and a nonzero turn no greater than 180 degrees.")
+	var module_id := _corner_id_for_radius(radius)
+	var module_definition := definition(module_id)
+	var primitives: Array[Dictionary] = []
+	var pose := {"position": Vector2.ZERO, "heading": 0.0}
+	_append_arc(primitives, pose, radius, signed_turn)
+	var parameters := {
+		"radius": radius,
+		"angle_deg": rad_to_deg(absf(signed_turn)),
+		"hand": signf(signed_turn),
+		"closure": true,
+	}
+	var module := _describe_instance(module_definition, parameters, primitives, {"closure": true})
+	module["closure"] = true
+	var validation := validate_instance(module)
+	module["local_validation"] = validation
+	if not bool(validation.get("valid", false)):
+		return validation
+	module["ok"] = true
+	return module
+
+
 static func compose(instances: Array[Dictionary], entry_position: Vector2 = Vector2.ZERO, entry_heading: float = 0.0) -> Dictionary:
 	if instances.is_empty():
 		return _error("empty_cycle", "A route needs at least one module.")
@@ -297,6 +321,14 @@ static func _describe_instance(module_definition: Dictionary, parameters: Dictio
 		"finish_checker_s": length * 0.5 if module_definition["id"] == &"straight_setup" and bool(parameters.get("finish", false)) else -1.0,
 		"validation_hooks": [&"validate_instance", &"validate_join", &"validate_continuous", &"validate_sampled"],
 	}
+
+
+static func _corner_id_for_radius(radius: float) -> StringName:
+	if radius < 260.0:
+		return &"corner_tight"
+	if radius < 520.0:
+		return &"corner_medium"
+	return &"corner_sweeper"
 
 
 static func _validate_parameters(module_id: StringName, parameters: Dictionary) -> Dictionary:
