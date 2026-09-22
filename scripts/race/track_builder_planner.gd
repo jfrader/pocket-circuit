@@ -19,7 +19,8 @@ static func plan_obstacles(
 		moments: Dictionary,
 		roster: Array,
 		standard_route: PackedVector2Array,
-		shortcut_route: PackedVector2Array
+		shortcut_route: PackedVector2Array,
+		room_model: Dictionary = {}
 ) -> Array[Dictionary]:
 	var plan: Array[Dictionary] = []
 	if not bool(spec.get("obstacles_enabled", true)) or roster.is_empty():
@@ -69,6 +70,12 @@ static func plan_obstacles(
 				continue
 			if not GEOM.clear_of_occupied(candidate, footprint_size.length() * 0.5, occupied):
 				continue
+			if not GEOM.clear_of_points(candidate, centerline, HALF_WIDTH + lateral_extent + 1.0):
+				continue
+			# v8: also clear centerline tube globally (curve may make local lateral intrude elsewhere)
+			# and room_model exclusions + reserved passage lanes (doc §4.3, 5.3 assembled layout)
+			if not _obstacle_clears_room_model(candidate, footprint_size, shape_kind, rotation, room_model):
+				continue
 			var route_clearance := float(definition.get("clearance", OBSTACLE_ROUTE_CLEARANCE))
 			if not GEOM.line_sweep_clears_footprint(standard_route, candidate, footprint_size, shape_kind, rotation, route_clearance):
 				continue
@@ -91,6 +98,27 @@ static func plan_obstacles(
 		if not placed:
 			push_warning("TrackBuilderPlanner: skipped an obstacle that had no AI-safe placement")
 	return plan
+
+
+static func _obstacle_clears_room_model(candidate: Vector2, footprint_size: Vector2, shape_kind: StringName, rotation: float, room_model: Dictionary) -> bool:
+	if room_model.is_empty() or not bool(room_model.get("valid", false)):
+		return true
+	# solid exclusions (holes) must not contain obstacle
+	for hole: PackedVector2Array in room_model.get("solid_exclusions", []):
+		if Geometry2D.is_point_in_polygon(candidate, hole):
+			return false
+		var r := footprint_size.length() * 0.5
+		for s in 8:
+			var tp := candidate + Vector2.RIGHT.rotated(TAU * float(s) / 8.0) * r
+			if Geometry2D.is_point_in_polygon(tp, hole):
+				return false
+	# reserved passages must stay clear (full corridor + margin)
+	var pc := HALF_WIDTH + footprint_size.length() * 0.5 + 8.0
+	for passage: Dictionary in room_model.get("reserved_passages", []):
+		var lanes: PackedVector2Array = passage.get("lane_centers", PackedVector2Array())
+		if not GEOM.clear_of_points(candidate, lanes, pc):
+			return false
+	return true
 
 
 static func plan_hazard(theme: StringName, spec: Dictionary, centerline: PackedVector2Array, moments: Dictionary) -> Dictionary:

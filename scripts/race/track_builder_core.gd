@@ -91,7 +91,8 @@ static func _plan_generated_obstacles(
 		moments,
 		GENERATED_OBSTACLE_TYPES.get(theme, []),
 		_racing_line_points(centerline, moments, false),
-		_racing_line_points(centerline, moments, true)
+		_racing_line_points(centerline, moments, true),
+		spec.get("room_model", {}) if spec is Dictionary else {}
 	)
 
 
