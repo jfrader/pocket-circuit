@@ -498,7 +498,8 @@ static func build_edge_and_apron_decor(
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		stage: Callable = Callable()
+		stage: Callable = Callable(),
+		room_model: Dictionary = {}
 ) -> void:
 	var decor: Array = spec.get("edge_decor", [])
 	if decor.is_empty():
@@ -557,6 +558,9 @@ static func build_edge_and_apron_decor(
 			continue
 		if not TrackBuilderCore._clear_of_occupied(candidate, maxf(18.0, clearance_radius), occupied):
 			continue
+		if not is_flat:
+			if not TrackBuilderCore._placement_clears_room_model(candidate, clearance_radius, room_model):
+				continue
 		if is_flat:
 			var spr := Sprite2D.new()
 			spr.name = "EdgeDecor%03d" % placed

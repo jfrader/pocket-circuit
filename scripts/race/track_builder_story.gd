@@ -85,7 +85,7 @@ static func compose_generated_story(
 	await TrackBuilderCore._build_room_dressing(container, story, spec, centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied, stage)
 	if stage.is_valid():
 		await stage.call("Adding surface detail")
-	await TrackBuilderCore._build_edge_and_apron_decor(container, spec, centerline, room_polygon, gate_samples, occupied, stage)
+	await TrackBuilderCore._build_edge_and_apron_decor(container, spec, centerline, room_polygon, gate_samples, occupied, stage, room_model)
 	if stage.is_valid():
 		await stage.call("Preparing grip zones and hazards")
 	TrackBuilderCore._build_generated_surfaces(root, container, story, spec, moments, centerline, gate_samples)
