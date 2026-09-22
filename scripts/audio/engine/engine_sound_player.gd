@@ -183,7 +183,7 @@ func _ensure_player() -> bool:
 	_primed = false
 	_player = AudioStreamPlayer.new()
 	_player.name = "EngineVoicePlayer"
-	_player.bus = &"SFX"
+	_player.bus = &"Engine"
 	_player.stream = stream
 	_player.volume_db = SILENCE_DB
 	add_child(_player)

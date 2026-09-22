@@ -358,6 +358,11 @@ func show_settings() -> void:
 	_add_slider("Master", float(settings["master_volume"]), "master_volume")
 	_add_slider("Music", float(settings["music_volume"]), "music_volume")
 	_add_slider("SFX", float(settings["sfx_volume"]), "sfx_volume")
+	_add_slider("Engine", float(settings.get("engine_volume", settings["sfx_volume"])), "engine_volume")
+	_add_slider("Tyres", float(settings.get("tyre_volume", settings["sfx_volume"])), "tyre_volume")
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_AUTO
+	_scroll.mouse_filter = Control.MOUSE_FILTER_STOP
+	_scroll.follow_focus = true
 	_add_section("DISPLAY & COMFORT", "")
 	var fullscreen := CheckButton.new()
 	fullscreen.text = "Fullscreen"
@@ -632,6 +637,9 @@ func _clear_content() -> void:
 	_entrance_generation += 1
 	_save_error_back_action = Callable()
 	_button_focus_chain.clear()
+	_scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_scroll.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_scroll.follow_focus = false
 	_scroll.scroll_vertical = 0
 	_scroll.set_deferred("scroll_vertical", 0)
 	if _content_tween and _content_tween.is_valid():
@@ -991,7 +999,6 @@ func _grab_first_focus() -> void:
 		var button := node as BaseButton
 		if button and not button.is_queued_for_deletion() and not button.disabled and button.visible:
 			button.grab_focus()
-			_scroll.scroll_vertical = 0
 			return
 
 

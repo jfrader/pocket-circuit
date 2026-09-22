@@ -1132,8 +1132,8 @@ func _create_pause_overlay() -> void:
 	_pause_settings_panel = PanelContainer.new()
 	_pause_settings_panel.name = "PauseSettingsPanel"
 	_pause_settings_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.94), Color("4a8fb8")))
-	_pause_settings_panel.position = Vector2(320.0, 50.0)
-	_pause_settings_panel.size = Vector2(640.0, 620.0)
+	_pause_settings_panel.position = Vector2(320.0, 16.0)
+	_pause_settings_panel.size = Vector2(640.0, 688.0)
 	_pause_settings_panel.visible = false
 	_pause_overlay.add_child(_pause_settings_panel)
 	var settings_margin := MarginContainer.new()
@@ -1160,6 +1160,8 @@ func _create_pause_overlay() -> void:
 	_pause_settings_first_control = _add_pause_setting_slider(settings_column, "Master", "master_volume", float(settings.get("master_volume", 1.0)))
 	_add_pause_setting_slider(settings_column, "Music", "music_volume", float(settings.get("music_volume", 0.8)))
 	_add_pause_setting_slider(settings_column, "SFX", "sfx_volume", float(settings.get("sfx_volume", 0.9)))
+	_add_pause_setting_slider(settings_column, "Engine", "engine_volume", float(settings.get("engine_volume", settings.get("sfx_volume", 0.9))))
+	_add_pause_setting_slider(settings_column, "Tyres", "tyre_volume", float(settings.get("tyre_volume", settings.get("sfx_volume", 0.9))))
 	var comfort_heading := Label.new()
 	comfort_heading.text = "COMFORT"
 	comfort_heading.add_theme_font_size_override("font_size", 18)

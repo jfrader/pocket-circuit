@@ -102,7 +102,7 @@ func _ensure_player() -> bool:
 	_capacity = int(BUFFER_SECONDS * float(SAMPLE_RATE))
 	_player = AudioStreamPlayer.new()
 	_player.name = "DriftVoicePlayer"
-	_player.bus = &"SFX"
+	_player.bus = &"Tyre"
 	_player.stream = stream
 	_player.volume_db = MIX_DB
 	add_child(_player)
