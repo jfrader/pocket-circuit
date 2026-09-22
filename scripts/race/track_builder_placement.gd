@@ -7,11 +7,14 @@ static func placement_is_safe(
 		radius: float,
 		room_polygon: PackedVector2Array,
 		allowed_polygon: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> bool:
 	if not inside_polygon_with_radius(candidate, radius, room_polygon):
 		return false
 	if not inside_polygon_with_radius(candidate, radius, allowed_polygon):
+		return false
+	if not _placement_clears_room_model(candidate, radius, room_model):
 		return false
 	return TrackBuilderCore._clear_of_occupied(candidate, radius, occupied)
 
@@ -21,7 +24,8 @@ static func best_island_position(
 		radius: float,
 		room_polygon: PackedVector2Array,
 		island_polygon: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> Dictionary:
 	var bounds := TrackBuilderCore._polygon_bounds_rect(island_polygon)
 	var best_position := Vector2.ZERO
@@ -34,7 +38,7 @@ static func best_island_position(
 				bounds.size.x * (float(x) + 0.5) / 17.0,
 				bounds.size.y * (float(y) + 0.5) / 17.0
 			)
-			if not placement_is_safe(candidate, radius, room_polygon, island_polygon, occupied):
+			if not placement_is_safe(candidate, radius, room_polygon, island_polygon, occupied, room_model):
 				continue
 			var score := candidate.distance_squared_to(preferred)
 			if score < best_score:
@@ -49,7 +53,8 @@ static func best_offtrack_position(
 		room_polygon: PackedVector2Array,
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> Dictionary:
 	var bounds := TrackBuilderCore._polygon_bounds_rect(room_polygon)
 	var best_position := Vector2.ZERO
@@ -60,7 +65,7 @@ static func best_offtrack_position(
 				bounds.size.x * (float(x) + 0.5) / 25.0,
 				bounds.size.y * (float(y) + 0.5) / 17.0
 			)
-			if not trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
+			if not trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied, room_model):
 				continue
 			var score := candidate.distance_squared_to(preferred)
 			if score < best_score:
@@ -78,7 +83,8 @@ static func best_giant_position(
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		committed_racing_lines: Array[PackedVector2Array] = []
+		committed_racing_lines: Array[PackedVector2Array] = [],
+		room_model: Dictionary = {}
 ) -> Dictionary:
 	var bounds := TrackBuilderCore._polygon_bounds_rect(room_polygon)
 	var preferred := centerline[preferred_index]
@@ -94,7 +100,7 @@ static func best_giant_position(
 			var centerline_index := int(closest["index"])
 			var tangent_angle := TrackBuilderCore._sample_tangent(centerline, centerline_index).angle()
 			var rotation := tangent_angle - local_footprint_rotation if size.x >= size.y else tangent_angle - PI * 0.5 - local_footprint_rotation
-			if not giant_placement_is_safe(candidate, size, shape_kind, rotation + local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines):
+			if not giant_placement_is_safe(candidate, size, shape_kind, rotation + local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines, room_model):
 				continue
 			var score := candidate.distance_squared_to(preferred)
 			if score < best_score:
@@ -112,10 +118,13 @@ static func giant_placement_is_safe(
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		committed_racing_lines: Array[PackedVector2Array] = []
+		committed_racing_lines: Array[PackedVector2Array] = [],
+		room_model: Dictionary = {}
 ) -> bool:
 	var bounding_radius := size.length() * 0.5
 	if not TrackBuilderCore._clear_of_occupied(candidate, bounding_radius, occupied):
+		return false
+	if not _placement_clears_giant_room_model(candidate, size, shape_kind, rotation, room_model):
 		return false
 	if shape_kind == &"circle":
 		var radius := maxf(size.x, size.y) * 0.5
@@ -180,9 +189,12 @@ static func trackside_placement_is_safe(
 		room_polygon: PackedVector2Array,
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> bool:
 	if not inside_polygon_with_radius(candidate, radius, room_polygon):
+		return false
+	if not _placement_clears_room_model(candidate, radius, room_model):
 		return false
 	if TrackBuilderCore._distance_to_centerline(candidate, centerline) < TrackBuilderCore.HALF_WIDTH + radius + TrackBuilderCore.APRON_COLLIDER_CLEARANCE:
 		return false
@@ -202,7 +214,8 @@ static func best_trackside_position(
 		outer_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> Dictionary:
 	var best_position := Vector2.ZERO
 	var best_index := 0
@@ -213,7 +226,7 @@ static func best_trackside_position(
 			var side := 1.0 if attempt % 2 == 0 else -1.0
 			var offset := TrackBuilderCore.HALF_WIDTH + radius + TrackBuilderCore.APRON_COLLIDER_CLEARANCE + float(attempt / 2) * 8.0
 			var candidate := centerline[index] + outward * side * offset
-			if not trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
+			if not trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied, room_model):
 				continue
 			var score := float(TrackBuilderCore._cyclic_index_distance(index, posmod(preferred_index, centerline.size()), centerline.size())) + float(attempt) * 0.01
 			if score < best_score:
@@ -255,6 +268,80 @@ static func clear_of_recovery_lanes(
 			return false
 	return true
 
+
+# Room-model-aware safety for v8 (solid exclusions + reserved passages per doc §4.3).
+# Empty model (v7) or invalid produces identical behaviour to pre-change.
+static func _disk_clears_exclusion(candidate: Vector2, radius: float, exclusion: PackedVector2Array) -> bool:
+	if exclusion.is_empty():
+		return true
+	if Geometry2D.is_point_in_polygon(candidate, exclusion):
+		return false
+	for s in 8:
+		var tp := candidate + Vector2.RIGHT.rotated(TAU * float(s) / 8.0) * radius
+		if Geometry2D.is_point_in_polygon(tp, exclusion):
+			return false
+	for pt: Vector2 in exclusion:
+		if pt.distance_to(candidate) <= radius:
+			return false
+	return true
+
+
+static func _oriented_rect_clears_exclusion(center: Vector2, size: Vector2, rotation: float, poly: PackedVector2Array) -> bool:
+	if poly.is_empty():
+		return true
+	var half_size := size * 0.5
+	var corners := [
+		Vector2(-half_size.x, -half_size.y),
+		Vector2(half_size.x, -half_size.y),
+		Vector2(half_size.x, half_size.y),
+		Vector2(-half_size.x, half_size.y),
+	]
+	for c: Vector2 in corners:
+		var wp: Vector2 = center + c.rotated(rotation)
+		if Geometry2D.is_point_in_polygon(wp, poly):
+			return false
+	for pt: Vector2 in poly:
+		if point_to_oriented_rect_distance(pt, center, size, rotation) <= 0.0:
+			return false
+	return true
+
+
+static func _placement_clears_room_model(candidate: Vector2, radius: float, room_model: Dictionary) -> bool:
+	if room_model.is_empty() or not bool(room_model.get("valid", false)):
+		return true
+	for hole: PackedVector2Array in room_model.get("solid_exclusions", []):
+		if not _disk_clears_exclusion(candidate, radius, hole):
+			return false
+	# Use reserved passage lane centers (at portals) as must-clear points at track width.
+	# (Full corridor protection for passages is provided by centerline distance checks;
+	# this ensures the room_model's reserved_passages data affects safety per §4.3.)
+	var passage_clearance := TrackBuilderCore.HALF_WIDTH + radius + TrackBuilderCore.APRON_COLLIDER_CLEARANCE
+	for passage: Dictionary in room_model.get("reserved_passages", []):
+		var lanes: PackedVector2Array = passage.get("lane_centers", PackedVector2Array())
+		if not TrackBuilderCore._clear_of_points(candidate, lanes, passage_clearance):
+			return false
+	return true
+
+
+static func _placement_clears_giant_room_model(candidate: Vector2, size: Vector2, shape_kind: StringName, rotation: float, room_model: Dictionary) -> bool:
+	if room_model.is_empty() or not bool(room_model.get("valid", false)):
+		return true
+	for hole: PackedVector2Array in room_model.get("solid_exclusions", []):
+		if shape_kind == &"circle":
+			var r := maxf(size.x, size.y) * 0.5
+			if not _disk_clears_exclusion(candidate, r, hole):
+				return false
+		else:
+			if not _oriented_rect_clears_exclusion(candidate, size, rotation, hole):
+				return false
+	# passages via bounding radius proxy
+	var br := size.length() * 0.5
+	var passage_clear := TrackBuilderCore.HALF_WIDTH + br + TrackBuilderCore.APRON_COLLIDER_CLEARANCE
+	for passage: Dictionary in room_model.get("reserved_passages", []):
+		var lanes: PackedVector2Array = passage.get("lane_centers", PackedVector2Array())
+		if not TrackBuilderCore._clear_of_points(candidate, lanes, passage_clear):
+			return false
+	return true
 
 
 static func asset_radius(texture_path: String, fallback_radius: float) -> float:
