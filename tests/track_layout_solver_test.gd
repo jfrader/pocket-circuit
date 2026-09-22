@@ -4,6 +4,8 @@ const SOLVER := preload("res://scripts/race/track_layout_solver.gd")
 const GENERATOR := preload("res://scripts/race/track_v8_development_generator.gd")
 const ROOM_MODEL := preload("res://scripts/race/track_room_model.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
+const MODULES := preload("res://scripts/race/track_module_catalog.gd")
+const SIGNATURES := preload("res://scripts/race/track_layout_signatures.gd")
 
 const CASES: Array[Dictionary] = [
 	{"room": &"classic", "tier": &"standard", "seed": 928},
@@ -16,6 +18,8 @@ func _initialize() -> void:
 
 
 func _run_test() -> void:
+	if not _test_signatures():
+		return
 	for test_case: Dictionary in CASES:
 		var started := Time.get_ticks_usec()
 		var generated := GENERATOR.generate_route(test_case["room"], test_case["tier"], int(test_case["seed"]))
@@ -111,6 +115,37 @@ func _points_digest(points: PackedVector2Array) -> String:
 	context.start(HashingContext.HASH_SHA256)
 	context.update(points.to_byte_array())
 	return context.finish().hex_encode()
+
+
+func _test_signatures() -> bool:
+	var parameters := {"radius": 240.0, "depth_1": 600.0, "depth_2": 800.0, "width": 500.0, "hand": 1.0}
+	var compound := MODULES.instantiate(&"switchback", parameters)
+	var route := MODULES.compose([compound])
+	var signature := SIGNATURES.describe(route)
+	if not _expect(int(signature["semantic_count"]) == 6 and String(signature["structural"]).contains("R"), "zero-net-turn compounds must expand into their internal turn and straight arrangement"):
+		return false
+	for mirror in [false, true]:
+		for reverse in [false, true]:
+			var transformed := MODULES.compose([MODULES.instantiate(&"switchback", parameters, {"mirror": mirror, "reverse": reverse})], Vector2(170, -230), 0.7)
+			if not _expect(SIGNATURES.describe(transformed) == signature, "signatures must discount mirror, reversal, rotation and translation"):
+				return false
+	var expanded: Array[Dictionary] = []
+	for primitive: Dictionary in compound["primitives"]:
+		if primitive["kind"] == &"line":
+			expanded.append(MODULES.instantiate(&"straight_link", {"length": float(primitive["length"]) * 0.5}))
+			expanded.append(MODULES.instantiate(&"straight_link", {"length": float(primitive["length"]) * 0.5}))
+		else:
+			expanded.append(MODULES.instantiate_closure_arc(float(primitive["radius"]), float(primitive["signed_turn"])))
+	if not _expect(SIGNATURES.describe(MODULES.compose(expanded)) == signature, "equivalent primitive composition and artificial straight splits must not earn new arrangements"):
+		return false
+	var rotated: Array = (route["primitives"] as Array).duplicate()
+	rotated.append(rotated.pop_front())
+	if not _expect(SIGNATURES.describe({"primitives": rotated}) == signature, "canonical signatures must merge runs across a cyclic seam"):
+		return false
+	var opening := {"inner_radius": 240.0, "outer_radius": 360.0, "angle_deg": 90.0, "split": 0.5, "hand": 1.0}
+	var original := MODULES.compose([MODULES.instantiate(&"corner_opening", opening)])
+	var reversed := MODULES.compose([MODULES.instantiate(&"corner_opening", opening, {"reverse": true})])
+	return _expect(SIGNATURES.describe(original) == SIGNATURES.describe(reversed), "profile canonicalization must exchange opening and tightening under reversal")
 
 
 func _expect(condition: bool, message: String) -> bool:
