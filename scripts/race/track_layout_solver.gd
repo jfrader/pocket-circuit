@@ -5,6 +5,7 @@ const MODULES := preload("res://scripts/race/track_module_catalog.gd")
 const ROOM_MODEL := preload("res://scripts/race/track_room_model.gd")
 const VALIDATION := preload("res://scripts/race/track_layout_validation.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const SIGNATURES := preload("res://scripts/race/track_layout_signatures.gd")
 
 const MAX_GRAPH_CANDIDATES := 24
 const MAX_PLACEMENT_EXPANSIONS_PER_GRAPH := 2048
@@ -73,6 +74,7 @@ static func solve(request: Dictionary) -> Dictionary:
 			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
 			continue
 		var completed_graph := _complete_cycle(graph, route)
+		var signatures := SIGNATURES.describe(route)
 		var reserved_room := room.duplicate(true)
 		reserved_room["reserved_passages"] = assignments["portal_traversals"]
 		return {
@@ -98,8 +100,8 @@ static func solve(request: Dictionary) -> Dictionary:
 				"closure_heading_residual": float(search["closure_heading_residual"]),
 			},
 			"search": counters.duplicate(true),
-			"structural_signature": _structural_signature(route),
-			"profile_signature": _profile_signature(route),
+			"structural_signature": signatures["structural"],
+			"profile_signature": signatures["profile"],
 		}
 	var reason := "No graph candidate produced a valid closed route within %d graphs, %d placements, %d closures, and %d narrow-phase operations (last rejection: %s)." % [int(counters["graph_candidates"]), int(counters["placement_expansions"]), int(counters["closure_candidates"]), int(counters["narrow_phase_operations"]), counters["last_rejection"]]
 	return _failure(identity, &"candidate_search", &"no_feasible_layout", reason, counters)
@@ -653,23 +655,6 @@ static func _complete_cycle(graph: Dictionary, route: Dictionary) -> Array[Dicti
 			slots[index]["module_id"] = modules[index]["id"]
 			slots[index]["parameters"] = (modules[index]["parameters"] as Dictionary).duplicate(true)
 	return slots
-
-
-static func _structural_signature(route: Dictionary) -> String:
-	var tokens := PackedStringArray()
-	for module: Dictionary in route["modules"]:
-		if absf(float(module["signed_turn"])) <= 0.0001:
-			tokens.append("S")
-		else:
-			tokens.append("L" if float(module["signed_turn"]) > 0.0 else "R")
-	return ".".join(tokens)
-
-
-static func _profile_signature(route: Dictionary) -> String:
-	var tokens := PackedStringArray()
-	for module: Dictionary in route["modules"]:
-		tokens.append(String(module["id"]))
-	return ".".join(tokens)
 
 
 static func _ring_bounds(ring: PackedVector2Array) -> Rect2:
