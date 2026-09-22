@@ -136,7 +136,8 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int, g
 	if prepared.is_empty():
 		return {"scene": null, "seed": seed}
 	var root := create_layout_root(prepared)
-	_build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], theme)
+	var build_room_model: Dictionary = prepared.get("room_model", {}) if prepared is Dictionary else {}
+	_build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], theme, Callable(), build_room_model)
 	_mark_owned(root)
 	var packed := PackedScene.new()
 	packed.pack(root)
@@ -300,7 +301,8 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		var moments := _analyze_track_moments(centerline, gate_samples)
 		spec["obstacle_plan"] = _plan_generated_obstacles(theme, spec, centerline, gate_samples, moments)
 		spec["hazard_plan"] = _plan_generated_hazard(theme, spec, centerline, moments)
-	var prepared := {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed}
+	var prepared_room_model: Dictionary = spec.get("room_model", {}) if spec is Dictionary else {}
+	var prepared := {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed, "room_model": prepared_room_model}
 	prepared["racing_line_metrics"] = racing_line_metrics_from_prepared(prepared)
 	return prepared
 
@@ -381,7 +383,8 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 
 
 static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable) -> void:
-	await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage)
+	var runtime_room_model: Dictionary = prepared.get("room_model", {}) if prepared is Dictionary else {}
+	await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage, runtime_room_model)
 
 
 static func _sample_centerline(controls: Variant) -> PackedVector2Array:
@@ -403,7 +406,8 @@ static func _authoritative_centerline(spec: Dictionary) -> PackedVector2Array:
 static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
 	return TRACK_BUILDER_GEOMETRY.corridor_edges(centerline)
 
-static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable()) -> void:
+static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
+	# room_model flows from prepare_layout/assembly for v8 (v7 passes {}); not forwarded to scene builder in this step
 	await TRACK_BUILDER_SCENE.build(root, spec, centerline, edges, room_polygon, theme, stage)
 
 
@@ -602,9 +606,11 @@ static func _compose_generated_story(
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		moments: Dictionary,
-		stage: Callable = Callable()
+		stage: Callable = Callable(),
+		room_model: Dictionary = {}
 ) -> void:
-	await TRACK_BUILDER_STORY.compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, moments, stage)
+	var story_room_model: Dictionary = room_model if not room_model.is_empty() else (spec.get("room_model", {}) if spec is Dictionary else {})
+	await TRACK_BUILDER_STORY.compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, moments, stage, story_room_model)
 
 
 static func _analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array) -> Dictionary:
@@ -678,9 +684,11 @@ static func _build_island_story(
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		stage: Callable = Callable()
+		stage: Callable = Callable(),
+		room_model: Dictionary = {}
 ) -> void:
-	await TRACK_BUILDER_STORY.build_island_story(parent, story, spec, centerline, inner_loop, room_polygon, gate_samples, occupied, stage)
+	var island_room_model: Dictionary = room_model if not room_model.is_empty() else (spec.get("room_model", {}) if spec is Dictionary else {})
+	await TRACK_BUILDER_STORY.build_island_story(parent, story, spec, centerline, inner_loop, room_polygon, gate_samples, occupied, stage, island_room_model)
 
 
 static func _bounded_quantity_count(quantity: StringName, requested: int) -> int:
@@ -864,9 +872,10 @@ static func _placement_is_safe(
 		radius: float,
 		room_polygon: PackedVector2Array,
 		allowed_polygon: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> bool:
-	return TRACK_BUILDER_PLACEMENT.placement_is_safe(candidate, radius, room_polygon, allowed_polygon, occupied)
+	return TRACK_BUILDER_PLACEMENT.placement_is_safe(candidate, radius, room_polygon, allowed_polygon, occupied, room_model)
 
 
 static func _best_island_position(
@@ -874,9 +883,10 @@ static func _best_island_position(
 		radius: float,
 		room_polygon: PackedVector2Array,
 		island_polygon: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> Dictionary:
-	return TRACK_BUILDER_PLACEMENT.best_island_position(preferred, radius, room_polygon, island_polygon, occupied)
+	return TRACK_BUILDER_PLACEMENT.best_island_position(preferred, radius, room_polygon, island_polygon, occupied, room_model)
 
 
 static func _best_offtrack_position(
@@ -885,9 +895,10 @@ static func _best_offtrack_position(
 		room_polygon: PackedVector2Array,
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> Dictionary:
-	return TRACK_BUILDER_PLACEMENT.best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied)
+	return TRACK_BUILDER_PLACEMENT.best_offtrack_position(preferred, radius, room_polygon, centerline, gate_samples, occupied, room_model)
 
 
 static func _best_giant_position(
@@ -899,9 +910,10 @@ static func _best_giant_position(
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		committed_racing_lines: Array[PackedVector2Array] = []
+		committed_racing_lines: Array[PackedVector2Array] = [],
+		room_model: Dictionary = {}
 ) -> Dictionary:
-	return TRACK_BUILDER_PLACEMENT.best_giant_position(preferred_index, size, shape_kind, local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines)
+	return TRACK_BUILDER_PLACEMENT.best_giant_position(preferred_index, size, shape_kind, local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines, room_model)
 
 
 static func _giant_placement_is_safe(
@@ -913,9 +925,10 @@ static func _giant_placement_is_safe(
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
 		occupied: Array[Dictionary],
-		committed_racing_lines: Array[PackedVector2Array] = []
+		committed_racing_lines: Array[PackedVector2Array] = [],
+		room_model: Dictionary = {}
 ) -> bool:
-	return TRACK_BUILDER_PLACEMENT.giant_placement_is_safe(candidate, size, shape_kind, rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines)
+	return TRACK_BUILDER_PLACEMENT.giant_placement_is_safe(candidate, size, shape_kind, rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines, room_model)
 
 
 static func _committed_lines_clear_giant(
@@ -957,9 +970,10 @@ static func _trackside_placement_is_safe(
 		room_polygon: PackedVector2Array,
 		centerline: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> bool:
-	return TRACK_BUILDER_PLACEMENT.trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied)
+	return TRACK_BUILDER_PLACEMENT.trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied, room_model)
 
 
 static func _best_trackside_position(
@@ -969,9 +983,10 @@ static func _best_trackside_position(
 		outer_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		room_model: Dictionary = {}
 ) -> Dictionary:
-	return TRACK_BUILDER_PLACEMENT.best_trackside_position(preferred_index, radius, centerline, outer_loop, room_polygon, gate_samples, occupied)
+	return TRACK_BUILDER_PLACEMENT.best_trackside_position(preferred_index, radius, centerline, outer_loop, room_polygon, gate_samples, occupied, room_model)
 
 
 static func _inside_polygon_with_radius(point: Vector2, radius: float, polygon: PackedVector2Array) -> bool:
