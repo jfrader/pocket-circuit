@@ -20,7 +20,7 @@ func _ready() -> void:
 	_headless = DisplayServer.get_name().to_lower() == "headless"
 	_player = AudioStreamPlayer2D.new()
 	_player.name = "LoopPlayer"
-	_player.bus = &"SFX"
+	_player.bus = &"Tyre"
 	_player.max_distance = _max_distance
 	_player.attenuation = 1.25
 	_player.panning_strength = 1.0

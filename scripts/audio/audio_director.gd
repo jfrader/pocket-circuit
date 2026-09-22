@@ -17,9 +17,9 @@ const ChampionshipCatalogScript := preload("res://data/championship/catalog.gd")
 ## tyre further.
 const ENGINE_SLIDE_DUCK_DB := -1.5
 ## Settled tyre level. A slide sits under the engine; a small steer stays silent.
-const TYRE_LEVEL_CEILING := 0.16
-const TYRE_RISE_PER_SEC := 0.12
-const TYRE_FALL_PER_SEC := 0.45
+const TYRE_LEVEL_CEILING := 0.40
+const TYRE_RISE_PER_SEC := 0.55
+const TYRE_FALL_PER_SEC := 0.8
 const TYRE_PLAY_THRESHOLD := 0.045
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
@@ -132,6 +132,8 @@ func _exit_tree() -> void:
 func ensure_buses() -> void:
 	_ensure_bus(&"Music")
 	_ensure_bus(&"SFX")
+	_ensure_bus(&"Engine")
+	_ensure_bus(&"Tyre")
 	_ensure_master_limiter()
 
 ## The music loop and the engine loop each respect their own ceiling, but they
@@ -411,7 +413,7 @@ func _build_players() -> void:
 
 	_engine_player = AudioStreamPlayer.new()
 	_engine_player.name = "EnginePlayer"
-	_engine_player.bus = &"SFX"
+	_engine_player.bus = &"Engine"
 	_engine_player.stream = _engine_loop
 	_engine_player.volume_db = SILENCE_DB
 	add_child(_engine_player)
@@ -428,7 +430,7 @@ func _build_players() -> void:
 	# never reached the speakers in play, which is why only enemies were audible.
 	_local_tyre_player = AudioStreamPlayer.new()
 	_local_tyre_player.name = "LocalTyreVoice"
-	_local_tyre_player.bus = &"SFX"
+	_local_tyre_player.bus = &"Tyre"
 	_local_tyre_player.volume_db = SILENCE_DB
 	add_child(_local_tyre_player)
 
@@ -642,7 +644,7 @@ func _update_drift(_delta: float) -> void:
 func _tyre_target_level(tyre_state: Dictionary) -> float:
 	var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
 	if bool(tyre_state["sliding"]):
-		return clampf(0.05 + screech * 0.11, 0.0, TYRE_LEVEL_CEILING)
+		return clampf(0.18 + screech * 0.22, 0.0, TYRE_LEVEL_CEILING)
 	var cornering := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
 	return clampf(maxf(cornering - 0.72, 0.0) * 0.04, 0.0, 0.04)
 
@@ -758,11 +760,11 @@ func get_engine_voice_signature() -> String:
 
 func _ensure_bus(bus_name: StringName) -> int:
 	var bus_index := AudioServer.get_bus_index(bus_name)
-	if bus_index >= 0:
-		return bus_index
-	AudioServer.add_bus()
-	bus_index = AudioServer.bus_count - 1
-	AudioServer.set_bus_name(bus_index, bus_name)
+	if bus_index < 0:
+		AudioServer.add_bus()
+		bus_index = AudioServer.bus_count - 1
+		AudioServer.set_bus_name(bus_index, bus_name)
+	AudioServer.set_bus_send(bus_index, &"Master")
 	return bus_index
 
 func _make_runtime_loop(source: AudioStream) -> AudioStream:

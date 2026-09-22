@@ -140,6 +140,8 @@ func confirm_new_championship() -> bool:
 		"master_volume": _save_data["master_volume"],
 		"music_volume": _save_data["music_volume"],
 		"sfx_volume": _save_data["sfx_volume"],
+		"engine_volume": _save_data["engine_volume"],
+		"tyre_volume": _save_data["tyre_volume"],
 		"fullscreen": _save_data["fullscreen"],
 		"reduced_camera_shake": _save_data["reduced_camera_shake"],
 		"reduced_motion": _save_data["reduced_motion"],
@@ -927,7 +929,7 @@ func update_setting(key: String, value: Variant) -> bool:
 				candidate[key] = value
 			else:
 				return false
-		"master_volume", "music_volume", "sfx_volume":
+		"master_volume", "music_volume", "sfx_volume", "engine_volume", "tyre_volume":
 			if value is float or value is int:
 				candidate[key] = clampf(float(value), 0.0, 1.0)
 			else:
@@ -1032,6 +1034,8 @@ func _apply_settings() -> void:
 	_apply_bus_volume("Master", float(_save_data["master_volume"]))
 	_apply_bus_volume("Music", float(_save_data["music_volume"]))
 	_apply_bus_volume("SFX", float(_save_data["sfx_volume"]))
+	_apply_bus_volume("Engine", float(_save_data["engine_volume"]))
+	_apply_bus_volume("Tyre", float(_save_data["tyre_volume"]))
 	if DisplayServer.get_name().to_lower() != "headless":
 		var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if bool(_save_data["fullscreen"]) else DisplayServer.WINDOW_MODE_WINDOWED
 		DisplayServer.window_set_mode(mode)

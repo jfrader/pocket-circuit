@@ -51,7 +51,9 @@ func _run_test() -> void:
 	director.ensure_buses()
 	if not _expect(AudioServer.bus_count == bus_count, "repeated bus setup should be idempotent"):
 		return
-	if not _expect(_bus_occurrences(&"Music") == 1 and _bus_occurrences(&"SFX") == 1, "Music and SFX buses should each exist exactly once"):
+	if not _expect(_bus_occurrences(&"Music") == 1 and _bus_occurrences(&"SFX") == 1 and _bus_occurrences(&"Engine") == 1 and _bus_occurrences(&"Tyre") == 1, "Music, SFX, Engine, and Tyre buses should each exist exactly once"):
+		return
+	if not _expect(AudioServer.get_bus_send(AudioServer.get_bus_index(&"Engine")) == &"Master" and AudioServer.get_bus_send(AudioServer.get_bus_index(&"Tyre")) == &"Master", "Engine and Tyre must not sit under SFX"):
 		return
 	var master := AudioServer.get_bus_index(&"Master")
 	var master_limiter_count := 0
@@ -150,11 +152,15 @@ func _run_test() -> void:
 	if not _expect(local_tyre != null and local_tyre.volume_db <= -40.0, "one frame of steer must not open the tyre loop, got %.1f dB" % local_tyre.volume_db):
 		return
 	director.call("_update_drift", 4.0)
+	if not _expect(local_tyre.bus == &"Tyre", "the local tyre voice must use the Tyre bus, not SFX"):
+		return
+	if not _expect((director.get_node("EnginePlayer") as AudioStreamPlayer).bus == &"Engine", "the engine voice must use the Engine bus, not SFX"):
+		return
 	if not _expect(local_tyre.stream is AudioStreamWAV, "the local car must play the same tyre loop rivals use"):
 		return
 	if not _expect(not local_tyre.stream is AudioStreamGenerator, "the local tyre voice must not be an AudioStreamGenerator"):
 		return
-	if not _expect(local_tyre.volume_db < -12.0 and local_tyre.volume_db > -28.0, "a held slide should be subtle, got %.1f dB" % local_tyre.volume_db):
+	if not _expect(local_tyre.volume_db < -6.0 and local_tyre.volume_db > -16.0, "a held slide should be audible and under the old blast, got %.1f dB" % local_tyre.volume_db):
 		return
 	local_car.free()
 	if not _expect(director.play_sfx(&"impact", 0.9), "a prepared car should play its generated crash"):
