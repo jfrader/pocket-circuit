@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
+- Your own tyres now use the same loop as rival cars.
 - Tyre sound now follows the same drift and slide state as skid marks, stays present through ordinary steering, changes character with the room surface, and comes from nearby rival cars as positional audio.
 - Tyre scrub is quieter in ordinary corners and resolves into a rising, resonant squeal during a full slide instead of broadband hiss.
 - Fixed false "WRONG WAY" warnings and the resulting teleport reset when driving on the open apron beside a folded circuit. Wrong-way is now a warning only — the car is never reset for it.

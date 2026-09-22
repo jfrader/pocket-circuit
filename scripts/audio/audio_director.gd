@@ -42,6 +42,7 @@ var _engine_player: AudioStreamPlayer
 var _engine_voice: EngineSoundPlayer
 ## Continuous tyre scrub for the local car, driven by its slip angle.
 var _drift_voice: DriftSoundPlayer
+var _local_tyre_player: AudioStreamPlayer
 ## Positional WAV-loop voices for AI and remote cars. The local car alone keeps
 ## the per-sample generator above.
 var _positional_tyre_emitters: Array[Node] = []
@@ -113,6 +114,7 @@ func _exit_tree() -> void:
 		_engine_voice.stop()
 	if is_instance_valid(_drift_voice):
 		_drift_voice.stop()
+	_stop_local_tyre()
 	_clear_positional_tyre_emitters()
 	for player: AudioStreamPlayer in _sfx_players:
 		if is_instance_valid(player):
@@ -285,6 +287,7 @@ func clear_local_vehicle() -> void:
 		_engine_voice.stop()
 	if is_instance_valid(_drift_voice):
 		_drift_voice.stop()
+	_stop_local_tyre()
 	_clear_positional_tyre_emitters()
 
 
@@ -414,6 +417,14 @@ func _build_players() -> void:
 	_drift_voice = DriftSoundPlayerScript.new()
 	_drift_voice.name = "DriftVoice"
 	add_child(_drift_voice)
+
+	# The local car uses the same looping WAV rivals use. The generator voice
+	# never reached the speakers in play, which is why only enemies were audible.
+	_local_tyre_player = AudioStreamPlayer.new()
+	_local_tyre_player.name = "LocalTyreVoice"
+	_local_tyre_player.bus = &"SFX"
+	_local_tyre_player.volume_db = SILENCE_DB
+	add_child(_local_tyre_player)
 
 	for index in SFX_PLAYER_COUNT:
 		var player := AudioStreamPlayer.new()
@@ -599,28 +610,58 @@ func get_boost_voice_signature() -> String:
 
 ## Drives the continuous scrub from the local car's slip. Independent of the
 ## engine voice, so a drift still sounds if the engine fell back to its loop.
-func _update_drift(delta: float) -> void:
+func _update_drift(_delta: float) -> void:
 	if not is_instance_valid(_drift_voice):
 		return
 	if not is_instance_valid(_local_vehicle) or _race_paused:
 		_drift_voice.stop()
+		_stop_local_tyre()
 		if is_instance_valid(_engine_voice):
 			_engine_voice.set_duck_db(0.0)
 		return
 	if not _local_vehicle.has_method("get_tyre_state"):
 		_drift_voice.stop()
+		_stop_local_tyre()
 		if is_instance_valid(_engine_voice):
 			_engine_voice.set_duck_db(0.0)
 		return
 	var tyre_state: Dictionary = _local_vehicle.call("get_tyre_state")
 	if is_instance_valid(_engine_voice):
 		_engine_voice.set_duck_db(ENGINE_SLIDE_DUCK_DB if bool(tyre_state["sliding"]) else 0.0)
-	var scrub := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
+	# Rivals are audible because they play a looping WAV. The local generator
+	# was a different player and did not come through. Same stream, no distance
+	# cut, no -7 dB rival trim.
+	_drift_voice.stop()
+	_drive_local_tyre(tyre_state, maxf(0.0, float(_local_vehicle.get("speed"))))
+
+
+func _drive_local_tyre(tyre_state: Dictionary, speed: float) -> void:
+	if not is_instance_valid(_local_tyre_player):
+		return
+	var cornering := clampf(float(tyre_state["cornering"]), 0.0, 1.0)
 	var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
-	var speed := maxf(0.0, float(_local_vehicle.get("speed")))
-	var grip := float(tyre_state["grip"])
-	var surface_profile: Dictionary = TyreSurfaceProfilesScript.profile_for(tyre_state["surface"])
-	_drift_voice.set_state(scrub, screech, clampf(speed / _vehicle_max_speed, 0.0, 1.0), grip, surface_profile, delta)
+	var level := maxf(cornering * 0.62, screech)
+	if level <= 0.01:
+		_stop_local_tyre()
+		return
+	var profile: Dictionary = TyreSurfaceProfilesScript.profile_for(tyre_state["surface"])
+	var stream := _tyre_loop_for(profile)
+	if _local_tyre_player.stream != stream:
+		_local_tyre_player.stop()
+		_local_tyre_player.stream = stream
+	var max_speed := _max_speed_for(_local_vehicle)
+	var speed_ratio := clampf(speed / max_speed, 0.0, 1.0)
+	_local_tyre_player.volume_db = linear_to_db(clampf(level, 0.01, 1.0))
+	_local_tyre_player.pitch_scale = clampf(0.80 + speed_ratio * 0.24 + screech * 0.12, 0.65, 1.5)
+	if not _headless and not _local_tyre_player.playing:
+		_local_tyre_player.play()
+
+
+func _stop_local_tyre() -> void:
+	if not is_instance_valid(_local_tyre_player):
+		return
+	_local_tyre_player.stop()
+	_local_tyre_player.volume_db = SILENCE_DB
 
 
 func _update_positional_tyres() -> void:
