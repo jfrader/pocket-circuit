@@ -4,6 +4,8 @@ const ENGINE_LOOP := preload("res://assets/audio/engine_loop.ogg")
 const RaceMusicPlan := preload("res://scripts/audio/race_music_plan.gd")
 const EngineSoundPlayerScript := preload("res://scripts/audio/engine/engine_sound_player.gd")
 const EngineRecipeLibraryScript := preload("res://scripts/audio/engine/engine_recipe_library.gd")
+const EngineLoopGeneratorScript := preload("res://scripts/audio/engine/engine_loop_generator.gd")
+const EngineDrivetrainModelScript := preload("res://scripts/audio/engine/engine_drivetrain_model.gd")
 const DriftSoundPlayerScript := preload("res://scripts/audio/sfx/drift_sound_player.gd")
 const TyreSurfaceProfilesScript := preload("res://scripts/audio/sfx/tyre_surface_profiles.gd")
 const TyreLoopGeneratorScript := preload("res://scripts/audio/sfx/tyre_loop_generator.gd")
@@ -21,6 +23,10 @@ const TYRE_LEVEL_CEILING := 0.40
 const TYRE_RISE_PER_SEC := 0.55
 const TYRE_FALL_PER_SEC := 0.8
 const TYRE_PLAY_THRESHOLD := 0.045
+const ENGINE_EMITTER_LIMIT := 3
+const ENGINE_EMITTER_INTERVAL := 0.05
+const ENGINE_MAX_DISTANCE := 1400.0
+const ENGINE_VOICE_TRIM_DB := -6.0
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
 const PAUSED_MUSIC_DB := -9.0
@@ -52,6 +58,9 @@ var _local_tyre_level := 0.0
 ## Positional WAV-loop voices for AI and remote cars. The local car alone keeps
 ## the per-sample generator above.
 var _positional_tyre_emitters: Array[Node] = []
+var _positional_engine_emitters: Array[Node] = []
+var _engine_emitter_models: Dictionary = {}
+var _engine_emitter_clock := 0.0
 var _tyre_loop_streams: Dictionary = {}
 ## Generated one-shots keyed by SFX name: the global interface blips at boot,
 ## plus the current car's crash and boost on vehicle handoff.
@@ -106,6 +115,11 @@ func _process(delta: float) -> void:
 	_update_engine(delta)
 	_update_drift(delta)
 	_update_positional_tyres()
+	_engine_emitter_clock += delta
+	if _engine_emitter_clock >= ENGINE_EMITTER_INTERVAL:
+		var step := _engine_emitter_clock
+		_engine_emitter_clock = 0.0
+		_update_positional_engines(step)
 	_update_live_volume()
 	_update_live_rotation(delta)
 
@@ -121,7 +135,7 @@ func _exit_tree() -> void:
 	if is_instance_valid(_drift_voice):
 		_drift_voice.stop()
 	_stop_local_tyre()
-	_clear_positional_tyre_emitters()
+	_clear_positional_emitters()
 	for player: AudioStreamPlayer in _sfx_players:
 		if is_instance_valid(player):
 			player.stop()
@@ -296,19 +310,32 @@ func clear_local_vehicle() -> void:
 	if is_instance_valid(_drift_voice):
 		_drift_voice.stop()
 	_stop_local_tyre()
-	_clear_positional_tyre_emitters()
+	_clear_positional_emitters()
 
 
 func set_positional_vehicles(vehicles: Array[Node]) -> void:
-	_clear_positional_tyre_emitters()
+	_clear_positional_emitters()
 	for vehicle: Node in vehicles:
 		if not is_instance_valid(vehicle) or not vehicle is Node2D or vehicle == _local_vehicle:
 			continue
-		var emitter := VehicleLoopEmitterScript.new()
-		emitter.name = "VehicleTyreEmitter%d" % _positional_tyre_emitters.size()
-		add_child(emitter)
-		emitter.configure(vehicle as Node2D)
-		_positional_tyre_emitters.append(emitter)
+		var source := vehicle as Node2D
+		var tyre_emitter := VehicleLoopEmitterScript.new()
+		tyre_emitter.name = "VehicleTyreEmitter%d" % _positional_tyre_emitters.size()
+		add_child(tyre_emitter)
+		tyre_emitter.configure(source)
+		_positional_tyre_emitters.append(tyre_emitter)
+		var engine_emitter := VehicleLoopEmitterScript.new()
+		engine_emitter.name = "VehicleEngineEmitter%d" % _positional_engine_emitters.size()
+		add_child(engine_emitter)
+		engine_emitter.configure(source, ENGINE_MAX_DISTANCE, ENGINE_VOICE_TRIM_DB, &"Engine")
+		var recipe := _recipe_for_vehicle(vehicle)
+		if recipe != null and not _headless:
+			engine_emitter.set_stream(EngineLoopGeneratorScript.generate_cached(recipe))
+		var model := EngineDrivetrainModelScript.new()
+		if recipe != null:
+			model.configure(recipe)
+		_engine_emitter_models[engine_emitter.get_instance_id()] = model
+		_positional_engine_emitters.append(engine_emitter)
 
 func set_race_paused(paused: bool) -> void:
 	_race_paused = paused
@@ -723,15 +750,85 @@ func _max_speed_for(vehicle: Node) -> float:
 	return 680.0
 
 
-func _clear_positional_tyre_emitters() -> void:
+func _clear_positional_emitters() -> void:
 	for emitter: Node in _positional_tyre_emitters:
 		if is_instance_valid(emitter):
 			emitter.queue_free()
 	_positional_tyre_emitters.clear()
+	for emitter: Node in _positional_engine_emitters:
+		if is_instance_valid(emitter):
+			emitter.queue_free()
+	_positional_engine_emitters.clear()
+	_engine_emitter_models.clear()
 
 
 func get_positional_tyre_emitters() -> Array[Node]:
 	return _positional_tyre_emitters
+
+
+func get_positional_engine_emitters() -> Array[Node]:
+	return _positional_engine_emitters
+
+
+func _recipe_for_vehicle(vehicle: Node) -> EngineRecipe:
+	var stats: Variant = vehicle.get("stats")
+	if not (stats is VehicleStats):
+		return null
+	var vehicle_id := ""
+	if vehicle.has_meta("audio_vehicle_id"):
+		vehicle_id = String(vehicle.get_meta("audio_vehicle_id"))
+	if vehicle_id.is_empty():
+		vehicle_id = EngineRecipeLibraryScript.vehicle_id_for(stats as VehicleStats)
+	if vehicle_id.is_empty():
+		vehicle_id = EngineRecipeLibraryScript.UNIDENTIFIED_VEHICLE_ID
+	return EngineRecipeLibraryScript.resolve(vehicle_id, stats as VehicleStats)
+
+
+func _listener_position() -> Vector2:
+	var listener_camera := get_viewport().get_camera_2d()
+	if is_instance_valid(listener_camera):
+		return listener_camera.global_position
+	if is_instance_valid(_local_vehicle) and _local_vehicle is Node2D:
+		return (_local_vehicle as Node2D).global_position
+	return Vector2.ZERO
+
+
+func _update_positional_engines(delta: float) -> void:
+	var listener_position := _listener_position()
+	var ranked: Array[Dictionary] = []
+	for emitter: Node in _positional_engine_emitters:
+		var source := emitter.call("get_source") as Node2D
+		if not is_instance_valid(source):
+			emitter.call("update_voice", listener_position, 0.0, 1.0, false)
+			continue
+		ranked.append({
+			"emitter": emitter,
+			"source": source,
+			"distance": source.global_position.distance_to(listener_position),
+		})
+	ranked.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["distance"]) < float(b["distance"]))
+	for index in ranked.size():
+		var entry: Dictionary = ranked[index]
+		var emitter: Node = entry["emitter"]
+		var source: Node = entry["source"]
+		var in_earshot := index < ENGINE_EMITTER_LIMIT and float(entry["distance"]) <= ENGINE_MAX_DISTANCE
+		var model: Variant = _engine_emitter_models.get(emitter.get_instance_id())
+		var rpm := 0.0
+		if model != null:
+			var speed := maxf(0.0, float(source.get("speed")))
+			var load := float(source.call("get_engine_load")) if source.has_method("get_engine_load") else 0.0
+			var throttle := float(source.call("get_throttle_input")) if source.has_method("get_throttle_input") else load
+			model.step(speed, _max_speed_for(source), load, throttle, delta)
+			rpm = float(model.get_rpm())
+		var player := emitter.call("get_player") as AudioStreamPlayer2D
+		var stream: AudioStream = player.stream if player != null else null
+		var base_rpm := rpm
+		if stream != null and stream.has_meta("base_rpm"):
+			base_rpm = float(stream.get_meta("base_rpm"))
+		var pitch := EngineLoopGeneratorScript.pitch_for_rpm(rpm if rpm > 0.0 else base_rpm, base_rpm)
+		var load_now := float(source.call("get_engine_load")) if source.has_method("get_engine_load") else 0.0
+		var level := 0.3 + clampf(load_now, 0.0, 1.0) * 0.7
+		emitter.call("update_voice", listener_position, level, pitch, in_earshot and not _race_paused and stream != null)
 
 
 ## Generates and caches a vehicle's engine voice and one-shots ahead of the race
@@ -748,6 +845,7 @@ func warm_vehicle_audio(vehicle_id: String) -> bool:
 		return false
 	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
 	var warmed := EngineVoiceGenerator.generate_cached(recipe) != null
+	EngineLoopGeneratorScript.generate_cached(recipe)
 	_prepare_vehicle_sfx(stats, vehicle_id)
 	return warmed
 
