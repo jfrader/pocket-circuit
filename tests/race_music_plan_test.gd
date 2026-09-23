@@ -84,15 +84,16 @@ func _initialize() -> void:
 	var menu := RaceMusicPlan.menu_deck()
 	if menu.is_empty():
 		failures.append("menu_deck must not be empty")
-	for phase: String in ["garage", "breather", "grid", "cooldown", "ignition"]:
-		if not menu.has(phase):
-			failures.append("menu_deck is missing " + phase)
-	var grid_stops := 0
+	if menu.has("ignition") or menu.has("garage"):
+		failures.append("menu_deck must not replay intro phases")
+	var grids_before_cruise := 0
 	for phase: String in menu:
+		if phase == "cruise":
+			break
 		if phase == "grid":
-			grid_stops += 1
-	if grid_stops < 3:
-		failures.append("menu_deck should return to grid often")
+			grids_before_cruise += 1
+	if grids_before_cruise < 4:
+		failures.append("menu should loop grid several times before cruise")
 
 	if not failures.is_empty():
 		push_error("RACE_MUSIC_PLAN_TEST FAIL: " + "; ".join(failures))

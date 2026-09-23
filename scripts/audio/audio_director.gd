@@ -41,7 +41,7 @@ const LIVE_RECIPE := "racing"
 ## The consumer drives every phase itself, so the score's tour form is held.
 const LIVE_ARRANGEMENT := "seeded"
 const MENU_SEED := "pc_menu"
-const MENU_DWELL_SECONDS := 8.0
+
 
 var _music_player: AudioStreamPlayer
 var _engine_player: AudioStreamPlayer
@@ -167,7 +167,7 @@ func play_menu_music() -> void:
 	else:
 		# Stay on the loaded score. The engine crossfades to grid.
 		set_live_race_state("grid", 0.28, 0.0, false)
-	begin_live_rotation(RaceMusicPlan.menu_deck(), MENU_DWELL_SECONDS, "grid")
+	begin_live_rotation(RaceMusicPlan.menu_deck(), RaceMusicPlan.menu_phrase_seconds(), "grid")
 
 func play_race_music() -> void:
 	if is_instance_valid(_music_player):
@@ -208,9 +208,7 @@ func advance_live_rotation() -> void:
 		return
 	if _live_dwell > _live_rotation_dwell * 0.5:
 		return
-	_live_dwell = _live_rotation_dwell
-	_live_deck_index = (_live_deck_index + 1) % _live_deck.size()
-	_cue_live_direct(_live_deck[_live_deck_index])
+	_step_live_rotation()
 
 func set_local_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 	_local_vehicle = vehicle
@@ -508,7 +506,9 @@ func _cue_live_direct(section: String) -> bool:
 	var accepted := bool(_live_music.call("cue_section", section))
 	if accepted:
 		_live_requested_section = section
-		var index := _live_deck.find(section)
+		var index := _live_deck.find(section, _live_deck_index)
+		if index < 0:
+			index = _live_deck.find(section)
 		if index >= 0:
 			_live_deck_index = index
 	return accepted
@@ -533,9 +533,18 @@ func _update_live_rotation(delta: float) -> void:
 	_live_dwell = maxf(0.0, _live_dwell - delta)
 	if _live_dwell > 0.0:
 		return
-	_live_dwell = _live_rotation_dwell
+	_step_live_rotation()
+
+func _step_live_rotation() -> void:
 	_live_deck_index = (_live_deck_index + 1) % _live_deck.size()
-	_cue_live_direct(_live_deck[_live_deck_index])
+	_live_dwell = _live_rotation_dwell
+	var next := _live_deck[_live_deck_index]
+	# Same section: the held score is already looping. Cueing it again would
+	# restart a slow opening.
+	if next == _live_requested_section:
+		return
+	_cue_live_direct(next)
+
 
 func _update_engine(delta: float = 1.0 / 60.0) -> void:
 	if not is_instance_valid(_engine_player):
