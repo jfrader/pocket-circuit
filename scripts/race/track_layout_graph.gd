@@ -268,8 +268,48 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 	if composition == 4 and cells.size() > 1 and (region_budgets[(excursion_cell + 1) % cells.size()] as Dictionary)["excursion_count"] == 0:
 		return _failure(&"region_excursion_budget", "The double-wedge composition could not place its second region excursion.")
 	ring = _simplify_polygon(ring)
-	bevel_cuts.append_array(_ring_chamfer_cuts(ring, identity, candidate))
 	var slot_budget: Vector2i = TIER_SLOT_BUDGETS[StringName(identity["length_tier"])]
+	# The available span inside the required regions can cap the ring below the
+	# length floor (a short or narrow room for the tier). Grow authored lobes
+	# until the loop can reach the band, or reject this candidate cheaply instead
+	# of spending search budget on a route that can never satisfy the contract.
+	var top_up_attempts := 0
+	while _ring_length(ring) < float(band["min_length"]) and top_up_attempts < cells.size() * 2:
+		top_up_attempts += 1
+		var grown := false
+		for cell_index in cells.size():
+			var bounds: Rect2 = cells[cell_index]["bounds"]
+			var range_x := _excursion_range(bounds, left, right)
+			var lobe_width := range_x.y - range_x.x
+			if lobe_width < CELL_MIN:
+				continue
+			for for_side: float in [-1.0, 1.0]:
+				var available := -half_height - bounds.position.y if for_side < 0.0 else bounds.end.y - half_height
+				if available < CELL_MIN:
+					continue
+				var depth := minf(available, maxf(CELL_MIN, (float(band["min_length"]) - _ring_length(ring)) * 0.5))
+				var anchored_left := bounds.get_center().x < 0.0
+				var from_x := range_x.x if anchored_left else range_x.y - lobe_width
+				var extension := _excursion_polygon(from_x, lobe_width, half_height, depth, for_side, 0, anchored_left)
+				var merged := Geometry2D.merge_polygons(ring, extension)
+				if merged.size() != 1:
+					continue
+				var proposed := _simplify_polygon(merged[0])
+				# A lobe adds vertices on the edge it attaches to, which would
+				# split the long straight that must host the finish. Keep the
+				# longest edge able to carry it.
+				if proposed.size() * 2 > slot_budget.y or _ring_length(proposed) <= _ring_length(ring) or _longest_edge_length(proposed) < FINISH_EDGE_MIN + 2.0 * RADIUS:
+					continue
+				ring = proposed
+				grown = true
+				break
+			if grown:
+				break
+		if not grown:
+			break
+	if _ring_length(ring) < float(band["min_length"]):
+		return _failure(&"length_capacity", "Region span cannot reach the %.0f length floor; best ring reaches %.2f." % [float(band["min_length"]), _ring_length(ring)])
+	bevel_cuts.append_array(_ring_chamfer_cuts(ring, identity, candidate))
 	for cut: PackedVector2Array in bevel_cuts:
 		var pieces := Geometry2D.clip_polygons(ring, cut)
 		if pieces.size() != 1:
@@ -527,6 +567,13 @@ static func _corner_trims(module: Dictionary) -> Vector2:
 	var angle := absf(float(module["signed_turn"]))
 	var outgoing := absf(exit.y) / sin(angle)
 	return Vector2(exit.x - outgoing * cos(angle), outgoing)
+
+
+static func _longest_edge_length(ring: PackedVector2Array) -> float:
+	var longest := 0.0
+	for index in ring.size():
+		longest = maxf(longest, ring[index].distance_to(ring[(index + 1) % ring.size()]))
+	return longest
 
 
 static func _ring_length(ring: PackedVector2Array) -> float:
