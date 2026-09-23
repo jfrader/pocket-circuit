@@ -35,8 +35,10 @@ const MENU_PROFILE := {
 	"brightness": 0.60,
 	"syncopation": 0.50,
 }
-## Grid is the menu home and returns between the other calm phases.
-const MENU_DECK: Array[String] = ["grid", "garage", "grid", "breather", "grid", "cooldown", "grid", "ignition", "grid", "cruise"]
+## One 4-bar phrase at a mid racing tempo. Repeated deck slots hold a phase
+## through several loops without cueing it again.
+const MENU_PHRASE_SECONDS := 7.5
+const MENU_GRID_LOOPS := 4
 
 
 ## The Gamestruments generate seed for a circuit. The whole track identity
@@ -107,10 +109,24 @@ static func menu_profile() -> Dictionary:
 	return MENU_PROFILE.duplicate()
 
 
+## Grid loops several times, then a groove that can keep going. Ignition is not
+## in this cycle: cueing it replays its slow opening.
 static func menu_deck() -> Array[String]:
 	var deck: Array[String] = []
-	deck.assign(MENU_DECK)
+	var visits: Array[String] = ["cruise", "breather", "slipstream"]
+	for visit in visits:
+		_append_loops(deck, "grid", MENU_GRID_LOOPS)
+		_append_loops(deck, visit, 4 if visit == "slipstream" else 2)
 	return deck
+
+
+static func menu_phrase_seconds() -> float:
+	return MENU_PHRASE_SECONDS
+
+
+static func _append_loops(deck: Array[String], section: String, count: int) -> void:
+	for _index in count:
+		deck.append(section)
 
 
 static func _pick_next(options: Array[String], deck: Array[String], rng: RandomNumberGenerator) -> String:
