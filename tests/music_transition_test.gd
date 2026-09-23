@@ -33,6 +33,8 @@ func _run_test() -> void:
 	if not _expect(bool(director.call("has_live_score")), "a cold menu start should load a live score"):
 		return
 	var menu_seed := String(director.call("get_live_seed"))
+	if not _expect(menu_seed.begins_with("pc_menu_") and menu_seed != "pc_menu", "a cold start should generate a fresh menu piece"):
+		return
 	if not _expect(int(director.call("get_live_score_generations")) == 1, "a cold start should generate exactly one score"):
 		return
 

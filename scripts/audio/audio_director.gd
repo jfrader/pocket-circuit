@@ -40,7 +40,7 @@ const LIVE_RECIPE := "racing"
 ## the defeat/recovery/wrong-way signals) with a per-seed arrangement surface.
 ## The consumer drives every phase itself, so the score's tour form is held.
 const LIVE_ARRANGEMENT := "seeded"
-const MENU_SEED := "pc_menu"
+
 
 
 var _music_player: AudioStreamPlayer
@@ -89,6 +89,8 @@ var _live_score_generations := 0
 var _live_paused := false
 ## Last section handed to the engine.
 var _live_requested_section := ""
+## Chosen once per launch so the title piece is not the same score every time.
+var _menu_launch_seed := ""
 var _live_rotation_enabled := false
 var _live_deck: Array[String] = []
 var _live_deck_index := 0
@@ -163,7 +165,7 @@ func play_menu_music() -> void:
 	clear_local_vehicle()
 	set_race_paused(false)
 	if not _live_score_loaded:
-		_start_live_score(MENU_SEED, RaceMusicPlan.menu_profile(), "grid")
+		_start_live_score(_session_menu_seed(), RaceMusicPlan.menu_profile(), "grid")
 	else:
 		# Stay on the loaded score. The engine crossfades to grid.
 		set_live_race_state("grid", 0.28, 0.0, false)
@@ -181,6 +183,14 @@ func play_race_music() -> void:
 ## Test/introspection: the generate seed backing the loaded score.
 func get_live_seed() -> String:
 	return _live_seed
+
+
+func _session_menu_seed() -> String:
+	if _menu_launch_seed.is_empty():
+		var random := RandomNumberGenerator.new()
+		random.randomize()
+		_menu_launch_seed = "pc_menu_%d" % random.randi()
+	return _menu_launch_seed
 
 ## Start or resume the automatic phase rotation. The deck is a loop; empty
 ## disables rotation. `first` overrides the opening phase when provided.
