@@ -15,6 +15,10 @@ const FINISH_EDGE_MIN := 1000.0
 const SETUP_EDGE_MIN := 520.0
 const TECHNICAL_RADII: Array[float] = [RADIUS, 260.0, 360.0, 520.0]
 const COMPOSITION_COUNT := 5
+# A closed cycle needs a real loop, not a degenerate two-module arc. The tier
+# budgets are proposal ceilings, not floors (the published module counts are
+# ranges), so this is the only hard lower bound.
+const MIN_CYCLE_SLOTS := 6
 const TIER_SLOT_BUDGETS := {
 	&"compact": Vector2i(6, 12),
 	&"standard": Vector2i(8, 16),
@@ -125,10 +129,28 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 	if right - left < minimum_width:
 		return _failure(&"finish_budget", "Region span %.2f is below the %.2f finish-and-turn envelope." % [right - left, minimum_width])
 	var desired_excursions := int(composition > 0 or required_depth > 0.0)
-	var excursion_cell := required_cell_index if required_cell_index >= 0 else int(_unit(identity, candidate + 271) * cells.size()) % cells.size()
-	var excursion_side := -1.0 if required_depth > 0.0 or _unit(identity, candidate + 313) < 0.5 else 1.0
-	var excursion_bounds: Rect2 = cells[excursion_cell]["bounds"]
 	var minimum_excursion_depth := CHAMFER_MIN if composition == 3 else (WEDGE_MIN if composition in [2, 4] else CELL_MIN)
+	var excursion_cell := required_cell_index
+	var excursion_side := -1.0 if required_depth > 0.0 or _unit(identity, candidate + 313) < 0.5 else 1.0
+	if excursion_cell < 0:
+		# An authored excursion goes where the room leaves depth for it. Draw the
+		# cell from the ones that can host it, not from a thin arm, so the ring
+		# keeps its authored fold instead of silently falling back to a plain
+		# rectangle (which concentrates the structural signature).
+		var viable: Array[int] = []
+		for cell_index in cells.size():
+			var candidate_bounds: Rect2 = cells[cell_index]["bounds"]
+			if maxf(-candidate_bounds.position.y, candidate_bounds.end.y) - minimum_excursion_depth >= minimum_half_height:
+				viable.append(cell_index)
+		if viable.is_empty():
+			excursion_cell = int(_unit(identity, candidate + 271) * cells.size()) % cells.size()
+		else:
+			excursion_cell = viable[int(_unit(identity, candidate + 271) * viable.size()) % viable.size()]
+			var viable_bounds: Rect2 = cells[excursion_cell]["bounds"]
+			excursion_side = -1.0 if _unit(identity, candidate + 313) < 0.5 else 1.0
+			if (-viable_bounds.position.y if excursion_side < 0.0 else viable_bounds.end.y) - minimum_excursion_depth < minimum_half_height:
+				excursion_side *= -1.0
+	var excursion_bounds: Rect2 = cells[excursion_cell]["bounds"]
 	var side_extent := -excursion_bounds.position.y if excursion_side < 0.0 else excursion_bounds.end.y
 	if required_cell_index < 0 and side_extent - minimum_excursion_depth < minimum_half_height:
 		excursion_side *= -1.0
@@ -268,9 +290,12 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 			if second_merged.size() == 1:
 				ring = second_merged[0]
 				(region_budgets[second_cell] as Dictionary)["excursion_count"] = 1
-	if desired_excursions > 0 and (region_budgets[excursion_cell] as Dictionary)["excursion_count"] == 0:
+	# An authored excursion is optional: when the room leaves no depth for it the
+	# ring can still carry the tier. Only a region the route must cover makes the
+	# excursion mandatory, and only then is a missing lobe a hard failure.
+	if required_depth > 0.0 and (region_budgets[excursion_cell] as Dictionary)["excursion_count"] == 0:
 		return _failure(&"region_excursion_budget", "The selected graph composition could not place its required region excursion (span=%.2f max_width=%.2f depth=%.2f available=%.2f)." % [attempted_excursion_span, attempted_excursion_width, excursion_depth, excursion_available])
-	if composition == 4 and cells.size() > 1 and (region_budgets[(excursion_cell + 1) % cells.size()] as Dictionary)["excursion_count"] == 0:
+	if required_depth > 0.0 and composition == 4 and cells.size() > 1 and (region_budgets[(excursion_cell + 1) % cells.size()] as Dictionary)["excursion_count"] == 0:
 		return _failure(&"region_excursion_budget", "The double-wedge composition could not place its second region excursion.")
 	ring = _simplify_polygon(ring)
 	var slot_budget: Vector2i = TIER_SLOT_BUDGETS[StringName(identity["length_tier"])]
@@ -345,6 +370,11 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 			return _failure(&"portal_traversal_budget", "Region cycle crosses portal '%s' %d times; a closed visit needs a positive even count within capacity %d." % [connection["id"], count, int(connection["traversal_capacity"])])
 		graph["portal_counts"][connection["id"]] = count
 	graph["slot_budget"] = slot_budget
+	# The tier budgets are a ceiling, but a loop simpler than a real cycle (a
+	# degenerate two-module arc) is off-contract even when it otherwise
+	# validates. Reject it cheaply so a richer candidate is used.
+	if (graph["ordinary_slots"] as Array).size() + 3 < MIN_CYCLE_SLOTS:
+		return _failure(&"slot_budget", "Region traversal needs only %d slots; a closed cycle needs at least %d." % [(graph["ordinary_slots"] as Array).size() + 3, MIN_CYCLE_SLOTS])
 	if (graph["ordinary_slots"] as Array).size() + 3 > (graph["slot_budget"] as Vector2i).y:
 		return _failure(&"slot_budget", "Region traversal needs %d slots; length-band budget allows %d." % [(graph["ordinary_slots"] as Array).size() + 3, (graph["slot_budget"] as Vector2i).y])
 	return graph
