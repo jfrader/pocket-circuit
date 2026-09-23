@@ -76,12 +76,17 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 			Vector2(notch.x, notch.y), Vector2(half.x, notch.y),
 			Vector2(half.x, half.y), Vector2(-half.x, half.y),
 		])
-		var portal_x := notch.x - 360.0
+		var portal_y0 := notch.y + CONSTRUCTION_MARGIN
+		var portal_y1 := half.y - CONSTRUCTION_MARGIN
+		# Disjoint required arms: the shared corner belongs to the vertical arm
+		# and the horizontal arm is the top-right rectangle beyond the notch.
+		# Overlapping arms forced a single deep excursion the compact room
+		# cannot host; disjoint arms let the ring choose zero, one or two lobes.
 		regions = [
 			_region(&"vertical_arm", PackedVector2Array([Vector2(-half.x, -half.y), Vector2(notch.x, -half.y), Vector2(notch.x, half.y), Vector2(-half.x, half.y)]), true, half.y - notch.y),
-			_region(&"horizontal_arm", PackedVector2Array([Vector2(-half.x, notch.y), Vector2(half.x, notch.y), Vector2(half.x, half.y), Vector2(-half.x, half.y)]), true, half.x - notch.x),
+			_region(&"horizontal_arm", PackedVector2Array([Vector2(notch.x, notch.y), Vector2(half.x, notch.y), Vector2(half.x, half.y), Vector2(notch.x, half.y)]), true, half.x - notch.x),
 		]
-		portals = [_portal_definition(&"el_junction", &"vertical_arm", &"horizontal_arm", Vector2(portal_x, notch.y + CONSTRUCTION_MARGIN), Vector2(portal_x, half.y - CONSTRUCTION_MARGIN), 2)]
+		portals = [_portal_definition(&"el_junction", &"vertical_arm", &"horizontal_arm", Vector2(notch.x, portal_y0), Vector2(notch.x, portal_y1), 2)]
 	else:
 		var bevel := float(definition["bevel"]) * minf(tier_size.x, tier_size.y)
 		var styles: Array = definition["boundary_styles"]
