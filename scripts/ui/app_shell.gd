@@ -153,9 +153,8 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_event_id = ""
 	_quick_race = true
 	_quick_race_theme = &"kitchen"
-	_quick_race_room = &"classic"
-	_quick_race_seed = 875
 	_quick_race_reverse = false
+	_quick_race_seed = _random_quick_race_seed()
 	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
 	_quick_race_entry_count += 1
 	_clear_content()

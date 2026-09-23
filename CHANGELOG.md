@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Changed
+- Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
+
 ### Fixed
 - Leaving a race for the menu no longer drops the music out. The menu stays on Starting Grid for several loops, then steps to a groove. It does not drop back into Ignition.
 - Your own tyres now use the same loop as rival cars, and they stay quiet unless the car is actually sliding. A small steer does not open them.
