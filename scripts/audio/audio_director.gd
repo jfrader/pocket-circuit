@@ -41,8 +41,6 @@ const LIVE_RECIPE := "racing"
 ## The consumer drives every phase itself, so the score's tour form is held.
 const LIVE_ARRANGEMENT := "seeded"
 const MENU_SEED := "pc_menu"
-const SWAP_FADE_OUT_SECONDS := 0.35
-const SWAP_FADE_IN_SECONDS := 0.7
 const MENU_DWELL_SECONDS := 20.0
 
 var _music_player: AudioStreamPlayer
@@ -80,20 +78,17 @@ var _engine_loop: AudioStream
 var _engine_rpm := 0.08
 var _headless := false
 var _live_music: Node
-## True once the live player holds a generated score. Re-entering the same
-## context/seed reuses it; a different circuit fades out, regenerates, fades in.
+## True once the live player holds a generated score. The same seed is reused.
+## A different circuit generates a new score. A scene change on the loaded
+## score asks the engine for a phase; it does not fade the player out.
 var _live_score_loaded := false
 ## The generate seed of the loaded score, so a repeat call is a no-op.
 var _live_seed := ""
 ## Introspection for tests; counts how often a live score was generated.
 var _live_score_generations := 0
-## Live-player context/fade gain. `_update_live_volume` applies it (plus the
-## pause duck) to the engine's own stream player every frame.
-var _live_volume_db := 0.0
 var _live_paused := false
-var _live_swapping := false
-## A section requested while a score swap is in flight; the last one wins.
-var _live_pending_section := ""
+## Last section handed to the engine.
+var _live_requested_section := ""
 var _live_rotation_enabled := false
 var _live_deck: Array[String] = []
 var _live_deck_index := 0
@@ -167,7 +162,11 @@ func play_menu_music() -> void:
 	_music_context = &"menu"
 	clear_local_vehicle()
 	set_race_paused(false)
-	_start_live_score(MENU_SEED, RaceMusicPlan.menu_profile(), "garage")
+	if not _live_score_loaded:
+		_start_live_score(MENU_SEED, RaceMusicPlan.menu_profile(), "garage")
+	else:
+		# Stay on the loaded score. The engine crossfades to garage.
+		set_live_race_state("garage", 0.35, 0.0, false)
 	begin_live_rotation(RaceMusicPlan.menu_deck(), MENU_DWELL_SECONDS, "garage")
 
 func play_race_music() -> void:
@@ -205,7 +204,7 @@ func stop_live_rotation() -> void:
 ## its dwell. Used for lap boundaries and meaningful position changes so the
 ## score re-evaluates without churning through transitions.
 func advance_live_rotation() -> void:
-	if not _live_rotation_enabled or _live_deck.is_empty() or _live_swapping:
+	if not _live_rotation_enabled or _live_deck.is_empty():
 		return
 	if _live_dwell > _live_rotation_dwell * 0.5:
 		return
@@ -386,20 +385,22 @@ func has_live_score() -> bool:
 func get_music_context() -> StringName:
 	return _music_context
 
+func get_live_requested_section() -> String:
+	return _live_requested_section
+
 func get_sfx_player_count() -> int:
 	return _sfx_players.size()
 
 func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result: String = "") -> void:
-	# Music-only adaptive state for the live procedural engine.
 	if _live_music != null and _live_music.has_method("set_race_state"):
-		_live_music.call("set_race_state", phase, intensity, pressure, final_lap, finish_result)
+		if bool(_live_music.call("set_race_state", phase, intensity, pressure, final_lap, finish_result)):
+			_live_requested_section = phase
 
 func cue_live_section(section: String) -> bool:
 	if _live_music == null or not _live_music.has_method("cue_section"):
 		return false
-	if not _live_score_loaded or _live_swapping:
-		_live_pending_section = section
-		return true
+	if not _live_score_loaded:
+		return false
 	return _cue_live_direct(section)
 
 ## Cue a section and guarantee it holds for at least `hold_seconds` before the
@@ -467,42 +468,27 @@ func _current_event() -> Dictionary:
 			return event as Dictionary
 	return {}
 
-## Regenerate or reuse the live score. Runs as a coroutine when a swap needs a
-## fade; callers do not await it (the request is accepted immediately and any
-## section cue during the swap is applied once the new score is up).
+## Generate a score when the seed changes. Style and traits are the sound
+## world and are read by generate. The same seed only cues a phase.
 func _start_live_score(seed: String, profile: Dictionary, initial_section: String) -> void:
 	if _live_score_loaded and _live_seed == seed:
-		var target := _live_pending_section if not _live_pending_section.is_empty() else initial_section
-		_live_pending_section = ""
-		if not target.is_empty():
-			_cue_live_direct(target)
+		if not initial_section.is_empty():
+			_cue_live_direct(initial_section)
 		return
-	_live_swapping = true
-	var fade_out := 0.0 if _headless else SWAP_FADE_OUT_SECONDS
-	var fade_in := 0.0 if _headless else SWAP_FADE_IN_SECONDS
-	if _live_score_loaded and fade_out > 0.0:
-		await _fade_live_to(SILENCE_DB, fade_out)
-	else:
-		_fade_live_to(SILENCE_DB, fade_out)
 	_apply_live_profile(profile)
 	_live_music.set("arrangement", LIVE_ARRANGEMENT)
 	_live_music.set("autoplay", false)
 	if not bool(_live_music.call("generate", seed)):
 		push_error("Gamestruments generation failed for seed " + seed)
+		return
 	_live_seed = seed
 	_live_score_loaded = true
 	_live_score_generations += 1
 	# The seeded composer attaches a tour form; hold it so the game owns the arc.
 	_live_music.call("set_form_hold", true)
-	var target := _live_pending_section if not _live_pending_section.is_empty() else initial_section
-	_live_pending_section = ""
-	_live_swapping = false
-	if not target.is_empty():
-		_cue_live_direct(target)
-	if fade_in > 0.0:
-		await _fade_live_to(0.0, fade_in)
-	else:
-		_fade_live_to(0.0, fade_in)
+	if not initial_section.is_empty():
+		_cue_live_direct(initial_section)
+	_update_live_volume()
 
 func _apply_live_profile(profile: Dictionary) -> void:
 	_live_music.set("style", String(profile.get("style", RaceMusicPlan.MENU_STYLE)))
@@ -516,25 +502,16 @@ func _cue_live_direct(section: String) -> bool:
 		return false
 	var accepted := bool(_live_music.call("cue_section", section))
 	if accepted:
+		_live_requested_section = section
 		var index := _live_deck.find(section)
 		if index >= 0:
 			_live_deck_index = index
 	return accepted
 
-func _fade_live_to(target_db: float, duration: float) -> void:
-	if not is_instance_valid(_live_music) or duration <= 0.0 or not is_inside_tree():
-		_live_volume_db = target_db
-		_update_live_volume()
-		return
-	var tween := create_tween()
-	tween.tween_property(self, "_live_volume_db", target_db, duration)
-	await tween.finished
-	_update_live_volume()
-
 func _update_live_volume() -> void:
 	if not is_instance_valid(_live_music):
 		return
-	var db := _live_volume_db
+	var db := 0.0
 	if _live_paused and _music_context == &"race":
 		db += PAUSED_MUSIC_DB
 	if not _live_score_loaded:
@@ -544,7 +521,7 @@ func _update_live_volume() -> void:
 			(child as AudioStreamPlayer).volume_db = db
 
 func _update_live_rotation(delta: float) -> void:
-	if not _live_rotation_enabled or _live_deck.is_empty() or _live_swapping or _live_paused:
+	if not _live_rotation_enabled or _live_deck.is_empty() or _live_paused:
 		return
 	if not _live_score_loaded:
 		return
