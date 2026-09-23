@@ -696,24 +696,28 @@ func _on_race_finished(_total_time: float) -> void:
 	var director := _audio_director()
 	if director != null and director.has_method("stop_live_rotation"):
 		director.call("stop_live_rotation")
-	# A won race lands on the victory outro then releases into cooldown; a lost
-	# one uses the defeat outro the seeded score carries.
+	# Finish outro first. Once that blend has started, queue garage so the menu
+	# phase is already in motion while the results are on screen.
 	_cue_live_section("victory" if _race_won else "defeat")
 	_results_panel.visible = true
 	_retry_button.disabled = true
 	_continue_button.disabled = true
 	_update_results(race_manager.get_results())
-	_play_finish_cooldown()
+	_queue_menu_phase()
 
 
-func _play_finish_cooldown() -> void:
-	if not _race_won:
-		return
-	# Let the victory sting play before the resolving cooldown under the results panel.
-	await get_tree().create_timer(4.0).timeout
+func _queue_menu_phase() -> void:
+	var director := _audio_director()
+	var deadline := Time.get_ticks_msec() + 3000
+	while is_inside_tree() and _finished and Time.get_ticks_msec() < deadline:
+		if director != null and director.has_method("get_live_section"):
+			var section := String(director.call("get_live_section"))
+			if section == "victory" or section == "defeat":
+				break
+		await get_tree().process_frame
 	if not _finished or not is_inside_tree():
 		return
-	_cue_live_section("cooldown")
+	_cue_live_section("garage")
 
 
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:
@@ -964,8 +968,8 @@ func _advance_live_rotation() -> void:
 
 
 func _begin_race_music() -> void:
-	# The race rotates through a per-circuit deck of grooves and peaks so no one
-	# section holds; events (lead, incident, final lap, finish) override it.
+	# The race rotates through grooves, builds, peaks, and a breather. Events
+	# (lead, incident, final lap, finish) override that deck.
 	var director := _audio_director()
 	if director == null or not director.has_method("begin_live_rotation"):
 		return

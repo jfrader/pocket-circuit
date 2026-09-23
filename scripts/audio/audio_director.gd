@@ -41,7 +41,7 @@ const LIVE_RECIPE := "racing"
 ## The consumer drives every phase itself, so the score's tour form is held.
 const LIVE_ARRANGEMENT := "seeded"
 const MENU_SEED := "pc_menu"
-const MENU_DWELL_SECONDS := 20.0
+const MENU_DWELL_SECONDS := 8.0
 
 var _music_player: AudioStreamPlayer
 var _engine_player: AudioStreamPlayer
@@ -387,6 +387,11 @@ func get_music_context() -> StringName:
 
 func get_live_requested_section() -> String:
 	return _live_requested_section
+
+func get_live_section() -> String:
+	if _live_music == null or not _live_music.has_method("get_current_section"):
+		return ""
+	return String(_live_music.call("get_current_section"))
 
 func get_sfx_player_count() -> int:
 	return _sfx_players.size()
