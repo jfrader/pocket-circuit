@@ -30,13 +30,13 @@ const CALMS: Array[String] = ["breather"]
 const MENU_STYLE := "funk"
 const MENU_PROFILE := {
 	"style": MENU_STYLE,
-	"energy": 0.42,
+	"energy": 0.32,
 	"complexity": 0.52,
 	"brightness": 0.60,
 	"syncopation": 0.50,
 }
-## Calm and build phases. Peaks stay on the race deck; outros stay on finish cues.
-const MENU_DECK: Array[String] = ["garage", "breather", "grid", "cooldown", "ignition", "cruise"]
+## Grid is the menu home and returns between the other calm phases.
+const MENU_DECK: Array[String] = ["grid", "garage", "grid", "breather", "grid", "cooldown", "grid", "ignition", "grid", "cruise"]
 
 
 ## The Gamestruments generate seed for a circuit. The whole track identity

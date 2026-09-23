@@ -696,7 +696,7 @@ func _on_race_finished(_total_time: float) -> void:
 	var director := _audio_director()
 	if director != null and director.has_method("stop_live_rotation"):
 		director.call("stop_live_rotation")
-	# Finish outro first. Once that blend has started, queue garage so the menu
+	# Finish outro first. Once that blend has started, queue grid so the menu
 	# phase is already in motion while the results are on screen.
 	_cue_live_section("victory" if _race_won else "defeat")
 	_results_panel.visible = true
@@ -717,7 +717,7 @@ func _queue_menu_phase() -> void:
 		await get_tree().process_frame
 	if not _finished or not is_inside_tree():
 		return
-	_cue_live_section("garage")
+	_cue_live_section("grid")
 
 
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:

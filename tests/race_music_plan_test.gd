@@ -87,6 +87,12 @@ func _initialize() -> void:
 	for phase: String in ["garage", "breather", "grid", "cooldown", "ignition"]:
 		if not menu.has(phase):
 			failures.append("menu_deck is missing " + phase)
+	var grid_stops := 0
+	for phase: String in menu:
+		if phase == "grid":
+			grid_stops += 1
+	if grid_stops < 3:
+		failures.append("menu_deck should return to grid often")
 
 	if not failures.is_empty():
 		push_error("RACE_MUSIC_PLAN_TEST FAIL: " + "; ".join(failures))

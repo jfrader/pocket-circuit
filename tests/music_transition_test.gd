@@ -67,7 +67,7 @@ func _run_test() -> void:
 		return
 	if not _expect(String(director.call("get_live_seed")) == race_seed, "returning to the menu must keep the score that is already playing"):
 		return
-	if not _expect(String(director.call("get_live_requested_section")) == "garage", "returning to the menu should ask the engine for the garage phase"):
+	if not _expect(String(director.call("get_live_requested_section")) == "grid", "returning to the menu should ask the engine for the grid phase"):
 		return
 	director.call("play_menu_music")
 	await process_frame
