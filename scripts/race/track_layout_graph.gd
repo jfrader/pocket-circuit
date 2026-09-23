@@ -413,7 +413,7 @@ static func _embed_ring(ring: PackedVector2Array, identity: Dictionary, candidat
 		var prior_length := float(MODULES.instantiate(corners[index]["module_id"], parameters)["length"])
 		var prior_loss := trims[index].x + trims[index].y - prior_length
 		var maximum_loss := prior_loss + maxf(0.0, embedded_length - minimum_length)
-		var corner := _corner_slot(float(parameters["hand"]), float(parameters["angle_deg"]), available, candidate, index, maximum_loss, _unit(identity, candidate + 2281))
+		var corner := _corner_slot(float(parameters["hand"]), float(parameters["angle_deg"]), available, candidate, index, maximum_loss, _unit(identity, candidate + 2281), StringName(identity.get("length_tier", &"")) in [&"long", &"endurance", &"marathon"])
 		corners[index] = corner
 		var module := MODULES.instantiate(corner["module_id"], corner["parameters"])
 		trims[index] = _corner_trims(module)
@@ -540,8 +540,9 @@ static func _ring_slot_count(ring: PackedVector2Array, trims: Array[Vector2]) ->
 	return count
 
 
-static func _corner_slot(hand: float, angle_deg: float, available: Vector2, candidate: int, index: int, maximum_loss: float = INF, parameter_unit: float = 0.0) -> Dictionary:
+static func _corner_slot(hand: float, angle_deg: float, available: Vector2, candidate: int, index: int, maximum_loss: float = INF, parameter_unit: float = 0.0, prefer_large: bool = false) -> Dictionary:
 	var choices: Array[Dictionary] = []
+	var radii: Array[float] = []
 	for definition: Dictionary in MODULES.definitions():
 		if definition["family"] not in [&"corner", &"profile"]:
 			continue
@@ -557,8 +558,17 @@ static func _corner_slot(hand: float, angle_deg: float, available: Vector2, cand
 				selected_distance = absf(unit - parameter_unit)
 		if not selected.is_empty():
 			choices.append(selected)
+			radii.append(float((selected["parameters"] as Dictionary).get("radius", (selected["parameters"] as Dictionary).get("outer_radius", RADIUS))))
 	if choices.is_empty() or candidate < 4:
 		return _slot(&"corner_tight", {"radius": RADIUS, "angle_deg": angle_deg, "hand": hand}, &"technical" if hand < 0.0 else &"conflict")
+	if prefer_large:
+		# Long tiers can afford the largest legal corner, and a bigger radius
+		# trades straight for arc, which is what lowers the straight fraction.
+		var best := 0
+		for choice in choices.size():
+			if radii[choice] > radii[best]:
+				best = choice
+		return choices[best]
 	return choices[(candidate + index) % choices.size()]
 
 
