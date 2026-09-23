@@ -147,6 +147,11 @@ static func build(room: Dictionary, band: Dictionary, identity: Dictionary, cand
 				extra_excursions.append({"cell": next_cell, "side": next_side, "extent": extent})
 	if desired_excursions > 0 and side_extent - minimum_excursion_depth >= minimum_half_height:
 		var height_limit := minf(maximum_half_height, side_extent - minimum_excursion_depth)
+		# An authored excursion only reads as a distinct fold when the loop
+		# leaves it room. Keep the ring's half-height at most half of the depth
+		# available beyond it so the excursion stays comparable to the ring
+		# instead of spreading into a shallow bump on a stretched rectangle.
+		height_limit = minf(height_limit, maxf(minimum_half_height, 0.5 * side_extent))
 		for extra: Dictionary in extra_excursions:
 			height_limit = minf(height_limit, float(extra["extent"]) - CELL_MIN)
 		var excursion_count := extra_excursions.size() + 1
