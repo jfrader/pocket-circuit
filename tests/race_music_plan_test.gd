@@ -52,13 +52,23 @@ func _initialize() -> void:
 	if deck.is_empty() or not ["cruise", "slipstream"].has(deck[0]):
 		failures.append("flow_deck must open on a groove")
 	var saw_peak := false
+	var saw_build := false
+	var saw_calm := false
 	for phase: String in deck:
 		if not VALID_PHASES.has(phase):
 			failures.append("flow_deck has an invalid phase: " + phase)
 		if ["attack", "redline"].has(phase):
 			saw_peak = true
+		if ["ignition", "grid"].has(phase):
+			saw_build = true
+		if phase == "breather":
+			saw_calm = true
 	if not saw_peak:
 		failures.append("flow_deck must include a peak")
+	if not saw_build:
+		failures.append("flow_deck must include a build")
+	if not saw_calm:
+		failures.append("flow_deck must include a breather")
 
 	var compact := base.duplicate()
 	compact["length_tier"] = "compact"
@@ -71,8 +81,12 @@ func _initialize() -> void:
 
 	if not VALID_STYLES.has(String(RaceMusicPlan.menu_profile()["style"])):
 		failures.append("menu_profile style must be a library style")
-	if RaceMusicPlan.menu_deck().is_empty():
+	var menu := RaceMusicPlan.menu_deck()
+	if menu.is_empty():
 		failures.append("menu_deck must not be empty")
+	for phase: String in ["garage", "breather", "grid", "cooldown", "ignition"]:
+		if not menu.has(phase):
+			failures.append("menu_deck is missing " + phase)
 
 	if not failures.is_empty():
 		push_error("RACE_MUSIC_PLAN_TEST FAIL: " + "; ".join(failures))
