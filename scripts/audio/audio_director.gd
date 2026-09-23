@@ -163,11 +163,11 @@ func play_menu_music() -> void:
 	clear_local_vehicle()
 	set_race_paused(false)
 	if not _live_score_loaded:
-		_start_live_score(MENU_SEED, RaceMusicPlan.menu_profile(), "garage")
+		_start_live_score(MENU_SEED, RaceMusicPlan.menu_profile(), "grid")
 	else:
-		# Stay on the loaded score. The engine crossfades to garage.
-		set_live_race_state("garage", 0.35, 0.0, false)
-	begin_live_rotation(RaceMusicPlan.menu_deck(), MENU_DWELL_SECONDS, "garage")
+		# Stay on the loaded score. The engine crossfades to grid.
+		set_live_race_state("grid", 0.28, 0.0, false)
+	begin_live_rotation(RaceMusicPlan.menu_deck(), MENU_DWELL_SECONDS, "grid")
 
 func play_race_music() -> void:
 	if is_instance_valid(_music_player):

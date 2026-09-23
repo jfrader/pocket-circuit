@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Fixed
-- Leaving a race for the menu no longer drops the music out. The piece moves to the garage phase while the results are still up, and the menu and the race use more of the phase pool.
+- Leaving a race for the menu no longer drops the music out. The piece moves to Starting Grid while the results are still up, and the menu keeps coming back to it.
 - Your own tyres now use the same loop as rival cars, and they stay quiet unless the car is actually sliding. A small steer does not open them.
 - Settings has separate Engine and Tyres sliders. SFX no longer changes them.
 - Nearby rival cars now have their own engine note, pitched from that car. Far cars stay quiet.
