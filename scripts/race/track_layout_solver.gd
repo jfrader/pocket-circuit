@@ -400,8 +400,13 @@ static func _solve_closure(graph: Dictionary, room: Dictionary, band: Dictionary
 	var target: Dictionary = partial["entry_port"]
 	var reserved: Array = graph.get("closure_targets", [])
 	var proposal_count := CLOSURE_RADII.size() * CLOSURE_FAMILIES.size() + int(not reserved.is_empty())
+	# Rank the connectors by their own local closure residual first (cheap math,
+	# already computed inside the connector builder) so the charged validators
+	# are spent on the most promising closings rather than enumeration order.
+	var candidates: Array[Dictionary] = []
+	var band_middle := 0.5 * (float(band["min_length"]) + float(band["max_length"]))
+	var partial_length := float(partial["length"])
 	for proposal in mini(proposal_count, int(limits["closure_candidates_per_frontier"])):
-		counters["closure_candidates"] = int(counters["closure_candidates"]) + 1
 		var family := &"reserved"
 		var radius := 0.0
 		var connector := {}
@@ -409,7 +414,13 @@ static func _solve_closure(graph: Dictionary, room: Dictionary, band: Dictionary
 			var instances: Array[Dictionary] = []
 			for slot: Dictionary in reserved:
 				instances.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
-			connector = {"ok": true, "modules": instances}
+			var reserved_route := MODULES.compose(instances)
+			connector = {
+				"ok": true,
+				"modules": instances,
+				"position_residual": (reserved_route["exit_port"]["position"] as Vector2).distance_to(target["position"]),
+				"heading_residual": absf(wrapf(float(reserved_route["exit_port"]["heading"]) - float(target["heading"]), -PI, PI)),
+			}
 		else:
 			var analytic_index := proposal - int(not reserved.is_empty())
 			radius = CLOSURE_RADII[analytic_index / CLOSURE_FAMILIES.size()]
@@ -418,6 +429,26 @@ static func _solve_closure(graph: Dictionary, room: Dictionary, band: Dictionary
 		if not bool(connector.get("ok", false)):
 			counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
 			continue
+		var connector_length := 0.0
+		for module: Dictionary in connector["modules"]:
+			connector_length += float(module["length"])
+		candidates.append({
+			"family": family,
+			"radius": radius,
+			"connector": connector,
+			"score": float(connector["position_residual"]) + float(connector["heading_residual"]) * 200.0 + absf(partial_length + connector_length - band_middle) * 0.001,
+			"order": proposal,
+		})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if not is_equal_approx(float(a["score"]), float(b["score"])):
+			return float(a["score"]) < float(b["score"])
+		return int(a["order"]) < int(b["order"])
+	)
+	for candidate: Dictionary in candidates:
+		counters["closure_candidates"] = int(counters["closure_candidates"]) + 1
+		var family: StringName = candidate["family"]
+		var radius := float(candidate["radius"])
+		var connector: Dictionary = candidate["connector"]
 		var all_modules: Array[Dictionary] = modules.duplicate()
 		all_modules.append_array(connector["modules"])
 		var route := MODULES.compose(all_modules, graph["start_position"], float(graph["start_heading"]))
