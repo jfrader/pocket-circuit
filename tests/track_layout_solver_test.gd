@@ -468,7 +468,12 @@ func _test_band_and_finish_contract() -> bool:
 		if not _expect(feasible > 0, "%s must have a constructible region graph" % label):
 			return false
 		if String(tier) == "marathon":
-			if not _expect(length_capacity_rejections > 0, "%s must reject floor-unreachable rings as length_capacity" % label):
+			# Marathon rooms are sized so every candidate can reach the tier
+			# floor (GURI-928). A length_capacity rejection here would mean the
+			# room shrank below its published scale, so the unreachable-ring
+			# path must stay unused rather than the room being too small to
+			# hold the band.
+			if not _expect(length_capacity_rejections == 0, "%s should reach its length floor in the published marathon room" % label):
 				return false
 	return true
 

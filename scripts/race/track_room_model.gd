@@ -15,7 +15,7 @@ const TIER_SIZE := {
 	&"standard": Vector2(1.0, 1.0),
 	&"long": Vector2(1.62, 1.50),
 	&"endurance": Vector2(2.35, 2.10),
-	&"marathon": Vector2(3.35, 2.90),
+	&"marathon": Vector2(4.20, 3.65),
 }
 
 
