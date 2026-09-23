@@ -36,7 +36,7 @@ func _run_test() -> void:
 		var wall := world.get_node("Wall")
 		var side := wall.get_node("SideStrip") as Sprite2D
 		var side_size := side.get_rect().size * side.scale
-		if not _expect(side_size.is_equal_approx(Vector2(2260, 34)), "wall side art must cover its entire span regardless of texture resolution"):
+		if not _expect(side_size.is_equal_approx(Vector2(2200, 34)), "wall side art must cover its entire span regardless of texture resolution"):
 			return
 		for strip: Sprite2D in wall.find_children("EdgeStrip*", "Sprite2D", false, false):
 			if not _expect(is_equal_approx(strip.get_rect().size.y * strip.scale.y, 50.0), "edge textures must not become oversized rectangles when their dimensions change"):

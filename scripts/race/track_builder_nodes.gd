@@ -51,29 +51,41 @@ static func add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2
 		first.set_meta("bidirectional", true)
 
 
-static func add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String) -> void:
+static func add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String, room_polygon: PackedVector2Array = PackedVector2Array(), outward_normal: Vector2 = Vector2.ZERO) -> bool:
+	var thickness := TrackBuilderCore.ROOM_WALL_THICKNESS
+	var outward := outward_normal.normalized() if not outward_normal.is_zero_approx() else Vector2.ZERO
 	var wall := StaticBody2D.new()
 	wall.name = node_name
-	wall.position = position
+	# The wall body sits half its thickness outside the room edge so the full
+	# 50u furniture edge never intrudes into the free interior the generator
+	# reserved for the corridor. Without outward info (legacy fixtures) it stays
+	# centered at the edge midpoint.
+	wall.position = position + outward * thickness * 0.5
 	wall.rotation = rotation
 	wall.collision_layer = 2
 	TrackBuilderCore._mark_solid_body(wall, edge_texture_path, &"room_wall")
-	parent.add_child(wall)
-	var shape := RectangleShape2D.new()
-	shape.size = Vector2(length + 60.0, 50.0)
-	var cs := CollisionShape2D.new()
-	cs.shape = shape
-	wall.add_child(cs)
-	TrackBuilderCore._record_shape_probe_points(wall, Vector2.ZERO, shape.size, &"rect")
+	var tangent := Vector2.from_angle(rotation)
+	var from := position - tangent * length * 0.5
+	var to := position + tangent * length * 0.5
+	if room_polygon.is_empty() or outward.is_zero_approx():
+		var shape := RectangleShape2D.new()
+		shape.size = Vector2(length, thickness)
+		var cs := CollisionShape2D.new()
+		cs.shape = shape
+		wall.add_child(cs)
+		TrackBuilderCore._record_shape_probe_points(wall, Vector2.ZERO, shape.size, &"rect")
+	elif not _build_clipped_wall_collision(wall, from, to, outward, thickness, room_polygon, length):
+		wall.free()
+		return false
 	var visual := Polygon2D.new()
 	visual.name = "Visual"
-	visual.polygon = TrackBuilderCore._rect_points(Vector2.ZERO, Vector2(length + 60.0, 50.0))
+	visual.polygon = TrackBuilderCore._rect_points(Vector2.ZERO, Vector2(length, thickness))
 	visual.color = Color("0e1524")
 	TrackBuilderCore._mark_solid_visual(visual, edge_texture_path, &"room_wall")
 	wall.add_child(visual)
 	var side_face := Polygon2D.new()
 	side_face.name = "SideFace"
-	side_face.polygon = TrackBuilderCore._rect_points(Vector2(0.0, -14.0), Vector2(length + 60.0, 22.0))
+	side_face.polygon = TrackBuilderCore._rect_points(Vector2(0.0, -14.0), Vector2(length, 22.0))
 	side_face.color = Color("262e3a")
 	TrackBuilderCore._mark_solid_visual(side_face, "", &"room_wall")
 	wall.add_child(side_face)
@@ -84,35 +96,61 @@ static func add_wall_segment(parent: Node, node_name: String, position: Vector2,
 		side_strip.texture = edge_texture_side
 		side_strip.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		side_strip.position = Vector2(0.0, -14.0)
-		var side_tiles := maxi(1, int(ceil((length + 60.0) / TrackBuilderCore.ROOM_EDGE_TILE_WORLD_LENGTH)))
+		var side_tiles := maxi(1, int(ceil(length / TrackBuilderCore.ROOM_EDGE_TILE_WORLD_LENGTH)))
 		side_strip.region_enabled = true
 		side_strip.region_rect = Rect2(0, 0, edge_texture_side.get_width() * side_tiles, edge_texture_side.get_height())
 		side_strip.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
-		side_strip.scale = Vector2((length + 60.0) / (edge_texture_side.get_width() * float(side_tiles)), 34.0 / edge_texture_side.get_height())
+		side_strip.scale = Vector2(length / (edge_texture_side.get_width() * float(side_tiles)), 34.0 / edge_texture_side.get_height())
 		side_strip.modulate = Color(0.85, 0.85, 0.85)
 		side_strip.set_meta("asset_path", edge_texture_path)
 		TrackBuilderCore.VISUAL_ROLE_CONTRACT.assign(side_strip, TrackBuilderCore.VISUAL_ROLE_SOLID)
 		wall.add_child(side_strip)
 	var top_lip := Polygon2D.new()
 	top_lip.name = "TopLip"
-	top_lip.polygon = TrackBuilderCore._rect_points(Vector2(0.0, -28.0), Vector2(length + 60.0, 5.0))
+	top_lip.polygon = TrackBuilderCore._rect_points(Vector2(0.0, -28.0), Vector2(length, 5.0))
 	top_lip.color = Color("e8d9b8", 0.85)
 	TrackBuilderCore._mark_solid_visual(top_lip, "", &"room_wall")
 	wall.add_child(top_lip)
 	var edge_texture := load(edge_texture_path) as Texture2D
 	if edge_texture:
-		var tile_count := maxi(1, int(ceil((length + 60.0) / TrackBuilderCore.ROOM_EDGE_TILE_WORLD_LENGTH)))
+		var tile_count := maxi(1, int(ceil(length / TrackBuilderCore.ROOM_EDGE_TILE_WORLD_LENGTH)))
 		for tile in tile_count:
 			var strip := Sprite2D.new()
 			strip.name = "EdgeStrip"
 			strip.texture = edge_texture
 			strip.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-			var offset := (float(tile) - float(tile_count - 1) * 0.5) * ((length + 60.0) / float(tile_count))
+			var offset := (float(tile) - float(tile_count - 1) * 0.5) * (length / float(tile_count))
 			strip.position = Vector2(offset, 0.0)
-			strip.scale = Vector2((length + 60.0) / (edge_texture.get_width() * float(tile_count)), 50.0 / edge_texture.get_height())
+			strip.scale = Vector2(length / (edge_texture.get_width() * float(tile_count)), 50.0 / edge_texture.get_height())
 			strip.set_meta("asset_path", edge_texture_path)
 			TrackBuilderCore.VISUAL_ROLE_CONTRACT.assign(strip, TrackBuilderCore.VISUAL_ROLE_SOLID)
 			wall.add_child(strip)
+	parent.add_child(wall)
+	return true
+
+
+static func _build_clipped_wall_collision(wall: StaticBody2D, from: Vector2, to: Vector2, outward: Vector2, thickness: float, room_polygon: PackedVector2Array, length: float) -> bool:
+	# The wall rectangle spans the edge outward by the full thickness. Clip it
+	# against the room interior so a concave corner (a notch narrower than the
+	# wall) cannot leave solid intruding into free space; the kept outside
+	# portions become convex collision polygons in wall-local coordinates.
+	# A clip/decompose that yields nothing is a hard failure — never fabricate a
+	# hull or rectangle to cover it.
+	var pieces := TrackBuilderCore._wall_collision_pieces(from, to, outward, thickness, room_polygon)
+	if pieces.is_empty():
+		return false
+	for index in pieces.size():
+		var local := PackedVector2Array()
+		for point: Vector2 in pieces[index]:
+			local.append((point - wall.position).rotated(-wall.rotation))
+		var convex := ConvexPolygonShape2D.new()
+		convex.points = local
+		var cs := CollisionShape2D.new()
+		cs.name = "WallCollision" if index == 0 else "WallCollision%d" % index
+		cs.shape = convex
+		wall.add_child(cs)
+	TrackBuilderCore._record_shape_probe_points(wall, Vector2.ZERO, Vector2(length, thickness), &"rect")
+	return true
 
 
 static func gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:

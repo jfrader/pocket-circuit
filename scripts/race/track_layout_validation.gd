@@ -10,9 +10,21 @@ const MIN_TURN_RADIUS := 147.0
 const MIN_SELF_DISTANCE := 320.0
 const LOCAL_ARC_CUTOFF := 960.0
 const MIN_SETUP_LENGTH := 450.0
+const MIN_EXCLUSIVE_REGION_LENGTH := 450.0
 const POSITION_EPSILON := 0.01
 const FLATTEN_STEP := 20.0
 const FLATTEN_ERROR := 0.02
+# Guard band for the nonlocal AABB skip. The exact segment distance is a
+# float32 `Vector2.distance_to` result (relative error ~1e-7), while the AABB
+# gap is computed in float64. The margin must dominate that rounding so a
+# skipped pair can never have produced a smaller certified distance.
+const SKIP_MARGIN_ABSOLUTE := 0.01
+const SKIP_MARGIN_RELATIVE := 0.0001
+# Safety pad for the arc-near windowing bounds. The s-coordinates are float64
+# cumulative lengths; a one-ULP wobble at a primitive boundary must never let a
+# window stop before the exact arc-near condition flips. It only ever extends a
+# window by a handful of already-nonlocal pairs, never reclassifies one.
+const LOCAL_WINDOW_MARGIN := 0.000001
 
 
 static func validate_continuous(route: Dictionary, room_polygon: PackedVector2Array) -> Dictionary:
@@ -57,26 +69,36 @@ static func validate_continuous(route: Dictionary, room_polygon: PackedVector2Ar
 	for cell: Dictionary in cells:
 		if not _cell_inside_room(cell, room_polygon, RESERVED_RADIUS):
 			return _failure(&"clearance", &"room_sweep", "Reserved radius-135 sweep leaves the room polygon.", int(cell["primitive_index"]))
+	var cell_count := cells.size()
+	var cell_bounds: Array[Rect2] = []
+	var cell_errors := PackedFloat64Array()
+	var cell_s0 := PackedFloat64Array()
+	var cell_s1 := PackedFloat64Array()
+	cell_bounds.resize(cell_count)
+	cell_errors.resize(cell_count)
+	cell_s0.resize(cell_count)
+	cell_s1.resize(cell_count)
+	var max_cell_error := 0.0
+	for index in cell_count:
+		var cell: Dictionary = cells[index]
+		cell_bounds[index] = _segment_bounds(cell["from"], cell["to"])
+		var error := float(cell["error"])
+		cell_errors[index] = error
+		cell_s0[index] = float(cell["s0"])
+		cell_s1[index] = float(cell["s1"])
+		max_cell_error = maxf(max_cell_error, error)
 	var minimum_nonlocal := INF
 	var minimum_return_limb := _minimum_endpoint_return_distance(primitives)
 	if minimum_return_limb < MIN_SELF_DISTANCE:
 		return _failure(&"clearance", &"return_limb_spacing", "Continuous endpoint return-limb distance is %.2f, below %.0f." % [minimum_return_limb, MIN_SELF_DISTANCE])
-	for first in cells.size():
-		var a: Dictionary = cells[first]
-		for second in range(first + 1, cells.size()):
-			var b: Dictionary = cells[second]
-			var midpoint_separation := _cyclic_separation((float(a["s0"]) + float(a["s1"])) * 0.5, (float(b["s0"]) + float(b["s1"])) * 0.5, float(route["length"]))
-			var possible_separation := midpoint_separation + (float(a["s1"]) - float(a["s0"]) + float(b["s1"]) - float(b["s0"])) * 0.5
-			var closest := _segment_closest(a["from"], a["to"], b["from"], b["to"])
-			var certified_distance := float(closest["distance"]) - float(a["error"]) - float(b["error"])
-			if possible_separation >= LOCAL_ARC_CUTOFF:
-				minimum_nonlocal = minf(minimum_nonlocal, certified_distance)
-				if certified_distance < MIN_SELF_DISTANCE:
-					return _failure(&"clearance", &"self_distance", "Continuous nonlocal self-distance is %.2f, below %.0f." % [certified_distance, MIN_SELF_DISTANCE], int(a["primitive_index"]), int(b["primitive_index"]))
-			elif _stationary_return_pair(a, b, closest, primitives.size()):
-				minimum_return_limb = minf(minimum_return_limb, certified_distance)
-				if certified_distance < MIN_SELF_DISTANCE:
-					return _failure(&"clearance", &"return_limb_spacing", "Continuous return-limb distance is %.2f, below %.0f." % [certified_distance, MIN_SELF_DISTANCE], int(a["primitive_index"]), int(b["primitive_index"]))
+	var local_result := _local_return_limb_pass(cells, cell_s0, cell_s1, cell_errors, float(route["length"]), primitives.size(), minimum_return_limb)
+	if local_result.has("failure"):
+		return local_result["failure"]
+	minimum_return_limb = float(local_result["minimum"])
+	var nonlocal_result := _nonlocal_sweep(cells, cell_bounds, cell_errors, cell_s0, cell_s1, float(route["length"]), max_cell_error, minimum_nonlocal)
+	if nonlocal_result.has("failure"):
+		return nonlocal_result["failure"]
+	minimum_nonlocal = float(nonlocal_result["minimum"])
 	return {
 		"ok": true,
 		"valid": true,
@@ -127,11 +149,99 @@ static func validate_sampled(route: Dictionary, sampling: Dictionary, room_polyg
 	}
 
 
+# Pure exact query: how much of the analytic route lies in each supplied region
+# and in NO other supplied region (the "exclusive" length per region). Every
+# line/arc primitive is intersected against every region polygon edge with
+# `_primitive_intersections`; each crossing becomes a primitive fraction (line
+# projection or directed arc angle), the fractions are sorted/deduped/clamped
+# into intervals, and each interval midpoint is classified with `_primitive_point`.
+# A midpoint contributes `primitive.length * (hi - lo)` to a region only when it
+# is inside that region and outside every other supplied region, so overlaps
+# contribute to neither. No chord/sample approximation is used. Every actual
+# primitive-edge intersection counts as one query operation against `max_queries`;
+# the result never reports `ok` for a measurement that stopped on the budget.
+static func validate_region_occupation(route: Dictionary, room: Dictionary, max_queries: int = 2147483647) -> Dictionary:
+	var regions: Array[Dictionary] = []
+	for region: Dictionary in room.get("regions", []):
+		if bool(region.get("required", false)):
+			regions.append(region)
+	var overlapping := {}
+	for first in regions.size():
+		for second in range(first + 1, regions.size()):
+			if not Geometry2D.intersect_polygons(regions[first]["polygon"], regions[second]["polygon"]).is_empty():
+				overlapping[regions[first]["id"]] = true
+				overlapping[regions[second]["id"]] = true
+	if overlapping.is_empty():
+		return {"ok": true, "valid": true, "lengths": {}, "query_operations": 0}
+	var measured := exclusive_region_lengths(route, regions, max_queries)
+	if not bool(measured["ok"]):
+		measured["valid"] = false
+		return measured
+	for region_id: StringName in overlapping:
+		var length := float(measured["lengths"].get(region_id, 0.0))
+		if length < MIN_EXCLUSIVE_REGION_LENGTH:
+			var failure := _failure(&"region_assignment", &"required_region_length", "Required region '%s' carries %.2f exclusive route units; minimum is %.0f." % [region_id, length, MIN_EXCLUSIVE_REGION_LENGTH])
+			failure["query_operations"] = measured["query_operations"]
+			return failure
+	measured["valid"] = true
+	return measured
+
+
+static func exclusive_region_lengths(route: Dictionary, regions: Array, max_queries: int = 2147483647) -> Dictionary:
+	var lengths := {}
+	for region: Dictionary in regions:
+		lengths[region["id"]] = 0.0
+	if not bool(route.get("ok", false)):
+		return {"ok": false, "budget_exhausted": false, "query_operations": 0, "lengths": lengths, "kind": &"invalid_route", "reason": "Exclusive region lengths need a composed analytic route."}
+	var primitives: Array = route.get("primitives", [])
+	var query_operations := 0
+	var cap := maxi(max_queries, 0)
+	for primitive: Dictionary in primitives:
+		var fractions := PackedFloat64Array([0.0, 1.0])
+		for region: Dictionary in regions:
+			var polygon: PackedVector2Array = region.get("polygon", PackedVector2Array())
+			for edge_index in polygon.size():
+				if query_operations >= cap:
+					return {"ok": false, "budget_exhausted": true, "query_operations": query_operations, "lengths": lengths, "kind": &"query_budget_exhausted", "reason": "Exclusive region measurement needs more than %d primitive-edge queries." % cap}
+				query_operations += 1
+				var edge_primitive := {"kind": &"line", "start": polygon[edge_index], "end": polygon[(edge_index + 1) % polygon.size()]}
+				for point: Vector2 in _primitive_intersections(primitive, edge_primitive):
+					fractions.append(_primitive_fraction(primitive, point))
+		fractions.sort()
+		var unique := PackedFloat64Array()
+		for value: float in fractions:
+			var clamped := clampf(value, 0.0, 1.0)
+			if unique.is_empty() or clamped - unique[unique.size() - 1] > 0.000001:
+				unique.append(clamped)
+		for interval_index in range(unique.size() - 1):
+			var lo := unique[interval_index]
+			var hi := unique[interval_index + 1]
+			if hi - lo <= 0.000001:
+				continue
+			var midpoint := _primitive_point(primitive, (lo + hi) * 0.5)
+			var owner := -1
+			var overlap := false
+			for region_index in regions.size():
+				if not Geometry2D.is_point_in_polygon(midpoint, (regions[region_index] as Dictionary)["polygon"]):
+					continue
+				if owner >= 0:
+					overlap = true
+					break
+				owner = region_index
+			if not overlap and owner >= 0:
+				var region_id = (regions[owner] as Dictionary)["id"]
+				lengths[region_id] = float(lengths[region_id]) + float(primitive["length"]) * (hi - lo)
+	return {"ok": true, "budget_exhausted": false, "query_operations": query_operations, "lengths": lengths}
+
+
 static func _sampled_segment_checks(points: PackedVector2Array, total_length: float, room_polygon: PackedVector2Array, approximation_error: float) -> Dictionary:
 	var cumulative := PackedFloat64Array([0.0])
 	for index in points.size():
 		cumulative.append(cumulative[index] + points[index].distance_to(points[(index + 1) % points.size()]))
 	var sampled_length := float(cumulative[cumulative.size() - 1])
+	var segment_bounds: Array[Rect2] = []
+	for index in points.size():
+		segment_bounds.append(_segment_bounds(points[index], points[(index + 1) % points.size()]))
 	var minimum_nonlocal := INF
 	for first in points.size():
 		var first_next := (first + 1) % points.size()
@@ -148,6 +258,8 @@ static func _sampled_segment_checks(points: PackedVector2Array, total_length: fl
 			var second_s := (float(cumulative[second]) + float(cumulative[second + 1])) * 0.5
 			var half_lengths := (points[first].distance_to(points[first_next]) + points[second].distance_to(points[second_next])) * 0.5
 			if _cyclic_separation(first_s, second_s, sampled_length) + half_lengths < LOCAL_ARC_CUTOFF:
+				continue
+			if _nonlocal_skip_safe(segment_bounds[first], segment_bounds[second], approximation_error, approximation_error, minimum_nonlocal):
 				continue
 			var distance := float(_segment_closest(points[first], points[first_next], points[second], points[second_next])["distance"]) - approximation_error * 2.0
 			minimum_nonlocal = minf(minimum_nonlocal, distance)
@@ -421,6 +533,135 @@ static func _segment_closest(a0: Vector2, a1: Vector2, b0: Vector2, b1: Vector2)
 	return {"distance": point_a.distance_to(point_b), "t": s, "u": t, "point_a": point_a, "point_b": point_b}
 
 
+static func _segment_bounds(from: Vector2, to: Vector2) -> Rect2:
+	return Rect2(Vector2(minf(from.x, to.x), minf(from.y, to.y)), Vector2(absf(from.x - to.x), absf(from.y - to.y)))
+
+
+static func _aabb_gap_distance(a: Rect2, b: Rect2) -> float:
+	var gap_x := maxf(0.0, maxf(a.position.x, b.position.x) - minf(a.end.x, b.end.x))
+	var gap_y := maxf(0.0, maxf(a.position.y, b.position.y) - minf(a.end.y, b.end.y))
+	return sqrt(gap_x * gap_x + gap_y * gap_y)
+
+
+static func _nonlocal_skip_safe(a_bounds: Rect2, b_bounds: Rect2, a_error: float, b_error: float, current_minimum: float) -> bool:
+	if not is_finite(current_minimum):
+		return false
+	var gap := _aabb_gap_distance(a_bounds, b_bounds)
+	var lower := gap - a_error - b_error
+	var margin := SKIP_MARGIN_ABSOLUTE + SKIP_MARGIN_RELATIVE * gap
+	return lower >= current_minimum + margin
+
+
+static func _pair_possible_separation(s0_a: float, s1_a: float, s0_b: float, s1_b: float, total: float) -> float:
+	var midpoint_separation := _cyclic_separation((s0_a + s1_a) * 0.5, (s0_b + s1_b) * 0.5, total)
+	return midpoint_separation + (s1_a - s0_a + s1_b - s0_b) * 0.5
+
+
+# Arc-near stationary-return pass, in original route order. Only intervals whose
+# arc distance to `first` is inside LOCAL_ARC_CUTOFF are enumerated: the forward
+# window (non-wrapping) and the wrap window (across the loop seam). The two
+# windows are disjoint whenever `total > 2 * LOCAL_ARC_CUTOFF`; shorter routes
+# fall back to the exhaustive route-order loop, which is bit-identical to the
+# reference and only runs for tiny cell counts.
+static func _local_return_limb_pass(cells: Array[Dictionary], s0: PackedFloat64Array, s1: PackedFloat64Array, errors: PackedFloat64Array, total: float, primitive_count: int, minimum_return_limb: float) -> Dictionary:
+	var cutoff := LOCAL_ARC_CUTOFF
+	if total <= cutoff * 2.0 + LOCAL_WINDOW_MARGIN * 2.0:
+		for first in cells.size():
+			var a: Dictionary = cells[first]
+			for second in range(first + 1, cells.size()):
+				var b: Dictionary = cells[second]
+				if _pair_possible_separation(s0[first], s1[first], s0[second], s1[second], total) >= cutoff:
+					continue
+				var closest := _segment_closest(a["from"], a["to"], b["from"], b["to"])
+				if not _stationary_return_pair(a, b, closest, primitive_count):
+					continue
+				var certified := float(closest["distance"]) - errors[first] - errors[second]
+				minimum_return_limb = minf(minimum_return_limb, certified)
+				if certified < MIN_SELF_DISTANCE:
+					return {"failure": _failure(&"clearance", &"return_limb_spacing", "Continuous return-limb distance is %.2f, below %.0f." % [certified, MIN_SELF_DISTANCE], int(a["primitive_index"]), int(b["primitive_index"]))}
+		return {"minimum": minimum_return_limb}
+	for first in cells.size():
+		var a: Dictionary = cells[first]
+		var a_s0 := s0[first]
+		var a_s1 := s1[first]
+		# Forward arc-near window: second advances in route order until the arc
+		# gap from `first` clears the cutoff. `s1` is monotonically increasing.
+		var second := first + 1
+		while second < cells.size() and s1[second] - a_s0 < cutoff + LOCAL_WINDOW_MARGIN:
+			if _pair_possible_separation(a_s0, a_s1, s0[second], s1[second], total) < cutoff:
+				var b: Dictionary = cells[second]
+				var closest := _segment_closest(a["from"], a["to"], b["from"], b["to"])
+				if _stationary_return_pair(a, b, closest, primitive_count):
+					var certified := float(closest["distance"]) - errors[first] - errors[second]
+					minimum_return_limb = minf(minimum_return_limb, certified)
+					if certified < MIN_SELF_DISTANCE:
+						return {"failure": _failure(&"clearance", &"return_limb_spacing", "Continuous return-limb distance is %.2f, below %.0f." % [certified, MIN_SELF_DISTANCE], int(a["primitive_index"]), int(b["primitive_index"]))}
+			second += 1
+		# Wrap arc-near window: cells just behind the loop seam whose arc gap to
+		# `first` (through the seam) is inside the cutoff. `s0` increases with
+		# index, so iterating downward is monotonic.
+		second = cells.size() - 1
+		while second > first and s0[second] > a_s1 + (total - cutoff) - LOCAL_WINDOW_MARGIN:
+			if _pair_possible_separation(a_s0, a_s1, s0[second], s1[second], total) < cutoff:
+				var b: Dictionary = cells[second]
+				var closest := _segment_closest(a["from"], a["to"], b["from"], b["to"])
+				if _stationary_return_pair(a, b, closest, primitive_count):
+					var certified := float(closest["distance"]) - errors[first] - errors[second]
+					minimum_return_limb = minf(minimum_return_limb, certified)
+					if certified < MIN_SELF_DISTANCE:
+						return {"failure": _failure(&"clearance", &"return_limb_spacing", "Continuous return-limb distance is %.2f, below %.0f." % [certified, MIN_SELF_DISTANCE], int(a["primitive_index"]), int(b["primitive_index"]))}
+			second -= 1
+	return {"minimum": minimum_return_limb}
+
+
+# Deterministic x-sorted sweep over the continuous NONLOCAL pairs. Cells are
+# ordered by minimum-x, then original index, so the inner loop can stop as soon
+# as the x-gap (minus a conservative flatten-error bound) exceeds the running
+# minimum by the skip margin. Each candidate pair is canonicalized back to
+# original index order before `_segment_closest`, so the distance arithmetic is
+# bit-identical to the reference double loop. Arc-near pairs are skipped here;
+# the local pass owns them.
+static func _nonlocal_sweep(cells: Array[Dictionary], bounds: Array[Rect2], errors: PackedFloat64Array, s0: PackedFloat64Array, s1: PackedFloat64Array, total: float, max_cell_error: float, minimum_nonlocal: float) -> Dictionary:
+	var count := cells.size()
+	var order: Array[int] = []
+	order.resize(count)
+	for index in count:
+		order[index] = index
+	order.sort_custom(func(a: int, b: int) -> bool:
+		var a_x: float = bounds[a].position.x
+		var b_x: float = bounds[b].position.x
+		if a_x != b_x:
+			return a_x < b_x
+		return a < b
+	)
+	var cutoff := LOCAL_ARC_CUTOFF
+	for position in count:
+		var a_index: int = order[position]
+		var a_bounds: Rect2 = bounds[a_index]
+		var a_error := errors[a_index]
+		for right_position in range(position + 1, count):
+			var b_index: int = order[right_position]
+			var b_bounds: Rect2 = bounds[b_index]
+			if is_finite(minimum_nonlocal):
+				var x_gap := b_bounds.position.x - a_bounds.end.x
+				if x_gap - a_error - max_cell_error >= minimum_nonlocal + SKIP_MARGIN_ABSOLUTE + SKIP_MARGIN_RELATIVE * x_gap:
+					break
+			var low := a_index if a_index < b_index else b_index
+			var high := b_index if a_index < b_index else a_index
+			if _pair_possible_separation(s0[low], s1[low], s0[high], s1[high], total) < cutoff:
+				continue
+			if _nonlocal_skip_safe(a_bounds, b_bounds, a_error, errors[b_index], minimum_nonlocal):
+				continue
+			var low_cell: Dictionary = cells[low]
+			var high_cell: Dictionary = cells[high]
+			var closest := _segment_closest(low_cell["from"], low_cell["to"], high_cell["from"], high_cell["to"])
+			var certified := float(closest["distance"]) - errors[low] - errors[high]
+			minimum_nonlocal = minf(minimum_nonlocal, certified)
+			if certified < MIN_SELF_DISTANCE:
+				return {"failure": _failure(&"clearance", &"self_distance", "Continuous nonlocal self-distance is %.2f, below %.0f." % [certified, MIN_SELF_DISTANCE], int(low_cell["primitive_index"]), int(high_cell["primitive_index"]))}
+	return {"minimum": minimum_nonlocal}
+
+
 static func _primitive_entry_port(primitive: Dictionary) -> Dictionary:
 	return _port(primitive["start"], float(primitive["heading"]))
 
@@ -439,6 +680,25 @@ static func _primitive_point(primitive: Dictionary, fraction: float) -> Vector2:
 	if primitive["kind"] == &"line":
 		return (primitive["start"] as Vector2).lerp(primitive["end"], fraction)
 	return (primitive["center"] as Vector2) + ((primitive["start"] as Vector2) - (primitive["center"] as Vector2)).rotated(float(primitive["signed_turn"]) * fraction)
+
+
+# Inverse of `_primitive_point` for an exact on-primitive position: a line uses
+# the axial projection, an arc uses the directed angle traveled from its start.
+# Matches the `_point_on_arc` winding convention so round-tripping a generated
+# midpoint recovers its fraction exactly.
+static func _primitive_fraction(primitive: Dictionary, point: Vector2) -> float:
+	if primitive["kind"] == &"line":
+		var segment := (primitive["end"] as Vector2) - (primitive["start"] as Vector2)
+		var length_squared := segment.length_squared()
+		if length_squared <= POSITION_EPSILON * POSITION_EPSILON:
+			return 0.0
+		return clampf((point - (primitive["start"] as Vector2)).dot(segment) / length_squared, 0.0, 1.0)
+	var center: Vector2 = primitive["center"]
+	var turn := float(primitive["signed_turn"])
+	var start_angle := ((primitive["start"] as Vector2) - center).angle()
+	var point_angle := (point - center).angle()
+	var traveled := fposmod(point_angle - start_angle, TAU) if turn > 0.0 else fposmod(start_angle - point_angle, TAU)
+	return traveled / maxf(absf(turn), 0.000001)
 
 
 static func _minimum_analytic_radius(primitives: Array) -> float:

@@ -6,6 +6,7 @@ const ROOM_MODEL := preload("res://scripts/race/track_room_model.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const MODULES := preload("res://scripts/race/track_module_catalog.gd")
 const SIGNATURES := preload("res://scripts/race/track_layout_signatures.gd")
+const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 
 const CASES: Array[Dictionary] = [
 	{"room": &"classic", "tier": &"standard", "seed": 928},
@@ -21,6 +22,8 @@ func _run_test() -> void:
 	if not _test_signatures():
 		return
 	if not _test_general_graphs() or not _test_catalog_search() or not _test_technical_embeds() or not _test_remaining_bounds() or not _test_frontier_budget():
+		return
+	if not _test_resumed_search() or not _test_incremental_checks() or not _test_corner_trims() or not _test_reserved_connector() or not _test_canonical_band_cases() or not _test_exclusive_visits():
 		return
 	for test_case: Dictionary in CASES:
 		var started := Time.get_ticks_usec()
@@ -48,7 +51,7 @@ func _run_test() -> void:
 			return
 	if not _test_bounded_failure():
 		return
-	print("TRACK_LAYOUT_SOLVER_TEST PASS cases=2 bounded_failure=1")
+	print("TRACK_LAYOUT_SOLVER_TEST PASS cases=2 bounded_failure=1 resumed_seeds=3 incremental_crossing=1 diagonal_trims=1 reserved_closure=1 canonical_band=2")
 	quit(0)
 
 
@@ -60,7 +63,8 @@ func _verify_case(test_case: Dictionary, generated: Dictionary, elapsed_ms: floa
 	if not _expect(int(identity["schema_version"]) == 2 and int(identity["generator_version"]) == 8 and identity["room_shape"] == test_case["room"] and identity["length_tier"] == test_case["tier"] and int(identity["seed"]) == int(test_case["seed"]), "%s should retain its complete requested identity" % label):
 		return false
 	var cycle: Array = generated["gameplay_cycle"]
-	if not _expect(cycle.size() >= 6 and cycle.size() <= 12, "%s should stay inside its initial semantic-slot budget (got %d)" % [label, cycle.size()]):
+	var slot_ceiling := int((SOLVER.GRAPHS.TIER_SLOT_BUDGETS[StringName(test_case["tier"])] as Vector2i).y)
+	if not _expect(cycle.size() >= 6 and cycle.size() <= slot_ceiling, "%s should stay inside its published semantic-slot budget of at most %d (got %d)" % [label, slot_ceiling, cycle.size()]):
 		return false
 	for index in cycle.size():
 		if not _expect(int(cycle[index]["predecessor"]) == posmod(index - 1, cycle.size()) and int(cycle[index]["successor"]) == (index + 1) % cycle.size(), "%s slot %d should have exactly one cyclic predecessor and successor" % [label, index]):
@@ -80,6 +84,13 @@ func _verify_case(test_case: Dictionary, generated: Dictionary, elapsed_ms: floa
 	if not _expect(int(search["graph_candidates"]) <= SOLVER.MAX_GRAPH_CANDIDATES and int(search["placement_expansions"]) <= SOLVER.MAX_PLACEMENT_EXPANSIONS_PER_GRAPH * int(search["graph_candidates"]) and int(search["closure_candidates"]) <= SOLVER.MAX_CLOSURE_CANDIDATES * int(search["placement_expansions"]) and int(search["narrow_phase_operations"]) <= SOLVER.MAX_NARROW_PHASE_OPERATIONS, "%s should stay inside the per-graph placement, per-frontier closure, and shared narrow-phase caps" % label):
 		return false
 	var metrics: Dictionary = generated["metrics"]
+	var route: Dictionary = generated["analytic_route"]
+	if not _expect(route.has("finish_primitive_index"), "%s must sample from its protected finish straight" % label):
+		return false
+	var finish: Dictionary = route["primitives"][int(route["finish_primitive_index"])]
+	var finish_midpoint := (finish["start"] as Vector2).lerp(finish["end"], 0.5)
+	if not _expect((generated["points"][0] as Vector2).distance_to(finish_midpoint) <= MODULES.POSITION_TOLERANCE, "%s runtime start must coincide with the midpoint of the reserved finish straight" % label):
+		return false
 	if not _expect(float(metrics["closure_position_residual"]) <= 0.01 and float(metrics["closure_heading_residual"]) <= 0.0001 and absf(absf(float(metrics["signed_turn"])) - TAU) <= 0.0001, "%s should close analytically at the exact pose with +/-2PI winding" % label):
 		return false
 	var has_left := false
@@ -235,6 +246,8 @@ func _test_technical_embeds() -> bool:
 
 func _test_frontier_budget() -> bool:
 	var room := ROOM_MODEL.generate_recipe(&"classic", 1494245235, &"standard")
+	room["regions"] = []
+	room["portals"] = []
 	var graph := {"start_position": Vector2(-800, -300), "start_heading": 0.0}
 	var corner := MODULES.instantiate(&"corner_tight", {"radius": 180.0, "angle_deg": 90.0, "hand": 1.0})
 	var straight := MODULES.instantiate(&"straight_setup", {"length": 1600.0})
@@ -243,6 +256,166 @@ func _test_frontier_budget() -> bool:
 	var state := {"budget_exhausted": false, "closure_start": 0}
 	var closed := SOLVER._solve_closure(graph, room, {"min_length": 4375.0, "max_length": 9625.0}, counters, SOLVER._limits({}), instances, state)
 	return _expect(bool(closed.get("ok", false)) and not bool(state["budget_exhausted"]) and int(counters["closure_candidates"]) == SOLVER.MAX_CLOSURE_CANDIDATES + 1, "a new frontier must get its own closure allowance after a previous frontier consumed 24 candidates")
+
+
+func _test_resumed_search() -> bool:
+	for seed in [2, 3, 8]:
+		var identity := IDENTITIES.create_v8(&"kitchen", &"classic", seed, false, 1, "", "", {}, "long")
+		var room_seed := int(identity["room_geometry_seed"])
+		var generated := GENERATOR.generate_route(&"classic", &"long", seed, room_seed)
+		if not _expect(bool(generated.get("ok", false)), "long seed %d must reach a valid alternative instead of starving behind a rejected graph: %s" % [seed, generated.get("reason", "")]):
+			return false
+		if not _expect(bool(generated["analytic_validation"]["valid"]) and bool(generated["sampled_validation"]["valid"]) and int(generated["search"]["narrow_phase_operations"]) <= SOLVER.MAX_NARROW_PHASE_OPERATIONS, "resumed search must retain full validation and the original operation limit"):
+			return false
+		var repeated := GENERATOR.generate_route(&"classic", &"long", seed, room_seed)
+		if not _expect(generated["points"] == repeated.get("points") and generated["search"] == repeated.get("search"), "resumed candidate search must reproduce geometry and counters"):
+			return false
+	return true
+
+
+func _test_incremental_checks() -> bool:
+	var room := ROOM_MODEL.generate_recipe(&"classic", 1494245235, &"marathon")
+	var corner := MODULES.instantiate(&"corner_tight", {"radius": 180.0, "angle_deg": 90.0, "hand": 1.0})
+	var instances: Array[Dictionary] = []
+	var validated_count := 0
+	var sequence: Array[Dictionary] = [
+		MODULES.instantiate(&"straight_setup", {"length": 1600.0}), corner,
+		MODULES.instantiate(&"straight_setup", {"length": 600.0}), corner,
+		MODULES.instantiate(&"straight_setup", {"length": 1000.0}), corner,
+		MODULES.instantiate(&"straight_setup", {"length": 1200.0}),
+	]
+	for index in sequence.size():
+		instances.append(sequence[index])
+		var route := MODULES.compose(instances, Vector2(-800, -300))
+		var complete_check := SOLVER._partial_route_valid(route, room)
+		var incremental_check := SOLVER._partial_route_valid(route, room, validated_count)
+		if not _expect(complete_check == incremental_check and complete_check == (index < sequence.size() - 1), "incremental checks must accept valid extensions and reject a new limb crossing the validated prefix"):
+			return false
+		validated_count = (route["primitives"] as Array).size()
+	return true
+
+
+func _test_corner_trims() -> bool:
+	for definition: Dictionary in MODULES.definitions():
+		if definition["family"] not in [&"corner", &"profile"]:
+			continue
+		for angle_deg in [45.0, 90.0, 135.0]:
+			for hand in [-1.0, 1.0]:
+				var parameters := MODULES.proposal_parameters(definition["id"], {"hand": hand}, {"radius": 0.0, "inner_radius": 0.0, "outer_radius": 0.0})
+				parameters["angle_deg"] = angle_deg
+				var corner := MODULES.instantiate(definition["id"], parameters)
+				var trims := SOLVER.GRAPHS._corner_trims(corner)
+				var expected_exit := Vector2(trims.x, 0.0) + Vector2.RIGHT.rotated(deg_to_rad(angle_deg) * hand) * trims.y
+				if not _expect(expected_exit.distance_to(corner["exit_port"]["position"]) <= MODULES.POSITION_TOLERANCE, "corner trims must reproduce the tangent intersection for %s at %s degrees, hand %s" % [definition["id"], angle_deg, hand]):
+					return false
+	var ring := PackedVector2Array([Vector2(-2000, -600), Vector2(1000, -600), Vector2(1800, 200), Vector2(1800, 1000), Vector2(-2000, 1000)])
+	var graph := SOLVER.GRAPHS._embed_ring(ring, {"seed": 928, "length_tier": &"long"}, 0)
+	if not _expect(bool(graph.get("ok", false)), "diagonal ring must embed with sufficient straight and bend space"):
+		return false
+	var instances: Array[Dictionary] = []
+	for slot: Dictionary in (graph["ordinary_slots"] as Array) + (graph["closure_targets"] as Array):
+		instances.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+	var route := MODULES.compose(instances, graph["start_position"], float(graph["start_heading"]))
+	if not _expect(bool(MODULES.validate_join(route["exit_port"], route["entry_port"])["valid"]), "embedded diagonal ring must return to its exact starting pose before closure search"):
+		return false
+	return true
+
+
+func _test_reserved_connector() -> bool:
+	var room := ROOM_MODEL.generate_recipe(&"classic", 1494245235, &"standard")
+	var identity := {"room_shape": &"classic", "length_tier": &"standard", "seed": 928}
+	var band := SOLVER.GENERATED_RULES.length_profile("standard")
+	var resolved: Dictionary = {}
+	for graph: Dictionary in SOLVER._graph_candidates(room, identity):
+		if bool(graph.get("ok", false)) and not (graph.get("closure_targets", []) as Array).is_empty():
+			var target_modules: Array[Dictionary] = []
+			for slot: Dictionary in (graph["ordinary_slots"] as Array) + (graph["closure_targets"] as Array):
+				target_modules.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+			var route := MODULES.compose(target_modules, graph["start_position"], float(graph["start_heading"]))
+			if float(route["length"]) < float(band["min_length"]) or float(route["length"]) > float(band["max_length"]):
+				continue
+			if not bool(ROOM_MODEL.route_fits(room, route).get("valid", false)) or not bool(SOLVER._assign_regions_and_portals(graph, room, route).get("ok", false)):
+				continue
+			if not bool(SOLVER.VALIDATION.validate_continuous(route, room["outer"]).get("valid", false)) or not bool(SOLVER.VALIDATION.validate_sampled(route, MODULES.sample_route(route, 260, 35.0, 0.25), room["outer"]).get("valid", false)):
+				continue
+			resolved = graph
+			break
+	if not _expect(not resolved.is_empty(), "a real classic/standard graph must expose a reserved closure connector"):
+		return false
+	var modules: Array[Dictionary] = []
+	for slot: Dictionary in resolved["ordinary_slots"]:
+		modules.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+	var counters := {"closure_candidates": 0, "closure_rejections": 0, "narrow_phase_operations": 0, "last_rejection": &"none"}
+	var limits := SOLVER._limits({"closure_candidates_per_frontier": 1})
+	var state := {"budget_exhausted": false}
+	var closed := SOLVER._solve_closure(resolved, room, band, counters, limits, modules, state)
+	if not _expect(bool(closed.get("ok", false)) and not bool(state["budget_exhausted"]), "the reserved connector must close a real graph through the full validator stack (last rejection: %s)" % [counters.get("last_rejection", &"none")]):
+		return false
+	return _expect((closed["route"]["closure"] as Dictionary)["family"] == &"reserved" and int(counters["closure_candidates"]) == 1, "the reserved connector must be accepted as the single closure proposal (family=%s candidates=%d)" % [(closed["route"]["closure"] as Dictionary)["family"], int(counters["closure_candidates"])])
+
+
+func _test_canonical_band_cases() -> bool:
+	for test_case: Dictionary in [{"room": &"tall", "tier": &"long"}, {"room": &"classic", "tier": &"marathon"}]:
+		var room: StringName = test_case["room"]
+		var tier: StringName = test_case["tier"]
+		var label := "%s/%s" % [room, tier]
+		var identity := IDENTITIES.create_v8(&"kitchen", room, 0, false, 1, "", "", {}, String(tier))
+		if not _expect(not identity.is_empty(), "%s seed 0 must have a canonical v8 identity" % label):
+			return false
+		var room_seed := int(identity["room_geometry_seed"])
+		var generated := GENERATOR.generate_route(room, tier, 0, room_seed)
+		if not _expect(bool(generated.get("ok", false)), "%s seed 0 must solve: %s" % [label, generated.get("reason", "unknown")]):
+			return false
+		var gen_identity: Dictionary = generated["identity"]
+		if not _expect(int(gen_identity["room_geometry_seed"]) == room_seed and gen_identity["room_shape"] == room and gen_identity["length_tier"] == tier and int(gen_identity["seed"]) == 0, "%s seed 0 must retain its canonical identity" % label):
+			return false
+		var band := SOLVER.GENERATED_RULES.length_profile(String(tier))
+		var length := float(generated["metrics"]["length"])
+		if not _expect(length >= float(band["min_length"]) and length <= float(band["max_length"]), "%s seed 0 must land inside its requested length band (%.2f in [%.0f, %.0f])" % [label, length, float(band["min_length"]), float(band["max_length"])]):
+			return false
+		var required := 0
+		for visit: Dictionary in generated["region_visits"]:
+			if bool(visit["required"]):
+				required += 1
+				if not _expect(not (visit["slot_indices"] as PackedInt32Array).is_empty(), "%s seed 0 must assign every required region to route slots" % label):
+					return false
+		if not _expect(required > 0, "%s seed 0 must carry at least one required region" % label):
+			return false
+		var search: Dictionary = generated["search"]
+		if not _expect(int(search["graph_candidates"]) <= SOLVER.MAX_GRAPH_CANDIDATES and int(search["placement_expansions"]) <= SOLVER.MAX_PLACEMENT_EXPANSIONS_PER_GRAPH * int(search["graph_candidates"]) and int(search["closure_candidates"]) <= SOLVER.MAX_CLOSURE_CANDIDATES * int(search["placement_expansions"]) and int(search["narrow_phase_operations"]) <= SOLVER.MAX_NARROW_PHASE_OPERATIONS, "%s seed 0 must respect the original per-graph, per-frontier, and shared caps" % label):
+			return false
+		var repeated := GENERATOR.generate_route(room, tier, 0, room_seed)
+		if not _expect(generated["identity"] == repeated.get("identity") and generated["points"] == repeated.get("points") and generated["search"] == repeated.get("search"), "%s seed 0 must reproduce its canonical identity, geometry, and counters" % label):
+			return false
+	return true
+
+
+func _test_exclusive_visits() -> bool:
+	var corner := MODULES.instantiate(&"corner_tight", {"radius": 180.0, "angle_deg": 90.0, "hand": 1.0})
+	var modules: Array[Dictionary] = [
+		MODULES.instantiate(&"straight_setup", {"length": 1000.0}), corner,
+		MODULES.instantiate(&"straight_link", {"length": 180.0}), corner,
+		MODULES.instantiate(&"straight_setup", {"length": 1000.0}), corner,
+		MODULES.instantiate(&"straight_link", {"length": 180.0}), corner,
+	]
+	var route := MODULES.compose(modules, Vector2(-800, 0))
+	var room := {"regions": [
+		{"id": &"first", "required": true, "polygon": ROOM_MODEL._rectangle_ring(Vector2.ZERO, Vector2(4000, 3000))},
+		{"id": &"second", "required": true, "polygon": ROOM_MODEL._rectangle_ring(Vector2(0, 500), Vector2(4000, 2000))},
+	], "portals": []}
+	var rejected := SOLVER._assign_regions_and_portals({}, room, route)
+	if not _expect(not bool(rejected.get("ok", false)) and rejected.get("kind") == &"required_region_length", "counting module midpoints inside a shared junction must not count as visiting both arms"):
+		return false
+	room["regions"][0]["polygon"] = ROOM_MODEL._rectangle_ring(Vector2(-1000, 0), Vector2(2000, 3000))
+	room["regions"][1]["polygon"] = ROOM_MODEL._rectangle_ring(Vector2(750, 0), Vector2(2500, 3000))
+	var accepted := SOLVER._assign_regions_and_portals({}, room, route)
+	if not _expect(bool(accepted.get("ok", false)) and int(accepted["query_operations"]) > 0, "exclusive route lengths must certify a real visit to both overlapping required regions"):
+		return false
+	for visit: Dictionary in accepted["region_visits"]:
+		if not _expect(float(visit["exclusive_length"]) >= 450.0, "each certified required arm must carry at least 450 exclusive route units"):
+			return false
+	var exhausted := SOLVER._assign_regions_and_portals({}, room, route, 0)
+	return _expect(not bool(exhausted.get("ok", false)) and bool(exhausted.get("budget_exhausted", false)) and int(exhausted["query_operations"]) == 0, "region certification must respect the remaining query allowance")
 
 
 func _expect(condition: bool, message: String) -> bool:

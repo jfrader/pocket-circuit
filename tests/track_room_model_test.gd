@@ -19,9 +19,13 @@ func _run_test() -> void:
 		return
 	if not _test_el_notch_and_catalog_placement():
 		return
+	if not _test_el_notch_profiles():
+		return
 	if not _test_independent_recipes():
 		return
-	print("TRACK_ROOM_MODEL_TEST PASS legacy_round_trips=6 offset_contours=1 erosion_components=2 portal_width=590 notch_guard=1 concave_fixture=1 recipes=30")
+	if not _test_bay_depth_scale_invariance():
+		return
+	print("TRACK_ROOM_MODEL_TEST PASS legacy_round_trips=6 offset_contours=1 erosion_components=2 portal_width=590 notch_guard=1 concave_fixture=1 recipes=30 bay_depth_seed_groups=15 el_notch_profiles=3")
 	quit(0)
 
 
@@ -96,6 +100,50 @@ func _test_el_notch_and_catalog_placement() -> bool:
 	return _expect(not bool(rejected.get("valid", false)) and rejected.get("kind") == &"route_outside_free_space", "free-polygon placement should reject a sweep crossing the EL notch even when route vertices are in bounds")
 
 
+func _test_el_notch_profiles() -> bool:
+	var profiles: Array = ROOM_MODEL.RECIPE_DATA.recipe(&"el")["notch_profiles"]
+	if not _expect(profiles.size() == 3, "EL recipe should author three notch profiles"):
+		return false
+	var profile_seed := {}
+	for seed in 48:
+		var room := ROOM_MODEL.generate_recipe(&"el", seed, &"standard")
+		if not _expect(bool(room.get("valid", false)), "EL seed %d should stay a valid recipe" % seed):
+			return false
+		var index := int(room["el_notch_profile_index"])
+		if not profile_seed.has(index):
+			profile_seed[index] = seed
+	if not _expect(profile_seed.size() == 3, "EL development window should expose all three authored notch profiles: %s" % profile_seed):
+		return false
+	for index in profiles.size():
+		var seed := int(profile_seed[index])
+		var tier_size: Vector2 = ROOM_MODEL.TIER_SIZE[&"standard"]
+		var room := ROOM_MODEL.generate_recipe(&"el", seed, &"standard")
+		var corner := _el_notch_corner(room["outer"])
+		var half := _ring_half_extent(room["outer"])
+		var base: Vector2 = profiles[index]
+		var lower := Vector2(
+			clampf((base.x - 150.0) * tier_size.x, -half.x + 900.0, half.x - 900.0),
+			clampf((base.y - 125.0) * tier_size.y, -half.y + 900.0, half.y - 900.0)
+		)
+		var upper := Vector2(
+			clampf((base.x + 150.0) * tier_size.x, -half.x + 900.0, half.x - 900.0),
+			clampf((base.y + 125.0) * tier_size.y, -half.y + 900.0, half.y - 900.0)
+		)
+		if not _expect(corner.x >= lower.x - 0.1 and corner.x <= upper.x + 0.1 and corner.y >= lower.y - 0.1 and corner.y <= upper.y + 0.1, "EL profile %d notch corner %s should follow authored profile %s within %s..%s" % [index, corner, base, lower, upper]):
+			return false
+	for index in profiles.size():
+		for tier: StringName in ROOM_MODEL.TIER_SIZE:
+			var room := ROOM_MODEL.generate_recipe(&"el", int(profile_seed[index]), tier)
+			if not _expect(bool(room.get("valid", false)) and int(room["el_notch_profile_index"]) == index, "EL profile %d/%s should stay valid with its selected profile" % [index, tier]):
+				return false
+			if not _expect(int((room["portals"] as Array)[0]["traversal_capacity"]) >= 2, "EL profile %d/%s should keep a full-width two-lane junction portal" % [index, tier]):
+				return false
+			for region: Dictionary in room["regions"]:
+				if not _expect(float(region["available_route_depth"]) >= 450.0, "EL profile %d/%s should budget at least 450 route units in every arm" % [index, tier]):
+					return false
+	return true
+
+
 func _test_independent_recipes() -> bool:
 	var first_digests := {}
 	for family: StringName in [&"classic", &"wide", &"tall", &"el", &"long", &"square"]:
@@ -116,14 +164,87 @@ func _test_independent_recipes() -> bool:
 			return false
 		if family != &"el":
 			var boundary_styles := {}
+			var shelf_seed := -1
 			for seed in 48:
 				var varied := ROOM_MODEL.generate_recipe(family, seed, &"compact")
 				if not _expect(bool(varied.get("valid", false)), "%s compact boundary variant %d should preserve its polygon and portals" % [family, seed]):
 					return false
 				boundary_styles[varied["boundary_style"]] = true
-			if not _expect(boundary_styles.size() == 3, "%s should expose all three authored boundary styles in the fixed development window" % family):
+				if varied["boundary_style"] == &"upper_shelf":
+					shelf_seed = seed
+			var authored_styles: Array = ROOM_MODEL.RECIPE_DATA.recipe(family)["boundary_styles"]
+			if not _expect(boundary_styles.size() == authored_styles.size(), "%s should expose every authored boundary style in the fixed development window" % family):
+				return false
+			for tier: StringName in ROOM_MODEL.TIER_SIZE:
+				var shelf := ROOM_MODEL.generate_recipe(family, shelf_seed, tier)
+				if not _expect(bool(shelf.get("valid", false)), "shelf boundary must retain valid full-width portals in every tier"):
+					return false
+				for region: Dictionary in shelf["regions"]:
+					if region["id"] not in [&"west_bay", &"east_bay"]:
+						continue
+					var center := Vector2.ZERO
+					for point: Vector2 in region["polygon"]:
+						center += point
+					if not _expect(center.y < 0.0, "upper shelf must place both bay centers above the room center"):
+						return false
+	return true
+
+
+func _test_bay_depth_scale_invariance() -> bool:
+	for family: StringName in [&"classic", &"wide", &"tall", &"long", &"square"]:
+		for seed: int in [928, 17, 104729]:
+			var proportions := PackedFloat64Array()
+			for tier: StringName in [&"compact", &"standard", &"long", &"endurance", &"marathon"]:
+				var room := ROOM_MODEL.generate_recipe(family, seed, tier)
+				if not _expect(bool(room.get("valid", false)), "%s/%s seed %d should stay a valid recipe with intact portals" % [family, tier, seed]):
+					return false
+				var bounds := _region_x_bounds(room, &"west_bay")
+				if not _expect(bounds.size() == 2, "%s/%s seed %d should expose a west_bay region" % [family, tier, seed]):
+					return false
+				proportions.append((bounds[1] - bounds[0]) / -bounds[1])
+			var minimum := float(proportions[0])
+			var maximum := float(proportions[0])
+			for index in range(1, proportions.size()):
+				minimum = minf(minimum, float(proportions[index]))
+				maximum = maxf(maximum, float(proportions[index]))
+			if not _expect(maximum - minimum <= 0.00001 * maxf(1.0, absf(maximum)), "%s seed %d seeded bay depth proportions should be tier-invariant: %s" % [family, seed, proportions]):
 				return false
 	return true
+
+
+func _region_x_bounds(room: Dictionary, id: StringName) -> PackedFloat64Array:
+	for region: Dictionary in room["regions"]:
+		if region["id"] == id:
+			var polygon: PackedVector2Array = region["polygon"]
+			var minimum := INF
+			var maximum := -INF
+			for point: Vector2 in polygon:
+				minimum = minf(minimum, point.x)
+				maximum = maxf(maximum, point.x)
+			return PackedFloat64Array([minimum, maximum])
+	return PackedFloat64Array()
+
+
+func _el_notch_corner(outer: PackedVector2Array) -> Vector2:
+	var minimum := Vector2(INF, INF)
+	var maximum := Vector2(-INF, -INF)
+	for point: Vector2 in outer:
+		minimum.x = minf(minimum.x, point.x)
+		minimum.y = minf(minimum.y, point.y)
+		maximum.x = maxf(maximum.x, point.x)
+		maximum.y = maxf(maximum.y, point.y)
+	for point: Vector2 in outer:
+		if point.x > minimum.x + 0.5 and point.x < maximum.x - 0.5 and point.y > minimum.y + 0.5 and point.y < maximum.y - 0.5:
+			return point
+	return Vector2(NAN, NAN)
+
+
+func _ring_half_extent(outer: PackedVector2Array) -> Vector2:
+	var maximum := Vector2(-INF, -INF)
+	for point: Vector2 in outer:
+		maximum.x = maxf(maximum.x, point.x)
+		maximum.y = maxf(maximum.y, point.y)
+	return maximum
 
 
 func _rect(center: Vector2, size: Vector2) -> PackedVector2Array:
