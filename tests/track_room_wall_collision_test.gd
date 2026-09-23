@@ -4,7 +4,11 @@ extends SceneTree
 ## free space, so each wall body sits half its thickness outside an edge and is
 ## clipped against the room interior at concave corners. Proves, for convex and
 ## concave polygons in either winding, that wall collision (a) never intrudes
-## into the interior and (b) still closes the room boundary.
+## into the interior and (b) still closes the room boundary. Also runs every
+## frozen v7 shipping shape (BUILDER.ROOM_SHAPES, including the concave `el`)
+## through the same checks plus the prepare-time clip/decompose gate, so a frozen
+## shape that would now be silently dropped as an empty {} layout fails loudly
+## here instead.
 
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const WALL_MASK := 2
@@ -36,7 +40,19 @@ func _run_test() -> void:
 			checked += 1
 	if not await _check_negative():
 		return
-	print("TRACK_ROOM_WALL_COLLISION_TEST PASS polygons=%d windings=%d" % [polygons.size(), checked])
+	# Every frozen v7 room shape the shipping path can emit (BUILDER.ROOM_SHAPES,
+	# including the concave `el`) must keep outward wall collision out of the
+	# interior, close the boundary, and pass the prepare-time clip/decompose gate
+	# that otherwise returns {} and silently drops the track.
+	for room_shape: String in BUILDER.ROOM_SHAPES:
+		var frozen: PackedVector2Array = BUILDER.ROOM_SHAPES[room_shape]
+		for winding: PackedVector2Array in [frozen, _reversed(frozen)]:
+			if not await _check_polygon(winding):
+				return
+			checked += 1
+		if not _check_prepare_gate(room_shape, frozen):
+			return
+	print("TRACK_ROOM_WALL_COLLISION_TEST PASS synthetic=%d frozen=%d windings=%d" % [polygons.size(), BUILDER.ROOM_SHAPES.size(), checked])
 	quit(0)
 
 
@@ -104,6 +120,17 @@ func _check_negative() -> bool:
 		await _cleanup(fixture)
 		return false
 	await _cleanup(fixture)
+	return true
+
+
+func _check_prepare_gate(room_shape: String, polygon: PackedVector2Array) -> bool:
+	# Mirrors the prepare_layout gate: a room whose outward wall rectangle cannot
+	# be clipped/decomposed into convex collision yields {} (no track). The
+	# shipping v7 path runs this on every frozen ROOM_SHAPES entry, so each edge
+	# must produce at least one convex piece here or the track silently vanishes.
+	for entry: Dictionary in BUILDER._room_wall_edges(polygon):
+		if BUILDER._wall_collision_pieces(entry["from"], entry["to"], entry["outward"], BUILDER.ROOM_WALL_THICKNESS, polygon).is_empty():
+			return _expect(false, "%s wall edge %s -> %s fails the prepare gate (no clipped convex collision)" % [room_shape, str(entry["from"]), str(entry["to"])])
 	return true
 
 
