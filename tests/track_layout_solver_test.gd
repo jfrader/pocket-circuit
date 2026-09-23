@@ -13,6 +13,11 @@ const CASES: Array[Dictionary] = [
 	{"room": &"el", "tier": &"compact", "seed": 1001},
 ]
 
+const CANONICAL_GRAPH_CASES: Array[Dictionary] = [
+	{"room": &"classic", "tier": &"marathon"},
+	{"room": &"tall", "tier": &"compact"},
+]
+
 
 func _initialize() -> void:
 	call_deferred("_run_test")
@@ -24,6 +29,8 @@ func _run_test() -> void:
 	if not _test_general_graphs() or not _test_catalog_search() or not _test_technical_embeds() or not _test_remaining_bounds() or not _test_frontier_budget():
 		return
 	if not _test_resumed_search() or not _test_incremental_checks() or not _test_corner_trims() or not _test_reserved_connector() or not _test_canonical_band_cases() or not _test_exclusive_visits():
+		return
+	if not _test_band_and_finish_contract() or not _test_graph_determinism():
 		return
 	for test_case: Dictionary in CASES:
 		var started := Time.get_ticks_usec()
@@ -51,7 +58,7 @@ func _run_test() -> void:
 			return
 	if not _test_bounded_failure():
 		return
-	print("TRACK_LAYOUT_SOLVER_TEST PASS cases=2 bounded_failure=1 resumed_seeds=3 incremental_crossing=1 diagonal_trims=1 reserved_closure=1 canonical_band=2")
+	print("TRACK_LAYOUT_SOLVER_TEST PASS cases=2 bounded_failure=1 resumed_seeds=3 incremental_crossing=1 diagonal_trims=1 reserved_closure=1 canonical_band=2 band_contract=2 determinism=2")
 	quit(0)
 
 
@@ -416,6 +423,112 @@ func _test_exclusive_visits() -> bool:
 			return false
 	var exhausted := SOLVER._assign_regions_and_portals({}, room, route, 0)
 	return _expect(not bool(exhausted.get("ok", false)) and bool(exhausted.get("budget_exhausted", false)) and int(exhausted["query_operations"]) == 0, "region certification must respect the remaining query allowance")
+
+
+func _test_band_and_finish_contract() -> bool:
+	for test_case: Dictionary in CANONICAL_GRAPH_CASES:
+		var room: StringName = test_case["room"]
+		var tier: StringName = test_case["tier"]
+		var label := "%s/%s" % [room, tier]
+		var identity := IDENTITIES.create_v8(&"kitchen", room, 0, false, 1, "", "", {}, String(tier))
+		if not _expect(not identity.is_empty(), "%s seed 0 must have a canonical v8 identity" % label):
+			return false
+		var resolved := SOLVER._resolve_request({
+			"seed": 0,
+			"room_shape": room,
+			"length_tier": tier,
+			"room_geometry_seed": int(identity["room_geometry_seed"]),
+		})
+		if not _expect(bool(resolved.get("ok", false)), "%s must resolve: %s" % [label, resolved.get("reason", "unknown")]):
+			return false
+		var band: Dictionary = resolved["band"]
+		var graphs := SOLVER._graph_candidates(resolved["room"], resolved["identity"])
+		if not _expect(graphs.size() == SOLVER.MAX_GRAPH_CANDIDATES, "%s should enumerate the full graph budget" % label):
+			return false
+		var feasible := 0
+		var length_capacity_rejections := 0
+		for graph: Dictionary in graphs:
+			if not bool(graph.get("ok", false)):
+				if not _expect(graph.has("reason") and graph.get("kind") is StringName, "%s graph failure must explain its geometric or capacity constraint" % label):
+					return false
+				if graph.get("kind") == &"length_capacity":
+					length_capacity_rejections += 1
+				continue
+			feasible += 1
+			var route := _compose_target(graph)
+			if not _expect(bool(route.get("ok", false)), "%s target route must compose" % label):
+				return false
+			var length := float(route["length"])
+			if not _expect(length >= float(band["min_length"]) and length <= float(band["max_length"]), "%s composed target must land inside its tier band (%.2f in [%.0f, %.0f])" % [label, length, float(band["min_length"]), float(band["max_length"])]):
+				return false
+			var ring := _ring_from_route(route)
+			var longest_edge := SOLVER.GRAPHS._longest_edge_length(ring)
+			if not _expect(longest_edge >= SOLVER.GRAPHS.FINISH_EDGE_MIN + 2.0 * SOLVER.GRAPHS.RADIUS, "%s composed target ring must keep its finish straight (longest edge %.2f below %.2f)" % [label, longest_edge, SOLVER.GRAPHS.FINISH_EDGE_MIN + 2.0 * SOLVER.GRAPHS.RADIUS]):
+				return false
+		if not _expect(feasible > 0, "%s must have a constructible region graph" % label):
+			return false
+		if String(tier) == "marathon":
+			if not _expect(length_capacity_rejections > 0, "%s must reject floor-unreachable rings as length_capacity" % label):
+				return false
+	return true
+
+
+func _test_graph_determinism() -> bool:
+	for test_case: Dictionary in CANONICAL_GRAPH_CASES:
+		var room: StringName = test_case["room"]
+		var tier: StringName = test_case["tier"]
+		var label := "%s/%s" % [room, tier]
+		var identity := IDENTITIES.create_v8(&"kitchen", room, 0, false, 1, "", "", {}, String(tier))
+		var resolved := SOLVER._resolve_request({
+			"seed": 0,
+			"room_shape": room,
+			"length_tier": tier,
+			"room_geometry_seed": int(identity["room_geometry_seed"]),
+		})
+		if not _expect(bool(resolved.get("ok", false)), "%s must resolve" % label):
+			return false
+		var first := SOLVER._graph_candidates(resolved["room"], resolved["identity"])
+		var second := SOLVER._graph_candidates(resolved["room"], resolved["identity"])
+		for index in first.size():
+			var graph: Dictionary = first[index]
+			var repeated: Dictionary = second[index]
+			if not _expect(bool(graph.get("ok", false)) == bool(repeated.get("ok", false)), "%s graph %d must rebuild the same acceptance" % [label, index]):
+				return false
+			if not bool(graph.get("ok", false)):
+				continue
+			var ring := _ring_from_route(_compose_target(graph))
+			var repeated_ring := _ring_from_route(_compose_target(repeated))
+			if not _expect(SOLVER.GRAPHS._ring_length(ring) == SOLVER.GRAPHS._ring_length(repeated_ring) and SOLVER.GRAPHS._longest_edge_length(ring) == SOLVER.GRAPHS._longest_edge_length(repeated_ring), "%s graph %d must rebuild the identical ring length and longest edge" % [label, index]):
+				return false
+	return true
+
+
+func _compose_target(graph: Dictionary) -> Dictionary:
+	var target_modules: Array[Dictionary] = []
+	for slot: Dictionary in (graph["ordinary_slots"] as Array) + (graph["closure_targets"] as Array):
+		target_modules.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+	return MODULES.compose(target_modules, graph["start_position"], float(graph["start_heading"]))
+
+
+func _ring_from_route(route: Dictionary) -> PackedVector2Array:
+	var vertices := PackedVector2Array()
+	for module: Dictionary in route["modules"]:
+		var family: StringName = MODULES.definition(module["id"])["family"]
+		if family not in [&"corner", &"profile", &"return"]:
+			continue
+		var entry: Dictionary = module["entry_port"]
+		var exit: Dictionary = module["exit_port"]
+		var entry_dir := Vector2.RIGHT.rotated(float(entry["heading"]))
+		var exit_dir := Vector2.RIGHT.rotated(float(exit["heading"]))
+		var crossing := entry_dir.cross(exit_dir)
+		if absf(crossing) <= MODULES.HEADING_TOLERANCE:
+			var radius := float(module["parameters"].get("radius", SOLVER.GRAPHS.RADIUS))
+			vertices.append((entry["position"] as Vector2) + entry_dir * radius)
+			vertices.append((exit["position"] as Vector2) - exit_dir * radius)
+		else:
+			var along := ((exit["position"] as Vector2) - (entry["position"] as Vector2)).cross(exit_dir) / crossing
+			vertices.append((entry["position"] as Vector2) + entry_dir * along)
+	return vertices
 
 
 func _expect(condition: bool, message: String) -> bool:
