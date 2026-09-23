@@ -220,7 +220,9 @@ func _prepare_race_async() -> void:
 		add_child(track_root)
 		if prepared.has("loaded_preview_fingerprint"):
 			track_root.set_meta("preview_fingerprint", prepared["loaded_preview_fingerprint"])
-		await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step)
+		if not await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step):
+			app.call("fail_race_loading", "The room could not be assembled")
+			return
 		_apply_circuit_identity_metadata(event)
 		_apply_track_variant(StringName(event.get("theme", "kitchen")))
 	else:

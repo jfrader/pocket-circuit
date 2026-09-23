@@ -11,12 +11,12 @@ static var LEGACY_OUTERS := {
 }
 
 static var RECIPES := {
-	&"classic": {"id": 0, "revision": 1, "half_size": Vector2(1540, 1010), "bevel": 105.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays"]},
-	&"wide": {"id": 1, "revision": 1, "half_size": Vector2(2070, 1050), "bevel": 115.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays"]},
-	&"tall": {"id": 2, "revision": 1, "half_size": Vector2(1020, 1320), "bevel": 105.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays"]},
-	&"el": {"id": 5, "revision": 1, "half_size": Vector2(2100, 1225), "notch": Vector2(630, -105)},
-	&"long": {"id": 3, "revision": 1, "half_size": Vector2(2300, 980), "bevel": 100.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays"]},
-	&"square": {"id": 4, "revision": 1, "half_size": Vector2(1330, 1330), "bevel": 125.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays"]},
+	&"classic": {"id": 0, "revision": 1, "half_size": Vector2(1540, 1010), "bevel": 105.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays", &"upper_shelf"]},
+	&"wide": {"id": 1, "revision": 1, "half_size": Vector2(2070, 1050), "bevel": 115.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays", &"upper_shelf"]},
+	&"tall": {"id": 2, "revision": 1, "half_size": Vector2(1020, 1320), "bevel": 105.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays", &"upper_shelf"]},
+	&"el": {"id": 5, "revision": 1, "half_size": Vector2(2100, 1225), "notch_profiles": [Vector2(210, -300), Vector2(630, -105), Vector2(1050, 300)]},
+	&"long": {"id": 3, "revision": 1, "half_size": Vector2(2300, 980), "bevel": 100.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays", &"upper_shelf"]},
+	&"square": {"id": 4, "revision": 1, "half_size": Vector2(1330, 1330), "bevel": 125.0, "boundary_styles": [&"paired_bays", &"offset_bays", &"asymmetric_bays", &"upper_shelf"]},
 }
 
 

@@ -2,7 +2,7 @@ class_name TrackBuilderScene
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
 
-static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
+static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), room_model: Dictionary = {}) -> bool:
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
@@ -77,19 +77,12 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	if not spec.get("seed_obstacles", false):
 		TrackBuilderCore._add_corner_set_pieces(root, spec, room_polygon, clipped)
 
-	# Room walls (real furniture edges along the room outline)
+	# Room walls (real furniture edges along the room outline). Walls sit on the
+	# outside of each edge at exact edge length; see TrackBuilderCore._build_room_walls.
 	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
-	var wall_index := 0
-	for index in room_polygon.size():
-		var from: Vector2 = room_polygon[index]
-		var to: Vector2 = room_polygon[(index + 1) % room_polygon.size()]
-		var mid := (from + to) * 0.5
-		var edge_vector := to - from
-		var length := edge_vector.length()
-		if length < 1.0:
-			continue
-		TrackBuilderCore._add_wall_segment(root, "Wall%d" % wall_index, mid, length, atan2(edge_vector.y, edge_vector.x), edge_texture)
-		wall_index += 1
+	if not TrackBuilderCore._build_room_walls(root, room_polygon, edge_texture):
+		push_error("TrackBuilderScene: room wall collision could not be built for %s" % String(spec.get("room_shape", "")))
+		return false
 
 	# Checkpoints along the arc, aligned to the tangent. The last lap gate sits
 	# slightly past the corner rejoin so its recovery point stays on a straight.
@@ -211,3 +204,4 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	# directions. Canonical fixtures retain the older one-sided start banner.
 	if not spec.get("seed_obstacles", false):
 		TrackBuilderCore._add_start_banner(root, start, start_tangent, corridor)
+	return true

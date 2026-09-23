@@ -202,15 +202,27 @@ static func compose(instances: Array[Dictionary], entry_position: Vector2 = Vect
 static func sample_route(route: Dictionary, minimum_samples: int = 260, maximum_step: float = 35.0, maximum_chord_deviation: float = 0.25) -> Dictionary:
 	if not bool(route.get("ok", false)) or (route.get("primitives", []) as Array).is_empty():
 		return _error("invalid_route", "Only a composed analytic route can be sampled.")
+	var primitives: Array = route["primitives"]
+	var finish_index := -1
+	if route.has("finish_primitive_index"):
+		var requested: Variant = route["finish_primitive_index"]
+		if requested is not int:
+			return _error("finish_primitive_index", "finish_primitive_index must be an integer primitive index, not %s." % type_string(typeof(requested)))
+		finish_index = int(requested)
+		if finish_index < 0 or finish_index >= primitives.size():
+			return _error("finish_primitive_index", "finish_primitive_index %d is outside the route's %d primitives." % [finish_index, primitives.size()])
+		if (primitives[finish_index] as Dictionary)["kind"] != &"line":
+			return _error("finish_primitive_index", "finish_primitive_index %d must reference a line primitive, not %s." % [finish_index, (primitives[finish_index] as Dictionary)["kind"]])
 	var target_step := minf(maximum_step, float(route["length"]) / float(maxi(minimum_samples, 1)))
 	var points := PackedVector2Array()
 	var primitive_boundaries := PackedInt32Array()
 	var max_realized_step := 0.0
 	var max_realized_arc_step := 0.0
 	var max_realized_deviation := 0.0
-	for primitive_index in (route["primitives"] as Array).size():
-		var primitive: Dictionary = route["primitives"][primitive_index]
-		primitive_boundaries.append(points.size())
+	var finish_midpoint_index := -1
+	for primitive_index in primitives.size():
+		var primitive: Dictionary = primitives[primitive_index]
+		primitive_boundaries.append(0 if points.is_empty() else points.size() - 1)
 		if points.is_empty():
 			points.append(primitive["start"])
 		var steps := maxi(1, ceili(float(primitive["length"]) / target_step))
@@ -218,13 +230,19 @@ static func sample_route(route: Dictionary, minimum_samples: int = 260, maximum_
 			var radius := float(primitive["radius"])
 			var deviation_angle := 2.0 * acos(clampf(1.0 - maximum_chord_deviation / radius, -1.0, 1.0))
 			steps = maxi(steps, ceili(absf(float(primitive["signed_turn"])) / maxf(deviation_angle, 0.000001)))
+		if primitive_index == finish_index:
+			steps = maxi(steps, 2)
+			if steps % 2 == 1:
+				steps += 1
 		for step in range(1, steps + 1):
-			if primitive_index == (route["primitives"] as Array).size() - 1 and step == steps:
+			if primitive_index == primitives.size() - 1 and step == steps:
 				continue
 			var fraction := float(step) / float(steps)
 			var point := _primitive_point(primitive, fraction)
 			max_realized_step = maxf(max_realized_step, points[points.size() - 1].distance_to(point))
 			points.append(point)
+			if primitive_index == finish_index and step * 2 == steps:
+				finish_midpoint_index = points.size() - 1
 		if primitive["kind"] == &"arc":
 			var arc_step := float(primitive["length"]) / float(steps)
 			var angle_step := absf(float(primitive["signed_turn"])) / float(steps)
@@ -233,6 +251,10 @@ static func sample_route(route: Dictionary, minimum_samples: int = 260, maximum_
 	max_realized_step = maxf(max_realized_step, points[points.size() - 1].distance_to(points[0]))
 	if points.size() < minimum_samples:
 		return _error("sample_count", "Analytic sampling produced fewer than %d points." % minimum_samples)
+	if finish_index >= 0:
+		points = _rotate_points(points, finish_midpoint_index)
+		for index in primitive_boundaries.size():
+			primitive_boundaries[index] = posmod(primitive_boundaries[index] - finish_midpoint_index, points.size())
 	return {
 		"ok": true,
 		"points": points,
@@ -518,6 +540,14 @@ static func _primitive_point(primitive: Dictionary, fraction: float) -> Vector2:
 	if primitive["kind"] == &"line":
 		return (primitive["start"] as Vector2).lerp(primitive["end"], fraction)
 	return (primitive["center"] as Vector2) + ((primitive["start"] as Vector2) - (primitive["center"] as Vector2)).rotated(float(primitive["signed_turn"]) * fraction)
+
+
+static func _rotate_points(points: PackedVector2Array, offset: int) -> PackedVector2Array:
+	var rotated := PackedVector2Array()
+	rotated.resize(points.size())
+	for index in points.size():
+		rotated[index] = points[(index + offset) % points.size()]
+	return rotated
 
 
 static func _transform_point(point: Vector2, origin: Vector2, rotation: float) -> Vector2:

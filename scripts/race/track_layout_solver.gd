@@ -43,15 +43,24 @@ static func solve(request: Dictionary) -> Dictionary:
 		return _failure(identity, &"region_assignment", portal_check.get("kind", &"portal_infeasible"), String(portal_check.get("reason", "Required room portal is infeasible.")), counters)
 	var candidates := _graph_candidates(room, identity)
 	var graph_count := mini(candidates.size(), int(limits["graph_candidates"]))
-	for attempt in graph_count * 2:
+	var placements: Array[Dictionary] = []
+	var attempt := 0
+	var active := graph_count
+	var budget_stage := &""
+	var budget_reason := ""
+	while active > 0:
 		var graph_index := attempt % graph_count
 		var target_pass := attempt < graph_count
+		attempt += 1
 		if target_pass:
 			counters["graph_candidates"] = int(counters["graph_candidates"]) + 1
 		var graph: Dictionary = candidates[graph_index]
+		if target_pass:
+			placements.append(_placement_state(graph) if bool(graph.get("ok", false)) else {"finished": true})
 		if not bool(graph.get("ok", false)):
 			if not target_pass:
 				continue
+			active -= 1
 			counters["last_rejection"] = graph.get("kind", &"invalid_graph")
 			counters["last_reason"] = graph.get("reason", "Invalid graph.")
 			var failures: Dictionary = counters["graph_failure_reasons"]
@@ -59,29 +68,34 @@ static func solve(request: Dictionary) -> Dictionary:
 			failures[detail] = int(failures.get(detail, 0)) + 1
 			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
 			continue
-		var search := _place_targets(graph, room, band, counters, limits) if target_pass else _place_graph(graph, room, band, counters, limits)
+		var placement: Dictionary = placements[graph_index]
+		if bool(placement["finished"]):
+			continue
+		var search := _place_targets(graph, room, band, counters, limits) if target_pass else _advance_placement(placement, room, band, counters, limits)
+		if target_pass:
+			placement["expansions"] = int(graph.get("target_expansions", 0))
 		if bool(search.get("budget_exhausted", false)):
-			return _failure(identity, StringName(search.get("stage", &"placement")), &"search_budget_exhausted", String(search.get("reason", "The deterministic search budget was exhausted.")), counters)
-		if not bool(search.get("ok", false)):
+			# One candidate exhausting the shared allowance must not abandon the
+			# request: reject that candidate and let cheaper ones still be tried.
+			# The request fails only once no candidate can make progress.
+			placement["finished"] = true
+			active -= 1
 			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
+			if budget_stage == &"":
+				budget_stage = StringName(search.get("stage", &"placement"))
+				budget_reason = String(search.get("reason", "The deterministic search budget was exhausted."))
+			continue
+		if bool(placement["finished"]):
+			active -= 1
+		if not bool(search.get("ok", false)):
+			if target_pass or bool(placement["finished"]):
+				counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
 			continue
 		var route: Dictionary = search["route"]
-		var assignments := _assign_regions_and_portals(graph, room, route)
-		if not bool(assignments.get("ok", false)):
-			counters["last_rejection"] = assignments.get("kind", &"region_assignment")
-			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
-			continue
-		var continuous := VALIDATION.validate_continuous(route, room["outer"])
-		if not bool(continuous.get("valid", false)):
-			counters["last_rejection"] = continuous.get("kind", &"continuous_validation")
-			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
-			continue
-		var sampling := MODULES.sample_route(route, 260, 35.0, 0.25)
-		var sampled := VALIDATION.validate_sampled(route, sampling, room["outer"])
-		if not bool(sampled.get("valid", false)):
-			counters["last_rejection"] = sampled.get("kind", &"sampled_validation")
-			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
-			continue
+		var assignments: Dictionary = search["assignments"]
+		var continuous: Dictionary = search["continuous"]
+		var sampling: Dictionary = search["sampling"]
+		var sampled: Dictionary = search["sampled"]
 		var length := float(route["length"])
 		if length < float(band["min_length"]) or length > float(band["max_length"]):
 			counters["graph_rejections"] = int(counters["graph_rejections"]) + 1
@@ -90,6 +104,9 @@ static func solve(request: Dictionary) -> Dictionary:
 		var signatures := SIGNATURES.describe(route)
 		var reserved_room := room.duplicate(true)
 		reserved_room["reserved_passages"] = assignments["portal_traversals"]
+		var accepted_search := counters.duplicate(true)
+		accepted_search["accepted_graph_candidate"] = int(graph["candidate_index"])
+		accepted_search["accepted_region_budgets"] = (graph.get("region_budgets", []) as Array).duplicate(true)
 		return {
 			"ok": true,
 			"identity": identity,
@@ -112,10 +129,15 @@ static func solve(request: Dictionary) -> Dictionary:
 				"closure_position_residual": float(search["closure_position_residual"]),
 				"closure_heading_residual": float(search["closure_heading_residual"]),
 			},
-			"search": counters.duplicate(true),
+			"search": accepted_search,
 			"structural_signature": signatures["structural"],
 			"profile_signature": signatures["profile"],
 		}
+	if budget_stage != &"":
+		return _failure(identity, budget_stage, &"search_budget_exhausted", budget_reason, counters)
+	for placement: Dictionary in placements:
+		if bool(placement.get("exhausted", false)):
+			return _failure(identity, &"placement", &"search_budget_exhausted", "No graph completed before its bounded placement search was exhausted.", counters)
 	var reason := "No graph candidate produced a valid closed route within %d graphs, %d placements, %d closures, and %d narrow-phase operations (last rejection: %s)." % [int(counters["graph_candidates"]), int(counters["placement_expansions"]), int(counters["closure_candidates"]), int(counters["narrow_phase_operations"]), counters["last_rejection"]]
 	if counters.has("last_reason"):
 		reason += " " + String(counters["last_reason"])
@@ -181,15 +203,19 @@ static func _required_portals_are_feasible(room: Dictionary) -> Dictionary:
 static func _graph_candidates(room: Dictionary, identity: Dictionary) -> Array[Dictionary]:
 	var result: Array[Dictionary] = []
 	var band := GENERATED_RULES.length_profile(String(identity["length_tier"]))
+	var spatial := GRAPHS.prepare(room)
 	for candidate in MAX_GRAPH_CANDIDATES:
-		var graph := GRAPHS.build(room, band, identity, candidate)
+		var graph := GRAPHS.build(room, band, identity, candidate, spatial)
 		if bool(graph.get("ok", false)):
 			graph.merge(_finalize_graph(graph["ordinary_slots"], graph["start_position"], graph["start_heading"], graph["closure_radius"], graph["id"]), true)
 		graph["candidate_index"] = candidate
+		graph["preference_rank"] = _hash_index(identity, "structure_preference|" + String(graph.get("target_structure", "invalid_%d" % candidate)), 0, 2147483647)
 		for key: String in ["seed", "room_shape", "length_tier"]:
 			graph[key] = identity[key]
 		result.append(graph)
 	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a["preference_rank"]) != int(b["preference_rank"]):
+			return int(a["preference_rank"]) < int(b["preference_rank"])
 		return _hash_index(identity, "composition_order", int(a["candidate_index"]), 2147483647) < _hash_index(identity, "composition_order", int(b["candidate_index"]), 2147483647)
 	)
 	return result
@@ -215,25 +241,20 @@ static func _finalize_graph(ordinary: Array[Dictionary], start: Vector2, heading
 	}
 
 
-static func _place_graph(graph: Dictionary, room: Dictionary, band: Dictionary, counters: Dictionary, limits: Dictionary) -> Dictionary:
+static func _placement_state(graph: Dictionary) -> Dictionary:
 	graph = graph.duplicate(true)
 	for index in (graph["ordinary_slots"] as Array).size():
 		var slot: Dictionary = graph["ordinary_slots"][index]
 		slot["options"] = _slot_options(slot, graph, index)
 		slot["bounds"] = _option_bounds(slot)
 	var modules: Array[Dictionary] = []
-	var state := {
-		"budget_exhausted": false,
-		"stage": &"placement",
-		"reason": "",
-		"placement_start": int(counters["placement_expansions"]) - int(graph.get("target_expansions", 0)),
+	return {
+		"graph": graph,
+		"modules": modules,
+		"options": [0],
+		"expansions": 0,
+		"finished": false,
 	}
-	var placed := _place_slot_recursive(graph, room, band, counters, limits, 0, modules, state)
-	if bool(state["budget_exhausted"]):
-		return state
-	if not bool(placed.get("ok", false)):
-		return {"ok": false}
-	return placed
 
 
 static func _place_targets(graph: Dictionary, room: Dictionary, band: Dictionary, counters: Dictionary, limits: Dictionary) -> Dictionary:
@@ -251,33 +272,49 @@ static func _place_targets(graph: Dictionary, room: Dictionary, band: Dictionary
 	return state if bool(state["budget_exhausted"]) else result
 
 
-static func _place_slot_recursive(graph: Dictionary, room: Dictionary, band: Dictionary, counters: Dictionary, limits: Dictionary, slot_index: int, modules: Array[Dictionary], state: Dictionary) -> Dictionary:
+static func _advance_placement(state: Dictionary, room: Dictionary, band: Dictionary, counters: Dictionary, limits: Dictionary) -> Dictionary:
+	var graph: Dictionary = state["graph"]
 	var ordinary: Array = graph["ordinary_slots"]
-	if slot_index >= ordinary.size():
-		return _solve_closure(graph, room, band, counters, limits, modules, state)
-	if int(counters["placement_expansions"]) - int(state["placement_start"]) >= int(limits["placement_expansions_per_graph"]):
-		state.merge({"budget_exhausted": true, "stage": &"placement", "reason": "Placement reached its bounded expansion cap."}, true)
-		return {}
-	var slot: Dictionary = ordinary[slot_index]
-	for option: Dictionary in slot["options"]:
+	var modules: Array[Dictionary] = state["modules"]
+	var options: Array = state["options"]
+	while not options.is_empty():
+		var slot_index := modules.size()
+		if slot_index == ordinary.size():
+			var closure_state := {"budget_exhausted": false}
+			var closed := _solve_closure(graph, room, band, counters, limits, modules, closure_state)
+			options.pop_back()
+			modules.pop_back()
+			counters["placement_backtracks"] = int(counters["placement_backtracks"]) + 1
+			return closure_state if bool(closure_state["budget_exhausted"]) else closed
+		var slot: Dictionary = ordinary[slot_index]
+		if int(options[-1]) >= (slot["options"] as Array).size():
+			options.pop_back()
+			if not modules.is_empty():
+				modules.pop_back()
+				counters["placement_backtracks"] = int(counters["placement_backtracks"]) + 1
+			continue
+		if int(state["expansions"]) >= int(limits["placement_expansions_per_graph"]):
+			state["exhausted"] = true
+			break
+		var option: Dictionary = slot["options"][int(options[-1])]
+		options[-1] = int(options[-1]) + 1
+		state["expansions"] = int(state["expansions"]) + 1
 		counters["placement_expansions"] = int(counters["placement_expansions"]) + 1
 		var module := MODULES.instantiate(slot["module_id"], option)
-		if not bool(module.get("ok", false)):
-			continue
-		modules.append(module)
-		var partial := MODULES.compose(modules, graph["start_position"], float(graph["start_heading"]))
-		if not _consume_narrow_phase(partial, room, counters, limits):
-			state.merge({"budget_exhausted": true, "stage": &"narrow_phase", "reason": "Placement reached the shared narrow-phase operation cap."}, true)
-			return {}
-		if _partial_route_valid(partial, room) and _remaining_feasible(partial, ordinary, slot_index + 1, band):
-			var solved := _place_slot_recursive(graph, room, band, counters, limits, slot_index + 1, modules, state)
-			if bool(state["budget_exhausted"]) or bool(solved.get("ok", false)):
-				return solved
-		modules.pop_back()
-		counters["placement_backtracks"] = int(counters["placement_backtracks"]) + 1
-		if int(counters["placement_expansions"]) - int(state["placement_start"]) >= int(limits["placement_expansions_per_graph"]):
-			state.merge({"budget_exhausted": true, "stage": &"placement", "reason": "Placement reached its bounded expansion cap."}, true)
-			return {}
+		if bool(module.get("ok", false)):
+			modules.append(module)
+			var partial := MODULES.compose(modules, graph["start_position"], float(graph["start_heading"]))
+			if _remaining_feasible(partial, ordinary, slot_index + 1, band):
+				var validated_count := (partial["primitives"] as Array).size() - (module["primitives"] as Array).size()
+				if not _consume_narrow_phase(partial, room, counters, limits, validated_count):
+					return {"budget_exhausted": true, "stage": &"narrow_phase", "reason": "Placement reached the shared narrow-phase operation cap."}
+				if _partial_route_valid(partial, room, validated_count):
+					options.append(0)
+					return {}
+			modules.pop_back()
+			counters["placement_backtracks"] = int(counters["placement_backtracks"]) + 1
+		return {}
+	state["finished"] = true
 	return {}
 
 
@@ -361,32 +398,75 @@ static func _solve_closure(graph: Dictionary, room: Dictionary, band: Dictionary
 	var partial := MODULES.compose(modules, graph["start_position"], float(graph["start_heading"]))
 	var frontier: Dictionary = partial["exit_port"]
 	var target: Dictionary = partial["entry_port"]
-	var closure_start := int(counters["closure_candidates"])
-	for radius: float in CLOSURE_RADII:
-		for family: StringName in CLOSURE_FAMILIES:
-			if int(counters["closure_candidates"]) - closure_start >= int(limits["closure_candidates_per_frontier"]):
-				state.merge({"budget_exhausted": true, "stage": &"closure", "reason": "Closure reached its bounded candidate cap."}, true)
-				return {}
-			counters["closure_candidates"] = int(counters["closure_candidates"]) + 1
-			var connector := _dubins_connector(frontier, target, radius, family)
-			if not bool(connector.get("ok", false)):
-				counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
-				continue
-			var all_modules: Array[Dictionary] = modules.duplicate()
-			all_modules.append_array(connector["modules"])
-			var route := MODULES.compose(all_modules, graph["start_position"], float(graph["start_heading"]))
-			var join := MODULES.validate_join(route["exit_port"], route["entry_port"])
-			if not bool(join.get("valid", false)) or float(route["length"]) < float(band["min_length"]) or float(route["length"]) > float(band["max_length"]):
-				counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
-				continue
-			if not _consume_narrow_phase(route, room, counters, limits):
-				state.merge({"budget_exhausted": true, "stage": &"narrow_phase", "reason": "Closure reached the shared narrow-phase operation cap."}, true)
-				return {}
-			if not bool(ROOM_MODEL.route_fits(room, route, MODULES.RESERVED_RADIUS).get("valid", false)):
-				counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
-				continue
-			route["closure"] = {"family": family, "radius": radius, "module_count": (connector["modules"] as Array).size(), "candidate_index": int(counters["closure_candidates"]) - 1}
-			return {"ok": true, "route": route, "closure_position_residual": float(join["position_residual"]), "closure_heading_residual": float(join["heading_residual"])}
+	var reserved: Array = graph.get("closure_targets", [])
+	var proposal_count := CLOSURE_RADII.size() * CLOSURE_FAMILIES.size() + int(not reserved.is_empty())
+	for proposal in mini(proposal_count, int(limits["closure_candidates_per_frontier"])):
+		counters["closure_candidates"] = int(counters["closure_candidates"]) + 1
+		var family := &"reserved"
+		var radius := 0.0
+		var connector := {}
+		if proposal == 0 and not reserved.is_empty():
+			var instances: Array[Dictionary] = []
+			for slot: Dictionary in reserved:
+				instances.append(MODULES.instantiate(slot["module_id"], slot["parameters"]))
+			connector = {"ok": true, "modules": instances}
+		else:
+			var analytic_index := proposal - int(not reserved.is_empty())
+			radius = CLOSURE_RADII[analytic_index / CLOSURE_FAMILIES.size()]
+			family = CLOSURE_FAMILIES[analytic_index % CLOSURE_FAMILIES.size()]
+			connector = _dubins_connector(frontier, target, radius, family)
+		if not bool(connector.get("ok", false)):
+			counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
+			continue
+		var all_modules: Array[Dictionary] = modules.duplicate()
+		all_modules.append_array(connector["modules"])
+		var route := MODULES.compose(all_modules, graph["start_position"], float(graph["start_heading"]))
+		var join := MODULES.validate_join(route["exit_port"], route["entry_port"])
+		if not bool(join.get("valid", false)) or float(route["length"]) < float(band["min_length"]) or float(route["length"]) > float(band["max_length"]):
+			counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
+			continue
+		if not _consume_narrow_phase(route, room, counters, limits):
+			state.merge({"budget_exhausted": true, "stage": &"narrow_phase", "reason": "Closure reached the shared narrow-phase operation cap."}, true)
+			return {}
+		if not bool(ROOM_MODEL.route_fits(room, route, MODULES.RESERVED_RADIUS).get("valid", false)):
+			counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
+			continue
+		var assignments := _assign_regions_and_portals(graph, room, route, maxi(0, int(limits["narrow_phase_operations"]) - int(counters["narrow_phase_operations"])))
+		counters["narrow_phase_operations"] = int(counters["narrow_phase_operations"]) + int(assignments.get("query_operations", 0))
+		if bool(assignments.get("budget_exhausted", false)):
+			state.merge({"budget_exhausted": true, "stage": &"region_assignment", "reason": "Region assignment reached the shared narrow-phase operation cap."}, true)
+			return {}
+		if not bool(assignments.get("ok", false)):
+			counters["last_rejection"] = assignments.get("kind", &"region_assignment")
+			counters["last_reason"] = assignments.get("reason", "Required region or portal assignment failed.")
+			counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
+			continue
+		var continuous := VALIDATION.validate_continuous(route, room["outer"])
+		if not bool(continuous.get("valid", false)):
+			counters["last_rejection"] = continuous.get("kind", &"continuous_validation")
+			counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
+			continue
+		for module: Dictionary in route["modules"]:
+			if bool((module["parameters"] as Dictionary).get("finish", false)):
+				route["finish_primitive_index"] = int(module["primitives"][0]["index"])
+				break
+		var sampling := MODULES.sample_route(route, 260, 35.0, 0.25)
+		var sampled := VALIDATION.validate_sampled(route, sampling, room["outer"])
+		if not bool(sampled.get("valid", false)):
+			counters["last_rejection"] = sampled.get("kind", &"sampled_validation")
+			counters["closure_rejections"] = int(counters["closure_rejections"]) + 1
+			continue
+		route["closure"] = {"family": family, "radius": radius, "module_count": (connector["modules"] as Array).size(), "candidate_index": int(counters["closure_candidates"]) - 1}
+		return {
+			"ok": true,
+			"route": route,
+			"assignments": assignments,
+			"continuous": continuous,
+			"sampling": sampling,
+			"sampled": sampled,
+			"closure_position_residual": float(join["position_residual"]),
+			"closure_heading_residual": float(join["heading_residual"]),
+		}
 	return {"ok": false}
 
 
@@ -491,28 +571,39 @@ static func _dubins_parameters(family: StringName, alpha: float, beta: float, di
 	return {"ok": true, "parameters": PackedFloat64Array([t, p, q]), "kinds": kinds}
 
 
-static func _partial_route_valid(route: Dictionary, room: Dictionary) -> bool:
-	if not bool(ROOM_MODEL.route_fits(room, route, MODULES.RESERVED_RADIUS).get("valid", false)):
-		return false
+static func _partial_route_valid(route: Dictionary, room: Dictionary, validated_count: int = 0) -> bool:
 	var primitives: Array = route["primitives"]
+	var extension := {"ok": bool(route.get("ok", false)), "primitives": primitives.slice(validated_count)}
+	if not bool(ROOM_MODEL.route_fits(room, extension, MODULES.RESERVED_RADIUS).get("valid", false)):
+		return false
 	for first in primitives.size():
-		for second in range(first + 2, primitives.size()):
+		for second in range(maxi(first + 2, validated_count), primitives.size()):
+			if not _primitive_bounds(primitives[first]).intersects(_primitive_bounds(primitives[second]), true):
+				continue
 			if not VALIDATION._primitive_intersections(primitives[first], primitives[second]).is_empty():
 				return false
 	return true
 
 
-static func _consume_narrow_phase(route: Dictionary, room: Dictionary, counters: Dictionary, limits: Dictionary) -> bool:
+static func _consume_narrow_phase(route: Dictionary, room: Dictionary, counters: Dictionary, limits: Dictionary, validated_count: int = 0) -> bool:
 	var primitive_count := (route.get("primitives", []) as Array).size()
 	var boundary_edges := (room.get("outer", PackedVector2Array()) as PackedVector2Array).size()
 	for hole: PackedVector2Array in room.get("solid_exclusions", []):
 		boundary_edges += hole.size()
-	var operations := primitive_count * boundary_edges + primitive_count * maxi(primitive_count - 1, 0) / 2
+	var new_count := primitive_count - validated_count
+	var operations := new_count * boundary_edges + new_count * validated_count + new_count * maxi(new_count - 1, 0) / 2
 	counters["narrow_phase_operations"] = int(counters["narrow_phase_operations"]) + operations
 	return int(counters["narrow_phase_operations"]) <= int(limits["narrow_phase_operations"])
 
 
-static func _assign_regions_and_portals(graph: Dictionary, room: Dictionary, route: Dictionary) -> Dictionary:
+static func _primitive_bounds(primitive: Dictionary) -> Rect2:
+	if primitive["kind"] == &"line":
+		return Rect2(primitive["start"], Vector2.ZERO).expand(primitive["end"])
+	var radius := float(primitive["radius"])
+	return Rect2((primitive["center"] as Vector2) - Vector2.ONE * radius, Vector2.ONE * radius * 2.0)
+
+
+static func _assign_regions_and_portals(graph: Dictionary, room: Dictionary, route: Dictionary, max_region_queries: int = 2147483647) -> Dictionary:
 	var visits: Array[Dictionary] = []
 	var required_regions := _required_region_ids(room)
 	for region: Dictionary in room.get("regions", []):
@@ -544,7 +635,13 @@ static func _assign_regions_and_portals(graph: Dictionary, room: Dictionary, rou
 			"slot_indices": crossings["slot_indices"],
 			"clear_width": float(portal.get("clear_width", 0.0)),
 		})
-	return {"ok": true, "region_visits": visits, "portal_traversals": traversals}
+	var occupation := VALIDATION.validate_region_occupation(route, room, max_region_queries)
+	if not bool(occupation.get("valid", false)):
+		return occupation
+	for visit: Dictionary in visits:
+		if (occupation["lengths"] as Dictionary).has(visit["region_id"]):
+			visit["exclusive_length"] = occupation["lengths"][visit["region_id"]]
+	return {"ok": true, "region_visits": visits, "portal_traversals": traversals, "query_operations": occupation["query_operations"]}
 
 
 static func _required_region_ids(room: Dictionary) -> Dictionary:

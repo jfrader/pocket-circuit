@@ -411,6 +411,9 @@ func _validate_v8(result: Dictionary, room: String, tier: String, seed: int) -> 
 	var continuous := VALIDATION.validate_continuous(route, model["outer"])
 	if not bool(continuous.get("valid", false)):
 		return continuous
+	var occupation := VALIDATION.validate_region_occupation(route, model)
+	if not bool(occupation.get("valid", false)):
+		return occupation
 	var band := GENERATED_RULES.length_profile(tier)
 	if float(route["length"]) < float(band["min_length"]) or float(route["length"]) > float(band["max_length"]):
 		return {"valid": false, "reason": "analytic length outside requested tier"}
@@ -644,6 +647,10 @@ func _aggregate_records(records: Array[Dictionary], expected_generator: int) -> 
 			aggregate["both_turn_hands"] = int(aggregate["both_turn_hands"]) + 1
 		if int(record.get("repair_count", 0)) > 0:
 			aggregate["repaired_layouts"] = int(aggregate["repaired_layouts"]) + 1
+		# Curvature classes are turning-radius bins only. A straight is recorded
+		# in curvature_class_histogram for reporting, but it is not a curvature
+		# class: counting it would let an always-present straight stand in for a
+		# missing tight/medium/sweeper bin in the Section 7 gate.
 		for curvature_class: String in ["tight", "medium", "sweeper"]:
 			if int((record.get("curvature_class_histogram", {}) as Dictionary).get(curvature_class, 0)) > 0:
 				(aggregate["curvature_classes"] as Dictionary)[curvature_class] = true
@@ -764,7 +771,7 @@ func _full_window_variety_error(summary: Dictionary, complete_matrix: bool) -> S
 		if int(coverage["repaired_layouts"]) > 12:
 			return "%s may repair at most 12 complete layouts (got %d)" % [cell, int(coverage["repaired_layouts"])]
 		if (coverage["curvature_classes"] as Array).size() < 3:
-			return "%s needs all three populated turn-curvature classes (got %s)" % [cell, coverage["curvature_classes"]]
+			return "%s needs >=3 populated curvature classes (got %s)" % [cell, coverage["curvature_classes"]]
 		if (coverage["joint_distribution_bins"] as Array).size() < 3:
 			return "%s needs >=3 occupied semantic-count/straight-fraction bins (got %s)" % [cell, coverage["joint_distribution_bins"]]
 		if int(coverage["room_shape_clusters"]) < 3:
@@ -1003,6 +1010,28 @@ func _test_measurements() -> bool:
 		return false
 	passing_full_cell["shape_clusters"] = int(compact_gate["shapes"]) - 1
 	if not _expect(not _full_window_variety_error(full_summary, false).is_empty(), "the full gate must reject a tier-specific shape-floor miss"):
+		return false
+	passing_full_cell["shape_clusters"] = compact_gate["shapes"]
+	var two_turn_records: Array[Dictionary] = [
+		{"generator": 8, "room": "classic", "tier": "compact", "seed": 0, "status": "ok", "curvature_class_histogram": {"straight": 5, "tight": 4, "medium": 4}},
+		{"generator": 8, "room": "classic", "tier": "compact", "seed": 1, "status": "ok", "curvature_class_histogram": {"straight": 6, "tight": 3, "medium": 5}},
+	]
+	var two_turn_summary: Dictionary = _aggregate_records(two_turn_records, 8)["summary"]
+	var two_turn_cell: Dictionary = two_turn_summary["cells"]["classic/compact"]
+	if not _expect(two_turn_cell["curvature_classes"] == ["tight", "medium"], "curvature aggregation must drop straight and report two turning classes (got %s)" % [two_turn_cell["curvature_classes"]]):
+		return false
+	passing_full_cell["curvature_classes"] = two_turn_cell["curvature_classes"]
+	if not _expect(not _full_window_variety_error(full_summary, false).is_empty(), "two turning classes plus straight must fail the curvature gate"):
+		return false
+	var three_turn_records: Array[Dictionary] = [
+		{"generator": 8, "room": "classic", "tier": "compact", "seed": 0, "status": "ok", "curvature_class_histogram": {"straight": 5, "tight": 4, "medium": 4, "sweeper": 4}},
+	]
+	var three_turn_summary: Dictionary = _aggregate_records(three_turn_records, 8)["summary"]
+	var three_turn_cell: Dictionary = three_turn_summary["cells"]["classic/compact"]
+	if not _expect(three_turn_cell["curvature_classes"] == ["tight", "medium", "sweeper"], "curvature aggregation must report three turning classes (got %s)" % [three_turn_cell["curvature_classes"]]):
+		return false
+	passing_full_cell["curvature_classes"] = three_turn_cell["curvature_classes"]
+	if not _expect(_full_window_variety_error(full_summary, false).is_empty(), "three turning classes must pass the curvature gate"):
 		return false
 	var duplicate: Array[Dictionary] = synthetic.duplicate(true)
 	duplicate.append(synthetic[0].duplicate(true))

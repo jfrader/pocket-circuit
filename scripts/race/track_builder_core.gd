@@ -24,6 +24,7 @@ const TRACK_BUILDER_PLACEMENT := preload("res://scripts/race/track_builder_place
 const TRACK_BUILDER_COLLISION := preload("res://scripts/race/track_builder_collision.gd")
 const TRACK_BUILDER_RACING := preload("res://scripts/race/track_builder_racing.gd")
 const HALF_WIDTH := 125.0
+const ROOM_WALL_THICKNESS := 50.0
 const GATE_COUNT := 8
 const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
 const DEFAULT_FLOOR_TILE_WORLD_SIZE := Vector2(512.0, 512.0)
@@ -139,6 +140,9 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int, g
 	var root := create_layout_root(prepared)
 	var build_room_model: Dictionary = prepared.get("room_model", {}) if prepared is Dictionary else {}
 	_build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], theme, Callable(), build_room_model)
+	if not bool(root.get_meta("assembly_complete", false)):
+		root.free()
+		return {"scene": null, "seed": seed}
 	_mark_owned(root)
 	var packed := PackedScene.new()
 	packed.pack(root)
@@ -306,6 +310,14 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["obstacle_plan"] = _plan_generated_obstacles(theme, spec, centerline, gate_samples, moments)
 		spec["hazard_plan"] = _plan_generated_hazard(theme, spec, centerline, moments)
 	var prepared_room_model: Dictionary = spec.get("room_model", {}) if spec is Dictionary else {}
+	# Wall collision must be buildable before this layout is considered valid; a
+	# room whose edges cannot be clipped/decomposed into convex collision would
+	# otherwise pack a track with a missing wall. Fail the whole layout instead.
+	if not room_polygon.is_empty():
+		for wall_entry: Dictionary in _room_wall_edges(room_polygon):
+			if _wall_collision_pieces(wall_entry["from"], wall_entry["to"], wall_entry["outward"], ROOM_WALL_THICKNESS, room_polygon).is_empty():
+				push_error("TrackBuilderCore: room polygon for %s cannot build collision walls" % room_shape)
+				return {}
 	var prepared := {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed, "room_model": prepared_room_model}
 	prepared["racing_line_metrics"] = racing_line_metrics_from_prepared(prepared)
 	return prepared
@@ -386,9 +398,9 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 	return root
 
 
-static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable) -> void:
+static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable) -> bool:
 	var runtime_room_model: Dictionary = prepared.get("room_model", {}) if prepared is Dictionary else {}
-	await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage, runtime_room_model)
+	return await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage, runtime_room_model)
 
 
 static func _sample_centerline(controls: Variant) -> PackedVector2Array:
@@ -410,9 +422,11 @@ static func _authoritative_centerline(spec: Dictionary) -> PackedVector2Array:
 static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
 	return TRACK_BUILDER_GEOMETRY.corridor_edges(centerline)
 
-static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), room_model: Dictionary = {}) -> void:
+static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), room_model: Dictionary = {}) -> bool:
 	# room_model flows from prepare_layout/assembly for v8 (v7 passes {}); forwarded for gate-post and island-rim solid checks
-	await TRACK_BUILDER_SCENE.build(root, spec, centerline, edges, room_polygon, theme, stage, room_model)
+	var assembled := await TRACK_BUILDER_SCENE.build(root, spec, centerline, edges, room_polygon, theme, stage, room_model)
+	root.set_meta("assembly_complete", assembled)
+	return assembled
 
 
 
@@ -569,8 +583,66 @@ static func _add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector
 	TRACK_BUILDER_NODES.add_finish_checker(parent, finish, tangent)
 
 
-static func _add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String) -> void:
-	TRACK_BUILDER_NODES.add_wall_segment(parent, node_name, position, length, rotation, edge_texture_path)
+static func _room_wall_edges(room_polygon: PackedVector2Array) -> Array[Dictionary]:
+	# Non-degenerate room edges with their outward normal derived from polygon
+	# winding. The room polygon is interior free space; walls sit entirely on the
+	# outside of each edge so their thickness never eats the corridor clearance
+	# the generator reserved.
+	var winding := _polygon_area(room_polygon)
+	var outward_rotation := -PI * 0.5 if winding > 0.0 else PI * 0.5
+	var edges: Array[Dictionary] = []
+	for index in room_polygon.size():
+		var from: Vector2 = room_polygon[index]
+		var to: Vector2 = room_polygon[(index + 1) % room_polygon.size()]
+		var edge_vector := to - from
+		var length := edge_vector.length()
+		if length < 1.0:
+			continue
+		var tangent := edge_vector / length
+		edges.append({
+			"from": from,
+			"to": to,
+			"length": length,
+			"rotation": atan2(edge_vector.y, edge_vector.x),
+			"outward": tangent.rotated(outward_rotation),
+			"mid": (from + to) * 0.5,
+		})
+	return edges
+
+
+static func _wall_collision_pieces(from: Vector2, to: Vector2, outward: Vector2, thickness: float, room_polygon: PackedVector2Array) -> Array[PackedVector2Array]:
+	# Convex collision pieces for one outward wall rectangle, clipped against the
+	# room interior so a concave corner (a notch narrower than the wall) cannot
+	# leave solid in free space. Empty means the edge cannot build valid collision
+	# (clip or convex decomposition yielded nothing) — callers must treat empty as
+	# failure, never as license to fabricate a hull or rectangle.
+	var rect := PackedVector2Array([from, to, to + outward * thickness, from + outward * thickness])
+	var outside := Geometry2D.clip_polygons(rect, room_polygon)
+	if outside.is_empty():
+		return []
+	var pieces: Array[PackedVector2Array] = []
+	for piece: PackedVector2Array in outside:
+		var cleaned := _deduplicate_loop(piece)
+		if cleaned.size() < 3 or absf(_polygon_area(cleaned)) < 1.0:
+			return []
+		var convex_pieces := Geometry2D.decompose_polygon_in_convex(cleaned)
+		if convex_pieces.is_empty():
+			return []
+		pieces.append_array(convex_pieces)
+	return pieces
+
+
+static func _build_room_walls(root: Node, room_polygon: PackedVector2Array, edge_texture_path: String) -> bool:
+	var wall_index := 0
+	for entry: Dictionary in _room_wall_edges(room_polygon):
+		if not _add_wall_segment(root, "Wall%d" % wall_index, entry["mid"], entry["length"], entry["rotation"], edge_texture_path, room_polygon, entry["outward"]):
+			return false
+		wall_index += 1
+	return true
+
+
+static func _add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String, room_polygon: PackedVector2Array = PackedVector2Array(), outward_normal: Vector2 = Vector2.ZERO) -> bool:
+	return TRACK_BUILDER_NODES.add_wall_segment(parent, node_name, position, length, rotation, edge_texture_path, room_polygon, outward_normal)
 
 
 static func _gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:

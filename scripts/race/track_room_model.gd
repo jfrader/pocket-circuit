@@ -56,11 +56,16 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 	var regions: Array[Dictionary]
 	var portals: Array[Dictionary]
 	var boundary_style := &"el_notch" if family == &"el" else &"paired_bays"
+	var el_notch_profile_index := -1
 	if family == &"el":
-		var base_notch: Vector2 = definition["notch"]
+		# Profile selection uses its own hash salt so the authored notch position is
+		# independent of the ±150/±125 arm-perturbation domain below.
+		var profiles: Array = definition["notch_profiles"]
+		el_notch_profile_index = mini(profiles.size() - 1, floori(_hash_unit(room_seed, 0x2D) * profiles.size()))
+		var base_notch: Vector2 = profiles[el_notch_profile_index]
 		var notch := Vector2(
-			base_notch.x * tier_size.x + lerpf(-150.0, 150.0, _hash_unit(room_seed, 0x71)),
-			base_notch.y * tier_size.y + lerpf(-125.0, 125.0, _hash_unit(room_seed, 0x97))
+			(base_notch.x + lerpf(-150.0, 150.0, _hash_unit(room_seed, 0x71))) * tier_size.x,
+			(base_notch.y + lerpf(-125.0, 125.0, _hash_unit(room_seed, 0x97))) * tier_size.y
 		)
 		# The two arm dimensions and the notch move independently. Compact keeps
 		# more than 450 units beyond the common junction in both required arms.
@@ -72,12 +77,11 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 			Vector2(half.x, half.y), Vector2(-half.x, half.y),
 		])
 		var portal_x := notch.x - 360.0
-		var portal_center_y := clampf(notch.y + 470.0, -half.y + 310.0, half.y - 310.0)
 		regions = [
 			_region(&"vertical_arm", PackedVector2Array([Vector2(-half.x, -half.y), Vector2(notch.x, -half.y), Vector2(notch.x, half.y), Vector2(-half.x, half.y)]), true, half.y - notch.y),
 			_region(&"horizontal_arm", PackedVector2Array([Vector2(-half.x, notch.y), Vector2(half.x, notch.y), Vector2(half.x, half.y), Vector2(-half.x, half.y)]), true, half.x - notch.x),
 		]
-		portals = [_portal_definition(&"el_junction", &"vertical_arm", &"horizontal_arm", Vector2(portal_x, portal_center_y - 330.0), Vector2(portal_x, portal_center_y + 330.0), 2)]
+		portals = [_portal_definition(&"el_junction", &"vertical_arm", &"horizontal_arm", Vector2(portal_x, notch.y + CONSTRUCTION_MARGIN), Vector2(portal_x, half.y - CONSTRUCTION_MARGIN), 2)]
 	else:
 		var bevel := float(definition["bevel"]) * minf(tier_size.x, tier_size.y)
 		var styles: Array = definition["boundary_styles"]
@@ -86,10 +90,13 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 		var right_half_height := maxf(350.0, half.y * lerpf(0.34, 0.42, _hash_unit(room_seed, 0xC5)))
 		var left_center_y := 0.0
 		var right_center_y := 0.0
-		var base_depth := maxf(380.0, half.x * 0.14)
+		var base_depth := maxf(380.0, base_half.x * 0.14) * (half.x / base_half.x)
 		var left_depth := base_depth * lerpf(0.85, 1.25, _hash_unit(room_seed, 0xB3))
 		var right_depth := base_depth * lerpf(0.85, 1.25, _hash_unit(room_seed, 0xD7))
 		match boundary_style:
+			&"upper_shelf":
+				left_center_y = -half.y + bevel + 20.0 + left_half_height
+				right_center_y = -half.y + bevel + 20.0 + right_half_height
 			&"offset_bays":
 				left_half_height = maxf(520.0, half.y * 0.56)
 				right_half_height = maxf(520.0, half.y * 0.56)
@@ -133,9 +140,9 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 			_region(&"east_bay", _rectangle_ring(Vector2(half.x + right_depth * 0.5, right_center_y), Vector2(right_depth, right_half_height * 2.0)), false, right_depth),
 		]
 		portals = [
-			_portal_definition(&"core", &"west", &"east", Vector2(0, -310.0), Vector2(0, 310.0), 2),
-			_portal_definition(&"west_bay_mouth", &"west", &"west_bay", Vector2(-half.x, -310.0), Vector2(-half.x, 310.0), 2),
-			_portal_definition(&"east_bay_mouth", &"east", &"east_bay", Vector2(half.x, -310.0), Vector2(half.x, 310.0), 2),
+			_portal_definition(&"core", &"west", &"east", Vector2(0, -half.y + bevel), Vector2(0, half.y - bevel), 2),
+			_portal_definition(&"west_bay_mouth", &"west", &"west_bay", Vector2(-half.x, left_lower), Vector2(-half.x, left_upper), 2),
+			_portal_definition(&"east_bay_mouth", &"east", &"east_bay", Vector2(half.x, right_lower), Vector2(half.x, right_upper), 2),
 		]
 	var room := create({
 		"recipe_id": int(definition["id"]),
@@ -145,6 +152,7 @@ static func generate_recipe(family: StringName, room_seed: int, tier: StringName
 		"tier": tier,
 		"coordinate_scale": 1.0,
 		"boundary_style": boundary_style,
+		"el_notch_profile_index": el_notch_profile_index,
 		"outer": outer,
 		"solid_exclusions": [],
 		"regions": regions,
@@ -206,6 +214,7 @@ static func create(source: Dictionary) -> Dictionary:
 		"tier": StringName(source.get("tier", &"fixture")),
 		"coordinate_scale": float(source.get("coordinate_scale", 1.0)),
 		"boundary_style": StringName(source.get("boundary_style", &"fixture")),
+		"el_notch_profile_index": int(source.get("el_notch_profile_index", -1)),
 		"outer": outer,
 		"solid_exclusions": holes,
 		"regions": (source.get("regions", []) as Array).duplicate(true),
