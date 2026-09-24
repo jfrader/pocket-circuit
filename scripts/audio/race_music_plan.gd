@@ -24,16 +24,21 @@ const TIER_TRAITS := {
 	"marathon": {"energy": 0.89, "complexity": 0.80},
 }
 const GROOVES: Array[String] = ["cruise", "slipstream"]
+const BUILDS: Array[String] = ["ignition", "grid"]
 const PEAKS: Array[String] = ["redline", "attack"]
+const CALMS: Array[String] = ["breather"]
 const MENU_STYLE := "funk"
 const MENU_PROFILE := {
 	"style": MENU_STYLE,
-	"energy": 0.42,
+	"energy": 0.32,
 	"complexity": 0.52,
 	"brightness": 0.60,
 	"syncopation": 0.50,
 }
-const MENU_DECK: Array[String] = ["garage", "breather", "cruise", "breather"]
+## One 4-bar phrase at a mid racing tempo. Repeated deck slots hold a phase
+## through several loops without cueing it again.
+const MENU_PHRASE_SECONDS := 7.5
+const MENU_GRID_LOOPS := 4
 
 
 ## The Gamestruments generate seed for a circuit. The whole track identity
@@ -68,22 +73,20 @@ static func race_profile(event: Dictionary) -> Dictionary:
 	}
 
 
-## The groove/peak running order for a circuit: more peaks as the tier grows,
-## deterministic per track so the same seed always plays the same arc.
+## Running order for a circuit. Grooves, builds, peaks, and a breather, more of
+## each as the tier grows. Deterministic per track. Opens on a groove.
 static func flow_deck(event: Dictionary) -> Array[String]:
 	var rank := _tier_rank(_tier(event))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(seed_for_event(event).hash())
-	var groove_count := 3 + int((rank + 1) / 2)
-	var peak_count := 2 + rank
 	var deck: Array[String] = []
-	for index in maxi(groove_count, peak_count):
-		if index < groove_count:
-			deck.append(GROOVES[rng.randi_range(0, GROOVES.size() - 1)])
-		if index < peak_count:
-			deck.append(PEAKS[rng.randi_range(0, PEAKS.size() - 1)])
-	if deck.is_empty() or not GROOVES.has(deck[0]):
-		deck.insert(0, GROOVES[0])
+	for _cycle in 1 + rank:
+		deck.append(_pick_next(GROOVES, deck, rng))
+		deck.append(_pick_next(BUILDS, deck, rng))
+		deck.append(_pick_next(PEAKS, deck, rng))
+		deck.append(_pick_next(CALMS, deck, rng))
+		deck.append(_pick_next(GROOVES, deck, rng))
+		deck.append(_pick_next(PEAKS, deck, rng))
 	return deck
 
 
@@ -106,10 +109,34 @@ static func menu_profile() -> Dictionary:
 	return MENU_PROFILE.duplicate()
 
 
+## Grid loops several times, then a groove that can keep going. Ignition is not
+## in this cycle: cueing it replays its slow opening.
 static func menu_deck() -> Array[String]:
 	var deck: Array[String] = []
-	deck.assign(MENU_DECK)
+	var visits: Array[String] = ["cruise", "breather", "slipstream"]
+	for visit in visits:
+		_append_loops(deck, "grid", MENU_GRID_LOOPS)
+		_append_loops(deck, visit, 4 if visit == "slipstream" else 2)
 	return deck
+
+
+static func menu_phrase_seconds() -> float:
+	return MENU_PHRASE_SECONDS
+
+
+static func _append_loops(deck: Array[String], section: String, count: int) -> void:
+	for _index in count:
+		deck.append(section)
+
+
+static func _pick_next(options: Array[String], deck: Array[String], rng: RandomNumberGenerator) -> String:
+	var previous := ""
+	if not deck.is_empty():
+		previous = deck[deck.size() - 1]
+	var choice := options[rng.randi_range(0, options.size() - 1)]
+	if options.size() > 1 and choice == previous:
+		choice = options[(options.find(choice) + 1) % options.size()]
+	return choice
 
 
 static func _tier(event: Dictionary) -> String:

@@ -144,7 +144,9 @@ func _run_test() -> void:
 	loaded = store.load_data()
 	if not _expect(loaded["completed_events"] == ["kitchen_crumb_rush"] and int(loaded["best_event_points"]["kitchen_crumb_rush"]) == 7, "older saves should derive current progress fields from finishes"):
 		return
-	if not _expect(bool(loaded["championship_started"]) and loaded.has("music_volume") and loaded.has("first_run") and not bool(loaded["reduced_motion"]), "older raced saves should merge the current reduced-motion default"):
+	if not _expect(bool(loaded["championship_started"]) and loaded.has("music_volume") and loaded.has("engine_volume") and loaded.has("tyre_volume") and loaded.has("first_run") and not bool(loaded["reduced_motion"]), "older raced saves should merge the current reduced-motion default"):
+		return
+	if not _expect(is_equal_approx(float(loaded["engine_volume"]), float(loaded["sfx_volume"])) and is_equal_approx(float(loaded["tyre_volume"]), float(loaded["sfx_volume"])), "saves without engine or tyre volume should start from the saved SFX level"):
 		return
 	var migrated_identity: Dictionary = loaded["championship_circuit"]
 	if not _expect(int(loaded["version"]) == 4 and int(migrated_identity["seed"]) == 665001 and migrated_identity["events"].size() == CATALOG.EVENTS.size() and loaded["mastery_records"].is_empty() and loaded["personal_ghosts"].is_empty() and loaded["circuit_history"].is_empty() and loaded["favorite_circuits"].is_empty(), "version 1 saves should receive deterministic identity and empty mastery/discovery archives in memory"):

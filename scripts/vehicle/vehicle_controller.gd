@@ -5,6 +5,16 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const CONTACT_RELEASE_GRACE := 0.12
+## A small steer is not tyre sound. The bed stays at zero until the wheel is
+## well past a correction, then rises slowly toward full lock.
+const TYRE_STEER_ONSET := 0.28
+const TYRE_FULL_STEER := 0.85
+const TYRE_STEER_EXPONENT := 1.7
+const TYRE_ROLLING_SPEED := 25.0
+const TYRE_FULL_SPEED := 120.0
+## Slip angle where a sliding tyre starts to screech, and where the screech peaks.
+const SCREECH_ONSET_DEG := 12.0
+const SCREECH_FULL_DEG := 35.0
 const RACER_TAG_Y_OFFSETS := [-64.0, -84.0, -84.0, -64.0]
 const MAX_EXTERNAL_POWER_MULTIPLIER := 1.15
 const LEGACY_ANGULAR_DAMP := 2.5
@@ -208,6 +218,40 @@ func get_engine_load() -> float:
 
 func get_throttle_input() -> float:
 	return _throttle_input
+
+
+## Presentation state shared by tyre audio and VFX. Gameplay's drift/slide flags
+## own the sliding truth; raw slip only shapes intensity after gameplay says the
+## tyres have broken away.
+func get_tyre_state() -> Dictionary:
+	var sliding := is_drifting or is_sliding
+	var speed_weight := smoothstep(TYRE_ROLLING_SPEED, TYRE_FULL_SPEED, speed)
+	var steer := maxf(absf(_steer_input) - TYRE_STEER_ONSET, 0.0)
+	var cornering := pow(
+		clampf(steer / maxf(TYRE_FULL_STEER - TYRE_STEER_ONSET, 0.01), 0.0, 1.0),
+		TYRE_STEER_EXPONENT,
+	) * speed_weight
+	var rear_slip_deg := rad_to_deg(absf(_rear_slip_angle))
+	var span := maxf(SCREECH_FULL_DEG - SCREECH_ONSET_DEG, 1.0)
+	var slip_intensity := pow(clampf((rear_slip_deg - SCREECH_ONSET_DEG) / span, 0.0, 1.0), 1.6)
+	return {
+		"cornering": cornering,
+		"sliding": sliding,
+		"screech": slip_intensity if sliding else 0.0,
+		"drift_state": _drift_state,
+		"surface": current_surface,
+		"grip": get_effective_grip(),
+		"surface_grip": surface_grip_multiplier,
+	}
+
+
+## Compatibility accessors for probes and presentation callers.
+func get_tyre_scrub() -> float:
+	return float(get_tyre_state()["cornering"])
+
+
+func get_tyre_screech() -> float:
+	return float(get_tyre_state()["screech"])
 
 
 func get_effective_max_speed() -> float:

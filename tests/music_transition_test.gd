@@ -1,9 +1,7 @@
 extends SceneTree
 
-## The live score is regenerated per circuit from the track identity, so the
-## same circuit always reproduces the same music while a different circuit gets
-## a different score. Menu and race are different seeds; re-entering either
-## reuses the loaded score instead of regenerating it.
+## A new circuit generates its own score. Leaving the race for the menu does
+## not. That change asks the loaded score for the garage phase.
 
 const AUDIO_DIRECTOR := preload("res://scripts/audio/audio_director.gd")
 
@@ -35,6 +33,8 @@ func _run_test() -> void:
 	if not _expect(bool(director.call("has_live_score")), "a cold menu start should load a live score"):
 		return
 	var menu_seed := String(director.call("get_live_seed"))
+	if not _expect(menu_seed.begins_with("pc_menu_") and menu_seed != "pc_menu", "a cold start should generate a fresh menu piece"):
+		return
 	if not _expect(int(director.call("get_live_score_generations")) == 1, "a cold start should generate exactly one score"):
 		return
 
@@ -61,13 +61,19 @@ func _run_test() -> void:
 	if not _expect(String(director.call("get_live_seed")) != track_seed, "different circuits must not share a seed"):
 		return
 
+	var before_menu := int(director.call("get_live_score_generations"))
+	var race_seed := String(director.call("get_live_seed"))
 	director.call("play_menu_music")
 	await process_frame
-	if not _expect(int(director.call("get_live_score_generations")) == 4, "returning to the menu should restore the menu score"):
+	if not _expect(int(director.call("get_live_score_generations")) == before_menu, "returning to the menu must not regenerate the score"):
+		return
+	if not _expect(String(director.call("get_live_seed")) == race_seed, "returning to the menu must keep the score that is already playing"):
+		return
+	if not _expect(String(director.call("get_live_requested_section")) == "grid", "returning to the menu should ask the engine for the grid phase"):
 		return
 	director.call("play_menu_music")
 	await process_frame
-	if not _expect(int(director.call("get_live_score_generations")) == 4, "re-entering the menu must reuse its score"):
+	if not _expect(int(director.call("get_live_score_generations")) == before_menu, "re-entering the menu must reuse its score"):
 		return
 
 	director.queue_free()

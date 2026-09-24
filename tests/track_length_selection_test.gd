@@ -8,6 +8,7 @@ const RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 
 class MockApp extends Node:
 	var last_quick_tier := ""
+	var quick_draws := 0
 	var last_discovery_identity: Dictionary = {}
 	var favorites: Array = []
 	var save_read_only := false
@@ -22,7 +23,9 @@ class MockApp extends Node:
 		return ""
 
 	func random_circuit_seed(theme: StringName) -> Dictionary:
-		return {"theme": String(theme), "room": String(IDENTITIES.room_for_route_seed(24680)), "seed": 24680}
+		quick_draws += 1
+		var seed := 24680 + quick_draws
+		return {"theme": String(theme), "room": String(IDENTITIES.room_for_route_seed(seed)), "seed": seed}
 
 	func circuit_room_for_seed(seed: int) -> StringName:
 		return IDENTITIES.room_for_route_seed(seed)
@@ -143,12 +146,13 @@ func _test_ui_selection() -> void:
 	var first_tier := String(shell.get("_quick_race_length_tier"))
 	if not _expect(not first_tier.is_empty(), "Quick Race should assign a tier"):
 		return
+	var first_seed := int(shell.get("_quick_race_seed"))
 	if not _expect(
 			String(shell.get("_quick_race_theme")) == "kitchen"
-			and String(shell.get("_quick_race_room")) == "classic"
-			and int(shell.get("_quick_race_seed")) == 875
+			and first_seed != 875
+			and String(shell.get("_quick_race_room")) == String(IDENTITIES.room_for_route_seed(first_seed))
 			and not bool(shell.get("_quick_race_reverse")),
-			"Quick Race should pin the fixed kitchen/classic seed 875 identity"
+			"Quick Race should open on a rolled kitchen circuit, not seed 875"
 	):
 		return
 	if not _expect(shell.find_child("QuickRaceSize", true, false) == null, "Quick Race should not expose a size selector"):
@@ -161,6 +165,8 @@ func _test_ui_selection() -> void:
 	await _wait_frames(2)
 	var second_tier := String(shell.get("_quick_race_length_tier"))
 	if not _expect(second_tier != first_tier, "a new Quick Race entry should rotate the tier"):
+		return
+	if not _expect(int(shell.get("_quick_race_seed")) != first_seed, "a new Quick Race entry should roll another circuit"):
 		return
 	shell.call("_start_quick_race")
 	if not _expect(mock.last_quick_tier == second_tier, "starting the second quick race should forward the new profile"):

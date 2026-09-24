@@ -266,6 +266,9 @@ func _prepare_race_async() -> void:
 	if director:
 		# The director swaps in this circuit's score and opens on `ignition`.
 		director.call("play_race_music")
+		for entry: Dictionary in _build_field_racers_for_preparation():
+			director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")))
+			await _loading_step("Preparing race audio")
 	for frame in 3:
 		await _loading_step("Warming graphics for the starting grid")
 	if not app.call("complete_race_loading"):
@@ -283,6 +286,10 @@ func _exit_tree() -> void:
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("set_race_audio_paused"):
 		app.call("set_race_audio_paused", false)
+	var director := _audio_director()
+	if director and director.has_method("set_positional_vehicles"):
+		var no_vehicles: Array[Node] = []
+		director.call("set_positional_vehicles", no_vehicles)
 
 
 func _process(_delta: float) -> void:
@@ -378,13 +385,14 @@ func _configure_racers() -> void:
 	camera.call("set_target", _player_vehicle)
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("set_local_race_vehicle"):
-		app.call("set_local_race_vehicle", _player_vehicle)
+		app.call("set_local_race_vehicle", _player_vehicle, player_vehicle_id)
 
 	var event: Dictionary = _session.get("event", {})
 	var opponent_ids: Array = event.get("opponents", FALLBACK_OPPONENTS) if not event.is_empty() else FALLBACK_OPPONENTS
 	var opponent_count := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
 	var difficulty := String(_session.get("difficulty", "club_circuit"))
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
+	var positional_vehicles: Array[Node] = []
 	for ai_index in mini(opponent_ids.size(), opponent_count):
 		var driver_id := String(opponent_ids[ai_index])
 		var driver := CATALOG.get_driver(driver_id)
@@ -395,6 +403,7 @@ func _configure_racers() -> void:
 		ai_vehicle.stats = CATALOG.create_vehicle_stats(ai_vehicle_id)
 		ai_vehicle.remove_from_group("player_vehicle")
 		ai_vehicle.add_to_group("race_vehicle")
+		ai_vehicle.set_meta("audio_vehicle_id", ai_vehicle_id)
 		ai_vehicle.set_player_controlled(false)
 		ai_vehicle.set_controls_locked(true)
 		# Register the rigid body at its actual spawn, not at the scene's
@@ -412,6 +421,10 @@ func _configure_racers() -> void:
 			driver_id,
 			driver.get("ai_style", {}) as Dictionary
 		)
+		positional_vehicles.append(ai_vehicle)
+	var director := _audio_director()
+	if director and director.has_method("set_positional_vehicles"):
+		director.call("set_positional_vehicles", positional_vehicles)
 
 
 func _configure_vehicle(
@@ -683,24 +696,28 @@ func _on_race_finished(_total_time: float) -> void:
 	var director := _audio_director()
 	if director != null and director.has_method("stop_live_rotation"):
 		director.call("stop_live_rotation")
-	# A won race lands on the victory outro then releases into cooldown; a lost
-	# one uses the defeat outro the seeded score carries.
+	# Finish outro first. Once that blend has started, queue grid so the menu
+	# phase is already in motion while the results are on screen.
 	_cue_live_section("victory" if _race_won else "defeat")
 	_results_panel.visible = true
 	_retry_button.disabled = true
 	_continue_button.disabled = true
 	_update_results(race_manager.get_results())
-	_play_finish_cooldown()
+	_queue_menu_phase()
 
 
-func _play_finish_cooldown() -> void:
-	if not _race_won:
-		return
-	# Let the victory sting play before the resolving cooldown under the results panel.
-	await get_tree().create_timer(4.0).timeout
+func _queue_menu_phase() -> void:
+	var director := _audio_director()
+	var deadline := Time.get_ticks_msec() + 3000
+	while is_inside_tree() and _finished and Time.get_ticks_msec() < deadline:
+		if director != null and director.has_method("get_live_section"):
+			var section := String(director.call("get_live_section"))
+			if section == "victory" or section == "defeat":
+				break
+		await get_tree().process_frame
 	if not _finished or not is_inside_tree():
 		return
-	_cue_live_section("cooldown")
+	_cue_live_section("grid")
 
 
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:
@@ -951,8 +968,8 @@ func _advance_live_rotation() -> void:
 
 
 func _begin_race_music() -> void:
-	# The race rotates through a per-circuit deck of grooves and peaks so no one
-	# section holds; events (lead, incident, final lap, finish) override it.
+	# The race rotates through grooves, builds, peaks, and a breather. Events
+	# (lead, incident, final lap, finish) override that deck.
 	var director := _audio_director()
 	if director == null or not director.has_method("begin_live_rotation"):
 		return
@@ -1123,8 +1140,8 @@ func _create_pause_overlay() -> void:
 	_pause_settings_panel = PanelContainer.new()
 	_pause_settings_panel.name = "PauseSettingsPanel"
 	_pause_settings_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.94), Color("4a8fb8")))
-	_pause_settings_panel.position = Vector2(320.0, 50.0)
-	_pause_settings_panel.size = Vector2(640.0, 620.0)
+	_pause_settings_panel.position = Vector2(320.0, 16.0)
+	_pause_settings_panel.size = Vector2(640.0, 688.0)
 	_pause_settings_panel.visible = false
 	_pause_overlay.add_child(_pause_settings_panel)
 	var settings_margin := MarginContainer.new()
@@ -1151,6 +1168,8 @@ func _create_pause_overlay() -> void:
 	_pause_settings_first_control = _add_pause_setting_slider(settings_column, "Master", "master_volume", float(settings.get("master_volume", 1.0)))
 	_add_pause_setting_slider(settings_column, "Music", "music_volume", float(settings.get("music_volume", 0.8)))
 	_add_pause_setting_slider(settings_column, "SFX", "sfx_volume", float(settings.get("sfx_volume", 0.9)))
+	_add_pause_setting_slider(settings_column, "Engine", "engine_volume", float(settings.get("engine_volume", settings.get("sfx_volume", 0.9))))
+	_add_pause_setting_slider(settings_column, "Tyres", "tyre_volume", float(settings.get("tyre_volume", settings.get("sfx_volume", 0.9))))
 	var comfort_heading := Label.new()
 	comfort_heading.text = "COMFORT"
 	comfort_heading.add_theme_font_size_override("font_size", 18)
