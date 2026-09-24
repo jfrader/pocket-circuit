@@ -44,6 +44,8 @@ class TestApp extends Node:
 		"master_volume": 1.0,
 		"music_volume": 0.8,
 		"sfx_volume": 0.8,
+		"engine_volume": 0.8,
+		"tyre_volume": 0.8,
 		"fullscreen": false,
 		"reduced_camera_shake": false,
 		"reduced_motion": false,

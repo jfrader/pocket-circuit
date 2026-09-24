@@ -2,13 +2,32 @@
 
 ## [Unreleased]
 
+### Changed
+- Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
+
 ### Fixed
+- Leaving a race for the menu no longer drops the music out. The menu stays on Starting Grid for several loops, then steps to a groove. It does not drop back into Ignition.
+- Your own tyres now use the same loop as rival cars, and they stay quiet unless the car is actually sliding. A small steer does not open them.
+- Settings has separate Engine and Tyres sliders. SFX no longer changes them.
+- Nearby rival cars now have their own engine note, pitched from that car. Far cars stay quiet.
+- Tyre sound now follows the same drift and slide state as skid marks, stays present through ordinary steering, changes character with the room surface, and comes from nearby rival cars as positional audio.
+- Tyre scrub is quieter in ordinary corners and resolves into a rising, resonant squeal during a full slide instead of broadband hiss.
 - Fixed false "WRONG WAY" warnings and the resulting teleport reset when driving on the open apron beside a folded circuit. Wrong-way is now a warning only — the car is never reset for it.
 - Race music no longer loops one section or lags behind the race. Each circuit now generates its own score from the track seed, so a circuit always sounds the same while different circuits, tiers, and acts sound different, and the race rotates through the whole racing pool — grooves, peaks, the starting-grid reprise, a reset sting, the final lap, and the win/loss outros.
 - Shipped the live Gamestruments engine into the release gate (sync + hard `ClassDB.class_exists("GamestrumentsPlayer")` check at the start of `tools/build_release.sh`). Removed rendered WAV fallbacks (`assets/audio/menu_loop.wav`, `race_loop.wav` and their `.import`s); the live engine is now mandatory — there is no silent-music or WAV fallback mode.
 
 ### Added
 
+- Drifting now makes a continuous tyre scrub that follows the slide instead of a
+  single scratch at the start of it, and it bites harder the faster and more
+  sideways you go. Crashes are built from the machine's own weight and
+  toughness, so a light tap, a hard hit and a heavy car all sound different.
+  Boost and the menu/race blips are generated too — the game no longer ships any
+  recorded sound effects.
+- Each machine now has its own engine voice, generated from the car's own stats
+  instead of pitching one shared loop. A virtual gearbox pulls revs up and drops
+  them on each shift, the note changes with throttle and load, and coasting
+  sounds different from power.
 - Championship events now use progressive track length tiers (from compact to marathon). Quick Race exhibition lengths now rotate across tiers per entry.
 - The complete nine-event Grand Household Circuit, with three story acts,
   recurring rivals, persistent standings, vehicle and event unlocks,

@@ -140,6 +140,8 @@ func confirm_new_championship() -> bool:
 		"master_volume": _save_data["master_volume"],
 		"music_volume": _save_data["music_volume"],
 		"sfx_volume": _save_data["sfx_volume"],
+		"engine_volume": _save_data["engine_volume"],
+		"tyre_volume": _save_data["tyre_volume"],
 		"fullscreen": _save_data["fullscreen"],
 		"reduced_camera_shake": _save_data["reduced_camera_shake"],
 		"reduced_motion": _save_data["reduced_motion"],
@@ -268,7 +270,7 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false, 
 		current_race_session["mastery_identity"] = mastery_identity
 		current_race_session["mastery_targets"] = (mastery_context["targets"] as Dictionary).duplicate(true)
 		current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), mastery_identity)
-	_begin_race_transition()
+	_begin_race_transition(vehicle_id)
 
 
 func start_mastery_run(event_id: String, vehicle_id: String) -> void:
@@ -497,7 +499,7 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 			"difficulty": String(_save_data["difficulty"]),
 			"result_committed": false,
 		}
-		_begin_race_transition()
+		_begin_race_transition(vehicle_id)
 		return true
 	return _start_generated_identity_race(identity, vehicle_id, "quick")
 
@@ -543,7 +545,7 @@ func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: Stri
 		"difficulty": String(_save_data["difficulty"]),
 		"result_committed": false,
 	}
-	_begin_race_transition()
+	_begin_race_transition(vehicle_id)
 	return true
 
 
@@ -611,7 +613,7 @@ func _yield_loading_frame() -> void:
 		await RenderingServer.frame_post_draw
 
 
-func _begin_race_transition() -> void:
+func _begin_race_transition(vehicle_id: String = "") -> void:
 	_transitioning_to_race = true
 	_loading_cancelled = false
 	_loading_failed = false
@@ -641,12 +643,43 @@ func _begin_race_transition() -> void:
 		fail_race_loading("Race resources could not be loaded")
 		return
 	var packed := resources.get(RACE_SCENE) as PackedScene
+	# Synthesize this car's engine voice and crash/boost one-shots behind the
+	# loading screen; the race scene would otherwise pay for them on its first
+	# live frame.
+	await loading_step("Tuning the engine")
+	if _loading_cancelled:
+		_leave_race_loading()
+		return
+	if is_instance_valid(audio_director):
+		audio_director.call("warm_vehicle_audio", vehicle_id)
+		for opponent_id in _opponent_audio_vehicle_ids():
+			if _loading_cancelled:
+				_leave_race_loading()
+				return
+			await loading_step("Tuning the engine")
+			audio_director.call("warm_vehicle_audio", opponent_id)
 	await loading_step("Opening the circuit")
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
 	if packed == null or get_tree().change_scene_to_packed(packed) != OK:
 		fail_race_loading("The race scene could not be opened")
+
+
+func _opponent_audio_vehicle_ids() -> PackedStringArray:
+	var ids := PackedStringArray()
+	if String(current_race_session.get("mode", "")) == "mastery":
+		return ids
+	var event: Dictionary = current_race_session.get("event", {})
+	var opponent_ids: Array = event.get("opponents", [])
+	var count := clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
+	for index in mini(opponent_ids.size(), count):
+		var driver: Dictionary = CATALOG.get_driver(String(opponent_ids[index]))
+		var vehicle_id := String(driver.get("vehicle_id", ""))
+		if vehicle_id.is_empty() or vehicle_id in ids:
+			continue
+		ids.append(vehicle_id)
+	return ids
 
 
 func _load_scene_resources(path: String, resources: Dictionary) -> bool:
@@ -851,7 +884,7 @@ func retry_race(reload_scene: bool = true) -> void:
 		current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), identity)
 	_reset_race_attempt()
 	if reload_scene:
-		_begin_race_transition()
+		_begin_race_transition(String(current_race_session.get("vehicle_id", "")))
 
 
 func can_start_mastery_rematch() -> bool:
@@ -882,7 +915,7 @@ func start_mastery_rematch(reload_scene: bool = true) -> bool:
 	current_race_session["best_ghost"] = PERSONAL_GHOST.compatible_best(_save_data.get("personal_ghosts"), identity)
 	_reset_race_attempt()
 	if reload_scene:
-		_begin_race_transition()
+		_begin_race_transition(vehicle_id)
 	return true
 
 
@@ -918,7 +951,7 @@ func update_setting(key: String, value: Variant) -> bool:
 				candidate[key] = value
 			else:
 				return false
-		"master_volume", "music_volume", "sfx_volume":
+		"master_volume", "music_volume", "sfx_volume", "engine_volume", "tyre_volume":
 			if value is float or value is int:
 				candidate[key] = clampf(float(value), 0.0, 1.0)
 			else:
@@ -953,9 +986,9 @@ func play_sfx(sound_name: StringName, volume_scale: float = 1.0, pitch_scale: fl
 	return audio_director.play_sfx(sound_name, volume_scale, pitch_scale) if is_instance_valid(audio_director) else false
 
 
-func set_local_race_vehicle(vehicle: Node) -> void:
+func set_local_race_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 	if is_instance_valid(audio_director):
-		audio_director.set_local_vehicle(vehicle)
+		audio_director.set_local_vehicle(vehicle, vehicle_id)
 
 
 func set_race_audio_paused(paused: bool) -> void:
@@ -1023,6 +1056,8 @@ func _apply_settings() -> void:
 	_apply_bus_volume("Master", float(_save_data["master_volume"]))
 	_apply_bus_volume("Music", float(_save_data["music_volume"]))
 	_apply_bus_volume("SFX", float(_save_data["sfx_volume"]))
+	_apply_bus_volume("Engine", float(_save_data["engine_volume"]))
+	_apply_bus_volume("Tyre", float(_save_data["tyre_volume"]))
 	if DisplayServer.get_name().to_lower() != "headless":
 		var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if bool(_save_data["fullscreen"]) else DisplayServer.WINDOW_MODE_WINDOWED
 		DisplayServer.window_set_mode(mode)
