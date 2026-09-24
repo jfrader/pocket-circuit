@@ -4,7 +4,6 @@ extends SceneTree
 ## not. That change asks the loaded score for the garage phase.
 
 const AUDIO_DIRECTOR := preload("res://scripts/audio/audio_director.gd")
-const SILENCE_DB := -80.0
 
 
 class FakeApp extends Node:
@@ -46,32 +45,6 @@ func _run_test() -> void:
 		return
 	var track_seed := String(director.call("get_live_seed"))
 	if not _expect(track_seed != menu_seed, "the circuit score seed should differ from the menu score"):
-		return
-
-	# A seed swap must crossfade, not cut. The extension rewinds its transport on
-	# generate(), so the old score has to fade out under the new one: both players
-	# exist and are audible for the fade window.
-	var outgoing := director.get_node_or_null("GamestrumentsPlayerOutgoing")
-	var incoming := director.get_node_or_null("GamestrumentsPlayer")
-	if not _expect(outgoing != null, "a seed swap should keep the old score as a fading player, not cut it"):
-		return
-	if not _expect(incoming != null and incoming != outgoing, "the incoming score should be a separate live player"):
-		return
-	# Step partway through the fade by hand: headless frames are too short to
-	# advance it on wall-clock time. Both scores must be audible at once.
-	director.call("_update_live_volume", 0.2)
-	director.call("_update_live_volume", 0.2)
-	if not _expect(_music_child_db(outgoing) > SILENCE_DB and _music_child_db(incoming) > SILENCE_DB, "both scores should be audible during the crossfade"):
-		return
-	# Finish the fade: the old score is released and the new one holds full level.
-	for _step in 6:
-		director.call("_update_live_volume", 0.2)
-	await process_frame
-	if not _expect(not is_instance_valid(outgoing), "the outgoing score should be released once the crossfade lands"):
-		return
-	if not _expect(director.get_node_or_null("GamestrumentsPlayer") == incoming, "the incoming score should be the live player after the crossfade"):
-		return
-	if not _expect(is_zero_approx(_music_child_db(incoming)), "the live score should sit at full level once the crossfade ends"):
 		return
 	director.call("play_race_music")
 	await process_frame
@@ -119,17 +92,6 @@ func _set_race_session(_director: Node, theme: String, room: String, seed: int, 
 		"event_id": "circuit_%s_%s_%d" % [theme, room, seed],
 		"event": {"theme": theme, "room": room, "seed": seed, "length_tier": tier},
 	})
-
-
-## The level of the score player's own stream, used to tell a live score from a
-## fading one.
-func _music_child_db(player: Node) -> float:
-	if not is_instance_valid(player):
-		return -200.0
-	for child: Node in player.get_children():
-		if child is AudioStreamPlayer:
-			return (child as AudioStreamPlayer).volume_db
-	return -200.0
 
 
 func _expect(condition: bool, message: String) -> bool:

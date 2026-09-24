@@ -29,10 +29,6 @@ const ENGINE_VOICE_TRIM_DB := -6.0
 const SFX_PLAYER_COUNT := 6
 const SILENCE_DB := -80.0
 const PAUSED_MUSIC_DB := -9.0
-## Whole-score swaps crossfade over this window. A seed change rebuilds the
-## extension's transport and rewinds it to tick 0, so swapping the stream of a
-## playing score is a hard cut; two scores instead overlap through the change.
-const MUSIC_CROSSFADE_SECONDS := 0.75
 
 ## Ceiling for the Master-bus hard limiter. Music and engine are mastered to
 ## -1.0 dBTP individually, but their sum can exceed full scale, so the mix needs
@@ -82,14 +78,6 @@ var _engine_loop: AudioStream
 var _engine_rpm := 0.08
 var _headless := false
 var _live_music: Node
-## The score being faded out after a swap. Kept only for the crossfade window,
-## then stopped and freed so a session never renders two scores at rest.
-var _fading_music: Node
-var _fade_active := false
-var _fade_elapsed := 0.0
-## Equal-power gains applied on top of the music base level while fading.
-var _fade_in_db := 0.0
-var _fade_out_db := 0.0
 ## True once the live player holds a generated score. The same seed is reused.
 ## A different circuit generates a new score. A scene change on the loaded
 ## score asks the engine for a phase; it does not fade the player out.
@@ -127,7 +115,7 @@ func _process(delta: float) -> void:
 		var step := _engine_emitter_clock
 		_engine_emitter_clock = 0.0
 		_update_positional_engines(step)
-	_update_live_volume(delta)
+	_update_live_volume()
 	_update_live_rotation(delta)
 
 func _exit_tree() -> void:
@@ -139,9 +127,6 @@ func _exit_tree() -> void:
 		_engine_player.stream = null
 	if is_instance_valid(_engine_voice):
 		_engine_voice.stop()
-	if is_instance_valid(_fading_music):
-		_release_music(_fading_music)
-		_fading_music = null
 	_stop_local_tyre()
 	_clear_positional_emitters()
 	for player: AudioStreamPlayer in _sfx_players:
@@ -440,27 +425,18 @@ func cue_live_section_timed(section: String, hold_seconds: float) -> bool:
 	return accepted
 
 func _bind_live_music() -> void:
-	_live_music = _make_live_player("GamestrumentsPlayer")
-
-## One configured live-score player. Each score lives on its own player so a swap
-## can overlap the old and the new instead of rewinding a single transport.
-func _make_live_player(node_name: String) -> Node:
-	var music := ClassDB.instantiate("GamestrumentsPlayer") as Node
-	if music == null:
-		push_error("GamestrumentsPlayer is unavailable; live music is disabled")
-		return null
-	music.name = node_name
-	music.set("project_secret", "guri-pc-dev-salt")
-	music.set("recipe", LIVE_RECIPE)
-	music.set("arrangement", LIVE_ARRANGEMENT)
-	music.set("autoplay", false)
-	music.set("style", RaceMusicPlan.MENU_STYLE)
-	music.set("melody_voice", "pluck")
-	music.set("harmony_voice", "warm")
-	music.set("drive_voice", "pluck")
-	music.set("bass_voice", "bass")
-	add_child(music)
-	return music
+	_live_music = ClassDB.instantiate("GamestrumentsPlayer")
+	_live_music.name = "GamestrumentsPlayer"
+	_live_music.set("project_secret", "guri-pc-dev-salt")
+	_live_music.set("recipe", LIVE_RECIPE)
+	_live_music.set("arrangement", LIVE_ARRANGEMENT)
+	_live_music.set("autoplay", false)
+	_live_music.set("style", RaceMusicPlan.MENU_STYLE)
+	_live_music.set("melody_voice", "pluck")
+	_live_music.set("harmony_voice", "warm")
+	_live_music.set("drive_voice", "pluck")
+	_live_music.set("bass_voice", "bass")
+	add_child(_live_music)
 
 func _build_players() -> void:
 	if is_instance_valid(_music_player):
@@ -506,82 +482,33 @@ func _current_event() -> Dictionary:
 	return {}
 
 ## Generate a score when the seed changes. Style and traits are the sound
-## world and are read by generate. The same seed only cues a phase. A seed change
-## while a score is already playing builds the new score behind it and
-## crossfades, because the extension rewinds its transport on generate().
+## world and are read by generate. The same seed only cues a phase.
 func _start_live_score(seed: String, profile: Dictionary, initial_section: String) -> void:
 	if _live_score_loaded and _live_seed == seed:
 		if not initial_section.is_empty():
 			_cue_live_direct(initial_section)
 		return
-	if not _live_score_loaded:
-		if not _generate_into(_live_music, seed, profile):
-			return
-		_live_seed = seed
-		_live_score_loaded = true
-		_live_score_generations += 1
-		if not initial_section.is_empty():
-			_cue_live_direct(initial_section)
-		_update_live_volume()
+	_apply_live_profile(profile)
+	_live_music.set("arrangement", LIVE_ARRANGEMENT)
+	_live_music.set("autoplay", false)
+	if not bool(_live_music.call("generate", seed)):
+		push_error("Gamestruments generation failed for seed " + seed)
 		return
-	var incoming := _make_live_player("GamestrumentsPlayerIncoming")
-	if incoming == null or not _generate_into(incoming, seed, profile):
-		if is_instance_valid(incoming):
-			incoming.queue_free()
-		return
-	_begin_music_crossfade(incoming)
 	_live_seed = seed
+	_live_score_loaded = true
 	_live_score_generations += 1
+	# The seeded composer attaches a tour form; hold it so the game owns the arc.
+	_live_music.call("set_form_hold", true)
 	if not initial_section.is_empty():
 		_cue_live_direct(initial_section)
 	_update_live_volume()
 
-## Generates this seed's score on `music` and holds its form. Returns false (and
-## leaves the player unloaded) when the extension rejects the seed.
-func _generate_into(music: Node, seed: String, profile: Dictionary) -> bool:
-	if not is_instance_valid(music):
-		return false
-	_apply_live_profile(music, profile)
-	music.set("arrangement", LIVE_ARRANGEMENT)
-	music.set("autoplay", false)
-	if not bool(music.call("generate", seed)):
-		push_error("Gamestruments generation failed for seed " + seed)
-		return false
-	# The seeded composer attaches a tour form; hold it so the game owns the arc.
-	music.call("set_form_hold", true)
-	return true
-
-## Hands the live score role to `incoming` and fades the previous score out over
-## MUSIC_CROSSFADE_SECONDS. Any fade still running is finished first.
-func _begin_music_crossfade(incoming: Node) -> void:
-	if is_instance_valid(_fading_music):
-		_release_music(_fading_music)
-	_fading_music = _live_music
-	if is_instance_valid(_fading_music):
-		_fading_music.name = "GamestrumentsPlayerOutgoing"
-	_live_music = incoming
-	_live_music.name = "GamestrumentsPlayer"
-	_fade_elapsed = 0.0
-	_fade_active = is_instance_valid(_fading_music)
-	_fade_in_db = SILENCE_DB if _fade_active else 0.0
-	_fade_out_db = 0.0
-	_apply_music_volume(_live_music, _music_base_db() + _fade_in_db)
-	_apply_music_volume(_fading_music, _music_base_db())
-
-func _release_music(music: Node) -> void:
-	if not is_instance_valid(music):
-		return
-	var stream_player := music.get_node_or_null("LiveStream") as AudioStreamPlayer
-	if stream_player != null:
-		stream_player.stop()
-	music.queue_free()
-
-func _apply_live_profile(music: Node, profile: Dictionary) -> void:
-	music.set("style", String(profile.get("style", RaceMusicPlan.MENU_STYLE)))
-	music.set("energy", float(profile.get("energy", 0.62)))
-	music.set("complexity", float(profile.get("complexity", 0.60)))
-	music.set("brightness", float(profile.get("brightness", 0.52)))
-	music.set("syncopation", float(profile.get("syncopation", 0.70)))
+func _apply_live_profile(profile: Dictionary) -> void:
+	_live_music.set("style", String(profile.get("style", RaceMusicPlan.MENU_STYLE)))
+	_live_music.set("energy", float(profile.get("energy", 0.62)))
+	_live_music.set("complexity", float(profile.get("complexity", 0.60)))
+	_live_music.set("brightness", float(profile.get("brightness", 0.52)))
+	_live_music.set("syncopation", float(profile.get("syncopation", 0.70)))
 
 func _cue_live_direct(section: String) -> bool:
 	if _live_music == null or not _live_music.has_method("cue_section"):
@@ -596,50 +523,17 @@ func _cue_live_direct(section: String) -> bool:
 			_live_deck_index = index
 	return accepted
 
-## Applies the music level to the live score and, while a swap is fading, to the
-## outgoing one too. `delta` advances the crossfade; callers that only want to
-## re-apply the level pass nothing.
-func _update_live_volume(delta: float = 0.0) -> void:
+func _update_live_volume() -> void:
 	if not is_instance_valid(_live_music):
 		return
-	_advance_music_crossfade(delta)
-	var db := _music_base_db()
-	_apply_music_volume(_live_music, db + _fade_in_db)
-	if is_instance_valid(_fading_music):
-		_apply_music_volume(_fading_music, db + _fade_out_db)
-
-func _music_base_db() -> float:
-	if not _live_score_loaded:
-		return SILENCE_DB
+	var db := 0.0
 	if _live_paused and _music_context == &"race":
-		return PAUSED_MUSIC_DB
-	return 0.0
-
-func _apply_music_volume(music: Node, db: float) -> void:
-	if not is_instance_valid(music):
-		return
-	for child: Node in music.get_children():
+		db += PAUSED_MUSIC_DB
+	if not _live_score_loaded:
+		db = SILENCE_DB
+	for child: Node in _live_music.get_children():
 		if child is AudioStreamPlayer:
 			(child as AudioStreamPlayer).volume_db = db
-
-## Equal-power fade so the two scores sum to a steady level through the swap. The
-## outgoing score is released the moment the fade lands.
-func _advance_music_crossfade(delta: float) -> void:
-	if not _fade_active or delta <= 0.0:
-		return
-	_fade_elapsed += delta
-	var progress := clampf(_fade_elapsed / MUSIC_CROSSFADE_SECONDS, 0.0, 1.0)
-	var angle := progress * PI * 0.5
-	_fade_in_db = linear_to_db(maxf(sin(angle), 0.0001))
-	_fade_out_db = linear_to_db(maxf(cos(angle), 0.0001))
-	if progress < 1.0:
-		return
-	_fade_active = false
-	_fade_in_db = 0.0
-	_fade_out_db = SILENCE_DB
-	if is_instance_valid(_fading_music):
-		_release_music(_fading_music)
-	_fading_music = null
 
 func _update_live_rotation(delta: float) -> void:
 	if not _live_rotation_enabled or _live_deck.is_empty() or _live_paused:
