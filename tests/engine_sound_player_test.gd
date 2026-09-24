@@ -19,6 +19,7 @@ func _run_test() -> void:
 	errors.append_array(_check_prepare(player, recipe))
 	errors.append_array(_check_state(player, recipe))
 	errors.append_array(_check_pause(player))
+	errors.append_array(_check_restart(player, recipe))
 	errors.append_array(_check_fallback())
 	root.remove_child(player)
 	player.free()
@@ -75,6 +76,21 @@ func _check_pause(player: EngineSoundPlayer) -> PackedStringArray:
 	for index in 30:
 		player.set_vehicle_state(692.0, 692.0, 1.0, 1.0, STEP)
 	errors.append_array(_expect(player.get_rpm() >= rpm_before, "resuming should let the drivetrain advance again"))
+	return errors
+
+
+## A voice stopped for a menu or race transition must be re-bound to the live
+## generator playback when the next race prepares it. Reusing the pre-stop
+## playback leaves the player reporting playing while the bus stays silent.
+func _check_restart(player: EngineSoundPlayer, recipe: EngineRecipe) -> PackedStringArray:
+	var errors := PackedStringArray()
+	player.stop()
+	errors.append_array(_expect(player.prepare(recipe, "rustbug"), "re-preparing after a stop should succeed"))
+	var audio_player := player.get("_player") as AudioStreamPlayer
+	errors.append_array(_expect(audio_player != null and audio_player.playing, "a re-prepared voice should be playing again"))
+	var playback: Variant = player.get("_playback")
+	errors.append_array(_expect(playback != null, "a re-prepared voice should hold a playback"))
+	errors.append_array(_expect(playback == audio_player.get_stream_playback(), "the voice must write into the playback the player is mixing now, not the one from before the stop"))
 	return errors
 
 

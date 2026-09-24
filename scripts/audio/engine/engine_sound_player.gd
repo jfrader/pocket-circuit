@@ -124,8 +124,7 @@ func start() -> void:
 	if _headless or _player == null:
 		return
 	_player.volume_db = _current_volume_db()
-	if not _player.playing:
-		_player.play()
+	_bind_playback()
 
 
 func stop() -> void:
@@ -133,6 +132,10 @@ func stop() -> void:
 		_player.stop()
 	if _player != null:
 		_player.volume_db = SILENCE_DB
+	# The playback died with the player; writing into it after a later play()
+	# would leave the voice silent while the player still reports playing.
+	_playback = null
+	_primed = false
 
 
 func set_paused(paused: bool) -> void:
@@ -174,22 +177,30 @@ func get_voice_bytes() -> int:
 
 
 func _ensure_player() -> bool:
-	if _player != null:
-		return true
-	var stream := AudioStreamGenerator.new()
-	stream.mix_rate = float(SAMPLE_RATE)
-	stream.buffer_length = BUFFER_SECONDS
-	_capacity = int(BUFFER_SECONDS * float(SAMPLE_RATE))
-	_primed = false
-	_player = AudioStreamPlayer.new()
-	_player.name = "EngineVoicePlayer"
-	_player.bus = &"Engine"
-	_player.stream = stream
-	_player.volume_db = SILENCE_DB
-	add_child(_player)
-	# get_stream_playback() is only valid while the player is active.
-	_player.play()
+	if _player == null:
+		var stream := AudioStreamGenerator.new()
+		stream.mix_rate = float(SAMPLE_RATE)
+		stream.buffer_length = BUFFER_SECONDS
+		_capacity = int(BUFFER_SECONDS * float(SAMPLE_RATE))
+		_player = AudioStreamPlayer.new()
+		_player.name = "EngineVoicePlayer"
+		_player.bus = &"Engine"
+		_player.stream = stream
+		_player.volume_db = SILENCE_DB
+		add_child(_player)
+	return _bind_playback()
+
+
+## get_stream_playback() is only valid while the player is active, and every
+## (re)play hands back a fresh playback. The voice must always write into the
+## playback the server is mixing now: a reference kept across a stop() reports a
+## full buffer that never drains, so the player looks alive while the bus is
+## silent.
+func _bind_playback() -> bool:
+	if not _player.playing:
+		_player.play()
 	_playback = _player.get_stream_playback() as AudioStreamGeneratorPlayback
+	_primed = false
 	if _playback == null:
 		_player.stop()
 	return _playback != null
