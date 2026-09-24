@@ -69,6 +69,10 @@ static func create(
 			seeds[domain] = sub_seed_overrides[domain]
 	if int(seeds.get("route", -1)) != route_seed:
 		return {}
+	# Local preview switch only: v8 stays opt-in and is never the default. Run
+	# with PC_TRACK_V8=1 to generate v8 tracks in Quick Race.
+	if OS.get_environment("PC_TRACK_V8") != "":
+		return create_v8(theme, room, route_seed, reverse, danger_level, explicit_material_id, explicit_palette_id, sub_seed_overrides, length_tier)
 	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds, length_tier)
 
 
