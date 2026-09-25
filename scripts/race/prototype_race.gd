@@ -45,6 +45,7 @@ const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identi
 const CIRCUIT_PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const PERSONAL_GHOST_SCRIPT := preload("res://scripts/race/personal_ghost.gd")
+const RACE_MUSIC_PLAN := preload("res://scripts/audio/race_music_plan.gd")
 const COUNTDOWN_STEP_SECONDS := 0.65
 const FALLBACK_OPPONENTS: Array[String] = ["juniper", "milo", "tess"]
 const GRID_TRANSFORMS: Array[Transform2D] = [
@@ -84,7 +85,6 @@ var _countdown_label: Label
 var _race_flash_label: Label
 var _race_hud: RaceHUD
 var _position_label: Label
-var _wrong_way_label: Label
 var _results_panel: Panel
 var _results_label: Label
 var _retry_button: Button
@@ -99,6 +99,8 @@ var _pause_settings_status: Label
 var _session: Dictionary = {}
 var _save_error := ""
 var _results_finalized: bool = false
+var _player_took_lead := false
+var _race_won := false
 var _track_variant_presenter: TrackVariantPresenter
 var _countdown_tween: Tween
 var _race_flash_tween: Tween
@@ -151,6 +153,7 @@ func _complete_race_setup(start_countdown: bool = true) -> void:
 	race_manager.wrong_way_changed.connect(_on_wrong_way_changed)
 	race_manager.lap_completed.connect(_on_lap_completed)
 	race_manager.racer_finished.connect(_on_racer_finished)
+	race_manager.racer_recovered.connect(_on_racer_recovered)
 	race_manager.results_ready.connect(_on_results_ready)
 	if OS.is_debug_build():
 		_ensure_debug_overlay()
@@ -261,7 +264,11 @@ func _prepare_race_async() -> void:
 	await _loading_step("Preparing race audio")
 	var director := app.get("audio_director") as Node
 	if director:
+		# The director swaps in this circuit's score and opens on `ignition`.
 		director.call("play_race_music")
+		for entry: Dictionary in _build_field_racers_for_preparation():
+			director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")))
+			await _loading_step("Preparing race audio")
 	for frame in 3:
 		await _loading_step("Warming graphics for the starting grid")
 	if not app.call("complete_race_loading"):
@@ -279,6 +286,10 @@ func _exit_tree() -> void:
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("set_race_audio_paused"):
 		app.call("set_race_audio_paused", false)
+	var director := _audio_director()
+	if director and director.has_method("set_positional_vehicles"):
+		var no_vehicles: Array[Node] = []
+		director.call("set_positional_vehicles", no_vehicles)
 
 
 func _process(_delta: float) -> void:
@@ -374,13 +385,14 @@ func _configure_racers() -> void:
 	camera.call("set_target", _player_vehicle)
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("set_local_race_vehicle"):
-		app.call("set_local_race_vehicle", _player_vehicle)
+		app.call("set_local_race_vehicle", _player_vehicle, player_vehicle_id)
 
 	var event: Dictionary = _session.get("event", {})
 	var opponent_ids: Array = event.get("opponents", FALLBACK_OPPONENTS) if not event.is_empty() else FALLBACK_OPPONENTS
 	var opponent_count := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
 	var difficulty := String(_session.get("difficulty", "club_circuit"))
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
+	var positional_vehicles: Array[Node] = []
 	for ai_index in mini(opponent_ids.size(), opponent_count):
 		var driver_id := String(opponent_ids[ai_index])
 		var driver := CATALOG.get_driver(driver_id)
@@ -391,6 +403,7 @@ func _configure_racers() -> void:
 		ai_vehicle.stats = CATALOG.create_vehicle_stats(ai_vehicle_id)
 		ai_vehicle.remove_from_group("player_vehicle")
 		ai_vehicle.add_to_group("race_vehicle")
+		ai_vehicle.set_meta("audio_vehicle_id", ai_vehicle_id)
 		ai_vehicle.set_player_controlled(false)
 		ai_vehicle.set_controls_locked(true)
 		# Register the rigid body at its actual spawn, not at the scene's
@@ -408,6 +421,10 @@ func _configure_racers() -> void:
 			driver_id,
 			driver.get("ai_style", {}) as Dictionary
 		)
+		positional_vehicles.append(ai_vehicle)
+	var director := _audio_director()
+	if director and director.has_method("set_positional_vehicles"):
+		director.call("set_positional_vehicles", positional_vehicles)
 
 
 func _configure_vehicle(
@@ -624,7 +641,10 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 
 
 func _run_countdown() -> void:
-	_push_live_race_state("grid")
+	var director := _audio_director()
+	if director != null and director.has_method("stop_live_rotation"):
+		director.call("stop_live_rotation")
+	_cue_live_section("grid")
 	race_manager.begin_countdown()
 	for value in ["3", "2", "1"]:
 		_present_countdown(value)
@@ -638,7 +658,7 @@ func _run_countdown() -> void:
 	_play_sfx(&"go", 0.92)
 	race_manager.report_countdown_tick("GO!")
 	race_manager.start_race()
-	_push_live_race_state("race")
+	_begin_race_music()
 	if "--media-capture" in OS.get_cmdline_user_args():
 		print("MEDIA_RACE_READY %s %s" % [String(_session.get("event_id", "unknown")), String(_session.get("vehicle_id", "unknown"))])
 	_countdown_active = false
@@ -672,35 +692,59 @@ func _update_race_hud() -> void:
 func _on_race_finished(_total_time: float) -> void:
 	_finished = true
 	_race_hud.visible = false
-	_push_live_race_state("finish")
+	_race_won = is_instance_valid(_player_vehicle) and race_manager.get_racer_position(_player_vehicle) == 1
+	var director := _audio_director()
+	if director != null and director.has_method("stop_live_rotation"):
+		director.call("stop_live_rotation")
+	# Finish outro first. Once that blend has started, queue grid so the menu
+	# phase is already in motion while the results are on screen.
+	_cue_live_section("victory" if _race_won else "defeat")
 	_results_panel.visible = true
 	_retry_button.disabled = true
 	_continue_button.disabled = true
 	_update_results(race_manager.get_results())
-	_play_finish_cooldown()
+	_queue_menu_phase()
 
 
-func _play_finish_cooldown() -> void:
-	# Let the victory sting play before the resolving cooldown under the results panel.
-	await get_tree().create_timer(4.0).timeout
+func _queue_menu_phase() -> void:
+	var director := _audio_director()
+	var deadline := Time.get_ticks_msec() + 3000
+	while is_inside_tree() and _finished and Time.get_ticks_msec() < deadline:
+		if director != null and director.has_method("get_live_section"):
+			var section := String(director.call("get_live_section"))
+			if section == "victory" or section == "defeat":
+				break
+		await get_tree().process_frame
 	if not _finished or not is_inside_tree():
 		return
-	var app := get_node_or_null("/root/App")
-	if app == null:
-		return
-	var director: Variant = app.get("audio_director")
-	if is_instance_valid(director) and (director is Node) and director.has_method("cue_live_section"):
-		(director as Node).call("cue_live_section", "cooldown")
+	_cue_live_section("grid")
 
 
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:
+	if racer != _player_vehicle:
+		return
+	_update_race_hud()
+	if _countdown_active or _finished:
+		return
+	if _position == 1 and not _player_took_lead:
+		_player_took_lead = true
+		_cue_live_section_timed("grid", 8.0)
+	else:
+		_advance_live_rotation()
+
+func _on_racer_recovered(racer: Node2D) -> void:
 	if racer == _player_vehicle:
-		_update_race_hud()
+		# A spin that gets saved gets a reset sting, then the rotation resumes.
+		_cue_live_section_timed("recovery", 8.0)
 
 
 func _on_wrong_way_changed(racer: Node2D, wrong_way: bool) -> void:
-	if racer == _player_vehicle and is_instance_valid(_race_hud):
+	if racer != _player_vehicle:
+		return
+	if is_instance_valid(_race_hud):
 		_race_hud.set_wrong_way(wrong_way)
+	if wrong_way and not _countdown_active and not _finished:
+		_cue_live_section_timed("wrong-way", 6.0)
 
 
 func _on_lap_completed(lap: int) -> void:
@@ -714,7 +758,14 @@ func _on_lap_completed(lap: int) -> void:
 		return
 	_race_flash_label.text = "FINAL LAP" if lap == race_manager.laps_to_finish - 1 else "LAP %d" % (lap + 1)
 	if lap == race_manager.laps_to_finish - 1:
-		_push_live_race_state("race", true)
+		var director := _audio_director()
+		if director != null and director.has_method("stop_live_rotation"):
+			director.call("stop_live_rotation")
+		_cue_live_section("final-lap")
+	else:
+		# Re-evaluate the running order at each lap boundary instead of holding
+		# one section through the whole race.
+		_advance_live_rotation()
 	_race_flash_label.visible = true
 	_race_flash_label.modulate.a = 1.0
 	if _race_flash_tween and _race_flash_tween.is_valid():
@@ -886,43 +937,50 @@ func _play_sfx(sound_name: StringName, volume_scale: float = 1.0) -> void:
 		app.call("play_sfx", sound_name, volume_scale)
 
 
-func _push_live_race_state(phase: String, final_lap: bool = false, finish_result: String = "") -> void:
-	# Additive, music-only. Guarded by ClassDB + get_node_or_null so race logic and
-	# non-audio tests are completely unaffected. Uses App.get_current_race_session()
-	# access pattern that already exists in this file.
+func _audio_director() -> Node:
 	if not ClassDB.class_exists("GamestrumentsPlayer"):
-		return
+		return null
 	var app := get_node_or_null("/root/App")
 	if app == null:
-		return
-	if app.has_method("get_current_race_session"):
-		var _dummy: Dictionary = app.call("get_current_race_session")
-		# session consulted per task guidance (value not required for music params)
+		return null
 	var director: Variant = app.get("audio_director")
-	if not is_instance_valid(director) or not (director is Node) or not director.has_method("set_live_race_state"):
+	if is_instance_valid(director) and director is Node:
+		return director as Node
+	return null
+
+
+func _cue_live_section(section: String) -> void:
+	var director := _audio_director()
+	if director != null and director.has_method("cue_live_section"):
+		director.call("cue_live_section", section)
+
+
+func _cue_live_section_timed(section: String, hold_seconds: float) -> void:
+	var director := _audio_director()
+	if director != null and director.has_method("cue_live_section_timed"):
+		director.call("cue_live_section_timed", section, hold_seconds)
+
+
+func _advance_live_rotation() -> void:
+	var director := _audio_director()
+	if director != null and director.has_method("advance_live_rotation"):
+		director.call("advance_live_rotation")
+
+
+func _begin_race_music() -> void:
+	# The race rotates through grooves, builds, peaks, and a breather. Events
+	# (lead, incident, final lap, finish) override that deck.
+	var director := _audio_director()
+	if director == null or not director.has_method("begin_live_rotation"):
 		return
-	var intensity := 0.35
-	var pressure := 0.2
-	if is_instance_valid(_player_vehicle) and phase != "grid":
-		# intensity sourced from vehicle speed normalized (see also audio_director _update_engine)
-		var speed := maxf(0.0, float(_player_vehicle.get("speed")))
-		var max_speed := 680.0
-		var stats: Variant = _player_vehicle.get("stats")
-		if stats is Object:
-			max_speed = maxf(1.0, float((stats as Object).get("max_speed")))
-		intensity = clampf(speed / max_speed, 0.0, 1.0)
-	var pos := 1
-	var cnt := 4
-	if is_instance_valid(race_manager) and is_instance_valid(_player_vehicle):
-		pos = race_manager.get_racer_position(_player_vehicle)
-		cnt = maxi(1, race_manager.get_racer_count())
-	if cnt > 1:
-		# pressure from current standing (1=lead high pressure, higher numbers lower); mirrors progress/position math already in race_manager
-		pressure = clampf((float(cnt) - float(pos)) / float(cnt - 1), 0.0, 1.0)
-	var fr := finish_result
-	if phase == "finish":
-		fr = "win" if pos == 1 else "loss"
-	(director as Node).call("set_live_race_state", phase, intensity, pressure, final_lap, fr)
+	var event := _music_event()
+	var tier := String(event.get("length_tier", "standard"))
+	director.call("begin_live_rotation", RACE_MUSIC_PLAN.flow_deck(event), RACE_MUSIC_PLAN.tier_dwell(tier))
+
+
+func _music_event() -> Dictionary:
+	var event: Variant = _session.get("event", {})
+	return event as Dictionary if event is Dictionary else {}
 
 
 func _ensure_debug_overlay() -> void:
@@ -986,21 +1044,6 @@ func _create_phase_one_ui() -> void:
 	_position_label.add_theme_constant_override("outline_size", 6)
 	_position_label.visible = false
 	hud.add_child(_position_label)
-
-	_wrong_way_label = Label.new()
-	_wrong_way_label.name = "WrongWayLabel"
-	_wrong_way_label.offset_left = 440.0
-	_wrong_way_label.offset_top = 118.0
-	_wrong_way_label.offset_right = 840.0
-	_wrong_way_label.offset_bottom = 170.0
-	_wrong_way_label.text = "WRONG WAY"
-	_wrong_way_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_wrong_way_label.add_theme_font_size_override("font_size", 34)
-	_wrong_way_label.add_theme_color_override("font_color", Color(1.0, 0.28, 0.18))
-	_wrong_way_label.add_theme_color_override("font_outline_color", Color(0.08, 0.09, 0.12))
-	_wrong_way_label.add_theme_constant_override("outline_size", 7)
-	_wrong_way_label.visible = false
-	hud.add_child(_wrong_way_label)
 
 	_results_panel = Panel.new()
 	_results_panel.name = "ResultsPanel"
@@ -1097,8 +1140,8 @@ func _create_pause_overlay() -> void:
 	_pause_settings_panel = PanelContainer.new()
 	_pause_settings_panel.name = "PauseSettingsPanel"
 	_pause_settings_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.94), Color("4a8fb8")))
-	_pause_settings_panel.position = Vector2(320.0, 50.0)
-	_pause_settings_panel.size = Vector2(640.0, 620.0)
+	_pause_settings_panel.position = Vector2(320.0, 16.0)
+	_pause_settings_panel.size = Vector2(640.0, 688.0)
 	_pause_settings_panel.visible = false
 	_pause_overlay.add_child(_pause_settings_panel)
 	var settings_margin := MarginContainer.new()
@@ -1125,6 +1168,8 @@ func _create_pause_overlay() -> void:
 	_pause_settings_first_control = _add_pause_setting_slider(settings_column, "Master", "master_volume", float(settings.get("master_volume", 1.0)))
 	_add_pause_setting_slider(settings_column, "Music", "music_volume", float(settings.get("music_volume", 0.8)))
 	_add_pause_setting_slider(settings_column, "SFX", "sfx_volume", float(settings.get("sfx_volume", 0.9)))
+	_add_pause_setting_slider(settings_column, "Engine", "engine_volume", float(settings.get("engine_volume", settings.get("sfx_volume", 0.9))))
+	_add_pause_setting_slider(settings_column, "Tyres", "tyre_volume", float(settings.get("tyre_volume", settings.get("sfx_volume", 0.9))))
 	var comfort_heading := Label.new()
 	comfort_heading.text = "COMFORT"
 	comfort_heading.add_theme_font_size_override("font_size", 18)

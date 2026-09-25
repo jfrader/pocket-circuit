@@ -29,6 +29,8 @@ func _run_test() -> void:
 		return
 	if not _test_backward_on_section():
 		return
+	if not _test_far_off_route_uses_checkpoint_chord():
+		return
 	if not _test_reverse_tangent():
 		return
 	if not _test_parallel_legs():
@@ -123,6 +125,20 @@ func _test_backward_on_section() -> bool:
 	var racer := _registered_racer(manager, Vector2(1500, 0), Vector2(-500, 0))
 	var wrong_way := _advance_and_read_wrong_way(manager, racer, 0.7)
 	if not _expect(wrong_way, "backward motion on that same section must flag wrong way"):
+		return false
+	return true
+
+
+func _test_far_off_route_uses_checkpoint_chord() -> bool:
+	var manager := _overshoot_manager()
+	# ~700u above the route: too far for a local tangent to speak for the car.
+	var far := Vector2(1500, 1200)
+	if not _expect(manager.get_route_forward_direction(far, 0, 1) == Vector2.ZERO, "far off-route positions must not borrow a distant route tangent"):
+		return false
+	# A car out here heading for the expected checkpoint must not be flagged.
+	var racer := _registered_racer(manager, far, far.direction_to(Vector2(1000, 500)) * 500.0)
+	var wrong_way := _advance_and_read_wrong_way(manager, racer, 0.7)
+	if not _expect(not wrong_way, "forward motion far off-route must fall back to the checkpoint chord"):
 		return false
 	return true
 

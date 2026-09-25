@@ -151,7 +151,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var tier := StringName(params.get("length_tier", &"standard"))
 	var profile := length_profile(tier)
 	if profile.is_empty():
-		return _empty_result(seed, family)
+		var e = _empty_result(seed, family)
+		e["reason"] = "profile empty"
+		return e
 	var length_roll := _hash_unit(seed, LENGTH_SALT)
 	var target_length := lerpf(float(profile["min_length"]), float(profile["max_length"]), length_roll)
 	var configured_max := float(params.get("max_loop_length", 0.0))
@@ -163,18 +165,30 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var room_shape := StringName(params.get("room_shape", &""))
 	var source_rect := _generation_rect(room_rect, params, room_polygon)
 	var requested_margin := float(params.get("margin", 150.0))
-	var centerline_margin := maxf(requested_margin, CORRIDOR_CLEARANCE)
-	var usable_rect := source_rect.grow(-centerline_margin).grow(-SPLINE_GUARD)
-	if usable_rect.size.x < HALF_WIDTH * 2.0 or usable_rect.size.y < HALF_WIDTH * 2.0:
-		return _empty_result(seed, family)
+	
+	var width_amplitude := float(params.get("width_amplitude", 0.0))
+	var forced_half := float(params.get("forced_half_width", 0.0))
+	var eff_half := HALF_WIDTH
+	if width_amplitude > 0.0:
+		eff_half = 240.0
+	elif forced_half > 0.0:
+		eff_half = forced_half
+	var eff_clearance := eff_half + 10.0
 
-	var requested_self_distance := maxf(float(params.get("min_self_distance", 250.0)), HALF_WIDTH * 2.0)
+	var centerline_margin := maxf(requested_margin, eff_clearance)
+	var usable_rect := source_rect.grow(-centerline_margin).grow(-SPLINE_GUARD)
+	if usable_rect.size.x < eff_half * 2.0 or usable_rect.size.y < eff_half * 2.0:
+		var e = _empty_result(seed, family)
+		e["reason"] = "usable rect too small"
+		return e
+
+	var requested_self_distance := maxf(float(params.get("min_self_distance", 250.0)), eff_half * 2.0)
 	# A narrow room cannot honor an arbitrarily large requested branch gap after
 	# reserving the corridor and wall margin. Keep the full corridor clear while
 	# accepting that physical maximum instead of rejecting every candidate.
-	var physical_self_distance := maxf(HALF_WIDTH * 2.0, minf(usable_rect.size.x, usable_rect.size.y) * 0.55)
+	var physical_self_distance := maxf(eff_half * 2.0, minf(usable_rect.size.x, usable_rect.size.y) * 0.55)
 	var min_self_distance := minf(requested_self_distance, physical_self_distance)
-	var room_check_margin := maxf(float(params.get("room_check_margin", 0.0)), CORRIDOR_CLEARANCE)
+	var room_check_margin := maxf(float(params.get("room_check_margin", 0.0)), eff_clearance)
 	var minimum_length := float(params.get("min_loop_length", 1900.0 * WORLD_SCALE))
 	# Large tiers honor their band floor as a validation minimum so a compact
 	# program cannot slip in below the selected band.
@@ -185,7 +199,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	# plus the corridor-boundary simplification keep long/tall loops valid, and
 	# the whole-loop validation still rejects any candidate that would tip a
 	# room's aspect or clearance, so no whole-category silence is needed.
-	var decorate_enabled := true
+	var decorate_enabled := width_amplitude <= 0.001 and forced_half <= 0.0
 	# The standard tier keeps its 0.78 aesthetic fit floor; non-standard tiers fit
 	# from the physical branch-gap and corner-radius constraints only.
 	var fit_floor := 0.78 if tier == &"standard" else 0.0
@@ -202,15 +216,22 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 			if generation_rect.size.x < 1.0:
 				generation_rect = usable_rect
 			use_el_controls = false
-		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"])) \
-			if use_el_controls else _family_controls(family, family, seed, attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, attempt_pockets, attempt_profiles, decorate_enabled)
+		# The marathon L carries a combed fold on one arm so it is not a bare
+		# perimeter; every smaller tier keeps the plain seeded L footprint.
+		var el_folded := use_el_controls and tier == &"marathon"
+		var el_program: StringName = &"el_folded" if el_folded else &"el_safe"
+		var controls := _el_controls(family, seed, attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"]), el_folded) \
+			if use_el_controls else _family_controls(family, family, seed, attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, attempt_pockets, attempt_profiles, decorate_enabled, tier)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
 			room_polygon,
 			room_check_margin,
 			min_self_distance,
-			minimum_length
+			minimum_length,
+			width_amplitude,
+			seed,
+			forced_half
 		)
 		last_reason = String(validation.get("reason", "unknown"))
 		if bool(validation["valid"]):
@@ -221,7 +242,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				room_polygon,
 				room_check_margin,
 				min_self_distance,
-				minimum_length
+				minimum_length, width_amplitude, seed, forced_half
 			)
 			if not bool(ordered_validation["valid"]):
 				last_reason = "post-order " + String(ordered_validation.get("reason", "unknown"))
@@ -250,9 +271,9 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				"attempt": attempt,
 				"fallback": false,
 				"pockets": _detect_pockets(final_controls),
-				"realization": &"el_safe" if room_shape == &"el" and tier != &"compact" else family,
-				"route_recipe": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_name(seed, attempt, target_length),
-				"route_program": &"el_safe" if room_shape == &"el" and tier != &"compact" else _route_program_name(seed, attempt, target_length),
+				"realization": el_program if room_shape == &"el" and tier != &"compact" else family,
+				"route_recipe": el_program if room_shape == &"el" and tier != &"compact" else _route_name(seed, attempt, target_length, tier),
+				"route_program": el_program if room_shape == &"el" and tier != &"compact" else _route_program_name(seed, attempt, target_length, tier),
 				"route_sequence": normalized_route_sequence(final_controls),
 				"corner_profiles": _merge_profile_counts(attempt_profiles),
 				"motifs": motif["motifs"],
@@ -274,14 +295,17 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				generation_rect = usable_rect
 			use_el_safe = false
 		var controls := _el_safe_controls(family, seed, fallback_attempt, source_rect, target_length, min_self_distance, float(profile["room_scale"])) \
-			if use_el_safe else _family_controls(&"conservative", family, seed, fallback_attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, fallback_pockets, fallback_profiles, decorate_enabled)
+			if use_el_safe else _family_controls(&"conservative", family, seed, fallback_attempt, generation_rect, target_length, max_length, min_self_distance, fit_floor, fallback_pockets, fallback_profiles, decorate_enabled, tier)
 		var validation := _validate_controls(
 			controls,
 			source_rect,
 			room_polygon,
 			room_check_margin,
 			min_self_distance,
-			fallback_minimum
+			fallback_minimum,
+			width_amplitude,
+			seed,
+			forced_half
 		)
 		last_reason = String(validation.get("reason", "unknown"))
 		if bool(validation["valid"]):
@@ -292,7 +316,7 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 				room_polygon,
 				room_check_margin,
 				min_self_distance,
-				fallback_minimum
+				fallback_minimum, width_amplitude, seed, forced_half
 			)
 			if not bool(ordered_validation["valid"]):
 				last_reason = "post-order " + String(ordered_validation.get("reason", "unknown"))
@@ -369,15 +393,19 @@ static func _family_controls(
 	fit_floor: float = 0.78,
 	pockets: Array = [],
 	profile_summary: Array = [],
-	profiles_enabled: bool = true
+	profiles_enabled: bool = true,
+	tier: StringName = &""
 ) -> PackedVector2Array:
-	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length)
+	var definition := {} if template_family == &"conservative" else _route_definition(seed, attempt, target_length, tier)
 	if template_family != &"conservative":
 		var tall := usable_rect.size.y > usable_rect.size.x
 		var size := Vector2(usable_rect.size.y, usable_rect.size.x) if tall else usable_rect.size
 		var bias := clampf(inverse_lerp(8500.0, 9600.0, target_length), 0.0, 1.0)
 		var rhythm_seed := _hash32(seed ^ (attempt * RHYTHM_SALT))
-		definition = ROUTE_GRAMMAR.construct(_route_index(seed, attempt), rhythm_seed, bias, Rect2(-size * 0.5, size))
+		if tier == &"marathon":
+			definition = ROUTE_GRAMMAR.construct_marathon(_route_index(seed, attempt, tier), rhythm_seed, bias, Rect2(-size * 0.5, size))
+		else:
+			definition = ROUTE_GRAMMAR.construct(_route_index(seed, attempt), rhythm_seed, bias, Rect2(-size * 0.5, size))
 		var vertices: PackedVector2Array = definition["anchors"]
 		for i in vertices.size():
 			vertices[i] = usable_rect.get_center() + (vertices[i].rotated(PI * 0.5) if tall else vertices[i])
@@ -548,20 +576,24 @@ static func _per_corner_fillet_radii(seed: int, attempt: int, vertex_count: int)
 	return radii
 
 
-static func _route_index(seed: int, attempt: int) -> int:
+static func _route_index(seed: int, attempt: int, tier: StringName = &"") -> int:
+	if tier == &"marathon":
+		return posmod(_hash32(seed ^ ROUTE_SALT ^ 0x6A4C1) + attempt, ROUTE_GRAMMAR.MARATHON_NAMES.size())
 	return posmod(_hash32(seed ^ ROUTE_SALT) + attempt, ROUTE_GRAMMAR.count())
 
 
-static func _route_name(seed: int, attempt: int, target_length: float) -> StringName:
-	return StringName(_route_definition(seed, attempt, target_length)["recipe"])
+static func _route_name(seed: int, attempt: int, target_length: float, tier: StringName = &"") -> StringName:
+	return StringName(_route_definition(seed, attempt, target_length, tier)["recipe"])
 
 
-static func _route_program_name(seed: int, attempt: int, target_length: float) -> StringName:
-	return StringName(_route_definition(seed, attempt, target_length)["program"])
+static func _route_program_name(seed: int, attempt: int, target_length: float, tier: StringName = &"") -> StringName:
+	return StringName(_route_definition(seed, attempt, target_length, tier)["program"])
 
 
-static func _route_definition(seed: int, attempt: int, target_length: float = 2500.0 * WORLD_SCALE) -> Dictionary:
+static func _route_definition(seed: int, attempt: int, target_length: float = 2500.0 * WORLD_SCALE, tier: StringName = &"") -> Dictionary:
 	var length_bias := clampf(inverse_lerp(8500.0, 9600.0, target_length), 0.0, 1.0)
+	if tier == &"marathon":
+		return ROUTE_GRAMMAR.construct_marathon(_route_index(seed, attempt, tier), _hash32(seed ^ (attempt * RHYTHM_SALT)), length_bias)
 	return ROUTE_GRAMMAR.construct(_route_index(seed, attempt), _hash32(seed ^ (attempt * RHYTHM_SALT)), length_bias)
 
 
@@ -651,7 +683,8 @@ static func _el_controls(
 	source_rect: Rect2,
 	target_length: float,
 	min_self_distance: float,
-	room_scale: float
+	room_scale: float,
+	folded: bool = false
 ) -> PackedVector2Array:
 	# Seeded L footprint. The elbow (notch) position is parameterized per seed so
 	# the L shape genuinely varies (deep vs shallow notch) under a normalized shape
@@ -673,6 +706,51 @@ static func _el_controls(
 		Vector2(-0.30, 0.76), Vector2(-0.65, 0.72), Vector2(-0.82, 0.60),
 		Vector2(-0.86, 0.35), Vector2(-0.86, 0.05), Vector2(-0.86, -0.20),
 	])
+	if folded:
+		# Marathon-only comb on the lower arm, built from corner vertices and
+		# filleted with the shared corner fitter so every tooth keeps a driveable
+		# radius after the uniform length fit. The teeth are wide and deep enough
+		# that no >220u-saving chord can stay inside the 103u drive corridor
+		# across a tooth, so `_best_complex_bypass` cannot replace it with a chord.
+		var fold_elbow_x := lerpf(0.06, 0.22, _hash_unit(seed, ROUTE_SALT + 0xD1 + attempt * 7))
+		var fold_step_y := lerpf(0.00, 0.14, _hash_unit(seed, ROUTE_SALT + 0xD3 + attempt * 7))
+		var comb_depth := lerpf(0.26, 0.34, _hash_unit(seed, ROUTE_SALT + 0xD5 + attempt * 7))
+		var teeth := 3
+		var half_slot := 0.10
+		var comb_right := 0.44
+		var comb_left := -0.42
+		var pitch := (comb_right - comb_left) / float(teeth)
+		var poly := PackedVector2Array()
+		poly.append(Vector2(-0.86, -0.76))
+		poly.append(Vector2(fold_elbow_x, -0.76))
+		poly.append(Vector2(fold_elbow_x, fold_step_y))
+		poly.append(Vector2(0.86, fold_step_y))
+		poly.append(Vector2(0.86, 0.76))
+		var base_y := 0.76
+		for i in teeth:
+			var cx := comb_right - pitch * (float(i) + 0.5)
+			poly.append(Vector2(cx + half_slot, base_y))
+			poly.append(Vector2(cx + half_slot, base_y - comb_depth))
+			poly.append(Vector2(cx - half_slot, base_y - comb_depth))
+			poly.append(Vector2(cx - half_slot, base_y))
+		poly.append(Vector2(-0.86, base_y))
+		var mapped_poly := PackedVector2Array()
+		for point: Vector2 in poly:
+			mapped_poly.append(source_rect.get_center() + point * source_rect.size * 0.5)
+		# Cut a few convex corners so the folded L carries a real angle mix too,
+		# instead of a pure 90-degree comb.
+		mapped_poly = ROUTE_GRAMMAR._compound_chamfer(mapped_poly, seed, 4, false)
+		mapped_poly = ROUTE_GRAMMAR._drop_collinear_anchors(mapped_poly)
+		if mapped_poly.size() < 4:
+			return PackedVector2Array()
+		var radii := PackedFloat32Array()
+		for _index in mapped_poly.size():
+			radii.append(260.0)
+		var profiled: Dictionary = ROUTE_GRAMMAR.round_corners_profiled(mapped_poly, radii, -1)
+		var folded_controls: PackedVector2Array = profiled["controls"]
+		if folded_controls.is_empty():
+			return PackedVector2Array()
+		return _fit_length_scale(folded_controls, source_rect, target_length, min_self_distance, room_scale, attempt)
 	var jittered := PackedVector2Array()
 	# Per-seed aspect variation changes the L's proportions (a genuine normalized
 	# shape feature), so seeded EL routes are distinct beyond just elbow depth.
@@ -699,21 +777,38 @@ static func _el_controls(
 	var mapped := PackedVector2Array()
 	for point: Vector2 in jittered:
 		mapped.append(source_rect.get_center() + point * source_rect.size * 0.5)
-	var full_length := _polyline_length(_sample_centerline(mapped))
+	return _fit_length_scale(mapped, source_rect, target_length, min_self_distance, room_scale, attempt)
+
+
+## Uniformly scale a control loop about the room center so its sampled length
+## meets the requested target without dropping under the branch-clearance floor
+## or the per-attempt retry ceiling. Returns an empty loop when the input cannot
+## be sampled.
+static func _fit_length_scale(
+	controls: PackedVector2Array,
+	source_rect: Rect2,
+	target_length: float,
+	min_self_distance: float,
+	room_scale: float,
+	attempt: int
+) -> PackedVector2Array:
+	var centerline := _sample_centerline(controls)
+	var full_length := _polyline_length(centerline)
 	if full_length < 1.0:
 		return PackedVector2Array()
 	# The L footprint's shortest edge needs ~94% of its standard-room extent to
 	# keep two literal straights; scaled rooms (large tiers) can shrink further.
 	var minimum_scale := 0.94 / maxf(room_scale, 0.001)
-	var full_clearance := _minimum_branch_distance(_sample_centerline(mapped), min_self_distance)
+	var full_clearance := _minimum_branch_distance(centerline, min_self_distance)
 	if full_clearance < INF:
 		minimum_scale = maxf(minimum_scale, minf(1.0, min_self_distance / maxf(full_clearance, 1.0)))
 	var retry_ceiling := maxf(minimum_scale, 1.0 - float(mini(attempt, MAX_VARIANTS - 1)) * 0.006)
 	var length_scale := clampf(target_length / full_length, minimum_scale, retry_ceiling)
 	var center := source_rect.get_center()
-	for index in mapped.size():
-		mapped[index] = center + (mapped[index] - center) * length_scale
-	return mapped
+	var fitted := PackedVector2Array()
+	for point: Vector2 in controls:
+		fitted.append(center + (point - center) * length_scale)
+	return fitted
 
 
 static func _el_safe_controls(
@@ -779,7 +874,10 @@ static func _validate_controls(
 	room_polygon: PackedVector2Array,
 	room_margin: float,
 	min_self_distance: float,
-	minimum_length: float
+	minimum_length: float,
+	width_amplitude: float = 0.0,
+	route_seed: int = 0,
+	forced_half: float = 0.0
 ) -> Dictionary:
 	if controls.size() < 8:
 		return {"valid": false, "reason": "too few controls"}
@@ -806,15 +904,30 @@ static func _validate_controls(
 	var literal_straight_count := _literal_straight_count(centerline)
 	if literal_straight_count < 2:
 		return {"valid": false, "reason": "only %d literal straight region(s)" % literal_straight_count}
-	var minimum_turn_radius := _minimum_turn_radius(centerline)
-	if minimum_turn_radius < MIN_DRIVE_RADIUS:
-		return {"valid": false, "reason": "turn radius %.1f < %.1f" % [minimum_turn_radius, MIN_DRIVE_RADIUS]}
 	var bypass := _best_complex_bypass(centerline)
 	if bool(bypass.get("found", false)):
 		return {
 			"valid": false,
 			"reason": "driveable chord saves %.0fu over %.0fu" % [float(bypass["saving"]), float(bypass["arc"])],
 		}
+	if width_amplitude > 0.001 or forced_half > 0.0:
+		var ws := compute_width_profile(centerline, route_seed, width_amplitude)
+		if forced_half > 0.0:
+			for i in ws.size():
+				ws[i] = forced_half
+		if not _local_turn_radii_ok(centerline, ws):
+			return {"valid": false, "reason": "local turn radius < w_local + hull"}
+		if not _local_branch_spacing_ok(centerline, ws, 70.0):
+			return {"valid": false, "reason": "local branch w_a + w_b + gap violated"}
+		if not room_polygon.is_empty() and not _local_corridor_edges_inside_room(centerline, ws, room_polygon):
+			return {"valid": false, "reason": "variable-width road edge outside room polygon"}
+		var min_local_r := INF
+		for i in ws.size():
+			min_local_r = minf(min_local_r, ws[i] + VEHICLE_HULL_RADIUS)
+		return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": min_local_r, "literal_straight_count": literal_straight_count}
+	var minimum_turn_radius := _minimum_turn_radius(centerline)
+	if minimum_turn_radius < MIN_DRIVE_RADIUS:
+		return {"valid": false, "reason": "turn radius %.1f < %.1f" % [minimum_turn_radius, MIN_DRIVE_RADIUS]}
 	return {"valid": true, "centerline": centerline, "length": loop_length, "minimum_turn_radius": minimum_turn_radius, "literal_straight_count": literal_straight_count}
 
 
@@ -1388,3 +1501,110 @@ static func _hash32(value: int) -> int:
 
 static func _hash_unit(seed: int, salt: int) -> float:
 	return float(_hash32(seed ^ salt)) / 2147483647.0
+
+
+static func compute_width_profile(centerline: PackedVector2Array, seed: int, amplitude: float) -> PackedFloat32Array:
+	var n := centerline.size()
+	var widths = PackedFloat32Array()
+	widths.resize(n)
+	if n < 3 or amplitude <= 0.001:
+		var w = 125.0
+		for i in n:
+			widths[i] = w
+		return widths
+
+	var path_distances = PackedFloat32Array()
+	path_distances.resize(n)
+	path_distances[0] = 0.0
+	for i in range(1, n):
+		path_distances[i] = path_distances[i-1] + centerline[i].distance_to(centerline[i-1])
+	var total_length = path_distances[n-1] + centerline[n-1].distance_to(centerline[0])
+
+	var h_seed1 = _hash_unit(seed, 0x1A2B3C)
+	var h_seed2 = _hash_unit(seed, 0x4D5E6F)
+	
+	# Curvature approx based on turning angle over a small arc length
+	var curvatures = PackedFloat32Array()
+	curvatures.resize(n)
+	var span := 3
+	for i in n:
+		var p0 = centerline[posmod(i - span, n)]
+		var p1 = centerline[i]
+		var p2 = centerline[(i + span) % n]
+		var d1 = p1 - p0
+		var d2 = p2 - p1
+		var angle = abs(d1.angle_to(d2))
+		var arc = p0.distance_to(p1) + p1.distance_to(p2)
+		curvatures[i] = angle / max(arc, 1.0)
+		
+	# Smooth curvature slightly to prevent spikes
+	var smooth_curv = PackedFloat32Array()
+	smooth_curv.resize(n)
+	for i in n:
+		smooth_curv[i] = (curvatures[posmod(i-1, n)] + curvatures[i] + curvatures[(i+1)%n]) / 3.0
+
+	for i in n:
+		var s = path_distances[i]
+		var norm_s = s / total_length
+		
+		# harmonics
+		var h = sin(norm_s * PI * 2.0 * (2.0 + h_seed1 * 4.0)) * 0.5 + 0.5
+		h += sin(norm_s * PI * 2.0 * (5.0 + h_seed2 * 6.0)) * 0.25
+		
+		var curv_factor = smooth_curv[i] * 100.0 # arbitrary scaling to map curvature to [0, 1] roughly
+		
+		var w = 125.0 + amplitude * (h * 0.5 + curv_factor * 0.5)
+		w = clampf(w, 125.0, 240.0)
+		widths[i] = w
+		
+	return widths
+
+static func _local_turn_radii_ok(centerline: PackedVector2Array, ws: PackedFloat32Array) -> bool:
+	var span := 3
+	for index in centerline.size():
+		var before := centerline[posmod(index - span, centerline.size())]
+		var current := centerline[index]
+		var after := centerline[(index + span) % centerline.size()]
+		var incoming := before.direction_to(current)
+		var outgoing := current.direction_to(after)
+		if absf(incoming.angle_to(outgoing)) < 0.08:
+			continue
+		var area_twice := absf((current - before).cross(after - before))
+		if area_twice < 0.01:
+			continue
+		var radius := before.distance_to(current) * current.distance_to(after) * before.distance_to(after) / (2.0 * area_twice)
+		if radius < ws[index] + VEHICLE_HULL_RADIUS:
+			return false
+	return true
+
+static func _local_branch_spacing_ok(centerline: PackedVector2Array, ws: PackedFloat32Array, gap: float) -> bool:
+	var count := centerline.size()
+	var cumulative := PackedFloat32Array([0.0])
+	for index in count:
+		cumulative.append(cumulative[index] + centerline[index].distance_to(centerline[(index + 1) % count]))
+	var total_length := cumulative[count]
+	var local_arc := 850.0 # fixed min arc for branch checks
+	for first in count:
+		for second in range(first + 1, count):
+			var forward_arc := cumulative[second] - cumulative[first]
+			if minf(forward_arc, total_length - forward_arc) < local_arc:
+				continue
+			var dist = centerline[first].distance_to(centerline[second])
+			if dist < ws[first] + ws[second] + gap:
+				return false
+	return true
+
+static func _local_corridor_edges_inside_room(centerline: PackedVector2Array, ws: PackedFloat32Array, room_polygon: PackedVector2Array) -> bool:
+	var n = centerline.size()
+	for i in n:
+		var p1 = centerline[i]
+		var p2 = centerline[(i+1)%n]
+		var d = (p2 - p1).normalized()
+		var right = Vector2(-d.y, d.x)
+		var w = ws[i]
+		if not _inside_with_margin(p1 + right * w, room_polygon, 0.0):
+			return false
+		if not _inside_with_margin(p1 - right * w, room_polygon, 0.0):
+			return false
+	return true
+

@@ -63,6 +63,18 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 - Generated route and room dimensions use `WORLD_SCALE = 1.75`. The target
   length stream spans roughly 4,375 to 9,625 world units; elongated room
   perimeters can realize longer loops when required by their silhouette.
+  The length tiers (`GeneratedCircuitRules.LENGTH_TIERS`) are
+  `compact` (4–6k, room_scale 0.95), `standard` (4,375–9,625, 1.0),
+  `long` (12–16k, 1.8), `endurance` (18–24k, 2.8), and `marathon`
+  (32–48k, 4.5).
+- The `marathon` tier selects from a dedicated folded grammar
+  (`TrackRouteGrammar.MARATHON_NAMES`: `double_switchback`, `deep_comb`)
+  instead of the four standard programs, so the standard tiers' seed geometry
+  is untouched. Marathon routes land 16–22 broad turn complexes (twice the
+  standard bound below) at the same corridor width and corner rules.
+  L-shaped rooms keep their dedicated `el_safe` route, which lands fewer
+  complexes; a small number of wide/long seeds fall back to the technical
+  perimeter when the folded shape cannot reach the 32k band floor.
 - Corridor half-width is 125 units. Validation reserves the complete 250-unit
   nominal racing corridor for route fitting and prop placement, rejects
   centerline self-intersections, enforces nonlocal self-distance, and keeps the
@@ -77,8 +89,9 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   spline-scale wiggles, and validation rejects driveable chords that replace a
   complete complex.
 - Individual routes retain a 1–10 broad-complex bound; the regression matrix
-  average is at most 8. Richer sections must remain separated by usable setup
-  straights, not high-frequency spline wiggles.
+  average is at most 8. Marathon-tier routes are the deliberate exception:
+  their folded programs land 16–22 complexes. Richer sections must remain
+  separated by usable setup straights, not high-frequency spline wiggles.
 - L-shaped rooms use the dedicated `el_safe` realization. The route must occupy
   both the upper-left arm and the right/lower extension while retaining the
   seed-selected family metadata.

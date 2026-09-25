@@ -1,9 +1,35 @@
 # Changelog
 
-## Unreleased
+## [Unreleased]
+
+### Changed
+- Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
+
+### Fixed
+- Your car keeps its engine note for every race in a session. It used to fall silent after the first one, while still reporting that it was playing.
+- Leaving a race for the menu no longer drops the music out. The menu stays on Starting Grid for several loops, then steps to a groove. It does not drop back into Ignition.
+- Your own tyres now use the same loop as rival cars, and they stay quiet unless the car is actually sliding. A small steer does not open them.
+- Settings has separate Engine and Tyres sliders. SFX no longer changes them.
+- Nearby rival cars now have their own engine note, pitched from that car. Far cars stay quiet.
+- Tyre sound now follows the same drift and slide state as skid marks, stays present through ordinary steering, changes character with the room surface, and comes from nearby rival cars as positional audio.
+- Tyre scrub is quieter in ordinary corners and resolves into a rising, resonant squeal during a full slide instead of broadband hiss.
+- Fixed false "WRONG WAY" warnings and the resulting teleport reset when driving on the open apron beside a folded circuit. Wrong-way is now a warning only — the car is never reset for it.
+- Race music no longer loops one section or lags behind the race. Each circuit now generates its own score from the track seed, so a circuit always sounds the same while different circuits, tiers, and acts sound different, and the race rotates through the whole racing pool — grooves, peaks, the starting-grid reprise, a reset sting, the final lap, and the win/loss outros.
+- Shipped the live Gamestruments engine into the release gate (sync + hard `ClassDB.class_exists("GamestrumentsPlayer")` check at the start of `tools/build_release.sh`). Removed rendered WAV fallbacks (`assets/audio/menu_loop.wav`, `race_loop.wav` and their `.import`s); the live engine is now mandatory — there is no silent-music or WAV fallback mode.
 
 ### Added
 
+- Drifting now makes a continuous tyre scrub that follows the slide instead of a
+  single scratch at the start of it, and it bites harder the faster and more
+  sideways you go. Crashes are built from the machine's own weight and
+  toughness, so a light tap, a hard hit and a heavy car all sound different.
+  Boost and the menu/race blips are generated too — the game no longer ships any
+  recorded sound effects.
+- Each machine now has its own engine voice, generated from the car's own stats
+  instead of pitching one shared loop. A virtual gearbox pulls revs up and drops
+  them on each shift, the note changes with throttle and load, and coasting
+  sounds different from power.
+- Championship events now use progressive track length tiers (from compact to marathon). Quick Race exhibition lengths now rotate across tiers per entry.
 - The complete nine-event Grand Household Circuit, with three story acts,
   recurring rivals, persistent standings, vehicle and event unlocks,
   replayable races, and a championship ending.
@@ -70,6 +96,10 @@
 - Quick Race and Circuit Discovery now offer Compact, Standard, Long and
   Endurance sizes. Larger circuits use expanded rooms and distance-aware curve
   sampling; shared codes and favorites preserve the selected size.
+- A new Marathon size joins the tier list: a 4.5x room and a dedicated folded
+  grammar (`double_switchback` and `deep_comb`) produce circuits with roughly
+  twice the turns (16–22 broad complexes) at roughly twice the length
+  (32–48k world units), without touching the other tiers' seed geometry.
 - Opening/tightening two-arc corners and safe section excursions add new turn
   profiles. L-shaped rooms now vary their elbow and proportions by seed.
 - Correctly following a long curve no longer causes a false wrong-way reset,
@@ -81,9 +111,21 @@
 - Race HUD calls a solo run a time trial instead of 1st of 1, drops invisible
   gate numbers, and the personal ghost is easier to see. Championship results
   say saved instead of filed.
+- Marathon-length circuits are now genuinely folded instead of just longer:
+  the seeded route packs switchback spines, combs, a serpentine, and a
+  four-lobe cross into the room, and the L-shaped room gets its own folded
+  route with a combed lower arm.
 
 ### Changed
 
+- Existing shared marathon codes and any saved laps or ghosts keyed to the old
+  marathon geometry no longer match, because the generator version advanced.
+  Championship seeds, rooms, and story progress are kept.
+- Live race music now cycles through extended cruise and high-pressure sections, with grid reprises and a victory sting, replacing the previous repetitive loops.
+
+- Quick Race is now a one-click exhibition: a fixed Kitchen/Classic circuit
+  (seed 875, standard length, forward direction) with just PLAY, CHANGE CAR,
+  and BACK TO TITLE. Theme, size, and direction selectors are gone.
 - Cars now receive distinct procedural liveries per driver. Rae, Inez, Tess,
   Cass and rivals sharing a chassis get different palette/livery/wheel/spoiler
   cosmetics; the same race field always produces the same looks via deterministic
@@ -98,7 +140,6 @@
   puts you back on the nearby route, facing the right way.
 - Steering follows the stick more at speed. Fast throttle-on corners can
   slide the rear a little without Space; Space is still the big drift.
->>>>>>> origin/dev
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.
