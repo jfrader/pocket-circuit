@@ -47,6 +47,11 @@ var _route_cumulative: PackedFloat32Array = PackedFloat32Array()
 var _route_length := 0.0
 var _route_checkpoint_arc: Dictionary = {}
 const ROUTE_SECTION_MARGIN := 200.0
+# Beyond this distance from the car the nearest route tangent stops being a
+# reliable "forward" reference: an off-corridor car can be closest to a folded
+# return leg and be judged backward. Corridor half-width (125) plus the maximum
+# racing-line inward offset (90) bounds every legal on-road position.
+const ROUTE_TANGENT_MAX_DISTANCE := 215.0
 
 
 func _ready() -> void:
@@ -422,6 +427,11 @@ func get_route_forward_direction(position: Vector2, previous_checkpoint_index: i
 	var nearest := _nearest_route_segment(position, lo, hi)
 	if int(nearest["index"]) < 0:
 		return Vector2.ZERO
+	if float(nearest["distance_squared"]) > ROUTE_TANGENT_MAX_DISTANCE * ROUTE_TANGENT_MAX_DISTANCE:
+		# Off the corridor the nearest in-window segment may belong to a folded
+		# return leg running the other way. Leave the judgement to the caller's
+		# checkpoint chord rather than report a backwards tangent.
+		return Vector2.ZERO
 	var index := int(nearest["index"])
 	var tangent := (_route_points[(index + 1) % _route_points.size()] - _route_points[index]).normalized()
 	if is_reverse_direction():
@@ -569,7 +579,10 @@ func _update_wrong_way_from_motion(vehicle: Node2D, state: Dictionary, previous_
 	var rigid_body := vehicle as RigidBody2D
 	var velocity := rigid_body.linear_velocity
 	if velocity.length() < 80.0:
-		state["wrong_way_time"] = maxf(0.0, float(state["wrong_way_time"]) - delta)
+		# Below the motion threshold the route tangent is not judged, so the
+		# warning must not outlive the manoeuvre that raised it.
+		state["wrong_way_time"] = 0.0
+		_set_wrong_way(vehicle, state, false)
 		return
 	# Judge alignment against the actual route tangent within the current
 	# checkpoint section. This keeps a car moving away from the next gate but

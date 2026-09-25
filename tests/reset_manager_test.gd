@@ -80,17 +80,14 @@ func _run_test() -> void:
 		return
 
 	race_manager.wrong_way = true
-	reset_manager.wrong_way_timeout = 0.05
-	vehicle.linear_velocity = Vector2.ZERO
-	reset_manager.call("_physics_process", 0.06)
-	if not _expect(not bool(reset_manager.get("_recovering")), "a stationary car should keep the warning without triggering a stale wrong-way recovery"):
-		return
 	vehicle.linear_velocity = Vector2(100.0, 0.0)
 	reset_manager.call("_physics_process", 0.03)
 	reset_manager.call("_physics_process", 0.03)
-	if not _expect(bool(reset_manager.get("_recovering")) and race_manager.reported_recoveries == 2 and not race_manager.wrong_way, "persistent wrong-way driving should recover once and clear the warning state"):
+	if not _expect(not bool(reset_manager.get("_recovering")), "wrong-way must not trigger a recovery"):
 		return
-	await create_timer(0.08).timeout
+	if not _expect(race_manager.reported_recoveries == 1 and race_manager.wrong_way, "wrong-way should stay a warning and leave race state untouched"):
+		return
+	vehicle.linear_velocity = Vector2.ZERO
 
 	reset_manager.recover_vehicle()
 	race_manager.finished = true
