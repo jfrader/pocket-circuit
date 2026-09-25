@@ -11,6 +11,33 @@ class FakeVehicle extends Node:
 		return engine_load
 
 
+class StatsVehicle extends Node:
+	var speed := 0.0
+	var engine_load := 0.0
+	var stats: VehicleStats = preload("res://data/vehicles/rustbug.tres")
+
+	func get_engine_load() -> float:
+		return engine_load
+
+	func get_throttle_input() -> float:
+		return engine_load
+
+
+class PositionalVehicle extends Node2D:
+	var speed := 320.0
+	var stats: VehicleStats = preload("res://data/vehicles/rustbug.tres")
+
+	func get_tyre_state() -> Dictionary:
+		return {
+			"cornering": 0.7,
+			"sliding": true,
+			"screech": 0.65,
+			"surface": &"workbench",
+			"grip": 1.15,
+			"surface_grip": 1.0,
+		}
+
+
 func _initialize() -> void:
 	call_deferred("_run_test")
 
@@ -24,7 +51,9 @@ func _run_test() -> void:
 	director.ensure_buses()
 	if not _expect(AudioServer.bus_count == bus_count, "repeated bus setup should be idempotent"):
 		return
-	if not _expect(_bus_occurrences(&"Music") == 1 and _bus_occurrences(&"SFX") == 1, "Music and SFX buses should each exist exactly once"):
+	if not _expect(_bus_occurrences(&"Music") == 1 and _bus_occurrences(&"SFX") == 1 and _bus_occurrences(&"Engine") == 1 and _bus_occurrences(&"Tyre") == 1, "Music, SFX, Engine, and Tyre buses should each exist exactly once"):
+		return
+	if not _expect(AudioServer.get_bus_send(AudioServer.get_bus_index(&"Engine")) == &"Master" and AudioServer.get_bus_send(AudioServer.get_bus_index(&"Tyre")) == &"Master", "Engine and Tyre must not sit under SFX"):
 		return
 	var master := AudioServer.get_bus_index(&"Master")
 	var master_limiter_count := 0
@@ -43,33 +72,37 @@ func _run_test() -> void:
 	if not _expect(director.get_music_context() == &"menu" and director.get_node("MusicPlayer").get_instance_id() == music_player_id, "re-entering a context should reuse its single music player"):
 		return
 	var live := director.get_node_or_null("GamestrumentsPlayer")
-	if live != null:
-		var live_stream := live.get_node_or_null("LiveStream") as AudioStreamPlayer
-		if not _expect(is_instance_valid(live_stream), "GamestrumentsPlayer/LiveStream must exist as AudioStreamPlayer on live path after play_menu_music()"):
-			return
-		if not _expect(String(live.get("recipe")) == "racing", "live music should use recipe \"racing\" after play_menu_music()"):
-			return
-		if not _expect(String(live.get("arrangement")) == "extended", "live music should use arrangement \"extended\" after play_menu_music()"):
-			return
-		if not _expect(live.get("autoplay") == false, "play_menu_music live path should use autoplay false for garage"):
-			return
+	if not _expect(live != null, "GamestrumentsPlayer must be present (live engine is required)"):
+		return
+	var live_stream := live.get_node_or_null("LiveStream") as AudioStreamPlayer
+	if not _expect(is_instance_valid(live_stream), "GamestrumentsPlayer/LiveStream must exist as AudioStreamPlayer on live path after play_menu_music()"):
+		return
+	if not _expect(String(live.get("recipe")) == "racing", "live music should use recipe \"racing\" after play_menu_music()"):
+		return
+	if not _expect(String(live.get("arrangement")) == "seeded", "live music should use the seeded racing arrangement after play_menu_music()"):
+		return
+	if not _expect(live.get("autoplay") == false, "the live score should not autoplay its tour form; the game drives every phase"):
+		return
+	if not _expect(not String(director.call("get_live_seed")).is_empty(), "play_menu_music should load a live score with a seed"):
+		return
+	var menu_seed := String(director.call("get_live_seed"))
 	var engine_stream: AudioStream = (director.get_node("EnginePlayer") as AudioStreamPlayer).stream
-	if live == null:
-		var menu_stream := music_player.stream as AudioStreamWAV
-		if not _expect(_loop_spans_stream(menu_stream) and _loop_spans_stream(engine_stream), "menu and engine loops should span decoded samples instead of compressed bytes"):
-			return
-	elif not _expect(_loop_spans_stream(engine_stream), "engine loop should span decoded samples"):
+	if not _expect(_loop_spans_stream(engine_stream), "engine loop should span decoded samples"):
 		return
 	director.play_race_music()
 	director.play_race_music()
 	if not _expect(director.get_music_context() == &"race" and director.get_sfx_player_count() == 6, "race music and the fixed SFX pool should remain singletons"):
 		return
-	if live == null:
-		if not _expect(_loop_spans_stream(music_player.stream as AudioStreamWAV), "race music should span decoded samples when import metadata is absent"):
-			return
-	elif not _expect(live.get("autoplay") == true, "play_race_music live path should use autoplay true for extended arc"):
+	if not _expect(String(live.get("arrangement")) == "seeded", "play_race_music should keep the seeded racing arrangement"):
 		return
-	if live != null and not _expect(director.cue_live_section("cooldown"), "cue_live_section should forward a known Extended section to the live player"):
+	if not _expect(live.get("autoplay") == false, "play_race_music should not autoplay its tour form"):
+		return
+	if not _expect(
+		String(director.call("get_live_seed")) != menu_seed,
+		"a race should load a score seeded from the circuit, not the menu score"
+	):
+		return
+	if not _expect(director.cue_live_section("cooldown"), "cue_live_section should forward a known racing section to the live player"):
 		return
 	director.set_race_paused(true)
 	if not _expect(is_equal_approx(music_player.volume_db, -9.0), "pausing should duck race music"):
@@ -95,6 +128,82 @@ func _run_test() -> void:
 		return
 	if not _expect(engine_player.pitch_scale >= 1.55, "wide-open throttle should sit near the high-rev ceiling"):
 		return
+	var voiced := StatsVehicle.new()
+	voiced.speed = 300.0
+	voiced.engine_load = 1.0
+	director.set_local_vehicle(voiced)
+	if not _expect(director.has_engine_voice(), "a vehicle with stats should prepare the generated engine voice"):
+		return
+	if not _expect(not String(director.get_engine_voice_signature()).is_empty(), "the prepared voice should expose its signature"):
+		return
+	if not _expect(not engine_player.playing, "the legacy loop should yield to the generated voice"):
+		return
+	if not _expect(director.has_generated_sfx(&"impact") and director.has_generated_sfx(&"boost"), "the local car should generate its own crash and boost"):
+		return
+	if not _expect(not String(director.call("get_crash_voice_signature")).is_empty(), "the crash voice should carry a signature"):
+		return
+	var local_car := PositionalVehicle.new()
+	root.add_child(local_car)
+	director.set_local_vehicle(local_car)
+	director.call("_update_drift", 1.0 / 60.0)
+	var local_tyre := director.get_node_or_null("LocalTyreVoice") as AudioStreamPlayer
+	if not _expect(local_tyre != null and local_tyre.volume_db <= -40.0, "one frame of steer must not open the tyre loop, got %.1f dB" % local_tyre.volume_db):
+		return
+	director.call("_update_drift", 4.0)
+	if not _expect(local_tyre.bus == &"Tyre", "the local tyre voice must use the Tyre bus, not SFX"):
+		return
+	if not _expect((director.get_node("EnginePlayer") as AudioStreamPlayer).bus == &"Engine", "the engine voice must use the Engine bus, not SFX"):
+		return
+	if not _expect(local_tyre.stream is AudioStreamWAV, "the local car must play the same tyre loop rivals use"):
+		return
+	if not _expect(not local_tyre.stream is AudioStreamGenerator, "the local tyre voice must not be an AudioStreamGenerator"):
+		return
+	if not _expect(local_tyre.volume_db < -6.0 and local_tyre.volume_db > -16.0, "a held slide should be audible and under the old blast, got %.1f dB" % local_tyre.volume_db):
+		return
+	local_car.free()
+	if not _expect(director.play_sfx(&"impact", 0.9), "a prepared car should play its generated crash"):
+		return
+	if not _expect(director.play_sfx(&"boost", 0.82), "a prepared car should play its generated boost"):
+		return
+	var opponent := PositionalVehicle.new()
+	root.add_child(opponent)
+	var opponents: Array[Node] = [opponent]
+	director.set_positional_vehicles(opponents)
+	director.call("_update_positional_tyres")
+	var emitters: Array[Node] = director.call("get_positional_tyre_emitters")
+	if not _expect(emitters.size() == 1, "each non-local vehicle should get one positional tyre emitter"):
+		return
+	var positional_player := emitters[0].call("get_player") as AudioStreamPlayer2D
+	if not _expect(positional_player != null and positional_player.stream is AudioStreamWAV, "opponent tyres should use a generated looping WAV on AudioStreamPlayer2D"):
+		return
+	if not _expect(not positional_player.stream is AudioStreamGenerator, "opponents must not run per-sample generator DSP"):
+		return
+	director.call("_update_engine", 1.0 / 60.0)
+	if not _expect(director.has_engine_voice(), "the generated voice should stay active while driving"):
+		return
+	# Regression: the catalog hands out duplicated VehicleStats, whose
+	# resource_path is empty, so the race supplies the vehicle id instead.
+	var duplicated := StatsVehicle.new()
+	duplicated.stats = (preload("res://data/vehicles/anvil.tres") as VehicleStats).duplicate(true) as VehicleStats
+	duplicated.speed = 300.0
+	duplicated.engine_load = 1.0
+	director.set_local_vehicle(duplicated, "anvil")
+	if not _expect(director.has_engine_voice(), "duplicated stats must still prepare a voice when the race supplies the id"):
+		return
+	if not _expect(String(director.get_engine_voice_signature()).contains("anvil"), "the voice signature should carry the race's vehicle id"):
+		return
+	director.set_local_vehicle(duplicated)
+	if not _expect(director.has_engine_voice(), "a car with no id at all should still get a generated voice, not the legacy loop"):
+		return
+	duplicated.free()
+	opponent.queue_free()
+	director.set_race_paused(true)
+	if not _expect(director.has_engine_voice(), "pausing should not tear down the generated voice"):
+		return
+	director.set_race_paused(false)
+	director.clear_local_vehicle()
+	director.call("_update_engine", 1.0 / 60.0)
+	voiced.free()
 	director.set_live_race_state("finish", 0.0, 0.0, false, "win")
 	idle.free()
 	revs.free()

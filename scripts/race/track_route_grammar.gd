@@ -2,6 +2,10 @@ class_name TrackRouteGrammar
 ## Circuit plans reserve full-width infield passages before rounding corners.
 
 const NAMES: Array[StringName] = [&"infield", &"switchback", &"dogleg", &"harbour"]
+# Marathon-only programs: folded multi-spine layouts that pack roughly twice
+# the switchback's turn complexes into the same room bounds. Standard tiers
+# never select them, so their seed geometry is untouched.
+const MARATHON_NAMES: Array[StringName] = [&"double_switchback", &"deep_comb", &"serpentine", &"multi_comb", &"multi_lobe"]
 const MACRO_SALT := 0x36D1A77
 const CORNER_RADIUS := 180.0
 const CONTROL_SPACING := 55.0
@@ -76,7 +80,183 @@ static func construct(index: int, seed: int, length_bias: float = 0.0, bounds :=
 	return {"program": program, "recipe": StringName("%s_%08x" % [program, seed]), "anchors": vertices, "radii": radii}
 
 
+## Marathon entry point: same contract as construct, but selects among the
+## folded MARATHON_NAMES programs. Standard tiers never call this, so their
+## seed-to-program mapping is untouched.
+static func construct_marathon(index: int, seed: int, length_bias: float = 0.0, bounds := Rect2(-1300, -800, 2600, 1600)) -> Dictionary:
+	var program := MARATHON_NAMES[posmod(index, MARATHON_NAMES.size())]
+	var width := bounds.size.x * _roll(seed, 0x2A1, 0.83, 0.94)
+	var height := bounds.size.y * _roll(seed, 0x2B7, 0.78, 0.88)
+	var x := width * 0.5
+	var y := height * 0.5
+	var vertices := PackedVector2Array()
+	match program:
+		&"double_switchback":
+			vertices = _double_switchback_anchors(seed, x, y, height)
+		&"deep_comb":
+			vertices = _deep_comb_anchors(seed, x, y, height)
+		&"serpentine":
+			vertices = _serpentine_anchors(seed, x, y, height)
+		&"multi_comb":
+			vertices = _multi_comb_anchors(seed, x, y, height)
+		&"multi_lobe":
+			vertices = _multi_lobe_anchors(seed, x, y, height)
+	# Cut several convex corners into chamfers so the folded programs carry a
+	# real angle mix instead of an all-90 spine. Corners are spaced at least one
+	# edge apart, so no single straight is cut from both ends; the shared fitter
+	# still rejects any stem that lands collinear with its neighbour.
+	vertices = _compound_chamfer(vertices, seed, 4, false)
+	var heading := _roll(seed, 0x2E9, 0.04, 0.08)
+	if _roll_int(seed, 0x2F5, 2) == 0:
+		heading = -heading
+	var mirror := -1.0 if _roll_int(seed, 0x301, 2) == 0 else 1.0
+	for i in vertices.size():
+		vertices[i] = bounds.get_center() + Vector2(vertices[i].x * mirror, vertices[i].y).rotated(heading)
+	# The folded programs share connector lines between adjacent legs, which
+	# leaves collinear or duplicated anchor points. The corner fitter rejects
+	# those as zero turns, so drop them after the transforms (collinearity is
+	# preserved by mirror/rotate) and before the radii are seeded.
+	vertices = _drop_collinear_anchors(vertices)
+	var radii := PackedFloat32Array()
+	for i in vertices.size():
+		radii.append(_roll(seed, 0x30D + i * 7, CORNER_RADIUS, 225.0 + 25.0 * length_bias))
+	return {"program": program, "recipe": StringName("%s_%08x" % [program, seed]), "anchors": vertices, "radii": radii}
+
+
+## Double switchback: two full-height switchback spines side by side, joined
+## through a narrow waist. Every anchor is a 90-degree corner (the switchback's
+## own proven shape), so no near-180-degree turn ever reaches the fitter. The
+## two spines plus the waist double the switchback's turn count inside the same
+## room bounds.
+static func _double_switchback_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var spine := maxf(400.0, x * _roll(seed, 0x411, 0.28, 0.34))
+	var waist := maxf(400.0, x * _roll(seed, 0x425, 0.14, 0.18))
+	# Depth is capped so the two opposing notch floors keep at least 0.2h
+	# (>> the 320u self-distance floor) between them.
+	var depth := maxf(380.0, height * _roll(seed, 0x43B, 0.30, 0.38))
+	if spine - waist * 0.5 < 380.0:
+		spine = waist * 0.5 + 380.0
+	return PackedVector2Array([
+		Vector2(-x, -y),
+		Vector2(-spine, -y),
+		Vector2(-spine, -y + depth),
+		Vector2(-waist * 0.5, -y + depth),
+		Vector2(-waist * 0.5, -y),
+		Vector2(waist * 0.5, -y),
+		Vector2(waist * 0.5, -y + depth),
+		Vector2(spine, -y + depth),
+		Vector2(spine, -y),
+		Vector2(x, -y),
+		Vector2(x, y),
+		Vector2(spine, y),
+		Vector2(spine, y - depth),
+		Vector2(waist * 0.5, y - depth),
+		Vector2(waist * 0.5, y),
+		Vector2(-waist * 0.5, y),
+		Vector2(-waist * 0.5, y - depth),
+		Vector2(-spine, y - depth),
+		Vector2(-spine, y),
+		Vector2(-x, y),
+	])
+
+
+## Asymmetric comb: the double-switchback topology with unequal notch depths
+## (one side bites much deeper than the other) so it reads as a distinct
+## layout. Kept inside the same self-distance limits the symmetric variant
+## proved: waist >= 0.14x and the two notch floors together stay well clear.
+static func _deep_comb_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var spine := maxf(400.0, x * _roll(seed, 0x451, 0.28, 0.34))
+	var waist := maxf(400.0, x * _roll(seed, 0x465, 0.15, 0.19))
+	var deep := maxf(380.0, height * _roll(seed, 0x47B, 0.30, 0.38))
+	var shallow := maxf(380.0, height * _roll(seed, 0x491, 0.16, 0.22))
+	if spine - waist * 0.5 < 380.0:
+		spine = waist * 0.5 + 380.0
+	return PackedVector2Array([
+		Vector2(-x, -y),
+		Vector2(-spine, -y),
+		Vector2(-spine, -y + shallow),
+		Vector2(-waist * 0.5, -y + shallow),
+		Vector2(-waist * 0.5, -y),
+		Vector2(waist * 0.5, -y),
+		Vector2(waist * 0.5, -y + deep),
+		Vector2(spine, -y + deep),
+		Vector2(spine, -y),
+		Vector2(x, -y),
+		Vector2(x, y),
+		Vector2(spine, y),
+		Vector2(spine, y - deep),
+		Vector2(waist * 0.5, y - deep),
+		Vector2(waist * 0.5, y),
+		Vector2(-waist * 0.5, y),
+		Vector2(-waist * 0.5, y - shallow),
+		Vector2(-spine, y - shallow),
+		Vector2(-spine, y),
+		Vector2(-x, y),
+	])
+
+
+
+
+## Interlocking teeth on both sides: a barcode silhouette, distinct from the
+## double switchback. Anchors span the full room so the lap reaches the
+## marathon band; every leg clears the 375u the 180u fillet needs.
+static func _serpentine_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var teeth := 3
+	var pitch := (2.0 * x) / float(teeth + 1)
+	var half_slot := pitch * 0.22
+	var depth := height * _roll(seed, 0x5A1, 0.26, 0.32)
+	var pts := PackedVector2Array()
+	pts.append(Vector2(-x, -y))
+	for i in teeth:
+		var cx := -x + pitch * float(i + 1)
+		pts.append(Vector2(cx - half_slot, -y))
+		pts.append(Vector2(cx - half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y))
+	pts.append(Vector2(x, -y))
+	pts.append(Vector2(x, y))
+	for i in range(teeth - 1, -1, -1):
+		var cx := -x + pitch * float(i + 1) + pitch * 0.5
+		pts.append(Vector2(cx + half_slot, y))
+		pts.append(Vector2(cx + half_slot, y - depth))
+		pts.append(Vector2(cx - half_slot, y - depth))
+		pts.append(Vector2(cx - half_slot, y))
+	pts.append(Vector2(-x, y))
+	return pts
+
+
+## One-sided comb: repeated rectangular teeth along the bottom, flat return.
+static func _multi_comb_anchors(seed: int, x: float, y: float, height: float) -> PackedVector2Array:
+	var teeth := 3
+	var pitch := (2.0 * x) / float(teeth + 1)
+	var half_slot := pitch * 0.26
+	var depth := height * _roll(seed, 0x6B1, 0.30, 0.38)
+	var pts := PackedVector2Array()
+	pts.append(Vector2(-x, -y))
+	for i in teeth:
+		var cx := -x + pitch * float(i + 1)
+		pts.append(Vector2(cx - half_slot, -y))
+		pts.append(Vector2(cx - half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y + depth))
+		pts.append(Vector2(cx + half_slot, -y))
+	pts.append(Vector2(x, -y))
+	pts.append(Vector2(x, y))
+	pts.append(Vector2(-x, y))
+	return pts
+
+
+## Four-lobe cross: deep pockets on every side, a silhouette no other program
+## produces. The arm half-width keeps every leg clear of the fillet floor.
+static func _multi_lobe_anchors(seed: int, x: float, y: float, _height: float) -> PackedVector2Array:
+	var arm := minf(x, y) * _roll(seed, 0x7C1, 0.34, 0.44)
+	return PackedVector2Array([
+		Vector2(-arm, -y), Vector2(arm, -y), Vector2(arm, -arm), Vector2(x, -arm),
+		Vector2(x, arm), Vector2(arm, arm), Vector2(arm, y), Vector2(-arm, y),
+		Vector2(-arm, arm), Vector2(-x, arm), Vector2(-x, -arm), Vector2(-arm, -arm),
+	])
+
 static func round_corners(vertices: PackedVector2Array, radii: PackedFloat32Array) -> PackedVector2Array:
+
 	return round_corners_profiled(vertices, radii, -1)["controls"]
 
 
@@ -186,12 +366,13 @@ static func _hash32(value: int) -> int:
 	return (mixed ^ (mixed >> 16)) & 0x7FFFFFFF
 
 
-static func _compound_chamfer(vertices: PackedVector2Array, seed: int) -> PackedVector2Array:
-	# Cut 1-2 convex corners into unequal chamfers: corner -> entry vertex, a
+static func _compound_chamfer(vertices: PackedVector2Array, seed: int, maximum: int = 2, require_roll: bool = true) -> PackedVector2Array:
+	# Cut convex corners into unequal chamfers: corner -> entry vertex, a
 	# diagonal stem, an exit vertex. The diagonal gains a third heading family
 	# (>=11 deg off both legs) while the two longest straight corridors and the
 	# concave bays stay intact. Chosen corners never share an edge, so no single
-	# straight is cut from both ends.
+	# straight is cut from both ends. Standard programs use the legacy 1-2 cut;
+	# the folded marathon programs pass a higher `maximum` for a real angle mix.
 	var n := vertices.size()
 	if n < 4:
 		return vertices
@@ -214,13 +395,27 @@ static func _compound_chamfer(vertices: PackedVector2Array, seed: int) -> Packed
 	var chosen: Dictionary = {}
 	var start := _roll_int(seed, 0x6D, eligible.size())
 	chosen[eligible[start]] = true
-	if _roll_int(seed, 0x6B, 2) == 1:
-		for k in range(1, eligible.size()):
-			var candidate: int = eligible[(start + k) % eligible.size()]
-			var circular := mini(absi(candidate - eligible[start]), n - absi(candidate - eligible[start]))
-			if circular >= 2:
+	if require_roll:
+		if _roll_int(seed, 0x6B, 2) == 1:
+			for k in range(1, eligible.size()):
+				var candidate: int = eligible[(start + k) % eligible.size()]
+				var circular := mini(absi(candidate - eligible[start]), n - absi(candidate - eligible[start]))
+				if circular >= 2:
+					chosen[candidate] = true
+					break
+	else:
+		var offset := 1
+		while chosen.size() < maximum and offset < eligible.size():
+			var candidate: int = eligible[(start + offset) % eligible.size()]
+			offset += 1
+			var separated := true
+			for picked: int in chosen:
+				var circular := mini(absi(candidate - picked), n - absi(candidate - picked))
+				if circular < 2:
+					separated = false
+					break
+			if separated:
 				chosen[candidate] = true
-				break
 	var result := PackedVector2Array()
 	for i in n:
 		if not chosen.has(i):
@@ -243,3 +438,28 @@ static func _polygon_area(points: PackedVector2Array) -> float:
 	for i in points.size():
 		total += points[i].cross(points[(i + 1) % points.size()])
 	return total * 0.5
+
+
+## Remove anchors whose position duplicates their predecessor or whose turn is
+## near-collinear, so the corner fitter only sees real corners. The folded
+## marathon programs emit both: shared connector lines and repeated leg ends.
+static func _drop_collinear_anchors(points: PackedVector2Array) -> PackedVector2Array:
+	if points.size() < 4:
+		return points
+	var deduped := PackedVector2Array()
+	for index in points.size():
+		var current := points[index]
+		if deduped.is_empty() or current.distance_squared_to(deduped[deduped.size() - 1]) > 0.01:
+			deduped.append(current)
+	var result := PackedVector2Array()
+	var count := deduped.size()
+	for index in count:
+		var previous := deduped[posmod(index - 1, count)]
+		var current := deduped[index]
+		var next := deduped[(index + 1) % count]
+		var turn := absf(previous.direction_to(current).angle_to(current.direction_to(next)))
+		if turn > 0.02:
+			result.append(current)
+	if result.size() < 4:
+		return points
+	return result

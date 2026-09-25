@@ -41,6 +41,8 @@ func default_data() -> Dictionary:
 		"master_volume": 1.0,
 		"music_volume": 0.8,
 		"sfx_volume": 0.9,
+		"engine_volume": 0.9,
+		"tyre_volume": 0.9,
 		"fullscreen": false,
 		"reduced_camera_shake": false,
 		"reduced_motion": false,
@@ -196,6 +198,9 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	normalized["master_volume"] = _bounded_float(raw.get("master_volume"), 0.0, 1.0, 1.0)
 	normalized["music_volume"] = _bounded_float(raw.get("music_volume"), 0.0, 1.0, 0.8)
 	normalized["sfx_volume"] = _bounded_float(raw.get("sfx_volume"), 0.0, 1.0, 0.9)
+	var sfx_volume := float(normalized["sfx_volume"])
+	normalized["engine_volume"] = _bounded_float(raw.get("engine_volume"), 0.0, 1.0, sfx_volume)
+	normalized["tyre_volume"] = _bounded_float(raw.get("tyre_volume"), 0.0, 1.0, sfx_volume)
 	for key: String in ["fullscreen", "reduced_camera_shake", "reduced_motion", "first_run"]:
 		if raw.get(key) is bool:
 			normalized[key] = raw[key]

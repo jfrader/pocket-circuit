@@ -8,7 +8,7 @@ mkdir -p "$BIN"
 if [[ -n "${GAMESTRUMENTS_ADDON_DIR:-}" ]]; then
 	if [[ ! -f "$GAMESTRUMENTS_ADDON_DIR/gamestruments.gdextension" ]]; then
 		echo "ERROR: GAMESTRUMENTS_ADDON_DIR set but no gamestruments.gdextension found at $GAMESTRUMENTS_ADDON_DIR" >&2
-		echo "Set GAMESTRUMENTS_ADDON_DIR to a directory containing a packaged addon (gamestruments.gdextension + bin/ lib or sibling lib)." >&2
+		echo "Set GAMESTRUMENTS_ADDON_DIR to a packaged addon containing gamestruments.gdextension plus Linux and Windows libraries in bin/ or alongside." >&2
 		exit 1
 	fi
 	cp -f "$GAMESTRUMENTS_ADDON_DIR/gamestruments.gdextension" "$DEST/gamestruments.gdextension"
@@ -20,6 +20,14 @@ if [[ -n "${GAMESTRUMENTS_ADDON_DIR:-}" ]]; then
 		echo "ERROR: GAMESTRUMENTS_ADDON_DIR set but no libgamestruments_godot.so found (looked in bin/ and alongside)." >&2
 		exit 1
 	fi
+	if [[ -f "$GAMESTRUMENTS_ADDON_DIR/bin/gamestruments_godot.dll" ]]; then
+		cp -f "$GAMESTRUMENTS_ADDON_DIR/bin/gamestruments_godot.dll" "$BIN/gamestruments_godot.dll"
+	elif [[ -f "$GAMESTRUMENTS_ADDON_DIR/gamestruments_godot.dll" ]]; then
+		cp -f "$GAMESTRUMENTS_ADDON_DIR/gamestruments_godot.dll" "$BIN/gamestruments_godot.dll"
+	else
+		echo "ERROR: GAMESTRUMENTS_ADDON_DIR set but no gamestruments_godot.dll found (looked in bin/ and alongside)." >&2
+		exit 1
+	fi
 	echo "Synced packaged Gamestruments addon from $GAMESTRUMENTS_ADDON_DIR into $DEST"
 else
 	SOURCE="${GAMESTRUMENTS_ROOT:-$HOME/Workspace/gamestruments}"
@@ -29,7 +37,8 @@ else
 		echo "Or run from a checkout that has the source at ~/Workspace/gamestruments" >&2
 		exit 1
 	fi
-	cargo build -p gamestruments-godot --release --manifest-path "$SOURCE/Cargo.toml"
+	# Build from the source directory so gamestruments' pinned rust-toolchain.toml applies.
+	( cd "$SOURCE" && cargo build -p gamestruments-godot --release )
 	cp -f "$SOURCE/crates/godot/gamestruments.gdextension" "$DEST/gamestruments.gdextension"
 	cp -f "$SOURCE/target/release/libgamestruments_godot.so" "$BIN/libgamestruments_godot.so"
 	echo "Synced Gamestruments GDExtension (release) into $DEST"

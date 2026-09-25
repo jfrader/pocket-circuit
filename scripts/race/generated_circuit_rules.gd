@@ -14,13 +14,14 @@ const ACT_OBSTACLE_RANGES := {
 	3: Vector2i(2, 3),
 }
 const HAZARD_PRESENCE_BY_ACT := {1: 0.35, 2: 0.55, 3: 0.75}
-const LENGTH_TIERS: Array[String] = ["compact", "standard", "long", "endurance"]
+const LENGTH_TIERS: Array[String] = ["compact", "standard", "long", "endurance", "marathon"]
 const DEFAULT_LENGTH_TIER: String = "standard"
 const LENGTH_PROFILE_BANDS := {
 	"compact": {"min_length": 4000.0, "max_length": 6000.0, "room_scale": 0.95},
 	"standard": {"min_length": 4375.0, "max_length": 9625.0, "room_scale": 1.0},
 	"long": {"min_length": 12000.0, "max_length": 16000.0, "room_scale": 1.8},
 	"endurance": {"min_length": 18000.0, "max_length": 24000.0, "room_scale": 2.8},
+	"marathon": {"min_length": 32000.0, "max_length": 48000.0, "room_scale": 4.5},
 }
 
 
