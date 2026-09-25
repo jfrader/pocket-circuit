@@ -142,9 +142,12 @@ func play_menu_music() -> void:
 	clear_local_vehicle()
 	set_race_paused(false)
 	# The menu reuses whatever score is already playing; it only generates the
-	# title score on a cold start.
+	# title score on a cold start. Returning to the menu drops the race pressure
+	# back to the menu feel on the loaded score.
 	if not _live.has_score():
 		_live.play(_session_menu_seed(), RaceMusicPlan.menu_profile(), "grid")
+	else:
+		_live.set_race_state("grid", 0.28, 0.0, false)
 	_live.rotate(RaceMusicPlan.menu_deck(), RaceMusicPlan.menu_phrase_seconds(), "grid")
 
 func play_race_music() -> void:

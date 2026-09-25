@@ -100,6 +100,13 @@ func cue(section: String, hold_seconds := 0.0) -> bool:
 	if not bool(_player.call("cue_section", section)):
 		return false
 	_requested = section
+	# Keep the rotation clock parked on the section that is actually playing, so
+	# a manual sting resumes the deck from there instead of an old pointer.
+	var index := _deck.find(section, _deck_index)
+	if index < 0:
+		index = _deck.find(section)
+	if index >= 0:
+		_deck_index = index
 	if hold_seconds > 0.0:
 		_dwell_left = maxf(_dwell_left, hold_seconds)
 	return true
