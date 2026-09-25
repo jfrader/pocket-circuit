@@ -336,7 +336,7 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 func show_settings() -> void:
 	_screen = "settings"
 	_clear_content()
-	_content.add_theme_constant_override("separation", 5)
+	_content.add_theme_constant_override("separation", 2)
 	_configure_stage(&"settings", "rustbug", "inez")
 	_add_kicker("SETTINGS")
 	_add_heading("Race your way")
