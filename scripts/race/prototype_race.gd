@@ -696,8 +696,10 @@ func _on_race_finished(_total_time: float) -> void:
 	var director := _audio_director()
 	if director != null and director.has_method("stop_live_rotation"):
 		director.call("stop_live_rotation")
-	# Finish outro first. Once that blend has started, queue grid so the menu
-	# phase is already in motion while the results are on screen.
+	# Cue victory/defeat outro first. _queue_menu_phase waits a beat so the
+	# outro gets its musical time before we cue grid (get_live_section reports
+	# the incoming target immediately during transition, which used to cut it).
+	# Grid arrives during results if the player lingers.
 	_cue_live_section("victory" if _race_won else "defeat")
 	_results_panel.visible = true
 	_retry_button.disabled = true
@@ -707,14 +709,12 @@ func _on_race_finished(_total_time: float) -> void:
 
 
 func _queue_menu_phase() -> void:
-	var director := _audio_director()
-	var deadline := Time.get_ticks_msec() + 3000
-	while is_inside_tree() and _finished and Time.get_ticks_msec() < deadline:
-		if director != null and director.has_method("get_live_section"):
-			var section := String(director.call("get_live_section"))
-			if section == "victory" or section == "defeat":
-				break
-		await get_tree().process_frame
+	# Fixed delay after the victory cue (instead of polling get_live_section,
+	# which reports the target section the instant the blend starts). 3.5 s
+	# gives the outro its musical time before grid is cued. The LiveMusic cue
+	# guard ensures play_menu_music() on boot entry does not re-cue and restart
+	# the grid phrase.
+	await get_tree().create_timer(3.5).timeout
 	if not _finished or not is_inside_tree():
 		return
 	_cue_live_section("grid")
