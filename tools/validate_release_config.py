@@ -487,7 +487,7 @@ def main() -> int:
     vendor_readme = gamestruments_vendor / "README.md"
     if vendor_readme.is_file():
         readme_text = vendor_readme.read_text(encoding="utf-8")
-        for required_text in ("v1.0.4", "credential-free", "fine-grained GitHub PAT", "Contents: read"):
+        for required_text in ("v1.0.5-rc1", "credential-free", "fine-grained GitHub PAT", "Contents: read"):
             if required_text not in readme_text:
                 errors.append(f"vendor/gamestruments/README.md must document {required_text}")
 
