@@ -4,8 +4,10 @@
 
 ### Changed
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
+- The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 
 ### Fixed
+- Starting a newly generated menu or circuit score no longer cuts off the score already playing. The outgoing score stays up until the incoming music is audible, then crossfades into it.
 - Your car keeps its engine note for every race in a session. It used to fall silent after the first one, while still reporting that it was playing.
 - Leaving a race for the menu no longer drops the music out. The menu stays on Starting Grid for several loops, then steps to a groove. It does not drop back into Ignition.
 - Your own tyres now use the same loop as rival cars, and they stay quiet unless the car is actually sliding. A small steer does not open them.
