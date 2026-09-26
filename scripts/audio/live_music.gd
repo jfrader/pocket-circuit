@@ -97,15 +97,11 @@ func current_section() -> String:
 func cue(section: String, hold_seconds := 0.0) -> bool:
 	if not has_score() or not _player.has_method("cue_section"):
 		return false
-	var already := section == _requested
-	if not already:
-		if not bool(_player.call("cue_section", section)):
-			return false
+	if not bool(_player.call("cue_section", section)):
+		return false
 	_requested = section
 	# Keep the rotation clock parked on the section that is actually playing, so
 	# a manual sting resumes the deck from there instead of an old pointer.
-	# Guarding a re-cue of the same requested section prevents double-cue
-	# restarts of e.g. the grid phrase when play_menu_music() re-enters on boot.
 	var index := _deck.find(section, _deck_index)
 	if index < 0:
 		index = _deck.find(section)
