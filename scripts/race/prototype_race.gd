@@ -1293,6 +1293,7 @@ func _on_retry_pressed() -> void:
 
 
 func _on_mastery_pressed() -> void:
+	_left_results = true
 	_set_paused(false)
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("start_mastery_rematch"):
