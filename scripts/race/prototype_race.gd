@@ -47,6 +47,9 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const PERSONAL_GHOST_SCRIPT := preload("res://scripts/race/personal_ghost.gd")
 const RACE_MUSIC_PLAN := preload("res://scripts/audio/race_music_plan.gd")
 const COUNTDOWN_STEP_SECONDS := 0.65
+## The victory/defeat outro is a four-bar phrase. Hold the menu phase off it for
+## roughly that long so the finish reads as an outro rather than a cut.
+const RESULTS_OUTRO_SECONDS := 7.0
 const FALLBACK_OPPONENTS: Array[String] = ["juniper", "milo", "tess"]
 const GRID_TRANSFORMS: Array[Transform2D] = [
 	Transform2D(PI * 0.5, Vector2(-600.0, 315.0)),
@@ -81,6 +84,9 @@ const TRACK_SCENES: Dictionary = {
 
 var _player_vehicle: VehicleController
 var _finished: bool = false
+## Set when the player leaves the results screen (continue/retry/abandon) so the
+## queued menu phase cannot fire after the scene has moved on.
+var _left_results := false
 var _countdown_label: Label
 var _race_flash_label: Label
 var _race_hud: RaceHUD
@@ -709,13 +715,11 @@ func _on_race_finished(_total_time: float) -> void:
 
 
 func _queue_menu_phase() -> void:
-	# Fixed delay after the victory cue (instead of polling get_live_section,
-	# which reports the target section the instant the blend starts). 3.5 s
-	# gives the outro its musical time before grid is cued. The LiveMusic cue
-	# guard ensures play_menu_music() on boot entry does not re-cue and restart
-	# the grid phrase.
-	await get_tree().create_timer(3.5).timeout
-	if not _finished or not is_inside_tree():
+	# The binding reports the incoming section the moment a transition starts, so
+	# polling `get_live_section` would cue grid the instant the victory blend
+	# began. Wait out the outro phrase, then hand over to the menu phase.
+	await get_tree().create_timer(RESULTS_OUTRO_SECONDS).timeout
+	if _left_results or not _finished or not is_inside_tree():
 		return
 	_cue_live_section("grid")
 
@@ -835,6 +839,7 @@ func _update_results(results: Array) -> void:
 
 
 func restart_race() -> void:
+	_left_results = true
 	_set_paused(false)
 	var app := get_node_or_null("/root/App")
 	if app and not _session.is_empty() and app.has_method("retry_race"):
@@ -844,6 +849,7 @@ func restart_race() -> void:
 
 
 func request_return() -> void:
+	_left_results = true
 	_set_paused(false)
 	return_requested.emit()
 	var app := get_node_or_null("/root/App")
@@ -856,6 +862,7 @@ func request_return() -> void:
 func request_abandon() -> void:
 	if _finished or _results_finalized:
 		return
+	_left_results = true
 	_set_paused(false)
 	return_requested.emit()
 	var app := get_node_or_null("/root/App")
