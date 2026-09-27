@@ -38,8 +38,11 @@ static func plan_obstacles(
 	var occupied: Array[Dictionary] = []
 	for slot in target_count:
 		var definition: Dictionary = (roster[posmod(rng.randi(), roster.size())] as Dictionary).duplicate(true)
-		var footprint_size: Vector2 = definition["footprint_size"]
-		var shape_kind := StringName(definition["footprint_kind"])
+		var footprint_size := TrackBuilderCore.PROP_SCALE.size_for(String(definition["asset"]), Vector2(40.0, 40.0))
+		var shape_kind := &"rect"
+		definition["footprint_size"] = footprint_size
+		definition["visual_size"] = footprint_size
+		definition["footprint_kind"] = shape_kind
 		var preferred_index := rng.randi_range(0, centerline.size() - 1)
 		var preferred_side := -1.0 if rng.randi() % 2 == 0 else 1.0
 		var placed := false
@@ -97,13 +100,8 @@ static func plan_hazard(theme: StringName, spec: Dictionary, centerline: PackedV
 	var rng := RandomNumberGenerator.new()
 	rng.seed = int(spec.get("hazard_seed", 0))
 	var act := clampi(int(spec.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
-	var footprint_size := Vector2(60.0, 60.0)
-	var footprint_kind := &"circle"
-	if theme == &"workshop":
-		footprint_size = Vector2(58.0, 58.0)
-	elif theme == &"office":
-		footprint_size = Vector2(60.0, 36.0)
-		footprint_kind = &"rect"
+	var footprint_size := WorldPropScale.hazard_size(theme)
+	var footprint_kind := &"rect" if theme == &"office" else &"circle"
 	var motion := &"static" if theme == &"office" else &"rolling"
 	var paths := {}
 	for direction: String in ["forward", "reverse"]:

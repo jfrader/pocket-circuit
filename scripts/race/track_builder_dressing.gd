@@ -149,7 +149,7 @@ static func build_opening_landmark(
 	opening.set_meta("semantic_quantity", &"unique")
 	opening.set_meta("requested_count", 1)
 	var base_radius := TrackBuilderCore._asset_radius(asset_path, 64.0)
-	var size_scale := minf(1.0, 72.0 / maxf(base_radius, 1.0))
+	var size_scale := 1.0
 	var radius := base_radius * size_scale
 	var preferred := int(round(float(centerline.size()) * float(spec.get("opening_fraction", 0.11))))
 	var selected_index := preferred
@@ -192,6 +192,19 @@ static func build_opening_landmark(
 			TrackBuilderCore._add_generated_prop(opening, "Focal", candidate, asset_path, TrackBuilderCore._sample_tangent(centerline, selected_index).angle(), &"opening", &"unique", 0, size_scale)
 			occupied.append({"position": candidate, "radius": radius})
 			placed_count = 1
+	if placed_count == 0:
+		for replacement: String in spec["landmark_fallbacks"]:
+			var replacement_radius := TrackBuilderCore._asset_radius(replacement, 24.0)
+			var fit := TrackBuilderCore._best_trackside_position(preferred, replacement_radius, centerline, outer_loop, room_polygon, gate_samples, occupied)
+			if not bool(fit["found"]):
+				continue
+			selected_index = int(fit["index"])
+			TrackBuilderCore._add_generated_prop(opening, "Focal", fit["position"], replacement, TrackBuilderCore._sample_tangent(centerline, selected_index).angle(), &"opening", &"unique", 0)
+			occupied.append({"position": fit["position"], "radius": replacement_radius})
+			opening.set_meta("asset_path", replacement)
+			opening.set_meta("replaced_asset", asset_path)
+			placed_count = 1
+			break
 	opening.set_meta("centerline_index", selected_index)
 	opening.set_meta("placed_count", placed_count)
 	return selected_index
@@ -303,7 +316,8 @@ static func build_track_formation(
 		outer_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		stage: Callable = Callable()
 ) -> void:
 	var formation := Node2D.new()
 	formation.name = node_name
@@ -318,6 +332,8 @@ static func build_track_formation(
 	var sample_step := (5 if radius > 20.0 else (4 if radius > 12.0 else 3)) if quantity == &"many" else maxi(6, ceili((radius * 2.0 + 10.0) / 10.0))
 	var placed_count := 0
 	for item_index in requested_count:
+		if stage.is_valid() and item_index > 0:
+			await stage.call("Placing track objects")
 		var sample_offset := int(round((float(item_index) - float(requested_count - 1) * 0.5) * float(sample_step)))
 		var placed := false
 		for adjustment_attempt in 17:
@@ -378,6 +394,9 @@ static func build_corner_landmarks(
 		if not reserved_unique_assets.has(asset_path):
 			available_assets.append(asset_path)
 	var target_count := mini(1 + posmod(TrackBuilderCore._mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), "landmarks"), 2), available_assets.size())
+	for asset_path: String in spec["landmark_fallbacks"]:
+		if not reserved_unique_assets.has(asset_path) and asset_path not in available_assets:
+			available_assets.append(asset_path)
 	landmarks.set_meta("requested_count", target_count)
 	var placed_count := 0
 	for corner_slot in corner_indices.size():
@@ -386,7 +405,7 @@ static func build_corner_landmarks(
 		var index := int(corner_indices[corner_slot])
 		var asset_path := available_assets[placed_count]
 		var base_radius := TrackBuilderCore._asset_radius(asset_path, 64.0)
-		var size_scale := minf(1.0, 72.0 / maxf(base_radius, 1.0))
+		var size_scale := 1.0
 		var radius := base_radius * size_scale
 		var outward := (outer_loop[index] - centerline[index]).normalized()
 		for attempt in 12:
@@ -401,15 +420,18 @@ static func build_corner_landmarks(
 			reserved_unique_assets[asset_path] = true
 			placed_count += 1
 			break
-	while placed_count < target_count:
-		var asset_path := available_assets[placed_count]
+	for asset_path: String in available_assets:
+		if placed_count >= target_count:
+			break
+		if reserved_unique_assets.has(asset_path):
+			continue
 		var base_radius := TrackBuilderCore._asset_radius(asset_path, 64.0)
-		var size_scale := minf(1.0, 72.0 / maxf(base_radius, 1.0))
+		var size_scale := 1.0
 		var radius := base_radius * size_scale
 		var preferred_index := int(corner_indices[mini(placed_count, corner_indices.size() - 1)])
 		var exhaustive := TrackBuilderCore._best_trackside_position(preferred_index, radius, centerline, outer_loop, room_polygon, gate_samples, occupied)
 		if not bool(exhaustive["found"]):
-			break
+			continue
 		var candidate: Vector2 = exhaustive["position"]
 		var index := int(exhaustive["index"])
 		TrackBuilderCore._add_generated_prop(landmarks, "Landmark%02d" % placed_count, candidate, asset_path, TrackBuilderCore._sample_tangent(centerline, index).angle(), &"corner", &"unique", placed_count, size_scale)
@@ -459,13 +481,13 @@ static func build_room_dressing(
 		for item_index in pocket_count:
 			if asset_pool.is_empty():
 				break
-			var asset_path := String(asset_pool[(placed_count + pocket_index * 3) % asset_pool.size()])
+			var asset_path := String(asset_pool[(pocket_index * 3 + item_index) % asset_pool.size()])
 			var base_radius := TrackBuilderCore._asset_radius(asset_path, 24.0)
-			var size_scale := minf(1.0, 16.0 / maxf(base_radius, 1.0)) * rng.randf_range(0.86, 1.0)
+			var size_scale := 1.0
 			var radius := base_radius * size_scale
 			var placed := false
 			for attempt in 12:
-				var ring := 30.0 + float(attempt / 6) * 10.0
+				var ring := radius * 2.0 + 12.0 + float(attempt / 6) * 10.0
 				var angle := base_angle + TAU * float(item_index) / float(pocket_count) + TAU * float(attempt % 6) / 18.0
 				var candidate := anchor + Vector2.RIGHT.rotated(angle) * ring
 				if not TrackBuilderCore._trackside_placement_is_safe(candidate, radius, room_polygon, centerline, gate_samples, occupied):
@@ -534,9 +556,8 @@ static func build_edge_and_apron_decor(
 		var tex := load(tex_path) as Texture2D
 		if tex == null:
 			continue
-		var longest := maxf(tex.get_width(), tex.get_height())
-		var sz := rng.randf_range(22.0, 52.0)
-		var sprite_scale := sz / maxf(longest, 1.0)
+		var sz := TrackBuilderCore.PROP_SCALE.length_for(tex_path, rng.randf_range(22.0, 52.0))
+		var sprite_scale := TrackBuilderCore.PROP_SCALE.sprite_scale(tex, TrackBuilderCore._texture_opaque_rect(tex), sz)
 		var rotation := rng.randf_range(0.0, TAU)
 		var alpha := rng.randf_range(0.55, 0.92)
 		var is_flat := TrackBuilderCore.FLAT_EDGE_ASSETS.has(tex_path.get_file())
@@ -589,7 +610,7 @@ static func build_edge_and_apron_decor(
 			spr.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			spr.scale = Vector2.ONE * sprite_scale
 			spr.position = -offset
-			spr.modulate = Color(1.0, 1.0, 1.0, alpha)
+			spr.modulate = Color.WHITE
 			TrackBuilderCore._mark_solid_visual(spr, tex_path, &"apron_prop")
 			body.add_child(spr)
 		placed += 1
@@ -655,19 +676,12 @@ static func build_giant_landmarks(
 			used_rect = TrackBuilderCore._texture_opaque_rect(tex)
 			footprint = TrackBuilderCore._texture_collision_footprint(tex, StringName(shape_entry.get("shape", &"rect")))
 			var footprint_size: Vector2 = footprint["size"]
-			desired_size = rng.randf_range(300.0, float(shape_entry.get("giant_max_size", 600.0))) if asset_attempt == 0 else 300.0
-			var sizes: Array[float] = [desired_size]
-			if desired_size > 300.0:
-				sizes.append(300.0)
-			for candidate_size in sizes:
-				desired_size = candidate_size
-				sprite_scale = desired_size / maxf(footprint_size.x, footprint_size.y)
-				visual_center_offset = ((footprint["center"] as Vector2) - Vector2(tex.get_width(), tex.get_height()) * 0.5) * sprite_scale
-				world_shape_size = footprint_size * sprite_scale
-				local_footprint_rotation = float(footprint["rotation"])
-				placement = TrackBuilderCore._best_giant_position(pref_idx, world_shape_size, StringName(footprint["kind"]), local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines)
-				if bool(placement.get("found", false)):
-					break
+			desired_size = TrackBuilderCore.PROP_SCALE.length_for(tex_path, TrackBuilderCore._prop_visual_size(tex_path, 300.0))
+			sprite_scale = desired_size / maxf(footprint_size.x, footprint_size.y)
+			visual_center_offset = ((footprint["center"] as Vector2) - Vector2(tex.get_width(), tex.get_height()) * 0.5) * sprite_scale
+			world_shape_size = footprint_size * sprite_scale
+			local_footprint_rotation = float(footprint["rotation"])
+			placement = TrackBuilderCore._best_giant_position(pref_idx, world_shape_size, StringName(footprint["kind"]), local_footprint_rotation, room_polygon, centerline, gate_samples, occupied, committed_racing_lines)
 			if bool(placement.get("found", false)):
 				break
 		if not bool(placement.get("found", false)) or tex == null:
@@ -714,7 +728,7 @@ static func build_giant_landmarks(
 
 static func room_dressing_assets(story: Dictionary, spec: Dictionary, reserved_unique_assets: Dictionary) -> Array[String]:
 	var assets: Array[String] = []
-	for asset_path: String in spec.get("island_fill_textures", []):
+	for asset_path: String in spec.get("ambient_props", []):
 		if not reserved_unique_assets.has(asset_path) and asset_path not in assets:
 			assets.append(asset_path)
 	for formation: Dictionary in story["island"]:
@@ -725,7 +739,7 @@ static func room_dressing_assets(story: Dictionary, spec: Dictionary, reserved_u
 		var asset_path := String(story[field]["asset"])
 		if asset_path not in assets:
 			assets.append(asset_path)
-	return assets
+	return TrackBuilderCore.PROP_SCALE.small_assets(assets)
 
 
 static func room_dressing_anchors(
@@ -820,16 +834,16 @@ static func build_room_ground_sections(
 		var visible_bounds := TrackBuilderCore._texture_opaque_rect(texture)
 		var source_size := texture.get_size()
 		var source_radius := visible_bounds.size.length() * 0.5 + visible_bounds.get_center().distance_to(source_size * 0.5)
-		var base_world_size := float(definition.get("size", 240.0)) * rng.randf_range(0.90, 1.08)
+		var base_world_size := TrackBuilderCore.PROP_SCALE.length_for(asset_path, float(definition.get("size", 240.0)))
 		var alpha := float(definition.get("alpha", 0.94))
 		var last_yield := Time.get_ticks_usec()
 		for attempt in 520:
 			if stage.is_valid() and Time.get_ticks_usec() - last_yield >= 6000:
 				await stage.call("Laying room materials")
 				last_yield = Time.get_ticks_usec()
-			var size_factor := lerpf(1.0, 0.6, float(attempt) / 519.0)
-			var world_size := base_world_size * size_factor
-			var footprint_radius := source_radius * world_size / maxf(source_size.x, source_size.y)
+			var world_size := base_world_size
+			var sprite_scale := TrackBuilderCore.PROP_SCALE.sprite_scale(texture, visible_bounds, world_size)
+			var footprint_radius := source_radius * sprite_scale
 			var candidate := Vector2(
 				rng.randf_range(bounds.position.x, bounds.end.x),
 				rng.randf_range(bounds.position.y, bounds.end.y)
@@ -857,8 +871,7 @@ static func build_room_ground_sections(
 			sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 			sprite.position = candidate
 			sprite.rotation = rng.randf_range(-PI, PI)
-			var longest := maxf(texture.get_width(), texture.get_height())
-			sprite.scale = Vector2.ONE * (world_size / maxf(longest, 1.0))
+			sprite.scale = Vector2.ONE * sprite_scale
 			sprite.modulate = Color(1.0, 1.0, 1.0, alpha)
 			sprite.z_index = -17
 			sprite.set_meta("asset_path", asset_path)
@@ -1197,4 +1210,3 @@ static func build_finish_moments(parent: Node2D, centerline: PackedVector2Array)
 	finish.set_meta("corridor_span", TrackBuilderCore.HALF_WIDTH * 2.0)
 	finish.set_meta("bidirectional_landmarks", true)
 	parent.add_child(finish)
-

@@ -547,7 +547,7 @@ static func add_planned_obstacle(parent: Node2D, data: Dictionary) -> void:
 	if texture == null:
 		return
 	var visual_size: Vector2 = data["visual_size"]
-	var sprite_scale := maxf(visual_size.x, visual_size.y) / maxf(texture.get_width(), texture.get_height())
+	var sprite_scale := TrackBuilderCore.PROP_SCALE.sprite_scale(texture, texture_opaque_rect(texture), maxf(visual_size.x, visual_size.y))
 	var shape_kind := StringName(data["footprint_kind"])
 	var offset := add_scaled_texture_collision(obstacle, texture, sprite_scale, shape_kind)
 	obstacle.set_meta("collision_footprint_size", data["footprint_size"])

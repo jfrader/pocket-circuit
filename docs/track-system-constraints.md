@@ -142,16 +142,20 @@ their original unscaled canvases.
   36 units beyond the 125-unit corridor edge; flat dressing may use the narrower
   visual margin. Ambient props, ground sections, and both detail layers stay
   inside the room and outside the protected route corridor and recovery lanes.
-- Every generated room places 1-3 giant household landmarks at 300-600 world
-  units. Every giant has scenery collision on layers 4 and 16; its collider uses
+- Every generated room places 1-3 household landmarks at their registered physical
+  size. Every landmark has scenery collision on layers 4 and 16; its collider uses
   at least 90% of the trimmed visible footprint and remains inside the room and
   clear of the corridor, gates, and other props. Giant placement additionally
   rejects any intersection with a 22-unit swept vehicle hull around the
   committed safe and shortcut racing lines.
-- Asset dimensions and collider kinds come from the explicit SOLID roster in
-  `PROP_SHAPES`; giant placement and collision use each texture's trimmed alpha
-  footprint. Generated story props must use transparent PNG textures, never
-  opaque JPG rectangles.
+- `data/world_prop_art.json` owns physical lengths and selected source artwork.
+  `WorldPropScale` uses one world unit per millimetre and trims transparent
+  padding before uniform scaling. Catalog SOLID contracts use those lengths
+  and alpha-derived hulls. All generated roles share the same size; no role
+  clamps, random giant inflation, or anisotropic rail stretching are allowed.
+  Tiny roles use physically small props. A focal or rail that cannot fit is
+  replaced from a theme-specific pool at its own size, never shrunk to fit.
+  Generated story props must use transparent PNG textures, never opaque JPG rectangles.
 - Trackside placement must remain clear of checkpoint recovery corridors:
   230 units along the route and 48 units across it, plus the prop radius.
 
@@ -228,27 +232,25 @@ line.
   decomposition.
 - Themed course rails are deliberately partial real assets. Eight deterministic
   sectors retain exactly one open run, at least four both-sided runs, and two or
-  three one-sided runs. Each edge remains represented in at least five sectors;
+  three one-sided runs. Each edge remains represented in at least four sectors,
+  with at least eleven occupied edge/sector pairs overall;
   a physically tight edge may move one requested run to the opposite safe side
   rather than violate the 36-unit apron clearance. The open run receives only
-  one flat non-colliding worn-floor hint. Kitchen mixes towel, spoon, chopstick,
-  and bread-board rails; Workshop mixes paint stirrer, dowel, clamp, and ruler
+  one flat non-colliding worn-floor hint. Kitchen mixes fork, spoon, chopstick,
+  and cork rails; Workshop mixes paint stirrer, dowel, clamp, ruler, and nail
   rails; Office mixes pencil, ruler, pen, and book-spine rails. Rail and corner-
   accent colliders validate their complete oriented footprint, not only their
-  center. An empty run means open drivable apron, never hidden collision.
+  center. Neighboring rail footprints do not overlap, and story placement
+  reserves the existing physical boundaries and posts. An empty run means open
+  drivable apron, never hidden collision.
 - Every ordered checkpoint `Area2D` is asymmetric: its inner endpoint stops at
   `HALF_WIDTH` or the raised island, while its outer endpoint reaches the room
   wall. Inner grass does not trip the gate, but legal outer-apron lines do. The
   checkpoint recovery anchor remains on the racing line. The finish checker
-  spans the complete nominal corridor, and its larger paired themed posts sit
+  spans the complete nominal corridor, and its paired physical-size themed posts sit
   symmetrically at the corridor ends so the same landmark reads in forward and
   reverse races. Other checkpoints use two small colliding themed posts without
   blocking the racing line.
-  remain corridor-sized visual landmarks. The finish checker spans the complete
-  nominal corridor, and its larger paired themed posts sit symmetrically at the
-  corridor ends so the same landmark reads in forward and reverse races. Other
-  checkpoints use two small colliding themed posts without blocking the racing
-  line.
 - All physical scenery uses the same upper-left key light: soft warm contact
   shadows offset down-right by 8-12% of the footprint, rectangular or circular
   to match the prop. Giants add a faint elongated down-right cast shadow.
