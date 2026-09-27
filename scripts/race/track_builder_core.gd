@@ -625,6 +625,10 @@ static func _bounded_quantity_count(quantity: StringName, requested: int) -> int
 	return TRACK_BUILDER_DRESSING.bounded_quantity_count(quantity, requested)
 
 
+static func _formation_assets(data: Dictionary) -> Array[String]:
+	return TRACK_BUILDER_DRESSING.formation_assets(data)
+
+
 static func _semantic_formation_offset(formation: StringName, index: int, count: int, radius: float) -> Vector2:
 	return TRACK_BUILDER_DRESSING.semantic_formation_offset(formation, index, count, radius)
 
