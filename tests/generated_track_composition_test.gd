@@ -7,7 +7,7 @@ const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 const ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"square"]
 const SIGNATURE_ASSETS := {
 	&"kitchen": "res://assets/textures/giant_props/giant_toaster.png",
-	&"workshop": "res://assets/textures/workshop_hero/hero_workshop_toolbox.png",
+	&"workshop": "res://assets/textures/workshop_hero/hero_workshop_paint_can.png",
 	&"office": "res://assets/textures/office_hero/hero_office_keyboard.png",
 }
 
@@ -64,7 +64,7 @@ func _run_test() -> void:
 		return
 	if not _check_legacy_builder_scale():
 		return
-	print("GENERATED_TRACK_COMPOSITION_TEST PASS builds=%d stories=12 surfaces=24+ gate_spans=%.1f..%.1f density floor60-120 edge60-150 giants1-3" % [_built_count, _minimum_gate_span, _maximum_gate_span])
+	print("GENERATED_TRACK_COMPOSITION_TEST PASS builds=%d stories=12 surfaces=24+ gate_spans=%.1f..%.1f density floor18-30 edge24-40 giants1-3" % [_built_count, _minimum_gate_span, _maximum_gate_span])
 	quit(0)
 
 
@@ -712,7 +712,7 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 
 	var edge_decor := track.get_node_or_null("GeneratedMoments/EdgeApronDecor")
 	var edge_count := int(edge_decor.get_meta("placed_count", 0)) if edge_decor else 0
-	if not _expect(edge_decor != null and edge_count >= 60 and edge_count <= 150 and edge_decor.get_child_count() == edge_count, "%s should place 60-150 classified edge and apron details (got %d)" % [label, edge_count]):
+	if not _expect(edge_decor != null and edge_count >= 24 and edge_count <= 40 and edge_decor.get_child_count() == edge_count, "%s should place 24-40 classified edge and apron details (got %d)" % [label, edge_count]):
 		return false
 	for decor: Node in edge_decor.get_children():
 		var sprite := decor as Sprite2D if decor is Sprite2D else decor.get_node_or_null("Sprite") as Sprite2D
@@ -802,7 +802,7 @@ func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
 		if not _expect(pocket_placed >= 2 and pocket_placed <= 3, "%s seed %d ambient pockets should preserve the semantic few quantity (got %d)" % [theme, seed, pocket_placed]):
 			return false
 	var details := dressing.get_node_or_null("FloorDetails")
-	if not _expect(details != null and details.get_child_count() == decal_count and decal_count >= 60, "%s seed %d should add 60-120 off-track floor details for visual density (got %d)" % [theme, seed, decal_count]):
+	if not _expect(details != null and details.get_child_count() == decal_count and decal_count >= 18 and decal_count <= 30, "%s seed %d should add 18-30 off-track floor details for visual hierarchy (got %d)" % [theme, seed, decal_count]):
 		return false
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
 	var room_shape := StringName(track.get_meta("room_shape", &"classic"))

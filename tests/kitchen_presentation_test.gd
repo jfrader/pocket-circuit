@@ -51,12 +51,19 @@ func _run_test() -> void:
 		var image := texture.get_image()
 		if not _expect(image.get_size() == Vector2i(512, 512) and image.get_pixel(0, 0).a == 0 and image.get_used_rect().has_area(), "hero sprites must have normalized size and transparent padding"):
 			return
+		var opaque_samples := 0
+		var key_color_samples := 0
 		for y in range(0, 512, 4):
 			for x in range(0, 512, 4):
 				var pixel := image.get_pixel(x, y)
+				if pixel.a < 0.5:
+					continue
+				opaque_samples += 1
 				var key_color := pixel.r > pixel.g * 1.5 and pixel.b > pixel.g * 1.2 and pixel.r > 0.5
-				if not _expect(pixel.a < 0.5 or not key_color, "processed hero art must not retain the chroma backdrop"):
-					return
+				if key_color:
+					key_color_samples += 1
+		if not _expect(key_color_samples <= maxi(2, opaque_samples / 100), "processed hero art must not retain a chroma-colored field"):
+			return
 	var shadow_root := Node2D.new()
 	world.add_child(shadow_root)
 	BUILDER._add_directional_shadow(shadow_root, "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", 160.0)

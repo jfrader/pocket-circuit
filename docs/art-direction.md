@@ -4,8 +4,8 @@
 
 A hand-illustrated Saturday-morning cartoon household where chunky toy cars
 race through oversized friendly objects under soft cel-shaded light, with a
-readable material track, strong inked silhouettes, warm surfaces, and dense
-small details that sell the miniature scale.
+readable material track, consistent inked silhouettes, warm surfaces, and
+selective small details that sell the miniature scale.
 
 This is a top-down 2D game. Visuals must read while rotating at speed and at
 roughly 32-55 pixels on screen. Everything is original; no protected vehicle,
@@ -47,8 +47,11 @@ rooms, route geometry, palette, interface, and story.
 
 - Cars are rounded and chunky, with exaggerated wheels, a strong roof/hood
   read, large windows, and three or four clear color masses.
-- Major silhouettes use closed dark outlines. Hero assets use thicker outlines
-  than dressing assets.
+- Every raised prop uses the same three-pixel closed contour on its normalized
+  512-pixel sprite. Scale and silhouette, not a different border weight,
+  distinguish hero landmarks from dressing assets.
+- Every generated prop receives the same prefilter, palette quantization, and
+  small-region cleanup. Keep only details that read at race scale.
 - One upper-left key light governs the whole race scene. Highlights use warm
   cream rather than pure white; every vehicle, prop, obstacle, and landmark
   shadow falls down and right with a soft warm dark-brown tint. Rectangular
@@ -92,8 +95,8 @@ rooms, route geometry, palette, interface, and story.
 ### Generated Room Density
 
 - Generated rooms layer density by scale: 1-3 giant household landmarks,
-  authored story clusters, 2-4 broad ground anchors, 60-120 low-contrast floor
-  details, and 60-150 tiny edge/apron details. Painted/material micro details
+  authored story clusters, 2-4 broad ground anchors, 18-30 low-contrast floor
+  details, and 24-40 tiny edge/apron details. Painted/material micro details
   are non-colliding; raised rails and recognizable loose props use
   silhouette-matched collision.
 - Edge details remain outside the drivable area and recovery lanes while sitting
@@ -167,9 +170,9 @@ fibers, hardware, worn-floor hints, and subtle material patterning, and from
 
 ### Generated Giant Landmarks
 
-- Kitchen: cereal box, mug, watermelon, fork, toaster, and milk carton.
-- Workshop: basketball, toolbox, paint can, watermelon, hammer, and wrench.
-- Office: keyboard, monitor, paper stack, pen, stapler, and mouse.
+- Kitchen: mug, plate stack, tea board, watermelon, fork, and toaster.
+- Workshop: paint can, wrench, tape, and hose coil.
+- Office: keyboard, notebook, monitor, paper stack, pen, and mouse.
 - These original top-down sprites live in `assets/textures/giant_props/`.
   One world unit represents one millimetre; a prop keeps its size in every role.
   The manifest is measured against trimmed alpha bounds, not the padded canvas.

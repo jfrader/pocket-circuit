@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Changed
-- Kitchen, Workshop, and Office use one smooth cel-illustrated 2D tabletop kit with varied utensils, tools, stationery, rulers, corks, biscuits, ceramics, wood, stone, fabric, paper, and surface spills. Props keep their real relative sizes across track roles: small spaces use corks, biscuits, screws, or erasers instead of shrunken appliances and utensils. Repeated formations cycle through prop families, and trackside objects no longer stretch into identical rails or overlap their neighbors. Cars are unchanged.
+- Kitchen, Workshop, and Office use one smooth top-down cel-illustrated tabletop kit with a shared palette, contour, lighting treatment, and restrained detail. Props keep their real relative sizes across track roles: small spaces use biscuits, washers, clips, or erasers instead of shrunken appliances and utensils. Each room uses a deliberate family of utensils, tools, or stationery, while reduced floor and edge clutter keeps the racing line readable. Cars are unchanged.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 

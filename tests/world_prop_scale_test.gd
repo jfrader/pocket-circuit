@@ -2,6 +2,23 @@ extends SceneTree
 
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const SCALE := preload("res://scripts/race/world_prop_scale.gd")
+const EXCLUDED_RUNTIME_ASSETS := [
+	"res://assets/textures/imagine/salt_shaker.png",
+	"res://assets/textures/imagine/barrel_wood.png",
+	"res://assets/textures/imagine/hammer.png",
+	"res://assets/textures/imagine/screwdriver.png",
+	"res://assets/textures/imagine/lamp_desk.png",
+	"res://assets/textures/imagine/stapler_top.png",
+	"res://assets/textures/imagine/office_keycap.png",
+	"res://assets/textures/workshop_hero/hero_workshop_toolbox.png",
+	"res://assets/textures/office_hero/hero_office_keycap.png",
+	"res://assets/textures/giant_props/giant_cereal_box.png",
+	"res://assets/textures/giant_props/giant_milk_carton.png",
+	"res://assets/textures/giant_props/giant_toolbox.png",
+	"res://assets/textures/giant_props/giant_hammer.png",
+	"res://assets/textures/giant_props/giant_stapler.png",
+	"res://assets/textures/tabletop/cork_cylinder.png",
+]
 var _checked := 0
 
 
@@ -37,15 +54,26 @@ func _run() -> void:
 	for theme: StringName in [&"kitchen", &"workshop", &"office"]:
 		var layout: Dictionary = BUILDER.LAYOUTS[theme]
 		var boundary: Dictionary = layout["generated_boundary"]
-		if not _expect((layout["ambient_props"] as Array).size() >= 8 and (boundary["sections"] as Array).size() >= 8, "%s dressing and boundaries must draw from broad prop families" % theme):
+		if not _expect((layout["ambient_props"] as Array).size() >= 4 and (boundary["sections"] as Array).size() >= 4, "%s dressing and boundaries must draw from a deliberate prop family" % theme):
 			return
 		for story: Dictionary in BUILDER.ROOM_COMPOSITIONS[theme]:
 			var object_line: Dictionary = story["object_line"]
 			var delimiter: Dictionary = story["delimiter"]
 			if not _expect((object_line.get("assets", []) as Array).size() >= 3 and (delimiter.get("assets", []) as Array).size() >= 3, "every %s story must vary repeated trackside props" % theme):
 				return
-	for sample_path: String in ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/workshop_hero/hero_workshop_toolbox.png", "res://assets/textures/office_hero/hero_office_keyboard.png"]:
-		if not _expect(_is_rich_cel_sprite(sample_path), "cel-illustrated sprites must keep anti-aliased edges and material color depth: " + sample_path):
+		var active_assets := {}
+		_collect_asset_paths(layout, active_assets)
+		_collect_asset_paths(BUILDER.ROOM_COMPOSITIONS[theme], active_assets)
+		_collect_asset_paths(BUILDER.ISLAND_VIGNETTES[theme], active_assets)
+		for excluded_path: String in EXCLUDED_RUNTIME_ASSETS:
+			if not _expect(not active_assets.has(excluded_path), "%s runtime composition must exclude mismatched perspective asset %s" % [theme, excluded_path.get_file()]):
+				return
+		if theme != &"kitchen":
+			for active_path: String in active_assets:
+				if not _expect("/kitchen/" not in active_path and "/kitchen_hero/" not in active_path, "%s runtime composition must not borrow Kitchen-specific art: %s" % [theme, active_path.get_file()]):
+					return
+	for sample_path: String in ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/workshop_hero/hero_workshop_paint_can.png", "res://assets/textures/office_hero/hero_office_keyboard.png"]:
+		if not _expect(_uses_shared_cel_contract(sample_path), "cel-illustrated sprites must keep anti-aliased edges and the shared controlled palette: " + sample_path):
 			return
 	for sample: Array in [[&"kitchen", &"classic", 0], [&"kitchen", &"tall", 1], [&"workshop", &"square", 51940], [&"office", &"el", 7]]:
 		var packed: PackedScene = BUILDER.build_packed(sample[0], sample[1], sample[2])["scene"]
@@ -90,8 +118,10 @@ func _run() -> void:
 	quit(0)
 
 
-func _is_rich_cel_sprite(path: String) -> bool:
-	var image := (load(path) as Texture2D).get_image()
+func _uses_shared_cel_contract(path: String) -> bool:
+	var image := Image.new()
+	if image.load_png_from_buffer(FileAccess.get_file_as_bytes(path)) != OK:
+		return false
 	image.convert(Image.FORMAT_RGBA8)
 	var data := image.get_data()
 	var colors := {}
@@ -100,9 +130,22 @@ func _is_rich_cel_sprite(path: String) -> bool:
 		var alpha := data[index + 3]
 		if alpha > 0 and alpha < 255:
 			has_soft_edge = true
-		if alpha >= 128 and colors.size() <= 24:
+		if alpha == 255 and colors.size() <= 128:
 			colors[Vector3i(data[index], data[index + 1], data[index + 2])] = true
-	return has_soft_edge and colors.size() > 24
+	return has_soft_edge and colors.size() >= 8 and colors.size() <= 128
+
+
+func _collect_asset_paths(value: Variant, paths: Dictionary) -> void:
+	if value is String:
+		var path := value as String
+		if path.begins_with("res://assets/"):
+			paths[path] = true
+	elif value is Array:
+		for item: Variant in value:
+			_collect_asset_paths(item, paths)
+	elif value is Dictionary:
+		for item: Variant in (value as Dictionary).values():
+			_collect_asset_paths(item, paths)
 
 
 func _expect(condition: bool, message: String) -> bool:
