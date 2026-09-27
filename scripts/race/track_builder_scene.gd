@@ -2,7 +2,7 @@ class_name TrackBuilderScene
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
 
-static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable()) -> void:
+static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), environment_composer: Callable = Callable()) -> void:
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
@@ -158,12 +158,17 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		await stage.call("Building trackside scenery")
 
 	if spec.get("seed_obstacles", false):
-		TrackBuilderCore._build_generated_outer_boundary_visuals(root, spec, centerline, inner_loop, outer_boundary, room_polygon, generated_moments)
-		if stage.is_valid():
-			await stage.call("Placing landmarks")
-		await TrackBuilderCore._compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments, stage)
-		TrackBuilderCore._build_generated_obstacles(root, spec)
 		TrackBuilderCore._seal_pockets(root, spec, centerline, room_polygon)
+		if stage.is_valid():
+			await stage.call("Building trackside scenery")
+		if environment_composer.is_valid():
+			await environment_composer.call(root, stage)
+		else:
+			TrackBuilderCore._build_generated_outer_boundary_visuals(root, spec, centerline, inner_loop, outer_boundary, room_polygon, generated_moments)
+			if stage.is_valid():
+				await stage.call("Placing landmarks")
+			await TrackBuilderCore._compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments, stage)
+			TrackBuilderCore._build_generated_obstacles(root, spec)
 	else:
 		# Canonical/static tracks retain their authored legacy dressing.
 		TrackBuilderCore._fill_island(root, spec, inner_loop, centerline)

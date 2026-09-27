@@ -4,11 +4,10 @@ extends Node2D
 const MANIFEST_PATH := "res://tools/environment_pilot.json"
 const TEXTURES := "res://assets/textures/environment_pilot/"
 const VEHICLE := preload("res://scenes/vehicles/rustbug.tscn")
+const PROPS := preload("res://tools/environment_pilot_props.gd")
 const THEMES := ["kitchen", "workshop", "office"]
 const FLOOR_EXTENT := 2000.0
 const FLOOR_PERIOD := 700.0
-const ALPHA_THRESHOLD := 0.5
-const OUTLINE_EPSILON := 1.0
 const REVIEW_CENTER := Vector2(0, 35)
 
 var manifest: Dictionary = JSON.parse_string(FileAccess.get_file_as_string(MANIFEST_PATH))
@@ -20,7 +19,7 @@ var vehicle: VehicleController
 var route_points := PackedVector2Array()
 var placement_metrics: Array[Dictionary] = []
 var follow_vehicle := false
-var runtime_fps := 0
+var runtime_fps := 0.0
 
 
 func _ready() -> void:
@@ -129,50 +128,7 @@ func _material_uv(points: PackedVector2Array, texture: Texture2D) -> PackedVecto
 
 
 func _add_prop(asset: Dictionary, placement: Dictionary) -> void:
-	var role: Dictionary = manifest["roles"][placement["role"]]
-	var texture := load(TEXTURES + theme + "_" + String(asset["name"]) + ".png") as Texture2D
-	var bitmap := BitMap.new()
-	bitmap.create_from_image_alpha(texture.get_image(), ALPHA_THRESHOLD)
-	var outlines := bitmap.opaque_to_polygons(Rect2i(Vector2i.ZERO, texture.get_size()), OUTLINE_EPSILON)
-	var bounds := Rect2()
-	for outline: PackedVector2Array in outlines:
-		for point: Vector2 in outline:
-			bounds = Rect2(point, Vector2.ZERO) if bounds == Rect2() else bounds.expand(point)
-	var physical_scale := float(asset["length_mm"]) * float(manifest["units_per_mm"]) / maxf(bounds.size.x, bounds.size.y)
-	var body := StaticBody2D.new()
-	body.name = String(asset["name"]).to_pascal_case() + str(placement_metrics.size())
-	body.position = _vector(placement["position"])
-	body.rotation = float(placement["rotation"])
-	body.collision_layer = 2
-	body.collision_mask = 1
-	world.add_child(body)
-	var shadow := Sprite2D.new()
-	shadow.name = "ContactShadow"
-	shadow.texture = texture
-	shadow.scale = Vector2.ONE * physical_scale
-	shadow.position = _vector(role["shadow_offset"]).rotated(-body.rotation)
-	shadow.modulate = Color(manifest["shadow_color"])
-	shadow.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	body.add_child(shadow)
-	var sprite := Sprite2D.new()
-	sprite.name = "Sprite"
-	sprite.texture = texture
-	sprite.scale = Vector2.ONE * physical_scale
-	sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	body.add_child(sprite)
-	var world_outlines: Array[PackedVector2Array] = []
-	for outline: PackedVector2Array in outlines:
-		var local_points := PackedVector2Array()
-		var global_points := PackedVector2Array()
-		for point: Vector2 in outline:
-			var local_point := (point - texture.get_size() * 0.5) * physical_scale
-			local_points.append(local_point)
-			global_points.append(body.to_global(local_point))
-		var collision := CollisionPolygon2D.new()
-		collision.polygon = local_points
-		body.add_child(collision)
-		world_outlines.append(global_points)
-	placement_metrics.append({"role": placement["role"], "length_mm": asset["length_mm"], "outlines": world_outlines, "body": body})
+	placement_metrics.append(PROPS.add(world, manifest, theme, asset, placement))
 
 
 func _vector(value: Array) -> Vector2:

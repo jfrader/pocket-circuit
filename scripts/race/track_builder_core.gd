@@ -324,8 +324,8 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 	return root
 
 
-static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable) -> void:
-	await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage)
+static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable, environment_composer: Callable = Callable()) -> void:
+	await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage, environment_composer)
 
 
 static func _sample_centerline(controls: Variant) -> PackedVector2Array:
@@ -341,8 +341,8 @@ static func _sample_centerline(controls: Variant) -> PackedVector2Array:
 static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
 	return TRACK_BUILDER_GEOMETRY.corridor_edges(centerline)
 
-static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable()) -> void:
-	await TRACK_BUILDER_SCENE.build(root, spec, centerline, edges, room_polygon, theme, stage)
+static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), environment_composer: Callable = Callable()) -> void:
+	await TRACK_BUILDER_SCENE.build(root, spec, centerline, edges, room_polygon, theme, stage, environment_composer)
 
 
 
