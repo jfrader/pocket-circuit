@@ -1,0 +1,87 @@
+{
+  "contract": "overhead_gouache_pilot_v1",
+  "status": "awaiting_native_review",
+  "source_model": "grok-imagine-image-2.0",
+  "units_per_mm": 1.0,
+  "viewport": [1280, 720],
+  "zoom": 1.12,
+  "route_width_mm": 220,
+  "route_clearance_mm": 18,
+  "shadow_color": "3f322840",
+  "roles": {
+    "hero": {"weight": 3, "detail": "broad", "max_count": 1, "zone": "focal", "collision": "alpha", "shadow_offset": [5, 7]},
+    "medium": {"weight": 2, "detail": "broad", "max_count": 2, "zone": "support", "collision": "alpha", "shadow_offset": [3, 4]},
+    "micro": {"weight": 1, "detail": "silhouette", "max_count": 4, "zone": "support", "collision": "alpha", "shadow_offset": [1, 1]},
+    "boundary": {"weight": 1, "detail": "broad", "max_count": 3, "zone": "edge", "collision": "alpha", "shadow_offset": [2, 3]}
+  },
+  "themes": {
+    "kitchen": {
+      "story": "Tea before the race",
+      "floor_source": "kitchen-floor.jpg",
+      "route_tint": "d9c6a7",
+      "route": [[-760, 125], [-400, 125], [-30, 145], [310, 140], [465, -50], [470, -480]],
+      "car": [-290, 143],
+      "assets": {
+        "hero": {"name": "teapot", "source": "kitchen-props.jpg", "crop": [45, 160, 507, 490], "length_mm": 260},
+        "medium": {"name": "coffee_cup", "source": "kitchen-cup.jpg", "crop": [90, 120, 995, 900], "length_mm": 120},
+        "micro": {"name": "sugar_cube", "source": "kitchen-props.jpg", "crop": [180, 620, 380, 820], "length_mm": 16},
+        "boundary": {"name": "butter_knife", "source": "kitchen-props.jpg", "crop": [510, 635, 995, 825], "length_mm": 180}
+      },
+      "placements": [
+        {"role": "hero", "position": [-90, -90], "rotation": 0},
+        {"role": "medium", "position": [140, -73], "rotation": 0},
+        {"role": "micro", "position": [206, -43], "rotation": 0.15},
+        {"role": "micro", "position": [228, -51], "rotation": -0.13},
+        {"role": "micro", "position": [218, -23], "rotation": 0.32},
+        {"role": "boundary", "position": [-365, -24], "rotation": 0},
+        {"role": "boundary", "position": [-120, 299], "rotation": 0.05},
+        {"role": "boundary", "position": [218, 301], "rotation": -0.14}
+      ]
+    },
+    "workshop": {
+      "story": "Fresh coat",
+      "floor_source": "workshop-floor-2.jpg",
+      "route_tint": "9ca89c",
+      "route": [[-760, 165], [-370, 165], [30, 168], [360, 80], [465, -130], [460, -500]],
+      "car": [-270, 171],
+      "assets": {
+        "hero": {"name": "toolbox", "source": "workshop-precision.jpg", "crop": [205, 170, 815, 550], "length_mm": 400},
+        "medium": {"name": "paint_tin", "source": "workshop-props.jpg", "crop": [550, 125, 935, 495], "length_mm": 165},
+        "micro": {"name": "washer", "source": "workshop-props.jpg", "crop": [130, 575, 415, 865], "length_mm": 22},
+        "boundary": {"name": "paint_stirrer", "source": "workshop-precision.jpg", "crop": [160, 675, 865, 815], "length_mm": 250}
+      },
+      "placements": [
+        {"role": "hero", "position": [-178, -135], "rotation": 0},
+        {"role": "medium", "position": [166, -70], "rotation": 0},
+        {"role": "micro", "position": [63, -39], "rotation": 0},
+        {"role": "micro", "position": [54, -8], "rotation": 0},
+        {"role": "micro", "position": [85, 10], "rotation": 0},
+        {"role": "boundary", "position": [192, -234], "rotation": -0.12},
+        {"role": "boundary", "position": [-248, 330], "rotation": 0},
+        {"role": "boundary", "position": [135, 314], "rotation": -0.12}
+      ]
+    },
+    "office": {
+      "story": "Last page before midnight",
+      "floor_source": "office-floor-2.jpg",
+      "route_tint": "bcc8d2",
+      "route": [[-760, 150], [-400, 150], [0, 153], [300, 158], [462, -35], [465, -480]],
+      "car": [-270, 170],
+      "assets": {
+        "hero": {"name": "keyboard", "source": "office-precision.jpg", "crop": [60, 160, 970, 560], "length_mm": 440},
+        "medium": {"name": "mouse", "source": "office-props.jpg", "crop": [625, 115, 895, 475], "length_mm": 110},
+        "micro": {"name": "paperclip", "source": "office-props.jpg", "crop": [165, 545, 335, 875], "length_mm": 32},
+        "boundary": {"name": "pencil", "source": "office-precision.jpg", "crop": [60, 705, 965, 810], "length_mm": 180}
+      },
+      "placements": [
+        {"role": "hero", "position": [-153, -102], "rotation": 0},
+        {"role": "medium", "position": [174, -90], "rotation": -0.1},
+        {"role": "micro", "position": [132, -7], "rotation": 0.2},
+        {"role": "micro", "position": [169, -1], "rotation": -0.3},
+        {"role": "boundary", "position": [-110, 301], "rotation": 0},
+        {"role": "boundary", "position": [208, 320], "rotation": -0.12},
+        {"role": "boundary", "position": [160, -231], "rotation": 0.04}
+      ]
+    }
+  }
+}
