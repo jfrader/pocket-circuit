@@ -4,7 +4,7 @@ from io import BytesIO
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import Image, ImageFilter, ImageOps
 from scipy import ndimage
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,10 +46,10 @@ def cell(image: Image.Image, index: int, columns: int = 4) -> Image.Image:
                        (x + 1) * image.width // columns, (y + 1) * image.height // columns))
 
 
-def transparent_sprite(image: Image.Image, clean_fragments: bool = True) -> Image.Image:
-    rgb = np.asarray(image.convert('RGB'), dtype=np.float32)
+def transparent_sprite(image: Image.Image, clean_fragments: bool = True, style: str = 'hard_pixel') -> Image.Image:
+    rgb = np.asarray(image.convert('RGB'), dtype=np.uint8)
     hsv = np.asarray(image.convert('HSV'))
-    r, g, b = rgb.transpose(2, 0, 1)
+    r, g, b = rgb.astype(np.float32).transpose(2, 0, 1)
     # Remove the keyed field (including enclosed holes) rather than treating
     # only the border as background. Cream/steel and red enamel stay intact.
     key = (hsv[:, :, 0] > 211) & (hsv[:, :, 0] < 250) & (r > g * 1.13) & (b > g * 0.92)
@@ -59,7 +59,31 @@ def transparent_sprite(image: Image.Image, clean_fragments: bool = True) -> Imag
         areas = np.bincount(labels.ravel())
         areas[0] = 0
         alpha[areas[labels] < max(12, areas.max() * 0.04)] = 0
-    rgba = np.dstack((rgb.astype(np.uint8), alpha))
+    if style == 'painted':
+        foreground = alpha > 0
+        _, nearest = ndimage.distance_transform_edt(~foreground, return_indices=True)
+        filled_rgb = rgb.copy()
+        filled_rgb[~foreground] = filled_rgb[nearest[0][~foreground], nearest[1][~foreground]]
+        edge_band = foreground & ndimage.binary_dilation(~foreground, iterations=6)
+        interior = foreground & ~edge_band
+        if interior.any():
+            _, nearest_interior = ndimage.distance_transform_edt(~interior, return_indices=True)
+            filled_rgb[edge_band] = filled_rgb[nearest_interior[0][edge_band], nearest_interior[1][edge_band]]
+        soft_alpha = Image.fromarray(alpha).filter(ImageFilter.GaussianBlur(0.7))
+        rgba = np.dstack((filled_rgb, np.asarray(soft_alpha)))
+        result = Image.fromarray(rgba)
+        bounds = Image.fromarray(alpha).getbbox()
+        if bounds is None:
+            raise ValueError('Empty keyed sprite')
+        result = result.crop(bounds)
+        scale = CONTENT / max(result.size)
+        painted_size = (max(1, round(result.width * scale)), max(1, round(result.height * scale)))
+        result = result.resize(painted_size, Image.Resampling.LANCZOS)
+        canvas = Image.new('RGBA', (CANVAS, CANVAS))
+        canvas.alpha_composite(result, ((CANVAS-result.width)//2, (CANVAS-result.height)//2))
+        return canvas
+
+    rgba = np.dstack((rgb, alpha))
     result = Image.fromarray(rgba)
     bounds = result.getbbox()
     if bounds is None:
@@ -78,14 +102,16 @@ def transparent_sprite(image: Image.Image, clean_fragments: bool = True) -> Imag
     return canvas
 
 
-def repeating_material(image: Image.Image) -> Image.Image:
+def repeating_material(image: Image.Image, style: str = 'hard_pixel') -> Image.Image:
     # Mirrored quadrants give exact wrap continuity without a blurred seam or
     # baking light direction into an albedo tile.
     inset = max(2, round(min(image.size) * 0.035))
     image = image.crop((inset, inset, image.width-inset, image.height-inset))
-    image = image.convert('RGB').resize((64, 64), Image.Resampling.LANCZOS)
-    image = image.quantize(colors=SPRITE_COLORS, method=Image.Quantize.MEDIANCUT).convert('RGB')
-    image = image.resize((256, 256), Image.Resampling.NEAREST)
+    source_size = 256 if style == 'painted' else 64
+    image = image.convert('RGB').resize((source_size, source_size), Image.Resampling.LANCZOS)
+    if style != 'painted':
+        image = image.quantize(colors=SPRITE_COLORS, method=Image.Quantize.MEDIANCUT).convert('RGB')
+        image = image.resize((256, 256), Image.Resampling.NEAREST)
     result = Image.new('RGB', (512, 512))
     result.paste(image, (0, 0))
     result.paste(ImageOps.mirror(image), (256, 0))
@@ -94,8 +120,8 @@ def repeating_material(image: Image.Image) -> Image.Image:
     return result
 
 
-def apply_finish(image: Image.Image, finish: str) -> Image.Image:
-    if finish != 'matte_metal':
+def apply_finish(image: Image.Image, finish: str, style: str) -> Image.Image:
+    if finish != 'matte_metal' or style == 'painted':
         return image
     pixels = np.asarray(image.convert('RGBA')).copy()
     rgb = pixels[:, :, :3]
@@ -123,15 +149,17 @@ def main() -> None:
     sheets = {entry['sheet']: Image.open(SOURCE / entry['sheet']) for entry in definitions}
     count = 0
     for entry in definitions:
-        sprite = transparent_sprite(cell(sheets[entry['sheet']], entry['cell'], entry.get('columns', 4)))
-        sprite = apply_finish(sprite, entry.get('finish', ''))
+        style = entry.get('style', 'hard_pixel')
+        sprite = transparent_sprite(cell(sheets[entry['sheet']], entry['cell'], entry.get('columns', 4)), style=style)
+        sprite = apply_finish(sprite, entry.get('finish', ''), style)
         for output in entry['outputs']:
             path = TEXTURES / output
             save_png(sprite, path)
             count += 1
     materials = Image.open(SOURCE / 'materials-kit.jpg')
     for index, name in enumerate(MATERIALS):
-        save_png(repeating_material(cell(materials, index)), TEXTURES / 'world_materials' / f'{name}.png')
+        style = 'painted' if name.startswith('kitchen_') else 'hard_pixel'
+        save_png(repeating_material(cell(materials, index), style), TEXTURES / 'world_materials' / f'{name}.png')
     decals = Image.open(SOURCE / 'surface-details.png')
     for index, outputs in enumerate(DECALS):
         sprite = transparent_sprite(cell(decals, index), clean_fragments=False)

@@ -112,11 +112,17 @@ rooms, route geometry, palette, interface, and story.
 
 ## Asset Plan
 
-Environment sprites use the same hard-pixel language as the 48x64 cars: stepped
-silhouettes, a dark outline, a compact palette, and discrete value blocks.
-Source-sheet realism is intentionally reduced through a 96px/twelve-color
-intermediate. Textures are unlit albedo; polished metal and glass do not bake in
-room reflections or glossy streaks. Future runtime lighting may add those cues.
+Environment sprites use a true 2D hand-painted language: smooth anti-aliased
+silhouettes, warm gouache-like color, tight contact shadows, and controlled
+directional shading. Wood, ceramic, matte metal, cloth, cork, paper, and food
+need distinct surface treatment without becoming photorealistic or reading as a
+3D render. Textures do not bake in room reflections or glossy streaks.
+
+Repeated roles use prop families rather than one stamped sprite. Boundary runs
+mix related utensils, rulers, sticks, corks, and hardware; ambient clusters mix
+silhouettes, colors, patterns, wear, and material variants. Purposeful clutter
+that explains the route stays dense. Unstructured micro-speckle is subordinate
+to the track and never substitutes for recognizable household objects.
 
 ### Hero Landmarks
 
@@ -188,8 +194,9 @@ fibers, hardware, worn-floor hints, and subtle material patterning, and from
   only by a flat worn-floor hint. Each side receives accents in at least four
   of eight sectors, with at least eleven occupied edge/sector pairs overall.
 - Partial rail sprites are the physical boundary wherever they appear; their
-  colliders fit inside their visible footprints. Kitchen mixes fork,
-  spoon, chopstick, and cork rails; Workshop mixes paint stirrer, dowel,
+  colliders fit inside their visible footprints. Kitchen mixes several forks,
+  spoons, rulers, craft sticks, chopsticks, butter knives, and cork rails;
+  Workshop mixes paint stirrer, dowel,
   clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
   Nails and erasers replace long rails where necessary. Sponge, tape, and
   sticky-note corner accents remain rare. Neighboring rail footprints do not overlap.
