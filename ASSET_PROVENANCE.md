@@ -37,22 +37,23 @@ illustrated mockup were used as references. Selected source sheets live in
 `assets/source/track-art/`; that directory remains excluded from exports.
 The prep tool uses Pillow, NumPy, and SciPy for chroma removal, disconnected
 artifact cleanup, edge decontamination, 512px normalization, and seamless
-mirrored material tiles. The selected cel pass keeps anti-aliased silhouettes,
-posterizes sprites and materials to controlled color bands, and adds a smooth
-dark contour without reducing artwork to stepped pixels. The earlier hard-pixel
-and softer hand-painted pilots were rejected and are not shipped outputs.
-The manifest records each selected cell and its physical dimension. Rejected
-front-facing toolbox, paint-can, bucket, barrel, mug, and cereal candidates
-are not selected by the manifest. The serving tray is empty so baked-in
-miniature cups cannot contradict the runtime prop scale. This is a review
-candidate, not operator release approval. Cars, portraits, and HUD assets are
-unchanged by this pass.
+mirrored material tiles. Every generated prop receives the same source
+prefilter, shared cel palette, small-region cleanup, anti-aliased silhouette,
+and three-pixel dark contour. The earlier hard-pixel and softer hand-painted
+pilots were rejected and are not the active treatment.
+The manifest records each prepared cell and its physical dimension. Runtime
+composition selects the coherent top-down families and excludes the
+front-facing toolbox, fasteners, stapler, keycap, lamp, cereal-box, and
+milk-carton alternatives. The serving tray is empty so baked-in miniature cups
+cannot contradict the runtime prop scale. This is a review candidate, not
+operator release approval. Cars, portraits, and HUD assets are unchanged by
+this pass.
 
 | Paths or content | Production method | Release status |
 |---|---|---|
 | `assets/textures/world_materials/*.png` | Selected from the original Imagine `materials-kit.jpg` atlas and prepared as wrap-continuous cel-illustrated albedo tiles by `tools/prepare_track_art.py`. The twelve room-story families and twenty-four palette variants remain data-driven. | Track-art candidate; operator review pending |
-| `assets/textures/kitchen_hero/hero_kitchen_*.png` | Text-only xAI `grok-imagine-image-quality` generation authorized for GURI-642, followed by hue-key removal, one-pixel edge cleanup and consistent 512px canvases with `tools/prepare_world_hero.py`. Selected sources are `mug.jpg`, `plate_stack.jpg`, and `tea_board_topdown.jpg` under `assets/source/kitchen_hero`. The first `tea_board.jpg` was rejected for perspective and is not used. All raw sources are excluded from exports. | Kitchen direction accepted; final package review pending |
-| `assets/textures/workshop_hero/*.png`, `assets/textures/office_hero/*.png` | Prepared with `tools/prepare_world_hero.py`. Wrench, paint can, keyboard and keycap reuse existing project artwork with explicit crop/alpha processing. The closed parts-container and notebook use operator-authorized text-only `grok-imagine-image-quality` sources (`assets/source/workshop_hero/parts_tin.jpg`, `assets/source/office_hero/notebook.jpg`). `closed_case.jpg` was rejected for its protruding handle. The script records selected crops and preserves dark foreground details during background-connected keying. | Expanded world candidate; operator review pending |
+| `assets/textures/kitchen_hero/hero_kitchen_*.png` | Text-only xAI `grok-imagine-image-quality` generation authorized for GURI-642. Selected sources are `mug.jpg`, `plate_stack.jpg`, and `tea_board_topdown.jpg` under `assets/source/kitchen_hero`; the first angled `tea_board.jpg` is not used. `tools/prepare_track_art.py` applies the shared track-art palette, cleanup, contour, and 512px normalization. All raw sources are excluded from exports. | Kitchen direction candidate; final package review pending |
+| `assets/textures/workshop_hero/*.png`, `assets/textures/office_hero/*.png` | Wrench, paint can, keyboard and keycap reuse existing project artwork. The closed parts-container and notebook use operator-authorized text-only `grok-imagine-image-quality` sources (`assets/source/workshop_hero/parts_tin.jpg`, `assets/source/office_hero/notebook.jpg`). `closed_case.jpg` was rejected for its protruding handle. `tools/prepare_track_art.py` applies the same palette, cleanup, contour, and normalization as every other active prop. The front-facing parts container and keycap remain outside active runtime composition. | Expanded world candidate; operator review pending |
 | `assets/ui/imagine/motorsport_panel_dark.png`, `motorsport_panel_paper.png` | 96×64 nine-slice derivatives of the existing Imagine telemetry and number-plate sources, assembled with Pillow using fixed 12px corners/edges and clean center strips. The paper panel mirrors its clean right edge to remove the baked checker strip; Godot draws fixed-size checker marks. No new generation or external source material. | Integrated UI-polish candidate; operator review pending |
 | `assets/ui/imagine/motorsport_loading.jpg` | xAI `grok-imagine-image-quality`, developer-directed text-only prompt for an original miniature pit-lane workbench illustration. No source images, brands or embedded UI text. Godot draws the actual loading stages and Back control over the image. | Integrated candidate; runtime/operator review pending |
 | `assets/ui/imagine/motorsport_title.jpg`, `motorsport_garage.jpg`, `motorsport_telemetry_plate.jpg`, `motorsport_number_plate.jpg` and `.png` | xAI `grok-imagine-image-quality`, developer-directed text-only prompts following the approved GURI-636 workbench concepts. Production images contain no interface lettering: Godot renders text and interactive controls. The number plate PNG is a 1168×386 crop at (40, 240) of the 1248×832 source JPEG; other images are used as full rectangles. Garage cars are rendered by the existing first-party Procedural 2D identity library, not generated replacements. | Integrated candidate; exact-build operator review pending |

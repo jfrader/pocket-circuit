@@ -552,11 +552,11 @@ static func build_edge_and_apron_decor(
 	parent.add_child(container)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = TrackBuilderCore._mix_seed(int(spec.get("dressing_seed", spec.get("requested_seed", 0))), "edge_decor:%s" % String(spec.get("story_id", "")))
-	var target := clampi(70 + int(rng.randf() * 80), 60, 150)
+	var target := clampi(24 + int(rng.randf() * 17), 24, 40)
 	var placed := 0
 	var bounds := polygon_bounds_rect(room_polygon)
-	# Dense along both edges + into apron. Painted material details stay FLAT;
-	# recognizable hardware becomes small SOLID scenery.
+	# A few readable details sit along both edges and into the apron. Painted
+	# material details stay FLAT; recognizable hardware becomes SOLID scenery.
 	var last_yield := Time.get_ticks_usec()
 	for attempt in 1200:
 		if stage.is_valid() and Time.get_ticks_usec() - last_yield >= 6000:
@@ -838,7 +838,7 @@ static func build_room_ground_sections(
 	var rng := RandomNumberGenerator.new()
 	rng.seed = TrackBuilderCore._mix_seed(int(spec.get("material_seed", spec["requested_seed"])), "ground_sections:%s" % String(story["id"]))
 	var room_area := absf(TrackBuilderCore._polygon_area(room_polygon))
-	var target_count := clampi(int(round(room_area / 750000.0)), 2, 4)
+	var target_count := mini(clampi(int(round(room_area / 750000.0)), 2, 4), definitions.size())
 	sections.set_meta("requested_count", target_count)
 	var bounds := polygon_bounds_rect(room_polygon)
 	var placements: Array[Dictionary] = []
@@ -923,7 +923,7 @@ static func build_room_floor_details(
 	details.name = "FloorDetails"
 	parent.add_child(details)
 	var bounds := polygon_bounds_rect(room_polygon)
-	var target_count := clampi(int(round(absf(TrackBuilderCore._polygon_area(room_polygon)) / 28000.0)), 60, 120)
+	var target_count := clampi(int(round(absf(TrackBuilderCore._polygon_area(room_polygon)) / 90000.0)), 18, 30)
 	var positions := PackedVector2Array()
 	for attempt in 820:
 		var candidate := Vector2(
