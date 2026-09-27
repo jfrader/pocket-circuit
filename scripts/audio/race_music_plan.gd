@@ -6,7 +6,7 @@ extends RefCounted
 ## from the track identity, so the same circuit always produces the same music
 ## while different circuits sound different. This module owns the mapping from
 ## track identity to generate seed, instrument/energy profile, and the phase
-## deck the race rotates through so no one section holds.
+## deck the race rotates through after the opening lap.
 
 const THEME_STYLES := {
 	"kitchen": ["funk", "fusion", "chip"],
@@ -26,7 +26,7 @@ const TIER_TRAITS := {
 const GROOVES: Array[String] = ["cruise", "slipstream"]
 const BUILDS: Array[String] = ["ignition", "grid"]
 const PEAKS: Array[String] = ["redline", "attack"]
-const CALMS: Array[String] = ["breather"]
+const OPENING_PHASE := "grid"
 const MENU_STYLE := "funk"
 const MENU_PROFILE := {
 	"style": MENU_STYLE,
@@ -35,12 +35,6 @@ const MENU_PROFILE := {
 	"brightness": 0.60,
 	"syncopation": 0.50,
 }
-## One 4-bar phrase at a mid racing tempo. Repeated deck slots hold a phase
-## through several loops without cueing it again.
-const MENU_PHRASE_SECONDS := 7.5
-const MENU_GRID_LOOPS := 4
-
-
 ## The Gamestruments generate seed for a circuit. The whole track identity
 ## feeds it, so a mirrored or retiered layout is a different track with its
 ## own score while replays of the same circuit reproduce the same music.
@@ -73,8 +67,8 @@ static func race_profile(event: Dictionary) -> Dictionary:
 	}
 
 
-## Running order for a circuit. Grooves, builds, peaks, and a breather, more of
-## each as the tier grows. Deterministic per track. Opens on a groove.
+## Running order after the first lap. Grooves, builds, and peaks grow with the
+## tier. Drumless/release phases stay out of automatic racing combinations.
 static func flow_deck(event: Dictionary) -> Array[String]:
 	var rank := _tier_rank(_tier(event))
 	var rng := RandomNumberGenerator.new()
@@ -84,7 +78,6 @@ static func flow_deck(event: Dictionary) -> Array[String]:
 		deck.append(_pick_next(GROOVES, deck, rng))
 		deck.append(_pick_next(BUILDS, deck, rng))
 		deck.append(_pick_next(PEAKS, deck, rng))
-		deck.append(_pick_next(CALMS, deck, rng))
 		deck.append(_pick_next(GROOVES, deck, rng))
 		deck.append(_pick_next(PEAKS, deck, rng))
 	return deck
@@ -109,24 +102,10 @@ static func menu_profile() -> Dictionary:
 	return MENU_PROFILE.duplicate()
 
 
-## Grid loops several times, then a groove that can keep going. Ignition is not
-## in this cycle: cueing it replays its slow opening.
-static func menu_deck() -> Array[String]:
-	var deck: Array[String] = []
-	var visits: Array[String] = ["cruise", "breather", "slipstream"]
-	for visit in visits:
-		_append_loops(deck, "grid", MENU_GRID_LOOPS)
-		_append_loops(deck, visit, 4 if visit == "slipstream" else 2)
-	return deck
-
-
-static func menu_phrase_seconds() -> float:
-	return MENU_PHRASE_SECONDS
-
-
-static func _append_loops(deck: Array[String], section: String, count: int) -> void:
-	for _index in count:
-		deck.append(section)
+## Starting Grid owns the menu, load, countdown, and complete first lap. A
+## one-lap race therefore keeps it until the finish cue.
+static func opening_phase_is_locked(completed_laps: int) -> bool:
+	return completed_laps < 1
 
 
 static func _pick_next(options: Array[String], deck: Array[String], rng: RandomNumberGenerator) -> String:

@@ -270,7 +270,7 @@ func _prepare_race_async() -> void:
 	await _loading_step("Preparing race audio")
 	var director := app.get("audio_director") as Node
 	if director:
-		# The director swaps in this circuit's score and opens on `ignition`.
+		# The director swaps in this circuit's score directly on Starting Grid.
 		director.call("play_race_music")
 		for entry: Dictionary in _build_field_racers_for_preparation():
 			director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")))
@@ -664,7 +664,6 @@ func _run_countdown() -> void:
 	_play_sfx(&"go", 0.92)
 	race_manager.report_countdown_tick("GO!")
 	race_manager.start_race()
-	_begin_race_music()
 	if "--media-capture" in OS.get_cmdline_user_args():
 		print("MEDIA_RACE_READY %s %s" % [String(_session.get("event_id", "unknown")), String(_session.get("vehicle_id", "unknown"))])
 	_countdown_active = false
@@ -730,6 +729,10 @@ func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> v
 	_update_race_hud()
 	if _countdown_active or _finished:
 		return
+	if RACE_MUSIC_PLAN.opening_phase_is_locked(race_manager.lap_count):
+		if _position == 1:
+			_player_took_lead = true
+		return
 	if _position == 1 and not _player_took_lead:
 		_player_took_lead = true
 		_cue_live_section_timed("grid", 8.0)
@@ -737,7 +740,7 @@ func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> v
 		_advance_live_rotation()
 
 func _on_racer_recovered(racer: Node2D) -> void:
-	if racer == _player_vehicle:
+	if racer == _player_vehicle and not RACE_MUSIC_PLAN.opening_phase_is_locked(race_manager.lap_count):
 		# A spin that gets saved gets a reset sting, then the rotation resumes.
 		_cue_live_section_timed("recovery", 8.0)
 
@@ -747,7 +750,7 @@ func _on_wrong_way_changed(racer: Node2D, wrong_way: bool) -> void:
 		return
 	if is_instance_valid(_race_hud):
 		_race_hud.set_wrong_way(wrong_way)
-	if wrong_way and not _countdown_active and not _finished:
+	if wrong_way and not _countdown_active and not _finished and not RACE_MUSIC_PLAN.opening_phase_is_locked(race_manager.lap_count):
 		_cue_live_section_timed("wrong-way", 6.0)
 
 
@@ -766,6 +769,8 @@ func _on_lap_completed(lap: int) -> void:
 		if director != null and director.has_method("stop_live_rotation"):
 			director.call("stop_live_rotation")
 		_cue_live_section("final-lap")
+	elif RACE_MUSIC_PLAN.opening_phase_is_locked(lap - 1):
+		_begin_race_music()
 	else:
 		# Re-evaluate the running order at each lap boundary instead of holding
 		# one section through the whole race.
@@ -975,8 +980,8 @@ func _advance_live_rotation() -> void:
 
 
 func _begin_race_music() -> void:
-	# The race rotates through grooves, builds, peaks, and a breather. Events
-	# (lead, incident, final lap, finish) override that deck.
+	# After lap one, rotate through grooves, builds, and peaks. Events (lead,
+	# incident, final lap, finish) override that deck.
 	var director := _audio_director()
 	if director == null or not director.has_method("begin_live_rotation"):
 		return
