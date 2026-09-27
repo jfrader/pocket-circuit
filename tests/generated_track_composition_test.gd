@@ -6,7 +6,7 @@ const PRESENTER := preload("res://scripts/presentation/track_variant_presenter.g
 const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 const ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"square"]
 const SIGNATURE_ASSETS := {
-	&"kitchen": "res://assets/textures/imagine/stove_top.png",
+	&"kitchen": "res://assets/textures/giant_props/giant_toaster.png",
 	&"workshop": "res://assets/textures/workshop_hero/hero_workshop_toolbox.png",
 	&"office": "res://assets/textures/office_hero/hero_office_keyboard.png",
 }
@@ -443,7 +443,7 @@ func _check_open_boundary_assets(track: Node2D, theme: StringName, seed: int) ->
 			sections.append(child as StaticBody2D)
 		elif child.name.begins_with("CornerAccent") and child is StaticBody2D:
 			accents.append(child as StaticBody2D)
-	if not _expect(sections.size() == int(visuals.get_meta("section_count", 0)) and sections.size() >= 24 and sections.size() <= 84, "%s should retain extended but partial real-asset rail sections (count=%d)" % [label, sections.size()]):
+	if not _expect(sections.size() == int(visuals.get_meta("section_count", 0)) and sections.size() >= 11 and sections.size() <= 84, "%s should retain physical-size rails across the required sectors (count=%d)" % [label, sections.size()]):
 		return false
 	if not _expect(accents.size() == int(visuals.get_meta("accent_count", 0)) and accents.size() in [1, 2], "%s should retain one or two visual corner-mouth accents" % label):
 		return false
@@ -486,7 +486,7 @@ func _check_open_boundary_assets(track: Node2D, theme: StringName, seed: int) ->
 		return false
 	var inner_runs := int(visuals.get_meta("inner_run_count", 0))
 	var outer_runs := int(visuals.get_meta("outer_run_count", 0))
-	if not _expect(inner_runs + outer_runs >= 11 and inner_runs >= 5 and outer_runs >= 5, "%s sparse rails should retain balanced sector coverage without sacrificing clearance" % label):
+	if not _expect(inner_runs + outer_runs >= 11 and inner_runs >= 4 and outer_runs >= 4, "%s physical-size rails should cover at least half of each edge without sacrificing clearance" % label):
 		return false
 	if not _expect(visuals.find_children("EmptyRunHint", "Sprite2D", false, false).size() == 1, "%s should mark its open sector with one flat worn-floor hint" % label):
 		return false
@@ -755,7 +755,7 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 		if bool(BUILDER.LAYOUTS[theme].get("distinct_giant_assets", false)) and not _expect(not seen_giant_assets.has(asset_path), "%s giant landmarks should not repeat the same object" % label):
 			return false
 		seen_giant_assets[asset_path] = true
-		if not _expect(asset_path in allowed_giants and ResourceLoader.exists(asset_path) and bool(BUILDER.PROP_SHAPES.get(asset_path.get_file(), {}).get("solid", false)) and world_size >= 300.0 and world_size <= 600.0, "%s giant landmarks should use registered 300-600u assets from their story roster" % label):
+		if not _expect(asset_path in allowed_giants and ResourceLoader.exists(asset_path) and bool(BUILDER.PROP_SHAPES.get(asset_path.get_file(), {}).get("solid", false)) and is_equal_approx(world_size, BUILDER.PROP_SCALE.length_for(asset_path, -1.0)), "%s landmarks must retain their registered physical size, never inflate to a role-dependent size" % label):
 			return false
 		var shape_kind := StringName(landmark.get_meta("footprint_kind", BUILDER.PROP_SHAPES.get(asset_path.get_file(), {}).get("shape", "circle")))
 		var gate_samples := PackedVector2Array()

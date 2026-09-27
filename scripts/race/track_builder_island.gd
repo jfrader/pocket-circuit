@@ -142,7 +142,7 @@ static func build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, poin
 
 
 static func add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
-	var assets: Array = spec.get("island_fill_textures", [])
+	var assets: Array = spec.get("ambient_props", [])
 	if assets.is_empty() or boundary.size() < 12:
 		return
 	var container := Node2D.new()
@@ -161,6 +161,5 @@ static func add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: P
 		var position := boundary_point + inward * 22.0
 		var next_point := boundary[(boundary_index + 1) % boundary.size()]
 		var texture_path := String(assets[posmod(seed + landmark_index * 5, assets.size())])
-		TrackBuilderCore._add_generated_prop(container, "Landmark%02d" % landmark_index, position, texture_path, (next_point - boundary_point).angle(), &"island_rim", &"few", landmark_index, 0.72)
-
+		TrackBuilderCore._add_generated_prop(container, "Landmark%02d" % landmark_index, position, texture_path, (next_point - boundary_point).angle(), &"island_rim", &"few", landmark_index)
 

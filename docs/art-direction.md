@@ -70,8 +70,8 @@ rooms, route geometry, palette, interface, and story.
 - Micro details such as crumbs, fibers, droplets, scratches, and wood grain use
   low contrast and never compete with the racing line. These painted/material
   marks remain flat; recognizable loose hardware is physical even at micro scale.
-- One to three giant landmarks per generated room establish the tiny-car scale.
-  Their 300-600-unit silhouettes use broad color masses, footprint-matched
+- One to three household landmarks per generated room establish the tiny-car scale.
+  Their silhouettes retain the physical dimensions in `data/world_prop_art.json`, with footprint-matched
   contact shadows, longer down-right cast shadows, full trimmed-footprint
   collision, and enough breathing room to remain readable without covering the
   corridor. If an object reads raised or solid, its center and extremities must
@@ -111,6 +111,12 @@ rooms, route geometry, palette, interface, and story.
   clear of route and checkpoint safety space.
 
 ## Asset Plan
+
+Environment sprites use the same hard-pixel language as the 48x64 cars: stepped
+silhouettes, a dark outline, a compact palette, and discrete value blocks.
+Source-sheet realism is intentionally reduced through a 96px/twelve-color
+intermediate. Textures are unlit albedo; polished metal and glass do not bake in
+room reflections or glossy streaks. Future runtime lighting may add those cues.
 
 ### Hero Landmarks
 
@@ -157,8 +163,11 @@ fibers, hardware, worn-floor hints, and subtle material patterning, and from
 - Kitchen: cereal box, mug, watermelon, fork, toaster, and milk carton.
 - Workshop: basketball, toolbox, paint can, watermelon, hammer, and wrench.
 - Office: keyboard, monitor, paper stack, pen, stapler, and mouse.
-- These original top-down sprites live in `assets/textures/giant_props/` and
-  are rendered at 300-600 world units rather than ordinary prop scale.
+- These original top-down sprites live in `assets/textures/giant_props/`.
+  One world unit represents one millimetre; a prop keeps its size in every role.
+  The manifest is measured against trimmed alpha bounds, not the padded canvas.
+  A tablespoon is 180 units long, a nail 40, and a keyboard 440. Tight spaces
+  receive a different suitable object rather than a squeezed or shrunken prop.
 
 ### Ambient Ground Dressing
 
@@ -176,13 +185,14 @@ fibers, hardware, worn-floor hints, and subtle material patterning, and from
 
 - Preserve controlled negative space: each generated lap has five short
   both-sided rail moments, two one-sided runs, and one open accent sector marked
-  only by a flat worn-floor hint. Each side receives accents in six of eight
-  sectors (about 54% visual coverage), never a repeated full fence.
+  only by a flat worn-floor hint. Each side receives accents in at least four
+  of eight sectors, with at least eleven occupied edge/sector pairs overall.
 - Partial rail sprites are the physical boundary wherever they appear; their
-  colliders fit inside their visible footprints. Kitchen mixes folded towel,
-  spoon, chopstick, and bread-board rails; Workshop mixes paint stirrer, dowel,
+  colliders fit inside their visible footprints. Kitchen mixes fork,
+  spoon, chopstick, and cork rails; Workshop mixes paint stirrer, dowel,
   clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
-  Corner mitt, tape, and sticky-note accents remain rare, visible physical props.
+  Nails and erasers replace long rails where necessary. Sponge, tape, and
+  sticky-note corner accents remain rare. Neighboring rail footprints do not overlap.
 - Bare floor between those assets is intentionally open and drivable. Never add
   a continuous outer collider, invisible corridor edge, or visual bevel that
   implies one.

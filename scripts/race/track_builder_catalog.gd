@@ -3,6 +3,7 @@ class_name TrackBuilderCatalog
 ## Construction stays in TrackBuilderCore.
 
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const PROP_SCALE := preload("res://scripts/race/world_prop_scale.gd")
 const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
 const VEHICLE_WIDTH := 44.0
 const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
@@ -10,17 +11,17 @@ const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
 
 static var GENERATED_OBSTACLE_TYPES := {
 	&"kitchen": [
-		{"id": &"rolling_apple", "asset": "res://assets/textures/kitchen/apple_cartoon.png", "footprint_kind": &"circle", "footprint_size": Vector2(32.0, 32.0), "visual_size": Vector2(42.0, 42.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
-		{"id": &"cereal_block", "asset": "res://assets/textures/imagine/kitchen_cereal_orange.png", "footprint_kind": &"rect", "footprint_size": Vector2(40.0, 38.0), "visual_size": Vector2(48.0, 48.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"dropped_strawberry", "asset": "res://assets/textures/imagine/strawberry.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"biscuit", "asset": "res://assets/textures/tabletop/biscuit.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 	],
 	&"workshop": [
-		{"id": &"dropped_screwdriver", "asset": "res://assets/textures/imagine/screwdriver.png", "footprint_kind": &"rect", "footprint_size": Vector2(56.0, 20.0), "visual_size": Vector2(64.0, 24.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
-		{"id": &"loose_wrench", "asset": "res://assets/textures/imagine/wrench.png", "footprint_kind": &"rect", "footprint_size": Vector2(52.0, 20.0), "visual_size": Vector2(62.0, 26.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"loose_bolt", "asset": "res://assets/textures/imagine/bolt.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"loose_nut", "asset": "res://assets/textures/imagine/hazard_workshop_socket.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 	],
 	&"office": [
-		{"id": &"loose_keycap", "asset": "res://assets/textures/imagine/office_keycap.png", "footprint_kind": &"rect", "footprint_size": Vector2(42.0, 42.0), "visual_size": Vector2(42.0, 42.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
-		{"id": &"fallen_pencil", "asset": "res://assets/textures/imagine/pencil.png", "footprint_kind": &"rect", "footprint_size": Vector2(64.0, 22.0), "visual_size": Vector2(64.0, 22.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
-		{"id": &"binder_clip", "asset": "res://assets/textures/edge_dressing/office_binder_clip_micro.png", "footprint_kind": &"rect", "footprint_size": Vector2(22.0, 30.0), "visual_size": Vector2(34.0, 34.0), "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"loose_keycap", "asset": "res://assets/textures/imagine/office_keycap.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"dropped_eraser", "asset": "res://assets/textures/tabletop/eraser.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"binder_clip", "asset": "res://assets/textures/edge_dressing/office_binder_clip_micro.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 	],
 }
 
@@ -210,11 +211,11 @@ static var ROOM_COMPOSITIONS := {
 			"id": StringName(GENERATED_RULES.STORY_IDS["kitchen"][0]),
 			"giants": ["res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", "res://assets/textures/giant_props/giant_milk_carton.png", "res://assets/textures/giant_props/giant_cereal_box.png"],
 			"island": [
-				{"asset": "res://assets/textures/imagine/stove_top.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
+				{"asset": "res://assets/textures/giant_props/giant_toaster.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
 				{"asset": "res://assets/textures/imagine/teacup_saucer.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(66, -12)},
-				{"asset": "res://assets/textures/imagine/kitchen_cereal_orange.png", "quantity": &"many", "count": 10, "formation": &"cluster", "offset": Vector2(16, 78)},
+				{"asset": "res://assets/textures/tabletop/cereal_ring.png", "quantity": &"many", "count": 10, "formation": &"cluster", "offset": Vector2(16, 78)},
 			],
-			"object_line": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 10},
+			"object_line": {"asset": "res://assets/textures/tabletop/biscuit.png", "count": 10},
 			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_spoon.png", "count": 2},
 			"landmarks": ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png"],
 			"surfaces": [
@@ -231,7 +232,7 @@ static var ROOM_COMPOSITIONS := {
 			],
 			"object_line": {"asset": "res://assets/textures/kitchen/apple_cartoon.png", "count": 12},
 			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/stove_top.png", "res://assets/textures/imagine/watermelon.png"],
+			"landmarks": ["res://assets/textures/giant_props/giant_toaster.png", "res://assets/textures/imagine/watermelon.png"],
 			"surfaces": [
 				{"name": &"prep crumbs", "grip": 0.8, "speed": 0.74, "decal": "res://assets/textures/kitchen/crumb_cluster_02.png"},
 				{"name": &"chopping spill", "grip": 0.6, "speed": 0.86, "decal": "res://assets/textures/kitchen/spill_decal.png"},
@@ -246,7 +247,7 @@ static var ROOM_COMPOSITIONS := {
 				{"asset": "res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "quantity": &"few", "count": 3, "formation": &"arc", "offset": Vector2(66, -6), "max_radius": 72.0},
 				{"asset": "res://assets/textures/imagine/strawberry.png", "quantity": &"many", "count": 14, "formation": &"arc", "offset": Vector2(4, 74)},
 			],
-			"object_line": {"asset": "res://assets/textures/imagine/kitchen_spoon.png", "count": 10},
+			"object_line": {"asset": "res://assets/textures/tabletop/biscuit.png", "count": 10},
 			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 2},
 			"landmarks": ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png"],
 			"surfaces": [
@@ -260,11 +261,11 @@ static var ROOM_COMPOSITIONS := {
 			"island": [
 				{"asset": "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8), "max_radius": 160.0},
 				{"asset": "res://assets/textures/kitchen/sponge_wet.png", "quantity": &"few", "count": 3, "formation": &"line", "offset": Vector2(62, -12)},
-				{"asset": "res://assets/textures/kitchen/cup_cartoon.png", "quantity": &"many", "count": 8, "formation": &"cluster", "offset": Vector2(8, 78)},
+				{"asset": "res://assets/textures/tabletop/cork.png", "quantity": &"many", "count": 8, "formation": &"cluster", "offset": Vector2(8, 78)},
 			],
-			"object_line": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "count": 10},
+			"object_line": {"asset": "res://assets/textures/tabletop/cork.png", "count": 10},
 			"delimiter": {"asset": "res://assets/textures/kitchen/napkin.png", "count": 2},
-			"landmarks": ["res://assets/textures/imagine/stove_top.png", "res://assets/textures/imagine/teapot_top.png"],
+			"landmarks": ["res://assets/textures/giant_props/giant_toaster.png", "res://assets/textures/imagine/teapot_top.png"],
 			"surfaces": [
 				{"name": &"cleanup suds", "grip": 0.62, "speed": 0.82, "decal": "res://assets/textures/kitchen/spill_decal.png"},
 				{"name": &"wipe crumbs", "grip": 0.86, "speed": 0.8, "decal": "res://assets/textures/kitchen/crumb_cluster_01.png"},
@@ -371,9 +372,9 @@ static var ROOM_COMPOSITIONS := {
 			"island": [
 				{"asset": "res://assets/textures/imagine/crayons.png", "quantity": &"unique", "count": 1, "formation": &"focal", "offset": Vector2(-34, -8)},
 				{"asset": "res://assets/textures/imagine/scissors_top.png", "quantity": &"few", "count": 2, "formation": &"arc", "offset": Vector2(70, -8)},
-				{"asset": "res://assets/textures/imagine/pencil.png", "quantity": &"many", "count": 10, "formation": &"arc", "offset": Vector2(4, 80)},
+				{"asset": "res://assets/textures/tabletop/eraser.png", "quantity": &"many", "count": 10, "formation": &"arc", "offset": Vector2(4, 80)},
 			],
-			"object_line": {"asset": "res://assets/textures/imagine/pencil.png", "count": 10},
+			"object_line": {"asset": "res://assets/textures/edge_dressing/pencil_shaving.png", "count": 10},
 			"delimiter": {"asset": "res://assets/textures/imagine/stapler_top.png", "count": 2},
 			"landmarks": ["res://assets/textures/office_hero/hero_office_notebook.png", "res://assets/textures/imagine/lamp_desk.png"],
 			"surfaces": [
@@ -507,6 +508,10 @@ static var LAYOUTS := {
 	&"kitchen": {
 		"scene": "res://scenes/tracks/kitchen_circuit.tscn",
 		"root_name": "KitchenGraybox",
+		"focal_fallback": "res://assets/textures/tabletop/espresso_mug.png",
+		"landmark_fallbacks": ["res://assets/textures/kitchen/sponge_wet.png", "res://assets/textures/imagine/salt_shaker.png"],
+		"ambient_props": ["res://assets/textures/tabletop/cereal_ring.png", "res://assets/textures/tabletop/cork.png", "res://assets/textures/imagine/strawberry.png", "res://assets/textures/edge_dressing/kitchen_herb_micro.png", "res://assets/textures/edge_dressing/kitchen_sugar_micro.png", "res://assets/textures/tabletop/biscuit.png"],
+		"gate_props": ["res://assets/textures/tabletop/cork.png", "res://assets/textures/tabletop/biscuit.png"],
 		"controls": [
 			Vector2(640, 370), Vector2(300, 370), Vector2(-300, 370), Vector2(-640, 370),
 			Vector2(-640, 200), Vector2(-640, -200), Vector2(-640, -370), Vector2(-300, -370),
@@ -556,14 +561,14 @@ static var LAYOUTS := {
 			"res://assets/textures/imagine/hazard_workshop_socket.png",
 		],
 		"generated_boundary": {
-			"section": "res://assets/textures/track_boundary/kitchen_folded_towel_rail.png",
+			"section": "res://assets/textures/track_boundary/kitchen_spoon_rail.png",
 			"sections": [
-				"res://assets/textures/track_boundary/kitchen_folded_towel_rail.png",
+				"res://assets/textures/kitchen/fork_cartoon.png",
 				"res://assets/textures/track_boundary/kitchen_spoon_rail.png",
 				"res://assets/textures/track_boundary/kitchen_chopstick_rail.png",
-				"res://assets/textures/track_boundary/kitchen_bread_board_rail.png",
+				"res://assets/textures/tabletop/cork.png",
 			],
-			"accent": "res://assets/textures/track_boundary/kitchen_mitt_corner.png",
+			"accent": "res://assets/textures/kitchen/sponge_wet.png",
 		},
 		"boundary_corner": [
 			"res://assets/textures/imagine/flower_pot.png",
@@ -634,6 +639,10 @@ static var LAYOUTS := {
 	&"workshop": {
 		"scene": "res://scenes/tracks/workshop_workbench.tscn",
 		"root_name": "WorkshopWorkbench",
+		"focal_fallback": "res://assets/textures/imagine/matchbox.png",
+		"landmark_fallbacks": ["res://assets/textures/imagine/screwdriver.png", "res://assets/textures/imagine/bolt.png"],
+		"ambient_props": ["res://assets/textures/imagine/screw.png", "res://assets/textures/imagine/bolt.png", "res://assets/textures/edge_dressing/workshop_washer_micro.png", "res://assets/textures/edge_dressing/workshop_nail_micro.png", "res://assets/textures/edge_dressing/blade_fragment.png"],
+		"gate_props": ["res://assets/textures/imagine/bolt.png", "res://assets/textures/tabletop/cork.png"],
 		"controls": [
 			Vector2(640, 370), Vector2(300, 370), Vector2(-300, 370), Vector2(-735, 330),
 			Vector2(-735, 0), Vector2(-735, -250), Vector2(-600, -420), Vector2(-300, -470),
@@ -690,6 +699,7 @@ static var LAYOUTS := {
 				"res://assets/textures/track_boundary/workshop_dowel_rail.png",
 				"res://assets/textures/track_boundary/workshop_clamp_rail.png",
 				"res://assets/textures/track_boundary/workshop_ruler_rail.png",
+				"res://assets/textures/edge_dressing/workshop_nail_micro.png",
 			],
 			"accent": "res://assets/textures/track_boundary/workshop_tape_corner.png",
 		},
@@ -769,6 +779,10 @@ static var LAYOUTS := {
 	&"office": {
 		"scene": "res://scenes/tracks/office_desk.tscn",
 		"root_name": "OfficeDesk",
+		"focal_fallback": "res://assets/textures/tabletop/eraser.png",
+		"landmark_fallbacks": ["res://assets/textures/imagine/stapler_top.png", "res://assets/textures/imagine/remote_control.png", "res://assets/textures/edge_dressing/office_binder_clip_micro.png"],
+		"ambient_props": ["res://assets/textures/imagine/paperclip.png", "res://assets/textures/office_hero/hero_office_keycap.png", "res://assets/textures/tabletop/eraser.png", "res://assets/textures/edge_dressing/office_push_pin_micro.png", "res://assets/textures/edge_dressing/office_pen_cap_micro.png"],
+		"gate_props": ["res://assets/textures/tabletop/eraser.png", "res://assets/textures/edge_dressing/office_binder_clip_micro.png"],
 		"controls": [
 			Vector2(640, 370), Vector2(300, 370), Vector2(-300, 370), Vector2(-400, 340),
 			Vector2(-700, 260), Vector2(-820, 215), Vector2(-750, 180), Vector2(-600, 112),
@@ -827,6 +841,7 @@ static var LAYOUTS := {
 				"res://assets/textures/track_boundary/office_ruler_rail.png",
 				"res://assets/textures/track_boundary/office_pen_rail.png",
 				"res://assets/textures/track_boundary/office_book_spine_rail.png",
+				"res://assets/textures/tabletop/eraser.png",
 			],
 			"accent": "res://assets/textures/track_boundary/office_sticky_corner.png",
 		},
@@ -910,6 +925,14 @@ static var LAYOUTS := {
 
 
 static func catalog() -> Dictionary:
+	for filename: String in PROP_SCALE.scenery_lengths:
+		var entry: Dictionary = PROP_SHAPES.get(filename, {}).duplicate()
+		entry["shadow_shape"] = entry.get("shadow_shape", &"circle" if StringName(entry.get("shape", "convex")) == &"circle" else &"rect")
+		entry["size"] = Vector2.ONE * PROP_SCALE.length_for(filename, 0.0)
+		entry["solid"] = true
+		entry["shape"] = "convex"
+		PROP_SHAPES[filename] = entry
+		ASSET_FOOTPRINT_OVERRIDES[filename] = {"kind": &"convex", "no_rotation": true}
 	return {
 		"generated_obstacle_types": GENERATED_OBSTACLE_TYPES,
 		"solid_edge_shapes": SOLID_EDGE_SHAPES,

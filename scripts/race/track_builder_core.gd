@@ -8,6 +8,7 @@ const CHECKPOINT_SCRIPT := preload("res://scripts/race/checkpoint.gd")
 const VISUAL_ROLE_CONTRACT := preload("res://scripts/race/generated_world_visual_role.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
+const PROP_SCALE := preload("res://scripts/race/world_prop_scale.gd")
 const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const TRACK_BUILDER_GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const TRACK_BUILDER_PLANNER := preload("res://scripts/race/track_builder_planner.gd")
@@ -646,9 +647,10 @@ static func _build_track_formation(
 		outer_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		gate_samples: PackedVector2Array,
-		occupied: Array[Dictionary]
+		occupied: Array[Dictionary],
+		stage: Callable = Callable()
 ) -> void:
-	TRACK_BUILDER_DRESSING.build_track_formation(parent, node_name, data, quantity, moment_index, centerline, outer_loop, room_polygon, gate_samples, occupied)
+	await TRACK_BUILDER_DRESSING.build_track_formation(parent, node_name, data, quantity, moment_index, centerline, outer_loop, room_polygon, gate_samples, occupied, stage)
 
 
 static func _build_corner_landmarks(
