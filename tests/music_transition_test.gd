@@ -37,11 +37,18 @@ func _run_test() -> void:
 		return
 	if not _expect(int(director.call("get_live_score_generations")) == 1, "a cold start should generate exactly one score"):
 		return
+	if not _expect(String(director.call("get_live_requested_section")) == "grid", "the menu should hold Starting Grid"):
+		return
+	director.call("_process", 120.0)
+	if not _expect(String(director.call("get_live_requested_section")) == "grid", "the menu must not rotate away from Starting Grid while the player waits"):
+		return
 
 	_set_race_session(director, "kitchen", "classic", 4242, "standard")
 	director.call("play_race_music")
 	await process_frame
 	if not _expect(int(director.call("get_live_score_generations")) == 2, "a new circuit should generate its own score"):
+		return
+	if not _expect(String(director.call("get_live_requested_section")) == "grid", "a circuit score should open on Starting Grid"):
 		return
 	var track_seed := String(director.call("get_live_seed"))
 	if not _expect(track_seed != menu_seed, "the circuit score seed should differ from the menu score"):
