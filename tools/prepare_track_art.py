@@ -4,7 +4,7 @@ from io import BytesIO
 from pathlib import Path
 
 import numpy as np
-from PIL import Image, ImageFilter, ImageOps
+from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 from scipy import ndimage
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -14,6 +14,8 @@ CANVAS = 512
 CONTENT = 448
 PIXEL_CONTENT = 96
 SPRITE_COLORS = 12
+CEL_COLORS = 48
+CEL_OUTLINE = (37, 31, 29, 232)
 MATERIALS = [
     'kitchen_board', 'kitchen_ceramic', 'kitchen_counter', 'kitchen_sage_tile',
     'kitchen_stone', 'office_desk', 'office_deskmat', 'office_laminate',
@@ -46,7 +48,12 @@ def cell(image: Image.Image, index: int, columns: int = 4) -> Image.Image:
                        (x + 1) * image.width // columns, (y + 1) * image.height // columns))
 
 
-def transparent_sprite(image: Image.Image, clean_fragments: bool = True, style: str = 'hard_pixel') -> Image.Image:
+def transparent_sprite(
+    image: Image.Image,
+    clean_fragments: bool = True,
+    style: str = 'cel',
+    outline: bool = True,
+) -> Image.Image:
     rgb = np.asarray(image.convert('RGB'), dtype=np.uint8)
     hsv = np.asarray(image.convert('HSV'))
     r, g, b = rgb.astype(np.float32).transpose(2, 0, 1)
@@ -59,7 +66,7 @@ def transparent_sprite(image: Image.Image, clean_fragments: bool = True, style: 
         areas = np.bincount(labels.ravel())
         areas[0] = 0
         alpha[areas[labels] < max(12, areas.max() * 0.04)] = 0
-    if style == 'painted':
+    if style in {'painted', 'cel'}:
         foreground = alpha > 0
         _, nearest = ndimage.distance_transform_edt(~foreground, return_indices=True)
         filled_rgb = rgb.copy()
@@ -76,9 +83,27 @@ def transparent_sprite(image: Image.Image, clean_fragments: bool = True, style: 
         if bounds is None:
             raise ValueError('Empty keyed sprite')
         result = result.crop(bounds)
+        if style == 'cel':
+            result = ImageEnhance.Color(result).enhance(1.14)
+            result = ImageEnhance.Contrast(result).enhance(1.08)
+            cel_alpha = result.getchannel('A')
+            result = result.convert('RGB').quantize(
+                colors=CEL_COLORS,
+                method=Image.Quantize.MEDIANCUT,
+                dither=Image.Dither.NONE,
+            ).convert('RGBA')
+            result.putalpha(cel_alpha)
+            if outline:
+                result = ImageOps.expand(result, border=6, fill=(0, 0, 0, 0))
+                cel_alpha = result.getchannel('A')
+                outline_alpha = cel_alpha.filter(ImageFilter.MaxFilter(9))
+                outline_layer = Image.new('RGBA', result.size, CEL_OUTLINE)
+                outline_layer.putalpha(outline_alpha)
+                outline_layer.alpha_composite(result)
+                result = outline_layer
         scale = CONTENT / max(result.size)
-        painted_size = (max(1, round(result.width * scale)), max(1, round(result.height * scale)))
-        result = result.resize(painted_size, Image.Resampling.LANCZOS)
+        render_size = (max(1, round(result.width * scale)), max(1, round(result.height * scale)))
+        result = result.resize(render_size, Image.Resampling.LANCZOS)
         canvas = Image.new('RGBA', (CANVAS, CANVAS))
         canvas.alpha_composite(result, ((CANVAS-result.width)//2, (CANVAS-result.height)//2))
         return canvas
@@ -102,14 +127,18 @@ def transparent_sprite(image: Image.Image, clean_fragments: bool = True, style: 
     return canvas
 
 
-def repeating_material(image: Image.Image, style: str = 'hard_pixel') -> Image.Image:
+def repeating_material(image: Image.Image, style: str = 'cel') -> Image.Image:
     # Mirrored quadrants give exact wrap continuity without a blurred seam or
     # baking light direction into an albedo tile.
     inset = max(2, round(min(image.size) * 0.035))
     image = image.crop((inset, inset, image.width-inset, image.height-inset))
-    source_size = 256 if style == 'painted' else 64
+    source_size = 256 if style in {'painted', 'cel'} else 64
     image = image.convert('RGB').resize((source_size, source_size), Image.Resampling.LANCZOS)
-    if style != 'painted':
+    if style == 'cel':
+        image = ImageEnhance.Color(image).enhance(1.08)
+        image = ImageEnhance.Contrast(image).enhance(1.06)
+        image = image.quantize(colors=CEL_COLORS, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).convert('RGB')
+    elif style != 'painted':
         image = image.quantize(colors=SPRITE_COLORS, method=Image.Quantize.MEDIANCUT).convert('RGB')
         image = image.resize((256, 256), Image.Resampling.NEAREST)
     result = Image.new('RGB', (512, 512))
@@ -149,7 +178,9 @@ def main() -> None:
     sheets = {entry['sheet']: Image.open(SOURCE / entry['sheet']) for entry in definitions}
     count = 0
     for entry in definitions:
-        style = entry.get('style', 'hard_pixel')
+        style = entry.get('style', 'cel')
+        if style == 'painted':
+            style = 'cel'
         sprite = transparent_sprite(cell(sheets[entry['sheet']], entry['cell'], entry.get('columns', 4)), style=style)
         sprite = apply_finish(sprite, entry.get('finish', ''), style)
         for output in entry['outputs']:
@@ -158,11 +189,10 @@ def main() -> None:
             count += 1
     materials = Image.open(SOURCE / 'materials-kit.jpg')
     for index, name in enumerate(MATERIALS):
-        style = 'painted' if name.startswith('kitchen_') else 'hard_pixel'
-        save_png(repeating_material(cell(materials, index), style), TEXTURES / 'world_materials' / f'{name}.png')
+        save_png(repeating_material(cell(materials, index), 'cel'), TEXTURES / 'world_materials' / f'{name}.png')
     decals = Image.open(SOURCE / 'surface-details.png')
     for index, outputs in enumerate(DECALS):
-        sprite = transparent_sprite(cell(decals, index), clean_fragments=False)
+        sprite = transparent_sprite(cell(decals, index), clean_fragments=False, style='cel', outline=False)
         for output in outputs:
             save_png(sprite, TEXTURES / output)
             count += 1

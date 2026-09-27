@@ -30,16 +30,17 @@ The explicit output paths in `data/world_prop_art.json` and the `DECALS` list
 in `tools/prepare_track_art.py` supersede the older group provenance below.
 These replacements were generated with operator-authorized xAI Grok Imagine
 (`grok-imagine-image-quality` for the first Kitchen/material sources;
-`grok-imagine-image-2.0` for companion kits, corrections, and the reviewed
-hand-painted Kitchen pilot) for GURI-1262 (Unify track artwork and realistic
-household prop scale). Only original Pocket Circuit source images and its
-operator-reviewed Kitchen mockup were used as references. Selected source sheets live in
+`grok-imagine-image-2.0` for companion kits, corrections, and visual-direction
+mockups) for GURI-1262 (Unify track artwork and realistic household prop scale).
+Only original Pocket Circuit source images and its operator-reviewed cel-
+illustrated mockup were used as references. Selected source sheets live in
 `assets/source/track-art/`; that directory remains excluded from exports.
 The prep tool uses Pillow, NumPy, and SciPy for chroma removal, disconnected
 artifact cleanup, edge decontamination, 512px normalization, and seamless
-mirrored material tiles. Manifest rows marked `painted` keep anti-aliased edges,
-material color depth, and soft authored shading; remaining rows still use the
-96px/twelve-color hard-pixel preparation while their replacement art is reviewed.
+mirrored material tiles. The selected cel pass keeps anti-aliased silhouettes,
+posterizes sprites and materials to controlled color bands, and adds a smooth
+dark contour without reducing artwork to stepped pixels. The earlier hard-pixel
+and softer hand-painted pilots were rejected and are not shipped outputs.
 The manifest records each selected cell and its physical dimension. Rejected
 front-facing toolbox, paint-can, bucket, barrel, mug, and cereal candidates
 are not selected by the manifest. The serving tray is empty so baked-in
@@ -49,7 +50,7 @@ unchanged by this pass.
 
 | Paths or content | Production method | Release status |
 |---|---|---|
-| `assets/textures/world_materials/*.png` | Selected from the original Imagine `materials-kit.jpg` atlas and prepared as wrap-continuous albedo tiles by `tools/prepare_track_art.py`. Kitchen retains smooth painted material detail; Workshop and Office retain the compact-palette preparation until their pilots are approved. The twelve room-story families and twenty-four palette variants remain data-driven. | Track-art candidate; operator review pending |
+| `assets/textures/world_materials/*.png` | Selected from the original Imagine `materials-kit.jpg` atlas and prepared as wrap-continuous cel-illustrated albedo tiles by `tools/prepare_track_art.py`. The twelve room-story families and twenty-four palette variants remain data-driven. | Track-art candidate; operator review pending |
 | `assets/textures/kitchen_hero/hero_kitchen_*.png` | Text-only xAI `grok-imagine-image-quality` generation authorized for GURI-642, followed by hue-key removal, one-pixel edge cleanup and consistent 512px canvases with `tools/prepare_world_hero.py`. Selected sources are `mug.jpg`, `plate_stack.jpg`, and `tea_board_topdown.jpg` under `assets/source/kitchen_hero`. The first `tea_board.jpg` was rejected for perspective and is not used. All raw sources are excluded from exports. | Kitchen direction accepted; final package review pending |
 | `assets/textures/workshop_hero/*.png`, `assets/textures/office_hero/*.png` | Prepared with `tools/prepare_world_hero.py`. Wrench, paint can, keyboard and keycap reuse existing project artwork with explicit crop/alpha processing. The closed parts-container and notebook use operator-authorized text-only `grok-imagine-image-quality` sources (`assets/source/workshop_hero/parts_tin.jpg`, `assets/source/office_hero/notebook.jpg`). `closed_case.jpg` was rejected for its protruding handle. The script records selected crops and preserves dark foreground details during background-connected keying. | Expanded world candidate; operator review pending |
 | `assets/ui/imagine/motorsport_panel_dark.png`, `motorsport_panel_paper.png` | 96×64 nine-slice derivatives of the existing Imagine telemetry and number-plate sources, assembled with Pillow using fixed 12px corners/edges and clean center strips. The paper panel mirrors its clean right edge to remove the baked checker strip; Godot draws fixed-size checker marks. No new generation or external source material. | Integrated UI-polish candidate; operator review pending |

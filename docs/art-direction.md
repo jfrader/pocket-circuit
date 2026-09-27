@@ -112,11 +112,12 @@ rooms, route geometry, palette, interface, and story.
 
 ## Asset Plan
 
-Environment sprites use a true 2D hand-painted language: smooth anti-aliased
-silhouettes, warm gouache-like color, tight contact shadows, and controlled
-directional shading. Wood, ceramic, matte metal, cloth, cork, paper, and food
-need distinct surface treatment without becoming photorealistic or reading as a
-3D render. Textures do not bake in room reflections or glossy streaks.
+Environment sprites use a smooth cel-illustrated 2D language: anti-aliased
+silhouettes, confident dark contours, controlled color bands, tight contact
+shadows, and restrained directional shading. Wood, ceramic, matte metal, cloth,
+cork, paper, and food keep distinct surface cues without becoming pixel art,
+photorealism, or a 3D render. Textures do not bake in room reflections or glossy
+streaks.
 
 Repeated roles use prop families rather than one stamped sprite. Boundary runs
 mix related utensils, rulers, sticks, corks, and hardware; ambient clusters mix

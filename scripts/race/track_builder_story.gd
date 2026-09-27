@@ -161,7 +161,7 @@ static func build_island_story(
 		scene_angle += PI
 	var placement_region := &"island"
 	var focal_data: Dictionary = story["island"][0]
-	var focal_path := String(focal_data["asset"])
+	var focal_path := TrackBuilderCore._formation_assets(focal_data)[0]
 	var focal_base_radius := TrackBuilderCore._asset_radius(focal_path, 24.0)
 	var focal_radius := focal_base_radius
 	var focal_offset: Vector2 = focal_data.get("offset", Vector2.ZERO)
@@ -182,17 +182,21 @@ static func build_island_story(
 		formation.name = "Formation%s" % String(quantity).to_pascal_case()
 		formation.set_meta("semantic_quantity", quantity)
 		formation.set_meta("requested_count", requested_count)
-		formation.set_meta("asset_path", String(formation_data["asset"]))
+		var asset_paths := TrackBuilderCore._formation_assets(formation_data)
+		formation.set_meta("asset_path", asset_paths[0])
+		formation.set_meta("asset_paths", PackedStringArray(asset_paths))
 		cluster.add_child(formation)
-		var asset_path := String(formation_data["asset"])
-		var base_radius := TrackBuilderCore._asset_radius(asset_path, 24.0)
 		var size_scale := 1.0
-		var radius := base_radius * size_scale
 		var authored_offset: Vector2 = formation_data.get("offset", Vector2.ZERO)
 		var semantic_spread := 1.45 if quantity == &"many" else (1.65 if quantity == &"few" else 1.0)
 		var target: Vector2 = anchor + (authored_offset * semantic_spread).rotated(scene_angle)
+		var variant_start := posmod(TrackBuilderCore._mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), String(story["id"]) + String(quantity)), asset_paths.size())
 		var placed_count := 0
 		for item_index in requested_count:
+			if stage.is_valid() and item_index > 0:
+				await stage.call("Dressing the start area")
+			var asset_path := asset_paths[(variant_start + item_index) % asset_paths.size()]
+			var radius := TrackBuilderCore._asset_radius(asset_path, 24.0) * size_scale
 			var local_offset := TrackBuilderCore._semantic_formation_offset(StringName(formation_data["formation"]), item_index, requested_count, radius)
 			var placed := false
 			var preferred := target + local_offset.rotated(scene_angle)
