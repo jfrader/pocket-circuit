@@ -5,8 +5,7 @@ extends RefCounted
 ##
 ## The engine owns every musical transition. This module only declares a seed
 ## and a profile, cues sections, and runs the phase rotation. One score is
-## generated per seed and reused, so a context change (menu <-> race) never
-## swaps the score.
+## generated per seed and reused.
 
 const RECIPE := "racing"
 ## The seeded composer is the whole racing pool (grooves, peaks, breather, and
@@ -55,18 +54,21 @@ func _init(host: Node) -> void:
 	_apply_volume()
 
 
-## Generate `seed` if it is not the loaded one, hold its tour form so the game
-## drives every phase, then cue `opening`.
+## Generate `seed` if it is not the loaded one, opening directly on the requested
+## section so a seed handoff does not stack a second section transition. Hold its
+## tour form so the game drives every later phase.
 func play(seed: String, profile: Dictionary, opening: String) -> void:
 	if _seed != seed:
 		_apply_profile(profile)
-		if not bool(_player.call("generate", seed)):
+		if not bool(_player.call("generate", seed, opening)):
 			push_error("Gamestruments generation failed for seed " + seed)
 			return
 		_seed = seed
 		_generations += 1
+		_requested = opening
 		_player.call("set_form_hold", true)
 		_apply_volume()
+		return
 	cue(opening)
 
 
