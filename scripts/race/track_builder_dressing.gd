@@ -254,6 +254,19 @@ static func bounded_quantity_count(quantity: StringName, requested: int) -> int:
 	return clampi(requested, 1, 20)
 
 
+static func formation_assets(data: Dictionary) -> Array[String]:
+	var assets: Array[String] = []
+	for value: Variant in data.get("assets", []):
+		var asset_path := String(value)
+		if not asset_path.is_empty() and asset_path not in assets:
+			assets.append(asset_path)
+	if assets.is_empty():
+		var fallback := String(data.get("asset", ""))
+		if not fallback.is_empty():
+			assets.append(fallback)
+	return assets
+
+
 static func semantic_formation_offset(formation: StringName, index: int, count: int, radius: float) -> Vector2:
 	var spacing := maxf(radius * 2.0 + 9.0, 25.0)
 	match formation:
@@ -319,21 +332,29 @@ static func build_track_formation(
 		occupied: Array[Dictionary],
 		stage: Callable = Callable()
 ) -> void:
+	var asset_paths := formation_assets(data)
+	if asset_paths.is_empty():
+		return
 	var formation := Node2D.new()
 	formation.name = node_name
 	formation.set_meta("semantic_quantity", quantity)
 	formation.set_meta("centerline_index", moment_index)
-	formation.set_meta("asset_path", String(data["asset"]))
+	formation.set_meta("asset_path", asset_paths[0])
+	formation.set_meta("asset_paths", PackedStringArray(asset_paths))
 	parent.add_child(formation)
 	var requested_count := bounded_quantity_count(quantity, int(data["count"]))
 	formation.set_meta("requested_count", requested_count)
-	var asset_path := String(data["asset"])
-	var radius := TrackBuilderCore._asset_radius(asset_path, 18.0)
-	var sample_step := (5 if radius > 20.0 else (4 if radius > 12.0 else 3)) if quantity == &"many" else maxi(6, ceili((radius * 2.0 + 10.0) / 10.0))
+	var maximum_radius := 0.0
+	for asset_path: String in asset_paths:
+		maximum_radius = maxf(maximum_radius, TrackBuilderCore._asset_radius(asset_path, 18.0))
+	var sample_step := (5 if maximum_radius > 20.0 else (4 if maximum_radius > 12.0 else 3)) if quantity == &"many" else maxi(6, ceili((maximum_radius * 2.0 + 10.0) / 10.0))
+	var variant_start := posmod(TrackBuilderCore._mix_seed(moment_index, node_name), asset_paths.size())
 	var placed_count := 0
 	for item_index in requested_count:
 		if stage.is_valid() and item_index > 0:
 			await stage.call("Placing track objects")
+		var asset_path := asset_paths[(variant_start + item_index) % asset_paths.size()]
+		var radius := TrackBuilderCore._asset_radius(asset_path, 18.0)
 		var sample_offset := int(round((float(item_index) - float(requested_count - 1) * 0.5) * float(sample_step)))
 		var placed := false
 		for adjustment_attempt in 17:
