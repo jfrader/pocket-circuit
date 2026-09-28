@@ -57,7 +57,7 @@ func _run_test() -> void:
 		return
 	if not _expect(String(prepared["spec"]["material_id"]) == String(identity["material_id"]) and String(prepared["spec"]["palette_id"]) == String(identity["palette_id"]), "prepared layout should publish the same material identity"):
 		return
-	if not _expect(prepared["spec"]["track_texture"] == prepared["spec"]["surface_identity"]["course"]["texture"], "course texture must come from its independent material role"):
+	if not _expect(prepared["spec"]["track_texture"] == prepared["spec"]["surface_identity"]["course"]["texture"] and prepared["spec"]["track_texture"] == prepared["spec"]["floor_texture"], "paint must retain the room's continuous substrate texture"):
 		return
 	if not _expect(BUILDER.ROOM_COMPOSITIONS == BUILDER.STORY_KITS, "STORY_KITS should remain an alias of room compositions"):
 		return

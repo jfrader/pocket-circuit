@@ -24,12 +24,15 @@ func _run() -> void:
 			assert(result == MATERIALS.resolve(theme, sample), "same seed must reproduce every surface parameter")
 			var course: Dictionary = result["course"]
 			courses[course["id"]] = true
-			constructions[str([course["grain_seed"], course["grain_period_mm"], course["join_count"], course["join_phase"]])] = true
+			constructions[str([course["grain_seed"], course["brush_period_mm"], course["brush_phase"], course["edge_width_mm"]])] = true
 			assert(course["contrast_safe"], "authored course/floor/island combinations must have a readable palette")
 			assert(float(course["min_surface_contrast"]) >= 1.5, "contrast policy must not be weakened")
+			assert(float(course["paint_opacity"]) > 0.0 and float(course["paint_opacity"]) <= 0.90, "paint must remain translucent")
+			assert((course["pigment_color"] as Color).s <= 0.3, "pigments must remain restrained rather than saturated")
 			for neighbor: String in ["floor", "island"]:
-				assert(MATERIALS.COURSE.surface_contrast(course["base_color"], result[neighbor]) >= float(course["min_surface_contrast"]), "course must remain clearly distinct from " + neighbor)
+				assert(MATERIALS.COURSE.course_contrast(course, result["floor"], result[neighbor]) >= float(course["min_surface_contrast"]), "composited paint must remain clearly distinct from " + neighbor)
 			assert(FileAccess.file_exists(course["texture"]), "course grain must use a shipping texture")
+			assert(course["texture"] == result["floor"]["texture"], "paint must retain the actual supporting material")
 			assert(String(course["id"]).begins_with(String(theme) + "_"), "course palette must belong to its room")
 			floors[result["floor"]["id"]] = true
 			islands[result["island"]["id"]] = true
@@ -55,7 +58,7 @@ func _run() -> void:
 				var resolved := MATERIALS.resolve(theme, sample, family, identity["palette_id"], identity["floor_modulate"])
 				assert(resolved["course"]["contrast_safe"], "curated story tints must preserve course contrast")
 				for neighbor: String in ["floor", "island"]:
-					assert(MATERIALS.COURSE.surface_contrast(resolved["course"]["base_color"], resolved[neighbor]) >= float(resolved["course"]["min_surface_contrast"]), "curated story course must differ from " + neighbor)
+					assert(MATERIALS.COURSE.course_contrast(resolved["course"], resolved["floor"], resolved[neighbor]) >= float(resolved["course"]["min_surface_contrast"]), "curated story paint must differ from " + neighbor)
 		print("SURFACE_RANGE ", theme, " seeds=", SAMPLE_COUNT, " floor=", floors.size(), " island=", islands.size(), " pairs=", pairs.size(), " structures=", structures.size())
 	var first := CORE.prepare_layout(&"workshop", &"wide", 246810, {"material_seed": 1})
 	var second := CORE.prepare_layout(&"workshop", &"wide", 246810, {"material_seed": 2})

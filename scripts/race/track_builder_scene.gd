@@ -29,12 +29,6 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	for piece: PackedVector2Array in clipped_pieces:
 		if piece.size() > clipped.size():
 			clipped = piece
-	if not spec.get("seed_obstacles", false):
-		# Canonical tracks retain their authored painted base. Generated tracks use
-		# the themed TrackSurface directly; a translucent annular overlay produces
-		# visible triangulation fans in deep notches and L-shaped routes.
-		TrackBuilderCore._add_polygon(root, "TrackRibbon", clipped, Color(1.0, 0.96, 0.88, 0.17), -10)
-		TrackBuilderCore._mark_flat_visual(root.get_node("TrackRibbon") as Polygon2D, "", &"track_surface")
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
 		var same_material := track_texture == floor_texture
