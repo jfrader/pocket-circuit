@@ -1,12 +1,15 @@
 class_name RaceHUD
 extends Control
 
-const INK := Color("0e151f")
-const PAPER := Color("f5f0e3")
-const MUTED := Color("aeb7c8")
-const AMBER := Color("f4c65a")
-const DARK_METER := Color("27313a")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
+const HINT_SECONDS := 10.0
+const KMH_AT_FULL_SPEED := 180.0
+const SPEED_FORMAT := "%03d"
+const SPEED_UNIT := "KM/H"
+const SPEED_FONT_SIZE := 26
+const CAPTION_FONT_SIZE := 11
+const SPEED_PADDING := 14.0
+const BOOST_TUBE_HEIGHT := 32.0
 
 var race_position := 1
 var racer_count := 4
@@ -21,15 +24,12 @@ var wrong_way := false
 var route_progress := PackedFloat32Array()
 var player_progress_index := 0
 var next_checkpoint := 0
-var _position_plate: StyleBoxTexture = SKIN.panel(true)
-var _instrument_plate: StyleBoxTexture = SKIN.panel(false)
 
 
 func _ready() -> void:
 	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	_position_plate.modulate_color = Color.WHITE
 	queue_redraw()
 
 
@@ -65,106 +65,101 @@ func set_route_progress(progress: PackedFloat32Array, player_index: int, checkpo
 func _draw() -> void:
 	if size.x < 640.0 or size.y < 360.0:
 		return
-	var font := ThemeDB.fallback_font
 	var layout := get_layout_rects()
-	_draw_position_cluster(font, layout)
-	_draw_clock_cluster(font, layout["clock"])
-	_draw_speed_cluster(font, layout["speed"], layout["controls_hint"])
-	_draw_route_progress(font, layout["progress"])
+	_draw_position(layout["position"])
+	_draw_lap(layout["lap"])
+	_draw_clock(layout["clock"])
+	_draw_speed(layout["speed"])
+	_draw_route_progress(layout["progress"])
+	if elapsed_seconds < HINT_SECONDS:
+		var hint_rect: Rect2 = layout["controls_hint"]
+		SKIN.draw_plate(self, hint_rect, SKIN.INK, 4, 0.0)
+		SKIN.draw_text(self, hint_rect.position + Vector2(10.0, 17.0), "R / Y  RECOVER   ·   ESC / START  PAUSE", 12, SKIN.CREAM, hint_rect.size.x - 16.0)
 	if wrong_way:
-		_draw_wrong_way(font, layout["warning"])
-
-
-func _outlined(font: Font, pos: Vector2, text: String, width: float, font_size: int, color: Color, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT) -> void:
-	draw_string_outline(font, pos, text, alignment, width, font_size, 2, INK)
-	draw_string(font, pos, text, alignment, width, font_size, color)
+		_draw_wrong_way(layout["warning"])
 
 
 func get_layout_rects() -> Dictionary:
 	return {
-		"position": Rect2(24, 24, 168, 72),
-		"lap": Rect2(202, 24, 190, 72),
-		"clock": Rect2(size.x - 224, 24, 200, 72),
-		"speed": Rect2(size.x - 314, size.y - 112, 290, 88),
-		"progress": Rect2(size.x * 0.5 - 170, size.y - 76, 340, 52),
-		"warning": Rect2(size.x * 0.5 - 170, 116, 340, 48),
-		"controls_hint": Rect2(24, size.y - 50, 390, 26),
+		"position": Rect2(24, 24, 150, 76),
+		"lap": Rect2(184, 30, 150, 64),
+		"clock": Rect2(size.x - 204, 24, 180, 64),
+		"speed": Rect2(size.x - 304, size.y - 104, 280, 80),
+		"progress": Rect2(size.x * 0.5 - 170, size.y - 64, 340, 40),
+		"warning": Rect2(size.x * 0.5 - 150, 116, 300, 52),
+		"controls_hint": Rect2(24, size.y - 48, 380, 24),
 	}
 
 
-func _text(font: Font, pos: Vector2, text: String, font_size: int, color: Color, width: float = -1.0, alignment: HorizontalAlignment = HORIZONTAL_ALIGNMENT_LEFT) -> void:
-	draw_string(font, pos, text, alignment, width, font_size, color)
-
-
-func _draw_position_cluster(font: Font, layout: Dictionary) -> void:
-	var position_rect: Rect2 = layout["position"]
-	draw_style_box(_position_plate, position_rect)
-	var origin := position_rect.position
-	for row in 4:
-		for column in 4:
-			if (row + column) % 2 == 0:
-				draw_rect(Rect2(origin + Vector2(16 + column * 5, 29 + row * 5), Vector2(5, 5)), INK)
+func _draw_position(rect: Rect2) -> void:
+	SKIN.draw_plate(self, rect, SKIN.CREAM)
+	var flag_height := rect.size.y - 24.0
+	SKIN.draw_flag(self, Rect2(rect.position + Vector2(12.0, 12.0), Vector2(18.0, flag_height)), 6.0)
+	var origin := rect.position + Vector2(42.0, 0.0)
 	if racer_count <= 1:
-		_text(font, origin + Vector2(48, 24), "TIME TRIAL", 11, INK)
-		_text(font, origin + Vector2(48, 57), "SOLO", 28, INK)
-	else:
-		_text(font, origin + Vector2(48, 24), "POSITION", 11, INK)
-		_text(font, origin + Vector2(48, 57), str(race_position), 34, INK)
-		_text(font, origin + Vector2(89, 57), "/ %d" % racer_count, 20, INK)
-	var lap_rect: Rect2 = layout["lap"]
-	draw_style_box(_instrument_plate, lap_rect)
-	_text(font, lap_rect.position + Vector2(16, 28), "LAP", 12, MUTED)
-	_text(font, lap_rect.position + Vector2(67, 29), "%d / %d" % [current_lap, lap_total], 22, PAPER)
-	var lap_hint := "TO FINISH" if next_checkpoint == 0 else ("FINAL LAP" if current_lap == lap_total else "")
+		_caption(origin + Vector2(0.0, 22.0), "TIME TRIAL")
+		SKIN.draw_text(self, origin + Vector2(0.0, 58.0), "SOLO", 30, SKIN.INK)
+		return
+	_caption(origin + Vector2(0.0, 22.0), "POSITION")
+	var place := str(race_position)
+	SKIN.draw_text(self, origin + Vector2(0.0, 64.0), place, 42, SKIN.INK)
+	var place_width := SKIN.display_font().get_string_size(place, HORIZONTAL_ALIGNMENT_LEFT, -1, 42).x
+	SKIN.draw_text(self, origin + Vector2(place_width + 6.0, 62.0), "/%d" % racer_count, 22, SKIN.INK_SOFT)
+
+
+func _draw_lap(rect: Rect2) -> void:
+	var final_lap := current_lap == lap_total
+	SKIN.draw_plate(self, rect, SKIN.YELLOW if final_lap else SKIN.CREAM)
+	_caption(rect.position + Vector2(16.0, 22.0), "LAP")
+	var lap_hint := "TO FINISH" if next_checkpoint == 0 else ("FINAL" if final_lap else "")
 	if not lap_hint.is_empty():
-		_text(font, lap_rect.position + Vector2(16, 55), lap_hint, 12, AMBER)
+		SKIN.draw_text(self, rect.position + Vector2(16.0, 22.0), lap_hint, 11, SKIN.ORANGE.darkened(0.35), rect.size.x - 32.0 - SKIN.SHADOW, HORIZONTAL_ALIGNMENT_RIGHT)
+	SKIN.draw_text(self, rect.position + Vector2(16.0, 52.0), "%d / %d" % [current_lap, lap_total], 26, SKIN.INK)
 
 
-func _draw_clock_cluster(font: Font, rect: Rect2) -> void:
-	draw_style_box(_instrument_plate, rect)
-	_text(font, rect.position + Vector2(16, 23), "RACE TIME", 11, MUTED)
-	_text(font, rect.position + Vector2(16, 56), _format_time(elapsed_seconds), 26, PAPER, rect.size.x - 32, HORIZONTAL_ALIGNMENT_RIGHT)
+func _draw_clock(rect: Rect2) -> void:
+	SKIN.draw_plate(self, rect, SKIN.CREAM)
+	_caption(rect.position + Vector2(16.0, 22.0), "TIME")
+	SKIN.draw_text(self, rect.position + Vector2(16.0, 52.0), _format_time(elapsed_seconds), 26, SKIN.INK, rect.size.x - 32.0 - SKIN.SHADOW, HORIZONTAL_ALIGNMENT_RIGHT)
 
 
-func _draw_speed_cluster(font: Font, rect: Rect2, hint_rect: Rect2) -> void:
-	var origin := rect.position
-	draw_style_box(_instrument_plate, rect)
-	var kmh := "%03d" % roundi(speed_ratio * 180.0)
-	_text(font, origin + Vector2(18, 25), "SPEED", 11, MUTED)
-	_text(font, origin + Vector2(18, 63), kmh, 30, PAPER)
-	_text(font, origin + Vector2(88, 61), "KM/H", 11, MUTED)
-	_text(font, origin + Vector2(136, 25), "BOOST  %d%%" % roundi(boost_ratio * 100), 12, AMBER)
-	for index in 10:
-		var segment := Rect2(origin + Vector2(136 + index * 12, 36), Vector2(8, 12))
-		draw_rect(segment, DARK_METER)
-		segment.size.x *= clampf(boost_ratio * 10 - index, 0, 1)
-		if segment.size.x > 0:
-			draw_rect(segment, SKIN.TEAL)
-	_text(font, origin + Vector2(136, 68), "SHIFT / B", 11, MUTED)
-	if elapsed_seconds < 10.0:
-		_outlined(font, hint_rect.position + Vector2(0, 18), "R / Y  RECOVER   ·   ESC / START  PAUSE", hint_rect.size.x, 13, PAPER)
+func _draw_speed(rect: Rect2) -> void:
+	SKIN.draw_plate(self, rect, SKIN.CREAM)
+	var face := Rect2(rect.position, rect.size - Vector2.ONE * SKIN.SHADOW).grow(-SPEED_PADDING)
+	var font := SKIN.display_font()
+	var readout_width := maxf(
+		font.get_string_size(SPEED_FORMAT % 0, HORIZONTAL_ALIGNMENT_LEFT, -1, SPEED_FONT_SIZE).x,
+		font.get_string_size(SPEED_UNIT, HORIZONTAL_ALIGNMENT_LEFT, -1, CAPTION_FONT_SIZE).x
+	)
+	SKIN.draw_text(self, Vector2(face.position.x, rect.position.y + 38.0), SPEED_FORMAT % roundi(speed_ratio * KMH_AT_FULL_SPEED), SPEED_FONT_SIZE, SKIN.INK)
+	_caption(Vector2(face.position.x, rect.position.y + 58.0), SPEED_UNIT)
+	var tube_left := face.position.x + readout_width + SPEED_PADDING
+	SKIN.draw_tube(self, Rect2(tube_left, face.get_center().y - BOOST_TUBE_HEIGHT * 0.5, face.end.x - tube_left, BOOST_TUBE_HEIGHT), boost_ratio)
 
 
-func _draw_route_progress(font: Font, rect: Rect2) -> void:
+func _draw_route_progress(rect: Rect2) -> void:
 	if route_progress.is_empty():
 		return
-	draw_style_box(_instrument_plate, rect)
-	var origin := rect.position + Vector2(16, 20)
-	var length := rect.size.x - 32
-	draw_line(origin, origin + Vector2(length, 0), MUTED, 2)
+	SKIN.draw_plate(self, rect, SKIN.CREAM, roundi(rect.size.y * 0.5))
+	var line_y := rect.position.y + (rect.size.y - SKIN.SHADOW) * 0.5 + 1.0
+	var start := Vector2(rect.position.x + 22.0, line_y)
+	var length := rect.size.x - 60.0
+	draw_line(start, start + Vector2(length, 0.0), SKIN.INK_SOFT, 3.0, true)
+	SKIN.draw_flag(self, Rect2(start + Vector2(length + 6.0, -8.0), Vector2(12.0, 16.0)), 4.0)
 	for index in route_progress.size():
-		if index == player_progress_index:
-			continue
-		draw_circle(origin + Vector2(clampf(route_progress[index], 0, 1) * length, 0), 3, PAPER)
+		if index != player_progress_index:
+			SKIN.draw_disc(self, start + Vector2(clampf(route_progress[index], 0.0, 1.0) * length, 0.0), 4.0, SKIN.BLUE, 0.0)
 	if player_progress_index >= 0 and player_progress_index < route_progress.size():
-		var player_x := clampf(route_progress[player_progress_index], 0, 1) * length
-		draw_circle(origin + Vector2(player_x, 0), 6, AMBER)
-	_text(font, rect.position + Vector2(16, 43), "RACE PROGRESS", 11, MUTED, length, HORIZONTAL_ALIGNMENT_CENTER)
+		SKIN.draw_disc(self, start + Vector2(clampf(route_progress[player_progress_index], 0.0, 1.0) * length, 0.0), 7.0, SKIN.ORANGE, 2.0)
 
 
-func _draw_wrong_way(font: Font, warning_rect: Rect2) -> void:
-	draw_style_box(_instrument_plate, warning_rect)
-	_text(font, warning_rect.position + Vector2(0, 33), "WRONG WAY", 23, AMBER, warning_rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+func _draw_wrong_way(rect: Rect2) -> void:
+	SKIN.draw_plate(self, rect, SKIN.RED)
+	SKIN.draw_text(self, rect.position + Vector2(0.0, 36.0), "WRONG WAY", 28, SKIN.CREAM, rect.size.x - SKIN.SHADOW, HORIZONTAL_ALIGNMENT_CENTER)
+
+
+func _caption(text_position: Vector2, text: String) -> void:
+	SKIN.draw_text(self, text_position, text, CAPTION_FONT_SIZE, SKIN.INK_SOFT)
 
 
 func _format_time(total_seconds: float) -> String:

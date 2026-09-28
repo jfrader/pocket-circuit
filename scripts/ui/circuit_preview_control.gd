@@ -1,16 +1,17 @@
 class_name CircuitPreviewControl
 extends Control
 
-const INK := Color("101b21")
-const AMBER := Color("f4c65a")
-const CORAL := Color("e85a2e")
-const MUTED := Color("4a5a6c")
+const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
+const SOURCE_SIZE := Vector2(420.0, 190.0)
+const GRID_CELL := 20.0
+const ROAD_WIDTH := 11.0
+const START_MARKER := 14.0
 
 var points := PackedVector2Array()
 
 
 func _ready() -> void:
-	custom_minimum_size = Vector2(420.0, 190.0)
+	custom_minimum_size = SOURCE_SIZE
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
@@ -20,16 +21,18 @@ func set_preview(preview: Dictionary) -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), Color(INK, 0.92), true)
-	draw_rect(Rect2(Vector2.ZERO, size), MUTED, false, 2.0)
+	var card := Rect2(Vector2.ZERO, size - Vector2.ONE * SKIN.SHADOW)
+	SKIN.draw_plate(self, card, SKIN.CREAM)
+	SKIN.draw_grid(self, card.grow(-SKIN.LINE - 4.0), GRID_CELL)
 	if points.size() < 3:
-		draw_string(ThemeDB.fallback_font, Vector2(22.0, size.y * 0.55), "PREPARING ROUTE PREVIEW…", HORIZONTAL_ALIGNMENT_LEFT, -1, 16, AMBER)
+		SKIN.draw_text(self, Vector2(22.0, card.size.y * 0.55), "PREPARING ROUTE PREVIEW…", 16, SKIN.INK)
 		return
 	var scaled := PackedVector2Array()
-	var source_size := Vector2(420.0, 190.0)
+	var scale_factor := card.size / SOURCE_SIZE
 	for point: Vector2 in points:
-		scaled.append(point * (size / source_size))
+		scaled.append(point * scale_factor)
 	scaled.append(scaled[0])
-	draw_polyline(scaled, Color(INK, 0.9), 15.0, true)
-	draw_polyline(scaled, AMBER, 7.0, true)
-	draw_circle(scaled[0], 7.0, CORAL)
+	draw_polyline(scaled, SKIN.INK, ROAD_WIDTH + SKIN.LINE * 2.0, true)
+	draw_polyline(scaled, SKIN.ASPHALT, ROAD_WIDTH, true)
+	draw_polyline(scaled, Color(SKIN.CREAM, 0.55), 1.5, true)
+	SKIN.draw_flag(self, Rect2(scaled[0] - Vector2.ONE * START_MARKER * 0.5, Vector2.ONE * START_MARKER), START_MARKER * 0.25)

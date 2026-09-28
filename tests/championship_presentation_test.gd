@@ -65,6 +65,10 @@ func _run_test() -> void:
 	await process_frame
 	if not _expect(String(shell.get("_screen")) == "quick_race" and int(shell.get("_quick_race_seed")) == seed_before, "Next should return to Quick Race without changing the chosen circuit"):
 		return
+	_button(shell, "REROLL").pressed.emit()
+	await process_frame
+	if not _expect(String(shell.get("_stage").get("vehicle_id")) == "flicker", "reroll must keep the preview car aligned with the selected and launched car"):
+		return
 	_button(shell, "PLAY").pressed.emit()
 	if not _expect(app.launched_vehicle == "flicker", "Quick Race should use the car chosen in the garage"):
 		return
