@@ -53,7 +53,7 @@ static func floor_contrast(color: Color, floor_profile: Dictionary) -> float:
 	return (maxf(luminance, nearest) + CONTRAST_LUMINANCE_OFFSET) / (minf(luminance, nearest) + CONTRAST_LUMINANCE_OFFSET)
 
 
-static func apply(track: Node2D, profile: Dictionary) -> NoiseTexture2D:
+static func apply(track: Node2D, profile: Dictionary) -> ImageTexture:
 	var surface := track.get_node_or_null("TrackSurface") as Line2D
 	if surface == null:
 		return null
@@ -75,7 +75,7 @@ static func apply(track: Node2D, profile: Dictionary) -> NoiseTexture2D:
 	return grain
 
 
-static func _grain(profile: Dictionary) -> NoiseTexture2D:
+static func _grain(profile: Dictionary) -> ImageTexture:
 	var key := str([profile["grain_seed"], profile["grain_frequency"], profile["grain_texture_size"], profile["grain_octaves"], profile["grain_blend_skirt"]])
 	if _grains.has(key):
 		return _grains[key]
@@ -83,13 +83,10 @@ static func _grain(profile: Dictionary) -> NoiseTexture2D:
 	noise.seed = int(profile["grain_seed"])
 	noise.frequency = float(profile["grain_frequency"])
 	noise.fractal_octaves = int(profile["grain_octaves"])
-	var grain := NoiseTexture2D.new()
-	grain.width = int(profile["grain_texture_size"])
-	grain.height = grain.width
-	grain.generate_mipmaps = true
-	grain.seamless = true
-	grain.seamless_blend_skirt = float(profile["grain_blend_skirt"])
-	grain.noise = noise
+	var size := int(profile["grain_texture_size"])
+	var image := noise.get_seamless_image(size, size, false, false, float(profile["grain_blend_skirt"]))
+	image.generate_mipmaps()
+	var grain := ImageTexture.create_from_image(image)
 	while _grains.size() >= int(profile["grain_cache_limit"]):
 		_grains.erase(_grains.keys()[0])
 	_grains[key] = grain
