@@ -11,6 +11,11 @@ changelog, not here.
 scripts/race/track_seed_gen.gd          requested seed + room -> deterministic route
 scripts/race/track_route_grammar.gd     seed-driven macro sections and dimensions
 scripts/race/track_builder_core.gd      route + story kit -> runtime PackedScene
+scripts/race/world_environment_catalog.gd  asset contract + semantic role pools
+scripts/race/world_environment_plan.gd     pure seeded physical placement plan
+scripts/race/world_environment_art.gd      yielded scene rendering
+scripts/race/household_surface_materials.gd independent procedural material stream
+scripts/race/handmade_course_materials.gd   seeded course grain, palette and flat joins
 tools/build_procedural_track.gd  optional CLI for saved development snapshots
 scripts/race/prototype_race.gd   builds the requested circuit at race startup
 ```
@@ -117,41 +122,53 @@ their original unscaled canvases.
 
 ## Household Stories
 
-- `ROOM_COMPOSITIONS` (`STORY_KITS` alias) is the source of truth for generated
-  dressing. Kitchen, Workshop, and Office each provide four coherent stories.
-  Each story selects one material family; an independent material stream then
-  chooses one of two curated palettes without changing route geometry.
-- Semantic quantities are literal: `unique` is exactly 1, `few` is 2-3, and
-  `many` is 8-20. A unique asset cannot repeat between the island, opening, and
-  corner landmarks in the same track.
-- Story dressing is concentrated into authored moments: one island focal
-  cluster, one object line, one sparse delimiter, one or two corner landmarks,
-  and one iconic opening landmark.
-- Ambient room dressing uses 4-6 deterministic safe pockets of three props
-  across distinct sectors. Each pocket is a semantic `few`, and the 12-18 prop
-  room-level aggregate remains a semantic `many` without becoming uniform
-  noise. Story assets marked `unique` are reserved before ambient placement.
-- Ground sections add 2-4 broad, theme-specific cloth, paper, cardboard, or
-  desk-pad anchors across distinct room sectors. They are non-colliding
-  `Sprite2D` presentation and never become gameplay surfaces or barriers.
-- Floor details add 60-120 small non-colliding themed decals to large blank
-  areas. Another 60-150 micro details dress the corridor edges and apron:
-  painted crumbs, fibers, droplets, grain, and sawdust stay flat, while visible
-  hardware such as screws, clips, pins, and washers uses small footprint-matched
-  scenery collision. Every collision-bearing trackside footprint stays at least
-  36 units beyond the 125-unit corridor edge; flat dressing may use the narrower
-  visual margin. Ambient props, ground sections, and both detail layers stay
-  inside the room and outside the protected route corridor and recovery lanes.
-- Every generated room places 1-3 giant household landmarks at 300-600 world
-  units. Every giant has scenery collision on layers 4 and 16; its collider uses
-  at least 90% of the trimmed visible footprint and remains inside the room and
-  clear of the corridor, gates, and other props. Giant placement additionally
-  rejects any intersection with a 22-unit swept vehicle hull around the
-  committed safe and shortcut racing lines.
-- Asset dimensions and collider kinds come from the explicit SOLID roster in
-  `PROP_SHAPES`; giant placement and collision use each texture's trimmed alpha
-  footprint. Generated story props must use transparent PNG textures, never
-  opaque JPG rectangles.
+- `ROOM_COMPOSITIONS` (`STORY_KITS` alias) retains four semantic stories per
+  theme and their gameplay surface choices. `WorldEnvironmentCatalog` combines
+  these with the asset contract and `data/environment_composition.json` support
+  families. A single `WorldEnvironmentPlan` replaces independent scatter passes.
+- The planner selects one fitted focal, then supporting groups, restrained micro
+  dressing, sparse boundary pieces and bounded ground/decal dressing. Role streams
+  are seeded independently. Focal alternatives retain their real dimensions;
+  a failed fit is not permission to shrink or stretch an object.
+- Repetition is keyed by canonical asset id rather than output alias. The plan
+  enforces the catalog budgets; visual gameplay-surface paint has its own bounded
+  sampling. Flat ground can underlay objects but cannot straddle a solid rim.
+- Gate footprints and sealed bay polygons are reserved before placement. Every
+  planned object stays inside the room and outside the full 125-unit corridor
+  plus its declared clearance. Solid footprints cannot overlap. One deliberately
+  open apron sector is preserved.
+- Procedural surface profiles live in `data/household_material_patterns.json`.
+  Story families and curated palette identities constrain the independent material
+  stream; profile, pattern layout, spacing, orientation, seams and grain vary
+  without changing geometry. Floor and course use world coordinates with independent
+  material profiles, so the intended route stays distinct from the open apron.
+- Four floor and three island profiles are available per theme. Workshop timber
+  and technical pads remain distinct from Office laminate/veneer and ink-blue,
+  oxblood or indigo desk pads. Kitchen retains ceramics and preparation boards.
+- The course adds a separate seed stream for card grain, palette and joins.
+  It does not perturb existing floor/island selections. Palettes target at least
+  1.5:1 linear-luminance contrast against both neighboring surfaces' base/pattern
+  color ranges (tabletop and island);
+  an unmatched custom palette chooses the strongest available contrast and exposes
+  `contrast_safe=false` rather than silently claiming the target was met.
+- Course construction is explicitly `FLAT`: shallow shadow, three to five joins
+  and paired tape strips. Reapplication replaces the previous construction; it
+  cannot add collision, change road width, racing lines or grip definitions.
+  Closed-loop sampling includes the closing segment. Grain uses Godot's
+  `FastNoiseLite.get_seamless_image()` and completed, mipmapped `ImageTexture`s.
+  Never embed worker-owning `NoiseTexture2D` resources in threaded-loaded scenes:
+  rapid scene cancellation can hang engine shutdown while they are destroyed.
+  Generation is bounded by the configured texture size and a yielded loading stage.
+  The grain cache is bounded by `course_settings.grain_cache_limit`.
+- `data/world_prop_art.json` owns sources, style, themes, roles, dimensions, zones,
+  clearances, repetition and collision/shadow behavior for all active outputs.
+  `WorldPropScale` uses one world unit per millimetre and trims transparent
+  padding before uniform scaling. Catalog SOLID contracts use those lengths
+  and alpha-derived hulls. All generated roles share the same size; no role
+  clamps, random giant inflation, or anisotropic rail stretching are allowed.
+  Tiny roles use physically small props. A focal or rail that cannot fit is
+  replaced from a theme-specific pool at its own size, never shrunk to fit.
+  Generated story props must use transparent PNG textures, never opaque JPG rectangles.
 - Trackside placement must remain clear of checkpoint recovery corridors:
   230 units along the route and 48 units across it, plus the prop radius.
 
@@ -160,7 +177,8 @@ their original unscaled canvases.
 Generated tracks implement the design contract in `game-design-spec.md` section
 11 as playable geometry and mechanics:
 
-- `OpeningLandmark`: one household focal prop near the opening sector.
+- `environment_focal`: the fitted household anchor; opening index metadata remains
+  available independently of the chosen physical placement.
 - `EarlyConflictForward` and `EarlyConflictReverse`: kitchen and workshop roll
   a hazard across the corridor 12-25% into the lap in either direction. Office
   parks a coiled cable at that pose. There is no countdown overlay.
@@ -189,15 +207,16 @@ line.
 ## Visual and Collision Language
 
 - No white edge lines, dashed centerlines, kerbs, painted route borders, or
-  translucent gameplay-zone overlays. Household objects and material changes
+  hard-edged gameplay-zone rectangles. Household objects and material changes
   communicate the course. The checker is the only painted race marking.
 - Generated routes use the themed `TrackSurface` directly and must not add the
   old `TrackRibbon`, whose triangulation produced artifacts in concave routes.
-- Surface gameplay polygons remain visually transparent. Their themed decals
-  show the technical section, risky shortcut lane, and extra grip patches.
-- Generated corridors carry exactly 32 low-alpha, non-colliding material marks
-  so wood, cork, and desk-pad roads do not read as flat color. These marks are
-  visual texture, not racing lines or gameplay zones.
+- Gameplay surfaces use feathered low-opacity material tints and seeded,
+  physically scaled paint sprites clipped to their authoritative polygons.
+  These cues show the technical section, risky shortcut and extra grip patches.
+- World-coordinate procedural patterns provide floor detail without a fixed
+  count of stamped corridor sprites. Material patterns are not racing lines or
+  gameplay zones.
 - The themed floor texture is clipped to the room surface. A 760-unit #111316
   overscan ring beyond the fully backed room walls deliberately reads as void,
   including around wide and L-shaped canvases.
@@ -222,33 +241,27 @@ line.
   never reused as island or edge scenery.
 - The island is one visibly raised solid object. Its closed layer-2
   `ConcavePolygonShape2D` segment chain follows the outer contact edge of a dark
-  side-face, tiled theme edge, and warm top lip. Two to four small visible
-  colliding props sit just inside that rim for scale. Recovery begins at that
+  side-face, theme-colored edge and top lip. Recovery begins at that
   visible contact edge; do not send the concave island through convex
   decomposition.
-- Themed course rails are deliberately partial real assets. Eight deterministic
-  sectors retain exactly one open run, at least four both-sided runs, and two or
-  three one-sided runs. Each edge remains represented in at least five sectors;
-  a physically tight edge may move one requested run to the opposite safe side
-  rather than violate the 36-unit apron clearance. The open run receives only
-  one flat non-colliding worn-floor hint. Kitchen mixes towel, spoon, chopstick,
-  and bread-board rails; Workshop mixes paint stirrer, dowel, clamp, and ruler
+- Themed course rails are deliberately sparse real assets. Eight deterministic
+  sectors describe the actual placed sides, with a reserved open-apron sector.
+  A physically tight placement selects another legal object or location rather
+  than shrinking art or violating clearance. Kitchen mixes fork, spoon, chopstick,
+  and cork rails; Workshop mixes paint stirrer, dowel, clamp, ruler, and nail
   rails; Office mixes pencil, ruler, pen, and book-spine rails. Rail and corner-
   accent colliders validate their complete oriented footprint, not only their
-  center. An empty run means open drivable apron, never hidden collision.
+  center. Neighboring rail footprints do not overlap, and story placement
+  reserves the existing physical boundaries and posts. An empty run means open
+  drivable apron, never hidden collision.
 - Every ordered checkpoint `Area2D` is asymmetric: its inner endpoint stops at
   `HALF_WIDTH` or the raised island, while its outer endpoint reaches the room
   wall. Inner grass does not trip the gate, but legal outer-apron lines do. The
   checkpoint recovery anchor remains on the racing line. The finish checker
-  spans the complete nominal corridor, and its larger paired themed posts sit
+  spans the complete nominal corridor, and its paired physical-size themed posts sit
   symmetrically at the corridor ends so the same landmark reads in forward and
   reverse races. Other checkpoints use two small colliding themed posts without
   blocking the racing line.
-  remain corridor-sized visual landmarks. The finish checker spans the complete
-  nominal corridor, and its larger paired themed posts sit symmetrically at the
-  corridor ends so the same landmark reads in forward and reverse races. Other
-  checkpoints use two small colliding themed posts without blocking the racing
-  line.
 - All physical scenery uses the same upper-left key light: soft warm contact
   shadows offset down-right by 8-12% of the footprint, rectangular or circular
   to match the prop. Giants add a faint elongated down-right cast shadow.

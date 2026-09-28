@@ -244,7 +244,7 @@ func _position_for(value: HazardState, elapsed: float) -> Vector2:
 
 
 func _default_footprint_size() -> Vector2:
-	return Vector2(60.0, 36.0) if theme == &"office" else Vector2(60.0, 60.0)
+	return WorldPropScale.hazard_size(theme)
 
 
 func _set_state(next_state: HazardState) -> void:
@@ -368,8 +368,10 @@ func _build_visuals() -> void:
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		sprite.set_meta("asset_path", sprite_texture.resource_path)
 		VISUAL_ROLE_CONTRACT.assign(sprite, VISUAL_ROLE_CONTRACT.MOVING_HAZARD)
-		var longest := maxf(sprite_texture.get_width(), sprite_texture.get_height())
-		sprite.scale = Vector2.ONE * ((maxf(footprint_size.x, footprint_size.y) + 8.0) / maxf(longest, 1.0))
+		var bounds := Rect2(sprite_texture.get_image().get_used_rect())
+		var scale_factor := WorldPropScale.sprite_scale(sprite_texture, bounds, maxf(footprint_size.x, footprint_size.y))
+		sprite.scale = Vector2.ONE * scale_factor
+		sprite.position = -(bounds.get_center() - sprite_texture.get_size() * 0.5) * scale_factor
 		_moving_visual.add_child(sprite)
 		_hazard_sprite = sprite
 		polygon.visible = false

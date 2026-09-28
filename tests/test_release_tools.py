@@ -1,4 +1,6 @@
 from pathlib import Path
+import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -29,3 +31,31 @@ class CompletionMarkerTests(unittest.TestCase):
             path.write_text('print("ONE_TEST PASS")\nprint("TWO_TEST PASS")\n')
             with self.assertRaises(ValueError):
                 marker_for(path)
+
+
+class GodotGateTests(unittest.TestCase):
+    def run_worker(self, code):
+        return subprocess.run(
+            ["bash", "-c", 'source "$1"; export -f run_godot_checked; shift; bash -c \'run_godot_checked "$@"\' worker "$@"',
+             "gate-test", str(ROOT / "tools/godot_gate.sh"), sys.executable, "-c", code],
+            env={**os.environ, "POCKET_CIRCUIT_EXPECT_OUTPUT": "FIXTURE PASS"},
+            capture_output=True, text=True, timeout=10,
+        )
+
+    def test_clean_success_marker_and_exit_pass(self):
+        result = self.run_worker('print("FIXTURE PASS")')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_nonzero_exit_after_success_marker_fails(self):
+        for status in (1, 7, 124):
+            with self.subTest(status=status):
+                result = self.run_worker(f'import sys; print("FIXTURE PASS"); sys.exit({status})')
+                self.assertNotEqual(result.returncode, 0, "tee must not hide the child process exit status")
+
+    def test_script_error_with_zero_exit_fails(self):
+        result = self.run_worker('print("FIXTURE PASS"); print("SCRIPT ERROR: broken fixture")')
+        self.assertNotEqual(result.returncode, 0)
+
+    def test_missing_completion_marker_fails(self):
+        result = self.run_worker('print("still preparing")')
+        self.assertNotEqual(result.returncode, 0)
