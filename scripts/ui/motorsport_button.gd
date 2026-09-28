@@ -1,6 +1,9 @@
 extends Button
 
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
+const FLAG_CELL := 5.0
+const FLAG_CELLS := 4
+const FEEDBACK_WIDTH := 112.0
 
 var reduced_motion := false
 var selected := false:
@@ -50,19 +53,23 @@ func _update_feedback() -> void:
 
 
 func _draw() -> void:
-	if selected and not disabled:
-		draw_line(Vector2(14, 5), Vector2(size.x - 14, 5), SKIN.AMBER, 2)
+	var push := Vector2.ONE * (SKIN.PRESS if is_pressed() else 0.0)
+	var plate := Rect2(push, size - Vector2.ONE * SKIN.SHADOW)
 	if _primary and icon == null and size.x >= 180:
-		var origin := Vector2(17, floorf((size.y - 20) * 0.5))
-		if is_pressed():
-			origin.y += 2
-		for row in 4:
-			for column in 4:
-				if (row + column) % 2 == 0:
-					draw_rect(Rect2(origin + Vector2(column * 5, row * 5), Vector2(5, 5)), Color(SKIN.INK, 0.4 if disabled else 0.85))
+		var flag_size := FLAG_CELL * FLAG_CELLS
+		var flag_origin := plate.position + Vector2(17.0, floorf((plate.size.y - flag_size) * 0.5))
+		SKIN.draw_flag(self, Rect2(flag_origin, Vector2.ONE * flag_size), FLAG_CELL, Color(SKIN.INK, 0.4 if disabled else 1.0))
+	if selected and not disabled:
+		SKIN.draw_checker(self, Rect2(plate.position + Vector2(10.0, 6.0), Vector2(plate.size.x - 20.0, FLAG_CELL)), FLAG_CELL, SKIN.INK, SKIN.YELLOW)
+		SKIN.draw_disc(self, plate.position + Vector2(plate.size.x - 4.0, 4.0), 9.0, SKIN.ORANGE, 2.0)
+		var tick := plate.position + Vector2(plate.size.x - 4.0, 4.0)
+		draw_polyline(PackedVector2Array([tick + Vector2(-4.5, 0.0), tick + Vector2(-1.0, 3.5), tick + Vector2(4.5, -3.5)]), SKIN.CREAM, 2.5, true)
+	if disabled and icon != null:
+		SKIN.draw_padlock(self, plate.position + Vector2(plate.size.x - 16.0, 18.0))
 	if not disabled and feedback > 0.01:
-		var length := maxf(0, minf(112, size.x - 32)) * feedback
-		draw_line(Vector2(16, size.y - 5), Vector2(16 + length, size.y - 5), SKIN.TEAL, 2)
+		var length := maxf(0.0, minf(FEEDBACK_WIDTH, plate.size.x - 32.0)) * feedback
+		var baseline := plate.position + Vector2(16.0, plate.size.y - 7.0)
+		draw_line(baseline, baseline + Vector2(length, 0.0), SKIN.INK if _primary else SKIN.ORANGE, 3.0, true)
 
 
 func _exit_tree() -> void:

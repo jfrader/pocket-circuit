@@ -6,6 +6,9 @@
 - Racing routes now use handmade blue/teal card in Kitchen, kraft card in Workshop, and paper card in Office, with seeded grain, palette choices and taped joins. The surrounding tabletop remains drivable; vehicle handling and grip zones are unchanged.
 - Kitchen, Workshop, and Office have a regenerated painted overhead environment library. Household objects keep believable relative sizes, with one focal arrangement, supporting groups and clearer space around the racing line. Cars are unchanged.
 - Room surfaces vary procedurally by seed: Kitchen ceramics and preparation boards, Workshop timber and cutting mats, and Office desktops and woven or leather-like pads. Pattern layout, spacing, orientation and material combinations vary independently of track geometry; the same seed rebuilds the same room.
+- Menus, the loading screen, the pause menu, and the race HUD now sit on a lamp-lit midnight workbench: cream plates with ink outlines, masking-tape labels, and the cast, their cars, and the four-car garage on the right of every screen. The garage shows speed, grip, mass, and drift for the focused car, and locked cars appear as padlocked silhouettes.
+- The title and settings boards are cream, so the cars and portraits no longer sink into the wood. The race speed number sits beside the boost tube.
+- The championship is the route board. Each race is a stop on the road. Focus follows the road.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 
@@ -13,6 +16,7 @@
 - Quick Race entries and rerolls cycle through Kitchen, Workshop and Office instead of remaining pinned to Kitchen. The preview and Play action use the selected theme.
 - Course palettes now contrast with both the tabletop and the island. Kitchen's blue/teal card replaces brown cork that blended into wooden islands.
 - Starting grids stay clear of rotated finish sensors and nearby furniture edges in both race directions. Scenery placement reserves gate posts and sealed bays, and grip artwork no longer hides solid rims behind rectangular texture stamps.
+- Button labels no longer carry a thick text stroke.
 - Starting Grid now holds from the menu through loading, countdown, and the complete first lap. A circuit's own seed lands directly on Grid in one musical handoff; automatic race rotation begins after lap one and excludes the drumless Breather and post-race Cooldown phases.
 - Starting a newly generated menu or circuit score no longer cuts off the score already playing. The outgoing score stays up until the incoming music is audible, then crossfades into it.
 - Your car keeps its engine note for every race in a session. It used to fall silent after the first one, while still reporting that it was playing.
