@@ -7,23 +7,27 @@ signal presentation_ready
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
-const TITLE_ART := preload("res://assets/ui/imagine/motorsport_title.jpg")
-const GARAGE_ART := preload("res://assets/ui/imagine/motorsport_garage.jpg")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
-const INK := Color("101b21")
-const CREAM := Color("fff2ce")
-const AMBER := Color("f4bf52")
-const TEAL := Color("71c9bc")
+const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const DESIGN_SIZE := Vector2(1280, 720)
+const COLUMN_X := 72.0
+const COLUMN_WIDTH := 510.0
+const ROW_GAP := 12
+const TITLE_STAGE := Rect2(640, 28, 600, 640)
+const GARAGE_STAGE := Rect2(590, 30, 650, 420)
+const SHELF := Rect2(72, 460, 1136, 106)
+const SHELF_GAP := 14.0
+const CAR_ICON_WIDTH := 34
+const TITLE_RIVAL := "cass"
 
 var reduced_motion := false
 var selected_vehicle_id := "rustbug"
 var _canvas: Control
-var _hero: TextureRect
+var _stage: AppShellStage
 var _vehicle_name: Label
 var _archetype: Label
-var _ratings: Dictionary = {}
+var _profile: Label
 var _vehicle_buttons: Dictionary = {}
 var _unlocked: Array = []
 var _generation := 0
@@ -37,10 +41,6 @@ func _ready() -> void:
 	resized.connect(_layout)
 
 
-func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), INK)
-
-
 func clear() -> void:
 	_generation += 1
 	if _entrance and _entrance.is_valid():
@@ -49,115 +49,84 @@ func clear() -> void:
 		remove_child(_canvas)
 		_canvas.queue_free()
 	_canvas = null
-	_hero = null
+	_stage = null
 	_garage_primary = null
 	_garage_back = null
 	_vehicle_buttons.clear()
-	_ratings.clear()
 	visible = false
 
 
-func show_title(has_progress: bool, read_only: bool) -> void:
-	_begin(TITLE_ART)
-	_label("POCKET", Rect2(74, 66, 535, 100), 86, CREAM)
-	_label("CIRCUIT", Rect2(74, 154, 550, 110), 94, AMBER)
-	_label("GRAND HOUSEHOLD CIRCUIT", Rect2(80, 275, 520, 36), 23, TEAL)
+func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustbug", unlocked: Array = ["rustbug"]) -> void:
+	_begin()
+	_add_stage(TITLE_STAGE).configure(&"title", vehicle_id, "rae", "kitchen", TITLE_RIVAL, unlocked)
+	_label("POCKET", Rect2(COLUMN_X - 4, 40, 560, 104), 88, SKIN.CREAM)
+	_label("CIRCUIT", Rect2(COLUMN_X - 4, 124, 580, 116), 100, SKIN.YELLOW)
+	_tape("GRAND HOUSEHOLD CIRCUIT", Vector2(COLUMN_X + 6, 246), SKIN.ORANGE, 17)
 	var status := "CONTINUE YOUR CHAMPIONSHIP" if has_progress else "TINY RACING. BIG STAKES."
 	if read_only:
 		status = "SAVE READ-ONLY · QUICK RACE AVAILABLE"
-	_label(status, Rect2(80, 326, 530, 30), 17, CREAM)
-	var play := _button("PLAY", Rect2(72, 386, 510, 80), &"championship", true)
+	_label(status, Rect2(COLUMN_X + 4, 290, COLUMN_WIDTH, 30), 18, SKIN.CREAM_DIM)
+	var play := _button("PLAY", Rect2(COLUMN_X, 336, COLUMN_WIDTH, 82), &"championship", true)
 	play.disabled = read_only and not has_progress
-	var second_row: Array[Button] = []
+	var second_actions := [&"new_run", &"quick_race"] if has_progress else [&"quick_race"]
+	var second_row := _button_row(second_actions, Rect2(COLUMN_X, 436, COLUMN_WIDTH, 54), 20)
 	if has_progress:
-		var new_run := _button("NEW RUN", Rect2(80, 484, 232, 52), &"new_run")
-		new_run.disabled = read_only
-		second_row.append(new_run)
-		second_row.append(_button("QUICK RACE", Rect2(324, 484, 252, 52), &"quick_race"))
-	else:
-		second_row.append(_button("QUICK RACE", Rect2(80, 484, 496, 52), &"quick_race"))
-	var last_row: Array[Button] = []
-	for index in 4:
-		var actions := [&"options", &"discovery", &"credits", &"quit"]
-		last_row.append(_button(String(actions[index]).to_upper(), Rect2(80 + index * 126, 550, 116, 48), actions[index]))
+		second_row[0].disabled = read_only
+	var last_row := _button_row([&"options", &"discovery", &"credits", &"quit"], Rect2(COLUMN_X, 504, COLUMN_WIDTH, 48), 16)
 	_wire_rows([[play], second_row, last_row])
-	_label("ARROWS / STICK  MOVE   ·   ENTER / A  SELECT", Rect2(80, 654, 730, 30), 16, CREAM)
+	_label("ARROWS / STICK  MOVE   ·   ENTER / A  SELECT", Rect2(COLUMN_X + 4, 646, 640, 26), 14, SKIN.CREAM_DIM)
 	_focus_later(play if not play.disabled else second_row.back(), _generation)
 
 
 func show_garage(selected: String, unlocked: Array, context: String, next_text: String, roster: Array = []) -> void:
-	_begin(GARAGE_ART)
+	_begin()
 	_unlocked = unlocked
-	_label("SELECT YOUR CAR", Rect2(86, 65, 720, 58), 40, CREAM)
-	_label(context, Rect2(88, 121, 1040, 30), 17, TEAL)
-	_vehicle_name = _label("", Rect2(88, 195, 266, 50), 32, AMBER)
-	_archetype = _label("", Rect2(88, 251, 250, 42), 18, CREAM)
-	_hero = _texture(IDENTITIES.car_texture("rustbug"), Rect2(493, 169, 286, 307))
-	_hero.name = "SelectedCarArtwork"
-	_hero.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	for index in 3:
-		var key: String = ["speed", "grip", "drift"][index]
-		_label(key.to_upper(), Rect2(88, 310 + index * 57, 200, 25), 16, CREAM)
-		var bar := ProgressBar.new()
-		bar.position = Vector2(88, 338 + index * 57)
-		bar.size = Vector2(238, 12)
-		bar.show_percentage = false
-		bar.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		var fill := StyleBoxFlat.new()
-		fill.bg_color = TEAL if index == 1 else AMBER
-		fill.set_corner_radius_all(2)
-		bar.add_theme_stylebox_override("fill", fill)
-		var background := StyleBoxFlat.new()
-		background.bg_color = Color("17262d")
-		background.set_corner_radius_all(2)
-		bar.add_theme_stylebox_override("background", background)
-		_canvas.add_child(bar)
-		_ratings[key] = bar
-	var car_row: Array[Button] = []
+	_stage = _add_stage(GARAGE_STAGE)
+	_label("SELECT YOUR CAR", Rect2(COLUMN_X, 40, COLUMN_WIDTH, 58), 40, SKIN.CREAM)
+	_tape(context, Vector2(COLUMN_X + 6, 104), SKIN.YELLOW, 15)
+	_vehicle_name = _label("", Rect2(COLUMN_X, 150, COLUMN_WIDTH, 70), 54, SKIN.YELLOW)
+	_archetype = _label("", Rect2(COLUMN_X + 4, 226, COLUMN_WIDTH, 30), 20, SKIN.ORANGE)
+	_profile = _label("", Rect2(COLUMN_X + 4, 264, 480, 150), 16, SKIN.CREAM_DIM, false)
+	_profile.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var display_ids: Array[String] = []
 	if roster.is_empty():
-		for v: Dictionary in CATALOG.VEHICLES:
-			display_ids.append(String(v["id"]))
+		display_ids.assign(CATALOG.vehicle_ids())
 	else:
 		for item in roster:
 			display_ids.append(String(item))
-	var n := display_ids.size()
-	var base_x := 408
-	var spacing := 180
-	var btn_w := 166
-	if n > 4:
-		# center and tighten for up to 8; 4-car layout (base/spacing/w) left byte-close for n<=4
-		var avail := 1120.0
-		var pitch := avail / float(n)
-		btn_w = int(pitch - 14.0)
-		spacing = int(pitch)
-		base_x = int((1280.0 - avail) * 0.5 + (pitch - float(btn_w)) * 0.5)
+	_shelf(Rect2(SHELF.position.x - 16, SHELF.end.y - 2, SHELF.size.x + 32, 26))
+	var pitch := (SHELF.size.x + SHELF_GAP) / float(display_ids.size())
+	var car_row: Array[Button] = []
 	for index in display_ids.size():
 		var id := display_ids[index]
 		var vehicle: Dictionary = CATALOG.get_vehicle(id)
 		var available := id in unlocked
-		var button := _button(String(vehicle.get("name", id)).to_upper(), Rect2(base_x + index * spacing, 484, btn_w, 90), &"")
+		var slot := Rect2(SHELF.position.x + pitch * index, SHELF.position.y, pitch - SHELF_GAP, SHELF.size.y)
+		var button := _button("", slot, &"")
 		button.name = "Vehicle_" + id
-		button.text = String(vehicle.get("name", id)).to_upper() + ("" if available else "\nLOCKED")
-		button.add_theme_font_size_override("font_size", 15)
+		button.text = String(vehicle.get("name", id)).to_upper() + ("" if available else "\n" + String(vehicle.get("unlock", "")).to_upper())
+		button.add_theme_font_size_override("font_size", 14)
 		button.icon = IDENTITIES.car_texture(id)
 		button.expand_icon = true
-		button.add_theme_constant_override("icon_max_width", 42)
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		button.add_theme_constant_override("icon_max_width", CAR_ICON_WIDTH)
+		button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		button.disabled = not available
 		if available:
 			button.focus_entered.connect(_choose_vehicle.bind(id))
 			button.pressed.connect(_choose_vehicle.bind(id))
 		_vehicle_buttons[id] = button
 		car_row.append(button)
-	var back := _button("BACK", Rect2(88, 618, 242, 64), &"back")
-	var next := _button(next_text, Rect2(828, 618, 364, 64), &"play_vehicle", true)
+	var back := _button("BACK", Rect2(COLUMN_X, 612, 240, 64), &"back")
+	var next := _button(next_text, Rect2(868, 612, 340, 64), &"play_vehicle", true)
 	_garage_primary = next
 	_garage_back = back
 	next.name = "GaragePrimaryAction"
 	_wire_rows([car_row, [back, next]])
 	for button: Button in car_row:
 		button.focus_neighbor_bottom = button.get_path_to(next)
-	_label("SELECTED CAR RACES · ENTER / A CONFIRM", Rect2(358, 638, 450, 24), 14, CREAM)
+	_label("ENTER / A  CONFIRM", Rect2(330, 632, 520, 26), 14, SKIN.CREAM_DIM).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var initial := selected if selected in unlocked else "rustbug"
 	_choose_vehicle(initial)
 	_focus_later(_vehicle_buttons.get(initial, next), _generation)
@@ -168,29 +137,26 @@ func _choose_vehicle(id: String) -> void:
 		return
 	selected_vehicle_id = id
 	var vehicle := CATALOG.get_vehicle(id)
-	_hero.texture = IDENTITIES.car_texture(id)
+	_stage.configure(&"vehicle", id, "rae", "kitchen", "", _unlocked)
 	_vehicle_name.text = String(vehicle["name"]).to_upper()
-	_archetype.text = String(vehicle["archetype"]).to_upper() + "\nSELECTED"
-	for key: String in _ratings:
-		_ratings[key].value = float(vehicle["ratings"][key]) * 100.0
+	_archetype.text = String(vehicle["archetype"]).to_upper()
+	_profile.text = "+ %s\n– %s" % [String(vehicle.get("strength", "")), String(vehicle.get("tradeoff", ""))]
 	for candidate: String in _vehicle_buttons:
-		var button: Button = _vehicle_buttons[candidate]
-		button.set("selected", candidate == id)
-		button.add_theme_color_override("font_color", AMBER if candidate == id else CREAM)
+		(_vehicle_buttons[candidate] as Button).set("selected", candidate == id)
 	if is_instance_valid(_garage_primary):
 		_garage_primary.focus_neighbor_top = _garage_primary.get_path_to(_vehicle_buttons[id])
 		_garage_back.focus_neighbor_top = _garage_back.get_path_to(_vehicle_buttons[id])
 	vehicle_selected.emit(id)
 
 
-func _begin(art: Texture2D) -> void:
+func _begin() -> void:
 	clear()
 	visible = true
 	_canvas = Control.new()
 	_canvas.name = "Composition"
 	_canvas.size = DESIGN_SIZE
+	_canvas.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	add_child(_canvas)
-	_texture(art, Rect2(Vector2.ZERO, DESIGN_SIZE)).stretch_mode = TextureRect.STRETCH_SCALE
 	_layout()
 	if not reduced_motion:
 		_canvas.modulate.a = 0.0
@@ -199,7 +165,6 @@ func _begin(art: Texture2D) -> void:
 
 
 func _layout() -> void:
-	queue_redraw()
 	if not is_instance_valid(_canvas):
 		return
 	var factor := minf(size.x / DESIGN_SIZE.x, size.y / DESIGN_SIZE.y)
@@ -207,50 +172,81 @@ func _layout() -> void:
 	_canvas.position = (size - DESIGN_SIZE * factor) * 0.5
 
 
-func _texture(texture: Texture2D, rect: Rect2) -> TextureRect:
-	var view := TextureRect.new()
-	view.texture = texture
-	view.position = rect.position
-	view.size = rect.size
-	view.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	view.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_canvas.add_child(view)
-	return view
+func _add_stage(rect: Rect2) -> AppShellStage:
+	var stage := STAGE_SCRIPT.new() as AppShellStage
+	stage.name = "Stage"
+	stage.position = rect.position
+	stage.size = rect.size
+	_canvas.add_child(stage)
+	return stage
 
 
-func _label(text: String, rect: Rect2, font_size: int, color: Color) -> Label:
+func _shelf(rect: Rect2) -> void:
+	var shelf := Panel.new()
+	shelf.name = "Shelf"
+	shelf.position = rect.position
+	shelf.size = rect.size
+	shelf.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	shelf.add_theme_stylebox_override("panel", SKIN.card_style(SKIN.WOOD_EDGE, 0.0))
+	_canvas.add_child(shelf)
+
+
+func _label(text: String, rect: Rect2, font_size: int, color: Color, display: bool = true) -> Label:
 	var label := Label.new()
 	label.text = text
 	label.position = rect.position
 	label.size = rect.size
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
-	label.add_theme_color_override("font_outline_color", INK)
-	label.add_theme_constant_override("outline_size", 5 if font_size >= 40 else 2)
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	SKIN.style_label(label, font_size, color, display)
+	_canvas.add_child(label)
+	return label
+
+
+func _tape(text: String, origin: Vector2, fill: Color, font_size: int) -> Label:
+	var label := Label.new()
+	label.text = text
+	label.position = origin
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	SKIN.style_tape(label, fill, font_size)
 	_canvas.add_child(label)
 	return label
 
 
 func _button(text: String, rect: Rect2, action: StringName, primary: bool = false) -> Button:
-	var button := BUTTON_SCRIPT.new() as Button
-	button.set("reduced_motion", reduced_motion)
-	button.text = text
+	var button := _make_button(text, action, primary)
 	button.position = rect.position
 	button.size = rect.size
-	button.focus_mode = Control.FOCUS_ALL
-	button.add_theme_font_size_override("font_size", 30 if primary else 20)
-	apply_button_art(button, primary)
-	button.focus_entered.connect(func(): focus_moved.emit())
-	if not action.is_empty():
-		button.pressed.connect(func(): action_requested.emit(action))
 	_canvas.add_child(button)
 	return button
 
 
-static func apply_button_art(button: Button, primary: bool) -> void:
+func _button_row(actions: Array, rect: Rect2, font_size: int) -> Array[Button]:
+	var row := HBoxContainer.new()
+	row.position = rect.position
+	row.size = rect.size
+	row.add_theme_constant_override("separation", ROW_GAP)
+	_canvas.add_child(row)
+	var buttons: Array[Button] = []
+	for action: StringName in actions:
+		var button := _make_button(String(action).replace("_", " ").to_upper(), action)
+		button.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		button.add_theme_font_size_override("font_size", font_size)
+		row.add_child(button)
+		buttons.append(button)
+	return buttons
+
+
+func _make_button(text: String, action: StringName, primary: bool = false) -> Button:
+	var button := BUTTON_SCRIPT.new() as Button
+	button.set("reduced_motion", reduced_motion)
+	button.text = text
+	button.focus_mode = Control.FOCUS_ALL
+	button.add_theme_font_size_override("font_size", 32 if primary else 20)
 	SKIN.apply_button(button, primary)
+	button.focus_entered.connect(func(): focus_moved.emit())
+	if not action.is_empty():
+		button.pressed.connect(func(): action_requested.emit(action))
+	return button
 
 
 func _wire_rows(rows: Array) -> void:
