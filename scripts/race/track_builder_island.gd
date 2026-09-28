@@ -4,7 +4,7 @@ class_name TrackBuilderIsland
 
 static func build_island_prop(root: Node2D, spec: Dictionary, region: PackedVector2Array, inner_loop: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
 	var expanded := PackedVector2Array()
-	if spec.get("seed_obstacles", false):
+	if spec.get("seed_obstacles", false) or spec.has("environment_plan"):
 		# Geometry2D already returns a simple central polygon. Procedural concave
 		# loops can make a naively offset inner centerline self-intersect, which is
 		# not a valid CollisionPolygon2D; use the clipped island itself instead.
@@ -24,7 +24,7 @@ static func build_island_prop(root: Node2D, spec: Dictionary, region: PackedVect
 	barrier.set_meta("boundary_polygon", expanded)
 	barrier.set_meta("visible_collision_backing", &"raised_island_rim")
 	root.add_child(barrier)
-	if spec.get("seed_obstacles", false):
+	if spec.get("seed_obstacles", false) or spec.has("environment_plan"):
 		# The line art is centered on `expanded`; contact belongs at its outer
 		# (track-facing) edge, not invisibly halfway through the 26u textured rim.
 		var collision_boundary := TrackBuilderCore._outset_polygon(expanded, TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH * 0.5)
@@ -48,7 +48,7 @@ static func build_island_prop(root: Node2D, spec: Dictionary, region: PackedVect
 		var barrier_collision := CollisionPolygon2D.new()
 		barrier_collision.polygon = expanded
 		barrier.add_child(barrier_collision)
-	if spec.get("seed_obstacles", false):
+	if spec.get("seed_obstacles", false) or spec.has("environment_plan"):
 		build_raised_island_rim(barrier, spec, expanded)
 
 	var min_point := Vector2(INF, INF)
@@ -142,7 +142,7 @@ static func build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, poin
 
 
 static func add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: PackedVector2Array, centerline: PackedVector2Array, stage: Callable = Callable()) -> void:
-	var assets: Array = spec.get("island_fill_textures", [])
+	var assets: Array = spec.get("ambient_props", [])
 	if assets.is_empty() or boundary.size() < 12:
 		return
 	var container := Node2D.new()
@@ -161,6 +161,4 @@ static func add_island_rim_landmarks(root: Node2D, spec: Dictionary, boundary: P
 		var position := boundary_point + inward * 22.0
 		var next_point := boundary[(boundary_index + 1) % boundary.size()]
 		var texture_path := String(assets[posmod(seed + landmark_index * 5, assets.size())])
-		TrackBuilderCore._add_generated_prop(container, "Landmark%02d" % landmark_index, position, texture_path, (next_point - boundary_point).angle(), &"island_rim", &"few", landmark_index, 0.72)
-
-
+		TrackBuilderCore._add_generated_prop(container, "Landmark%02d" % landmark_index, position, texture_path, (next_point - boundary_point).angle(), &"island_rim", &"few", landmark_index)

@@ -39,7 +39,8 @@ func _test_theme(theme: StringName) -> bool:
 	var expected: Dictionary = THEME_EXPECTATIONS[theme]
 	if not _expect(presenter.theme == theme and presenter.base_surface_name == expected["base_surface"], "%s should configure its runtime theme and base surface" % theme):
 		return false
-	if not _expect(presenter.surface_zones.size() == int(expected["zones"]), "%s should create the documented surface zones (%d)" % [theme, presenter.surface_zones.size()]):
+	var surface_definitions: Array = track.get_meta("generated_surfaces", [])
+	if not _expect(presenter.surface_zones.size() == surface_definitions.size() and presenter.surface_zones.size() >= int(expected["zones"]), "%s should create all declared gameplay surface zones (%d)" % [theme, presenter.surface_zones.size()]):
 		return false
 	if not _expect(presenter.hazard != null and presenter.hazard.name == String(expected["hazard"]) and presenter.hazard.get_node_or_null("WarningTelegraph") == null, "%s should create a deterministic hazard without a telegraph overlay" % theme):
 		return false

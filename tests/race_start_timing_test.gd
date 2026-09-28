@@ -45,6 +45,8 @@ func _run_test() -> void:
 			last_loading_tick = now
 		
 		print("RACE_START_LOADING retry=%s max_gap_ms=%.3f" % [retry, max_loading_gap])
+		var metrics: Dictionary = app.get("loading_metrics")
+		print("RACE_START_TIMING retry=%s metrics=%s" % [retry, metrics])
 		# Cold start observed a ~182 ms maximum gap and warm/retry ~71 ms,
 		# so a bound of 250 ms safely bounds the frame gap and avoids user-perceptible
 		# lockups while leaving comfortable headroom for CI variance.
@@ -54,8 +56,6 @@ func _run_test() -> void:
 			print("RACE_START_STALLED ", (app.get("_loading_screen") as Node).call("metrics"))
 		if not _expect(not app.call("is_race_loading"), "loading must finish within the bounded startup deadline"):
 			return
-		var metrics: Dictionary = app.get("loading_metrics")
-		print("RACE_START_TIMING retry=%s metrics=%s" % [retry, metrics])
 		if not _expect(BUILDER.synchronous_outline_builds == outlines_before, "scene assembly must not fall back to synchronous texture-alpha scans"):
 			return
 		if not _expect(int(metrics["frames"]) >= 3 and float(metrics["max_frame_gap_ms"]) < 250.0, "preparation must keep servicing frames (maximum gap under 250ms)"):

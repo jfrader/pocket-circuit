@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://crwn41nu7110d"]
+
+[ext_resource type="Script" uid="uid://caalnx5p15if5" path="res://tools/environment_pilot.gd" id="1_48nj5"]
+
+[node name="EnvironmentPilot" type="Node2D" unique_id=1391033797]
+script = ExtResource("1_48nj5")

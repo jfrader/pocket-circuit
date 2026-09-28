@@ -2,228 +2,133 @@
 
 ## Visual Thesis
 
-A hand-illustrated Saturday-morning cartoon household where chunky toy cars
-race through oversized friendly objects under soft cel-shaded light, with a
-readable material track, strong inked silhouettes, warm surfaces, and dense
-small details that sell the miniature scale.
+Tiny toy cars race through a warm, painted household. Environment art uses
+orthographic overhead silhouettes, broad gouache-like material tones, colored
+edges and quiet texture. Kitchen, Workshop and Office share that treatment but
+have distinct materials, palettes and household stories.
 
-This is a top-down 2D game. Visuals must read while rotating at speed and at
-roughly 32-55 pixels on screen. Everything is original; no protected vehicle,
-track, character, branding, or UI designs are copied.
+This is a top-down 2D game. Cars remain crisp and readable at roughly 32–55 pixels
+on screen. Vehicle art, portraits and HUD keep their existing production
+treatment; environment regeneration does not redraw or resize the cars.
 
-The championship shell presents that world as a midnight workbench: editorial
-type and focused controls occupy the left side while an illustrated garage,
-driver, machine, or route board occupies the right. The visual stage reacts to
-the focused screen or vehicle so the cast and four-car roster are always
-visible rather than described only in text.
+Everything is original. The project uses genre principles from Micro Machines,
+Toybox Turbos, Mini Motor Racing and Circuit Superstars without copying their
+vehicles, characters, branding, tracks or interface designs.
 
-## Reference Principles
+## Environment Art Contract
 
-The direction uses genre principles observed across classic *Micro Machines*,
-*Toybox Turbos*, *Mini Motor Racing*, and *Circuit Superstars*: oversized room
-objects sell scale, cars need distinct top-down silhouettes, and every track
-edge or shortcut must be legible before the player reaches it. These references
-are evaluation targets only. Pocket Circuit uses its own cast, machines,
-rooms, route geometry, palette, interface, and story.
+`data/world_prop_art.json` is the authoritative environment catalog. Its
+`overhead_gouache_v1` entries describe source cells or approved-source reuse,
+theme membership, roles, physical dimensions, scale/detail tiers, visual weight,
+placement zones and clearance, repetition, collision and shadow behavior.
 
-## Palette
+- **Perspective:** camera directly overhead. Cups have circular mouths; keyboards,
+  cartons and appliances show their tops, not front-facing illustrations.
+- **Contours:** edges use darker local material colors. Do not add a uniform
+  black contour, a white sticker border or the rejected cel-palette filter.
+- **Values:** broad material masses carry recognition. Small scratches and grain
+  remain subordinate to the object, the racing line and the cars.
+- **Light:** warm upper-left highlights and soft down-right contact shadows.
+  Shadows follow physical footprints; they do not become oversized grey cards.
+- **Materials:** wood, ceramic, matte metal, cloth, cork, paper and food retain
+  recognizable surface cues without photorealism or glossy room reflections.
+- **Scale:** one world unit is one millimetre. Both axes derive from visible alpha
+  bounds at the collision threshold, not from transparent canvas padding.
+  A tablespoon is 180 units long, a nail 40 and a keyboard 440. Placement changes
+  the chosen object or location rather than shrinking an object to fit.
+- **Collision:** raised scenery has visible, footprint-backed collision. Alpha
+  props derive convex shapes from their art. Flat marks do not own rigid-body
+  collision. A ground underlay must not conceal a solid island or pocket rim.
 
-| Color | Role |
+The active catalog contains 151 contracts covering 223 prepared output paths,
+including materials and utility masks. `tools/prepare_environment_library.py`
+rebuilds these outputs. `tools/prepare_track_art.py` delegates to that pipeline;
+it no longer applies the rejected cel preparation.
+
+## Room Identity and Procedural Materials
+
+Material choices live in `data/household_material_patterns.json` and are rendered
+by `HouseholdSurfaceMaterials` and the world-coordinate household surface shader.
+They are generated parameters, not one fixed background picture per room.
+
+| Room | Tabletop and apron | Handmade course | Raised island surfaces | Prop accents |
+|---|---|---|---|---|
+| Kitchen | Ivory or sage ceramics, terracotta inlay, cream laminate | Blue/teal colored card | Maple strips, end-grain board, walnut preparation board | Ivory, sage, terracotta, food colors |
+| Workshop | Bench boards, oiled timber, plywood, narrower wood slats | Kraft card | Charcoal or kraft cutting grids, ribbed work pad | Red enamel, ochre, pale wood, matte steel |
+| Office | Ivory/cool laminate, ash veneer, walnut herringbone | Ivory or oat card | Ink-blue weave, oxblood desk pad, indigo twill | Ivory, ink blue, ochre, restrained brick red |
+
+Workshop and Office must not collapse into two teal rooms. Their large value
+masses, pattern families and edge colors must remain distinguishable before the
+player identifies individual props.
+
+Each theme offers four floor and three island profiles. The twelve existing
+story families and curated palette identities constrain the choices; an
+independent material stream varies profile selection, spacing, orientation,
+phase, seams, stagger and grain. The same seed reproduces the same result.
+Material changes must not alter route geometry or racing-line fingerprints.
+
+The course is a continuous, flat household-material layer at the existing road
+width. Thin cut edges, a shallow contact shadow and occasional taped joins make
+it read as an assembled course. Its three palettes per theme are selected for
+contrast against both the tabletop and the island; grain and construction vary with the material
+seed without changing existing floor/island choices. The apron remains drivable.
+
+Both floor and course texture use world coordinates, with independent material
+periods. No overlapping square cards, camera-relative grain or fake asphalt
+should appear at bends. Pattern contrast stays below the objects and cars.
+Paper joins and tape are drive-over decoration, not walls or new grip zones.
+
+## Composition
+
+`WorldEnvironmentCatalog` combines the asset contract, the twelve semantic
+stories and supporting families in `data/environment_composition.json`.
+`WorldEnvironmentPlan` produces physical placements without accessing a scene
+or textures; `WorldEnvironmentArt` builds the visible objects with per-item
+loading yields. Procedural and saved track fixtures use the same model.
+
+- Select one fitting focal anchor, with supporting medium objects and restrained
+  nearby micro dressing. Prefer recognizable arrangements over uniform scatter.
+- Spread supporting groups across distinct route sectors. Object choice,
+  placement and orientation are deterministic, with independent role streams.
+- Keep object repetition within the catalog limits. Ground/decal placement and
+  clipped gameplay-surface paint are bounded separately.
+- Preserve negative space around the full nominal corridor and its clearances.
+  Reserve gate posts and sealed bay geometry before planning scenery.
+- Boundary props come from compatible household families. An intentionally open
+  apron sector remains drivable; never back bare floor with an invisible outer
+  corridor wall.
+- Solid objects retain their registered sizes and cannot intersect other planned
+  solid footprints. The planner reports an unsuccessful fit instead of distorting
+  a prop or changing the requested seed.
+- The room ends at a visible furniture edge, with the dark `#111316` overscan void
+  beyond it. Island and pocket surfaces have a visible side face and lip matching
+  their physical boundary.
+
+Technical surfaces, the faster low-grip shortcut, direction-specific hazards,
+the speed section, finish approaches and ordered gates remain gameplay data.
+Their art must remain visible and understandable. Grip-region paint uses the
+authoritative polygons, feathered boundaries and physically scaled artwork;
+rectangular texture stamps must not cover the course or hide solid edges.
+
+## Vehicle and Effects
+
+Vehicle and HUD accents retain their existing reference palette; environment
+colors come from the room profiles above.
+
+| Color | Vehicle/UI role |
 |---|---|
-| `#3F2A22` | Deep wood and counter shadow |
-| `#5C4638` | Main counter wood |
-| `#8C6F55` | Counter highlights and warm edges |
-| `#2A2F33` | Track asphalt |
 | `#E85A2E` | Rustbug orange and energy accents |
-| `#F4C65A` | Sponge, cereal highlights, start/finish |
-| `#2E8B57` | Lime, scrub pad, wet-area accents |
-| `#C81E2E` | Apple red and hazard accents |
-| `#4A8FB8` | Windows, ceramic, cool metal |
-| `#F5F0E3` | Ceramic, crumbs, warm highlights |
+| `#F4C65A` | Yellow highlights and boost fill |
+| `#4A8FB8` | Windows and cool metal |
+| `#F5F0E3` | Cream surfaces and warm highlights |
 | `#1A1F23` | Ink outlines and deep shadows |
-| `#111316` | Void beyond the counter |
 
-## Shape Language
-
-- Cars are rounded and chunky, with exaggerated wheels, a strong roof/hood
-  read, large windows, and three or four clear color masses.
-- Major silhouettes use closed dark outlines. Hero assets use thicker outlines
-  than dressing assets.
-- One upper-left key light governs the whole race scene. Highlights use warm
-  cream rather than pure white; every vehicle, prop, obstacle, and landmark
-  shadow falls down and right with a soft warm dark-brown tint. Rectangular
-  objects retain rectangular footprints, and giants add a faint longer cast.
-- Track edges are broad, rounded, and slightly hand-drawn rather than perfect
-  vector radii. Track value contrast must remain clear at speed.
-- The full inner island is a visibly raised solid feature: a dark side face,
-  textured theme edge, warm top lip, and small edge landmarks communicate the
-  exact physical rim from every approach.
-- The room apron is open Micro Machines-style diorama space. No invisible
-  corridor wall sits under bare floor; collision is reserved for real visible
-  household assets, the raised island, and room walls.
-- Traversable shortcuts include authored surface lanes inside the racing
-  corridor. The raised island physically closes the inside line; ordered gates
-  stop there but extend across the open outer apron. If a car penetrates the
-  island or persists the wrong way, it returns to its last legal gate.
-- Kitchen props are oversized, friendly, and readable from directly above.
-  Details are broad shapes, not thin linework.
-- Micro details such as crumbs, fibers, droplets, scratches, and wood grain use
-  low contrast and never compete with the racing line. These painted/material
-  marks remain flat; recognizable loose hardware is physical even at micro scale.
-- One to three giant landmarks per generated room establish the tiny-car scale.
-  Their 300-600-unit silhouettes use broad color masses, footprint-matched
-  contact shadows, longer down-right cast shadows, full trimmed-footprint
-  collision, and enough breathing room to remain readable without covering the
-  corridor. If an object reads raised or solid, its center and extremities must
-  stop a car; only art that reads painted onto the ground may be drive-over.
-
-## Track Composition
-
-- Opening straight: bold start stripes, crumbs, and a half-visible counter
-  landmark behind the line.
-- Mug chicane: two distinct hero mugs, one cream and one blue, with readable
-  handles and coffee surfaces.
-- Right technical: two contrasting cereal towers act as visual bookends.
-- Top shortcut: a large wet sponge, puddle edge, droplets, and scrub fibers.
-- Left technical: ruler and spoon create long graphic directional forms.
-- Fruit cluster: apple and lime add color and scale detail.
-- The outer counter edge reads as a dangerous drop into the dark kitchen void.
-
-### Generated Room Density
-
-- Generated rooms layer density by scale: 1-3 giant household landmarks,
-  authored story clusters, 2-4 broad ground anchors, 60-120 low-contrast floor
-  details, and 60-150 tiny edge/apron details. Painted/material micro details
-  are non-colliding; raised rails and recognizable loose props use
-  silhouette-matched collision.
-- Edge details remain outside the drivable area and recovery lanes while sitting
-  close enough to both sides of the corridor to prevent empty floor bands.
-- The room surface ends at its fully backed perimeter wall; the 760-unit camera
-  overscan beyond it is the dark void rather than more floor material.
-- Thirty-two faint material marks break up each generated corridor. They read
-  as wood grain, cork, or desk-pad texture rather than painted racing lines.
-- Four to eight readable grip patches add themed material changes inside the
-  corridor. Decals communicate the surface before handling changes, and they
-  stay clear of the start, finish, checkpoints, and designed surface moments.
-- Giant landmarks use Kitchen food and utensils, Workshop sports and tool
-  silhouettes, or Office desk objects. Every giant is physical scenery with a
-  collider covering its visible center and ends, while every placement stays
-  clear of route and checkpoint safety space.
-
-## Asset Plan
-
-### Hero Landmarks
-
-- `kitchen_mug_hero.png`
-- `kitchen_mug_blue.png`
-- `kitchen_spoon_bridge.png`
-- `kitchen_cereal_tower_a.png`
-- `kitchen_cereal_tower_b.png`
-- `kitchen_counter_surface.png`
-- `kitchen_track_surface.png`
-- `kitchen_counter_edge.png`
-
-### Support Props
-
-- `kitchen_sponge_wet.png`
-- `kitchen_ruler_plank.png`
-- `kitchen_fork.png`
-- `kitchen_apple.png`
-- `kitchen_lime.png`
-- `kitchen_cup.png`
-- `kitchen_plate.png`
-- `kitchen_cutting_board.png`
-- `kitchen_toaster_edge.png`
-- `kitchen_napkin.png`
-
-### Micro Dressing
-
-- `kitchen_crumb_cluster_01.png`
-- `kitchen_crumb_cluster_02.png`
-- `kitchen_cereal_scatter.png`
-- `kitchen_wood_scratch.png`
-- `kitchen_water_droplet_01.png`
-- `kitchen_water_droplet_02.png`
-- `kitchen_spill_decal.png`
-- `kitchen_start_stripe_decal.png`
-- `kitchen_skid_mark.png`
-
-Generated tracks also draw from `assets/textures/edge_dressing/` for crumbs,
-fibers, hardware, worn-floor hints, and subtle material patterning, and from
-`assets/textures/grip_patches/` for readable surface decals.
-
-### Generated Giant Landmarks
-
-- Kitchen: cereal box, mug, watermelon, fork, toaster, and milk carton.
-- Workshop: basketball, toolbox, paint can, watermelon, hammer, and wrench.
-- Office: keyboard, monitor, paper stack, pen, stapler, and mouse.
-- These original top-down sprites live in `assets/textures/giant_props/` and
-  are rendered at 300-600 world units rather than ordinary prop scale.
-
-### Ambient Ground Dressing
-
-- Place two to four broad anchors in otherwise empty room sectors, using cloth,
-  paper, cardboard, or desk-pad silhouettes rather than uniform scatter.
-- Kitchen uses a checked tablecloth patch, striped dish towel, yellow cleaning
-  rag, and red oven mitt.
-- Workshop uses a stained drop cloth, red shop rag, cardboard scrap, and
-  sandpaper sheet.
-- Office uses a dark desk pad, envelope stack, sticky notes, and notepad page.
-- These pieces remain lower contrast than hero landmarks, do not collide, and
-  cannot become a substitute for readable track edges.
-
-### Generated Course Boundaries
-
-- Preserve controlled negative space: each generated lap has five short
-  both-sided rail moments, two one-sided runs, and one open accent sector marked
-  only by a flat worn-floor hint. Each side receives accents in six of eight
-  sectors (about 54% visual coverage), never a repeated full fence.
-- Partial rail sprites are the physical boundary wherever they appear; their
-  colliders fit inside their visible footprints. Kitchen mixes folded towel,
-  spoon, chopstick, and bread-board rails; Workshop mixes paint stirrer, dowel,
-  clamp, and ruler rails; Office mixes pencil, ruler, pen, and book-spine rails.
-  Corner mitt, tape, and sticky-note accents remain rare, visible physical props.
-- Bare floor between those assets is intentionally open and drivable. Never add
-  a continuous outer collider, invisible corridor edge, or visual bevel that
-  implies one.
-- The only continuous generated rim belongs to the raised island object. Room
-  perimeter walls remain visible furniture edges with dark void beyond them.
-- Checkpoint paint and banners stay across the nominal corridor. Small themed
-  colliding posts mark those corridor ends, while the invisible sensor extends
-  from the raised island or room wall to the opposite real boundary.
-- Keep corner accents larger and rarer than straight sections. Avoid even
-  spacing, mirrored walls, or enough repeated pieces to read as a stadium rail.
-
-### Vehicle And Effects
-
-- `rustbug_hero.png`
-- Vehicle shadows are baked consistently into the generated car sprites; the
-  obsolete standalone Rustbug shadow is not used by the scene.
-- `vfx_drift_dust.png`
-- `vfx_boost_flame_trail.png`
-- `vfx_impact_flash.png`
-- `vfx_skid_mark.png`
-
-### HUD
-
-- Rounded, restrained lap/timer plate with a cream surface and dark outline.
-- Cartoon boost tube using orange/yellow fill.
-- No MMO card chrome. Race position, lap, timer, and boost remain dominant.
-- Debug telemetry stays dev-only and visually separate from the race HUD.
-
-### Championship Shell
-
-- The left column carries hierarchy, copy, and controller-safe actions.
-- The right illustration stage shows Rae, rivals, room routes, or the currently
-  focused machine without requiring external source art.
-- Vehicle selection exposes all four silhouettes and progression locks at once;
-  focus updates the hero machine and its speed, grip, mass, and drift profile.
-- Driver portraits use crisp deterministic pixel features, individual hair,
-  clothing, accessories, and accent palettes for instant recognition.
-- Screen transitions remain a short slide and fade and are disabled by reduced
-  motion.
-
-## Motion Thesis
+- Cars retain their existing rounded, chunky silhouettes, exaggerated wheels,
+  roof/hood distinction, large windows and compact color masses.
+- Existing art includes `rustbug_hero.png`, `vfx_drift_dust.png`,
+  `vfx_boost_flame_trail.png`, `vfx_impact_flash.png` and `vfx_skid_mark.png`.
+- Vehicle shadows are part of the existing generated car sprites; the obsolete
+  standalone Rustbug shadow is not used by the scene.
 
 Use only effects that communicate handling:
 
@@ -233,12 +138,39 @@ Use only effects that communicate handling:
 4. A subtle one-to-two-percent camera pulse on boost or hard impact.
 5. One or two ambient motions, such as a droplet loop or fruit wobble.
 
-Effects never obscure the car, racing line, checkpoint, or nearby hazards.
+Effects never obscure the car, racing line, checkpoint or nearby hazards.
 
-## Acceptance Test
+## HUD and Championship Shell
 
-At 1280x720, a player must immediately identify the car, road, next route,
-start/finish, mug chicane, sponge shortcut, and outer counter drop. The slice
-must feel like one illustrated world rather than unrelated SVG assets placed
-on gray geometry. Before a race, the player must also see the protagonist,
-rival, selected car, locked roster, and relevant room without reading body copy.
+The championship shell remains a midnight workbench: focused controls and
+editorial type on the left, with the driver, machine or route illustration on
+the right. Focus changes the visual stage rather than adding explanatory copy.
+
+- The lap/timer plate is rounded and restrained, with a cream surface and dark
+  outline. The cartoon boost tube uses orange/yellow fill. No MMO card chrome;
+  lap, position, timer and boost stay dominant. Debug telemetry is dev-only and
+  visually separate.
+- The left column carries controller-safe actions. The right stage shows Rae,
+  rivals, room routes or the focused machine without requiring external source art.
+- Vehicle selection exposes all four silhouettes and progression locks at once;
+  focus updates the machine and its speed, grip, mass and drift profile.
+- Driver portraits retain deterministic pixel features, individual hair,
+  clothing, accessories and accents.
+- Screen transitions remain a short slide and fade and are disabled by reduced
+  motion. Camera and impact effects also respect reduced motion.
+
+## Acceptance
+
+Review native gameplay views at representative zoom for every theme, not only
+source sheets. Compare several seeds: variation must include material structure
+and composed arrangements, not only tint or prop jitter. Check deterministic
+rebuilds, theme isolation, physical dimensions, overlap, visible collision,
+route readability and the 250 ms loading-frame contract.
+
+At 1280×720, the player must immediately identify the car, road, next route,
+start/finish, nearby hazards and outer counter drop. Before a race, the
+protagonist, rival, selected car, locked roster and relevant room must be visible
+without reading body copy.
+
+The game should read as one painted household world with distinct rooms while
+retaining its original cars and existing race rules.
