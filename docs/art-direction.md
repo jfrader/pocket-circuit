@@ -105,13 +105,33 @@ rectangular texture stamps must not cover the course or hide solid edges.
 
 ## Vehicle and Effects
 
+Vehicle and HUD accents retain their existing reference palette; environment
+colors come from the room profiles above.
+
+| Color | Vehicle/UI role |
+|---|---|
+| `#E85A2E` | Rustbug orange and energy accents |
+| `#F4C65A` | Yellow highlights and boost fill |
+| `#4A8FB8` | Windows and cool metal |
+| `#F5F0E3` | Cream surfaces and warm highlights |
+| `#1A1F23` | Ink outlines and deep shadows |
+
 - Cars retain their existing rounded, chunky silhouettes, exaggerated wheels,
   roof/hood distinction, large windows and compact color masses.
+- Existing art includes `rustbug_hero.png`, `vfx_drift_dust.png`,
+  `vfx_boost_flame_trail.png`, `vfx_impact_flash.png` and `vfx_skid_mark.png`.
 - Vehicle shadows are part of the existing generated car sprites; the obsolete
   standalone Rustbug shadow is not used by the scene.
-- Drift dust, temporary skid marks, compact boost wisps and brief impact flashes
-  communicate handling. They must not obscure the car, route, checkpoints or
-  nearby hazards.
+
+Use only effects that communicate handling:
+
+1. Short warm dust puffs and faint temporary skid marks during hard drifts.
+2. A compact orange/yellow boost wisp with a few sparks.
+3. A very brief impact flash and small vehicle squash.
+4. A subtle one-to-two-percent camera pulse on boost or hard impact.
+5. One or two ambient motions, such as a droplet loop or fruit wobble.
+
+Effects never obscure the car, racing line, checkpoint or nearby hazards.
 
 ## HUD and Championship Shell
 
@@ -119,13 +139,18 @@ The championship shell remains a midnight workbench: focused controls and
 editorial type on the left, with the driver, machine or route illustration on
 the right. Focus changes the visual stage rather than adding explanatory copy.
 
-- Keep lap, position, timer and boost dominant during a race. Debug telemetry is
-  dev-only and visually separate.
-- Vehicle selection exposes all four silhouettes and progression locks; focus
-  updates the machine and its handling profile.
+- The lap/timer plate is rounded and restrained, with a cream surface and dark
+  outline. The cartoon boost tube uses orange/yellow fill. No MMO card chrome;
+  lap, position, timer and boost stay dominant. Debug telemetry is dev-only and
+  visually separate.
+- The left column carries controller-safe actions. The right stage shows Rae,
+  rivals, room routes or the focused machine without requiring external source art.
+- Vehicle selection exposes all four silhouettes and progression locks at once;
+  focus updates the machine and its speed, grip, mass and drift profile.
 - Driver portraits retain deterministic pixel features, individual hair,
   clothing, accessories and accents.
-- Short slide/fade transitions and camera/impact effects respect reduced motion.
+- Screen transitions remain a short slide and fade and are disabled by reduced
+  motion. Camera and impact effects also respect reduced motion.
 
 ## Acceptance
 
@@ -134,6 +159,11 @@ source sheets. Compare several seeds: variation must include material structure
 and composed arrangements, not only tint or prop jitter. Check deterministic
 rebuilds, theme isolation, physical dimensions, overlap, visible collision,
 route readability and the 250 ms loading-frame contract.
+
+At 1280×720, the player must immediately identify the car, road, next route,
+start/finish, nearby hazards and outer counter drop. Before a race, the
+protagonist, rival, selected car, locked roster and relevant room must be visible
+without reading body copy.
 
 The game should read as one painted household world with distinct rooms while
 retaining its original cars and existing race rules.

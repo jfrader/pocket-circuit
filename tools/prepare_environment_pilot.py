@@ -68,8 +68,7 @@ def main() -> None:
             sprites += 1
         for role in ("floor", "island"):
             with Image.open(SOURCE / definition[f"{role}_source"]) as source:
-                # Reuse the seamless-wrap utility only; painted mode retains source colors.
-                material = repeating_material(source, style="painted")
+                material = repeating_material(source)
             save_png(material, DESTINATION / f"{theme}_{role}.png")
             materials += 1
     print(f"ENVIRONMENT_PILOT_ART PASS: {sprites} fresh sprites, {materials} materials")

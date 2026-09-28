@@ -1,204 +1,23 @@
-"""Build transparent track sprites and repeating materials from the reviewed Imagine sheets."""
+"""Shared image utilities and compatibility entry point for the painted library."""
 import json
 from io import BytesIO
 from pathlib import Path
 
-import numpy as np
-from PIL import Image, ImageEnhance, ImageFilter, ImageOps
-from scipy import ndimage
+from PIL import Image, ImageOps
 
 ROOT = Path(__file__).resolve().parents[1]
-SOURCE = ROOT / 'assets/source/track-art'
-TEXTURES = ROOT / 'assets/textures'
-CANVAS = 512
-CONTENT = 440
-PIXEL_CONTENT = 96
-SPRITE_COLORS = 12
-CEL_OUTLINE_WIDTH = 3
-CEL_OUTLINE = (38, 32, 31, 224)
-CEL_PREFILTER_RADIUS = 0.65
-CEL_DETAIL_FILTER_SIZE = 7
-CEL_PALETTE = [
-    (25, 24, 27), (38, 34, 35), (53, 44, 41), (68, 53, 47),
-    (82, 64, 54), (102, 76, 59), (126, 92, 67), (151, 111, 77),
-    (178, 134, 88), (205, 162, 105), (231, 194, 132), (247, 222, 171),
-    (71, 72, 72), (91, 94, 94), (114, 119, 119), (139, 145, 144),
-    (165, 171, 168), (190, 194, 188), (218, 216, 203), (243, 237, 219),
-    (89, 37, 29), (125, 48, 32), (165, 58, 34), (205, 76, 37),
-    (232, 103, 43), (244, 139, 52), (247, 180, 72), (247, 211, 112),
-    (83, 57, 25), (121, 82, 31), (157, 110, 42), (192, 144, 62),
-    (43, 68, 42), (57, 91, 48), (78, 119, 58), (105, 147, 70),
-    (33, 70, 72), (39, 96, 98), (48, 125, 126), (70, 153, 148),
-    (34, 56, 79), (39, 76, 109), (48, 98, 140), (72, 125, 165),
-    (89, 35, 59), (126, 43, 71), (165, 56, 81), (205, 78, 94),
-]
-MATERIALS = [
-    'kitchen_board', 'kitchen_ceramic', 'kitchen_counter', 'kitchen_sage_tile',
-    'kitchen_stone', 'office_desk', 'office_deskmat', 'office_laminate',
-    'office_pad', 'office_walnut', 'workshop_bench', 'workshop_mat',
-    'workshop_oiled', 'workshop_paint', 'workshop_plywood',
-]
-DECALS = [
-    ['grip_patches/soapy_spill.png', 'kitchen/wet_spill.png', 'kitchen/spill_decal.png'],
-    ['grip_patches/oil_slick_small.png', 'imagine/oil_stain.png'],
-    ['grip_patches/kitchen_flour_dust.png'],
-    ['grip_patches/kitchen_syrup_smear.png'],
-    ['grip_patches/sawdust_patch.png', 'imagine/sawdust_patch.png', 'edge_dressing/sawdust_bit.png'],
-    ['grip_patches/coffee_ring.png', 'imagine/stain_ring.png'],
-    ['grip_patches/paper_scatter.png', 'imagine/paper_sheet.png'],
-    ['grip_patches/workshop_metal_filings.png'],
-    ['grip_patches/workshop_paint_smear.png'],
-    ['grip_patches/office_eraser_dust.png'],
-    ['grip_patches/office_ink_blot.png'],
-    ['imagine/crumb_cluster.png', 'kitchen/crumb_cluster_01.png', 'kitchen/crumb_cluster_02.png', 'kitchen/cereal_scatter.png', 'edge_dressing/crumb_micro_01.png', 'edge_dressing/crumb_micro_02.png'],
-    ['kitchen/water_droplet_01.png', 'kitchen/water_droplet_02.png', 'edge_dressing/droplet_micro.png'],
-    ['kitchen/wood_scratch.png', 'edge_dressing/wood_grain_faint.png'],
-    ['edge_dressing/fiber_strand.png'],
-    ['edge_dressing/worn_floor_hint.png'],
-]
 
 
-def cell(image: Image.Image, index: int, columns: int = 4) -> Image.Image:
-    x, y = index % columns, index // columns
-    return image.crop((x * image.width // columns, y * image.height // columns,
-                       (x + 1) * image.width // columns, (y + 1) * image.height // columns))
-
-
-def cel_palette_image() -> Image.Image:
-    palette = Image.new('P', (1, 1))
-    channels = [channel for color in CEL_PALETTE for channel in color]
-    palette.putpalette(channels + [0] * (768 - len(channels)))
-    return palette
-
-
-CEL_PALETTE_IMAGE = cel_palette_image()
-
-
-def quantize_cel(image: Image.Image) -> Image.Image:
-    softened = image.convert('RGB').filter(ImageFilter.GaussianBlur(CEL_PREFILTER_RADIUS))
-    indexed = softened.quantize(
-        palette=CEL_PALETTE_IMAGE,
-        dither=Image.Dither.NONE,
-    )
-    return indexed.convert('RGB').filter(ImageFilter.ModeFilter(CEL_DETAIL_FILTER_SIZE)).convert('RGBA')
-
-
-def transparent_sprite(
-    image: Image.Image,
-    clean_fragments: bool = True,
-    style: str = 'cel',
-    outline: bool = True,
-) -> Image.Image:
-    rgb = np.asarray(image.convert('RGB'), dtype=np.uint8)
-    hsv = np.asarray(image.convert('HSV'))
-    r, g, b = rgb.astype(np.float32).transpose(2, 0, 1)
-    # Remove the keyed field (including enclosed holes) rather than treating
-    # only the border as background. Cream/steel and red enamel stay intact.
-    key = (hsv[:, :, 0] > 211) & (hsv[:, :, 0] < 250) & (r > g * 1.13) & (b > g * 0.92)
-    alpha = np.where(key, 0, 255).astype(np.uint8)
-    if clean_fragments:
-        labels, _ = ndimage.label(alpha)
-        areas = np.bincount(labels.ravel())
-        areas[0] = 0
-        alpha[areas[labels] < max(12, areas.max() * 0.04)] = 0
-    if style in {'painted', 'cel'}:
-        foreground = alpha > 0
-        _, nearest = ndimage.distance_transform_edt(~foreground, return_indices=True)
-        filled_rgb = rgb.copy()
-        filled_rgb[~foreground] = filled_rgb[nearest[0][~foreground], nearest[1][~foreground]]
-        # Source atlases carry different baked edge treatments. Replace only
-        # the silhouette-adjacent band from each asset's own interior before
-        # applying the one final-resolution contour below.
-        interior_distance = ndimage.distance_transform_edt(foreground)
-        cleanup_depth = max(2.0, min(10.0, float(interior_distance.max()) * 0.28))
-        interior = foreground & (interior_distance > cleanup_depth)
-        edge_band = foreground & ~interior
-        if interior.any():
-            _, nearest_interior = ndimage.distance_transform_edt(~interior, return_indices=True)
-            filled_rgb[edge_band] = filled_rgb[nearest_interior[0][edge_band], nearest_interior[1][edge_band]]
-        soft_alpha = Image.fromarray(alpha).filter(ImageFilter.GaussianBlur(0.7))
-        rgba = np.dstack((filled_rgb, np.asarray(soft_alpha)))
-        result = Image.fromarray(rgba)
-        bounds = Image.fromarray(alpha).getbbox()
-        if bounds is None:
-            raise ValueError('Empty keyed sprite')
-        result = result.crop(bounds)
-        scale = CONTENT / max(result.size)
-        render_size = (max(1, round(result.width * scale)), max(1, round(result.height * scale)))
-        result = result.resize(render_size, Image.Resampling.LANCZOS)
-        if style == 'cel':
-            cel_alpha = result.getchannel('A')
-            softened = result.convert('RGB').filter(ImageFilter.GaussianBlur(0.45))
-            softened = ImageEnhance.Color(softened).enhance(1.08)
-            softened = ImageEnhance.Contrast(softened).enhance(1.04)
-            result = quantize_cel(softened)
-            result.putalpha(cel_alpha)
-            if outline:
-                result = ImageOps.expand(result, border=CEL_OUTLINE_WIDTH, fill=(0, 0, 0, 0))
-                cel_alpha = result.getchannel('A')
-                outline_alpha = cel_alpha.filter(ImageFilter.MaxFilter(CEL_OUTLINE_WIDTH * 2 + 1))
-                outline_alpha = outline_alpha.point(lambda value: value * CEL_OUTLINE[3] // 255)
-                outline_layer = Image.new('RGBA', result.size, CEL_OUTLINE)
-                outline_layer.putalpha(outline_alpha)
-                outline_layer.alpha_composite(result)
-                result = outline_layer
-        canvas = Image.new('RGBA', (CANVAS, CANVAS))
-        canvas.alpha_composite(result, ((CANVAS-result.width)//2, (CANVAS-result.height)//2))
-        return canvas
-
-    rgba = np.dstack((rgb, alpha))
-    result = Image.fromarray(rgba)
-    bounds = result.getbbox()
-    if bounds is None:
-        raise ValueError('Empty keyed sprite')
-    result = result.crop(bounds)
-    low_scale = PIXEL_CONTENT / max(result.size)
-    low_size = (max(1, round(result.width * low_scale)), max(1, round(result.height * low_scale)))
-    result = result.resize(low_size, Image.Resampling.LANCZOS)
-    alpha = result.getchannel('A').point(lambda value: 255 if value >= 128 else 0)
-    colors = result.convert('RGB').quantize(colors=SPRITE_COLORS, method=Image.Quantize.MEDIANCUT).convert('RGBA')
-    colors.putalpha(alpha)
-    pixel_scale = max(1, CONTENT // max(colors.size))
-    result = colors.resize((colors.width * pixel_scale, colors.height * pixel_scale), Image.Resampling.NEAREST)
-    canvas = Image.new('RGBA', (CANVAS, CANVAS))
-    canvas.alpha_composite(result, ((CANVAS-result.width)//2, (CANVAS-result.height)//2))
-    return canvas
-
-
-def repeating_material(image: Image.Image, style: str = 'cel') -> Image.Image:
-    # Mirrored quadrants give exact wrap continuity without a blurred seam or
-    # baking light direction into an albedo tile.
+def repeating_material(image: Image.Image) -> Image.Image:
     inset = max(2, round(min(image.size) * 0.035))
     image = image.crop((inset, inset, image.width-inset, image.height-inset))
-    source_size = 256 if style in {'painted', 'cel'} else 64
-    image = image.convert('RGB').resize((source_size, source_size), Image.Resampling.LANCZOS)
-    if style == 'cel':
-        image = ImageEnhance.Color(image).enhance(1.08)
-        image = ImageEnhance.Contrast(image).enhance(1.06)
-        image = quantize_cel(image).convert('RGB')
-    elif style != 'painted':
-        image = image.quantize(colors=SPRITE_COLORS, method=Image.Quantize.MEDIANCUT).convert('RGB')
-        image = image.resize((256, 256), Image.Resampling.NEAREST)
+    image = image.convert('RGB').resize((256, 256), Image.Resampling.LANCZOS)
     result = Image.new('RGB', (512, 512))
     result.paste(image, (0, 0))
     result.paste(ImageOps.mirror(image), (256, 0))
     result.paste(ImageOps.flip(image), (0, 256))
     result.paste(ImageOps.flip(ImageOps.mirror(image)), (256, 256))
     return result
-
-
-def apply_finish(image: Image.Image, finish: str, style: str) -> Image.Image:
-    if finish != 'matte_metal' or style == 'painted':
-        return image
-    pixels = np.asarray(image.convert('RGBA')).copy()
-    rgb = pixels[:, :, :3]
-    opaque = pixels[:, :, 3] > 0
-    neutral = (rgb.max(axis=2) - rgb.min(axis=2) < 42) & opaque
-    luminance = rgb.mean(axis=2)
-    shades = np.asarray(((42, 48, 51), (82, 90, 94), (122, 132, 136), (160, 169, 172)), dtype=np.uint8)
-    shade_index = np.digitize(luminance, (64, 112, 166))
-    rgb[neutral] = shades[shade_index[neutral]]
-    return Image.fromarray(pixels)
 
 
 def save_png(image: Image.Image, path: Path) -> None:
