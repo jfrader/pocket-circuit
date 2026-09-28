@@ -15,6 +15,7 @@ scripts/race/world_environment_catalog.gd  asset contract + semantic role pools
 scripts/race/world_environment_plan.gd     pure seeded physical placement plan
 scripts/race/world_environment_art.gd      yielded scene rendering
 scripts/race/household_surface_materials.gd independent procedural material stream
+scripts/race/handmade_course_materials.gd   seeded course grain, palette and flat joins
 tools/build_procedural_track.gd  optional CLI for saved development snapshots
 scripts/race/prototype_race.gd   builds the requested circuit at race startup
 ```
@@ -139,10 +140,22 @@ their original unscaled canvases.
 - Procedural surface profiles live in `data/household_material_patterns.json`.
   Story families and curated palette identities constrain the independent material
   stream; profile, pattern layout, spacing, orientation, seams and grain vary
-  without changing geometry. Floor and road remain in the same world-space phase.
+  without changing geometry. Floor and course use world coordinates with independent
+  material profiles, so the intended route stays distinct from the open apron.
 - Four floor and three island profiles are available per theme. Workshop timber
   and technical pads remain distinct from Office laminate/veneer and ink-blue,
   oxblood or indigo desk pads. Kitchen retains ceramics and preparation boards.
+- The course adds a separate seed stream for cork/card grain, palette and joins.
+  It does not perturb existing floor/island selections. Palettes target at least
+  1.3:1 linear-luminance contrast against the floor's base/pattern color range;
+  an unmatched custom palette chooses the strongest available contrast and exposes
+  `contrast_safe=false` rather than silently claiming the target was met.
+- Course construction is explicitly `FLAT`: shallow shadow, three to five joins
+  and paired tape strips. Reapplication replaces the previous construction; it
+  cannot add collision, change road width, racing lines or grip definitions.
+  Closed-loop sampling includes the closing segment. Noise uses Godot's threaded,
+  mipmapped `NoiseTexture2D`; runtime preparation waits for readiness while yielding.
+  The grain cache is bounded by `course_settings.grain_cache_limit`.
 - `data/world_prop_art.json` owns sources, style, themes, roles, dimensions, zones,
   clearances, repetition and collision/shadow behavior for all active outputs.
   `WorldPropScale` uses one world unit per millimetre and trims transparent

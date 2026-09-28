@@ -51,11 +51,11 @@ Material choices live in `data/household_material_patterns.json` and are rendere
 by `HouseholdSurfaceMaterials` and the world-coordinate household surface shader.
 They are generated parameters, not one fixed background picture per room.
 
-| Room | Drivable surface and apron | Raised island surfaces | Prop accents |
-|---|---|---|---|
-| Kitchen | Ivory or sage ceramics, terracotta inlay, cream laminate | Maple strips, end-grain board, walnut preparation board | Ivory, sage, terracotta, food colors |
-| Workshop | Bench boards, oiled timber, plywood, narrower wood slats | Charcoal or kraft cutting grids, ribbed work pad | Red enamel, ochre, pale wood, matte steel |
-| Office | Ivory/cool laminate, ash veneer, walnut herringbone | Ink-blue weave, oxblood desk pad, indigo twill | Ivory, ink blue, ochre, restrained brick red |
+| Room | Tabletop and apron | Handmade course | Raised island surfaces | Prop accents |
+|---|---|---|---|---|
+| Kitchen | Ivory or sage ceramics, terracotta inlay, cream laminate | Cut cork | Maple strips, end-grain board, walnut preparation board | Ivory, sage, terracotta, food colors |
+| Workshop | Bench boards, oiled timber, plywood, narrower wood slats | Kraft card | Charcoal or kraft cutting grids, ribbed work pad | Red enamel, ochre, pale wood, matte steel |
+| Office | Ivory/cool laminate, ash veneer, walnut herringbone | Ivory card | Ink-blue weave, oxblood desk pad, indigo twill | Ivory, ink blue, ochre, restrained brick red |
 
 Workshop and Office must not collapse into two teal rooms. Their large value
 masses, pattern families and edge colors must remain distinguishable before the
@@ -67,9 +67,16 @@ independent material stream varies profile selection, spacing, orientation,
 phase, seams, stagger and grain. The same seed reproduces the same result.
 Material changes must not alter route geometry or racing-line fingerprints.
 
-Floor and racing surface share world coordinates and material phase. No
-overlapping square cards, camera-relative grain or fake asphalt ribbon should
-appear at bends. Pattern contrast stays below the objects and cars.
+The course is a continuous, flat household-material layer at the existing road
+width. Thin cut edges, a shallow contact shadow and occasional taped joins make
+it read as an assembled course. Its three palettes per theme are selected for
+contrast against the tabletop; grain and construction vary with the material
+seed without changing existing floor/island choices. The apron remains drivable.
+
+Both floor and course texture use world coordinates, with independent material
+periods. No overlapping square cards, camera-relative grain or fake asphalt
+should appear at bends. Pattern contrast stays below the objects and cars.
+Paper joins and tape are drive-over decoration, not walls or new grip zones.
 
 ## Composition
 

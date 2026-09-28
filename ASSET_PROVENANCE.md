@@ -54,6 +54,11 @@ phase, seams, grain and palette-compatible choices independently of geometry.
 The game makes no runtime AI requests. Utility shadows, the checker and skid
 mask are generated locally by the preparation tool.
 
+Handmade course materials reuse these painted grain sources with original local
+shader treatment and Godot's built-in FastNoiseLite/NoiseTexture2D. Cork/card
+grain, cut edges, contact shadows and taped joins are procedural; no additional
+generated image sheets or third-party source artwork are used for the course.
+
 The operator approved the native production result, including the multi-seed
 material comparisons, for closeout. This approval covers the environment
 direction and integration, not publication of a release. Cars, portraits and

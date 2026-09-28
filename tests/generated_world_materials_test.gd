@@ -28,7 +28,7 @@ func _run_test() -> void:
 				return
 			for palette_id: String in MATERIALS.variant_ids(family_id):
 				var resolved := MATERIALS.resolve(StringName(theme), StringName(story_id), 0, family_id, palette_id)
-				if not _expect(bool(resolved["known"]) and String(resolved["floor_texture"]) == String(resolved["track_texture"]), "%s / %s should keep floor and race surface on the same material" % [family_id, palette_id]):
+				if not _expect(bool(resolved["known"]), "%s / %s should retain its curated room palette" % [family_id, palette_id]):
 					return
 				if not _expect(FileAccess.file_exists(String(resolved["floor_texture"])) and FileAccess.file_exists(String(resolved["island_material_texture"])), "%s textures should exist on disk" % family_id):
 					return
@@ -56,6 +56,8 @@ func _run_test() -> void:
 	if not _expect(prepared["spec"]["surface_identity"]["signature"] != other["spec"]["surface_identity"]["signature"] and prepared["spec"]["surface_identity"]["floor"]["id"] != other["spec"]["surface_identity"]["floor"]["id"], "catalog variants should change visible material, not the route"):
 		return
 	if not _expect(String(prepared["spec"]["material_id"]) == String(identity["material_id"]) and String(prepared["spec"]["palette_id"]) == String(identity["palette_id"]), "prepared layout should publish the same material identity"):
+		return
+	if not _expect(prepared["spec"]["track_texture"] == prepared["spec"]["surface_identity"]["course"]["texture"], "course texture must come from its independent material role"):
 		return
 	if not _expect(BUILDER.ROOM_COMPOSITIONS == BUILDER.STORY_KITS, "STORY_KITS should remain an alias of room compositions"):
 		return

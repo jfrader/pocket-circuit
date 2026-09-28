@@ -279,7 +279,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved}, candidates, {})
 		spec["surface_identity"] = HouseholdSurfaceMaterials.resolve(theme, int(spec.get("material_seed", _mix_seed(maxi(seed, 0), "material"))), String(spec.get("material_id", "")), String(spec.get("palette_id", "")), spec.get("floor_modulate", Color.WHITE))
 		spec["floor_texture"] = spec["surface_identity"]["floor"]["texture"]
-		spec["track_texture"] = spec["floor_texture"]
+		spec["track_texture"] = spec["surface_identity"]["course"]["texture"]
 		spec["island_material_texture"] = spec["surface_identity"]["island"]["texture"]
 		spec["floor_modulate"] = Color.WHITE
 		spec["ambient_props"] = []

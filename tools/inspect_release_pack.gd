@@ -32,10 +32,14 @@ func _initialize() -> void:
 		"res://data/vendor/procedural_2d/avatar_catalog.json",
 		"res://data/vendor/procedural_2d/car_catalog.json",
 		"res://data/vendor/procedural_2d/LICENSE",
+		"res://data/household_material_patterns.json",
 	]:
 		if not FileAccess.file_exists(required_path):
 			_fail("required release notice is missing: %s" % required_path)
 			return
+	if not ResourceLoader.exists("res://assets/shaders/handmade_course.gdshader"):
+		_fail("handmade course shader is missing")
+		return
 	var race_scene := load("res://scenes/race/prototype_race.tscn") as PackedScene
 	if race_scene == null:
 		_fail("release race scene could not be loaded")
