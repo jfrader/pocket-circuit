@@ -4,6 +4,12 @@ extends Control
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const HINT_SECONDS := 10.0
 const KMH_AT_FULL_SPEED := 180.0
+const SPEED_FORMAT := "%03d"
+const SPEED_UNIT := "KM/H"
+const SPEED_FONT_SIZE := 26
+const CAPTION_FONT_SIZE := 11
+const SPEED_PADDING := 14.0
+const BOOST_TUBE_HEIGHT := 32.0
 
 var race_position := 1
 var racer_count := 4
@@ -119,11 +125,16 @@ func _draw_clock(rect: Rect2) -> void:
 
 func _draw_speed(rect: Rect2) -> void:
 	SKIN.draw_plate(self, rect, SKIN.CREAM)
-	var origin := rect.position
-	SKIN.draw_text(self, origin + Vector2(12.0, 36.0), "%03d" % roundi(speed_ratio * KMH_AT_FULL_SPEED), 26, SKIN.INK)
-	SKIN.draw_text(self, origin + Vector2(14.0, 58.0), "KM/H", 11, SKIN.INK_SOFT)
-	var tube := Rect2(origin + Vector2(108.0, 18.0), Vector2(rect.size.x - 124.0 - SKIN.SHADOW, 42.0))
-	SKIN.draw_tube(self, tube, boost_ratio)
+	var face := Rect2(rect.position, rect.size - Vector2.ONE * SKIN.SHADOW).grow(-SPEED_PADDING)
+	var font := SKIN.display_font()
+	var readout_width := maxf(
+		font.get_string_size(SPEED_FORMAT % 0, HORIZONTAL_ALIGNMENT_LEFT, -1, SPEED_FONT_SIZE).x,
+		font.get_string_size(SPEED_UNIT, HORIZONTAL_ALIGNMENT_LEFT, -1, CAPTION_FONT_SIZE).x
+	)
+	SKIN.draw_text(self, Vector2(face.position.x, rect.position.y + 38.0), SPEED_FORMAT % roundi(speed_ratio * KMH_AT_FULL_SPEED), SPEED_FONT_SIZE, SKIN.INK)
+	_caption(Vector2(face.position.x, rect.position.y + 58.0), SPEED_UNIT)
+	var tube_left := face.position.x + readout_width + SPEED_PADDING
+	SKIN.draw_tube(self, Rect2(tube_left, face.get_center().y - BOOST_TUBE_HEIGHT * 0.5, face.end.x - tube_left, BOOST_TUBE_HEIGHT), boost_ratio)
 
 
 func _draw_route_progress(rect: Rect2) -> void:
@@ -148,7 +159,7 @@ func _draw_wrong_way(rect: Rect2) -> void:
 
 
 func _caption(text_position: Vector2, text: String) -> void:
-	SKIN.draw_text(self, text_position, text, 11, SKIN.INK_SOFT)
+	SKIN.draw_text(self, text_position, text, CAPTION_FONT_SIZE, SKIN.INK_SOFT)
 
 
 func _format_time(total_seconds: float) -> String:
