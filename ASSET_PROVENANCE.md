@@ -54,11 +54,11 @@ phase, seams, grain and palette-compatible choices independently of geometry.
 The game makes no runtime AI requests. Utility shadows, the checker and skid
 mask are generated locally by the preparation tool.
 
-Handmade course materials reuse these painted grain sources with original local
-shader treatment and Godot's built-in FastNoiseLite, baked into ImageTexture
-grain. Card
-grain, cut edges, contact shadows and taped joins are procedural; no additional
-generated image sheets or third-party source artwork are used for the course.
+Painted courses reuse the supporting room's texture and procedural surface
+pattern through a shared shader include. Restrained pigments, translucent edge
+markings and seeded brush coverage are rendered locally; brush textures use
+Godot's built-in FastNoiseLite baked into mipmapped ImageTextures. No new generated
+image sheets or third-party source artwork are used for the course.
 
 The operator approved the native production result, including the multi-seed
 material comparisons, for closeout. This approval covers the environment

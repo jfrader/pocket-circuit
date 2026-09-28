@@ -39,7 +39,8 @@ func _run_test() -> void:
 	var kitchen := KITCHEN_SCENE.instantiate()
 	root.add_child(kitchen)
 	await process_frame
-	if not _expect(kitchen.get_node_or_null("TrackRibbon") != null, "the generated kitchen should present a painted ribbon"):
+	var course := kitchen.get_node_or_null("TrackSurface") as Line2D
+	if not _expect(course != null and course.material is ShaderMaterial and course.get_meta("course_kind") == "painted_surface", "the kitchen should present its painted course"):
 		return
 
 	app.set("reduced_motion", original_reduced_motion)

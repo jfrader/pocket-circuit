@@ -1,13 +1,11 @@
 {
   "version": 1,
   "course_settings": {
-    "version":2,"min_surface_contrast":1.5,
+    "version":3,"min_surface_contrast":1.5,
     "grain_texture_size":256,"grain_cache_limit":8,"grain_octaves":3,"grain_blend_skirt":0.2,
-    "grain_frequency":[0.13,0.19],"grain_period_mm":[135,185],"paint_period_mm":360,"paint_strength":0.3,
-    "cut_period_mm":85,"cut_jitter_mm":[0.4,0.8],"cut_band_mm":[0.6,2.6],"cut_strength":0.45,"edge_aa_mm":[0.15,0.9],
-    "shadow_color":"35291e2e","shadow_offset_mm":[1.5,2.0],"shadow_extra_width_mm":2,
-    "join_count":[3,5],"join_phase":[0.1,0.9],"join_jitter":0.12,"seam_width_mm":1.1,"seam_alpha":0.45,
-    "tape_size_mm":[30,38],"tape_edge_inset_mm":3,"tape_angle_range":[-0.12,0.12],"tape_alpha":0.7
+    "grain_frequency":[0.035,0.045],"brush_period_mm":[750,1050],"brush_cross_repeat":3.0,"brush_min_coverage":0.96,
+    "opacity_steps":[0.38,0.42,0.46,0.50,0.54,0.58,0.62,0.66,0.70,0.74,0.78,0.82,0.86,0.90],
+    "edge_inset_mm":5.5,"edge_width_mm":[4.5,5.5],"edge_opacity":0.6,"edge_roughness_mm":1.4,"edge_feather_mm":0.8
   },
   "patterns": {"plain":0,"ceramic":1,"planks":2,"cutting_grid":3,"weave":4,"herringbone":5,"endgrain":6,"ribbed_rubber":7},
   "families": {
@@ -18,11 +16,11 @@
   "themes": {
     "kitchen": {
       "course":{
-        "kind":"colored_card","texture":"res://assets/textures/world_materials/kitchen_counter.png","grain_strength":[0.03,0.06],
+        "kind":"painted_surface",
         "palettes":[
-          {"id":"kitchen_card_teal","base":"355e67","cut":"233e46","tape":"c4c1a2"},
-          {"id":"kitchen_card_denim","base":"405275","cut":"2b374e","tape":"c9c5ab"},
-          {"id":"kitchen_card_slate","base":"303e56","cut":"202c40","tape":"b5baa5"}
+          {"id":"kitchen_paint_sage","pigment":"1f2a24","edge":"ced0c6"},
+          {"id":"kitchen_paint_slate","pigment":"2d343a","edge":"cbcecc"},
+          {"id":"kitchen_paint_umber","pigment":"39332e","edge":"d1cdc3"}
         ]
       },
       "grain_floor":"res://assets/textures/world_materials/kitchen_counter.png",
@@ -41,11 +39,11 @@
     },
     "workshop": {
       "course":{
-        "kind":"kraft_card","texture":"res://assets/textures/world_materials/workshop_plywood.png","grain_strength":[0.04,0.08],
+        "kind":"painted_surface",
         "palettes":[
-          {"id":"workshop_card_buff","base":"ded0af","cut":"a78e64","tape":"86a4a1"},
-          {"id":"workshop_card_linen","base":"f3e8ce","cut":"b4a080","tape":"799b9b"},
-          {"id":"workshop_card_umber","base":"9d7e54","cut":"735a3d","tape":"aec0b2"}
+          {"id":"workshop_paint_chalk","pigment":"f8f5ed","edge":"62655f"},
+          {"id":"workshop_paint_limestone","pigment":"f0f4f2","edge":"606963"},
+          {"id":"workshop_paint_graphite","pigment":"302f2c","edge":"c9c8bf"}
         ]
       },
       "grain_floor":"res://assets/textures/world_materials/workshop_bench.png",
@@ -64,11 +62,11 @@
     },
     "office": {
       "course":{
-        "kind":"ivory_card","texture":"res://assets/textures/world_materials/office_laminate.png","grain_strength":[0.02,0.04],
+        "kind":"painted_surface",
         "palettes":[
-          {"id":"office_card_ivory","base":"eee3c9","cut":"b6a587","tape":"91a4bc"},
-          {"id":"office_card_white","base":"fff9e8","cut":"c8baa0","tape":"8c9fb8"},
-          {"id":"office_card_oat","base":"ba9d6b","cut":"8f7753","tape":"849ab5"}
+          {"id":"office_paint_slate","pigment":"303539","edge":"c9cecc"},
+          {"id":"office_paint_pearl","pigment":"f2f2ec","edge":"636963"},
+          {"id":"office_paint_silver","pigment":"e9eeee","edge":"626b6b"}
         ]
       },
       "grain_floor":"res://assets/textures/world_materials/office_desk.png",
