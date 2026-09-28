@@ -56,7 +56,7 @@ mask are generated locally by the preparation tool.
 
 Handmade course materials reuse these painted grain sources with original local
 shader treatment and Godot's built-in FastNoiseLite, baked into ImageTexture
-grain. Cork/card
+grain. Card
 grain, cut edges, contact shadows and taped joins are procedural; no additional
 generated image sheets or third-party source artwork are used for the course.
 

@@ -145,9 +145,10 @@ their original unscaled canvases.
 - Four floor and three island profiles are available per theme. Workshop timber
   and technical pads remain distinct from Office laminate/veneer and ink-blue,
   oxblood or indigo desk pads. Kitchen retains ceramics and preparation boards.
-- The course adds a separate seed stream for cork/card grain, palette and joins.
+- The course adds a separate seed stream for card grain, palette and joins.
   It does not perturb existing floor/island selections. Palettes target at least
-  1.3:1 linear-luminance contrast against the floor's base/pattern color range;
+  1.5:1 linear-luminance contrast against both neighboring surfaces' base/pattern
+  color ranges (tabletop and island);
   an unmatched custom palette chooses the strongest available contrast and exposes
   `contrast_safe=false` rather than silently claiming the target was met.
 - Course construction is explicitly `FLAT`: shallow shadow, three to five joins

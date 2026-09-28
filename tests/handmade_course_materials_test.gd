@@ -53,6 +53,10 @@ func _run() -> void:
 		var packed := load(path) as PackedScene
 		var saved := packed.instantiate()
 		assert(saved.get_meta("surface_identity").has("course"), "canonical scenes must retain the course identity")
+		var identity: Dictionary = saved.get_meta("surface_identity")
+		assert(identity["course"]["kind"] == MATERIALS.catalog()["themes"][identity["theme"]]["course"]["kind"], "canonical fixtures must use the current course material family")
+		for neighbor: String in ["floor", "island"]:
+			assert(MATERIALS.COURSE.surface_contrast(identity["course"]["base_color"], identity[neighbor]) >= float(MATERIALS.catalog()["course_settings"]["min_surface_contrast"]), "canonical course must differ from " + neighbor)
 		assert((saved.get_node("TrackSurface").material as ShaderMaterial).shader == MATERIALS.COURSE.SHADER, "canonical course must render through the production shader")
 		assert((saved.get_node("TrackSurface").material as ShaderMaterial).get_shader_parameter("grain_noise") is ImageTexture, "thread-loaded fixtures must not embed active noise generators")
 		saved.free()

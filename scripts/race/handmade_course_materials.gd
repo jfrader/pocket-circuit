@@ -8,18 +8,20 @@ const SHADER_KEYS := ["base_color", "cut_color", "grain_period_mm", "grain_stren
 static var _grains: Dictionary = {}
 
 
-static func resolve(theme: StringName, seed_value: int, definition: Dictionary, settings: Dictionary, floor_profile: Dictionary) -> Dictionary:
+static func resolve(theme: StringName, seed_value: int, definition: Dictionary, settings: Dictionary, neighboring_surfaces: Array[Dictionary]) -> Dictionary:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = ("%s:course-v%d:%d" % [theme, int(settings["version"]), seed_value]).hash()
 	var candidates: Array[Dictionary] = []
 	var best: Dictionary = definition["palettes"][0]
 	var best_contrast := 0.0
 	for palette: Dictionary in definition["palettes"]:
-		var contrast := floor_contrast(Color(palette["base"]), floor_profile)
+		var contrast := INF
+		for surface: Dictionary in neighboring_surfaces:
+			contrast = minf(contrast, surface_contrast(Color(palette["base"]), surface))
 		if contrast > best_contrast:
 			best = palette
 			best_contrast = contrast
-		if contrast >= float(settings["min_floor_contrast"]):
+		if contrast >= float(settings["min_surface_contrast"]):
 			candidates.append(palette)
 	var chosen: Dictionary = best if candidates.is_empty() else candidates[rng.randi_range(0, candidates.size() - 1)]
 	var result := settings.duplicate(true)
@@ -43,11 +45,14 @@ static func resolve(theme: StringName, seed_value: int, definition: Dictionary, 
 	return result
 
 
-static func floor_contrast(color: Color, floor_profile: Dictionary) -> float:
-	var base: Color = floor_profile["base_color"]
-	var alternate := base.lerp(floor_profile["alternate_color"], float(floor_profile["contrast"]))
-	var lower := minf(base.srgb_to_linear().get_luminance(), alternate.srgb_to_linear().get_luminance())
-	var upper := maxf(base.srgb_to_linear().get_luminance(), alternate.srgb_to_linear().get_luminance())
+static func surface_contrast(color: Color, profile: Dictionary) -> float:
+	var base: Color = profile["base_color"]
+	var alternate: Color = profile["alternate_color"]
+	var mixed_srgb := base.lerp(alternate, float(profile["contrast"])).srgb_to_linear().get_luminance()
+	var mixed_linear := base.srgb_to_linear().lerp(alternate.srgb_to_linear(), float(profile["contrast"])).get_luminance()
+	var base_luminance := base.srgb_to_linear().get_luminance()
+	var lower := minf(base_luminance, minf(mixed_srgb, mixed_linear))
+	var upper := maxf(base_luminance, maxf(mixed_srgb, mixed_linear))
 	var luminance := color.srgb_to_linear().get_luminance()
 	var nearest := clampf(luminance, lower, upper)
 	return (maxf(luminance, nearest) + CONTRAST_LUMINANCE_OFFSET) / (minf(luminance, nearest) + CONTRAST_LUMINANCE_OFFSET)
