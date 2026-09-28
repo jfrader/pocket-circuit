@@ -125,9 +125,7 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 		seen_acts[act_number] = true
 	var notice := ""
 	if not result_summary.is_empty():
-		notice = "+%d PTS" % int(result_summary.get("points_gained", 0))
-		if bool(result_summary.get("act_completed", false)):
-			notice += "  ·  ACT WON"
+		notice = _result_notice_text(result_summary)
 	_page.hide()
 	_route.show()
 	_route.call("present", stops, focus_id, _selected_vehicle(progress), notice)
@@ -149,7 +147,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	if _quick_race_vehicle_id.is_empty():
 		_quick_race_vehicle_id = _selected_vehicle(progress)
 	_configure_stage(&"vehicle", _quick_race_vehicle_id)
-	_add_kicker("QUICK RACE")
+	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
 	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
@@ -165,7 +163,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 		seed_controls = _add_quick_race_seed_controls(seed_status)
 	_add_button("CHANGE CAR · %s" % String(CATALOG.get_vehicle(_quick_race_vehicle_id).get("name", "Rustbug")).to_upper(), Callable(self, "show_vehicle_select").bind("", true))
 	_add_button("BACK TO TITLE", Callable(self, "show_title"))
-	_footer.text = BACK_HINT
+	_footer.text = "EXHIBITION RESULTS DO NOT SAVE  ·  " + BACK_HINT
 	if not seed_controls.is_empty():
 		_complete_focus_row(seed_controls, play_button)
 	_queue_content_entrance()
@@ -239,7 +237,7 @@ func refresh_mastery_calibration(event_id: String) -> void:
 	if _screen == "map":
 		var progress: Dictionary = _app.call("get_save_data")
 		var finish := int(progress.get("best_event_finishes", {}).get(event_id, 0))
-		var button := find_child("Event_%s" % event_id, true, false) as Button
+		var button := find_child("Stop_%s" % event_id, true, false) as Button
 		var event := CATALOG.get_event(event_id)
 		if button and not event.is_empty() and finish > 0:
 			button.text = "%s\n%s" % [String(event["name"]), _completed_event_status(event_id, finish, int(progress.get("best_event_points", {}).get(event_id, 0)))]
@@ -526,7 +524,8 @@ func _build_base() -> void:
 	_route.name = "ChampionshipRoute"
 	_route.hide()
 	_route.connect("event_chosen", _open_event)
-	_route.connect("return_chosen", show_title)
+	_route.connect("return_chosen", _route_return)
+	_route.connect("focus_moved", _play_ui_move)
 	_root.add_child(_route)
 
 
@@ -661,19 +660,17 @@ func _add_section(left: String, right: String) -> Label:
 	return right_label
 
 
-func _add_result_notice(summary: Dictionary) -> void:
+func _result_notice_text(summary: Dictionary) -> String:
 	if bool(summary.get("mastery", false)):
 		if bool(summary.get("mastery_dnf", false)):
-			_add_kicker("TIME TRIAL · DID NOT FINISH", SKIN.ORANGE)
-			return
+			return "TIME TRIAL · DID NOT FINISH"
 		var record: Dictionary = summary.get("mastery_record", {})
 		var message := "TIME TRIAL SAVED"
 		if not record.is_empty():
 			message = "TIME TRIAL %s · LAP %s · RACE %s" % [String(record.get("medal", "none")).to_upper(), _format_time(float(record["best_lap"])), _format_time(float(record["best_race"]))]
 		if bool(summary.get("ghost_saved", false)):
 			message += " · GHOST SAVED"
-		_add_kicker(message, SKIN.CREAM)
-		return
+		return message
 	var message := "RESULT SAVED"
 	if int(summary.get("points_gained", 0)) > 0:
 		message += "  ·  +%d POINTS" % int(summary["points_gained"])
@@ -682,7 +679,7 @@ func _add_result_notice(summary: Dictionary) -> void:
 	var unlocked: Array = summary.get("unlocked_vehicles", [])
 	if not unlocked.is_empty():
 		message += "  ·  %s UNLOCKED" % String(CATALOG.get_vehicle(String(unlocked[0]))["name"]).to_upper()
-	_add_kicker(message, SKIN.CREAM)
+	return message
 
 
 func _add_button(text: String, callback: Callable, primary: bool = false, disabled: bool = false, node_name: String = "") -> Button:
@@ -937,7 +934,13 @@ func _reduced_motion_enabled() -> bool:
 
 
 func _open_event(event_id: String) -> void:
+	_play_ui_confirm()
 	show_briefing(event_id)
+
+
+func _route_return() -> void:
+	_play_ui_confirm()
+	show_title()
 
 
 func _show_map_act(act_number: int) -> void:
