@@ -136,8 +136,7 @@ static func apply_button(button: Button, primary: bool) -> void:
 	button.add_theme_color_override("font_hover_color", CREAM if primary else ORANGE.darkened(0.3))
 	button.add_theme_color_override("font_hover_pressed_color", CREAM if primary else INK)
 	button.add_theme_color_override("font_disabled_color", Color(INK, 0.55))
-	button.add_theme_color_override("font_outline_color", INK)
-	button.add_theme_constant_override("outline_size", 4 if primary else 0)
+	button.add_theme_constant_override("outline_size", 0)
 	button.add_theme_color_override("icon_disabled_color", Color(INK, 0.88))
 	if button.has_method("set_art_role"):
 		button.call("set_art_role", primary)
@@ -190,6 +189,7 @@ static func make_theme() -> Theme:
 		theme.set_color("font_hover_color", kind, ORANGE.darkened(0.3))
 		theme.set_color("font_hover_pressed_color", kind, INK)
 		theme.set_color("font_disabled_color", kind, Color(INK, 0.55))
+		theme.set_constant("outline_size", kind, 0)
 	theme.set_icon("arrow", "OptionButton", _chevron())
 	theme.set_constant("arrow_margin", "OptionButton", 12)
 	for icon: String in TOGGLE_ICONS:

@@ -10,6 +10,7 @@
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 
 ### Fixed
+- Button labels no longer carry a thick text stroke.
 - Starting Grid now holds from the menu through loading, countdown, and the complete first lap. A circuit's own seed lands directly on Grid in one musical handoff; automatic race rotation begins after lap one and excludes the drumless Breather and post-race Cooldown phases.
 - Starting a newly generated menu or circuit score no longer cuts off the score already playing. The outgoing score stays up until the incoming music is audible, then crossfades into it.
 - Your car keeps its engine note for every race in a session. It used to fall silent after the first one, while still reporting that it was playing.
