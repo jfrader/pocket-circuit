@@ -982,7 +982,7 @@ func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 	_quick_race_room = StringName(_app.call("circuit_room_for_seed", _quick_race_seed))
 	seed_edit.text = str(_quick_race_seed)
 	seed_status.text = "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()]
-	_configure_stage(&"map", "rustbug", "rae", String(_quick_race_theme))
+	_configure_stage(&"map", _quick_race_vehicle_id, "rae", String(_quick_race_theme))
 	_refresh_quick_identity_labels()
 
 
