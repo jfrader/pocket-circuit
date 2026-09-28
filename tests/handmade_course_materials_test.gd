@@ -28,10 +28,10 @@ func _run() -> void:
 		var racing_line := (track.get_node("RacingLine") as Line2D).points.duplicate()
 		var grip: Array = track.get_meta("generated_surfaces", []).duplicate(true)
 		var first := MATERIALS.resolve(theme, 123)
-		var grain := MATERIALS.apply(track, first)
-		if grain.get_image() == null:
-			await grain.changed
+		var grain: Texture2D = MATERIALS.apply(track, first)
+		assert(grain is ImageTexture, "course textures must be completed images, not worker-owning resources that can deadlock threaded scene-load shutdown")
 		assert(grain.get_image() != null, "course grain must finish before interactive presentation")
+		assert(grain.get_image().has_mipmaps(), "grain needs mipmaps to avoid distant shimmer")
 		var construction := track.get_node("CourseConstruction")
 		var signature := _construction_signature(construction)
 		assert(MATERIALS.apply(track, first) == grain, "repeated material must reuse the prepared grain")
@@ -54,12 +54,14 @@ func _run() -> void:
 		var saved := packed.instantiate()
 		assert(saved.get_meta("surface_identity").has("course"), "canonical scenes must retain the course identity")
 		assert((saved.get_node("TrackSurface").material as ShaderMaterial).shader == MATERIALS.COURSE.SHADER, "canonical course must render through the production shader")
+		assert((saved.get_node("TrackSurface").material as ShaderMaterial).get_shader_parameter("grain_noise") is ImageTexture, "thread-loaded fixtures must not embed active noise generators")
 		saved.free()
-	print("HANDMADE_COURSE_MATERIALS_TEST PASS distinct_course_idempotent_seeded_visual_only")
 	var app := root.get_node("App")
 	root.remove_child(app)
+	await process_frame
 	app.free()
 	await create_timer(0.2).timeout
+	print("HANDMADE_COURSE_MATERIALS_TEST PASS distinct_course_idempotent_seeded_visual_only")
 	quit()
 
 

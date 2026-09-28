@@ -41,7 +41,7 @@ static func resolve(theme: StringName, material_seed: int, family: String = "", 
 	return result
 
 
-static func apply(track: Node2D, resolved: Dictionary) -> NoiseTexture2D:
+static func apply(track: Node2D, resolved: Dictionary) -> ImageTexture:
 	var floor_material := _material(resolved["floor"])
 	var island_material := _material(resolved["island"])
 	for node: Node in track.find_children("*", "CanvasItem", true, false):

@@ -153,8 +153,11 @@ their original unscaled canvases.
 - Course construction is explicitly `FLAT`: shallow shadow, three to five joins
   and paired tape strips. Reapplication replaces the previous construction; it
   cannot add collision, change road width, racing lines or grip definitions.
-  Closed-loop sampling includes the closing segment. Noise uses Godot's threaded,
-  mipmapped `NoiseTexture2D`; runtime preparation waits for readiness while yielding.
+  Closed-loop sampling includes the closing segment. Grain uses Godot's
+  `FastNoiseLite.get_seamless_image()` and completed, mipmapped `ImageTexture`s.
+  Never embed worker-owning `NoiseTexture2D` resources in threaded-loaded scenes:
+  rapid scene cancellation can hang engine shutdown while they are destroyed.
+  Generation is bounded by the configured texture size and a yielded loading stage.
   The grain cache is bounded by `course_settings.grain_cache_limit`.
 - `data/world_prop_art.json` owns sources, style, themes, roles, dimensions, zones,
   clearances, repetition and collision/shadow behavior for all active outputs.
