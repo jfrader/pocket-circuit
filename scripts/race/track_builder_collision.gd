@@ -129,6 +129,9 @@ static func compute_alpha_outline(image: Image, width: int, height: int) -> Dict
 static func texture_collision_footprint(texture: Texture2D, shape_kind: StringName, force_axis_aligned: bool = false) -> Dictionary:
 	var override: Dictionary = TrackBuilderCore.ASSET_FOOTPRINT_OVERRIDES.get(texture.resource_path.get_file(), {})
 	var resolved_kind := StringName(override.get("kind", shape_kind))
+	var contract := WorldEnvironmentCatalog.for_path(texture.resource_path)
+	if not contract.is_empty() and contract.get("collision") == "alpha":
+		resolved_kind = &"convex"
 	var no_rotation := force_axis_aligned or bool(override.get("no_rotation", false))
 	var cache_key := "%s:%s:%s" % [texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id()), resolved_kind, no_rotation]
 	if TrackBuilderCore._texture_footprint_cache.has(cache_key):
@@ -788,15 +791,13 @@ static func add_boundary_worn_hint(container: Node2D, centerline: PackedVector2A
 
 
 
-static func seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+static func pocket_regions(spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> Array[Dictionary]:
 	# A mouth-only wall leaves the rest of a deep bay cuttable. Fill the bay with
 	# a visible raised pad, subtracting the racing corridor and its full apron.
 	var pockets: Array = spec.get("pockets", [])
+	var regions: Array[Dictionary] = []
 	if pockets.is_empty():
-		return
-	var container := Node2D.new()
-	container.name = "PocketSeals"
-	root.add_child(container)
+		return regions
 	var clearance := TrackBuilderCore.HALF_WIDTH + TrackBuilderCore.APRON_COLLIDER_CLEARANCE + TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH
 	var contours := Geometry2D.offset_polyline(centerline, clearance, Geometry2D.JOIN_ROUND, Geometry2D.END_JOINED)
 	var exclusion := PackedVector2Array()
@@ -805,7 +806,7 @@ static func seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVecto
 			exclusion = contour
 	if exclusion.is_empty():
 		push_error("TrackBuilderCollision: cannot seal bays without a valid corridor exclusion")
-		return
+		return regions
 	# The corridor exclusion can carry hundreds of collinear round-join vertices;
 	# clip_polygons inherits them, and a stray one can land exactly on a ray that
 	# the pad-intrusion probe casts. Simplify it before clipping (self-union is
@@ -822,28 +823,40 @@ static func seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVecto
 				var region := TrackBuilderCore._simple_island_loop(clipped)
 				if region.size() < 3 or absf(TrackBuilderCore._polygon_area(region)) < 100.0:
 					continue
-				var body := StaticBody2D.new()
-				body.name = "Seal%02d" % pocket_index
-				body.collision_layer = 2
-				body.set_meta("pocket_index", pocket_index)
-				TrackBuilderCore._mark_solid_body(body, "", &"raised_island_rim")
-				container.add_child(body)
-				var collision_region := TrackBuilderCore._outset_polygon(region, TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH * 0.5)
-				var segments := PackedVector2Array()
-				for i in collision_region.size():
-					segments.append(collision_region[i])
-					segments.append(collision_region[(i + 1) % collision_region.size()])
-				var shape := ConcavePolygonShape2D.new()
-				shape.segments = segments
-				var collision := CollisionShape2D.new()
-				collision.shape = shape
-				body.add_child(collision)
-				body.set_meta("collision_boundary_polygon", collision_region)
-				var surface := Polygon2D.new()
-				surface.name = "RaisedPad"
-				surface.polygon = region
-				surface.color = spec["island"]
-				surface.z_index = -9
-				TrackBuilderCore._mark_solid_visual(surface, "", &"raised_island")
-				body.add_child(surface)
-				TrackBuilderIsland.build_raised_island_rim(body, spec, region)
+				regions.append({"index":pocket_index,"region":region,"collision":TrackBuilderCore._outset_polygon(region, TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH * 0.5)})
+	return regions
+
+
+static func seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+	var regions: Array = spec["pocket_regions"] if spec.has("pocket_regions") else pocket_regions(spec, centerline, room_polygon)
+	if regions.is_empty():
+		return
+	var container := Node2D.new()
+	container.name = "PocketSeals"
+	root.add_child(container)
+	for definition: Dictionary in regions:
+		var body := StaticBody2D.new()
+		body.name = "Seal%02d" % int(definition["index"])
+		body.collision_layer = 2
+		body.set_meta("pocket_index", definition["index"])
+		TrackBuilderCore._mark_solid_body(body, "", &"raised_island_rim")
+		container.add_child(body)
+		var collision_region: PackedVector2Array = definition["collision"]
+		var segments := PackedVector2Array()
+		for i in collision_region.size():
+			segments.append(collision_region[i])
+			segments.append(collision_region[(i + 1) % collision_region.size()])
+		var shape := ConcavePolygonShape2D.new()
+		shape.segments = segments
+		var collision := CollisionShape2D.new()
+		collision.shape = shape
+		body.add_child(collision)
+		body.set_meta("collision_boundary_polygon", collision_region)
+		var surface := Polygon2D.new()
+		surface.name = "RaisedPad"
+		surface.polygon = definition["region"]
+		surface.color = spec["island"]
+		surface.z_index = -9
+		TrackBuilderCore._mark_solid_visual(surface, "", &"raised_island")
+		body.add_child(surface)
+		TrackBuilderIsland.build_raised_island_rim(body, spec, definition["region"])

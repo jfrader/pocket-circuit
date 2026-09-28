@@ -106,8 +106,8 @@ static var ASSET_FOOTPRINT_OVERRIDES := {
 	"napkin.png": {"kind": &"rect", "no_rotation": true},
 	"hazard_workshop_socket.png": {"kind": &"convex", "no_rotation": true},
 
-	"workshop_toolbox_top_bright.jpg": {"kind": &"rect", "no_rotation": true},
-	"office_keyboard_top_bright.jpg": {"kind": &"rect", "no_rotation": true},
+	"workshop_toolbox_top_bright.png": {"kind": &"rect", "no_rotation": true},
+	"office_keyboard_top_bright.png": {"kind": &"rect", "no_rotation": true},
 	"stove_top.png": {"kind": &"rect", "no_rotation": true},
 }
 
@@ -476,8 +476,8 @@ static var PROP_SHAPES := {
 	"workshop_paint_can.png": {"shape": "circle", "size": Vector2(52.0, 52.0)},
 	"island_tool_tray.png": {"shape": "rect", "size": Vector2(150.0, 150.0)},
 	"island_keyboard.png": {"shape": "rect", "size": Vector2(150.0, 150.0)},
-	"workshop_toolbox_top_bright.jpg": {"shape": "circle", "size": Vector2(130.0, 130.0)},
-	"office_keyboard_top_bright.jpg": {"shape": "circle", "size": Vector2(130.0, 130.0)},
+	"workshop_toolbox_top_bright.png": {"shape": "rect", "size": Vector2(400.0, 220.0)},
+	"office_keyboard_top_bright.png": {"shape": "rect", "size": Vector2(440.0, 170.0)},
 	"plate_large.png": {"shape": "circle", "size": Vector2(130.0, 130.0)},
 	"stove_top.png": {"shape": "rect", "size": Vector2(190.0, 190.0)},
 	"bucket_stack.png": {"shape": "circle", "size": Vector2(152.0, 152.0)},

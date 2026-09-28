@@ -34,8 +34,9 @@ static func _load_sizes() -> Dictionary:
 	for definition: Dictionary in definitions:
 		var length := float(definition["length_mm"]) * WORLD_UNITS_PER_MM
 		var width := float(definition.get("width_mm", definition["length_mm"])) * WORLD_UNITS_PER_MM
+		var dimensions: Array = definition.get("dimensions_mm", [length, width])
 		for output: String in definition["outputs"]:
-			result[output.get_file()] = Vector2(length, width)
+			result[output.get_file()] = Vector2(float(dimensions[0]), float(dimensions[1]))
 	return result
 
 

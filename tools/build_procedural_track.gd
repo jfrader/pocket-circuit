@@ -11,13 +11,13 @@ var _room_shape: StringName = &"classic"
 
 func _init() -> void:
 	var env := OS.get_environment("PC_THEME")
-	if env in [&"workshop", &"office"]:
+	if env in [&"kitchen", &"workshop", &"office"]:
 		_theme = StringName(env)
 	var seed_env := OS.get_environment("PC_SEED")
 	if not seed_env.is_empty():
 		_seed = int(seed_env)
 	var room_env := OS.get_environment("PC_ROOM")
-	if room_env in [&"classic", &"wide", &"tall", &"el"]:
+	if room_env in GeneratedCircuitRules.ROOMS:
 		_room_shape = StringName(room_env)
 	call_deferred("_run")
 
@@ -32,5 +32,6 @@ func _run() -> void:
 	var out_path := OS.get_environment("PC_SCENE_OUT")
 	if out_path.is_empty():
 		out_path = String(TrackBuilderCore.LAYOUTS[_theme]["scene"])
-	print("SAVE ", ResourceSaver.save(result["scene"] as PackedScene, out_path))
-	quit(0)
+	var error := ResourceSaver.save(result["scene"] as PackedScene, out_path)
+	print("SAVE ", error)
+	quit(0 if error == OK else 1)

@@ -53,7 +53,7 @@ func _run_test() -> void:
 		return
 	if not _expect(prepared["centerline"] == other["centerline"] and prepared["racing_line_metrics"] == other["racing_line_metrics"], "changing only material options must leave geometry fingerprints unchanged"):
 		return
-	if not _expect(String(prepared["spec"]["floor_texture"]) != String(other["spec"]["floor_texture"]) or prepared["spec"]["floor_modulate"] != other["spec"]["floor_modulate"], "catalog variants should change visible material, not the route"):
+	if not _expect(prepared["spec"]["surface_identity"]["signature"] != other["spec"]["surface_identity"]["signature"] and prepared["spec"]["surface_identity"]["floor"]["id"] != other["spec"]["surface_identity"]["floor"]["id"], "catalog variants should change visible material, not the route"):
 		return
 	if not _expect(String(prepared["spec"]["material_id"]) == String(identity["material_id"]) and String(prepared["spec"]["palette_id"]) == String(identity["palette_id"]), "prepared layout should publish the same material identity"):
 		return

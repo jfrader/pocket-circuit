@@ -104,7 +104,10 @@ static func compose_generated_story(
 		await stage.call("Preparing grip zones and hazards")
 	TrackBuilderCore._build_generated_surfaces(root, container, story, spec, moments, centerline, gate_samples)
 	TrackBuilderCore._build_finish_moments(container, centerline)
+	build_gameplay_moments(root, container, spec, moments, centerline, opening_index)
 
+
+static func build_gameplay_moments(root: Node2D, container: Node2D, spec: Dictionary, moments: Dictionary, centerline: PackedVector2Array, opening_index: int) -> void:
 	var hazard_paths := {}
 	var planned_hazard: Dictionary = spec.get("hazard_plan", {})
 	var planned_paths: Dictionary = planned_hazard.get("paths", {})

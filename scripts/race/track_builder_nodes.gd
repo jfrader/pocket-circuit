@@ -255,6 +255,35 @@ static func add_grid(parent: Node, node_name: String, rotation: float, positions
 		grid.add_child(marker)
 
 
+static func grid_arc_distances(centerline: PackedVector2Array, reverse: bool, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Array[float]:
+	var arc := TrackBuilderCore._arc_lengths(centerline)
+	var total := arc[arc.size() - 1]
+	var start := centerline[0]
+	var finish_tangent := (centerline[1] - centerline[centerline.size() - 1]).normalized()
+	for offset_step in 48:
+		var rows: Array[float] = []
+		var clear := true
+		for distance: float in TrackBuilderCore.GRID_ROW_DISTANCES:
+			var shifted := distance + float(offset_step) * 20.0
+			rows.append(shifted)
+			var sample_arc := total - shifted if reverse else shifted
+			var sample := TrackBuilderCore._sample_at_arc(centerline, arc, sample_arc)
+			var normal := TrackBuilderCore._tangent_at_arc(centerline, arc, sample_arc).rotated(PI * 0.5)
+			for side in [-1, 1]:
+				var point := sample + normal * TrackBuilderCore.GRID_LANE_OFFSET * float(side)
+				if absf((point - start).dot(finish_tangent)) < 70.0:
+					clear = false
+				if not TrackBuilderCore._inside_polygon_with_radius(point, 80.0, room_polygon):
+					clear = false
+				var nearest := TrackBuilderCore._closest_point_on_loop(point, island_polygon)
+				if Geometry2D.is_point_in_polygon(point, island_polygon) or point.distance_to(nearest["position"]) < 68.0:
+					clear = false
+		if clear:
+			return rows
+	push_error("Unable to place the starting grid clear of the finish sensor")
+	return []
+
+
 static func scatter_decals(root: Node2D, spec: Dictionary, room_polygon: PackedVector2Array, corridor: PackedVector2Array, rng: RandomNumberGenerator) -> void:
 	var decals: Array = spec.get("decals", [])
 	if decals.is_empty():

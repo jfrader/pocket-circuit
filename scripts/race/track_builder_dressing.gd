@@ -961,7 +961,7 @@ static func build_room_floor_details(
 	return positions.size()
 
 
-static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictionary, spec: Dictionary, moments: Dictionary, centerline: PackedVector2Array, gate_samples: PackedVector2Array) -> void:
+static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictionary, spec: Dictionary, moments: Dictionary, centerline: PackedVector2Array, gate_samples: PackedVector2Array, emit_decals: bool = true) -> void:
 	var definitions: Array[Dictionary] = []
 	var surfaces: Array = story["surfaces"]
 
@@ -991,7 +991,8 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 	technical.set_meta("decal_texture", technical_definition["decal"])
 	technical.set_meta("centerline_index", technical_index)
 	parent.add_child(technical)
-	add_surface_decals(technical, centerline, technical_index, 6, String(technical_data["decal"]))
+	if emit_decals:
+		add_surface_decals(technical, centerline, technical_index, 6, String(technical_data["decal"]))
 
 	var shortcut_data: Dictionary = surfaces[shortcut_surface_index]
 	var shortcut_index := int(moments["shortcut"])
@@ -1028,7 +1029,8 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 	shortcut.set_meta("shortcut_length", float(shortcut_geometry["shortcut_length"]))
 	shortcut.set_meta("safe_length", float(shortcut_geometry["safe_length"]))
 	parent.add_child(shortcut)
-	add_surface_decals(shortcut, centerline, shortcut_index, TrackBuilderCore.SHORTCUT_HALF_SPAN, String(shortcut_data["decal"]), float(shortcut_geometry["inside_sign"]) * TrackBuilderCore.SHORTCUT_LANE_OFFSET)
+	if emit_decals:
+		add_surface_decals(shortcut, centerline, shortcut_index, TrackBuilderCore.SHORTCUT_HALF_SPAN, String(shortcut_data["decal"]), float(shortcut_geometry["inside_sign"]) * TrackBuilderCore.SHORTCUT_LANE_OFFSET)
 
 	# Additional in-corridor grip patches are data for TrackVariantPresenter,
 	# which creates the authoritative SurfaceZone nodes at runtime. Keep them
@@ -1065,7 +1067,8 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 			patch_node.set_meta("polygon", poly)
 			patch_node.set_meta("decal_texture", String(data["decal"]))
 			parent.add_child(patch_node)
-			add_surface_decals(patch_node, centerline, pidx_center, 3, String(data["decal"]), 0.0)
+			if emit_decals:
+				add_surface_decals(patch_node, centerline, pidx_center, 3, String(data["decal"]), 0.0)
 			var def := {
 				"name": StringName(data["name"]),
 				"role": &"patch",

@@ -30,7 +30,7 @@ func prepare(theme: String, layout_seed: int = -1, material_seed: int = -1) -> D
 	_assets.merge(definition["support_assets"], true)
 	var recipe: Dictionary = definition["race"]
 	var chosen_seed := int(recipe["seed"]) if layout_seed < 0 else layout_seed
-	_prepared = CORE.prepare_layout(StringName(theme), StringName(recipe["room"]), chosen_seed, {"length_tier": StringName(recipe.get("length_tier", "compact")), "obstacles_enabled": false})
+	_prepared = CORE.prepare_layout(StringName(theme), StringName(recipe["room"]), chosen_seed, {"length_tier": StringName(recipe.get("length_tier", "compact")), "obstacles_enabled": false,"preview_composer":true})
 	var spec: Dictionary = _prepared["spec"]
 	_surfaces = SURFACES.resolve(StringName(theme), int(spec["material_seed"]) if material_seed < 0 else material_seed)
 	spec["floor_texture"] = PROPS.TEXTURES + theme + "_floor.png"
