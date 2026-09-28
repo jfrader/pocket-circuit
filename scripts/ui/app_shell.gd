@@ -8,6 +8,8 @@ const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
 const RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
+
 const PAGE_MARGIN := 48
 const PAGE_TOP := 28
 const BACK_HINT := "ESC / B  BACK"
@@ -24,7 +26,7 @@ var _screen := "title"
 var _event_id := ""
 var _quick_race := false
 var _map_act_number := 1
-var _quick_race_theme: StringName = &"kitchen"
+var _quick_race_theme := StringName(GENERATED_CIRCUITS.THEMES[0])
 var _quick_race_room: StringName = &"classic"
 var _quick_race_seed := 875
 var _quick_race_reverse := false
@@ -41,6 +43,7 @@ var _art_menu: Control
 var _discovery_panel: CircuitDiscoveryPanel
 
 static var _quick_race_entry_count := 0
+static var _quick_race_theme_cursor := -1
 
 func configure(app: Node) -> void:
 	_app = app
@@ -136,9 +139,8 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_screen = "quick_race"
 	_event_id = ""
 	_quick_race = true
-	_quick_race_theme = &"kitchen"
 	_quick_race_reverse = false
-	_quick_race_seed = _random_quick_race_seed()
+	_roll_quick_race()
 	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
 	_quick_race_entry_count += 1
 	_clear_content()
@@ -146,7 +148,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_race_vehicle_id.is_empty():
 		_quick_race_vehicle_id = _selected_vehicle(progress)
-	_configure_stage(&"vehicle", _quick_race_vehicle_id)
+	_configure_stage(&"map", _quick_race_vehicle_id, "rae", String(_quick_race_theme))
 	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
@@ -949,7 +951,7 @@ func _show_map_act(act_number: int) -> void:
 
 func _reset_quick_race_state() -> void:
 	_quick_race = false
-	_quick_race_theme = &"kitchen"
+	_quick_race_theme = StringName(GENERATED_CIRCUITS.THEMES[0])
 	_quick_race_room = &"classic"
 	_quick_race_seed = 875
 	_quick_race_reverse = false
@@ -965,7 +967,7 @@ func _adjust_quick_race_seed(adjustment: int, seed_edit: LineEdit, seed_status: 
 
 
 func _reroll_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
-	_quick_race_seed = _random_quick_race_seed()
+	_roll_quick_race()
 	_refresh_quick_race_seed(seed_edit, seed_status)
 
 
@@ -980,6 +982,7 @@ func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 	_quick_race_room = StringName(_app.call("circuit_room_for_seed", _quick_race_seed))
 	seed_edit.text = str(_quick_race_seed)
 	seed_status.text = "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()]
+	_configure_stage(&"map", "rustbug", "rae", String(_quick_race_theme))
 	_refresh_quick_identity_labels()
 
 
@@ -995,10 +998,16 @@ func _refresh_quick_identity_labels() -> void:
 		_quick_identity_summary.text = String(identity.get("summary", ""))
 
 
-func _random_quick_race_seed() -> int:
+func _roll_quick_race() -> void:
+	if _quick_race_theme_cursor < 0:
+		var rng := RandomNumberGenerator.new()
+		rng.randomize()
+		_quick_race_theme_cursor = rng.randi_range(0, GENERATED_CIRCUITS.THEMES.size() - 1)
+	_quick_race_theme = StringName(GENERATED_CIRCUITS.THEMES[_quick_race_theme_cursor])
+	_quick_race_theme_cursor = (_quick_race_theme_cursor + 1) % GENERATED_CIRCUITS.THEMES.size()
 	var draw: Dictionary = _app.call("random_circuit_seed", _quick_race_theme)
 	_quick_race_room = StringName(draw.get("room", "classic"))
-	return int(draw.get("seed", 0))
+	_quick_race_seed = int(draw.get("seed", 0))
 
 
 func _start_quick_race() -> void:

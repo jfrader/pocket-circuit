@@ -143,13 +143,13 @@ func _check_finish(track: Node2D, theme: StringName) -> bool:
 		return false
 	for landmark: StaticBody2D in [left, right]:
 		var sprite := landmark.get_node("Sprite") as Sprite2D
-		var visual_size := Vector2(sprite.texture.get_width() * absf(sprite.scale.x), sprite.texture.get_height() * absf(sprite.scale.y))
+		var visual_size := BUILDER._texture_opaque_rect(sprite.texture).size * sprite.scale.abs()
 		if not _expect(
 			bool(landmark.get_meta("finish_landmark", false))
 			and landmark.get_meta("race_directions", PackedStringArray()) == PackedStringArray(["forward", "reverse"])
 			and VISUAL_ROLE.read(landmark) == VISUAL_ROLE.SOLID
-			and visual_size.is_equal_approx(BUILDER.FINISH_LANDMARK_SIZE),
-			"%s paired finish posts should be larger bidirectional SOLID landmarks" % theme
+			and is_equal_approx(maxf(visual_size.x, visual_size.y), BUILDER.PROP_SCALE.length_for(sprite.texture.resource_path, -1.0)),
+			"%s paired finish posts should be bidirectional SOLID landmarks at their real prop size" % theme
 		):
 			return false
 	var dramatic := track.get_node("GeneratedMoments/DramaticFinish")
