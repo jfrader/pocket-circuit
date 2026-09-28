@@ -142,13 +142,13 @@ func play_menu_music() -> void:
 	clear_local_vehicle()
 	set_race_paused(false)
 	# The menu reuses whatever score is already playing; it only generates the
-	# title score on a cold start. Returning to the menu drops the race pressure
-	# back to the menu feel on the loaded score.
+	# title score on a cold start. Starting Grid then holds until a race completes
+	# its opening lap.
 	if not _live.has_score():
-		_live.play(_session_menu_seed(), RaceMusicPlan.menu_profile(), "grid")
+		_live.play(_session_menu_seed(), RaceMusicPlan.menu_profile(), RaceMusicPlan.OPENING_PHASE)
 	else:
-		_live.set_race_state("grid", 0.28, 0.0, false)
-	_live.rotate(RaceMusicPlan.menu_deck(), RaceMusicPlan.menu_phrase_seconds(), "grid")
+		_live.set_race_state(RaceMusicPlan.OPENING_PHASE, 0.28, 0.0, false)
+	_live.stop_rotation()
 
 func play_race_music() -> void:
 	if is_instance_valid(_music_player):
@@ -158,7 +158,7 @@ func play_race_music() -> void:
 	set_race_paused(false)
 	stop_live_rotation()
 	var event := _current_event()
-	_live.play(RaceMusicPlan.seed_for_event(event), RaceMusicPlan.race_profile(event), "ignition")
+	_live.play(RaceMusicPlan.seed_for_event(event), RaceMusicPlan.race_profile(event), RaceMusicPlan.OPENING_PHASE)
 
 ## Test/introspection: the generate seed backing the loaded score.
 func get_live_seed() -> String:
