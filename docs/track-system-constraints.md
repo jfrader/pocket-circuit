@@ -15,7 +15,7 @@ scripts/race/world_environment_catalog.gd  asset contract + semantic role pools
 scripts/race/world_environment_plan.gd     pure seeded physical placement plan
 scripts/race/world_environment_art.gd      yielded scene rendering
 scripts/race/household_surface_materials.gd independent procedural material stream
-scripts/race/handmade_course_materials.gd   seeded course grain, palette and flat joins
+scripts/race/handmade_course_materials.gd   seeded translucent paint, brushwork and edge markings
 tools/build_procedural_track.gd  optional CLI for saved development snapshots
 scripts/race/prototype_race.gd   builds the requested circuit at race startup
 ```
@@ -140,26 +140,34 @@ their original unscaled canvases.
 - Procedural surface profiles live in `data/household_material_patterns.json`.
   Story families and curated palette identities constrain the independent material
   stream; profile, pattern layout, spacing, orientation, seams and grain vary
-  without changing geometry. Floor and course use world coordinates with independent
-  material profiles, so the intended route stays distinct from the open apron.
+  without changing geometry. Floor and course share a world-coordinate substrate;
+  independently seeded pigments and brushwork distinguish the intended route.
 - Four floor and three island profiles are available per theme. Workshop timber
   and technical pads remain distinct from Office laminate/veneer and ink-blue,
   oxblood or indigo desk pads. Kitchen retains ceramics and preparation boards.
-- The course adds a separate seed stream for card grain, palette and joins.
-  It does not perturb existing floor/island selections. Palettes target at least
-  1.5:1 linear-luminance contrast against both neighboring surfaces' base/pattern
-  color ranges (tabletop and island);
+- The course adds a separate seed stream for paint pigments, brushwork and edge
+  width. It does not perturb existing floor/island selections. Palette selection
+  checks the composited paint, including minimum brush coverage and substrate
+  modulation, at the least opaque configured setting that meets at least 1.5:1
+  linear-luminance contrast against both neighbors' base/pattern color ranges.
+  SDR and linear-color blends are checked separately;
   an unmatched custom palette chooses the strongest available contrast and exposes
   `contrast_safe=false` rather than silently claiming the target was met.
-- Course construction is explicitly `FLAT`: shallow shadow, three to five joins
-  and paired tape strips. Reapplication replaces the previous construction; it
-  cannot add collision, change road width, racing lines or grip definitions.
-  Closed-loop sampling includes the closing segment. Grain uses Godot's
+- Paint is explicitly `FLAT`, with no shadow, curb, tape or paper joins.
+  Floor and paint shaders use `household_surface.gdshaderinc` and the same
+  explicitly bound grain texture and pattern uniforms. Reapplication cannot
+  add collision or change road width, racing lines or grip definitions.
+  Brush UVs include the closing segment and repeat an integer number of times.
+  Grain uses Godot's
   `FastNoiseLite.get_seamless_image()` and completed, mipmapped `ImageTexture`s.
   Never embed worker-owning `NoiseTexture2D` resources in threaded-loaded scenes:
   rapid scene cancellation can hang engine shutdown while they are destroyed.
   Generation is bounded by the configured texture size and a yielded loading stage.
   The grain cache is bounded by `course_settings.grain_cache_limit`.
+- Material-only changes to saved tracks use `tools/update_track_materials.gd`
+  with `PC_SCENE_OUT`, preserving the existing scene UID and physical nodes.
+  Full geometry regeneration can recompute alpha hulls from differently imported
+  textures and must not be used for a cosmetic-only refresh.
 - `data/world_prop_art.json` owns sources, style, themes, roles, dimensions, zones,
   clearances, repetition and collision/shadow behavior for all active outputs.
   `WorldPropScale` uses one world unit per millimetre and trims transparent

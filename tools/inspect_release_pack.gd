@@ -40,6 +40,9 @@ func _initialize() -> void:
 	if not ResourceLoader.exists("res://assets/shaders/handmade_course.gdshader"):
 		_fail("handmade course shader is missing")
 		return
+	if not load("res://assets/shaders/household_surface.gdshaderinc") is ShaderInclude:
+		_fail("shared household surface shader include is missing")
+		return
 	var race_scene := load("res://scenes/race/prototype_race.tscn") as PackedScene
 	if race_scene == null:
 		_fail("release race scene could not be loaded")

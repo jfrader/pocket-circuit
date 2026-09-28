@@ -2,9 +2,9 @@ class_name HandmadeCourseMaterials
 extends RefCounted
 
 const SHADER := preload("res://assets/shaders/handmade_course.gdshader")
-const CONSTRUCTION_NAME := "CourseConstruction"
 const CONTRAST_LUMINANCE_OFFSET := 0.05
-const SHADER_KEYS := ["base_color", "cut_color", "grain_period_mm", "grain_strength", "paint_period_mm", "paint_strength", "cut_period_mm", "cut_jitter_mm", "cut_band_mm", "cut_strength", "edge_aa_mm"]
+const COLOR_DIVISION_EPSILON := 0.001
+const SHADER_KEYS := ["pigment_color", "edge_color", "paint_opacity", "brush_min_coverage", "brush_cross_repeat", "brush_phase", "edge_inset_mm", "edge_width_mm", "edge_opacity", "edge_roughness_mm", "edge_feather_mm"]
 static var _grains: Dictionary = {}
 
 
@@ -12,72 +12,120 @@ static func resolve(theme: StringName, seed_value: int, definition: Dictionary, 
 	var rng := RandomNumberGenerator.new()
 	rng.seed = ("%s:course-v%d:%d" % [theme, int(settings["version"]), seed_value]).hash()
 	var candidates: Array[Dictionary] = []
-	var best: Dictionary = definition["palettes"][0]
+	var best: Dictionary = {}
 	var best_contrast := 0.0
 	for palette: Dictionary in definition["palettes"]:
-		var contrast := INF
-		for surface: Dictionary in neighboring_surfaces:
-			contrast = minf(contrast, surface_contrast(Color(palette["base"]), surface))
-		if contrast > best_contrast:
-			best = palette
-			best_contrast = contrast
-		if contrast >= float(settings["min_surface_contrast"]):
-			candidates.append(palette)
+		for opacity: float in settings["opacity_steps"]:
+			var candidate := {"id":palette["id"], "pigment_color":Color(palette["pigment"]), "edge_color":Color(palette["edge"]), "paint_opacity":opacity, "brush_min_coverage":float(settings["brush_min_coverage"])}
+			var minimum := INF
+			for neighbor: Dictionary in neighboring_surfaces:
+				minimum = minf(minimum, course_contrast(candidate, neighboring_surfaces[0], neighbor))
+			if minimum > best_contrast:
+				best = candidate
+				best_contrast = minimum
+			if minimum >= float(settings["min_surface_contrast"]):
+				candidates.append(candidate)
+				break
 	var chosen: Dictionary = best if candidates.is_empty() else candidates[rng.randi_range(0, candidates.size() - 1)]
 	var result := settings.duplicate(true)
+	result.merge(chosen, true)
 	result.merge({
-		"id": chosen["id"],
 		"kind": definition["kind"],
-		"texture": definition["texture"],
-		"base_color": Color(chosen["base"]),
-		"cut_color": Color(chosen["cut"]),
-		"tape_color": Color(chosen["tape"]),
+		"texture": neighboring_surfaces[0]["texture"],
 		"grain_seed": rng.randi(),
-		"detail_seed": rng.randi(),
+		"brush_phase": rng.randf(),
 		"contrast_safe": not candidates.is_empty(),
 	}, true)
-	for key: String in ["grain_frequency", "grain_period_mm", "cut_jitter_mm", "join_phase"]:
-		result[key] = _range(rng, settings[key])
-	result["grain_strength"] = _range(rng, definition["grain_strength"])
-	result["join_count"] = rng.randi_range(int(settings["join_count"][0]), int(settings["join_count"][1]))
-	for key: String in ["cut_band_mm", "edge_aa_mm", "shadow_offset_mm", "tape_size_mm"]:
-		result[key] = Vector2(float(settings[key][0]), float(settings[key][1]))
+	for key: String in ["grain_frequency", "brush_period_mm", "edge_width_mm"]:
+		result[key] = rng.randf_range(float(settings[key][0]), float(settings[key][1]))
 	return result
 
 
-static func surface_contrast(color: Color, profile: Dictionary) -> float:
+static func course_contrast(course: Dictionary, floor_profile: Dictionary, neighbor: Dictionary) -> float:
+	var neighboring := _surface_luminance_range(neighbor)
+	var result := INF
+	for linear_space: bool in [false, true]:
+		var painted := _paint_luminance_range(course, floor_profile, linear_space)
+		var ratio := 1.0
+		if painted.y < neighboring.x:
+			ratio = (neighboring.x + CONTRAST_LUMINANCE_OFFSET) / (painted.y + CONTRAST_LUMINANCE_OFFSET)
+		elif neighboring.y < painted.x:
+			ratio = (painted.x + CONTRAST_LUMINANCE_OFFSET) / (neighboring.y + CONTRAST_LUMINANCE_OFFSET)
+		result = minf(result, ratio)
+	return result
+
+
+static func _profile_colors(profile: Dictionary) -> Array[Color]:
 	var base: Color = profile["base_color"]
 	var alternate: Color = profile["alternate_color"]
-	var mixed_srgb := base.lerp(alternate, float(profile["contrast"])).srgb_to_linear().get_luminance()
-	var mixed_linear := base.srgb_to_linear().lerp(alternate.srgb_to_linear(), float(profile["contrast"])).get_luminance()
-	var base_luminance := base.srgb_to_linear().get_luminance()
-	var lower := minf(base_luminance, minf(mixed_srgb, mixed_linear))
-	var upper := maxf(base_luminance, maxf(mixed_srgb, mixed_linear))
-	var luminance := color.srgb_to_linear().get_luminance()
-	var nearest := clampf(luminance, lower, upper)
-	return (maxf(luminance, nearest) + CONTRAST_LUMINANCE_OFFSET) / (minf(luminance, nearest) + CONTRAST_LUMINANCE_OFFSET)
+	var weight := float(profile["contrast"])
+	return [base, base.lerp(alternate, weight), base.srgb_to_linear().lerp(alternate.srgb_to_linear(), weight).linear_to_srgb()]
 
 
-static func apply(track: Node2D, profile: Dictionary) -> ImageTexture:
+static func _surface_luminance_range(profile: Dictionary) -> Vector2:
+	var result := Vector2(INF, -INF)
+	for color: Color in _profile_colors(profile):
+		var luminance := color.srgb_to_linear().get_luminance()
+		result.x = minf(result.x, luminance)
+		result.y = maxf(result.y, luminance)
+	return result
+
+
+static func _paint_luminance_range(course: Dictionary, floor_profile: Dictionary, linear_space: bool) -> Vector2:
+	var result := Vector2(INF, -INF)
+	var base: Color = floor_profile["base_color"]
+	var pigment: Color = course["pigment_color"]
+	if linear_space:
+		base = base.srgb_to_linear()
+		pigment = pigment.srgb_to_linear()
+	for substrate: Color in _profile_colors(floor_profile):
+		if linear_space:
+			substrate = substrate.srgb_to_linear()
+		var coated := Color(
+			pigment.r * substrate.r / maxf(base.r, COLOR_DIVISION_EPSILON),
+			pigment.g * substrate.g / maxf(base.g, COLOR_DIVISION_EPSILON),
+			pigment.b * substrate.b / maxf(base.b, COLOR_DIVISION_EPSILON)
+		)
+		for coverage: float in [float(course["brush_min_coverage"]), 1.0]:
+			var color := substrate.lerp(coated, float(course["paint_opacity"]) * coverage)
+			var luminance := color.get_luminance() if linear_space else color.srgb_to_linear().get_luminance()
+			result.x = minf(result.x, luminance)
+			result.y = maxf(result.y, luminance)
+	return result
+
+
+static func apply(track: Node2D, profile: Dictionary, substrate_material: ShaderMaterial) -> ImageTexture:
 	var surface := track.get_node_or_null("TrackSurface") as Line2D
 	if surface == null:
 		return null
 	var grain := _grain(profile)
-	var material := ShaderMaterial.new()
+	var material := substrate_material.duplicate() as ShaderMaterial
 	material.shader = SHADER
 	for key: String in SHADER_KEYS:
 		material.set_shader_parameter(key, profile[key])
 	material.set_shader_parameter("grain_noise", grain)
 	material.set_shader_parameter("width_mm", surface.width)
+	var length := _path_length(surface)
+	material.set_shader_parameter("brush_repeats", maxf(1.0, roundf(length / float(profile["brush_period_mm"]))))
 	surface.texture = load(profile["texture"]) as Texture2D
+	surface.texture_mode = Line2D.LINE_TEXTURE_STRETCH
 	surface.material = material
 	surface.default_color = Color.WHITE
 	surface.modulate = Color.WHITE
 	surface.set_meta("material_profile", profile["id"])
 	surface.set_meta("course_kind", profile["kind"])
 	TrackBuilderCore._mark_flat_visual(surface, profile["texture"], &"track_surface")
-	_build_construction(track, surface, profile)
 	return grain
+
+
+static func _path_length(surface: Line2D) -> float:
+	if surface.points.size() < 2:
+		return 0.0
+	var arc := TrackBuilderCore._arc_lengths(surface.points)
+	var result := arc[-1]
+	if surface.closed:
+		result += surface.points[-1].distance_to(surface.points[0])
+	return result
 
 
 static func _grain(profile: Dictionary) -> ImageTexture:
@@ -96,63 +144,3 @@ static func _grain(profile: Dictionary) -> ImageTexture:
 		_grains.erase(_grains.keys()[0])
 	_grains[key] = grain
 	return grain
-
-
-static func _build_construction(track: Node2D, surface: Line2D, profile: Dictionary) -> void:
-	var previous := track.get_node_or_null(CONSTRUCTION_NAME)
-	if previous:
-		previous.free()
-	var container := Node2D.new()
-	container.name = CONSTRUCTION_NAME
-	container.transform = surface.transform
-	track.add_child(container)
-	var shadow := _line(container, "ContactShadow", surface.points, surface.width + float(profile["shadow_extra_width_mm"]), Color(profile["shadow_color"]), surface.z_index - 1)
-	shadow.closed = surface.closed
-	shadow.position = profile["shadow_offset_mm"]
-	var path := surface.points.duplicate()
-	if surface.closed and path.size() > 1 and path[-1] != path[0]:
-		path.append(path[0])
-	var arc := TrackBuilderCore._arc_lengths(path)
-	var total := arc[arc.size() - 1]
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(profile["detail_seed"])
-	var join_count := int(profile["join_count"])
-	for index in join_count:
-		var fraction := (float(index) + float(profile["join_phase"]) + rng.randf_range(-float(profile["join_jitter"]), float(profile["join_jitter"]))) / join_count
-		var point := TrackBuilderCore._sample_at_arc(path, arc, fposmod(fraction, 1.0) * total)
-		var tangent := TrackBuilderCore._tangent_at_arc(path, arc, fposmod(fraction, 1.0) * total)
-		var normal := tangent.rotated(PI * 0.5)
-		var inset := (profile["cut_band_mm"] as Vector2).y
-		var seam_color: Color = profile["cut_color"]
-		seam_color.a = float(profile["seam_alpha"])
-		_line(container, "Join%d" % index, PackedVector2Array([point - normal * (surface.width * 0.5 - inset), point + normal * (surface.width * 0.5 - inset)]), float(profile["seam_width_mm"]), seam_color, surface.z_index + 1)
-		for side in [-1, 1]:
-			var tape := Polygon2D.new()
-			tape.name = "Tape%d%s" % [index, "Left" if side < 0 else "Right"]
-			tape.position = point + normal * (surface.width * 0.5 - float(profile["tape_edge_inset_mm"])) * side
-			tape.rotation = tangent.angle() + _range(rng, profile["tape_angle_range"])
-			tape.polygon = TrackBuilderCore._rect_points(Vector2.ZERO, profile["tape_size_mm"])
-			tape.color = profile["tape_color"]
-			tape.color.a = float(profile["tape_alpha"])
-			tape.z_index = surface.z_index + 1
-			tape.antialiased = true
-			TrackBuilderCore._mark_flat_visual(tape, "", &"course_construction")
-			container.add_child(tape)
-
-
-static func _line(parent: Node, node_name: String, points: PackedVector2Array, width: float, color: Color, z_index: int) -> Line2D:
-	var line := Line2D.new()
-	line.name = node_name
-	line.points = points
-	line.width = width
-	line.default_color = color
-	line.z_index = z_index
-	line.joint_mode = Line2D.LINE_JOINT_ROUND
-	line.antialiased = true
-	TrackBuilderCore._mark_flat_visual(line, "", &"course_construction")
-	parent.add_child(line)
-	return line
-
-
-static func _range(rng: RandomNumberGenerator, values: Array) -> float:
-	return rng.randf_range(float(values[0]), float(values[1]))
