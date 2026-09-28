@@ -26,7 +26,7 @@ func _run() -> void:
 	var track := (load(scene_path) as PackedScene).instantiate() as Node2D
 	root.add_child(track)
 
-	var ribbon := track.get_node_or_null("TrackRibbon") as Polygon2D
+	var ribbon := track.get_node_or_null("TrackSurface") as Line2D
 	var barrier := track.get_node_or_null("InnerBarrier") as StaticBody2D
 	var finish := track.get_node_or_null("Checkpoint0Finish") as Area2D
 	var white := track.get_node_or_null("StartFinishWhite") as Polygon2D
@@ -55,7 +55,7 @@ func _run() -> void:
 					var marker_node := marker as Node2D
 					if marker_node == null:
 						continue
-					_check(Geometry2D.is_point_in_polygon(marker_node.position, ribbon.polygon), "%s marker %s is inside the painted track" % [container_name, marker.name])
+					_check(_inside_course(marker_node.position, ribbon), "%s marker %s is inside the painted track" % [container_name, marker.name])
 					if barrier != null:
 						_check(not Geometry2D.is_point_in_polygon(marker_node.position, barrier_collision_polygon(barrier)), "%s marker %s stays outside the inner barrier" % [container_name, marker.name])
 					var clearance := _clearance_from_colliders(track, marker_node.position)
@@ -68,7 +68,7 @@ func _run() -> void:
 				continue
 			var corners := _gate_corners(gate)
 			var center := gate.position
-			_check(Geometry2D.is_point_in_polygon(center, ribbon.polygon), "%s sits on the painted track" % gate_name)
+			_check(_inside_course(center, ribbon), "%s sits on the painted track" % gate_name)
 			var gate_size := ((gate.get_node("CollisionShape2D") as CollisionShape2D).shape as RectangleShape2D).size
 			var span := maxf(gate_size.x, gate_size.y)
 			var min_span := 272.0 if gate_name == "Checkpoint0Finish" else 250.0
@@ -106,6 +106,11 @@ func _run() -> void:
 	for failure: String in _failures:
 		push_error("TRACK_LAYOUT_QA FAIL: " + failure)
 	quit(1)
+
+
+func _inside_course(point: Vector2, surface: Line2D) -> bool:
+	var closest := TrackBuilderCore._closest_point_on_loop(point, surface.points)
+	return point.distance_to(closest["position"]) <= surface.width * 0.5
 
 
 func barrier_collision_polygon(barrier: StaticBody2D) -> PackedVector2Array:

@@ -57,7 +57,7 @@ static func apply(track: Node2D, resolved: Dictionary) -> ImageTexture:
 		elif node.name == "TopLip" and node is Line2D:
 			node.default_color = (resolved["island"]["base_color"] as Color).lightened(0.2)
 	track.set_meta("surface_identity", resolved.duplicate(true))
-	return COURSE.apply(track, resolved["course"])
+	return COURSE.apply(track, resolved["course"], floor_material)
 
 
 static func _paint(node: CanvasItem, profile: Dictionary, material: ShaderMaterial) -> void:
@@ -75,6 +75,7 @@ static func _paint(node: CanvasItem, profile: Dictionary, material: ShaderMateri
 static func _material(profile: Dictionary) -> ShaderMaterial:
 	var material := ShaderMaterial.new()
 	material.shader = SURFACE_SHADER
+	material.set_shader_parameter("surface_grain", load(profile["texture"]) as Texture2D)
 	for key: String in ["pattern", "base_color", "alternate_color", "seam_color", "cell_mm", "phase_mm", "angle", "line_mm", "contrast", "stagger", "grain_period"]:
 		material.set_shader_parameter(key, profile[key])
 	return material
