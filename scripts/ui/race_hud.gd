@@ -120,9 +120,9 @@ func _draw_clock(rect: Rect2) -> void:
 func _draw_speed(rect: Rect2) -> void:
 	SKIN.draw_plate(self, rect, SKIN.CREAM)
 	var origin := rect.position
-	SKIN.draw_text(self, origin + Vector2(14.0, 40.0), "%03d" % roundi(speed_ratio * KMH_AT_FULL_SPEED), 28, SKIN.INK)
-	SKIN.draw_text(self, origin + Vector2(16.0, 62.0), "KM/H", 11, SKIN.INK_SOFT)
-	var tube := Rect2(origin + Vector2(96.0, 16.0), Vector2(rect.size.x - 112.0 - SKIN.SHADOW, 46.0))
+	SKIN.draw_text(self, origin + Vector2(12.0, 36.0), "%03d" % roundi(speed_ratio * KMH_AT_FULL_SPEED), 26, SKIN.INK)
+	SKIN.draw_text(self, origin + Vector2(14.0, 58.0), "KM/H", 11, SKIN.INK_SOFT)
+	var tube := Rect2(origin + Vector2(108.0, 18.0), Vector2(rect.size.x - 124.0 - SKIN.SHADOW, 42.0))
 	SKIN.draw_tube(self, tube, boost_ratio)
 
 
