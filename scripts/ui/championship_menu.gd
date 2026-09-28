@@ -208,6 +208,8 @@ func _tape(text: String, origin: Vector2, fill: Color, font_size: int) -> Label:
 	label.position = origin
 	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	SKIN.style_tape(label, fill, font_size)
+	var text_size := SKIN.display_font().get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size)
+	label.size = text_size + Vector2(36, 12)
 	_canvas.add_child(label)
 	return label
 

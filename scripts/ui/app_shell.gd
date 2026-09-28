@@ -3,6 +3,7 @@ extends CanvasLayer
 const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
+const ROUTE_SCRIPT := preload("res://scripts/ui/championship_route_menu.gd")
 const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
@@ -16,6 +17,7 @@ var _root: Control
 var _scroll: ScrollContainer
 var _content: VBoxContainer
 var _stage: AppShellStage
+var _route: Control
 var _footer: Label
 var _button_focus_chain: Array[Button] = []
 var _screen := "title"
@@ -92,28 +94,15 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 		_map_act_number = clampi(requested_act, 1, CATALOG.ACTS.size())
 	elif not recommended_event_id.is_empty():
 		_map_act_number = int(CATALOG.get_event(recommended_event_id).get("act", _map_act_number))
-	var visible_act := CATALOG.get_act(_map_act_number)
-	_configure_stage(&"map", _selected_vehicle(progress), "rae", String(visible_act.get("id", "kitchen")))
-	_add_kicker("CHAMPIONSHIP · ACT %d OF %d" % [_map_act_number, CATALOG.ACTS.size()])
-	_add_heading(String(visible_act.get("name", "Grand Household Circuit")))
-	if not result_summary.is_empty():
-		_add_result_notice(result_summary)
-	if (
-		result_summary.is_empty()
-		and not recommended_event_id.is_empty()
-		and int(CATALOG.get_event(recommended_event_id).get("act", 0)) == _map_act_number
-	):
-		var recommended_event := CATALOG.get_event(recommended_event_id)
-		_add_copy("NEXT  ·  %s  ·  %s" % [String(recommended_event["name"]), String(recommended_event["format"])], SKIN.YELLOW)
-	var recommended_button: Button
-	var act_complete: bool = String(visible_act.get("id", "")) in progress.get("completed_acts", [])
-	var standings := "%d PTS" % CATALOG.act_points(progress, _map_act_number)
-	if act_complete:
-		standings += "  ·  WON"
-	_add_section("EVENTS", standings)
+	var focus_id := recommended_event_id
+	if requested_act > 0:
+		for event: Dictionary in CATALOG.EVENTS:
+			if int(event["act"]) == _map_act_number and CATALOG.is_event_unlocked(String(event["id"]), progress):
+				focus_id = String(event["id"])
+				break
+	var stops: Array[Dictionary] = []
+	var seen_acts: Dictionary = {}
 	for event: Dictionary in CATALOG.EVENTS:
-		if int(event["act"]) != _map_act_number:
-			continue
 		var event_id := String(event["id"])
 		var unlocked := CATALOG.is_event_unlocked(event_id, progress)
 		var finish := int(best_finishes.get(event_id, 0))
@@ -122,25 +111,27 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 			status = "OPEN · %s" % String(event["format"])
 		if finish > 0:
 			status = _completed_event_status(event_id, finish, int(best_points.get(event_id, 0)))
-		var event_button := _add_button(
-			"%s\n%s" % [String(event["name"]), status],
-			Callable(self, "_open_event").bind(event_id),
-			false,
-			not unlocked,
-			"Event_%s" % event_id
-		)
-		event_button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		if event_id == recommended_event_id:
-			recommended_button = event_button
-	var act_navigation := _add_act_navigation(_map_act_number, Callable(self, "_show_map_act"))
-	var return_button := _add_button("RETURN TO TITLE", Callable(self, "show_title"))
-	_complete_focus_row(act_navigation, return_button)
+		var act_number := int(event["act"])
+		stops.append({
+			"id": event_id,
+			"name": String(event["name"]),
+			"status": status,
+			"unlocked": unlocked,
+			"theme": String(event.get("theme", "kitchen")),
+			"act": act_number,
+			"act_name": String(CATALOG.get_act(act_number).get("name", "")),
+			"act_start": not seen_acts.has(act_number),
+		})
+		seen_acts[act_number] = true
+	var notice := ""
+	if not result_summary.is_empty():
+		notice = "+%d PTS" % int(result_summary.get("points_gained", 0))
+		if bool(result_summary.get("act_completed", false)):
+			notice += "  ·  ACT WON"
+	_page.hide()
+	_route.show()
+	_route.call("present", stops, focus_id, _selected_vehicle(progress), notice)
 	_footer.text = "ENTER / A  SELECT  ·  " + BACK_HINT
-	if recommended_button:
-		_queue_content_entrance()
-		_grab_button_focus_after_layout(recommended_button, _entrance_generation)
-	else:
-		_focus_first()
 
 
 func show_quick_race(_requested_act: int = 0) -> void:
@@ -531,6 +522,12 @@ func _build_base() -> void:
 	_art_menu.connect("focus_moved", _play_ui_move)
 	_art_menu.connect("presentation_ready", _report_media_screen_ready)
 	_art_menu.hide()
+	_route = ROUTE_SCRIPT.new()
+	_route.name = "ChampionshipRoute"
+	_route.hide()
+	_route.connect("event_chosen", _open_event)
+	_route.connect("return_chosen", show_title)
+	_root.add_child(_route)
 
 
 func _apply_compact_button_art(button: Button) -> void:
@@ -545,6 +542,8 @@ func _apply_compact_button_art(button: Button) -> void:
 
 func _clear_content() -> void:
 	_page.show()
+	if is_instance_valid(_route):
+		_route.hide()
 	_art_menu.call("clear")
 	_discovery_panel = null
 	_entrance_generation += 1
