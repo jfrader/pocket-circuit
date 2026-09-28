@@ -3,6 +3,7 @@ extends Control
 
 signal event_chosen(event_id: String)
 signal return_chosen
+signal focus_moved
 
 const STAGE := preload("res://scripts/ui/app_shell_stage.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
@@ -87,6 +88,7 @@ func present(stops: Array, focus_id: String, vehicle_id: String, notice: String)
 	back.name = "ReturnToTitle"
 	back.text = "RETURN TO TITLE"
 	back.pressed.connect(return_chosen.emit)
+	back.focus_entered.connect(func() -> void: focus_moved.emit())
 	add_child(back)
 	back.size = RETURN_SIZE
 	back.position = Vector2(BOARD.end.x - RETURN_SIZE.x - 30.0, BOARD.end.y - 8.0)
@@ -136,19 +138,24 @@ func _focus_stop(event_id: String) -> void:
 	for button in _buttons:
 		button.set("selected", button.name == "Stop_%s" % event_id)
 	queue_redraw()
+	focus_moved.emit()
 
 
 func _wire_focus(back: Button) -> void:
-	for index in _buttons.size():
-		var button := _buttons[index]
+	var focusable: Array[Button] = []
+	for button in _buttons:
+		if not button.disabled:
+			focusable.append(button)
+	for index in focusable.size():
+		var button := focusable[index]
 		if index > 0:
-			button.focus_neighbor_top = button.get_path_to(_buttons[index - 1])
-			_buttons[index - 1].focus_neighbor_bottom = _buttons[index - 1].get_path_to(button)
+			button.focus_neighbor_top = button.get_path_to(focusable[index - 1])
+			focusable[index - 1].focus_neighbor_bottom = focusable[index - 1].get_path_to(button)
 		button.focus_neighbor_left = button.get_path()
 		button.focus_neighbor_right = button.get_path()
-	if _buttons.is_empty():
+	if focusable.is_empty():
 		return
-	var last := _buttons[-1]
+	var last := focusable[-1]
 	last.focus_neighbor_bottom = last.get_path_to(back)
 	back.focus_neighbor_top = back.get_path_to(last)
 	back.focus_neighbor_left = back.get_path()
