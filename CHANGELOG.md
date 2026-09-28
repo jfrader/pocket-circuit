@@ -10,16 +10,17 @@
 
 ### Fixed
 - Starting grids stay clear of rotated finish sensors and nearby furniture edges in both race directions. Scenery placement reserves gate posts and sealed bays, and grip artwork no longer hides solid rims behind rectangular texture stamps.
+- Starting Grid now holds from the menu through loading, countdown, and the complete first lap. A circuit's own seed lands directly on Grid in one musical handoff; automatic race rotation begins after lap one and excludes the drumless Breather and post-race Cooldown phases.
 - Starting a newly generated menu or circuit score no longer cuts off the score already playing. The outgoing score stays up until the incoming music is audible, then crossfades into it.
 - Your car keeps its engine note for every race in a session. It used to fall silent after the first one, while still reporting that it was playing.
-- Leaving a race for the menu no longer drops the music out. The menu stays on Starting Grid for several loops, then steps to a groove. It does not drop back into Ignition.
+- Leaving a race for the menu no longer drops the music out. The menu stays on Starting Grid until the next race.
 - Your own tyres now use the same loop as rival cars, and they stay quiet unless the car is actually sliding. A small steer does not open them.
 - Settings has separate Engine and Tyres sliders. SFX no longer changes them.
 - Nearby rival cars now have their own engine note, pitched from that car. Far cars stay quiet.
 - Tyre sound now follows the same drift and slide state as skid marks, stays present through ordinary steering, changes character with the room surface, and comes from nearby rival cars as positional audio.
 - Tyre scrub is quieter in ordinary corners and resolves into a rising, resonant squeal during a full slide instead of broadband hiss.
 - Fixed false "WRONG WAY" warnings and the resulting teleport reset when driving on the open apron beside a folded circuit. Wrong-way is now a warning only — the car is never reset for it.
-- Race music no longer loops one section or lags behind the race. Each circuit now generates its own score from the track seed, so a circuit always sounds the same while different circuits, tiers, and acts sound different, and the race rotates through the whole racing pool — grooves, peaks, the starting-grid reprise, a reset sting, the final lap, and the win/loss outros.
+- Race music no longer loops one section or lags behind the race. Each circuit now generates its own score from the track seed, so a circuit always sounds the same while different circuits, tiers, and acts sound different, and the race rotates through grooves and peaks after lap one, with a reset sting, final-lap cue, and win/loss outros.
 - Shipped the live Gamestruments engine into the release gate (sync + hard `ClassDB.class_exists("GamestrumentsPlayer")` check at the start of `tools/build_release.sh`). Removed rendered WAV fallbacks (`assets/audio/menu_loop.wav`, `race_loop.wav` and their `.import`s); the live engine is now mandatory — there is no silent-music or WAV fallback mode.
 
 ### Added
