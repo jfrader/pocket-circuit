@@ -36,7 +36,7 @@ static func resolve(theme: StringName, material_seed: int, family: String = "", 
 			"stagger": rng.randf_range(0.25, 0.75), "grain_period": rng.randf_range(310.0, 620.0),
 			"texture": String(definition["grain_" + role]),
 		}
-	result["course"] = COURSE.resolve(theme, material_seed, definition["course"], data["course_settings"], result["floor"])
+	result["course"] = COURSE.resolve(theme, material_seed, definition["course"], data["course_settings"], [result["floor"], result["island"]])
 	result["signature"] = var_to_str(result).sha256_text()
 	return result
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "course_settings": {
-    "version":1,"min_floor_contrast":1.3,
+    "version":2,"min_surface_contrast":1.5,
     "grain_texture_size":256,"grain_cache_limit":8,"grain_octaves":3,"grain_blend_skirt":0.2,
     "grain_frequency":[0.13,0.19],"grain_period_mm":[135,185],"paint_period_mm":360,"paint_strength":0.3,
     "cut_period_mm":85,"cut_jitter_mm":[0.4,0.8],"cut_band_mm":[0.6,2.6],"cut_strength":0.45,"edge_aa_mm":[0.15,0.9],
@@ -18,11 +18,11 @@
   "themes": {
     "kitchen": {
       "course":{
-        "kind":"cork","texture":"res://assets/textures/world_materials/kitchen_counter.png","grain_strength":[0.12,0.18],
+        "kind":"colored_card","texture":"res://assets/textures/world_materials/kitchen_counter.png","grain_strength":[0.03,0.06],
         "palettes":[
-          {"id":"kitchen_cork_natural","base":"bd945d","cut":"785935","tape":"91a385"},
-          {"id":"kitchen_cork_blonde","base":"d7ba89","cut":"947345","tape":"a6b394"},
-          {"id":"kitchen_cork_toasted","base":"a87b49","cut":"73522f","tape":"9eb29c"}
+          {"id":"kitchen_card_teal","base":"355e67","cut":"233e46","tape":"c4c1a2"},
+          {"id":"kitchen_card_denim","base":"405275","cut":"2b374e","tape":"c9c5ab"},
+          {"id":"kitchen_card_slate","base":"303e56","cut":"202c40","tape":"b5baa5"}
         ]
       },
       "grain_floor":"res://assets/textures/world_materials/kitchen_counter.png",
@@ -44,7 +44,7 @@
         "kind":"kraft_card","texture":"res://assets/textures/world_materials/workshop_plywood.png","grain_strength":[0.04,0.08],
         "palettes":[
           {"id":"workshop_card_buff","base":"ded0af","cut":"a78e64","tape":"86a4a1"},
-          {"id":"workshop_card_linen","base":"ede2c8","cut":"b4a080","tape":"799b9b"},
+          {"id":"workshop_card_linen","base":"f3e8ce","cut":"b4a080","tape":"799b9b"},
           {"id":"workshop_card_umber","base":"9d7e54","cut":"735a3d","tape":"aec0b2"}
         ]
       },
@@ -68,7 +68,7 @@
         "palettes":[
           {"id":"office_card_ivory","base":"eee3c9","cut":"b6a587","tape":"91a4bc"},
           {"id":"office_card_white","base":"fff9e8","cut":"c8baa0","tape":"8c9fb8"},
-          {"id":"office_card_oat","base":"cdb994","cut":"9e8965","tape":"849ab5"}
+          {"id":"office_card_oat","base":"ba9d6b","cut":"8f7753","tape":"849ab5"}
         ]
       },
       "grain_floor":"res://assets/textures/world_materials/office_desk.png",

@@ -53,9 +53,9 @@ They are generated parameters, not one fixed background picture per room.
 
 | Room | Tabletop and apron | Handmade course | Raised island surfaces | Prop accents |
 |---|---|---|---|---|
-| Kitchen | Ivory or sage ceramics, terracotta inlay, cream laminate | Cut cork | Maple strips, end-grain board, walnut preparation board | Ivory, sage, terracotta, food colors |
+| Kitchen | Ivory or sage ceramics, terracotta inlay, cream laminate | Blue/teal colored card | Maple strips, end-grain board, walnut preparation board | Ivory, sage, terracotta, food colors |
 | Workshop | Bench boards, oiled timber, plywood, narrower wood slats | Kraft card | Charcoal or kraft cutting grids, ribbed work pad | Red enamel, ochre, pale wood, matte steel |
-| Office | Ivory/cool laminate, ash veneer, walnut herringbone | Ivory card | Ink-blue weave, oxblood desk pad, indigo twill | Ivory, ink blue, ochre, restrained brick red |
+| Office | Ivory/cool laminate, ash veneer, walnut herringbone | Ivory or oat card | Ink-blue weave, oxblood desk pad, indigo twill | Ivory, ink blue, ochre, restrained brick red |
 
 Workshop and Office must not collapse into two teal rooms. Their large value
 masses, pattern families and edge colors must remain distinguishable before the
@@ -70,7 +70,7 @@ Material changes must not alter route geometry or racing-line fingerprints.
 The course is a continuous, flat household-material layer at the existing road
 width. Thin cut edges, a shallow contact shadow and occasional taped joins make
 it read as an assembled course. Its three palettes per theme are selected for
-contrast against the tabletop; grain and construction vary with the material
+contrast against both the tabletop and the island; grain and construction vary with the material
 seed without changing existing floor/island choices. The apron remains drivable.
 
 Both floor and course texture use world coordinates, with independent material

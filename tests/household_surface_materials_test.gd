@@ -25,8 +25,10 @@ func _run() -> void:
 			var course: Dictionary = result["course"]
 			courses[course["id"]] = true
 			constructions[str([course["grain_seed"], course["grain_period_mm"], course["join_count"], course["join_phase"]])] = true
-			assert(course["contrast_safe"], "authored floor/course combinations must have a readable palette")
-			assert(MATERIALS.COURSE.floor_contrast(course["base_color"], result["floor"]) >= float(course["min_floor_contrast"]), "course must differ from the floor's material value range")
+			assert(course["contrast_safe"], "authored course/floor/island combinations must have a readable palette")
+			assert(float(course["min_surface_contrast"]) >= 1.5, "contrast policy must not be weakened")
+			for neighbor: String in ["floor", "island"]:
+				assert(MATERIALS.COURSE.surface_contrast(course["base_color"], result[neighbor]) >= float(course["min_surface_contrast"]), "course must remain clearly distinct from " + neighbor)
 			assert(FileAccess.file_exists(course["texture"]), "course grain must use a shipping texture")
 			assert(String(course["id"]).begins_with(String(theme) + "_"), "course palette must belong to its room")
 			floors[result["floor"]["id"]] = true
@@ -52,6 +54,8 @@ func _run() -> void:
 				assert(identity["known"], "contrast coverage must exercise actual curated palettes")
 				var resolved := MATERIALS.resolve(theme, sample, family, identity["palette_id"], identity["floor_modulate"])
 				assert(resolved["course"]["contrast_safe"], "curated story tints must preserve course contrast")
+				for neighbor: String in ["floor", "island"]:
+					assert(MATERIALS.COURSE.surface_contrast(resolved["course"]["base_color"], resolved[neighbor]) >= float(resolved["course"]["min_surface_contrast"]), "curated story course must differ from " + neighbor)
 		print("SURFACE_RANGE ", theme, " seeds=", SAMPLE_COUNT, " floor=", floors.size(), " island=", islands.size(), " pairs=", pairs.size(), " structures=", structures.size())
 	var first := CORE.prepare_layout(&"workshop", &"wide", 246810, {"material_seed": 1})
 	var second := CORE.prepare_layout(&"workshop", &"wide", 246810, {"material_seed": 2})

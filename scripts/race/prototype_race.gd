@@ -46,6 +46,7 @@ const CIRCUIT_PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const PERSONAL_GHOST_SCRIPT := preload("res://scripts/race/personal_ghost.gd")
 const RACE_MUSIC_PLAN := preload("res://scripts/audio/race_music_plan.gd")
+const STARTING_GRID_SYNC_FRAMES := 2
 const COUNTDOWN_STEP_SECONDS := 0.65
 ## The victory/defeat outro is a four-bar phrase. Hold the menu phase off it for
 ## roughly that long so the finish reads as an outro rather than a cut.
@@ -461,6 +462,8 @@ func _configure_vehicle(
 
 
 func _release_starting_grid() -> void:
+	if not is_inside_tree():
+		return
 	# Clear stale contacts while the body accepts its queued spawn transform.
 	# Restore normal collision immediately after the physics server syncs it.
 	for entry: Dictionary in _starting_collision_states:
@@ -468,8 +471,10 @@ func _release_starting_grid() -> void:
 		body.collision_layer = 0
 		body.collision_mask = 0
 		body.freeze = false
-	await get_tree().physics_frame
-	await get_tree().physics_frame
+	for _frame in STARTING_GRID_SYNC_FRAMES:
+		await get_tree().physics_frame
+		if not is_inside_tree():
+			return
 	for entry: Dictionary in _starting_collision_states:
 		var body := entry["body"] as RigidBody2D
 		if is_instance_valid(body):

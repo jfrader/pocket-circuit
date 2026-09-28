@@ -13,7 +13,7 @@ func _run_test() -> void:
 	root.size = Vector2i(1280, 720)
 	var spec: Dictionary = BUILDER.LAYOUTS[&"kitchen"]
 	var materials := HouseholdSurfaceMaterials.resolve(&"kitchen", 0)
-	if not _expect(materials["course"]["kind"] == "cork" and materials["course"]["contrast_safe"], "Kitchen course should use readable cork rather than disappear into the countertop"):
+	if not _expect(materials["course"]["kind"] == "colored_card" and materials["course"]["contrast_safe"], "Kitchen course should use contrasting colored card rather than blend into the wood island"):
 		return
 	var world := Node2D.new()
 	root.add_child(world)
