@@ -178,7 +178,7 @@ func _check_built_metadata() -> bool:
 		var footprint_kind := StringName(entry.get("footprint_kind", &""))
 		var has_fitted_shape := collision != null and (
 			(footprint_kind == &"circle" and collision.shape is CircleShape2D)
-			or (footprint_kind == &"rect" and collision.shape is RectangleShape2D)
+			or (footprint_kind == &"rect" and (collision.shape is RectangleShape2D or collision.shape is ConvexPolygonShape2D))
 		)
 		if not _expect(
 			has_fitted_shape

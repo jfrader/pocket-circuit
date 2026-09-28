@@ -49,7 +49,7 @@ func _run_giant_jam_scenario() -> bool:
 	var target := racers[1] as VehicleController
 	var controller := _get_ai_controller(target)
 	var track := prototype.get_node("Track") as Node2D
-	var giants := track.get_node_or_null("GeneratedMoments/GiantLandmarks")
+	var giants := track.get_node_or_null("GeneratedMoments/IslandStory")
 	if not _expect(controller != null and giants != null and giants.get_child_count() > 0, "giant-jam scenario needs an AI controller and generated giant"):
 		return false
 	var giant := giants.get_child(0) as Node2D

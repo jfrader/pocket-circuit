@@ -14,6 +14,12 @@ func _initialize() -> void:
 		"res://tests/input_map_test.gd",
 		"res://tools/build_release.sh",
 		"res://tools/create_media_save.gd",
+		"res://tools/environment_pilot.tscn",
+		"res://tools/environment_race_pilot.tscn",
+		"res://graphify-out/graph.json",
+		"res://assets/textures/environment_pilot/kitchen_teapot.png",
+		"res://assets/textures/environment_pilot/workshop_toolbox.png",
+		"res://assets/textures/environment_pilot/office_keyboard.png",
 		"res://media/steam/capsules/header_capsule.png",
 	]:
 		if ResourceLoader.exists(excluded_path) or FileAccess.file_exists(excluded_path):
@@ -26,10 +32,14 @@ func _initialize() -> void:
 		"res://data/vendor/procedural_2d/avatar_catalog.json",
 		"res://data/vendor/procedural_2d/car_catalog.json",
 		"res://data/vendor/procedural_2d/LICENSE",
+		"res://data/household_material_patterns.json",
 	]:
 		if not FileAccess.file_exists(required_path):
 			_fail("required release notice is missing: %s" % required_path)
 			return
+	if not ResourceLoader.exists("res://assets/shaders/handmade_course.gdshader"):
+		_fail("handmade course shader is missing")
+		return
 	var race_scene := load("res://scenes/race/prototype_race.tscn") as PackedScene
 	if race_scene == null:
 		_fail("release race scene could not be loaded")
