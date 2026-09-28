@@ -10,6 +10,7 @@ const STAT_KEYS: Array[String] = ["speed", "grip", "mass", "drift"]
 const SPEC_CARD_MAX_HEIGHT := 300.0
 const CONFETTI_SEED := 1278
 const CONFETTI_PIECES := 46
+const ROOM_ICON_RADIUS := 32.0
 
 var mode: StringName = &"title"
 var vehicle_id := "rustbug"
@@ -47,6 +48,93 @@ func configure(
 	queue_redraw()
 
 
+static func draw_map_board(item: CanvasItem, board: Rect2) -> void:
+	SKIN.draw_plate(item, board, SKIN.CREAM, 14)
+	SKIN.draw_grid(item, board.grow(-14.0), 26.0)
+	SKIN.draw_tape(item, board.position + Vector2(34.0, 6.0), Vector2(92.0, 22.0), -0.6)
+	SKIN.draw_tape(item, Vector2(board.end.x - 34.0, board.position.y + 6.0), Vector2(92.0, 22.0), 0.6)
+
+
+static func draw_car(item: CanvasItem, center: Vector2, length: float, id: String, angle: float = 0.0, locked: bool = false) -> void:
+	var texture := IDENTITIES.car_texture(id)
+	if texture == null:
+		return
+	var car_size := Vector2(length * CAR_ASPECT, length)
+	item.draw_set_transform(center, angle)
+	item.draw_texture_rect(texture, Rect2(-car_size * 0.5, car_size), false, Color(SKIN.INK, 0.92) if locked else Color.WHITE)
+	item.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	if locked:
+		SKIN.draw_padlock(item, center, maxf(12.0, length * 0.24))
+
+
+static func draw_portrait_card(item: CanvasItem, center: Vector2, width: float, id: String, angle: float, captioned: bool = true) -> void:
+	var payload := IDENTITIES.avatar_payload(id)
+	var texture := IDENTITIES.avatar_texture(id)
+	if payload.is_empty() or texture == null:
+		return
+	var inset := maxf(5.0, width * 0.07)
+	var height := width * CARD_ASPECT if captioned else width
+	var card := Rect2(-width * 0.5, -height * 0.5, width, height)
+	var photo := Rect2(card.position + Vector2.ONE * inset, Vector2.ONE * (width - inset * 2.0))
+	item.draw_set_transform(center, angle)
+	SKIN.draw_plate(item, card, SKIN.CREAM, 6 if width < 80.0 else 8)
+	item.draw_rect(photo, Color(String(payload["palette"]["accent"])).darkened(0.1))
+	item.draw_texture_rect(texture, photo, false)
+	item.draw_rect(photo, SKIN.INK, false, 2.0)
+	if captioned:
+		var caption_size := clampi(roundi(width * 0.1), 11, 20)
+		var caption_y := photo.end.y + (card.end.y - photo.end.y) * 0.5 + caption_size * 0.36
+		SKIN.draw_text(item, Vector2(card.position.x, caption_y), _first_name(id), caption_size, SKIN.INK, width, HORIZONTAL_ALIGNMENT_CENTER)
+	SKIN.draw_tape(item, Vector2(0.0, card.position.y + 2.0), Vector2(width * 0.42, maxf(12.0, width * 0.12)))
+	item.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+static func draw_room_stop(item: CanvasItem, center: Vector2, radius: float, room: String) -> void:
+	SKIN.draw_disc(item, center, radius, room_color(room))
+	item.draw_set_transform(center, 0.0, Vector2.ONE * radius / ROOM_ICON_RADIUS)
+	_draw_room_icon(item, room)
+	item.draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+
+
+static func draw_road(item: CanvasItem, points: PackedVector2Array, width: float) -> void:
+	item.draw_polyline(points, SKIN.INK, width + SKIN.LINE * 2.0, true)
+	item.draw_polyline(points, SKIN.ASPHALT, width, true)
+	for index in range(0, points.size() - 1, 2):
+		item.draw_line(points[index], points[index + 1], Color(SKIN.CREAM, 0.7), 2.5, true)
+
+
+static func smooth_path(points: Array[Vector2], samples: int) -> PackedVector2Array:
+	var path := PackedVector2Array()
+	for index in points.size() - 1:
+		var before := points[maxi(0, index - 1)]
+		var start := points[index]
+		var end := points[index + 1]
+		var after := points[mini(points.size() - 1, index + 2)]
+		for step in samples:
+			path.append(start.cubic_interpolate(end, before, after, float(step) / float(samples)))
+	path.append(points[-1])
+	return path
+
+
+static func act_rival(act_number: int) -> String:
+	for event: Dictionary in CATALOG.EVENTS:
+		var opponents: Array = event.get("opponents", [])
+		if int(event.get("act", 0)) == act_number and not opponents.is_empty():
+			return String(opponents[0])
+	return ""
+
+
+static func room_color(room: String) -> Color:
+	match room:
+		"kitchen":
+			return SKIN.ORANGE
+		"workshop":
+			return SKIN.YELLOW
+		"office":
+			return SKIN.BLUE
+	return SKIN.LIME
+
+
 func _draw() -> void:
 	if size.x < 80.0 or size.y < 120.0:
 		return
@@ -72,10 +160,10 @@ func _draw_title_stage() -> void:
 	SKIN.draw_plate(self, mat, SKIN.CREAM, 18)
 	SKIN.draw_tape(self, mat.position + Vector2(78.0, 6.0), Vector2(128.0, 26.0), -0.35)
 	_draw_mug(mat.position + Vector2(mat.size.x - 78.0, mat.size.y * 0.62))
-	_draw_car(mat.position + mat.size * Vector2(0.56, 0.42), mat.size.y * 0.48, vehicle_id, -0.42)
-	_draw_portrait_card(mat.position + Vector2(mat.size.x * 0.2, mat.size.y * 0.22), minf(mat.size.x * 0.3, 176.0), driver_id, -0.08)
+	draw_car(self, mat.position + mat.size * Vector2(0.56, 0.42), mat.size.y * 0.48, vehicle_id, -0.42)
+	draw_portrait_card(self, mat.position + Vector2(mat.size.x * 0.2, mat.size.y * 0.22), minf(mat.size.x * 0.3, 176.0), driver_id, -0.08)
 	if not secondary_driver_id.is_empty():
-		_draw_portrait_card(mat.position + Vector2(mat.size.x * 0.84, mat.size.y * 0.58), minf(mat.size.x * 0.24, 140.0), secondary_driver_id, 0.08)
+		draw_portrait_card(self, mat.position + Vector2(mat.size.x * 0.84, mat.size.y * 0.58), minf(mat.size.x * 0.24, 140.0), secondary_driver_id, 0.08)
 	_draw_roster(Rect2(mat.position.x + 16.0, mat.end.y - mat.size.y * 0.2, mat.size.x - 32.0, mat.size.y * 0.17), CATALOG.championship_vehicle_ids())
 
 
@@ -83,7 +171,7 @@ func _draw_vehicle_stage() -> void:
 	var table_radius := minf(size.x * 0.34, size.y * 0.46)
 	var table_center := Vector2(size.x * 0.36, size.y * 0.5)
 	_draw_turntable(table_center, table_radius)
-	_draw_car(table_center, table_radius * 1.45, vehicle_id, -0.35)
+	draw_car(self, table_center, table_radius * 1.45, vehicle_id, -0.35)
 	var card_height := minf(size.y * 0.76, SPEC_CARD_MAX_HEIGHT)
 	_draw_spec_card(Rect2(size.x * 0.7, (size.y - card_height) * 0.5, size.x * 0.28, card_height), CATALOG.get_vehicle(vehicle_id))
 
@@ -92,24 +180,21 @@ func _draw_briefing_stage() -> void:
 	var player := secondary_driver_id if not secondary_driver_id.is_empty() else "rae"
 	var card_width := minf(size.x * 0.3, 160.0)
 	var card_y := size.y * 0.24
-	_draw_portrait_card(Vector2(size.x * 0.27, card_y), card_width, player, -0.07)
-	_draw_portrait_card(Vector2(size.x * 0.73, card_y), card_width, driver_id, 0.07)
+	draw_portrait_card(self, Vector2(size.x * 0.27, card_y), card_width, player, -0.07)
+	draw_portrait_card(self, Vector2(size.x * 0.73, card_y), card_width, driver_id, 0.07)
 	var badge := Vector2(size.x * 0.5, card_y + 12.0)
 	SKIN.draw_disc(self, badge, 26.0, SKIN.ORANGE)
 	SKIN.draw_text(self, badge + Vector2(-30.0, 8.0), "VS", 22, SKIN.CREAM, 60.0, HORIZONTAL_ALIGNMENT_CENTER)
 	var car_length := minf(size.y * 0.2, 130.0)
 	var rival_vehicle := String(CATALOG.get_driver(driver_id).get("vehicle_id", vehicle_id))
-	_draw_car(Vector2(size.x * 0.27, size.y * 0.57), car_length, vehicle_id, -0.14)
-	_draw_car(Vector2(size.x * 0.73, size.y * 0.57), car_length, rival_vehicle, 0.14)
+	draw_car(self, Vector2(size.x * 0.27, size.y * 0.57), car_length, vehicle_id, -0.14)
+	draw_car(self, Vector2(size.x * 0.73, size.y * 0.57), car_length, rival_vehicle, 0.14)
 	_draw_track_card(Rect2(size.x * 0.08, size.y * 0.73, size.x * 0.84, size.y * 0.21), theme_id)
 
 
 func _draw_map_stage() -> void:
 	var board := Rect2(size.x * 0.05, size.y * 0.04, size.x * 0.88, size.y * 0.88)
-	SKIN.draw_plate(self, board, SKIN.CREAM, 14)
-	SKIN.draw_grid(self, board.grow(-14.0), 26.0)
-	SKIN.draw_tape(self, board.position + Vector2(34.0, 6.0), Vector2(92.0, 22.0), -0.6)
-	SKIN.draw_tape(self, Vector2(board.end.x - 34.0, board.position.y + 6.0), Vector2(92.0, 22.0), 0.6)
+	draw_map_board(self, board)
 	var acts: Array = CATALOG.ACTS
 	var stops: Array[Vector2] = []
 	for index in acts.size():
@@ -118,7 +203,7 @@ func _draw_map_stage() -> void:
 	var route: Array[Vector2] = [Vector2(stops[0].x, board.position.y + 20.0)]
 	route.append_array(stops)
 	route.append(Vector2(stops[-1].x + board.size.x * 0.3, board.end.y - 20.0))
-	_draw_road(_smooth_path(route, 14), 20.0)
+	draw_road(self, smooth_path(route, 14), 20.0)
 	for index in acts.size():
 		var act: Dictionary = acts[index]
 		var room := String(act["id"])
@@ -126,27 +211,26 @@ func _draw_map_stage() -> void:
 		var active := room == theme_id
 		if active:
 			draw_arc(stop, 46.0, 0.0, TAU, 40, SKIN.ORANGE, 6.0, true)
-		SKIN.draw_disc(self, stop, 32.0, _room_color(room))
-		_draw_room_icon(stop, room)
+		draw_room_stop(self, stop, ROOM_ICON_RADIUS, room)
 		var on_left := index % 2 == 0
 		var tag_width := board.size.x * 0.38
 		var tag_x := stop.x + 50.0 if on_left else stop.x - 50.0 - tag_width
 		SKIN.draw_tag(self, Rect2(tag_x, stop.y - 16.0, tag_width, 30.0), String(act["name"]).to_upper(), SKIN.YELLOW if active else SKIN.CREAM, 13)
-		var rival := _act_rival(int(act["number"]))
+		var rival := act_rival(int(act["number"]))
 		if not rival.is_empty():
-			_draw_portrait_card(Vector2(tag_x + tag_width * (0.8 if on_left else 0.2), stop.y + 58.0), 54.0, rival, 0.08 if on_left else -0.08, false)
+			draw_portrait_card(self, Vector2(tag_x + tag_width * (0.8 if on_left else 0.2), stop.y + 58.0), 54.0, rival, 0.08 if on_left else -0.08, false)
 		if active:
-			_draw_car(stop + Vector2(-58.0 if on_left else 58.0, 30.0), 64.0, vehicle_id, 0.5 if on_left else -0.5)
+			draw_car(self, stop + Vector2(-58.0 if on_left else 58.0, 30.0), 64.0, vehicle_id, 0.5 if on_left else -0.5)
 
 
 func _draw_mechanic_stage() -> void:
 	var mat := Rect2(12.0, 12.0, size.x - 24.0, size.y - 24.0)
 	SKIN.draw_plate(self, mat, SKIN.CREAM, 16)
-	_draw_car(mat.position + mat.size * Vector2(0.52, 0.74), minf(mat.size.y * 0.32, 190.0), vehicle_id, 1.4)
-	_draw_gear(mat.position + mat.size * Vector2(0.16, 0.62), minf(mat.size.x * 0.1, 52.0), SKIN.BLUE)
-	_draw_gear(mat.position + mat.size * Vector2(0.26, 0.78), minf(mat.size.x * 0.06, 34.0), SKIN.YELLOW)
+	draw_car(self, mat.position + mat.size * Vector2(0.52, 0.74), minf(mat.size.y * 0.32, 190.0), vehicle_id, 1.4)
+	_draw_gear(self, mat.position + mat.size * Vector2(0.16, 0.62), minf(mat.size.x * 0.1, 52.0), SKIN.BLUE)
+	_draw_gear(self, mat.position + mat.size * Vector2(0.26, 0.78), minf(mat.size.x * 0.06, 34.0), SKIN.YELLOW)
 	_draw_wrench(mat.position + mat.size * Vector2(0.84, 0.62), minf(mat.size.y / 420.0, 1.5))
-	_draw_portrait_card(mat.position + mat.size * Vector2(0.5, 0.28), minf(mat.size.x * 0.42, 220.0), driver_id, -0.05)
+	draw_portrait_card(self, mat.position + mat.size * Vector2(0.5, 0.28), minf(mat.size.x * 0.42, 220.0), driver_id, -0.05)
 
 
 func _draw_cast_stage() -> void:
@@ -159,16 +243,16 @@ func _draw_cast_stage() -> void:
 		var column := index % columns
 		var row := floori(float(index) / float(columns))
 		var center := Vector2(cell.x * (column + 0.5), size.y * 0.05 + cell.y * (row + 0.5))
-		_draw_portrait_card(center, card_width, String(cast[index]["id"]), (-0.07 if (index % 2 == 0) else 0.06))
+		draw_portrait_card(self, center, card_width, String(cast[index]["id"]), (-0.07 if (index % 2 == 0) else 0.06))
 
 
 func _draw_ending_stage() -> void:
 	_draw_confetti()
 	var champion := secondary_driver_id if not secondary_driver_id.is_empty() else "cass"
-	_draw_portrait_card(size * Vector2(0.25, 0.23), minf(size.x * 0.26, 140.0), driver_id, -0.08)
-	_draw_portrait_card(size * Vector2(0.75, 0.23), minf(size.x * 0.26, 140.0), champion, 0.08)
+	draw_portrait_card(self, size * Vector2(0.25, 0.23), minf(size.x * 0.26, 140.0), driver_id, -0.08)
+	draw_portrait_card(self, size * Vector2(0.75, 0.23), minf(size.x * 0.26, 140.0), champion, 0.08)
 	_draw_trophy(size * Vector2(0.52, 0.64), minf(size.y / 460.0, 1.5))
-	_draw_car(size * Vector2(0.16, 0.8), minf(size.y * 0.18, 110.0), vehicle_id, -0.35)
+	draw_car(self, size * Vector2(0.16, 0.8), minf(size.y * 0.18, 110.0), vehicle_id, -0.35)
 
 
 func _draw_mug(center: Vector2) -> void:
@@ -177,40 +261,6 @@ func _draw_mug(center: Vector2) -> void:
 	draw_rect(Rect2(body.position + Vector2(7.0, 7.0), Vector2(body.size.x - 14.0, 10.0)), SKIN.WOOD_DEEP)
 	draw_arc(center + Vector2(30.0, 6.0), 12.0, -0.7, 0.7, 10, SKIN.INK, 4.0, true)
 	draw_line(center + Vector2(-40.0, 18.0), center + Vector2(8.0, 28.0), SKIN.INK, 4.0, true)
-
-
-func _draw_car(center: Vector2, length: float, id: String, angle: float = 0.0, locked: bool = false) -> void:
-	var texture := IDENTITIES.car_texture(id)
-	if texture == null:
-		return
-	var car_size := Vector2(length * CAR_ASPECT, length)
-	draw_set_transform(center, angle)
-	draw_texture_rect(texture, Rect2(-car_size * 0.5, car_size), false, Color(SKIN.INK, 0.92) if locked else Color.WHITE)
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
-	if locked:
-		SKIN.draw_padlock(self, center, maxf(12.0, length * 0.24))
-
-
-func _draw_portrait_card(center: Vector2, width: float, id: String, angle: float, captioned: bool = true) -> void:
-	var payload := IDENTITIES.avatar_payload(id)
-	var texture := IDENTITIES.avatar_texture(id)
-	if payload.is_empty() or texture == null:
-		return
-	var inset := maxf(5.0, width * 0.07)
-	var height := width * CARD_ASPECT if captioned else width
-	var card := Rect2(-width * 0.5, -height * 0.5, width, height)
-	var photo := Rect2(card.position + Vector2.ONE * inset, Vector2.ONE * (width - inset * 2.0))
-	draw_set_transform(center, angle)
-	SKIN.draw_plate(self, card, SKIN.CREAM, 6 if width < 80.0 else 8)
-	draw_rect(photo, Color(String(payload["palette"]["accent"])).darkened(0.1))
-	draw_texture_rect(texture, photo, false)
-	draw_rect(photo, SKIN.INK, false, 2.0)
-	if captioned:
-		var caption_size := clampi(roundi(width * 0.1), 11, 20)
-		var caption_y := photo.end.y + (card.end.y - photo.end.y) * 0.5 + caption_size * 0.36
-		SKIN.draw_text(self, Vector2(card.position.x, caption_y), _first_name(id), caption_size, SKIN.INK, width, HORIZONTAL_ALIGNMENT_CENTER)
-	SKIN.draw_tape(self, Vector2(0.0, card.position.y + 2.0), Vector2(width * 0.42, maxf(12.0, width * 0.12)))
-	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
 func _draw_roster(rect: Rect2, ids: Array[String]) -> void:
@@ -228,7 +278,7 @@ func _draw_roster(rect: Rect2, ids: Array[String]) -> void:
 		var center := Vector2(rect.position.x + bay_width * (index + 0.5), rect.position.y + rect.size.y * 0.48)
 		if id == vehicle_id:
 			draw_rect(Rect2(rect.position.x + bay_width * index + 6.0, rect.end.y - 10.0, bay_width - 12.0, 6.0), SKIN.ORANGE)
-		_draw_car(center, length, id, 0.0, not id in unlocked_vehicle_ids)
+		draw_car(self, center, length, id, 0.0, not id in unlocked_vehicle_ids)
 
 
 func _draw_turntable(center: Vector2, radius: float) -> void:
@@ -268,33 +318,26 @@ func _draw_track_card(rect: Rect2, room: String) -> void:
 	draw_style_box(_ring(SKIN.ASPHALT, 14, corner), loop)
 	draw_style_box(_ring(Color(SKIN.CREAM, 0.5), 2, corner - 6), loop.grow(-6.0))
 	SKIN.draw_flag(self, Rect2(loop.get_center().x - 7.0, loop.end.y - 15.0, 14.0, 16.0), 4.0)
-	SKIN.draw_tag(self, Rect2(loop.get_center().x - 60.0, loop.get_center().y - 14.0, 120.0, 28.0), room.to_upper(), _room_color(room), 13)
+	SKIN.draw_tag(self, Rect2(loop.get_center().x - 60.0, loop.get_center().y - 14.0, 120.0, 28.0), room.to_upper(), room_color(room), 13)
 
 
-func _draw_room_icon(center: Vector2, room: String) -> void:
+static func _draw_room_icon(item: CanvasItem, room: String) -> void:
 	match room:
 		"kitchen":
-			draw_arc(center + Vector2(15.0, 0.0), 8.0, -PI * 0.5, PI * 0.5, 12, SKIN.INK, 7.0, true)
-			draw_arc(center + Vector2(15.0, 0.0), 8.0, -PI * 0.5, PI * 0.5, 12, SKIN.CREAM, 3.0, true)
-			SKIN.draw_disc(self, center, 14.0, SKIN.CREAM, 0.0)
-			draw_circle(center, 9.0, SKIN.WOOD_DEEP)
+			item.draw_arc(Vector2(15.0, 0.0), 8.0, -PI * 0.5, PI * 0.5, 12, SKIN.INK, 7.0, true)
+			item.draw_arc(Vector2(15.0, 0.0), 8.0, -PI * 0.5, PI * 0.5, 12, SKIN.CREAM, 3.0, true)
+			SKIN.draw_disc(item, Vector2.ZERO, 14.0, SKIN.CREAM, 0.0)
+			item.draw_circle(Vector2.ZERO, 9.0, SKIN.WOOD_DEEP)
 		"workshop":
-			_draw_gear(center, 17.0, SKIN.CREAM)
+			_draw_gear(item, Vector2.ZERO, 17.0, SKIN.CREAM)
 		_:
-			var note := Rect2(center - Vector2(14.0, 14.0), Vector2(28.0, 28.0))
-			SKIN.draw_plate(self, note, SKIN.CREAM, 3, 0.0)
-			draw_line(note.position + Vector2(7.0, 11.0), note.position + Vector2(21.0, 11.0), SKIN.INK, 2.0)
-			draw_line(note.position + Vector2(7.0, 18.0), note.position + Vector2(17.0, 18.0), SKIN.INK, 2.0)
+			var note := Rect2(-14.0, -14.0, 28.0, 28.0)
+			SKIN.draw_plate(item, note, SKIN.CREAM, 3, 0.0)
+			item.draw_line(note.position + Vector2(7.0, 11.0), note.position + Vector2(21.0, 11.0), SKIN.INK, 2.0)
+			item.draw_line(note.position + Vector2(7.0, 18.0), note.position + Vector2(17.0, 18.0), SKIN.INK, 2.0)
 
 
-func _draw_road(points: PackedVector2Array, width: float) -> void:
-	draw_polyline(points, SKIN.INK, width + SKIN.LINE * 2.0, true)
-	draw_polyline(points, SKIN.ASPHALT, width, true)
-	for index in range(0, points.size() - 1, 2):
-		draw_line(points[index], points[index + 1], Color(SKIN.CREAM, 0.7), 2.5, true)
-
-
-func _draw_gear(center: Vector2, radius: float, color: Color) -> void:
+static func _draw_gear(item: CanvasItem, center: Vector2, radius: float, color: Color) -> void:
 	var teeth := 8
 	var points := PackedVector2Array()
 	for index in teeth * 4:
@@ -302,9 +345,9 @@ func _draw_gear(center: Vector2, radius: float, color: Color) -> void:
 		points.append(center + Vector2.from_angle(angle) * (radius if index % 4 < 2 else radius * 0.76))
 	var outline := points.duplicate()
 	outline.append(points[0])
-	draw_colored_polygon(points, color)
-	draw_polyline(outline, SKIN.INK, SKIN.LINE, true)
-	SKIN.draw_disc(self, center, radius * 0.28, SKIN.WOOD_DEEP, 0.0)
+	item.draw_colored_polygon(points, color)
+	item.draw_polyline(outline, SKIN.INK, SKIN.LINE, true)
+	SKIN.draw_disc(item, center, radius * 0.28, SKIN.WOOD_DEEP, 0.0)
 
 
 func _draw_wrench(center: Vector2, scale_factor: float) -> void:
@@ -351,19 +394,6 @@ func _draw_confetti() -> void:
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-func _smooth_path(points: Array[Vector2], samples: int) -> PackedVector2Array:
-	var path := PackedVector2Array()
-	for index in points.size() - 1:
-		var before := points[maxi(0, index - 1)]
-		var start := points[index]
-		var end := points[index + 1]
-		var after := points[mini(points.size() - 1, index + 2)]
-		for step in samples:
-			path.append(start.cubic_interpolate(end, before, after, float(step) / float(samples)))
-	path.append(points[-1])
-	return path
-
-
 func _ring(color: Color, width: int, radius: int) -> StyleBoxFlat:
 	var ring := StyleBoxFlat.new()
 	ring.draw_center = false
@@ -374,27 +404,8 @@ func _ring(color: Color, width: int, radius: int) -> StyleBoxFlat:
 	return ring
 
 
-func _act_rival(act_number: int) -> String:
-	for event: Dictionary in CATALOG.EVENTS:
-		var opponents: Array = event.get("opponents", [])
-		if int(event.get("act", 0)) == act_number and not opponents.is_empty():
-			return String(opponents[0])
-	return ""
-
-
-func _first_name(id: String) -> String:
+static func _first_name(id: String) -> String:
 	return String(CATALOG.get_driver(id).get("name", id)).get_slice(" ", 0).to_upper()
-
-
-func _room_color(room: String) -> Color:
-	match room:
-		"kitchen":
-			return SKIN.ORANGE
-		"workshop":
-			return SKIN.YELLOW
-		"office":
-			return SKIN.BLUE
-	return SKIN.LIME
 
 
 func _stat_color(key: String) -> Color:

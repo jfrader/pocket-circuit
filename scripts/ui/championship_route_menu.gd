@@ -4,14 +4,43 @@ extends Control
 signal event_chosen(event_id: String)
 signal return_chosen
 
-const CATALOG := preload("res://data/championship/catalog.gd")
-const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const STAGE := preload("res://scripts/ui/app_shell_stage.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const BOARD := Rect2(28, 18, 1224, 640)
-const STOP_SIZE := Vector2(250, 58)
+const LANE_INSET := 20.0
+const LANE_GUTTER := 14.0
+const ROAD_AXIS := 58.0
+const ROAD_WIDTH := 18.0
+const ROAD_WAVE := 12.0
+const ROAD_SAMPLES := 12
+const ROAD_END_Y := 606.0
+const FINISH_DEPTH := 10.0
+const STOPS_TOP := 170.0
+const STOPS_BOTTOM := 600.0
+const STOP_RADIUS := 22.0
+const FOCUS_RING := 32.0
+const RIVAL_Y := 98.0
+const RIVAL_WIDTH := 64.0
+const ACT_TAPE_Y := 84.0
+const ACT_TAPE_GAP := 22.0
+const ACT_TAPE_PADDING := Vector2(16.0, 8.0)
+const ACT_FONT_SIZE := 14
+const CAR_LENGTH := 52.0
+const CAR_CLEARANCE := 6.0
+const LABEL_GAP := 14.0
+const LABEL_PADDING := 10.0
+const STOP_FONT_SIZE := 14
+const NOTICE_FONT_SIZE := 14
+const NOTICE_HEIGHT := 32.0
+const NOTICE_PADDING := 40.0
+const HINT := "ARROWS / STICK  MOVE   ·   ENTER / A  RACE   ·   ESC / B  BACK"
+const HINT_FONT_SIZE := 13
+const RETURN_SIZE := Vector2(250, 52)
 
 var _stops: Array[Dictionary] = []
+var _lanes: Array[Dictionary] = []
+var _centers: Array[Vector2] = []
 var _buttons: Array[Button] = []
 var _focused_id := ""
 var _vehicle_id := "rustbug"
@@ -25,41 +54,42 @@ func _ready() -> void:
 
 
 func present(stops: Array, focus_id: String, vehicle_id: String, notice: String) -> void:
-	_stops = []
-	for item in stops:
-		_stops.append(item)
+	_stops.assign(stops)
 	_vehicle_id = vehicle_id if not vehicle_id.is_empty() else "rustbug"
 	_notice = notice
 	_focused_id = focus_id
-	var previous := get_children()
-	for child in previous:
+	for child in get_children():
 		remove_child(child)
 		child.free()
 	_buttons.clear()
-	var centers := _centers()
-	for index in _stops.size():
-		var stop: Dictionary = _stops[index]
-		var button := BUTTON_SCRIPT.new() as Button
-		button.name = "Stop_%s" % String(stop["id"])
-		button.text = "%s\n%s" % [String(stop["name"]), String(stop["status"])]
-		button.alignment = HORIZONTAL_ALIGNMENT_LEFT
-		button.disabled = not bool(stop["unlocked"])
-		button.set("selected", String(stop["id"]) == focus_id)
-		var place_left := index >= 6
-		button.position = centers[index] + (Vector2(-STOP_SIZE.x - 22.0, -STOP_SIZE.y * 0.5) if place_left else Vector2(26.0, -STOP_SIZE.y * 0.5))
-		button.size = STOP_SIZE
-		button.focus_entered.connect(_focus_stop.bind(String(stop["id"])))
-		if not button.disabled:
-			button.pressed.connect(event_chosen.emit.bind(String(stop["id"])))
-		add_child(button)
-		_buttons.append(button)
+	_layout_lanes()
+	for lane in _lanes:
+		var label_left: float = lane["axis"] + ROAD_WAVE + FOCUS_RING + LABEL_GAP
+		var label_width: float = lane["right"] - LANE_GUTTER - label_left
+		for index: int in lane["stops"]:
+			var stop := _stops[index]
+			var event_id := String(stop["id"])
+			var button := BUTTON_SCRIPT.new() as Button
+			button.name = "Stop_%s" % event_id
+			button.text = "%s\n%s" % [String(stop["name"]), String(stop["status"])]
+			button.alignment = HORIZONTAL_ALIGNMENT_LEFT
+			button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			button.add_theme_font_size_override("font_size", STOP_FONT_SIZE)
+			button.disabled = not bool(stop["unlocked"])
+			button.set("selected", event_id == focus_id)
+			button.focus_entered.connect(_focus_stop.bind(event_id))
+			if not button.disabled:
+				button.pressed.connect(event_chosen.emit.bind(event_id))
+			add_child(button)
+			_fit_label(button, label_left, label_width, _centers[index].y)
+			_buttons.append(button)
 	var back := BUTTON_SCRIPT.new() as Button
 	back.name = "ReturnToTitle"
 	back.text = "RETURN TO TITLE"
-	back.position = Vector2(BOARD.end.x - 280, BOARD.end.y - 8)
-	back.size = Vector2(250, 52)
 	back.pressed.connect(return_chosen.emit)
 	add_child(back)
+	back.size = RETURN_SIZE
+	back.position = Vector2(BOARD.end.x - RETURN_SIZE.x - 30.0, BOARD.end.y - 8.0)
 	_wire_focus(back)
 	queue_redraw()
 	var initial := _button_for(focus_id)
@@ -67,6 +97,38 @@ func present(stops: Array, focus_id: String, vehicle_id: String, notice: String)
 		initial = _buttons[0]
 	if initial != null:
 		initial.grab_focus.call_deferred()
+
+
+func _layout_lanes() -> void:
+	_lanes.clear()
+	_centers.clear()
+	_centers.resize(_stops.size())
+	for index in _stops.size():
+		var stop := _stops[index]
+		var act := int(stop.get("act", 0))
+		if _lanes.is_empty() or int(_lanes[-1]["act"]) != act:
+			_lanes.append({"act": act, "name": String(stop.get("act_name", "")), "stops": []})
+		_lanes[-1]["stops"].append(index)
+	var lane_width := (BOARD.size.x - LANE_INSET * 2.0) / float(maxi(1, _lanes.size()))
+	for lane_index in _lanes.size():
+		var lane := _lanes[lane_index]
+		var left := BOARD.position.x + LANE_INSET + lane_width * lane_index
+		var axis := left + ROAD_AXIS
+		lane["right"] = left + lane_width
+		lane["axis"] = axis
+		var members: Array = lane["stops"]
+		for order in members.size():
+			var y := STOPS_TOP + (STOPS_BOTTOM - STOPS_TOP) * (order + 0.5) / float(members.size())
+			_centers[members[order]] = Vector2(axis + (ROAD_WAVE if order % 2 == 1 else -ROAD_WAVE), y)
+
+
+func _fit_label(button: Button, left: float, width: float, center_y: float) -> void:
+	var margins := button.get_theme_stylebox("normal").get_minimum_size()
+	var font := button.get_theme_font("font")
+	var text_height := font.get_multiline_string_size(button.text, HORIZONTAL_ALIGNMENT_LEFT, width - margins.x, button.get_theme_font_size("font_size")).y
+	var height := maxf(text_height + margins.y + LABEL_PADDING, button.get_combined_minimum_size().y)
+	button.size = Vector2(width, height)
+	button.position = Vector2(left, center_y - height * 0.5)
 
 
 func _focus_stop(event_id: String) -> void:
@@ -94,79 +156,77 @@ func _wire_focus(back: Button) -> void:
 
 
 func _draw() -> void:
-	SKIN.draw_workbench(self, Rect2(Vector2.ZERO, size))
-	SKIN.draw_plate(self, BOARD, SKIN.CREAM, 18)
-	SKIN.draw_grid(self, BOARD.grow(-16), 28)
-	SKIN.draw_tape(self, BOARD.position + Vector2(86, 4), Vector2(150, 24), -0.4)
-	SKIN.draw_tape(self, Vector2(BOARD.end.x - 90, BOARD.position.y + 4), Vector2(130, 24), 0.35, SKIN.ORANGE)
+	STAGE.draw_map_board(self, BOARD)
+	for lane_index in _lanes.size():
+		_draw_lane(_lanes[lane_index], lane_index)
+	var focused := _index_of(_focused_id)
+	if focused >= 0 and bool(_stops[focused]["unlocked"]):
+		var heading := (_centers[focused] - _road_before(focused)).normalized()
+		var car_center := _centers[focused] - heading * (FOCUS_RING + CAR_LENGTH * 0.5 + CAR_CLEARANCE)
+		STAGE.draw_car(self, car_center, CAR_LENGTH, _vehicle_id, heading.angle() - Vector2.UP.angle())
 	if not _notice.is_empty():
-		SKIN.draw_tag(self, Rect2(BOARD.position.x + 36, BOARD.position.y + 18, 420, 32), _notice, SKIN.YELLOW, 14)
-	var centers := _centers()
-	if centers.size() >= 2:
-		_draw_road(_smooth(centers))
-	for index in _stops.size():
-		_draw_stop(centers[index], _stops[index])
-	SKIN.draw_text(self, Vector2(BOARD.position.x + 28, BOARD.end.y - 18), "ARROWS / STICK  FOLLOW THE ROAD    ENTER / A  RACE", 13, SKIN.INK_SOFT)
+		var notice_width := SKIN.display_font().get_string_size(_notice, HORIZONTAL_ALIGNMENT_LEFT, -1, NOTICE_FONT_SIZE).x + NOTICE_PADDING
+		SKIN.draw_tag(self, Rect2(BOARD.get_center().x - notice_width * 0.5, BOARD.position.y - NOTICE_HEIGHT * 0.3, notice_width, NOTICE_HEIGHT), _notice, SKIN.YELLOW, NOTICE_FONT_SIZE)
+	SKIN.draw_text(self, Vector2(BOARD.position.x + 28.0, BOARD.end.y - 18.0), HINT, HINT_FONT_SIZE, SKIN.INK_SOFT)
 
 
-func _draw_road(points: PackedVector2Array) -> void:
-	if points.size() < 2:
+func _draw_lane(lane: Dictionary, lane_index: int) -> void:
+	var axis: float = lane["axis"]
+	var members: Array = lane["stops"]
+	var road: Array[Vector2] = [Vector2(axis, RIVAL_Y)]
+	for index: int in members:
+		road.append(_centers[index])
+	road.append(Vector2(axis, ROAD_END_Y))
+	STAGE.draw_road(self, STAGE.smooth_path(road, ROAD_SAMPLES), ROAD_WIDTH)
+	var finish_half := ROAD_WIDTH * 0.5 + SKIN.LINE
+	SKIN.draw_flag(self, Rect2(axis - finish_half, ROAD_END_Y - FINISH_DEPTH, finish_half * 2.0, FINISH_DEPTH), FINISH_DEPTH * 0.5)
+	var rival := STAGE.act_rival(int(lane["act"]))
+	if not rival.is_empty():
+		STAGE.draw_portrait_card(self, Vector2(axis, RIVAL_Y), RIVAL_WIDTH, rival, -0.06 if lane_index % 2 == 0 else 0.06)
+	_draw_act_tape(Vector2(axis + RIVAL_WIDTH * 0.5 + ACT_TAPE_GAP, ACT_TAPE_Y), String(lane["name"]).to_upper())
+	for index: int in members:
+		_draw_stop(index)
+
+
+func _draw_act_tape(anchor: Vector2, text: String) -> void:
+	if text.is_empty():
 		return
-	draw_polyline(points, SKIN.INK, 22.0, true)
-	draw_polyline(points, SKIN.ASPHALT, 14.0, true)
-	draw_polyline(points, Color(SKIN.YELLOW, 0.85), 3.0, true)
+	var text_width := SKIN.display_font().get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, ACT_FONT_SIZE).x
+	var tape_size := Vector2(text_width, ACT_FONT_SIZE) + ACT_TAPE_PADDING * 2.0
+	draw_set_transform(anchor + Vector2(tape_size.x * 0.5, 0.0), -0.03)
+	SKIN.draw_tape(self, Vector2.ZERO, tape_size)
+	SKIN.draw_text(self, Vector2(-text_width * 0.5, ACT_FONT_SIZE * 0.36), text, ACT_FONT_SIZE, SKIN.INK)
+	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
 
 
-func _draw_stop(center: Vector2, stop: Dictionary) -> void:
-	var theme := String(stop.get("theme", "kitchen"))
-	var focused := String(stop["id"]) == _focused_id
-	var fill := _room_color(theme)
-	if not bool(stop["unlocked"]):
-		fill = SKIN.WOOD_EDGE
-	if focused:
-		draw_arc(center, 30.0, 0.0, TAU, 32, SKIN.ORANGE, 5.0, true)
-	SKIN.draw_disc(self, center, 18.0, fill)
-	if not bool(stop["unlocked"]):
-		SKIN.draw_padlock(self, center, 16.0)
-	elif focused:
-		var texture := IDENTITIES.car_texture(_vehicle_id)
-		if texture != null:
-			var car_size := Vector2(42, 56)
-			draw_texture_rect(texture, Rect2(center + Vector2(-78, -28) - car_size * 0.5, car_size), false)
-	if int(stop.get("act", 0)) > 0 and bool(stop.get("act_start", false)):
-		SKIN.draw_tag(self, Rect2(center + Vector2(-118, -46), Vector2(150, 26)), String(stop.get("act_name", "")).to_upper(), SKIN.YELLOW, 12)
+func _draw_stop(index: int) -> void:
+	var stop := _stops[index]
+	var center := _centers[index]
+	if String(stop["id"]) == _focused_id:
+		draw_arc(center, FOCUS_RING, 0.0, TAU, 40, SKIN.ORANGE, 5.0, true)
+	if bool(stop["unlocked"]):
+		STAGE.draw_room_stop(self, center, STOP_RADIUS, String(stop.get("theme", "kitchen")))
+	else:
+		SKIN.draw_disc(self, center, STOP_RADIUS, SKIN.WOOD_EDGE)
+		SKIN.draw_padlock(self, center, STOP_RADIUS * 0.8)
 
 
-func _centers() -> Array[Vector2]:
-	var centers: Array[Vector2] = []
-	var count := _stops.size()
-	if count == 0:
-		return centers
-	var columns := 3
-	var rows := ceili(float(count) / float(columns))
-	for index in count:
-		var column := index / rows
-		var row := index % rows
-		var x := BOARD.position.x + BOARD.size.x * (0.18 + 0.30 * column)
-		var y := BOARD.position.y + BOARD.size.y * (0.2 + 0.28 * row)
-		centers.append(Vector2(x, y))
-	return centers
+func _road_before(index: int) -> Vector2:
+	for lane in _lanes:
+		var members: Array = lane["stops"]
+		var order := members.find(index)
+		if order > 0:
+			return _centers[members[order - 1]]
+		if order == 0:
+			return Vector2(lane["axis"], RIVAL_Y)
+	return _centers[index] + Vector2.UP
 
 
-func _smooth(points: Array[Vector2]) -> PackedVector2Array:
-	var path := PackedVector2Array()
-	if points.size() < 2:
-		return path
-	var samples := 8
-	for index in points.size() - 1:
-		var start: Vector2 = points[index]
-		var end: Vector2 = points[index + 1]
-		var before: Vector2 = points[maxi(0, index - 1)]
-		var after: Vector2 = points[mini(points.size() - 1, index + 2)]
-		for step in samples:
-			path.append(start.cubic_interpolate(end, before, after, float(step) / float(samples)))
-	path.append(points[-1])
-	return path
+func _index_of(event_id: String) -> int:
+	for index in _stops.size():
+		if String(_stops[index]["id"]) == event_id:
+			return index
+	return -1
 
 
 func _button_for(event_id: String) -> Button:
@@ -174,14 +234,3 @@ func _button_for(event_id: String) -> Button:
 		if button.name == "Stop_%s" % event_id:
 			return button
 	return null
-
-
-func _room_color(room: String) -> Color:
-	match room:
-		"kitchen":
-			return SKIN.ORANGE
-		"workshop":
-			return SKIN.YELLOW
-		"office":
-			return SKIN.BLUE
-	return SKIN.LIME
