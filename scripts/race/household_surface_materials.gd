@@ -3,6 +3,7 @@ extends RefCounted
 
 const CATALOG_PATH := "res://data/household_material_patterns.json"
 const SURFACE_SHADER := preload("res://assets/shaders/household_surface.gdshader")
+const COURSE := preload("res://scripts/race/handmade_course_materials.gd")
 static var _catalog: Dictionary = {}
 
 
@@ -35,15 +36,16 @@ static func resolve(theme: StringName, material_seed: int, family: String = "", 
 			"stagger": rng.randf_range(0.25, 0.75), "grain_period": rng.randf_range(310.0, 620.0),
 			"texture": String(definition["grain_" + role]),
 		}
+	result["course"] = COURSE.resolve(theme, material_seed, definition["course"], data["course_settings"], result["floor"])
 	result["signature"] = var_to_str(result).sha256_text()
 	return result
 
 
-static func apply(track: Node2D, resolved: Dictionary) -> void:
+static func apply(track: Node2D, resolved: Dictionary) -> NoiseTexture2D:
 	var floor_material := _material(resolved["floor"])
 	var island_material := _material(resolved["island"])
 	for node: Node in track.find_children("*", "CanvasItem", true, false):
-		if node.name == "RoomSurface" or String(node.name).begins_with("TrackSurface"):
+		if node.name == "RoomSurface":
 			_paint(node, resolved["floor"], floor_material)
 		elif node.name in ["IslandProp", "RaisedPad"]:
 			_paint(node, resolved["island"], island_material)
@@ -55,6 +57,7 @@ static func apply(track: Node2D, resolved: Dictionary) -> void:
 		elif node.name == "TopLip" and node is Line2D:
 			node.default_color = (resolved["island"]["base_color"] as Color).lightened(0.2)
 	track.set_meta("surface_identity", resolved.duplicate(true))
+	return COURSE.apply(track, resolved["course"])
 
 
 static func _paint(node: CanvasItem, profile: Dictionary, material: ShaderMaterial) -> void:

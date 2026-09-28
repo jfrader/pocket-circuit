@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Racing routes now use handmade cork in Kitchen, kraft card in Workshop, and ivory card in Office, with seeded grain, palette choices and taped joins. The surrounding tabletop remains drivable; vehicle handling and grip zones are unchanged.
 - Kitchen, Workshop, and Office have a regenerated painted overhead environment library. Household objects keep believable relative sizes, with one focal arrangement, supporting groups and clearer space around the racing line. Cars are unchanged.
 - Room surfaces vary procedurally by seed: Kitchen ceramics and preparation boards, Workshop timber and cutting mats, and Office desktops and woven or leather-like pads. Pattern layout, spacing, orientation and material combinations vary independently of track geometry; the same seed rebuilds the same room.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.

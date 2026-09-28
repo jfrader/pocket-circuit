@@ -88,7 +88,11 @@ static func compose(root: Node2D, spec: Dictionary, centerline: PackedVector2Arr
 		_draw_grip_surface(root, name, asset, surface["points"], int(spec.get("material_seed", 0)))
 		if stage.is_valid():
 			await stage.call("Preparing grip surfaces")
-	SURFACES.apply(root, spec["surface_identity"])
+	var grain := SURFACES.apply(root, spec["surface_identity"])
+	if stage.is_valid() and grain != null and grain.get_image() == null:
+		await stage.call("Preparing course material")
+		if grain.get_image() == null:
+			await grain.changed
 
 
 static func _draw_grip_surface(root: Node2D, name: String, asset: Dictionary, polygon: PackedVector2Array, seed_value: int) -> void:

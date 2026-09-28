@@ -17,9 +17,18 @@ func _run() -> void:
 		var islands := {}
 		var pairs := {}
 		var structures := {}
+		var courses := {}
+		var constructions := {}
 		for sample in SAMPLE_COUNT:
 			var result := MATERIALS.resolve(theme, sample)
 			assert(result == MATERIALS.resolve(theme, sample), "same seed must reproduce every surface parameter")
+			var course: Dictionary = result["course"]
+			courses[course["id"]] = true
+			constructions[str([course["grain_seed"], course["grain_period_mm"], course["join_count"], course["join_phase"]])] = true
+			assert(course["contrast_safe"], "authored floor/course combinations must have a readable palette")
+			assert(MATERIALS.COURSE.floor_contrast(course["base_color"], result["floor"]) >= float(course["min_floor_contrast"]), "course must differ from the floor's material value range")
+			assert(FileAccess.file_exists(course["texture"]), "course grain must use a shipping texture")
+			assert(String(course["id"]).begins_with(String(theme) + "_"), "course palette must belong to its room")
 			floors[result["floor"]["id"]] = true
 			islands[result["island"]["id"]] = true
 			pairs[str(result["floor"]["id"]) + ":" + str(result["island"]["id"])] = true
@@ -34,6 +43,15 @@ func _run() -> void:
 		assert(floors.size() == 4 and islands.size() == 3, "every authored material family must remain reachable")
 		assert(pairs.size() >= 10, "variation must change floor/island combinations, not just color")
 		assert(structures.size() >= 4, "variation must include different structural patterns")
+		assert(courses.size() == 3 and constructions.size() == SAMPLE_COUNT, "course variation must reach all palettes and vary grain/construction beyond tint")
+		for family: String in MATERIALS.catalog()["families"]:
+			if not family.begins_with(String(theme) + "_"):
+				continue
+			for sample in 32:
+				var identity := CORE.WORLD_MATERIALS.resolve(theme, &"", sample, family)
+				assert(identity["known"], "contrast coverage must exercise actual curated palettes")
+				var resolved := MATERIALS.resolve(theme, sample, family, identity["palette_id"], identity["floor_modulate"])
+				assert(resolved["course"]["contrast_safe"], "curated story tints must preserve course contrast")
 		print("SURFACE_RANGE ", theme, " seeds=", SAMPLE_COUNT, " floor=", floors.size(), " island=", islands.size(), " pairs=", pairs.size(), " structures=", structures.size())
 	var first := CORE.prepare_layout(&"workshop", &"wide", 246810, {"material_seed": 1})
 	var second := CORE.prepare_layout(&"workshop", &"wide", 246810, {"material_seed": 2})

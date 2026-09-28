@@ -12,7 +12,8 @@ func _run_test() -> void:
 	root.content_scale_size = Vector2i(1280, 720)
 	root.size = Vector2i(1280, 720)
 	var spec: Dictionary = BUILDER.LAYOUTS[&"kitchen"]
-	if not _expect(spec["floor_texture"] == spec["track_texture"], "Kitchen route should share the countertop material rather than overlay a competing fabric"):
+	var materials := HouseholdSurfaceMaterials.resolve(&"kitchen", 0)
+	if not _expect(materials["course"]["kind"] == "cork" and materials["course"]["contrast_safe"], "Kitchen course should use readable cork rather than disappear into the countertop"):
 		return
 	var world := Node2D.new()
 	root.add_child(world)
