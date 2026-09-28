@@ -1,0 +1,20 @@
+{
+  "version":1,
+  "themes":{
+    "kitchen":{
+      "support":["tabletop/mug_patterned.png","tabletop/bowl_patterned.png","imagine/bottle_top.png","kitchen/apple_cartoon.png","tabletop/espresso_mug.png"],
+      "micro":["tabletop/cereal_ring.png","edge_dressing/kitchen_herb_micro.png","edge_dressing/kitchen_sugar_micro.png"],
+      "ground":["ground_dressing/kitchen_tablecloth_patch.png","ground_dressing/kitchen_dish_towel_blue.png"]
+    },
+    "workshop":{
+      "support":["imagine/wrench.png","imagine/screwdriver.png","imagine/tape_roll.png","imagine/hammer.png"],
+      "micro":["edge_dressing/workshop_washer_micro.png","edge_dressing/workshop_bolt_micro.png","edge_dressing/workshop_nail_micro.png"],
+      "ground":["ground_dressing/workshop_cardboard_scrap.png","ground_dressing/workshop_shop_rag_red.png","ground_dressing/workshop_sandpaper_sheet.png"]
+    },
+    "office":{
+      "support":["giant_props/giant_mouse.png","imagine/stapler_top.png","imagine/book_top.png","imagine/scissors_top.png","imagine/pencil.png"],
+      "micro":["edge_dressing/office_binder_clip_micro.png","edge_dressing/office_push_pin_micro.png","imagine/paperclip.png"],
+      "ground":["ground_dressing/office_envelope_stack.png","ground_dressing/office_sticky_notes.png","ground_dressing/office_notepad_page.png"]
+    }
+  }
+}

@@ -60,21 +60,21 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	var outer_loop := left if absf(TrackBuilderCore._polygon_area(left)) > absf(TrackBuilderCore._polygon_area(right)) else right
 	var inner_loop := left if absf(TrackBuilderCore._polygon_area(left)) < absf(TrackBuilderCore._polygon_area(right)) else right
 	var outer_boundary := outer_loop
-	if spec.get("seed_obstacles", false):
+	if spec.get("seed_obstacles", false) or spec.has("environment_plan"):
 		inner_loop = edges["inner_boundary"] if edges.has("inner_boundary") else TrackBuilderCore._simple_inner_boundary_loop(inner_loop, centerline)
 		outer_boundary = edges["outer_boundary"] if edges.has("outer_boundary") else TrackBuilderCore._simple_boundary_loop(outer_loop, centerline)
 	# Generated centerlines are clearance-validated, so their inner offset is the
 	# authoritative island boundary. Boolean subtraction represents the annular
 	# ribbon as nested outer/hole polygons and can otherwise select the whole room
 	# as a solid collision body.
-	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) else TrackBuilderCore._island_region(room_polygon, clipped, inner_loop)
+	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) or spec.has("environment_plan") else TrackBuilderCore._island_region(room_polygon, clipped, inner_loop)
 	await TrackBuilderCore._build_island_prop(root, spec, island_region, inner_loop, centerline, stage)
 	if stage.is_valid():
 		await stage.call("Placing room edges and checkpoints")
 
 	# Legacy authored tracks keep their fixed room-corner dressing. Generated
 	# tracks choose landmarks from geometry-aware story moments below.
-	if not spec.get("seed_obstacles", false):
+	if not spec.get("seed_obstacles", false) and not spec.has("environment_plan"):
 		TrackBuilderCore._add_corner_set_pieces(root, spec, room_polygon, clipped)
 
 	# Room walls (real furniture edges along the room outline)
@@ -125,24 +125,24 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	# technical layouts in both directions.
 	var forward_positions: Array[Vector2] = []
 	var forward_rotations: Array[float] = []
-	for grid_distance: float in [100.0, 220.0]:
+	for grid_distance: float in TrackBuilderNodes.grid_arc_distances(centerline, false, room_polygon, island_region):
 		var grid_sample := TrackBuilderCore._sample_at_arc(centerline, arc, grid_distance)
 		var grid_tangent := TrackBuilderCore._tangent_at_arc(centerline, arc, grid_distance)
 		var grid_normal := grid_tangent.rotated(PI * 0.5)
-		forward_positions.append(grid_sample - grid_normal * 45.0)
-		forward_positions.append(grid_sample + grid_normal * 45.0)
+		forward_positions.append(grid_sample - grid_normal * TrackBuilderCore.GRID_LANE_OFFSET)
+		forward_positions.append(grid_sample + grid_normal * TrackBuilderCore.GRID_LANE_OFFSET)
 		forward_rotations.append(atan2(grid_tangent.x, -grid_tangent.y))
 		forward_rotations.append(atan2(grid_tangent.x, -grid_tangent.y))
 	TrackBuilderCore._add_grid(root, "GridForward", 0.0, forward_positions, forward_rotations)
 	var reverse_positions: Array[Vector2] = []
 	var reverse_rotations: Array[float] = []
-	for grid_distance: float in [45.0, 120.0]:
+	for grid_distance: float in TrackBuilderNodes.grid_arc_distances(centerline, true, room_polygon, island_region):
 		var target_arc := maxf(total - grid_distance, 0.0)
 		var grid_sample := TrackBuilderCore._sample_at_arc(centerline, arc, target_arc)
 		var grid_tangent := TrackBuilderCore._tangent_at_arc(centerline, arc, target_arc)
 		var grid_normal := grid_tangent.rotated(PI * 0.5)
-		reverse_positions.append(grid_sample - grid_normal * 45.0)
-		reverse_positions.append(grid_sample + grid_normal * 45.0)
+		reverse_positions.append(grid_sample - grid_normal * TrackBuilderCore.GRID_LANE_OFFSET)
+		reverse_positions.append(grid_sample + grid_normal * TrackBuilderCore.GRID_LANE_OFFSET)
 		reverse_rotations.append(atan2(-grid_tangent.x, grid_tangent.y))
 		reverse_rotations.append(atan2(-grid_tangent.x, grid_tangent.y))
 	TrackBuilderCore._add_grid(root, "GridReverse", 0.0, reverse_positions, reverse_rotations)
@@ -163,12 +163,17 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 			await stage.call("Building trackside scenery")
 		if environment_composer.is_valid():
 			await environment_composer.call(root, stage)
+		elif spec.has("environment_plan"):
+			await WorldEnvironmentArt.compose(root, spec, centerline, stage)
+			TrackBuilderCore._build_generated_obstacles(root, spec)
 		else:
 			TrackBuilderCore._build_generated_outer_boundary_visuals(root, spec, centerline, inner_loop, outer_boundary, room_polygon, generated_moments)
 			if stage.is_valid():
 				await stage.call("Placing landmarks")
 			await TrackBuilderCore._compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments, stage)
 			TrackBuilderCore._build_generated_obstacles(root, spec)
+	elif spec.has("environment_plan"):
+		await WorldEnvironmentArt.compose(root, spec, centerline, stage)
 	else:
 		# Canonical/static tracks retain their authored legacy dressing.
 		TrackBuilderCore._fill_island(root, spec, inner_loop, centerline)

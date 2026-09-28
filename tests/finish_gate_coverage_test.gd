@@ -39,8 +39,10 @@ func _test_theme_gate(theme: StringName) -> bool:
 	if not _expect(finish != null, "%s should define a finish-line checkpoint" % theme):
 		return false
 	var corners := _gate_corners(finish)
-	var width: float = corners["max_x"] - corners["min_x"]
-	var height: float = corners["max_y"] - corners["min_y"]
+	var sensor := finish.get_node("CollisionShape2D") as CollisionShape2D
+	var size := (sensor.shape as RectangleShape2D).size * sensor.global_scale.abs()
+	var width := size.x
+	var height := size.y
 	var long_axis := maxf(width, height)
 	var short_axis := minf(width, height)
 	if not _expect(
@@ -61,12 +63,7 @@ func _test_theme_gate(theme: StringName) -> bool:
 			if marker == null:
 				continue
 			var marker_position := marker.global_position
-			var inside_gate: bool = (
-				marker_position.x > corners["min_x"] - 24.0
-				and marker_position.x < corners["max_x"] + 24.0
-				and marker_position.y > corners["min_y"] - 24.0
-				and marker_position.y < corners["max_y"] + 24.0
-			)
+			var inside_gate := Rect2(-size * 0.5, size).grow(24.0).has_point(sensor.to_local(marker_position))
 			if not _expect(not inside_gate, "%s %s marker %s overlaps the finish gate" % [theme, container_name, child.name]):
 				return false
 			if not _expect(

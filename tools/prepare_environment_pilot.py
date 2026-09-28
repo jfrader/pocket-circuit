@@ -35,6 +35,18 @@ def extract_sprite(image: Image.Image, matte_cleanup_pixels: int = 2) -> Image.I
     _, nearest = ndimage.distance_transform_edt(~interior, return_indices=True)
     clean = rgb[nearest[0], nearest[1]]
     alpha = Image.fromarray((opaque * 255).astype(np.uint8)).filter(ImageFilter.GaussianBlur(0.45))
+    # Unmix residual key color in translucent painted edges, rather than retaining
+    # pink pixels as opaque flour, paper or cloth texture.
+    border = np.concatenate((rgb[0], rgb[-1], rgb[:, 0], rgb[:, -1])).astype(float)
+    background = np.median(border, axis=0)
+    key_chroma = max(1.0, min(background[0], background[2]) - background[1])
+    foreground = clean.astype(float)
+    spill = np.maximum(0.0, np.minimum(foreground[:, :, 0], foreground[:, :, 2]) - foreground[:, :, 1]) / key_chroma
+    key_hue = (hsv[:, :, 0] > 210) & (hsv[:, :, 0] < 250)
+    coverage = 1.0 - np.clip(np.where(key_hue, spill, 0.0), 0.0, 0.95)
+    foreground = (foreground - (1.0 - coverage[:, :, None]) * background) / coverage[:, :, None]
+    clean = np.clip(foreground, 0, 255).astype(np.uint8)
+    alpha = Image.fromarray((np.asarray(alpha).astype(float) * coverage).astype(np.uint8))
     result = Image.fromarray(clean).convert("RGBA")
     result.putalpha(alpha)
     result = result.crop(alpha.getbbox())

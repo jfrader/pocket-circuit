@@ -16,6 +16,7 @@ func _initialize() -> void:
 		"res://tools/create_media_save.gd",
 		"res://tools/environment_pilot.tscn",
 		"res://tools/environment_race_pilot.tscn",
+		"res://graphify-out/graph.json",
 		"res://assets/textures/environment_pilot/kitchen_teapot.png",
 		"res://assets/textures/environment_pilot/workshop_toolbox.png",
 		"res://assets/textures/environment_pilot/office_keyboard.png",

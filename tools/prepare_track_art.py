@@ -212,30 +212,10 @@ def save_png(image: Image.Image, path: Path) -> None:
 
 
 def main() -> None:
+    from prepare_environment_library import prepare
+
     definitions = json.loads((ROOT / 'data/world_prop_art.json').read_text())
-    sheets = {entry['sheet']: Image.open(SOURCE / entry['sheet']) for entry in definitions}
-    count = 0
-    for entry in definitions:
-        style = entry.get('style', 'cel')
-        if style == 'painted':
-            style = 'cel'
-        source_cell = cell(sheets[entry['sheet']], entry['cell'], entry.get('columns', 4))
-        source_cell = apply_finish(source_cell, entry.get('finish', ''), style)
-        sprite = transparent_sprite(source_cell, style=style)
-        for output in entry['outputs']:
-            path = TEXTURES / output
-            save_png(sprite, path)
-            count += 1
-    materials = Image.open(SOURCE / 'materials-kit.jpg')
-    for index, name in enumerate(MATERIALS):
-        save_png(repeating_material(cell(materials, index), 'cel'), TEXTURES / 'world_materials' / f'{name}.png')
-    decals = Image.open(SOURCE / 'surface-details.png')
-    for index, outputs in enumerate(DECALS):
-        sprite = transparent_sprite(cell(decals, index), clean_fragments=False, style='cel', outline=False)
-        for output in outputs:
-            save_png(sprite, TEXTURES / output)
-            count += 1
-    print(f'Prepared {count} track sprites/decals and {len(MATERIALS)} seamless materials')
+    prepare(definitions)
 
 
 if __name__ == '__main__':

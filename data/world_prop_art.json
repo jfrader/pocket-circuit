@@ -1,111 +1,6872 @@
 [
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":0,"length_mm":120,"outputs":["kitchen_hero/hero_kitchen_mug.png","kitchen/mug_cream.png","imagine/mug_top.png","imagine/kitchen_mug_hero.png","giant_props/giant_mug.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":1,"length_mm":290,"outputs":["kitchen_hero/hero_kitchen_plate_stack.png","imagine/plate_stack.png","kitchen/plate_large.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":2,"length_mm":350,"outputs":["kitchen/cutting_board.png","track_boundary/kitchen_bread_board_rail.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":3,"length_mm":300,"outputs":["giant_props/giant_cereal_box.png","kitchen/cereal_tower_green.png","kitchen/cereal_tower_orange.png","imagine/kitchen_cereal_green.png","imagine/kitchen_cereal_orange.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":4,"length_mm":190,"finish":"matte_metal","outputs":["kitchen/fork_cartoon.png","imagine/kitchen_fork.png","giant_props/giant_fork.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":5,"length_mm":180,"finish":"matte_metal","outputs":["kitchen/spoon_bridge.png","imagine/kitchen_spoon.png","track_boundary/kitchen_spoon_rail.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":6,"length_mm":110,"outputs":["kitchen/sponge_wet.png","imagine/kitchen_sponge.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":7,"length_mm":75,"width_mm":75,"outputs":["kitchen/apple_cartoon.png","imagine/hazard_kitchen_apple.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":8,"length_mm":60,"outputs":["kitchen/lime_cartoon.png","imagine/kitchen_lime.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":9,"length_mm":260,"outputs":["imagine/teapot_top.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":10,"length_mm":145,"outputs":["imagine/teacup_saucer.png","imagine/kitchen_cup.png","kitchen/cup_cartoon.png","kitchen/mug_blue.png","imagine/kitchen_mug_blue.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":11,"length_mm":220,"outputs":["imagine/bottle_top.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":12,"length_mm":45,"outputs":["imagine/salt_shaker.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":13,"length_mm":380,"outputs":["imagine/frying_pan.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":14,"length_mm":480,"outputs":["kitchen_hero/hero_kitchen_tea_board.png"]},
-  {"sheet":"restyled/kitchen-kit-painted.jpg","style":"cel","cell":15,"length_mm":220,"outputs":["kitchen/napkin.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":0,"length_mm":145,"outputs":["tabletop/teaspoon.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":1,"length_mm":170,"outputs":["tabletop/dessert_spoon.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":2,"length_mm":190,"outputs":["tabletop/dinner_fork.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":3,"length_mm":155,"outputs":["tabletop/pastry_fork.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":4,"length_mm":45,"width_mm":24,"outputs":["tabletop/cork_cylinder.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":5,"length_mm":45,"width_mm":45,"outputs":["tabletop/cork_disk.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":6,"length_mm":55,"width_mm":55,"outputs":["tabletop/biscuit_round.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":7,"length_mm":55,"width_mm":55,"outputs":["tabletop/cracker_square.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":8,"length_mm":300,"width_mm":32,"outputs":["track_boundary/kitchen_ruler_painted.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":9,"length_mm":150,"width_mm":18,"outputs":["track_boundary/kitchen_craft_stick.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":10,"length_mm":230,"width_mm":22,"outputs":["track_boundary/kitchen_chopsticks_pair.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":11,"length_mm":180,"width_mm":22,"outputs":["track_boundary/kitchen_butter_knife.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":12,"length_mm":120,"width_mm":90,"outputs":["tabletop/mug_patterned.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":13,"length_mm":110,"width_mm":85,"outputs":["tabletop/mug_enamel_red.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":14,"length_mm":150,"width_mm":150,"outputs":["tabletop/bowl_patterned.png"]},
-  {"sheet":"restyled/kitchen-variety-painted.jpg","style":"cel","cell":15,"length_mm":85,"width_mm":85,"outputs":["tabletop/jar_lid.png"]},
-  {"sheet":"workshop-kit.png","cell":1,"length_mm":200,"finish":"matte_metal","outputs":["workshop_hero/hero_workshop_wrench.png","imagine/wrench.png","giant_props/giant_wrench.png"]},
-  {"sheet":"workshop-kit.png","cell":3,"length_mm":310,"finish":"matte_metal","outputs":["imagine/hammer.png","giant_props/giant_hammer.png"]},
-  {"sheet":"workshop-kit.png","cell":4,"length_mm":180,"finish":"matte_metal","outputs":["imagine/screwdriver.png"]},
-  {"sheet":"workshop-kit.png","cell":5,"length_mm":45,"width_mm":15,"finish":"matte_metal","outputs":["imagine/bolt.png","edge_dressing/workshop_bolt_micro.png"]},
-  {"sheet":"workshop-kit.png","cell":6,"length_mm":30,"finish":"matte_metal","outputs":["imagine/screw.png","edge_dressing/screw_small.png"]},
-  {"sheet":"workshop-kit.png","cell":7,"length_mm":40,"finish":"matte_metal","outputs":["edge_dressing/workshop_nail_micro.png"]},
-  {"sheet":"workshop-kit.png","cell":8,"length_mm":22,"finish":"matte_metal","outputs":["edge_dressing/workshop_washer_micro.png"]},
-  {"sheet":"workshop-kit.png","cell":9,"length_mm":200,"finish":"matte_metal","outputs":["track_boundary/workshop_clamp_rail.png"]},
-  {"sheet":"workshop-kit.png","cell":10,"length_mm":160,"outputs":["track_boundary/workshop_dowel_rail.png"]},
-  {"sheet":"workshop-kit.png","cell":11,"length_mm":250,"outputs":["track_boundary/workshop_paint_stirrer_rail.png"]},
-  {"sheet":"workshop-kit.png","cell":12,"length_mm":300,"outputs":["kitchen/ruler_plank.png","imagine/kitchen_ruler.png","track_boundary/workshop_ruler_rail.png","track_boundary/office_ruler_rail.png"]},
-  {"sheet":"workshop-kit.png","cell":13,"length_mm":95,"outputs":["imagine/tape_roll.png","track_boundary/workshop_tape_corner.png"]},
-  {"sheet":"workshop-kit.png","cell":14,"length_mm":240,"outputs":["imagine/basketball.png","giant_props/giant_basketball.png"]},
-  {"sheet":"workshop-kit.png","cell":15,"length_mm":440,"outputs":["imagine/hose_coil.png"]},
-  {"sheet":"office-kit.png","cell":0,"length_mm":440,"outputs":["office_hero/hero_office_keyboard.png","giant_props/giant_keyboard.png","imagine/island_keyboard.png"]},
-  {"sheet":"office-kit.png","cell":1,"length_mm":18,"width_mm":18,"outputs":["office_hero/hero_office_keycap.png","imagine/office_keycap.png"]},
-  {"sheet":"office-kit.png","cell":2,"length_mm":210,"outputs":["office_hero/hero_office_notebook.png"]},
-  {"sheet":"office-kit.png","cell":3,"length_mm":150,"outputs":["imagine/stapler_top.png","giant_props/giant_stapler.png"]},
-  {"sheet":"office-kit.png","cell":4,"length_mm":32,"finish":"matte_metal","outputs":["imagine/paperclip.png","edge_dressing/paperclip_micro.png"]},
-  {"sheet":"office-kit.png","cell":5,"length_mm":180,"outputs":["imagine/pencil.png","track_boundary/office_pencil_rail.png"]},
-  {"sheet":"office-kit.png","cell":6,"length_mm":170,"finish":"matte_metal","outputs":["imagine/scissors_top.png"]},
-  {"sheet":"office-kit.png","cell":7,"length_mm":85,"outputs":["imagine/crayons.png"]},
-  {"sheet":"office-kit.png","cell":8,"length_mm":230,"outputs":["imagine/book_top.png"]},
-  {"sheet":"office-kit.png","cell":9,"length_mm":260,"outputs":["imagine/lamp_desk.png"]},
-  {"sheet":"office-kit.png","cell":10,"length_mm":140,"outputs":["imagine/plant_small.png"]},
-  {"sheet":"office-kit.png","cell":11,"length_mm":250,"outputs":["imagine/monitor_top.png","giant_props/giant_monitor.png"]},
-  {"sheet":"office-kit.png","cell":12,"length_mm":110,"outputs":["giant_props/giant_mouse.png"]},
-  {"sheet":"office-kit.png","cell":13,"length_mm":145,"outputs":["giant_props/giant_pen.png","track_boundary/office_pen_rail.png"]},
-  {"sheet":"office-kit.png","cell":14,"length_mm":297,"outputs":["giant_props/giant_paper_stack.png"]},
-  {"sheet":"details-kit.png","cell":0,"length_mm":400,"outputs":["workshop_hero/hero_workshop_toolbox.png","giant_props/giant_toolbox.png"]},
-  {"sheet":"details-kit.png","cell":1,"length_mm":165,"outputs":["workshop_hero/hero_workshop_paint_can.png","imagine/workshop_paint_can.png","giant_props/giant_paint_can.png"]},
-  {"sheet":"details-kit.png","cell":2,"length_mm":300,"outputs":["giant_props/giant_toaster.png","kitchen/toaster_edge.png"]},
-  {"sheet":"details-kit.png","cell":3,"length_mm":95,"outputs":["giant_props/giant_milk_carton.png"]},
-  {"sheet":"details-kit.png","cell":4,"length_mm":280,"outputs":["imagine/watermelon.png","giant_props/giant_watermelon.png"]},
-  {"sheet":"details-kit.png","cell":5,"length_mm":35,"width_mm":35,"outputs":["imagine/strawberry.png"]},
-  {"sheet":"details-kit.png","cell":6,"length_mm":45,"outputs":["tabletop/cork.png","edge_dressing/cork_bump.png"]},
-  {"sheet":"details-kit.png","cell":7,"length_mm":45,"width_mm":20,"outputs":["tabletop/eraser.png"]},
-  {"sheet":"details-kit.png","cell":8,"length_mm":32,"width_mm":25,"outputs":["edge_dressing/office_binder_clip_micro.png"]},
-  {"sheet":"details-kit.png","cell":9,"length_mm":22,"outputs":["edge_dressing/office_push_pin_micro.png"]},
-  {"sheet":"details-kit.png","cell":10,"length_mm":45,"outputs":["edge_dressing/office_pen_cap_micro.png"]},
-  {"sheet":"details-kit.png","cell":11,"length_mm":24,"outputs":["edge_dressing/pencil_shaving.png"]},
-  {"sheet":"details-kit.png","cell":12,"length_mm":55,"outputs":["imagine/matchbox.png"]},
-  {"sheet":"details-kit.png","cell":13,"length_mm":170,"outputs":["imagine/remote_control.png"]},
-  {"sheet":"details-kit.png","cell":14,"length_mm":180,"outputs":["imagine/flower_pot.png"]},
-  {"sheet":"details-kit.png","cell":15,"length_mm":100,"outputs":["imagine/vase_top.png"]},
-  {"sheet":"cloth-kit.png","cell":0,"length_mm":360,"outputs":["ground_dressing/kitchen_tablecloth_patch.png"]},
-  {"sheet":"cloth-kit.png","cell":1,"length_mm":280,"outputs":["ground_dressing/kitchen_dish_towel_blue.png","track_boundary/kitchen_folded_towel_rail.png"]},
-  {"sheet":"cloth-kit.png","cell":2,"length_mm":240,"outputs":["ground_dressing/kitchen_cleaning_rag_yellow.png"]},
-  {"sheet":"cloth-kit.png","cell":3,"length_mm":280,"outputs":["ground_dressing/kitchen_oven_mitt_red.png","track_boundary/kitchen_mitt_corner.png"]},
-  {"sheet":"cloth-kit.png","cell":4,"length_mm":420,"outputs":["ground_dressing/workshop_dropcloth_patch.png"]},
-  {"sheet":"cloth-kit.png","cell":5,"length_mm":300,"outputs":["ground_dressing/workshop_shop_rag_red.png"]},
-  {"sheet":"cloth-kit.png","cell":6,"length_mm":320,"outputs":["ground_dressing/workshop_cardboard_scrap.png"]},
-  {"sheet":"cloth-kit.png","cell":7,"length_mm":280,"outputs":["ground_dressing/workshop_sandpaper_sheet.png"]},
-  {"sheet":"cloth-kit.png","cell":8,"length_mm":420,"outputs":["ground_dressing/office_desk_pad_patch.png"]},
-  {"sheet":"cloth-kit.png","cell":9,"length_mm":225,"outputs":["ground_dressing/office_envelope_stack.png"]},
-  {"sheet":"cloth-kit.png","cell":10,"length_mm":170,"outputs":["ground_dressing/office_sticky_notes.png","track_boundary/office_sticky_corner.png"]},
-  {"sheet":"cloth-kit.png","cell":11,"length_mm":210,"outputs":["ground_dressing/office_notepad_page.png"]},
-  {"sheet":"cloth-kit.png","cell":12,"length_mm":230,"outputs":["track_boundary/kitchen_chopstick_rail.png"]},
-  {"sheet":"cloth-kit.png","cell":13,"length_mm":230,"outputs":["track_boundary/office_book_spine_rail.png"]},
-  {"sheet":"cloth-kit.png","cell":14,"length_mm":12,"finish":"matte_metal","outputs":["edge_dressing/staple_bit.png"]},
-  {"sheet":"cloth-kit.png","cell":15,"length_mm":35,"finish":"matte_metal","outputs":["edge_dressing/blade_fragment.png"]},
-  {"sheet":"finishing-kit.png","cell":0,"length_mm":55,"width_mm":55,"outputs":["tabletop/biscuit.png"]},
-  {"sheet":"overhead-repairs.png","columns":2,"cell":3,"length_mm":14,"outputs":["tabletop/cereal_ring.png"]},
-  {"sheet":"finishing-kit.png","cell":2,"length_mm":10,"outputs":["edge_dressing/kitchen_sugar_micro.png"]},
-  {"sheet":"finishing-kit.png","cell":3,"length_mm":25,"outputs":["edge_dressing/kitchen_herb_micro.png"]},
-  {"sheet":"overhead-repairs.png","columns":2,"cell":0,"length_mm":290,"outputs":["imagine/bucket_stack.png"]},
-  {"sheet":"overhead-repairs.png","columns":2,"cell":1,"length_mm":450,"outputs":["imagine/barrel_wood.png"]},
-  {"sheet":"finishing-kit.png","cell":6,"length_mm":240,"outputs":["imagine/plank_wood.png"]},
-  {"sheet":"finishing-kit.png","cell":7,"length_mm":32,"width_mm":32,"outputs":["imagine/hazard_workshop_socket.png"]},
-  {"sheet":"finishing-kit.png","cell":8,"length_mm":130,"width_mm":90,"scenery":false,"outputs":["imagine/hazard_office_cable.png"]},
-  {"sheet":"finishing-kit.png","cell":9,"length_mm":24,"outputs":["imagine/coin.png"]},
-  {"sheet":"finishing-kit.png","cell":10,"length_mm":80,"outputs":["imagine/keys_ring.png"]},
-  {"sheet":"finishing-kit.png","cell":11,"length_mm":220,"outputs":["imagine/soccer_ball.png"]},
-  {"sheet":"finishing-kit.png","cell":12,"length_mm":280,"outputs":["imagine/football.png"]},
-  {"sheet":"finishing-kit.png","cell":13,"length_mm":580,"outputs":["imagine/stove_top.png"]},
-  {"sheet":"finishing-kit.png","cell":14,"length_mm":18,"outputs":["edge_dressing/kitchen_rice_micro.png"]},
-  {"sheet":"overhead-repairs.png","columns":2,"cell":2,"length_mm":100,"outputs":["tabletop/espresso_mug.png"]}
+  {
+    "id": "kitchen_kitchen_mug",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 120,
+    "outputs": [
+      "kitchen_hero/hero_kitchen_mug.png",
+      "kitchen/mug_cream.png",
+      "imagine/mug_top.png",
+      "imagine/kitchen_mug_hero.png",
+      "giant_props/giant_mug.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "kitchen mug",
+    "source": {
+      "prepared": "environment_pilot/kitchen_coffee_cup.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      120.0,
+      100.1674
+    ],
+    "width_mm": 100.1674,
+    "content_bounds_px": [
+      17,
+      56,
+      478,
+      399
+    ],
+    "scenery": true,
+    "average_color": "#8f6754"
+  },
+  {
+    "id": "kitchen_kitchen_plate_stack",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 290,
+    "outputs": [
+      "kitchen_hero/hero_kitchen_plate_stack.png",
+      "imagine/plate_stack.png",
+      "kitchen/plate_large.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "three nested ivory dinner plates, concentric circular terracotta rims, no visible side walls",
+    "source": {
+      "path": "environment-v2/kitchen-01.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      287.4412,
+      290.0
+    ],
+    "width_mm": 287.4412,
+    "content_bounds_px": [
+      87,
+      86,
+      337,
+      340
+    ],
+    "scenery": true,
+    "average_color": "#eac9a9"
+  },
+  {
+    "id": "kitchen_cutting_board",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 350,
+    "outputs": [
+      "kitchen/cutting_board.png",
+      "track_boundary/kitchen_bread_board_rail.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "warm rectangular wooden cutting board with a short handle and hanging hole, strict overhead",
+    "source": {
+      "path": "environment-v2/kitchen-01.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      214.3048,
+      350.0
+    ],
+    "width_mm": 214.3048,
+    "content_bounds_px": [
+      141,
+      69,
+      229,
+      374
+    ],
+    "scenery": true,
+    "average_color": "#d98e4c"
+  },
+  {
+    "id": "kitchen_cereal_box",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 300,
+    "outputs": [
+      "giant_props/giant_cereal_box.png",
+      "kitchen/cereal_tower_green.png",
+      "kitchen/cereal_tower_orange.png",
+      "imagine/kitchen_cereal_green.png",
+      "imagine/kitchen_cereal_orange.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "closed sage cereal carton seen exactly from above, only its narrow rectangular top with folded carton seam visible, no front face or writing",
+    "source": {
+      "path": "environment-v2/kitchen-01.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      300.0,
+      179.1946
+    ],
+    "width_mm": 179.1946,
+    "content_bounds_px": [
+      107,
+      167,
+      298,
+      178
+    ],
+    "scenery": true,
+    "average_color": "#a0aa70"
+  },
+  {
+    "id": "kitchen_fork_cartoon",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 190,
+    "outputs": [
+      "kitchen/fork_cartoon.png",
+      "imagine/kitchen_fork.png",
+      "giant_props/giant_fork.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "horizontal four-tined matte steel dinner fork, slim handle, realistic long narrow shape",
+    "source": {
+      "path": "environment-v2/kitchen-01.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      190.0,
+      34.1626
+    ],
+    "width_mm": 34.1626,
+    "content_bounds_px": [
+      53,
+      219,
+      406,
+      73
+    ],
+    "scenery": true,
+    "average_color": "#8991a5"
+  },
+  {
+    "id": "kitchen_spoon_bridge",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "kitchen/spoon_bridge.png",
+      "imagine/kitchen_spoon.png",
+      "track_boundary/kitchen_spoon_rail.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "horizontal matte steel tablespoon, oval bowl seen directly overhead and a slim handle",
+    "source": {
+      "path": "environment-v2/kitchen-02.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      180.0,
+      56.4055
+    ],
+    "width_mm": 56.4055,
+    "content_bounds_px": [
+      39,
+      188,
+      434,
+      136
+    ],
+    "scenery": true,
+    "average_color": "#97a39d"
+  },
+  {
+    "id": "kitchen_sponge_wet",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 110,
+    "outputs": [
+      "kitchen/sponge_wet.png",
+      "imagine/kitchen_sponge.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "yellow cleaning sponge seen directly from above, one rectangular porous top face only, no green side wall",
+    "source": {
+      "path": "environment-v2/kitchen-02.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      110.0,
+      77.9027
+    ],
+    "width_mm": 77.9027,
+    "content_bounds_px": [
+      91,
+      139,
+      329,
+      233
+    ],
+    "scenery": true,
+    "average_color": "#ebc25c"
+  },
+  {
+    "id": "kitchen_apple_cartoon",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 75,
+    "outputs": [
+      "kitchen/apple_cartoon.png",
+      "imagine/hazard_kitchen_apple.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "apple cartoon",
+    "width_mm": 71.6667,
+    "source": {
+      "prepared": "environment_pilot/kitchen_apple.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      75.0,
+      71.6667
+    ],
+    "content_bounds_px": [
+      98,
+      105,
+      315,
+      301
+    ],
+    "scenery": true,
+    "average_color": "#b94b36"
+  },
+  {
+    "id": "kitchen_lime_cartoon",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 60,
+    "outputs": [
+      "kitchen/lime_cartoon.png",
+      "imagine/kitchen_lime.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "lime cartoon",
+    "source": {
+      "path": "environment-v2/kitchen-02.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      58.9933,
+      60.0
+    ],
+    "width_mm": 58.9933,
+    "content_bounds_px": [
+      109,
+      107,
+      293,
+      298
+    ],
+    "scenery": true,
+    "average_color": "#8da33c"
+  },
+  {
+    "id": "kitchen_teapot_top",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 260,
+    "outputs": [
+      "imagine/teapot_top.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "teapot top",
+    "source": {
+      "prepared": "environment_pilot/kitchen_teapot.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      260.0,
+      170.0935
+    ],
+    "width_mm": 170.0935,
+    "content_bounds_px": [
+      42,
+      116,
+      428,
+      280
+    ],
+    "scenery": true,
+    "average_color": "#b2b393"
+  },
+  {
+    "id": "kitchen_teacup_saucer",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 145,
+    "outputs": [
+      "imagine/teacup_saucer.png",
+      "imagine/kitchen_cup.png",
+      "kitchen/cup_cartoon.png",
+      "kitchen/mug_blue.png",
+      "imagine/kitchen_mug_blue.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "ivory teacup centered on a circular sage saucer, concentric circles viewed exactly overhead, small side handle",
+    "source": {
+      "path": "environment-v2/kitchen-02.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      145.0,
+      141.3445
+    ],
+    "width_mm": 141.3445,
+    "content_bounds_px": [
+      77,
+      82,
+      357,
+      348
+    ],
+    "scenery": true,
+    "average_color": "#b6b895"
+  },
+  {
+    "id": "kitchen_bottle_top",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 220,
+    "outputs": [
+      "imagine/bottle_top.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "small glass bottle viewed straight down, circular glass shoulder surrounding a centered circular cream cap, no visible front label",
+    "source": {
+      "path": "environment-v2/kitchen-03.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      220.0,
+      220.0
+    ],
+    "width_mm": 220.0,
+    "content_bounds_px": [
+      111,
+      111,
+      290,
+      290
+    ],
+    "scenery": true,
+    "average_color": "#c0c2a5"
+  },
+  {
+    "id": "kitchen_salt_shaker",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "imagine/salt_shaker.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "small circular salt shaker cap seen directly overhead, five holes in a matte steel round top",
+    "source": {
+      "path": "environment-v2/kitchen-03.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      44.8421,
+      45.0
+    ],
+    "width_mm": 44.8421,
+    "content_bounds_px": [
+      114,
+      113,
+      284,
+      285
+    ],
+    "scenery": true,
+    "average_color": "#8d99a4"
+  },
+  {
+    "id": "kitchen_frying_pan",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 380,
+    "outputs": [
+      "imagine/frying_pan.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "matte dark slate frying pan, a circular flat cooking surface and a horizontal wooden handle, exact overhead",
+    "source": {
+      "path": "environment-v2/kitchen-03.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      380.0,
+      237.0297
+    ],
+    "width_mm": 237.0297,
+    "content_bounds_px": [
+      54,
+      130,
+      404,
+      252
+    ],
+    "scenery": true,
+    "average_color": "#565657"
+  },
+  {
+    "id": "kitchen_kitchen_tea_board",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 480,
+    "outputs": [
+      "kitchen_hero/hero_kitchen_tea_board.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "rectangular warm wood serving tray with shallow edges and two handles, seen exactly overhead, empty",
+    "source": {
+      "path": "environment-v2/kitchen-03.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      480.0,
+      339.4819
+    ],
+    "width_mm": 339.4819,
+    "content_bounds_px": [
+      63,
+      119,
+      386,
+      273
+    ],
+    "scenery": true,
+    "average_color": "#c37e3f"
+  },
+  {
+    "id": "kitchen_napkin",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 220,
+    "outputs": [
+      "kitchen/napkin.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "napkin",
+    "source": {
+      "path": "environment-v2/kitchen-04.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      209.6377,
+      220.0
+    ],
+    "width_mm": 209.6377,
+    "content_bounds_px": [
+      124,
+      118,
+      263,
+      276
+    ],
+    "scenery": true,
+    "average_color": "#d9c6a4"
+  },
+  {
+    "id": "kitchen_teaspoon",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 145,
+    "outputs": [
+      "tabletop/teaspoon.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "teaspoon",
+    "source": {
+      "path": "environment-v2/kitchen-04.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      145.0,
+      40.7544
+    ],
+    "width_mm": 40.7544,
+    "content_bounds_px": [
+      87,
+      208,
+      338,
+      95
+    ],
+    "scenery": true,
+    "average_color": "#94a09b"
+  },
+  {
+    "id": "kitchen_dessert_spoon",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 170,
+    "outputs": [
+      "tabletop/dessert_spoon.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "dessert spoon",
+    "source": {
+      "path": "environment-v2/kitchen-04.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      170.0,
+      51.8182
+    ],
+    "width_mm": 51.8182,
+    "content_bounds_px": [
+      69,
+      199,
+      374,
+      114
+    ],
+    "scenery": true,
+    "average_color": "#9e8d7c"
+  },
+  {
+    "id": "kitchen_dinner_fork",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 190,
+    "outputs": [
+      "tabletop/dinner_fork.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "dinner fork",
+    "source": {
+      "path": "environment-v2/kitchen-04.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      190.0,
+      47.7568
+    ],
+    "width_mm": 47.7568,
+    "content_bounds_px": [
+      71,
+      209,
+      370,
+      93
+    ],
+    "scenery": true,
+    "average_color": "#a9917b"
+  },
+  {
+    "id": "kitchen_pastry_fork",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 155,
+    "outputs": [
+      "tabletop/pastry_fork.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "pastry fork",
+    "source": {
+      "path": "environment-v2/kitchen-05.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      155.0,
+      106.8839
+    ],
+    "width_mm": 106.8839,
+    "content_bounds_px": [
+      45,
+      111,
+      422,
+      291
+    ],
+    "scenery": true,
+    "average_color": "#b1b29f"
+  },
+  {
+    "id": "kitchen_cork_cylinder",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "tabletop/cork_cylinder.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "small wine cork lying horizontally, warm cork texture, long rounded rectangle silhouette, no perspective",
+    "width_mm": 43.7224,
+    "source": {
+      "path": "environment-v2/kitchen-05.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      43.7224,
+      45.0
+    ],
+    "content_bounds_px": [
+      102,
+      98,
+      308,
+      317
+    ],
+    "scenery": true,
+    "average_color": "#da9553"
+  },
+  {
+    "id": "kitchen_cork_disk",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "tabletop/cork_disk.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "a single flat round cork coaster, seen straight down",
+    "width_mm": 42.5893,
+    "source": {
+      "path": "environment-v2/kitchen-05.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      45.0,
+      42.5893
+    ],
+    "content_bounds_px": [
+      88,
+      96,
+      336,
+      318
+    ],
+    "scenery": true,
+    "average_color": "#bd8d59"
+  },
+  {
+    "id": "kitchen_biscuit_round",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 55,
+    "outputs": [
+      "tabletop/biscuit_round.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "biscuit round",
+    "width_mm": 52.8333,
+    "source": {
+      "path": "environment-v2/kitchen-05.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      55.0,
+      52.8333
+    ],
+    "content_bounds_px": [
+      91,
+      97,
+      330,
+      317
+    ],
+    "scenery": true,
+    "average_color": "#e6aa61"
+  },
+  {
+    "id": "kitchen_cracker_square",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 55,
+    "outputs": [
+      "tabletop/cracker_square.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "cracker square",
+    "width_mm": 54.7843,
+    "source": {
+      "path": "environment-v2/kitchen-06.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      55.0,
+      54.7843
+    ],
+    "content_bounds_px": [
+      128,
+      129,
+      255,
+      254
+    ],
+    "scenery": true,
+    "average_color": "#f0ba5f"
+  },
+  {
+    "id": "kitchen_kitchen_ruler_painted",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 300,
+    "outputs": [
+      "track_boundary/kitchen_ruler_painted.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "kitchen ruler painted",
+    "width_mm": 62.4729,
+    "source": {
+      "path": "environment-v2/kitchen-06.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      300.0,
+      62.4729
+    ],
+    "content_bounds_px": [
+      25,
+      208,
+      461,
+      96
+    ],
+    "scenery": true,
+    "average_color": "#98a573"
+  },
+  {
+    "id": "kitchen_kitchen_craft_stick",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 150,
+    "outputs": [
+      "track_boundary/kitchen_craft_stick.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "kitchen craft stick",
+    "width_mm": 26.0695,
+    "source": {
+      "path": "environment-v2/kitchen-06.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      150.0,
+      26.0695
+    ],
+    "content_bounds_px": [
+      69,
+      223,
+      374,
+      65
+    ],
+    "scenery": true,
+    "average_color": "#edba76"
+  },
+  {
+    "id": "kitchen_kitchen_chopsticks_pair",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 230,
+    "outputs": [
+      "track_boundary/kitchen_chopsticks_pair.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "two slender horizontal wooden chopsticks lying side by side, subtle tapered ends",
+    "width_mm": 36.4208,
+    "source": {
+      "path": "environment-v2/kitchen-06.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      230.0,
+      36.4208
+    ],
+    "content_bounds_px": [
+      25,
+      219,
+      461,
+      73
+    ],
+    "scenery": true,
+    "average_color": "#cd924a"
+  },
+  {
+    "id": "kitchen_kitchen_butter_knife",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "track_boundary/kitchen_butter_knife.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "kitchen butter knife",
+    "width_mm": 32.6087,
+    "source": {
+      "prepared": "environment_pilot/kitchen_butter_knife.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      180.0,
+      32.6087
+    ],
+    "content_bounds_px": [
+      49,
+      218,
+      414,
+      75
+    ],
+    "scenery": true,
+    "average_color": "#a68a80"
+  },
+  {
+    "id": "kitchen_mug_patterned",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 120,
+    "outputs": [
+      "tabletop/mug_patterned.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "ONE PERFECT CIRCLE of dark coffee, surrounded by a circular ivory ceramic rim with small sage diamond marks ON THE RIM, with a small handle on the right. Cup viewed vertically from directly above; NO visible side wall, NO front face, NO body below the round opening. Circle plus handle silhouette.",
+    "width_mm": 99.5745,
+    "source": {
+      "path": "environment-v2/repair-overhead-01.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      120.0,
+      99.5745
+    ],
+    "content_bounds_px": [
+      91,
+      119,
+      329,
+      273
+    ],
+    "scenery": true,
+    "average_color": "#877f72"
+  },
+  {
+    "id": "kitchen_mug_enamel_red",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 110,
+    "outputs": [
+      "tabletop/mug_enamel_red.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "ONE PERFECT CIRCLE of dark coffee inside a thin circular ivory rim and a terracotta orange-red enamel cup, small red handle on the right. Strict overhead: no side wall or front face below the round mouth. Circle plus handle silhouette, no hearts or body decoration.",
+    "width_mm": 90.3448,
+    "source": {
+      "path": "environment-v2/repair-overhead-01.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      110.0,
+      90.3448
+    ],
+    "content_bounds_px": [
+      96,
+      125,
+      319,
+      262
+    ],
+    "scenery": true,
+    "average_color": "#804b3d"
+  },
+  {
+    "id": "kitchen_bowl_patterned",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 150,
+    "outputs": [
+      "tabletop/bowl_patterned.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "round ivory bowl seen straight down, circular terracotta rim and simple sage glaze arc, no side face",
+    "width_mm": 149.0769,
+    "source": {
+      "path": "environment-v2/kitchen-07.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      150.0,
+      149.0769
+    ],
+    "content_bounds_px": [
+      93,
+      94,
+      325,
+      323
+    ],
+    "scenery": true,
+    "average_color": "#decaad"
+  },
+  {
+    "id": "kitchen_jar_lid",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 85,
+    "outputs": [
+      "tabletop/jar_lid.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "jar lid",
+    "width_mm": 81.5188,
+    "source": {
+      "path": "environment-v2/kitchen-07.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      85.0,
+      81.5188
+    ],
+    "content_bounds_px": [
+      109,
+      115,
+      293,
+      281
+    ],
+    "scenery": true,
+    "average_color": "#bba173"
+  },
+  {
+    "id": "workshop_workshop_wrench",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 200,
+    "outputs": [
+      "workshop_hero/hero_workshop_wrench.png",
+      "imagine/wrench.png",
+      "giant_props/giant_wrench.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "workshop wrench",
+    "source": {
+      "prepared": "environment_pilot/workshop_spanner.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      200.0,
+      61.7391
+    ],
+    "width_mm": 61.7391,
+    "content_bounds_px": [
+      26,
+      185,
+      460,
+      142
+    ],
+    "scenery": true,
+    "average_color": "#7c858f"
+  },
+  {
+    "id": "workshop_hammer",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 310,
+    "outputs": [
+      "imagine/hammer.png",
+      "giant_props/giant_hammer.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "a steel claw hammer lying flat horizontally, long honey-wood handle and matte blue-grey steel head seen from overhead",
+    "source": {
+      "path": "environment-v2/workshop-01-v2.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      310.0,
+      193.5359
+    ],
+    "width_mm": 193.5359,
+    "content_bounds_px": [
+      75,
+      143,
+      362,
+      226
+    ],
+    "scenery": true,
+    "average_color": "#b49d7f"
+  },
+  {
+    "id": "workshop_screwdriver",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "imagine/screwdriver.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "one horizontal screwdriver lying flat, slim steel shaft and ochre handle, tip at left",
+    "source": {
+      "path": "environment-v2/workshop-01-v2.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      180.0,
+      37.5728
+    ],
+    "width_mm": 37.5728,
+    "content_bounds_px": [
+      50,
+      213,
+      412,
+      86
+    ],
+    "scenery": true,
+    "average_color": "#d29f54"
+  },
+  {
+    "id": "workshop_bolt",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "imagine/bolt.png",
+      "edge_dressing/workshop_bolt_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "a steel bolt lying flat horizontally: hexagonal head at one end and a long visible threaded shaft, NOT a round bolt head alone",
+    "width_mm": 17.756,
+    "source": {
+      "path": "environment-v2/workshop-01-v2.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      45.0,
+      17.756
+    ],
+    "content_bounds_px": [
+      89,
+      190,
+      332,
+      131
+    ],
+    "scenery": true,
+    "average_color": "#818a92"
+  },
+  {
+    "id": "workshop_screw",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 30,
+    "outputs": [
+      "imagine/screw.png",
+      "edge_dressing/screw_small.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "a steel wood screw lying flat horizontally: narrow pointed threaded shaft and small slotted head, NOT just a circular screw head",
+    "source": {
+      "path": "environment-v2/workshop-01-v2.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      30.0,
+      9.0341
+    ],
+    "width_mm": 9.0341,
+    "content_bounds_px": [
+      79,
+      203,
+      352,
+      106
+    ],
+    "scenery": true,
+    "average_color": "#878f96"
+  },
+  {
+    "id": "workshop_workshop_nail_micro",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 40,
+    "outputs": [
+      "edge_dressing/workshop_nail_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "one slender steel nail lying flat horizontally: straight long narrow shaft, sharp point left, small flat head right. No cross slot. NOT a round head seen from above",
+    "source": {
+      "path": "environment-v2/workshop-02.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      40.0,
+      5.9599
+    ],
+    "width_mm": 5.9599,
+    "content_bounds_px": [
+      82,
+      230,
+      349,
+      52
+    ],
+    "scenery": true,
+    "average_color": "#8d9393"
+  },
+  {
+    "id": "workshop_workshop_washer_micro",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 22,
+    "outputs": [
+      "edge_dressing/workshop_washer_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "workshop washer micro",
+    "source": {
+      "prepared": "environment_pilot/workshop_washer.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      21.807,
+      22.0
+    ],
+    "width_mm": 21.807,
+    "content_bounds_px": [
+      143,
+      142,
+      226,
+      228
+    ],
+    "scenery": true,
+    "average_color": "#7b8791"
+  },
+  {
+    "id": "workshop_workshop_clamp_rail",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 200,
+    "outputs": [
+      "track_boundary/workshop_clamp_rail.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "horizontal red and steel F-clamp lying flat on a bench, straight overhead",
+    "source": {
+      "path": "environment-v2/workshop-02.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      200.0,
+      106.8627
+    ],
+    "width_mm": 106.8627,
+    "content_bounds_px": [
+      52,
+      147,
+      408,
+      218
+    ],
+    "scenery": true,
+    "average_color": "#a37a7e"
+  },
+  {
+    "id": "workshop_workshop_dowel_rail",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 160,
+    "outputs": [
+      "track_boundary/workshop_dowel_rail.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "one slender straight horizontal wooden dowel,160mm long and12mm wide, with rounded ends, not a thick rolling pin",
+    "source": {
+      "path": "environment-v2/workshop-02.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      160.0,
+      15.4974
+    ],
+    "width_mm": 15.4974,
+    "content_bounds_px": [
+      65,
+      237,
+      382,
+      37
+    ],
+    "scenery": true,
+    "average_color": "#d29b66"
+  },
+  {
+    "id": "workshop_workshop_paint_stirrer_rail",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 250,
+    "outputs": [
+      "track_boundary/workshop_paint_stirrer_rail.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "workshop paint stirrer rail",
+    "source": {
+      "prepared": "environment_pilot/workshop_paint_stirrer.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      250.0,
+      17.7824
+    ],
+    "width_mm": 17.7824,
+    "content_bounds_px": [
+      17,
+      239,
+      478,
+      34
+    ],
+    "scenery": true,
+    "average_color": "#c5ac7c"
+  },
+  {
+    "id": "kitchen_ruler_plank",
+    "themes": [
+      "kitchen",
+      "workshop",
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 300,
+    "outputs": [
+      "kitchen/ruler_plank.png",
+      "imagine/kitchen_ruler.png",
+      "track_boundary/workshop_ruler_rail.png",
+      "track_boundary/office_ruler_rail.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "ruler plank",
+    "source": {
+      "path": "environment-v2/kitchen-08.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      300.0,
+      79.3872
+    ],
+    "width_mm": 79.3872,
+    "content_bounds_px": [
+      76,
+      208,
+      359,
+      95
+    ],
+    "scenery": true,
+    "average_color": "#dc9c57"
+  },
+  {
+    "id": "workshop_tape_roll",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 95,
+    "outputs": [
+      "imagine/tape_roll.png",
+      "track_boundary/workshop_tape_corner.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "tape roll",
+    "source": {
+      "prepared": "environment_pilot/workshop_masking_tape.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      95.0,
+      94.6916
+    ],
+    "width_mm": 94.6916,
+    "content_bounds_px": [
+      102,
+      102,
+      308,
+      307
+    ],
+    "scenery": true,
+    "average_color": "#536e6f"
+  },
+  {
+    "id": "workshop_basketball",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 240,
+    "outputs": [
+      "imagine/basketball.png",
+      "giant_props/giant_basketball.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "basketball",
+    "source": {
+      "path": "environment-v2/workshop-02.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      238.2979,
+      240.0
+    ],
+    "width_mm": 238.2979,
+    "content_bounds_px": [
+      116,
+      115,
+      280,
+      282
+    ],
+    "scenery": true,
+    "average_color": "#d4764c"
+  },
+  {
+    "id": "workshop_hose_coil",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 440,
+    "outputs": [
+      "imagine/hose_coil.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "hose coil",
+    "source": {
+      "path": "environment-v2/workshop-03.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      438.7135,
+      440.0
+    ],
+    "width_mm": 438.7135,
+    "content_bounds_px": [
+      85,
+      85,
+      341,
+      342
+    ],
+    "scenery": true,
+    "average_color": "#972e22"
+  },
+  {
+    "id": "office_office_keyboard",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 440,
+    "outputs": [
+      "office_hero/hero_office_keyboard.png",
+      "giant_props/giant_keyboard.png",
+      "imagine/island_keyboard.png",
+      "imagine/office_keyboard_top_bright.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "office keyboard",
+    "source": {
+      "prepared": "environment_pilot/office_keyboard.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      440.0,
+      171.2134
+    ],
+    "width_mm": 171.2134,
+    "content_bounds_px": [
+      17,
+      163,
+      478,
+      186
+    ],
+    "scenery": true,
+    "average_color": "#b9b3ac"
+  },
+  {
+    "id": "office_office_keycap",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 18,
+    "outputs": [
+      "office_hero/hero_office_keycap.png",
+      "imagine/office_keycap.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "office keycap",
+    "width_mm": 17.7545,
+    "source": {
+      "path": "environment-v2/office-01.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      17.7545,
+      18.0
+    ],
+    "content_bounds_px": [
+      147,
+      146,
+      217,
+      220
+    ],
+    "scenery": true,
+    "average_color": "#b8bab6"
+  },
+  {
+    "id": "office_office_notebook",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 210,
+    "outputs": [
+      "office_hero/hero_office_notebook.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "office notebook",
+    "source": {
+      "prepared": "environment_pilot/office_notebook.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      167.5703,
+      210.0
+    ],
+    "width_mm": 167.5703,
+    "content_bounds_px": [
+      100,
+      60,
+      312,
+      391
+    ],
+    "scenery": true,
+    "average_color": "#bb8b4b"
+  },
+  {
+    "id": "office_stapler_top",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 150,
+    "outputs": [
+      "imagine/stapler_top.png",
+      "giant_props/giant_stapler.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "small red stapler seen straight down, long rounded rectangular top lever over a short dark base, no side face",
+    "source": {
+      "path": "environment-v2/office-01.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      150.0,
+      77.9032
+    ],
+    "width_mm": 77.9032,
+    "content_bounds_px": [
+      100,
+      175,
+      310,
+      161
+    ],
+    "scenery": true,
+    "average_color": "#a54e4d"
+  },
+  {
+    "id": "office_paperclip",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 32,
+    "outputs": [
+      "imagine/paperclip.png",
+      "edge_dressing/paperclip_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "paperclip",
+    "source": {
+      "prepared": "environment_pilot/office_paperclip.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      11.4783,
+      32.0
+    ],
+    "width_mm": 11.4783,
+    "content_bounds_px": [
+      206,
+      118,
+      99,
+      276
+    ],
+    "scenery": true,
+    "average_color": "#a7a29a"
+  },
+  {
+    "id": "office_pencil",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "imagine/pencil.png",
+      "track_boundary/office_pencil_rail.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "pencil",
+    "source": {
+      "prepared": "environment_pilot/office_pencil.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      180.0,
+      7.5314
+    ],
+    "width_mm": 7.5314,
+    "content_bounds_px": [
+      17,
+      246,
+      478,
+      20
+    ],
+    "scenery": true,
+    "average_color": "#db9e3c"
+  },
+  {
+    "id": "office_scissors_top",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 170,
+    "outputs": [
+      "imagine/scissors_top.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "matte steel scissors lying flat, two ochre oval handles, blades slightly apart, exact overhead",
+    "source": {
+      "path": "environment-v2/office-01.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      127.3746,
+      170.0
+    ],
+    "width_mm": 127.3746,
+    "content_bounds_px": [
+      129,
+      86,
+      254,
+      339
+    ],
+    "scenery": true,
+    "average_color": "#be9f67"
+  },
+  {
+    "id": "office_crayons",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 85,
+    "outputs": [
+      "imagine/crayons.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "crayons",
+    "source": {
+      "path": "environment-v2/office-01.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      85.0,
+      65.7188
+    ],
+    "width_mm": 65.7188,
+    "content_bounds_px": [
+      99,
+      135,
+      313,
+      242
+    ],
+    "scenery": true,
+    "average_color": "#b08d7c"
+  },
+  {
+    "id": "office_book_top",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 230,
+    "outputs": [
+      "imagine/book_top.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "closed slate-blue book seen directly overhead, rectangular cloth cover and narrow ivory page margin, no side face",
+    "source": {
+      "path": "environment-v2/office-02.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      179.4697,
+      230.0
+    ],
+    "width_mm": 179.4697,
+    "content_bounds_px": [
+      153,
+      124,
+      206,
+      264
+    ],
+    "scenery": true,
+    "average_color": "#5a6f91"
+  },
+  {
+    "id": "office_lamp_desk",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 260,
+    "outputs": [
+      "imagine/lamp_desk.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "desk lamp viewed from directly above: a solid round OCHRE METAL SHADE BACK, with a small central pivot; a short flat slate arm extends to a second circular base behind it. You see the TOP of the shade, never its inside, never a bulb. No side or front projection.",
+    "source": {
+      "path": "environment-v2/repair-overhead-01.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      260.0,
+      155.5425
+    ],
+    "width_mm": 155.5425,
+    "content_bounds_px": [
+      85,
+      154,
+      341,
+      204
+    ],
+    "scenery": true,
+    "average_color": "#b69655"
+  },
+  {
+    "id": "office_plant_small",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 140,
+    "outputs": [
+      "imagine/plant_small.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "small houseplant seen exactly overhead: sage leaves radiate around a central stem over a circular terracotta pot rim",
+    "source": {
+      "path": "environment-v2/office-02.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      120.7087,
+      140.0
+    ],
+    "width_mm": 120.7087,
+    "content_bounds_px": [
+      146,
+      129,
+      219,
+      254
+    ],
+    "scenery": true,
+    "average_color": "#908b6b"
+  },
+  {
+    "id": "office_monitor_top",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 540,
+    "outputs": [
+      "imagine/monitor_top.png",
+      "giant_props/giant_monitor.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "computer monitor seen from straight above: a thin long slate horizontal monitor TOP EDGE with a short central neck and oval base behind it. Absolutely no front-facing screen",
+    "source": {
+      "path": "environment-v2/office-02.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      540.0,
+      208.5
+    ],
+    "width_mm": 208.5,
+    "content_bounds_px": [
+      76,
+      186,
+      360,
+      139
+    ],
+    "scenery": true,
+    "average_color": "#7d8898"
+  },
+  {
+    "id": "office_mouse",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 110,
+    "outputs": [
+      "giant_props/giant_mouse.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "mouse",
+    "source": {
+      "prepared": "environment_pilot/office_mouse.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      68.0952,
+      110.0
+    ],
+    "width_mm": 68.0952,
+    "content_bounds_px": [
+      165,
+      109,
+      182,
+      294
+    ],
+    "scenery": true,
+    "average_color": "#657586"
+  },
+  {
+    "id": "office_pen",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark",
+      "boundary"
+    ],
+    "length_mm": 145,
+    "outputs": [
+      "giant_props/giant_pen.png",
+      "track_boundary/office_pen_rail.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "one horizontal slate-blue capped fountain pen, long narrow silhouette and a small steel clip",
+    "source": {
+      "path": "environment-v2/office-03.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      145.0,
+      30.9429
+    ],
+    "width_mm": 30.9429,
+    "content_bounds_px": [
+      55,
+      213,
+      403,
+      86
+    ],
+    "scenery": true,
+    "average_color": "#738699"
+  },
+  {
+    "id": "office_paper_stack",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 297,
+    "outputs": [
+      "giant_props/giant_paper_stack.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "paper stack",
+    "source": {
+      "path": "environment-v2/office-03.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      269.7138,
+      297.0
+    ],
+    "width_mm": 269.7138,
+    "content_bounds_px": [
+      127,
+      114,
+      257,
+      283
+    ],
+    "scenery": true,
+    "average_color": "#e5d0bb"
+  },
+  {
+    "id": "workshop_workshop_toolbox",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 400,
+    "outputs": [
+      "workshop_hero/hero_workshop_toolbox.png",
+      "giant_props/giant_toolbox.png",
+      "imagine/workshop_toolbox_top_bright.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "workshop toolbox",
+    "source": {
+      "prepared": "environment_pilot/workshop_toolbox.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      400.0,
+      219.2469
+    ],
+    "width_mm": 219.2469,
+    "content_bounds_px": [
+      17,
+      125,
+      478,
+      262
+    ],
+    "scenery": true,
+    "average_color": "#bd3636"
+  },
+  {
+    "id": "workshop_workshop_paint_can",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 165,
+    "outputs": [
+      "workshop_hero/hero_workshop_paint_can.png",
+      "imagine/workshop_paint_can.png",
+      "giant_props/giant_paint_can.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "workshop paint can",
+    "source": {
+      "prepared": "environment_pilot/workshop_paint_tin.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      164.4762,
+      165.0
+    ],
+    "width_mm": 164.4762,
+    "content_bounds_px": [
+      99,
+      98,
+      314,
+      315
+    ],
+    "scenery": true,
+    "average_color": "#aa8b54"
+  },
+  {
+    "id": "kitchen_toaster",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 300,
+    "outputs": [
+      "giant_props/giant_toaster.png",
+      "kitchen/toaster_edge.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "toaster seen exactly from above, two long dark bread slots in a cream rounded-rectangle top panel, no front or side panel",
+    "source": {
+      "path": "environment-v2/kitchen-08.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      300.0,
+      210.1974
+    ],
+    "width_mm": 210.1974,
+    "content_bounds_px": [
+      104,
+      149,
+      304,
+      213
+    ],
+    "scenery": true,
+    "average_color": "#8f8c87"
+  },
+  {
+    "id": "kitchen_milk_carton",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 95,
+    "outputs": [
+      "giant_props/giant_milk_carton.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "milk carton seen from above, small folded cream carton top with a sage screw cap, no carton side faces or writing",
+    "source": {
+      "path": "environment-v2/kitchen-08.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      95.0,
+      87.2624
+    ],
+    "width_mm": 87.2624,
+    "content_bounds_px": [
+      145,
+      154,
+      221,
+      203
+    ],
+    "scenery": true,
+    "average_color": "#c8caaa"
+  },
+  {
+    "id": "kitchen_watermelon",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal",
+      "landmark"
+    ],
+    "length_mm": 280,
+    "outputs": [
+      "imagine/watermelon.png",
+      "giant_props/giant_watermelon.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "watermelon",
+    "source": {
+      "path": "environment-v2/kitchen-08.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      279.0378,
+      280.0
+    ],
+    "width_mm": 279.0378,
+    "content_bounds_px": [
+      111,
+      110,
+      290,
+      291
+    ],
+    "scenery": true,
+    "average_color": "#be6944"
+  },
+  {
+    "id": "kitchen_strawberry",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 35,
+    "outputs": [
+      "imagine/strawberry.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "strawberry",
+    "width_mm": 29.6875,
+    "source": {
+      "path": "environment-v2/kitchen-09.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      29.6875,
+      35.0
+    ],
+    "content_bounds_px": [
+      113,
+      88,
+      285,
+      336
+    ],
+    "scenery": true,
+    "average_color": "#d56d4b"
+  },
+  {
+    "id": "kitchen_cork",
+    "themes": [
+      "kitchen",
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "tabletop/cork.png",
+      "edge_dressing/cork_bump.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "cork",
+    "source": {
+      "path": "environment-v2/kitchen-09.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      44.404,
+      45.0
+    ],
+    "width_mm": 44.404,
+    "content_bounds_px": [
+      107,
+      105,
+      298,
+      302
+    ],
+    "scenery": true,
+    "average_color": "#ecb77b"
+  },
+  {
+    "id": "office_eraser",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "tabletop/eraser.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "eraser",
+    "width_mm": 28.413,
+    "source": {
+      "prepared": "environment_pilot/office_eraser.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      45.0,
+      28.413
+    ],
+    "content_bounds_px": [
+      109,
+      163,
+      293,
+      185
+    ],
+    "scenery": true,
+    "average_color": "#d1916b"
+  },
+  {
+    "id": "office_office_binder_clip_micro",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 32,
+    "outputs": [
+      "edge_dressing/office_binder_clip_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "small black binder clip lying flat, two folded silver wire handles, strict overhead",
+    "width_mm": 26.3111,
+    "source": {
+      "path": "environment-v2/office-03.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      32.0,
+      26.3111
+    ],
+    "content_bounds_px": [
+      143,
+      163,
+      225,
+      185
+    ],
+    "scenery": true,
+    "average_color": "#4c4c52"
+  },
+  {
+    "id": "office_office_push_pin_micro",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 22,
+    "outputs": [
+      "edge_dressing/office_push_pin_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "a single ochre push pin seen exactly from above, circular top and tiny centered highlight, no side view",
+    "source": {
+      "path": "environment-v2/office-03.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      21.8728,
+      22.0
+    ],
+    "width_mm": 21.8728,
+    "content_bounds_px": [
+      170,
+      169,
+      172,
+      173
+    ],
+    "scenery": true,
+    "average_color": "#d99b35"
+  },
+  {
+    "id": "office_office_pen_cap_micro",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "edge_dressing/office_pen_cap_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "office pen cap micro",
+    "source": {
+      "path": "environment-v2/office-04.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      45.0,
+      19.6023
+    ],
+    "width_mm": 19.6023,
+    "content_bounds_px": [
+      124,
+      198,
+      264,
+      115
+    ],
+    "scenery": true,
+    "average_color": "#6a799a"
+  },
+  {
+    "id": "office_pencil_shaving",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 24,
+    "outputs": [
+      "edge_dressing/pencil_shaving.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "pencil shaving",
+    "source": {
+      "path": "environment-v2/office-04.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      21.1707,
+      24.0
+    ],
+    "width_mm": 21.1707,
+    "content_bounds_px": [
+      147,
+      133,
+      217,
+      246
+    ],
+    "scenery": true,
+    "average_color": "#d38653"
+  },
+  {
+    "id": "kitchen_matchbox",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 55,
+    "outputs": [
+      "imagine/matchbox.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "matchbox",
+    "source": {
+      "path": "environment-v2/kitchen-09.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      55.0,
+      39.3314
+    ],
+    "width_mm": 39.3314,
+    "content_bounds_px": [
+      84,
+      133,
+      344,
+      246
+    ],
+    "scenery": true,
+    "average_color": "#b7915a"
+  },
+  {
+    "id": "office_remote_control",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 170,
+    "outputs": [
+      "imagine/remote_control.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "remote control",
+    "source": {
+      "path": "environment-v2/office-04.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      170.0,
+      82.9412
+    ],
+    "width_mm": 82.9412,
+    "content_bounds_px": [
+      111,
+      185,
+      289,
+      141
+    ],
+    "scenery": true,
+    "average_color": "#77819d"
+  },
+  {
+    "id": "kitchen_flower_pot",
+    "themes": [
+      "kitchen",
+      "office",
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "imagine/flower_pot.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "round terracotta flower pot viewed directly overhead, visible dark soil and a few small sage leaves, no side wall",
+    "source": {
+      "path": "environment-v2/kitchen-09.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      180.0,
+      180.0
+    ],
+    "width_mm": 180.0,
+    "content_bounds_px": [
+      95,
+      95,
+      321,
+      321
+    ],
+    "scenery": true,
+    "average_color": "#9b5d37"
+  },
+  {
+    "id": "kitchen_vase_top",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 100,
+    "outputs": [
+      "imagine/vase_top.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "round ivory vase viewed straight down, concentric neck opening and broad rounded shoulders, no vertical side wall",
+    "source": {
+      "path": "environment-v2/kitchen-10.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      100.0,
+      100.0
+    ],
+    "width_mm": 100.0,
+    "content_bounds_px": [
+      89,
+      89,
+      334,
+      334
+    ],
+    "scenery": true,
+    "average_color": "#e9d5b0"
+  },
+  {
+    "id": "kitchen_kitchen_tablecloth_patch",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 360,
+    "outputs": [
+      "ground_dressing/kitchen_tablecloth_patch.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "kitchen tablecloth patch",
+    "source": {
+      "path": "environment-v2/kitchen-10.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      355.7143,
+      360.0
+    ],
+    "width_mm": 355.7143,
+    "content_bounds_px": [
+      90,
+      88,
+      332,
+      336
+    ],
+    "scenery": true,
+    "average_color": "#a4b288"
+  },
+  {
+    "id": "kitchen_kitchen_dish_towel_blue",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary",
+      "ground"
+    ],
+    "length_mm": 280,
+    "outputs": [
+      "ground_dressing/kitchen_dish_towel_blue.png",
+      "track_boundary/kitchen_folded_towel_rail.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "kitchen dish towel blue",
+    "source": {
+      "prepared": "environment_pilot/kitchen_tea_towel.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      280.0,
+      246.0606
+    ],
+    "width_mm": 246.0606,
+    "content_bounds_px": [
+      58,
+      82,
+      396,
+      348
+    ],
+    "scenery": true,
+    "average_color": "#dcd0b3"
+  },
+  {
+    "id": "kitchen_kitchen_cleaning_rag_yellow",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 240,
+    "outputs": [
+      "ground_dressing/kitchen_cleaning_rag_yellow.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "kitchen cleaning rag yellow",
+    "source": {
+      "path": "environment-v2/kitchen-10.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      235.1862,
+      240.0
+    ],
+    "width_mm": 235.1862,
+    "content_bounds_px": [
+      85,
+      81,
+      342,
+      349
+    ],
+    "scenery": true,
+    "average_color": "#e4b450"
+  },
+  {
+    "id": "kitchen_kitchen_oven_mitt_red",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary",
+      "ground"
+    ],
+    "length_mm": 280,
+    "outputs": [
+      "ground_dressing/kitchen_oven_mitt_red.png",
+      "track_boundary/kitchen_mitt_corner.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "kitchen oven mitt red",
+    "source": {
+      "path": "environment-v2/kitchen-10.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      226.3212,
+      280.0
+    ],
+    "width_mm": 226.3212,
+    "content_bounds_px": [
+      100,
+      63,
+      312,
+      386
+    ],
+    "scenery": true,
+    "average_color": "#b34331"
+  },
+  {
+    "id": "workshop_workshop_dropcloth_patch",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 420,
+    "outputs": [
+      "ground_dressing/workshop_dropcloth_patch.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "workshop dropcloth patch",
+    "source": {
+      "path": "environment-v2/workshop-03.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      408.6486,
+      420.0
+    ],
+    "width_mm": 408.6486,
+    "content_bounds_px": [
+      76,
+      71,
+      360,
+      370
+    ],
+    "scenery": true,
+    "average_color": "#d1ad7e"
+  },
+  {
+    "id": "workshop_workshop_shop_rag_red",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 300,
+    "outputs": [
+      "ground_dressing/workshop_shop_rag_red.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "workshop shop rag red",
+    "source": {
+      "prepared": "environment_pilot/workshop_shop_rag.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      293.7238,
+      300.0
+    ],
+    "width_mm": 293.7238,
+    "content_bounds_px": [
+      22,
+      17,
+      468,
+      478
+    ],
+    "scenery": true,
+    "average_color": "#d1cfbe"
+  },
+  {
+    "id": "workshop_workshop_cardboard_scrap",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 320,
+    "outputs": [
+      "ground_dressing/workshop_cardboard_scrap.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "workshop cardboard scrap",
+    "source": {
+      "path": "environment-v2/workshop-03.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      320.0,
+      294.5055
+    ],
+    "width_mm": 294.5055,
+    "content_bounds_px": [
+      74,
+      88,
+      364,
+      335
+    ],
+    "scenery": true,
+    "average_color": "#bd8c54"
+  },
+  {
+    "id": "workshop_workshop_sandpaper_sheet",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 280,
+    "outputs": [
+      "ground_dressing/workshop_sandpaper_sheet.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "workshop sandpaper sheet",
+    "source": {
+      "path": "environment-v2/workshop-03.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      238.0403,
+      280.0
+    ],
+    "width_mm": 238.0403,
+    "content_bounds_px": [
+      108,
+      82,
+      295,
+      347
+    ],
+    "scenery": true,
+    "average_color": "#907b64"
+  },
+  {
+    "id": "office_office_desk_pad_patch",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 420,
+    "outputs": [
+      "ground_dressing/office_desk_pad_patch.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "office desk pad patch",
+    "source": {
+      "path": "environment-v2/office-04.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      420.0,
+      322.847
+    ],
+    "width_mm": 322.847,
+    "content_bounds_px": [
+      115,
+      148,
+      281,
+      216
+    ],
+    "scenery": true,
+    "average_color": "#dcb09b"
+  },
+  {
+    "id": "office_office_envelope_stack",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 225,
+    "outputs": [
+      "ground_dressing/office_envelope_stack.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "three offset cream envelopes seen overhead, visible triangular back flaps, no writing",
+    "source": {
+      "path": "environment-v2/office-05.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      225.0,
+      178.2692
+    ],
+    "width_mm": 178.2692,
+    "content_bounds_px": [
+      126,
+      153,
+      260,
+      206
+    ],
+    "scenery": true,
+    "average_color": "#f2e6d1"
+  },
+  {
+    "id": "office_office_sticky_notes",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary",
+      "ground"
+    ],
+    "length_mm": 170,
+    "outputs": [
+      "ground_dressing/office_sticky_notes.png",
+      "track_boundary/office_sticky_corner.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "small square stack of muted ochre sticky notes, slightly curled top corner, no writing",
+    "source": {
+      "path": "environment-v2/office-05.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      163.6364,
+      170.0
+    ],
+    "width_mm": 163.6364,
+    "content_bounds_px": [
+      166,
+      162,
+      180,
+      187
+    ],
+    "scenery": true,
+    "average_color": "#dfab55"
+  },
+  {
+    "id": "office_office_notepad_page",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 210,
+    "outputs": [
+      "ground_dressing/office_notepad_page.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 5,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "office notepad page",
+    "source": {
+      "path": "environment-v2/office-05.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      156.4865,
+      210.0
+    ],
+    "width_mm": 156.4865,
+    "content_bounds_px": [
+      159,
+      126,
+      193,
+      259
+    ],
+    "scenery": true,
+    "average_color": "#f5ecd9"
+  },
+  {
+    "id": "kitchen_kitchen_chopstick_rail",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 230,
+    "outputs": [
+      "track_boundary/kitchen_chopstick_rail.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "one slender horizontal wooden chopstick, long tapered silhouette",
+    "source": {
+      "path": "environment-v2/kitchen-11.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      230.0,
+      23.7346
+    ],
+    "width_mm": 23.7346,
+    "content_bounds_px": [
+      53,
+      235,
+      407,
+      42
+    ],
+    "scenery": true,
+    "average_color": "#d8a061"
+  },
+  {
+    "id": "office_office_book_spine_rail",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "boundary"
+    ],
+    "length_mm": 230,
+    "outputs": [
+      "track_boundary/office_book_spine_rail.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 8,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "a narrow closed book lying flat seen overhead, its elongated ochre cover and thin ivory page rim visible",
+    "source": {
+      "path": "environment-v2/office-05.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      230.0,
+      99.9615
+    ],
+    "width_mm": 99.9615,
+    "content_bounds_px": [
+      126,
+      199,
+      260,
+      113
+    ],
+    "scenery": true,
+    "average_color": "#d8a555"
+  },
+  {
+    "id": "office_staple_bit",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 12,
+    "outputs": [
+      "edge_dressing/staple_bit.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "staple bit",
+    "source": {
+      "path": "environment-v2/office-06.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      12.0,
+      6.5035
+    ],
+    "width_mm": 6.5035,
+    "content_bounds_px": [
+      113,
+      178,
+      286,
+      155
+    ],
+    "scenery": true,
+    "average_color": "#aa9f93"
+  },
+  {
+    "id": "workshop_blade_fragment",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 35,
+    "outputs": [
+      "edge_dressing/blade_fragment.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "blade fragment",
+    "source": {
+      "path": "environment-v2/workshop-04.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      35.0,
+      11.571
+    ],
+    "width_mm": 11.571,
+    "content_bounds_px": [
+      73,
+      195,
+      366,
+      121
+    ],
+    "scenery": true,
+    "average_color": "#85898b"
+  },
+  {
+    "id": "kitchen_biscuit",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 55,
+    "outputs": [
+      "tabletop/biscuit.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "biscuit",
+    "width_mm": 53.8494,
+    "source": {
+      "path": "environment-v2/kitchen-11.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      53.8494,
+      55.0
+    ],
+    "content_bounds_px": [
+      139,
+      136,
+      234,
+      239
+    ],
+    "scenery": true,
+    "average_color": "#e69f47"
+  },
+  {
+    "id": "kitchen_cereal_ring",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 14,
+    "outputs": [
+      "tabletop/cereal_ring.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "cereal ring",
+    "source": {
+      "path": "environment-v2/kitchen-11.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      13.791,
+      14.0
+    ],
+    "width_mm": 13.791,
+    "content_bounds_px": [
+      157,
+      155,
+      198,
+      201
+    ],
+    "scenery": true,
+    "average_color": "#e4a14c"
+  },
+  {
+    "id": "kitchen_kitchen_sugar_micro",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 10,
+    "outputs": [
+      "edge_dressing/kitchen_sugar_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "a tiny cluster of off-white granulated sugar crystals, flat overhead detail, not a sugar cube",
+    "source": {
+      "path": "environment-v2/kitchen-11.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      10.0,
+      9.6226
+    ],
+    "width_mm": 9.6226,
+    "content_bounds_px": [
+      150,
+      154,
+      212,
+      204
+    ],
+    "scenery": true,
+    "average_color": "#ecd8bc"
+  },
+  {
+    "id": "kitchen_kitchen_herb_micro",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 25,
+    "outputs": [
+      "edge_dressing/kitchen_herb_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "a tiny sprig of three sage herb leaves lying flat",
+    "source": {
+      "path": "environment-v2/kitchen-12.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      25.0,
+      24.6805
+    ],
+    "width_mm": 24.6805,
+    "content_bounds_px": [
+      99,
+      101,
+      313,
+      309
+    ],
+    "scenery": true,
+    "average_color": "#9caa7c"
+  },
+  {
+    "id": "workshop_bucket_stack",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 290,
+    "outputs": [
+      "imagine/bucket_stack.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "nested round paint buckets viewed exactly overhead, concentric circular rims, no bucket side faces",
+    "source": {
+      "path": "environment-v2/workshop-04.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      290.0,
+      288.2263
+    ],
+    "width_mm": 288.2263,
+    "content_bounds_px": [
+      92,
+      93,
+      327,
+      325
+    ],
+    "scenery": true,
+    "average_color": "#a8604f"
+  },
+  {
+    "id": "workshop_barrel_wood",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 450,
+    "outputs": [
+      "imagine/barrel_wood.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "wooden barrel top seen straight down, circular wood lid with two dark hoops and no barrel side face",
+    "source": {
+      "path": "environment-v2/workshop-04.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      448.6196,
+      450.0
+    ],
+    "width_mm": 448.6196,
+    "content_bounds_px": [
+      93,
+      93,
+      325,
+      326
+    ],
+    "scenery": true,
+    "average_color": "#a57f54"
+  },
+  {
+    "id": "workshop_plank_wood",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 240,
+    "outputs": [
+      "imagine/plank_wood.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "plank wood",
+    "source": {
+      "path": "environment-v2/workshop-04.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      240.0,
+      94.8541
+    ],
+    "width_mm": 94.8541,
+    "content_bounds_px": [
+      67,
+      181,
+      377,
+      149
+    ],
+    "scenery": true,
+    "average_color": "#d4984f"
+  },
+  {
+    "id": "workshop_hazard_workshop_socket",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 32,
+    "outputs": [
+      "imagine/hazard_workshop_socket.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "hazard workshop socket",
+    "width_mm": 29.0507,
+    "source": {
+      "prepared": "environment_pilot/workshop_socket.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      32.0,
+      29.0507
+    ],
+    "content_bounds_px": [
+      147,
+      157,
+      217,
+      197
+    ],
+    "scenery": true,
+    "average_color": "#6c717c"
+  },
+  {
+    "id": "office_hazard_office_cable",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 130,
+    "outputs": [
+      "imagine/hazard_office_cable.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "hazard",
+    "shadow": "contact",
+    "description": "hazard office cable",
+    "width_mm": 128.4195,
+    "scenery": false,
+    "source": {
+      "prepared": "environment_pilot/office_usb_cable.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      130.0,
+      128.4195
+    ],
+    "content_bounds_px": [
+      91,
+      93,
+      329,
+      325
+    ],
+    "average_color": "#687689"
+  },
+  {
+    "id": "office_coin",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 24,
+    "outputs": [
+      "imagine/coin.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "coin",
+    "source": {
+      "path": "environment-v2/office-06.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      23.9024,
+      24.0
+    ],
+    "width_mm": 23.9024,
+    "content_bounds_px": [
+      133,
+      133,
+      245,
+      246
+    ],
+    "scenery": true,
+    "average_color": "#c49848"
+  },
+  {
+    "id": "office_keys_ring",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 80,
+    "outputs": [
+      "imagine/keys_ring.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "keys ring",
+    "source": {
+      "path": "environment-v2/office-06.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      80.0,
+      79.7386
+    ],
+    "width_mm": 79.7386,
+    "content_bounds_px": [
+      103,
+      103,
+      306,
+      305
+    ],
+    "scenery": true,
+    "average_color": "#a87361"
+  },
+  {
+    "id": "workshop_soccer_ball",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 220,
+    "outputs": [
+      "imagine/soccer_ball.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "soccer ball",
+    "source": {
+      "path": "environment-v2/workshop-05.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      220.0,
+      219.2994
+    ],
+    "width_mm": 219.2994,
+    "content_bounds_px": [
+      99,
+      99,
+      314,
+      313
+    ],
+    "scenery": true,
+    "average_color": "#c2af96"
+  },
+  {
+    "id": "workshop_football",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 280,
+    "outputs": [
+      "imagine/football.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "football",
+    "source": {
+      "path": "environment-v2/workshop-05.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      280.0,
+      180.0525
+    ],
+    "width_mm": 180.0525,
+    "content_bounds_px": [
+      65,
+      133,
+      381,
+      245
+    ],
+    "scenery": true,
+    "average_color": "#c9652f"
+  },
+  {
+    "id": "kitchen_stove_top",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 580,
+    "outputs": [
+      "imagine/stove_top.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "overhead cream kitchen hob with four round dark burner rings in a rectangular metal surround; no oven front",
+    "source": {
+      "path": "environment-v2/kitchen-12.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      580.0,
+      531.9527
+    ],
+    "width_mm": 531.9527,
+    "content_bounds_px": [
+      87,
+      101,
+      338,
+      310
+    ],
+    "scenery": true,
+    "average_color": "#9f9c95"
+  },
+  {
+    "id": "kitchen_kitchen_rice_micro",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 18,
+    "outputs": [
+      "edge_dressing/kitchen_rice_micro.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "three pale rice grains lying in a small loose cluster, flat overhead",
+    "source": {
+      "path": "environment-v2/kitchen-12.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      14.8664,
+      18.0
+    ],
+    "width_mm": 14.8664,
+    "content_bounds_px": [
+      154,
+      132,
+      204,
+      247
+    ],
+    "scenery": true,
+    "average_color": "#f2dfbe"
+  },
+  {
+    "id": "kitchen_espresso_mug",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 100,
+    "outputs": [
+      "tabletop/espresso_mug.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 5,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "one small ivory espresso cup with dark coffee and a terracotta handle, circular opening, exactly overhead",
+    "source": {
+      "path": "environment-v2/kitchen-12.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      100.0,
+      78.4884
+    ],
+    "width_mm": 78.4884,
+    "content_bounds_px": [
+      84,
+      121,
+      344,
+      270
+    ],
+    "scenery": true,
+    "average_color": "#907663"
+  },
+  {
+    "id": "kitchen_crumb_micro_01",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 6,
+    "outputs": [
+      "edge_dressing/crumb_micro_01.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "crumb micro 01; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-13.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      5.8626,
+      6.0
+    ],
+    "width_mm": 5.8626,
+    "content_bounds_px": [
+      128,
+      125,
+      256,
+      262
+    ],
+    "scenery": true,
+    "average_color": "#ecbc7a"
+  },
+  {
+    "id": "kitchen_crumb_micro_02",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 8,
+    "outputs": [
+      "edge_dressing/crumb_micro_02.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "crumb micro 02; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-13.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      7.8769,
+      8.0
+    ],
+    "width_mm": 7.8769,
+    "content_bounds_px": [
+      128,
+      126,
+      256,
+      260
+    ],
+    "scenery": true,
+    "average_color": "#edbd8a"
+  },
+  {
+    "id": "kitchen_droplet_micro",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 6,
+    "outputs": [
+      "edge_dressing/droplet_micro.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "droplet micro; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-13.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      6.0,
+      5.8992
+    ],
+    "width_mm": 5.8992,
+    "content_bounds_px": [
+      137,
+      139,
+      238,
+      234
+    ],
+    "scenery": true,
+    "average_color": "#b2bb85"
+  },
+  {
+    "id": "kitchen_fiber_strand",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 18,
+    "outputs": [
+      "edge_dressing/fiber_strand.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "fiber strand; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-13.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      18.0,
+      4.9572
+    ],
+    "width_mm": 4.9572,
+    "content_bounds_px": [
+      69,
+      204,
+      374,
+      103
+    ],
+    "scenery": true,
+    "average_color": "#cb9248"
+  },
+  {
+    "id": "workshop_sawdust_bit",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 8,
+    "outputs": [
+      "edge_dressing/sawdust_bit.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "sawdust bit; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/workshop-05.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      8.0,
+      7.5962
+    ],
+    "width_mm": 7.5962,
+    "content_bounds_px": [
+      97,
+      105,
+      317,
+      301
+    ],
+    "scenery": true,
+    "average_color": "#e1ae59"
+  },
+  {
+    "id": "office_coffee_ring",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 95,
+    "outputs": [
+      "grip_patches/coffee_ring.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "coffee ring; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/office-06.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      93.2601,
+      95.0
+    ],
+    "width_mm": 93.2601,
+    "content_bounds_px": [
+      122,
+      119,
+      268,
+      273
+    ],
+    "scenery": true,
+    "average_color": "#bf5a37"
+  },
+  {
+    "id": "kitchen_kitchen_flour_dust",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "grip_patches/kitchen_flour_dust.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "kitchen flour dust; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-14.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      180.0,
+      171.6035
+    ],
+    "width_mm": 171.6035,
+    "content_bounds_px": [
+      84,
+      92,
+      343,
+      327
+    ],
+    "scenery": true,
+    "average_color": "#f5e2cf"
+  },
+  {
+    "id": "kitchen_kitchen_syrup_smear",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "grip_patches/kitchen_syrup_smear.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "kitchen syrup smear; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-14.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      180.0,
+      174.0361
+    ],
+    "width_mm": 174.0361,
+    "content_bounds_px": [
+      90,
+      95,
+      332,
+      321
+    ],
+    "scenery": true,
+    "average_color": "#c85829"
+  },
+  {
+    "id": "office_office_eraser_dust",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "grip_patches/office_eraser_dust.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "office eraser dust; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/office-07.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      44.4972,
+      45.0
+    ],
+    "width_mm": 44.4972,
+    "content_bounds_px": [
+      79,
+      77,
+      354,
+      358
+    ],
+    "scenery": true,
+    "average_color": "#d9c9ac"
+  },
+  {
+    "id": "office_office_ink_blot",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 65,
+    "outputs": [
+      "grip_patches/office_ink_blot.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "office ink blot; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/office-07.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      65.0,
+      65.0
+    ],
+    "width_mm": 65.0,
+    "content_bounds_px": [
+      80,
+      80,
+      351,
+      351
+    ],
+    "scenery": true,
+    "average_color": "#183269"
+  },
+  {
+    "id": "workshop_oil_slick_small",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "grip_patches/oil_slick_small.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "oil slick small; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/workshop-05.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      180.0,
+      162.7778
+    ],
+    "width_mm": 162.7778,
+    "content_bounds_px": [
+      94,
+      109,
+      324,
+      293
+    ],
+    "scenery": true,
+    "average_color": "#53606c"
+  },
+  {
+    "id": "kitchen_paper_scatter",
+    "themes": [
+      "kitchen",
+      "office",
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 350,
+    "outputs": [
+      "grip_patches/paper_scatter.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "paper scatter; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-14.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      350.0,
+      337.2191
+    ],
+    "width_mm": 337.2191,
+    "content_bounds_px": [
+      78,
+      84,
+      356,
+      343
+    ],
+    "scenery": true,
+    "average_color": "#d7d3b2"
+  },
+  {
+    "id": "workshop_sawdust_patch",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "grip_patches/sawdust_patch.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "sawdust patch; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/workshop-06.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      180.0,
+      178.4703
+    ],
+    "width_mm": 178.4703,
+    "content_bounds_px": [
+      79,
+      81,
+      353,
+      350
+    ],
+    "scenery": true,
+    "average_color": "#dea86b"
+  },
+  {
+    "id": "kitchen_soapy_spill",
+    "themes": [
+      "kitchen",
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "grip_patches/soapy_spill.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "soapy spill; flat overhead ground decal, no cast shadow",
+    "source": {
+      "prepared": "environment_pilot/kitchen_soapy_water.png",
+      "approved_pilot": true
+    },
+    "dimensions_mm": [
+      180.0,
+      154.0167
+    ],
+    "width_mm": 154.0167,
+    "content_bounds_px": [
+      17,
+      51,
+      478,
+      409
+    ],
+    "scenery": true,
+    "average_color": "#a7c5b6"
+  },
+  {
+    "id": "workshop_workshop_metal_filings",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 85,
+    "outputs": [
+      "grip_patches/workshop_metal_filings.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "workshop metal filings; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/workshop-06.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      85.0,
+      80.8469
+    ],
+    "width_mm": 80.8469,
+    "content_bounds_px": [
+      102,
+      110,
+      307,
+      292
+    ],
+    "scenery": true,
+    "average_color": "#575a66"
+  },
+  {
+    "id": "workshop_workshop_paint_smear",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "grip_patches/workshop_paint_smear.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "workshop paint smear; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/workshop-06.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      180.0,
+      169.6988
+    ],
+    "width_mm": 169.6988,
+    "content_bounds_px": [
+      90,
+      99,
+      332,
+      313
+    ],
+    "scenery": true,
+    "average_color": "#cd1e23"
+  },
+  {
+    "id": "kitchen_crumb_cluster",
+    "themes": [
+      "kitchen",
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 35,
+    "outputs": [
+      "imagine/crumb_cluster.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "crumb cluster; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-15.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      35.0,
+      33.5323
+    ],
+    "width_mm": 33.5323,
+    "content_bounds_px": [
+      101,
+      107,
+      310,
+      297
+    ],
+    "scenery": true,
+    "average_color": "#ebbf75"
+  },
+  {
+    "id": "kitchen_island_plate",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal"
+    ],
+    "length_mm": 290,
+    "outputs": [
+      "imagine/island_plate.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "island plate viewed exactly from above",
+    "source": {
+      "path": "environment-v2/kitchen-15.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      285.5657,
+      290.0
+    ],
+    "width_mm": 285.5657,
+    "content_bounds_px": [
+      95,
+      92,
+      322,
+      327
+    ],
+    "scenery": true,
+    "average_color": "#d3bea3"
+  },
+  {
+    "id": "kitchen_island_tool_tray",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "focal"
+    ],
+    "length_mm": 500,
+    "outputs": [
+      "imagine/island_tool_tray.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "island tool tray viewed exactly from above",
+    "source": {
+      "path": "environment-v2/kitchen-15.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      500.0,
+      379.2614
+    ],
+    "width_mm": 379.2614,
+    "content_bounds_px": [
+      80,
+      122,
+      352,
+      267
+    ],
+    "scenery": true,
+    "average_color": "#998965"
+  },
+  {
+    "id": "kitchen_oil_stain",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "imagine/oil_stain.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "oil stain; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-15.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      179.3857,
+      180.0
+    ],
+    "width_mm": 179.3857,
+    "content_bounds_px": [
+      110,
+      109,
+      292,
+      293
+    ],
+    "scenery": true,
+    "average_color": "#8a9191"
+  },
+  {
+    "id": "office_paper_sheet",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 297,
+    "outputs": [
+      "imagine/paper_sheet.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "paper sheet; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/office-07.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      288.4476,
+      297.0
+    ],
+    "width_mm": 288.4476,
+    "content_bounds_px": [
+      70,
+      65,
+      371,
+      382
+    ],
+    "scenery": true,
+    "average_color": "#f9ecd1"
+  },
+  {
+    "id": "kitchen_sawdust_patch",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "imagine/sawdust_patch.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "sawdust patch; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-16.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      180.0,
+      172.5
+    ],
+    "width_mm": 172.5,
+    "content_bounds_px": [
+      88,
+      95,
+      336,
+      322
+    ],
+    "scenery": true,
+    "average_color": "#e0b575"
+  },
+  {
+    "id": "kitchen_stain_ring",
+    "themes": [
+      "kitchen",
+      "office",
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 95,
+    "outputs": [
+      "imagine/stain_ring.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "stain ring; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-16.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      95.0,
+      88.0352
+    ],
+    "width_mm": 88.0352,
+    "content_bounds_px": [
+      85,
+      98,
+      341,
+      316
+    ],
+    "scenery": true,
+    "average_color": "#9fb59f"
+  },
+  {
+    "id": "kitchen_cereal_scatter",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 80,
+    "outputs": [
+      "kitchen/cereal_scatter.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "cereal scatter; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-16.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      80.0,
+      77.0279
+    ],
+    "width_mm": 77.0279,
+    "content_bounds_px": [
+      94,
+      100,
+      323,
+      311
+    ],
+    "scenery": true,
+    "average_color": "#e8b967"
+  },
+  {
+    "id": "kitchen_crumb_cluster_01",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 35,
+    "outputs": [
+      "kitchen/crumb_cluster_01.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "crumb cluster 01; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-16.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      34.3417,
+      35.0
+    ],
+    "width_mm": 34.3417,
+    "content_bounds_px": [
+      99,
+      96,
+      313,
+      319
+    ],
+    "scenery": true,
+    "average_color": "#9a7350"
+  },
+  {
+    "id": "kitchen_crumb_cluster_02",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 45,
+    "outputs": [
+      "kitchen/crumb_cluster_02.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "crumb cluster 02; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-17.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      42.7429,
+      45.0
+    ],
+    "width_mm": 42.7429,
+    "content_bounds_px": [
+      104,
+      96,
+      303,
+      319
+    ],
+    "scenery": true,
+    "average_color": "#e4ac70"
+  },
+  {
+    "id": "kitchen_spill_decal",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "kitchen/spill_decal.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "spill decal; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-17.jpg",
+      "columns": 2,
+      "cell": 1
+    },
+    "dimensions_mm": [
+      180.0,
+      154.8961
+    ],
+    "width_mm": 154.8961,
+    "content_bounds_px": [
+      87,
+      111,
+      337,
+      290
+    ],
+    "scenery": true,
+    "average_color": "#a8b48b"
+  },
+  {
+    "id": "kitchen_water_droplet_01",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 8,
+    "outputs": [
+      "kitchen/water_droplet_01.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "water droplet 01; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-17.jpg",
+      "columns": 2,
+      "cell": 2
+    },
+    "dimensions_mm": [
+      7.865,
+      8.0
+    ],
+    "width_mm": 7.865,
+    "content_bounds_px": [
+      139,
+      137,
+      233,
+      237
+    ],
+    "scenery": true,
+    "average_color": "#97aab5"
+  },
+  {
+    "id": "kitchen_water_droplet_02",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 12,
+    "outputs": [
+      "kitchen/water_droplet_02.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "water droplet 02; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-17.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "dimensions_mm": [
+      9.8141,
+      12.0
+    ],
+    "width_mm": 9.8141,
+    "content_bounds_px": [
+      146,
+      121,
+      220,
+      269
+    ],
+    "scenery": true,
+    "average_color": "#9fb0ba"
+  },
+  {
+    "id": "kitchen_wet_spill",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 180,
+    "outputs": [
+      "kitchen/wet_spill.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "wet spill; flat overhead ground decal, no cast shadow",
+    "source": {
+      "path": "environment-v2/kitchen-18.jpg",
+      "columns": 2,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      180.0,
+      137.9032
+    ],
+    "width_mm": 137.9032,
+    "content_bounds_px": [
+      70,
+      114,
+      372,
+      285
+    ],
+    "scenery": true,
+    "average_color": "#aab791"
+  },
+  {
+    "id": "kitchen_wood_scratch",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "decal"
+    ],
+    "length_mm": 90,
+    "outputs": [
+      "kitchen/wood_scratch.png"
+    ],
+    "scale_tier": "medium",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "room",
+      "apron"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 6,
+    "collision": "flat",
+    "shadow": "none",
+    "description": "three separate thin irregular sepia WOOD SCRATCH LINES as a flat decal, no board, no rectangle, no wooden background. Magenta fills all space between the lines. Broad enough 5-pixel strokes to extract cleanly. Just the isolated scratch marks.",
+    "source": {
+      "path": "environment-v2/repair-overhead-01.jpg",
+      "columns": 2,
+      "cell": 3
+    },
+    "matte_cleanup_pixels": 1,
+    "dimensions_mm": [
+      90.0,
+      51.0492
+    ],
+    "width_mm": 51.0492,
+    "content_bounds_px": [
+      103,
+      169,
+      305,
+      173
+    ],
+    "scenery": true,
+    "average_color": "#976f41"
+  },
+  {
+    "id": "kitchen_floor_grain",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "material",
+    "roles": [
+      "surface"
+    ],
+    "length_mm": 700,
+    "zones": [
+      "floor",
+      "island"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "surface",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "prepared": "environment_pilot/kitchen_floor.png",
+      "generator": "HouseholdSurfaceMaterials"
+    },
+    "outputs": [
+      "world_materials/kitchen_counter.png",
+      "world_materials/kitchen_sage_tile.png",
+      "world_materials/kitchen_ceramic.png",
+      "world_materials/kitchen_stone.png",
+      "kitchen/counter_surface.png",
+      "kitchen/counter_surface_bright.png",
+      "kitchen/track_surface.png"
+    ],
+    "dimensions_mm": [
+      700.0,
+      700.0
+    ],
+    "width_mm": 700.0,
+    "content_bounds_px": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "average_color": "#f7edd8"
+  },
+  {
+    "id": "kitchen_island_grain",
+    "themes": [
+      "kitchen"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "material",
+    "roles": [
+      "surface"
+    ],
+    "length_mm": 700,
+    "zones": [
+      "floor",
+      "island"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "surface",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "prepared": "environment_pilot/kitchen_island.png",
+      "generator": "HouseholdSurfaceMaterials"
+    },
+    "outputs": [
+      "world_materials/kitchen_board.png",
+      "kitchen/counter_edge.png"
+    ],
+    "dimensions_mm": [
+      700.0,
+      700.0
+    ],
+    "width_mm": 700.0,
+    "content_bounds_px": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "average_color": "#e5b366"
+  },
+  {
+    "id": "workshop_floor_grain",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "material",
+    "roles": [
+      "surface"
+    ],
+    "length_mm": 700,
+    "zones": [
+      "floor",
+      "island"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "surface",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "prepared": "environment_pilot/workshop_floor.png",
+      "generator": "HouseholdSurfaceMaterials"
+    },
+    "outputs": [
+      "world_materials/workshop_bench.png",
+      "world_materials/workshop_plywood.png",
+      "world_materials/workshop_oiled.png",
+      "world_materials/workshop_paint.png",
+      "imagine/floor_wood.png",
+      "imagine/track_wood.png"
+    ],
+    "dimensions_mm": [
+      700.0,
+      700.0
+    ],
+    "width_mm": 700.0,
+    "content_bounds_px": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "average_color": "#e4d3ba"
+  },
+  {
+    "id": "workshop_island_grain",
+    "themes": [
+      "workshop"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "material",
+    "roles": [
+      "surface"
+    ],
+    "length_mm": 700,
+    "zones": [
+      "floor",
+      "island"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "surface",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "prepared": "environment_pilot/workshop_island.png",
+      "generator": "HouseholdSurfaceMaterials"
+    },
+    "outputs": [
+      "world_materials/workshop_mat.png",
+      "imagine/workshop_edge_bright.png",
+      "edge_dressing/wood_grain_faint.png"
+    ],
+    "dimensions_mm": [
+      700.0,
+      700.0
+    ],
+    "width_mm": 700.0,
+    "content_bounds_px": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "average_color": "#304f4e"
+  },
+  {
+    "id": "office_floor_grain",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "material",
+    "roles": [
+      "surface"
+    ],
+    "length_mm": 700,
+    "zones": [
+      "floor",
+      "island"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "surface",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "prepared": "environment_pilot/office_floor.png",
+      "generator": "HouseholdSurfaceMaterials"
+    },
+    "outputs": [
+      "world_materials/office_desk.png",
+      "world_materials/office_laminate.png",
+      "world_materials/office_walnut.png",
+      "world_materials/office_deskmat.png",
+      "imagine/floor_pad.png",
+      "imagine/track_pad.png"
+    ],
+    "dimensions_mm": [
+      700.0,
+      700.0
+    ],
+    "width_mm": 700.0,
+    "content_bounds_px": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "average_color": "#7f8496"
+  },
+  {
+    "id": "office_island_grain",
+    "themes": [
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "material",
+    "roles": [
+      "surface"
+    ],
+    "length_mm": 700,
+    "zones": [
+      "floor",
+      "island"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "surface",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "prepared": "environment_pilot/office_island.png",
+      "generator": "HouseholdSurfaceMaterials"
+    },
+    "outputs": [
+      "world_materials/office_pad.png",
+      "imagine/office_edge_bright.png",
+      "edge_dressing/desk_pad_grid.png"
+    ],
+    "dimensions_mm": [
+      700.0,
+      700.0
+    ],
+    "width_mm": 700.0,
+    "content_bounds_px": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "average_color": "#33595a"
+  },
+  {
+    "id": "shadow_circle",
+    "themes": [
+      "kitchen",
+      "workshop",
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "utility",
+    "roles": [
+      "utility"
+    ],
+    "length_mm": 64,
+    "zones": [
+      "overlay"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "utility",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "generator": "shadow_circle"
+    },
+    "outputs": [
+      "edge_dressing/shadow_soft_circle.png"
+    ],
+    "dimensions_mm": [
+      64.0,
+      45.097
+    ],
+    "width_mm": 45.097,
+    "content_bounds_px": [
+      10,
+      45,
+      237,
+      167
+    ],
+    "average_color": "#40372d"
+  },
+  {
+    "id": "shadow_rect",
+    "themes": [
+      "kitchen",
+      "workshop",
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "utility",
+    "roles": [
+      "utility"
+    ],
+    "length_mm": 64,
+    "zones": [
+      "overlay"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "utility",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "generator": "shadow_rect"
+    },
+    "outputs": [
+      "edge_dressing/shadow_soft_rect.png"
+    ],
+    "dimensions_mm": [
+      64.0,
+      48.4534
+    ],
+    "width_mm": 48.4534,
+    "content_bounds_px": [
+      5,
+      35,
+      247,
+      187
+    ],
+    "average_color": "#40372d"
+  },
+  {
+    "id": "shadow_strip",
+    "themes": [
+      "kitchen",
+      "workshop",
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "utility",
+    "roles": [
+      "utility"
+    ],
+    "length_mm": 64,
+    "zones": [
+      "overlay"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "utility",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "generator": "shadow_strip"
+    },
+    "outputs": [
+      "edge_dressing/shadow_strip.png"
+    ],
+    "dimensions_mm": [
+      64.0,
+      21.5
+    ],
+    "width_mm": 21.5,
+    "content_bounds_px": [
+      0,
+      85,
+      256,
+      86
+    ],
+    "average_color": "#40372d"
+  },
+  {
+    "id": "skid",
+    "themes": [
+      "kitchen",
+      "workshop",
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "utility",
+    "roles": [
+      "utility"
+    ],
+    "length_mm": 64,
+    "zones": [
+      "overlay"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "utility",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "generator": "skid"
+    },
+    "outputs": [
+      "kitchen/skid_mark.png"
+    ],
+    "dimensions_mm": [
+      64.0,
+      1.4747
+    ],
+    "width_mm": 1.4747,
+    "content_bounds_px": [
+      20,
+      126,
+      217,
+      5
+    ],
+    "average_color": "#40372d"
+  },
+  {
+    "id": "checker",
+    "themes": [
+      "kitchen",
+      "workshop",
+      "office"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "utility",
+    "roles": [
+      "utility"
+    ],
+    "length_mm": 64,
+    "zones": [
+      "overlay"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "utility",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "generator": "checker"
+    },
+    "outputs": [
+      "kitchen/start_finish.png"
+    ],
+    "dimensions_mm": [
+      64.0,
+      64.0
+    ],
+    "width_mm": 64.0,
+    "content_bounds_px": [
+      0,
+      0,
+      256,
+      256
+    ],
+    "average_color": "#40372d"
+  }
 ]

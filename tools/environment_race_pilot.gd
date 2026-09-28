@@ -5,6 +5,7 @@ const PILOT_ART := preload("res://tools/environment_race_art.gd")
 @export var capture_mode := false
 @export var layout_seed := -1
 @export var material_seed := -1
+@export var production_environment := true
 var pilot_ready := false
 var pilot_art := PILOT_ART.new()
 var pilot_frame_gap_ms := 0.0
@@ -46,17 +47,27 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var preparation := PREPARATION_SCRIPT.new()
 	add_child(preparation)
-	var prepared: Dictionary = await preparation.run_data_job(pilot_art.prepare.bind(pilot_theme, layout_seed, material_seed))
-	await pilot_art.prepare_props(_pilot_stage)
+	var prepared: Dictionary = await preparation.run_data_job(_prepare_production if production_environment else pilot_art.prepare.bind(pilot_theme, layout_seed, material_seed))
+	if production_environment:
+		for path: String in TRACK_BUILDER.preparation_texture_paths(prepared["spec"]):
+			if TRACK_BUILDER.has_prepared_outline_path(path) or not ResourceLoader.exists(path):
+				continue
+			var texture := load(path) as Texture2D
+			var outline: Dictionary = await preparation.run_data_job(TRACK_BUILDER.compute_alpha_outline.bind(texture.get_image(), texture.get_width(), texture.get_height()))
+			TRACK_BUILDER.install_prepared_outline(texture, outline)
+			await _pilot_stage("Preparing object footprints")
+	else:
+		await pilot_art.prepare_props(_pilot_stage)
 	var embedded := track_root
 	remove_child(embedded)
 	embedded.free()
 	track_root = TRACK_BUILDER.create_layout_root(prepared)
 	track_root.name = "Track"
 	add_child(track_root)
-	await TRACK_BUILDER.assemble_runtime(track_root, prepared, _pilot_stage, pilot_art.dress)
+	await TRACK_BUILDER.assemble_runtime(track_root, prepared, _pilot_stage, Callable() if production_environment else pilot_art.dress)
 	_apply_track_variant(StringName(pilot_theme))
-	pilot_art.restyle_hazard(_track_variant_presenter)
+	if not production_environment:
+		pilot_art.restyle_hazard(_track_variant_presenter)
 	var field_racers: Array[Dictionary] = _build_field_racers_for_preparation()
 	var visual_keys: Dictionary = IDENTITIES.resolve_field_visual_keys(field_racers)
 	for visual_key: String in visual_keys.values():
@@ -77,7 +88,7 @@ func _ready() -> void:
 	_complete_race_setup(not capture_mode)
 	is_preparing = false
 	if capture_mode:
-		var focal: Vector2 = track_root.get_meta("pilot_focal", _player_vehicle.position)
+		var focal: Vector2 = track_root.get_meta("environment_focal", track_root.get_meta("pilot_focal", _player_vehicle.position))
 		var detail_center := focal
 		for item: Dictionary in pilot_art.placements:
 			if item["asset_key"] == "medium" and item["body"].get_meta("cluster_index", -1) == 0:
@@ -119,6 +130,14 @@ func _process(delta: float) -> void:
 		if _drive_report_elapsed >= 5.0:
 			_drive_report_elapsed = 0.0
 			print("PILOT_DRIVE time=%.1f position=%s speed=%.1f checkpoint=%d" % [race_manager.race_time, _player_vehicle.position, _player_vehicle.speed, race_manager.get_expected_checkpoint(_player_vehicle)])
+
+
+func _prepare_production() -> Dictionary:
+	var recipe: Dictionary = pilot_art.manifest["themes"][pilot_theme]["race"]
+	var options := {"length_tier":recipe.get("length_tier", "compact"), "obstacles_enabled":true}
+	if material_seed >= 0:
+		options["material_seed"] = material_seed
+	return TRACK_BUILDER.prepare_layout(StringName(pilot_theme), StringName(recipe["room"]), layout_seed if layout_seed >= 0 else int(recipe["seed"]), options)
 
 
 func _pilot_stage(phase: String) -> void:

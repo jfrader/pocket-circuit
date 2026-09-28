@@ -12,20 +12,22 @@ static func catalog() -> Dictionary:
 	return _catalog
 
 
-static func resolve(theme: StringName, material_seed: int) -> Dictionary:
+static func resolve(theme: StringName, material_seed: int, family: String = "", palette: String = "", tint: Color = Color.WHITE) -> Dictionary:
 	var data := catalog()
 	var definition: Dictionary = data["themes"][String(theme)]
-	var result := {"version": int(data["version"]), "theme": String(theme), "seed": material_seed}
+	var result := {"version": int(data["version"]), "theme": String(theme), "seed": material_seed,"family":family,"palette":palette}
 	for role: String in ["floor", "island"]:
 		var rng := RandomNumberGenerator.new()
-		rng.seed = ("%s:surface-v%d:%s:%d" % [theme, int(data["version"]), role, material_seed]).hash()
-		var pool: Array = definition[role]
+		rng.seed = ("%s:surface-v%d:%s:%d:%s:%s" % [theme, int(data["version"]), role, material_seed, family, palette]).hash()
+		var pool: Array = definition[role].duplicate()
+		if role == "floor" and data["families"].has(family):
+			pool = pool.filter(func(profile: Dictionary) -> bool: return profile["id"] in data["families"][family])
 		var profile: Dictionary = pool[rng.randi_range(0, pool.size() - 1)]
 		var dimensions: Array = profile["cell_mm"]
 		var angles: Array = profile["angles"]
 		result[role] = {
 			"id": String(profile["id"]), "pattern": int(data["patterns"][profile["pattern"]]),
-			"base_color": Color(profile["colors"][0]), "alternate_color": Color(profile["colors"][1]), "seam_color": Color(profile["colors"][2]),
+			"base_color": Color(profile["colors"][0]) * tint, "alternate_color": Color(profile["colors"][1]) * tint, "seam_color": Color(profile["colors"][2]) * tint,
 			"cell_mm": Vector2(_range(rng, dimensions[0]), _range(rng, dimensions[1])),
 			"line_mm": _range(rng, profile["line_mm"]), "contrast": _range(rng, profile["contrast"]),
 			"angle": deg_to_rad(float(angles[rng.randi_range(0, angles.size() - 1)])),

@@ -22,6 +22,8 @@ const TRACK_BUILDER_PLACEMENT := preload("res://scripts/race/track_builder_place
 const TRACK_BUILDER_COLLISION := preload("res://scripts/race/track_builder_collision.gd")
 const TRACK_BUILDER_RACING := preload("res://scripts/race/track_builder_racing.gd")
 const HALF_WIDTH := 125.0
+const GRID_ROW_DISTANCES := [100.0, 220.0]
+const GRID_LANE_OFFSET := 35.0
 const GATE_COUNT := 8
 const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
 const DEFAULT_FLOOR_TILE_WORLD_SIZE := Vector2(512.0, 512.0)
@@ -248,6 +250,41 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["hazard_plan"] = _plan_generated_hazard(theme, spec, centerline, moments)
 	var prepared := {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed}
 	prepared["racing_line_metrics"] = racing_line_metrics_from_prepared(prepared)
+	if not bool(generation_options.get("preview_composer", false)):
+		var left: PackedVector2Array = edges["left"]
+		var right: PackedVector2Array = edges["right"]
+		var inner: PackedVector2Array = edges["inner_boundary"] if edges.has("inner_boundary") else _simple_inner_boundary_loop(left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right, centerline)
+		var story: Dictionary = spec.get("story_kit", STORY_KITS[theme][0]).duplicate(true)
+		spec["story_kit"] = story
+		spec["environment_theme"] = theme
+		spec["environment_room_polygon"] = room_polygon
+		spec["environment_island_polygon"] = inner
+		var candidates := WorldEnvironmentCatalog.candidates(theme, story, spec)
+		spec["environment_assets"] = candidates
+		var reserved: Array[PackedVector2Array] = []
+		spec["pocket_regions"] = TrackBuilderCollision.pocket_regions(spec, centerline, room_polygon)
+		for pocket: Dictionary in spec["pocket_regions"]:
+			reserved.append(pocket["collision"])
+		var gate_points := _layout_gate_samples(centerline, spec)
+		var post_assets: Array = spec.get("gate_props", [])
+		if not post_assets.is_empty():
+			for gate_index in gate_points.size():
+				var closest := _closest_point_on_loop(gate_points[gate_index], centerline)
+				var tangent := _sample_tangent(centerline, int(closest["index"]))
+				for side in [-1, 1]:
+					var path := String(post_assets[posmod(gate_index * 2 + (1 if side > 0 else 0), post_assets.size())])
+					var size := PROP_SCALE.size_for(path, GATE_POST_SIZE) + Vector2.ONE * 6.0
+					var offset := FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET
+					reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side, size, tangent.angle()))
+		spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved}, candidates, {})
+		spec["surface_identity"] = HouseholdSurfaceMaterials.resolve(theme, int(spec.get("material_seed", _mix_seed(maxi(seed, 0), "material"))), String(spec.get("material_id", "")), String(spec.get("palette_id", "")), spec.get("floor_modulate", Color.WHITE))
+		spec["floor_texture"] = spec["surface_identity"]["floor"]["texture"]
+		spec["track_texture"] = spec["floor_texture"]
+		spec["island_material_texture"] = spec["surface_identity"]["island"]["texture"]
+		spec["floor_modulate"] = Color.WHITE
+		spec["ambient_props"] = []
+		spec["corridor_patterns"] = []
+		prepared["spec"] = spec
 	return prepared
 
 

@@ -10,6 +10,10 @@ const CONTACT_MARGIN_HARD_LIMIT := 8.0
 const CENTER_OFFSET_TOLERANCE := 2.0
 const THIN_ALPHA_THRESHOLD := 8.0
 const MARGIN_CLASSES := {
+	&"boundary": "Rails",
+	&"focal": "Giants",
+	&"support": "Story props",
+	&"micro": "Story props",
 	&"rail": "Rails",
 	&"giant": "Giants",
 	&"gate_post": "Gate posts",
@@ -451,6 +455,11 @@ func _check_flat_contract(track: Node2D, run_physics_probes: bool) -> bool:
 		if run_physics_probes and node is Node2D and flat_class in [&"corridor_pattern", &"surface_decal"] and safe_physics_samples < 12:
 			var params := PhysicsPointQueryParameters2D.new()
 			params.position = (node as Node2D).global_position
+			if node is Polygon2D and not node.polygon.is_empty():
+				var center := Vector2.ZERO
+				for point: Vector2 in node.polygon:
+					center += point
+				params.position = node.to_global(center / float(node.polygon.size()))
 			params.collision_mask = VEHICLE_SCENERY_MASK
 			params.collide_with_areas = false
 			params.collide_with_bodies = true

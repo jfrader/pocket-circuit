@@ -16,6 +16,7 @@ func _run() -> void:
 		var race := fixture.get_node("Race")
 		race.set("pilot_theme", theme)
 		race.set("capture_mode", true)
+		race.set("production_environment", false)
 		root.add_child(fixture)
 		var preparing_player := get_first_node_in_group("player_vehicle") as RigidBody2D
 		_expect(preparing_player != null and preparing_player.freeze and bool(preparing_player.get("controls_locked")), theme + ": player must remain frozen and ignore input while the race is prepared")
@@ -63,7 +64,8 @@ func _run() -> void:
 		for node: Node in track.find_children("*", "CanvasItem", true, false):
 			var texture: Texture2D = node.texture if node is Sprite2D or node is Polygon2D or node is Line2D else null
 			if texture:
-				_expect(texture.resource_path.begins_with(ART.TEXTURES), theme + ": rejected art remains active: " + texture.resource_path)
+				var registered := WorldEnvironmentCatalog.for_path(texture.resource_path)
+				_expect(texture.resource_path.begins_with(ART.TEXTURES) or registered.get("style", "") == WorldEnvironmentCatalog.CONTRACT, theme + ": unregistered/rejected art remains active: " + texture.resource_path)
 		var presenter := race.get("_track_variant_presenter") as TrackVariantPresenter
 		_expect(presenter.surface_zones.size() == 2, theme + ": visible grip surfaces are not active")
 		var save_before: Dictionary = root.get_node("App").get("_save_data").duplicate(true)
