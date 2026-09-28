@@ -26,42 +26,49 @@ licensed commercial font.
 
 Specific rows take precedence over catch-all groups; pending assets are not release-cleared by a broader row.
 
-The explicit output paths in `data/world_prop_art.json` and the `DECALS` list
-in `tools/prepare_track_art.py` supersede the older group provenance below.
-These replacements were generated with operator-authorized xAI Grok Imagine
-(`grok-imagine-image-quality` for the first Kitchen/material sources;
-`grok-imagine-image-2.0` for companion kits, corrections, and visual-direction
-mockups) for GURI-1262 (Unify track artwork and realistic household prop scale).
-Only original Pocket Circuit source images and its operator-reviewed cel-
-illustrated mockup were used as references. Selected source sheets live in
-`assets/source/track-art/`; that directory remains excluded from exports.
-The prep tool uses Pillow, NumPy, and SciPy for chroma removal, disconnected
-artifact cleanup, edge decontamination, 512px normalization, and seamless
-mirrored material tiles. Every generated prop receives the same source
-prefilter, shared cel palette, small-region cleanup, anti-aliased silhouette,
-and three-pixel dark contour. The earlier hard-pixel and softer hand-painted
-pilots were rejected and are not the active treatment.
-The manifest records each prepared cell and its physical dimension. Runtime
-composition selects the coherent top-down families and excludes the
-front-facing toolbox, fasteners, stapler, keycap, lamp, cereal-box, and
-milk-carton alternatives. The serving tray is empty so baked-in miniature cups
-cannot contradict the runtime prop scale. This is a review candidate, not
-operator release approval. Cars, portraits, and HUD assets are unchanged by
-this pass.
+The explicit output paths in `data/world_prop_art.json` supersede older
+environment group provenance below. Its 151 contracts cover 223 prepared
+outputs, including props, decals, materials and utility masks, for GURI-1262
+(Unify track artwork and realistic household prop scale).
+
+The active painted sources were generated with operator-authorized, text-only
+xAI Grok Imagine (`grok-imagine-image-2.0`). They are original household artwork,
+not third-party images or adaptations of protected designs. Source sheets live
+in `assets/source/environment-v2/`; the approved pilot sources live in
+`assets/source/environment-pilot/`. Both directories remain excluded from
+exports. Approved pilot outputs are reused where they depict the same
+object; remaining prop and decal cells use the new production sheets. The
+manifest identifies every source cell, crop or prepared-source reuse.
+
+`tools/prepare_environment_library.py` uses Pillow, NumPy and SciPy for chroma
+removal, disconnected artifact cleanup, key-color unmixing, edge cleanup,
+transparent 512px normalization and measurement of visible physical bounds.
+It does not apply the rejected cel quantization or uniform black contour.
+Front-facing mug and lamp attempts and a scratch drawn as a wooden slab were
+replaced by `repair-overhead-01.jpg`; only the corrected cells are used. Raw
+sheets can contain rejected cells that are not referenced by the manifest.
+
+Room materials combine new painted grain sources with original local shader
+patterns. The material seed controls structural profile, spacing, orientation,
+phase, seams, grain and palette-compatible choices independently of geometry.
+The game makes no runtime AI requests. Utility shadows, the checker and skid
+mask are generated locally by the preparation tool.
+
+The operator approved the native production result, including the multi-seed
+material comparisons, for closeout. This approval covers the environment
+direction and integration, not publication of a release. Cars, portraits and
+HUD artwork are unchanged.
 
 | Paths or content | Production method | Release status |
 |---|---|---|
-| `assets/textures/world_materials/*.png` | Selected from the original Imagine `materials-kit.jpg` atlas and prepared as wrap-continuous cel-illustrated albedo tiles by `tools/prepare_track_art.py`. The twelve room-story families and twenty-four palette variants remain data-driven. | Track-art candidate; operator review pending |
-| `assets/textures/kitchen_hero/hero_kitchen_*.png` | Text-only xAI `grok-imagine-image-quality` generation authorized for GURI-642. Selected sources are `mug.jpg`, `plate_stack.jpg`, and `tea_board_topdown.jpg` under `assets/source/kitchen_hero`; the first angled `tea_board.jpg` is not used. `tools/prepare_track_art.py` applies the shared track-art palette, cleanup, contour, and 512px normalization. All raw sources are excluded from exports. | Kitchen direction candidate; final package review pending |
-| `assets/textures/workshop_hero/*.png`, `assets/textures/office_hero/*.png` | Wrench, paint can, keyboard and keycap reuse existing project artwork. The closed parts-container and notebook use operator-authorized text-only `grok-imagine-image-quality` sources (`assets/source/workshop_hero/parts_tin.jpg`, `assets/source/office_hero/notebook.jpg`). `closed_case.jpg` was rejected for its protruding handle. `tools/prepare_track_art.py` applies the same palette, cleanup, contour, and normalization as every other active prop. The front-facing parts container and keycap remain outside active runtime composition. | Expanded world candidate; operator review pending |
+| `data/world_prop_art.json` output paths | Original text-only Grok Imagine 2.0 sources and explicit approved pilot-source reuse, prepared by `tools/prepare_environment_library.py`. The manifest declares theme, overhead style, role, dimensions, zones, clearances, repetition, collision and shadow behavior. | Native environment result approved; publication not performed |
+| `assets/textures/world_materials/*.png` | New painted grain sources from the approved pilot, prepared as wrap-continuous tiles. `data/household_material_patterns.json` and `household_surface.gdshader` generate the distinct room patterns and seeded variations locally. | Native environment result approved |
+| `assets/textures/kitchen_hero/*.png`, `assets/textures/workshop_hero/*.png`, `assets/textures/office_hero/*.png` | Fresh overhead source cells and approved-source reuse identified per output in the manifest. No rejected front-facing alternatives or old cel filtering are used. | Native environment result approved |
 | `assets/ui/imagine/motorsport_panel_dark.png`, `motorsport_panel_paper.png` | 96×64 nine-slice derivatives of the existing Imagine telemetry and number-plate sources, assembled with Pillow using fixed 12px corners/edges and clean center strips. The paper panel mirrors its clean right edge to remove the baked checker strip; Godot draws fixed-size checker marks. No new generation or external source material. | Integrated UI-polish candidate; operator review pending |
 | `assets/ui/imagine/motorsport_loading.jpg` | xAI `grok-imagine-image-quality`, developer-directed text-only prompt for an original miniature pit-lane workbench illustration. No source images, brands or embedded UI text. Godot draws the actual loading stages and Back control over the image. | Integrated candidate; runtime/operator review pending |
 | `assets/ui/imagine/motorsport_title.jpg`, `motorsport_garage.jpg`, `motorsport_telemetry_plate.jpg`, `motorsport_number_plate.jpg` and `.png` | xAI `grok-imagine-image-quality`, developer-directed text-only prompts following the approved GURI-636 workbench concepts. Production images contain no interface lettering: Godot renders text and interactive controls. The number plate PNG is a 1168×386 crop at (40, 240) of the 1248×832 source JPEG; other images are used as full rectangles. Garage cars are rendered by the existing first-party Procedural 2D identity library, not generated replacements. | Integrated candidate; exact-build operator review pending |
-| `assets/textures/ground_dressing/*.png` | Original project SVG compositions defined in `tools/gen_ground_dressing_assets.gd` and rendered locally to transparent PNGs with Godot's `Image.load_svg_from_buffer`; no external images, brands, or source media. | Cleared for this release |
-| `assets/textures/track_boundary/*.png` | Original project SVG compositions defined in `tools/gen_track_boundary_assets.gd` and `tools/gen_visual_density_assets.gd`, rendered locally to transparent PNGs with Godot's `Image.load_svg_from_buffer`; includes fictional kitchen towel/spoon/chopstick/bread-board, workshop stirrer/dowel/clamp/ruler, and office pencil/ruler/pen/book-spine rails plus corner accents. Runtime composition reuses these cleared rail textures for colliding course sections and small gate posts; no external source media. | Cleared for this release |
-| `assets/textures/edge_dressing/*.png` | Original project SVG compositions defined in `tools/gen_visual_density_assets.gd` and rendered locally at 1024 x 1024 to transparent PNGs with Godot's `Image.load_svg_from_buffer`; includes crumbs, fibers, rice/herbs/sugar, nails/washers/bolts, binder clips/pins/pen caps, worn-floor/material marks, and the two white-alpha directional shadow masks used by runtime tinting. | Cleared for this release |
-| `assets/textures/giant_props/*.png` | Original project SVG compositions defined in `tools/gen_visual_density_assets.gd` and rendered locally at 1024 x 1024 to transparent PNGs with Godot's `Image.load_svg_from_buffer`; includes fictional cereal, utensil, sports, toaster/carton, hammer/wrench, and stapler/mouse office landmarks with no external images, brands, or source media. | Cleared for this release |
-| `assets/textures/grip_patches/*.png` | Original project SVG compositions defined in `tools/gen_visual_density_assets.gd` and rendered locally at 1024 x 1024 to transparent PNGs with Godot's `Image.load_svg_from_buffer`; includes soapy spill, oil, paper, sawdust, coffee, flour, syrup, filings, paint, eraser, and ink material decals with no external source media. | Cleared for this release |
+| `assets/textures/ground_dressing/*.png`, `track_boundary/*.png`, `giant_props/*.png`, `grip_patches/*.png` | Regenerated painted overhead cloth, paper, utensils, tools, appliances and ground marks from the manifest's new Imagine sources. Alpha footprints govern physical sizing; local code supplies collision, placement and contact shadows. | Native environment result approved |
+| `assets/textures/edge_dressing/*.png` | Manifest-listed painted micro objects and decals from the new sources; grain aliases use the new material sources. White-alpha shadow utilities are generated locally with Pillow and tinted at runtime. | Native environment result approved |
 | Other `assets/models/**/*.png`, `assets/textures/**/*.png`, `assets/ui/**/*.png`, and `assets/vfx/**/*.png` | Developer-directed, AI-assisted original graphic generation followed by project-specific selection, conversion, sizing, composition, and revision. Designs are fictional and use no third-party source media. | Cleared for this release |
 | Legacy `assets/textures/imagine/*.png`, `assets/ui/imagine/*.png` not covered above | Mixed provenance: developer-directed Grok artwork and original SVG outputs from `tools/gen_prop_assets.gd` / `gen_prop_assets2.gd` share these folders. Folder naming alone does not identify generation method. | Per-file source and mix/scale audit remains pending |
 | `assets/branding/pocket_circuit_icon.svg` | Original project vector artwork assembled from simple geometric shapes and the game's palette. | Cleared for this release |

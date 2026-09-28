@@ -3,11 +3,13 @@
 ## [Unreleased]
 
 ### Changed
-- Kitchen, Workshop, and Office use one smooth top-down cel-illustrated tabletop kit with a shared palette, contour, lighting treatment, and restrained detail. Props keep their real relative sizes across track roles: small spaces use biscuits, washers, clips, or erasers instead of shrunken appliances and utensils. Each room uses a deliberate family of utensils, tools, or stationery, while reduced floor and edge clutter keeps the racing line readable. Cars are unchanged.
+- Kitchen, Workshop, and Office have a regenerated painted overhead environment library. Household objects keep believable relative sizes, with one focal arrangement, supporting groups and clearer space around the racing line. Cars are unchanged.
+- Room surfaces vary procedurally by seed: Kitchen ceramics and preparation boards, Workshop timber and cutting mats, and Office desktops and woven or leather-like pads. Pattern layout, spacing, orientation and material combinations vary independently of track geometry; the same seed rebuilds the same room.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 
 ### Fixed
+- Starting grids stay clear of rotated finish sensors and nearby furniture edges in both race directions. Scenery placement reserves gate posts and sealed bays, and grip artwork no longer hides solid rims behind rectangular texture stamps.
 - Starting a newly generated menu or circuit score no longer cuts off the score already playing. The outgoing score stays up until the incoming music is audible, then crossfades into it.
 - Your car keeps its engine note for every race in a session. It used to fall silent after the first one, while still reporting that it was playing.
 - Leaving a race for the menu no longer drops the music out. The menu stays on Starting Grid for several loops, then steps to a groove. It does not drop back into Ignition.
