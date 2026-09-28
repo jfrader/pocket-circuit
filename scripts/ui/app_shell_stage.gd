@@ -68,11 +68,15 @@ func _draw() -> void:
 
 
 func _draw_title_stage() -> void:
-	_draw_car(size * Vector2(0.54, 0.42), size.y * 0.42, vehicle_id, -0.42)
-	_draw_portrait_card(size * Vector2(0.17, 0.2), minf(size.x * 0.22, 132.0), driver_id, -0.1)
+	var mat := Rect2(10.0, 10.0, size.x - 20.0, size.y - 20.0)
+	SKIN.draw_plate(self, mat, SKIN.CREAM, 18)
+	SKIN.draw_tape(self, mat.position + Vector2(78.0, 6.0), Vector2(128.0, 26.0), -0.35)
+	_draw_mug(mat.position + Vector2(mat.size.x - 78.0, mat.size.y * 0.62))
+	_draw_car(mat.position + mat.size * Vector2(0.56, 0.42), mat.size.y * 0.48, vehicle_id, -0.42)
+	_draw_portrait_card(mat.position + Vector2(mat.size.x * 0.2, mat.size.y * 0.22), minf(mat.size.x * 0.3, 176.0), driver_id, -0.08)
 	if not secondary_driver_id.is_empty():
-		_draw_portrait_card(size * Vector2(0.87, 0.64), minf(size.x * 0.18, 108.0), secondary_driver_id, 0.09)
-	_draw_roster(Rect2(size.x * 0.02, size.y * 0.8, size.x * 0.96, size.y * 0.19), CATALOG.championship_vehicle_ids())
+		_draw_portrait_card(mat.position + Vector2(mat.size.x * 0.84, mat.size.y * 0.58), minf(mat.size.x * 0.24, 140.0), secondary_driver_id, 0.08)
+	_draw_roster(Rect2(mat.position.x + 16.0, mat.end.y - mat.size.y * 0.2, mat.size.x - 32.0, mat.size.y * 0.17), CATALOG.championship_vehicle_ids())
 
 
 func _draw_vehicle_stage() -> void:
@@ -136,11 +140,13 @@ func _draw_map_stage() -> void:
 
 
 func _draw_mechanic_stage() -> void:
-	_draw_car(size * Vector2(0.52, 0.74), minf(size.y * 0.26, 170.0), vehicle_id, 1.4)
-	_draw_gear(size * Vector2(0.16, 0.62), minf(size.x * 0.08, 44.0), SKIN.BLUE)
-	_draw_gear(size * Vector2(0.24, 0.78), minf(size.x * 0.05, 28.0), SKIN.YELLOW)
-	_draw_wrench(size * Vector2(0.85, 0.6), minf(size.y / 520.0, 1.3))
-	_draw_portrait_card(size * Vector2(0.5, 0.3), minf(size.x * 0.36, 196.0), driver_id, -0.05)
+	var mat := Rect2(12.0, 12.0, size.x - 24.0, size.y - 24.0)
+	SKIN.draw_plate(self, mat, SKIN.CREAM, 16)
+	_draw_car(mat.position + mat.size * Vector2(0.52, 0.74), minf(mat.size.y * 0.32, 190.0), vehicle_id, 1.4)
+	_draw_gear(mat.position + mat.size * Vector2(0.16, 0.62), minf(mat.size.x * 0.1, 52.0), SKIN.BLUE)
+	_draw_gear(mat.position + mat.size * Vector2(0.26, 0.78), minf(mat.size.x * 0.06, 34.0), SKIN.YELLOW)
+	_draw_wrench(mat.position + mat.size * Vector2(0.84, 0.62), minf(mat.size.y / 420.0, 1.5))
+	_draw_portrait_card(mat.position + mat.size * Vector2(0.5, 0.28), minf(mat.size.x * 0.42, 220.0), driver_id, -0.05)
 
 
 func _draw_cast_stage() -> void:
@@ -163,6 +169,14 @@ func _draw_ending_stage() -> void:
 	_draw_portrait_card(size * Vector2(0.75, 0.23), minf(size.x * 0.26, 140.0), champion, 0.08)
 	_draw_trophy(size * Vector2(0.52, 0.64), minf(size.y / 460.0, 1.5))
 	_draw_car(size * Vector2(0.16, 0.8), minf(size.y * 0.18, 110.0), vehicle_id, -0.35)
+
+
+func _draw_mug(center: Vector2) -> void:
+	var body := Rect2(center + Vector2(-26.0, -16.0), Vector2(52.0, 44.0))
+	SKIN.draw_plate(self, body, SKIN.CREAM, 8, 3.0)
+	draw_rect(Rect2(body.position + Vector2(7.0, 7.0), Vector2(body.size.x - 14.0, 10.0)), SKIN.WOOD_DEEP)
+	draw_arc(center + Vector2(30.0, 6.0), 12.0, -0.7, 0.7, 10, SKIN.INK, 4.0, true)
+	draw_line(center + Vector2(-40.0, 18.0), center + Vector2(8.0, 28.0), SKIN.INK, 4.0, true)
 
 
 func _draw_car(center: Vector2, length: float, id: String, angle: float = 0.0, locked: bool = false) -> void:
@@ -204,7 +218,7 @@ func _draw_roster(rect: Rect2, ids: Array[String]) -> void:
 		return
 	var bay_width := rect.size.x / float(ids.size())
 	var length := minf(rect.size.y * 0.82, bay_width * 1.1)
-	var line_color := Color(SKIN.CREAM, 0.4)
+	var line_color := Color(SKIN.INK, 0.35)
 	for index in ids.size() + 1:
 		var x := rect.position.x + bay_width * index
 		draw_line(Vector2(x, rect.position.y + 4.0), Vector2(x, rect.end.y - 4.0), line_color, 3.0)

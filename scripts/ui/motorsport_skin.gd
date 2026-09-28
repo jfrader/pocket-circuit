@@ -196,8 +196,8 @@ static func make_theme() -> Theme:
 		var toggle: Array = TOGGLE_ICONS[icon]
 		theme.set_icon(icon, "CheckButton", _toggle(bool(toggle[0]), bool(toggle[1])))
 	var groove := _flat(ASPHALT, INK, 7, 2).duplicate() as StyleBoxFlat
-	groove.content_margin_top = 5.0
-	groove.content_margin_bottom = 5.0
+	groove.content_margin_top = 8.0
+	groove.content_margin_bottom = 8.0
 	theme.set_stylebox("slider", "HSlider", groove)
 	theme.set_stylebox("grabber_area", "HSlider", _flat(ORANGE, INK, 7, 2))
 	theme.set_stylebox("grabber_area_highlight", "HSlider", _flat(YELLOW, INK, 7, 2))
@@ -301,11 +301,17 @@ static func draw_tube(item: CanvasItem, rect: Rect2, ratio: float, fill: Color =
 	if filled.size.x < 2.0:
 		return
 	item.draw_style_box(_flat(fill, fill, roundi(inner.size.y * 0.5), 0), filled)
-	var glint := maxf(2.0, inner.size.y * 0.22)
-	var glint_y := filled.position.y + inner.size.y * 0.3
-	var glint_inset := inner.size.y * 0.45
+	var glint := maxf(2.0, inner.size.y * 0.18)
+	var glint_y := filled.position.y + inner.size.y * 0.32
+	var glint_inset := inner.size.y * 0.4
 	if filled.size.x > glint_inset * 2.0:
 		item.draw_line(Vector2(filled.position.x + glint_inset, glint_y), Vector2(filled.end.x - glint_inset, glint_y), highlight, glint, true)
+	var ticks := 4
+	for tick in ticks:
+		var x := inner.position.x + inner.size.x * float(tick + 1) / float(ticks + 1)
+		item.draw_line(Vector2(x, inner.position.y + 2.0), Vector2(x, inner.position.y + inner.size.y * 0.28), Color(CREAM, 0.7), 2.0)
+	if ratio > 0.08:
+		item.draw_circle(Vector2(filled.end.x - inner.size.y * 0.35, inner.get_center().y), inner.size.y * 0.22, highlight)
 
 
 static func draw_tape(item: CanvasItem, center: Vector2, tape_size: Vector2, angle: float = 0.0, fill: Color = TAPE) -> void:
