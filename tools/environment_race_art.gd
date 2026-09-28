@@ -3,6 +3,7 @@ extends RefCounted
 
 const CORE := preload("res://scripts/race/track_builder_core.gd")
 const PROPS := preload("res://tools/environment_pilot_props.gd")
+const SURFACES := preload("res://scripts/race/household_surface_materials.gd")
 const MANIFEST := "res://tools/environment_pilot.json"
 const CLEARANCE := 18.0
 const SEPARATION := 10.0
@@ -19,16 +20,19 @@ var _assets: Dictionary
 var _prepared: Dictionary
 var _parent: Node2D
 var _cluster_anchors: Array[Vector2] = []
+var _surfaces: Dictionary
 
 
-func prepare(theme: String) -> Dictionary:
+func prepare(theme: String, layout_seed: int = -1, material_seed: int = -1) -> Dictionary:
 	_theme = theme
 	var definition: Dictionary = manifest["themes"][theme]
 	_assets = definition["assets"].duplicate(true)
 	_assets.merge(definition["support_assets"], true)
 	var recipe: Dictionary = definition["race"]
-	_prepared = CORE.prepare_layout(StringName(theme), StringName(recipe["room"]), int(recipe["seed"]), {"length_tier": StringName(recipe.get("length_tier", "compact")), "obstacles_enabled": false})
+	var chosen_seed := int(recipe["seed"]) if layout_seed < 0 else layout_seed
+	_prepared = CORE.prepare_layout(StringName(theme), StringName(recipe["room"]), chosen_seed, {"length_tier": StringName(recipe.get("length_tier", "compact")), "obstacles_enabled": false})
 	var spec: Dictionary = _prepared["spec"]
+	_surfaces = SURFACES.resolve(StringName(theme), int(spec["material_seed"]) if material_seed < 0 else material_seed)
 	spec["floor_texture"] = PROPS.TEXTURES + theme + "_floor.png"
 	spec["track_texture"] = spec["floor_texture"]
 	spec["floor_modulate"] = Color.WHITE
@@ -114,6 +118,7 @@ func dress(track: Node2D, stage: Callable) -> void:
 	await _boundaries(recipe, centerline, arc, total, stage)
 	await _gate_posts(recipe, centerline, stage)
 	await _grip_patches(track, recipe, centerline, arc, total, stage)
+	SURFACES.apply(track, _surfaces)
 	track.set_meta("pilot_placement_count", placements.size())
 	print("RACE_PILOT_ART theme=%s placements=%d focal=%s" % [_theme, placements.size(), track.get_meta("pilot_focal", Vector2.ZERO)])
 
