@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "patterns": {"plain":0,"ceramic":1,"planks":2,"cutting_grid":3,"weave":4,"herringbone":5,"endgrain":6,"ribbed_rubber":7},
+  "themes": {
+    "kitchen": {
+      "grain_floor":"res://assets/textures/environment_pilot/kitchen_floor.png",
+      "grain_island":"res://assets/textures/environment_pilot/kitchen_island.png",
+      "floor":[
+        {"id":"ivory_ceramic","pattern":"ceramic","colors":["e8dfc8","dbcfb5","b5a486"],"cell_mm":[[145,210],[145,210]],"line_mm":[1.5,2.5],"contrast":[0.08,0.16],"angles":[0,45]},
+        {"id":"sage_tiles","pattern":"ceramic","colors":["c5d0b4","d8dfc6","929f83"],"cell_mm":[[130,180],[130,180]],"line_mm":[1.2,2.0],"contrast":[0.12,0.22],"angles":[0,45]},
+        {"id":"cream_laminate","pattern":"plain","colors":["eee4ce","e4d8bc","beaa88"],"cell_mm":[[180,260],[180,260]],"line_mm":[0.8,1.2],"contrast":[0.03,0.06],"angles":[0,90]},
+        {"id":"terracotta_inlay","pattern":"ceramic","colors":["e5d3b4","cbaa85","b88c68"],"cell_mm":[[185,245],[110,160]],"line_mm":[1.4,2.2],"contrast":[0.12,0.20],"angles":[0,90]}
+      ],
+      "island":[
+        {"id":"maple_strips","pattern":"planks","colors":["cea26a","bd8f59","956e40"],"cell_mm":[[350,600],[65,110]],"line_mm":[0.8,1.4],"contrast":[0.10,0.18],"angles":[0,90]},
+        {"id":"endgrain_board","pattern":"endgrain","colors":["bc945d","d1ae7a","95723f"],"cell_mm":[[45,75],[40,65]],"line_mm":[0.5,0.9],"contrast":[0.15,0.26],"angles":[0,90]},
+        {"id":"walnut_prep","pattern":"planks","colors":["a77c4c","c39b68","7e5e3b"],"cell_mm":[[400,650],[100,170]],"line_mm":[0.7,1.1],"contrast":[0.12,0.19],"angles":[0,90]}
+      ]
+    },
+    "workshop": {
+      "grain_floor":"res://assets/textures/environment_pilot/workshop_floor.png",
+      "grain_island":"res://assets/textures/environment_pilot/workshop_island.png",
+      "floor":[
+        {"id":"bench_boards","pattern":"planks","colors":["c5ab82","ad9068","8c7759"],"cell_mm":[[450,720],[140,220]],"line_mm":[1.2,2.0],"contrast":[0.10,0.20],"angles":[0,90]},
+        {"id":"oiled_bench","pattern":"planks","colors":["ad8962","997653","735b42"],"cell_mm":[[500,850],[165,250]],"line_mm":[1.0,1.8],"contrast":[0.08,0.18],"angles":[0,90]},
+        {"id":"plywood_sheet","pattern":"plain","colors":["cfb990","bca478","8c7656"],"cell_mm":[[300,450],[180,260]],"line_mm":[1.0,1.5],"contrast":[0.04,0.09],"angles":[0,90]},
+        {"id":"slatted_bench","pattern":"planks","colors":["b8996d","d0b58b","816748"],"cell_mm":[[650,900],[75,120]],"line_mm":[1.2,2.0],"contrast":[0.12,0.22],"angles":[0,90]}
+      ],
+      "island":[
+        {"id":"charcoal_cutting_mat","pattern":"cutting_grid","colors":["414544","4d5350","9a9c83"],"cell_mm":[[35,50],[35,50]],"line_mm":[0.6,1.0],"contrast":[0.15,0.25],"angles":[0,90]},
+        {"id":"kraft_cutting_board","pattern":"cutting_grid","colors":["a38d66","ac9873","d4c4a0"],"cell_mm":[[45,65],[45,65]],"line_mm":[0.7,1.2],"contrast":[0.12,0.22],"angles":[0,90]},
+        {"id":"ribbed_work_pad","pattern":"ribbed_rubber","colors":["494747","625e54","373735"],"cell_mm":[[12,20],[120,180]],"line_mm":[1.0,1.6],"contrast":[0.08,0.14],"angles":[0,90]}
+      ]
+    },
+    "office": {
+      "grain_floor":"res://assets/textures/environment_pilot/office_floor.png",
+      "grain_island":"res://assets/textures/environment_pilot/office_island.png",
+      "floor":[
+        {"id":"ivory_desktop","pattern":"plain","colors":["dddace","d2cfc3","b0aba0"],"cell_mm":[[200,350],[200,350]],"line_mm":[0.7,1.0],"contrast":[0.02,0.05],"angles":[0,90]},
+        {"id":"ash_veneer","pattern":"planks","colors":["c6bba6","b6aa93","9c917d"],"cell_mm":[[650,950],[220,350]],"line_mm":[0.5,0.9],"contrast":[0.05,0.10],"angles":[0,90]},
+        {"id":"walnut_herringbone","pattern":"herringbone","colors":["b19a7e","c4b198","8e7960"],"cell_mm":[[95,145],[95,145]],"line_mm":[0.7,1.2],"contrast":[0.07,0.13],"angles":[0,45]},
+        {"id":"cool_laminate","pattern":"plain","colors":["c5c6c7","b5b8bd","989da7"],"cell_mm":[[200,400],[200,400]],"line_mm":[0.7,1.0],"contrast":[0.02,0.05],"angles":[0,90]}
+      ],
+      "island":[
+        {"id":"ink_blue_pad","pattern":"weave","colors":["404b70","535f82","303851"],"cell_mm":[[5,8],[5,8]],"line_mm":[0.35,0.55],"contrast":[0.04,0.08],"angles":[0,45]},
+        {"id":"oxblood_desk_pad","pattern":"plain","colors":["785053","8c6565","563d43"],"cell_mm":[[120,180],[120,180]],"line_mm":[0.5,0.8],"contrast":[0.025,0.045],"angles":[0,90]},
+        {"id":"indigo_twill","pattern":"herringbone","colors":["505873","646b84","3c415a"],"cell_mm":[[12,18],[12,18]],"line_mm":[0.4,0.6],"contrast":[0.04,0.075],"angles":[0,90]}
+      ]
+    }
+  }
+}

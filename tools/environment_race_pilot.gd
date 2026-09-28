@@ -3,6 +3,8 @@ extends "res://scripts/race/prototype_race.gd"
 const PILOT_ART := preload("res://tools/environment_race_art.gd")
 @export_enum("kitchen", "workshop", "office") var pilot_theme := "kitchen"
 @export var capture_mode := false
+@export var layout_seed := -1
+@export var material_seed := -1
 var pilot_ready := false
 var pilot_art := PILOT_ART.new()
 var pilot_frame_gap_ms := 0.0
@@ -18,6 +20,14 @@ func _ready() -> void:
 	var requested := OS.get_environment("PC_THEME")
 	if requested in ["kitchen", "workshop", "office"]:
 		pilot_theme = requested
+	for option: Dictionary in [{"env":"PC_SEED", "property":"layout_seed"}, {"env":"PC_MATERIAL_SEED", "property":"material_seed"}]:
+		var value := OS.get_environment(option["env"])
+		if not value.is_empty():
+			if not value.is_valid_int() or int(value) < 0:
+				push_error("Expected a non-negative seed for " + String(option["env"]))
+				get_tree().quit(1)
+				return
+			set(option["property"], int(value))
 	capture_mode = capture_mode or OS.get_environment("PC_PILOT_CAPTURE") == "1"
 	if auto_drive:
 		capture_mode = false
@@ -36,7 +46,7 @@ func _ready() -> void:
 	await get_tree().process_frame
 	var preparation := PREPARATION_SCRIPT.new()
 	add_child(preparation)
-	var prepared: Dictionary = await preparation.run_data_job(pilot_art.prepare.bind(pilot_theme))
+	var prepared: Dictionary = await preparation.run_data_job(pilot_art.prepare.bind(pilot_theme, layout_seed, material_seed))
 	await pilot_art.prepare_props(_pilot_stage)
 	var embedded := track_root
 	remove_child(embedded)
