@@ -4,6 +4,7 @@
 
 ### Changed
 - Menus, the loading screen, the pause menu, and the race HUD now sit on a lamp-lit midnight workbench: cream plates with ink outlines, masking-tape labels, and the cast, their cars, and the four-car garage on the right of every screen. The garage shows speed, grip, mass, and drift for the focused car, and locked cars appear as padlocked silhouettes.
+- The title and settings boards are cream, so the cars and portraits no longer sink into the wood. The race speed number sits beside the boost tube.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 

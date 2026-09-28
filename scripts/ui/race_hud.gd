@@ -67,7 +67,8 @@ func _draw() -> void:
 	_draw_route_progress(layout["progress"])
 	if elapsed_seconds < HINT_SECONDS:
 		var hint_rect: Rect2 = layout["controls_hint"]
-		SKIN.draw_text(self, hint_rect.position + Vector2(0.0, 18.0), "R / Y  RECOVER   ·   ESC / START  PAUSE", 13, SKIN.CREAM, hint_rect.size.x)
+		SKIN.draw_plate(self, hint_rect, SKIN.INK, 4, 0.0)
+		SKIN.draw_text(self, hint_rect.position + Vector2(10.0, 17.0), "R / Y  RECOVER   ·   ESC / START  PAUSE", 12, SKIN.CREAM, hint_rect.size.x - 16.0)
 	if wrong_way:
 		_draw_wrong_way(layout["warning"])
 
@@ -119,11 +120,9 @@ func _draw_clock(rect: Rect2) -> void:
 func _draw_speed(rect: Rect2) -> void:
 	SKIN.draw_plate(self, rect, SKIN.CREAM)
 	var origin := rect.position
-	SKIN.draw_text(self, origin + Vector2(16.0, 50.0), "%03d" % roundi(speed_ratio * KMH_AT_FULL_SPEED), 34, SKIN.INK)
-	_caption(origin + Vector2(18.0, 67.0), "KM/H")
-	var tube := Rect2(origin + Vector2(112.0, 32.0), Vector2(rect.size.x - 112.0 - 16.0 - SKIN.SHADOW, 24.0))
-	_caption(Vector2(tube.position.x + 2.0, origin.y + 22.0), "BOOST")
-	SKIN.draw_text(self, Vector2(tube.position.x, origin.y + 22.0), "SHIFT / B", 11, SKIN.INK_SOFT, tube.size.x, HORIZONTAL_ALIGNMENT_RIGHT)
+	SKIN.draw_text(self, origin + Vector2(14.0, 40.0), "%03d" % roundi(speed_ratio * KMH_AT_FULL_SPEED), 28, SKIN.INK)
+	SKIN.draw_text(self, origin + Vector2(16.0, 62.0), "KM/H", 11, SKIN.INK_SOFT)
+	var tube := Rect2(origin + Vector2(96.0, 16.0), Vector2(rect.size.x - 112.0 - SKIN.SHADOW, 46.0))
 	SKIN.draw_tube(self, tube, boost_ratio)
 
 
