@@ -3,6 +3,8 @@
 ## [Unreleased]
 
 ### Changed
+- Generated tracks restore colliding household objects along both sides of the course, with seed-varying clusters and quantities. Pens, rulers, sticks, utensils and workshop rails keep their real sizes and leave an open exit to the apron.
+- On-course obstacle targets now vary from 1–4, 2–6 and 3–8 by act, with more small household objects to steer around. AI passing space, checkpoints and recovery clearances are unchanged. These physical-layout changes advance the generator version; older circuit codes and lap/ghost records no longer match.
 - Racing routes now use muted, translucent paint with subtle brushwork and painted edge markings. Countertop tiles and wood grain continue beneath the course instead of forming a separate cut-out surface. The surrounding tabletop remains drivable; vehicle handling and grip zones are unchanged.
 - Kitchen, Workshop, and Office have a regenerated painted overhead environment library. Household objects keep believable relative sizes, with one focal arrangement, supporting groups and clearer space around the racing line. Cars are unchanged.
 - Room surfaces vary procedurally by seed: Kitchen ceramics and preparation boards, Workshop timber and cutting mats, and Office desktops and woven or leather-like pads. Pattern layout, spacing, orientation and material combinations vary independently of track geometry; the same seed rebuilds the same room.
@@ -13,6 +15,7 @@
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 
 ### Fixed
+- Vehicle-audio warm-up now yields between engine voice, loop and effect synthesis so it does not stall the loading screen in one long batch.
 - Quick Race entries and rerolls cycle through Kitchen, Workshop and Office instead of remaining pinned to Kitchen. The preview and Play action use the selected theme.
 - Course palettes now contrast with both the tabletop and the island, including their appearance after translucent paint is blended over the room surface.
 - Starting grids stay clear of rotated finish sensors and nearby furniture edges in both race directions. Scenery placement reserves gate posts and sealed bays, and grip artwork no longer hides solid rims behind rectangular texture stamps.

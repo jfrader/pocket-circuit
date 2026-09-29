@@ -9,9 +9,9 @@ const STORY_IDS := {
 	"office": ["dual_workstation", "mail_sort", "sketch_session", "coffee_break"],
 }
 const ACT_OBSTACLE_RANGES := {
-	1: Vector2i(0, 1),
-	2: Vector2i(1, 2),
-	3: Vector2i(2, 3),
+	1: Vector2i(1, 4),
+	2: Vector2i(2, 6),
+	3: Vector2i(3, 8),
 }
 const HAZARD_PRESENCE_BY_ACT := {1: 0.35, 2: 0.55, 3: 0.75}
 const LENGTH_TIERS: Array[String] = ["compact", "standard", "long", "endurance", "marathon"]

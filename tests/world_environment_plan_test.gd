@@ -79,6 +79,15 @@ func _run() -> void:
 		_mk_cand("workshop_support_hammer", [&"workshop"], [&"support"], Vector2(110, 60), "alpha", 2, 12.0, 2.0),
 	]
 	var story_restrict := {"asset_ids": ["kitchen_focal_mug", "kitchen_support_plate", "kitchen_micro_crumb", "kitchen_boundary_knife", "kitchen_ground_towel"]}
+	var reserved_planner := Plan.new()
+	reserved_planner.room = room
+	reserved_planner.line = cline
+	reserved_planner.island = island
+	reserved_planner.occupied.append(_make_rect_room(180.0,160.0))
+	if not reserved_planner._validate(cands_mixed[0],Vector2.ZERO,0.0).is_empty():
+		failures.append("solid reservations must reject overlapping physical scenery")
+	if reserved_planner._validate(cands_mixed[2],Vector2.ZERO,0.0).is_empty():
+		failures.append("flat underlays may occupy solid reservations without adding a blocker")
 
 	# 1. DETERMINISTIC REBUILD
 	var r1 := Plan.plan(&"kitchen", 424242, geo, cands_mixed, story_kitchen)

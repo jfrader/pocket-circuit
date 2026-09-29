@@ -99,10 +99,12 @@ loading yields. Procedural and saved track fixtures use the same model.
 - Keep object repetition within the catalog limits. Ground/decal placement and
   clipped gameplay-surface paint are bounded separately.
 - Preserve negative space around the full nominal corridor and its clearances.
-  Reserve gate posts and sealed bay geometry before planning scenery.
-- Boundary props come from compatible household families. An intentionally open
-  apron sector remains drivable; never back bare floor with an invisible outer
-  corridor wall.
+  Reserve gate posts, sealed bays, on-course obstacles and hazard sweeps before
+  planning scenery.
+- Boundary props reuse the layout's household rails and story delimiters in
+  seed-varying clusters on both sides. Quantity varies independently of the route,
+  within a bounded density range. An actual collision-free exit and open apron
+  sector remain drivable; never back bare floor with an invisible outer wall.
 - Solid objects retain their registered sizes and cannot intersect other planned
   solid footprints. The planner reports an unsuccessful fit instead of distorting
   a prop or changing the requested seed.

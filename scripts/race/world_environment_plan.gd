@@ -5,7 +5,8 @@ extends RefCounted
 const GROUP_COUNT := 4
 const SUPPORTS_PER_GROUP := 3
 const MICROS_PER_GROUP := 2
-const BOUNDARY_COUNT := 8
+const SECTOR_COUNT := 8
+const APRON_EXIT_DISTANCES: Array[float] = [210.0, 280.0, 360.0]
 const LOCAL_ATTEMPTS := 48
 const GRID := Vector2i(21, 17)
 
@@ -20,6 +21,7 @@ var pools: Dictionary = {}
 var used: Dictionary = {}
 var occupied: Array[PackedVector2Array] = []
 var reservations: Array[PackedVector2Array] = []
+var density: Dictionary = {}
 var placements: Array[Dictionary] = []
 var diagnostics := {"attempts":0,"focal_count":0,"support_count":0,"micro_count":0,"boundary_count":0,"ground_count":0,"decal_count":0,"notes":[]}
 
@@ -27,7 +29,8 @@ var diagnostics := {"attempts":0,"focal_count":0,"support_count":0,"micro_count"
 static func plan(theme: StringName, seed: int, geometry: Dictionary, candidates: Array[Dictionary], story: Dictionary) -> Dictionary:
 	var planner := WorldEnvironmentPlan.new()
 	planner.world_seed = seed
-	planner.open_sector = posmod(TrackBuilderCore._mix_seed(seed, "open_apron"), BOUNDARY_COUNT)
+	planner.open_sector = posmod(TrackBuilderCore._mix_seed(seed, "open_apron"), SECTOR_COUNT)
+	planner.density = WorldEnvironmentCatalog.boundary_density()
 	planner.room = geometry.get("room_polygon", PackedVector2Array())
 	planner.island = geometry.get("island_polygon", PackedVector2Array())
 	planner.line = geometry.get("centerline", PackedVector2Array())
@@ -38,6 +41,9 @@ static func plan(theme: StringName, seed: int, geometry: Dictionary, candidates:
 	for polygon: PackedVector2Array in geometry.get("reserved_polygons", []):
 		planner.occupied.append(polygon)
 		planner.reservations.append(polygon)
+	for polygon: PackedVector2Array in geometry.get("solid_footprints", []):
+		planner.occupied.append(polygon)
+	planner._reserve_open_exit()
 	planner._catalog(theme, candidates, story)
 	planner._compose()
 	planner.diagnostics["seed"] = seed
@@ -45,6 +51,36 @@ static func plan(theme: StringName, seed: int, geometry: Dictionary, candidates:
 	planner.diagnostics["total_placed"] = planner.placements.size()
 	planner.diagnostics["open_sector"] = planner.open_sector
 	return {"placements":planner.placements,"diagnostics":planner.diagnostics}
+
+
+func _reserve_open_exit() -> void:
+	var clearance := TrackBuilderCore.MIN_VIABLE_CORRIDOR_WIDTH * 0.5
+	var span := maxi(12, line.size() / (SECTOR_COUNT * 2) - 2)
+	for trial in SECTOR_COUNT:
+		var sector := posmod(open_sector + trial, SECTOR_COUNT)
+		var center := int(round((float(sector) + 0.5) * line.size() / SECTOR_COUNT)) % line.size()
+		for offset in range(-span, span + 1, 3):
+			var index := posmod(center + offset, line.size())
+			var tangent := TrackBuilderCore._sample_tangent(line, index)
+			for side: float in [-1.0, 1.0]:
+				var normal := tangent.rotated(PI * 0.5) * side
+				for distance: float in APRON_EXIT_DISTANCES:
+					var target := line[index] + normal * distance
+					var footprint := _make_oriented_rect((line[index] + target) * 0.5, Vector2(distance + clearance * 2.0, clearance * 2.0), normal.angle())
+					if not Geometry2D.clip_polygons(footprint, room).is_empty() or (not island.is_empty() and not Geometry2D.intersect_polygons(footprint, island).is_empty()):
+						continue
+					var blocked := false
+					for other: PackedVector2Array in occupied:
+						if not Geometry2D.intersect_polygons(footprint, other).is_empty():
+							blocked = true
+							break
+					if not blocked:
+						open_sector = sector
+						occupied.append(footprint)
+						diagnostics["open_exit"] = PackedVector2Array([line[index], target])
+						diagnostics["open_exit_width"] = clearance * 2.0
+						return
+	diagnostics["notes"].append("no_open_exit_fit")
 
 
 func _catalog(theme: StringName, candidates: Array[Dictionary], story: Dictionary) -> void:
@@ -114,15 +150,74 @@ func _compose() -> void:
 			var micro_rng := _rng("micro:%d" % group)
 			for index in MICROS_PER_GROUP:
 				_near("micro", anchor, micro_rng, 45.0)
-	rng = _rng("boundary")
-	for index in BOUNDARY_COUNT:
-		var anchor := _route_anchor((float(index) + rng.randf_range(0.2, 0.8)) / BOUNDARY_COUNT, 95.0)
-		_near("boundary", anchor["position"], rng, 0.0, float(anchor["rotation"]))
+	_compose_boundary()
 	for role: String in ["ground", "decal"]:
 		rng = _rng(role)
 		for index in (3 if role == "ground" else 5):
 			var anchor := _route_anchor(rng.randf(), 120.0)
 			_near(role, anchor["position"], rng, 0.0)
+
+
+func _compose_boundary() -> void:
+	var rng := _rng("boundary:density")
+	var length := arc[-1]
+	var target := _boundary_target(length, density, rng)
+	var cluster_range: Array = density["cluster_size"]
+	var cluster_size := rng.randi_range(int(cluster_range[0]), int(cluster_range[1]))
+	var cluster_count := ceili(float(target) / cluster_size)
+	diagnostics["boundary_target"] = target
+	diagnostics["boundary_clusters"] = cluster_count
+	var requested := 0
+	for cluster in cluster_count:
+		var cluster_rng := _rng("boundary:cluster:%d" % cluster)
+		var distance := length * (float(cluster) + cluster_rng.randf_range(0.15, 0.65)) / cluster_count
+		var side := -1.0 if cluster_rng.randf() < 0.5 else 1.0
+		for _member in mini(cluster_size, target - requested):
+			requested += 1
+			var placed := _boundary_near(distance, side, cluster_rng)
+			if placed.is_empty():
+				placed = _boundary_near(distance, -side, cluster_rng)
+			if not placed.is_empty():
+				distance += float(placed["advance_mm"])
+			else:
+				distance += float(density["search_stride_mm"])
+
+
+func _boundary_near(distance: float, side: float, rng: RandomNumberGenerator) -> Dictionary:
+	for asset: Dictionary in _available("boundary", rng):
+		if String(asset.get("collision", "flat")) == "flat":
+			continue
+		var size: Vector2 = asset["dimensions_mm"]
+		var gaps: Array = density["gap_mm"]
+		var gap := rng.randf_range(float(gaps[0]), float(gaps[1]))
+		for attempt in int(density["search_attempts"]):
+			var step := ceilf(float(attempt) / 2.0) * float(density["search_stride_mm"])
+			var offset := step if attempt % 2 == 0 else -step
+			var at := fposmod(distance + offset, arc[-1])
+			var point := TrackBuilderCore._sample_at_arc(line, arc, at)
+			var tangent := TrackBuilderCore._tangent_at_arc(line, arc, at)
+			var closest := TrackBuilderCore._closest_point_on_loop(point, island) if not island.is_empty() else {"position":TrackBuilderCore._polygon_bounds_rect(room).get_center()}
+			var normal := tangent.rotated(PI * 0.5)
+			if normal.dot(point - (closest["position"] as Vector2)) < 0.0:
+				normal = -normal
+			var angle := tangent.angle() + (PI * 0.5 if size.y > size.x else 0.0)
+			var clearance := float(asset.get("clearance_mm", 36.0))
+			var candidate := point + normal * side * (half_width + minf(size.x, size.y) * 0.5 + clearance + gap)
+			var nearest := TrackBuilderCore._closest_point_on_loop(candidate, line)
+			if mini(SECTOR_COUNT - 1, int(float(nearest["index"]) / line.size() * SECTOR_COUNT)) == open_sector:
+				continue
+			var fit := _validate(asset, candidate, angle)
+			if not fit.is_empty():
+				_store(asset, "boundary", fit)
+				return {"advance_mm":maxf(size.x, size.y) + gap}
+	return {}
+
+
+static func _boundary_target(length: float, settings: Dictionary, rng: RandomNumberGenerator) -> int:
+	var rate: Array = settings["per_1000_mm"]
+	var maximum := int(settings["maximum"])
+	var sampling_length := minf(length, maximum / float(rate[1]) * 1000.0)
+	return clampi(roundi(sampling_length / 1000.0 * rng.randf_range(float(rate[0]), float(rate[1]))), int(settings["minimum"]), maximum)
 
 
 func _route_anchor(fraction: float, offset: float) -> Dictionary:
@@ -200,7 +295,7 @@ func _validate(asset: Dictionary, point: Vector2, angle: float) -> Dictionary:
 		return {}
 	if zone == "apron" and String(asset.get("collision", "alpha")) != "flat":
 		var closest := TrackBuilderCore._closest_point_on_loop(point, line)
-		var sector := mini(BOUNDARY_COUNT - 1, int(float(closest["index"]) / line.size() * BOUNDARY_COUNT))
+		var sector := mini(SECTOR_COUNT - 1, int(float(closest["index"]) / line.size() * SECTOR_COUNT))
 		if sector == open_sector:
 			return {}
 	var clearance := float(asset.get("clearance_mm", 36.0))
