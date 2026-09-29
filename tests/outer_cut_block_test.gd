@@ -12,7 +12,7 @@ const CHORD_SAMPLES := 41
 ## by the vehicle's real physical half-width: the Rustbug collision capsule has
 ## radius 18 (scenes/vehicles/rustbug.tscn), which is what the physics actually
 ## sweeps — the 44 in TrackBuilderCore.VEHICLE_WIDTH is a corridor-planning figure.
-const MIN_CAR_CLEARANCE_MM := 18.0
+const MIN_CAR_CLEARANCE_MM := CORE.CAR_COLLISION_DIAMETER * 0.5
 const TURN_THRESHOLD := 0.18  # mirrors CORE.CUT_TURN_THRESHOLD
 ## Folds, like the cut definition itself, come from TrackBuilderCore so the
 ## planner that blocks them and this regression cannot drift apart.
