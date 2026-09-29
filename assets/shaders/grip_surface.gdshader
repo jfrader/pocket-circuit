@@ -3,8 +3,6 @@ render_mode unshaded;
 uniform vec2 boundary[64];
 uniform int boundary_count = 0;
 uniform float feather_mm = 18.0;
-uniform bool underlay = false;
-uniform vec4 surface_color : source_color = vec4(1.0);
 varying vec2 room_point;
 varying vec4 item_tint;
 void vertex() {
@@ -26,6 +24,6 @@ void fragment() {
 		}
 	}
 	float fade = inside ? smoothstep(0.0, feather_mm, edge_distance) : 0.0;
-	vec4 paint = underlay ? surface_color : texture(TEXTURE, UV) * item_tint;
+	vec4 paint = texture(TEXTURE, UV) * item_tint;
 	COLOR = vec4(paint.rgb, paint.a * fade);
 }

@@ -186,11 +186,8 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 		TrackBuilderCore._mark_solid_body(post, asset_path, &"gate_post")
 		container.add_child(post)
 		var sprite_scale := Vector2.ONE * TrackBuilderCore.PROP_SCALE.sprite_scale(texture, TrackBuilderCore._texture_opaque_rect(texture), TrackBuilderCore.GATE_POST_SIZE.x)
-		var footprint := TrackBuilderCore._texture_collision_footprint(texture, &"convex", true)
-		var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale + Vector2.ONE * 2.0
 		var offset := TrackBuilderCore._add_texture_collision(post, texture, sprite_scale, &"convex", true, 2.0)
 		(post.get_node("AssetCollision") as CollisionShape2D).name = "PostCollision"
-		TrackBuilderCore._add_directional_shadow(post, asset_path, TrackBuilderCore.GATE_POST_SIZE.x, 1.0, footprint_size)
 		var sprite := Sprite2D.new()
 		sprite.name = "Sprite"
 		sprite.texture = texture
@@ -199,6 +196,7 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 		sprite.position = -offset
 		TrackBuilderCore._mark_solid_visual(sprite, asset_path, &"gate_post")
 		post.add_child(sprite)
+		TrackBuilderCore._add_directional_shadow(sprite)
 		container.set_meta("placed_count", int(container.get_meta("placed_count", 0)) + 1)
 	if gate_index == 0:
 		container.set_meta("finish_landmark_paths", [NodePath("Gate00Left"), NodePath("Gate00Right")])
