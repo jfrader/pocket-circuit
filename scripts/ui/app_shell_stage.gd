@@ -147,6 +147,8 @@ func _draw() -> void:
 			_draw_map_stage()
 		&"settings":
 			_draw_mechanic_stage()
+		&"driver":
+			_draw_driver_stage()
 		&"credits":
 			_draw_cast_stage()
 		&"ending":
@@ -231,6 +233,14 @@ func _draw_mechanic_stage() -> void:
 	_draw_gear(self, mat.position + mat.size * Vector2(0.26, 0.78), minf(mat.size.x * 0.06, 34.0), SKIN.YELLOW)
 	_draw_wrench(mat.position + mat.size * Vector2(0.84, 0.62), minf(mat.size.y / 420.0, 1.5))
 	draw_portrait_card(self, mat.position + mat.size * Vector2(0.5, 0.28), minf(mat.size.x * 0.42, 220.0), driver_id, -0.05)
+
+
+func _draw_driver_stage() -> void:
+	var mat := Rect2(12.0, 12.0, size.x - 24.0, size.y - 24.0)
+	SKIN.draw_plate(self, mat, SKIN.CREAM, 16)
+	SKIN.draw_tape(self, mat.position + Vector2(mat.size.x * 0.5 - 64.0, 4.0), Vector2(128.0, 26.0), 0.28)
+	draw_portrait_card(self, mat.position + mat.size * Vector2(0.5, 0.46), minf(mat.size.x * 0.44, 260.0), driver_id, -0.04)
+	_draw_roster(Rect2(mat.position.x + 16.0, mat.end.y - mat.size.y * 0.18, mat.size.x - 32.0, mat.size.y * 0.15), CATALOG.quick_race_vehicle_ids())
 
 
 func _draw_cast_stage() -> void:

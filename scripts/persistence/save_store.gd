@@ -2,6 +2,10 @@ class_name SaveStore
 extends RefCounted
 
 const CURRENT_VERSION := 4
+## Player portrait seed. 91001 is the shipped driver-cast seed, so an untouched
+## save keeps rendering the original player portrait.
+const PLAYER_AVATAR_DEFAULT_SEED := 91001
+const PLAYER_AVATAR_MAX_SEED := 0x7FFFFFFF
 const DEFAULT_PATH := "user://pocket_circuit_save.json"
 const VALID_DIFFICULTIES := ["sunday_drive", "club_circuit", "clockwork"]
 const CATALOG := preload("res://data/championship/catalog.gd")
@@ -31,6 +35,7 @@ func default_data() -> Dictionary:
 		"completed_acts": [],
 		"unlocked_vehicles": ["rustbug"],
 		"selected_vehicle": "rustbug",
+		"player_avatar_seed": PLAYER_AVATAR_DEFAULT_SEED,
 		"mastery_circuit_metrics": {},
 		"mastery_records": [],
 		"personal_ghosts": [],
@@ -191,6 +196,7 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	var unlocked: Array = normalized["unlocked_vehicles"]
 	var selected: Variant = raw.get("selected_vehicle", "rustbug")
 	normalized["selected_vehicle"] = str(selected) if selected is String and selected in unlocked else "rustbug"
+	normalized["player_avatar_seed"] = _bounded_int(raw.get("player_avatar_seed"), 0, PLAYER_AVATAR_MAX_SEED, PLAYER_AVATAR_DEFAULT_SEED)
 
 	var difficulty: Variant = raw.get("difficulty", "club_circuit")
 	if difficulty is String and difficulty in VALID_DIFFICULTIES:
