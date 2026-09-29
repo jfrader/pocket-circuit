@@ -4,7 +4,7 @@ extends RefCounted
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const SCHEMA_VERSION := 1
-const GENERATOR_VERSION := 8
+const GENERATOR_VERSION := 9
 const MAX_SEED := 0x7FFFFFFF
 const SHARE_PREFIX := "PC1"
 const SHARE_ALPHABET := "0123456789ABCDEFGHJKMNPQRSTVWXYZ"

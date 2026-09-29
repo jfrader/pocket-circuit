@@ -253,12 +253,21 @@ line.
   side-face, theme-colored edge and top lip. Recovery begins at that
   visible contact edge; do not send the concave island through convex
   decomposition.
-- Themed course rails are real assets drawn from the existing layout boundary pool
-  and story delimiters. `boundary_density` in `data/environment_composition.json`
-  controls seed-varying count and cluster size, scaled by lap length and bounded
-  for large circuits without collapsing every long seed to the same count.
-  Eight deterministic sectors describe the actual placed sides, including both-sided
-  clusters and a reserved open-apron sector with a collision-free exit path.
+- Themed course rails are real assets drawn from the existing boundary pool.
+  `boundary_density` in `data/environment_composition.json` controls outer-run
+  coverage, membership, physical join gaps, bounded relocation and inner accents.
+  Completed outer runs are first-class records with per-member arc positions;
+  inner props and micro clutter cannot satisfy the outer-run requirement.
+- Fit minimum complete runs first, then hardware rows, then optional extensions.
+  Failed trials roll back every temporary footprint. Relocate whole sets along
+  the outer edge or to a bounded parallel outset, never silently to the island.
+  Coverage counts actual rail lengths, excluding the empty gaps between items
+  and sets. Physical front/back gaps are checked independently of arc metadata.
+- Common reusable rails and hardware have explicit repeat budgets in the asset
+  contract. The single-focal composition rule does not impose a global one-copy
+  limit on a pen that is also used in boundary sets.
+  Eight sectors describe actual side occupancy. Outer run records and separately
+  budgeted inner accents retain a reserved sector and collision-free apron exit.
   A physically tight placement selects another legal object or location rather
   than shrinking art or violating clearance. Kitchen mixes fork, spoon, chopstick,
   and cork rails; Workshop mixes paint stirrer, dowel, clamp, ruler, and nail
