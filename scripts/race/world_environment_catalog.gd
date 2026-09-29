@@ -102,5 +102,3 @@ static func _include(selected: Dictionary, theme: StringName, value: Variant, ro
 		if resolved_role not in entry["roles"]:
 			entry["roles"].append(resolved_role)
 		entry["visual_weight"] = maxf(float(entry["visual_weight"]), weight)
-		if resolved_role == "focal":
-			entry["max_repeats"] = 1
