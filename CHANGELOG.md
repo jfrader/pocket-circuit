@@ -37,6 +37,7 @@
 - Shipped the live Gamestruments engine into the release gate (sync + hard `ClassDB.class_exists("GamestrumentsPlayer")` check at the start of `tools/build_release.sh`). Removed rendered WAV fallbacks (`assets/audio/menu_loop.wav`, `race_loop.wav` and their `.import`s); the live engine is now mandatory — there is no silent-music or WAV fallback mode.
 
 ### Added
+- Driver portraits are now the friendly, front-facing set, and you can pick your own: `DRIVER LOOK` in the garage shuffles your portrait, and the look you keep follows you through every screen and reload.
 
 - Drifting now makes a continuous tyre scrub that follows the slide instead of a
   single scratch at the start of it, and it bites harder the faster and more

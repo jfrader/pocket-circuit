@@ -13,6 +13,7 @@ const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd"
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
 const CIRCUIT_PREVIEW_QUEUE := preload("res://scripts/race/circuit_preview_queue.gd")
 const RACE_ASSET_PRELOADER := preload("res://scripts/race/race_asset_preloader.gd")
+const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const LOADING_FRAME_BUDGET_USEC := 50_000
 
 var current_race_session: Dictionary = {}
@@ -77,6 +78,7 @@ func _ready() -> void:
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
 	_apply_settings()
+	_install_player_avatar()
 	if bool(_save_data["first_run"]):
 		_save_data["first_run"] = false
 		if not _test_mode:
@@ -123,6 +125,57 @@ func get_save_data() -> Dictionary:
 	return _save_data.duplicate(true)
 
 
+## The player drives one cast slot; only its portrait seed is customizable.
+func get_player_avatar_seed() -> int:
+	return int(_save_data.get("player_avatar_seed", SAVE_STORE_SCRIPT.PLAYER_AVATAR_DEFAULT_SEED))
+
+
+## Shows a candidate portrait without writing it to the save.
+func preview_player_avatar(seed: int) -> void:
+	var player_id := CATALOG.player_driver_id()
+	if player_id.is_empty():
+		return
+	IDENTITIES.set_avatar_seed_override(player_id, _bounded_avatar_seed(seed), _player_cast_avatar_seed(player_id))
+
+
+func save_player_avatar(seed: int) -> bool:
+	if is_save_read_only():
+		return false
+	var candidate := _save_data.duplicate(true)
+	candidate["player_avatar_seed"] = _bounded_avatar_seed(seed)
+	if candidate == _save_data:
+		_install_player_avatar()
+		return true
+	if not _save_candidate(candidate):
+		return false
+	_save_data = candidate
+	_install_player_avatar()
+	return true
+
+
+func random_player_avatar_seed() -> int:
+	return randi() % (SAVE_STORE_SCRIPT.PLAYER_AVATAR_MAX_SEED + 1)
+
+
+## Mirrors the save store's rule so an accepted seed always round-trips exactly.
+func _bounded_avatar_seed(seed: int) -> int:
+	if seed < 0 or seed > SAVE_STORE_SCRIPT.PLAYER_AVATAR_MAX_SEED:
+		return get_player_avatar_seed()
+	return seed
+
+
+func _player_cast_avatar_seed(player_id: String) -> int:
+	var art: Dictionary = CATALOG.get_driver(player_id).get("avatar_art", {})
+	return int(art.get("seed", SAVE_STORE_SCRIPT.PLAYER_AVATAR_DEFAULT_SEED))
+
+
+func _install_player_avatar() -> void:
+	var player_id := CATALOG.player_driver_id()
+	if player_id.is_empty():
+		return
+	IDENTITIES.set_avatar_seed_override(player_id, get_player_avatar_seed(), _player_cast_avatar_seed(player_id))
+
+
 func get_current_race_session() -> Dictionary:
 	return current_race_session.duplicate(true)
 
@@ -145,6 +198,7 @@ func confirm_new_championship() -> bool:
 		"fullscreen": _save_data["fullscreen"],
 		"reduced_camera_shake": _save_data["reduced_camera_shake"],
 		"reduced_motion": _save_data["reduced_motion"],
+		"player_avatar_seed": get_player_avatar_seed(),
 		"first_run": false,
 		"mastery_records": _save_data.get("mastery_records", []).duplicate(true),
 		"personal_ghosts": _save_data.get("personal_ghosts", []).duplicate(true),

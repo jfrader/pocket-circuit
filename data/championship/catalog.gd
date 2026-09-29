@@ -451,6 +451,13 @@ static func get_driver(driver_id: String) -> Dictionary:
 	return {}
 
 
+static func player_driver_id() -> String:
+	for driver: Dictionary in CAST:
+		if String(driver.get("role", "")) == "Player driver":
+			return String(driver["id"])
+	return ""
+
+
 static func event_ids() -> Array[String]:
 	var ids: Array[String] = []
 	for event: Dictionary in EVENTS:

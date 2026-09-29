@@ -14,11 +14,26 @@ const RACE_WHEEL_ROLL_DISTANCE := 64.0
 
 static var _avatar_payload_cache: Dictionary = {}
 static var _avatar_texture_cache: Dictionary = {}
+static var _avatar_seed_overrides: Dictionary = {}
 static var _car_payload_cache: Dictionary = {}
 static var _car_texture_cache: Dictionary = {}
 static var _car_spin_cache: Dictionary = {}
 static var _visual_resolutions: Dictionary = {}
 static var motion_image_generations := 0
+
+
+## The player's portrait seed lives in the save file, so the presentation layer
+## takes it as an override instead of reading persistence itself. Passing the
+## configured seed clears the override.
+static func set_avatar_seed_override(driver_id: String, seed: int, configured_seed: int) -> void:
+	if driver_id.is_empty():
+		return
+	if seed == configured_seed:
+		_avatar_seed_overrides.erase(driver_id)
+	else:
+		_avatar_seed_overrides[driver_id] = seed
+	_avatar_payload_cache.erase(driver_id)
+	_avatar_texture_cache.erase(driver_id)
 
 
 static func avatar_payload(driver_id: String) -> Dictionary:
@@ -29,7 +44,14 @@ static func avatar_payload(driver_id: String) -> Dictionary:
 	if art.is_empty():
 		push_error("No procedural avatar art is configured for driver '%s'." % driver_id)
 		return {}
-	var payload := AVATAR_GENERATOR.generate(int(art["seed"]), art.get("options", {}))
+	var seed := int(_avatar_seed_overrides.get(driver_id, art["seed"]))
+	var options: Dictionary = (art.get("options", {}) as Dictionary).duplicate(true)
+	if seed != int(art["seed"]):
+		# A randomized portrait keeps the driver's stable non-visual traits but
+		# must not inherit the trailing seeded picks of the cast look. Facing stays
+		# pinned so every portrait card reads in the same direction.
+		options = {"facing": art.get("options", {}).get("facing", "right")}
+	var payload := AVATAR_GENERATOR.generate(seed, options)
 	var payload_error := AVATAR_SPRITES.validate_payload(payload)
 	if not payload_error.is_empty():
 		push_error("Avatar art for '%s' is invalid: %s" % [driver_id, payload_error])
