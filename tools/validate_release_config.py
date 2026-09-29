@@ -59,6 +59,7 @@ REQUIRED_RELEASE_NOTICES = {
     "assets/**/LICENSE*",
     "data/vendor/**/LICENSE*",
     "data/vendor/procedural_2d/*.json",
+    "data/drivers/names.json",
 }
 EXPECTED_GAMESTRUMENTS_VENDOR_FILES = {
     "LICENSE.md",

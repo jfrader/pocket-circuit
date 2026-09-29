@@ -33,6 +33,7 @@ func _initialize() -> void:
 		"res://data/vendor/procedural_2d/car_catalog.json",
 		"res://data/vendor/procedural_2d/LICENSE",
 		"res://data/household_material_patterns.json",
+		"res://data/drivers/names.json",
 	]:
 		if not FileAccess.file_exists(required_path):
 			_fail("required release notice is missing: %s" % required_path)
