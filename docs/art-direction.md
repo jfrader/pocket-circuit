@@ -124,7 +124,8 @@ fit inside those regions without overlapping each other or slicing their natural
 outlines into rectangular cards. Their presentation size may decrease to fit a
 narrow grip zone; physical props and gameplay polygons retain their sizes. No
 zone-wide tint sits beneath the artwork: bare track between scraps and droplets
-keeps its original color.
+keeps its original color. Stamp fitting reuses the scenery reservations for
+gate posts, sealed pockets and fixed obstacles, and clears the raised island.
 
 ## Vehicle and Effects
 

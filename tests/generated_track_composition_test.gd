@@ -226,6 +226,8 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	if not _expect(surface_regions.size() == definitions.size(), "%s must render every authoritative grip region" % theme):
 		return false
 	for region: Node2D in surface_regions:
+		if not _expect(region.get_child_count() > 0, "%s every grip region must retain visible artwork after fitting around solids" % theme):
+			return false
 		var material := region.material as ShaderMaterial
 		if not _expect(material != null and float(material.get_shader_parameter("feather_mm")) > 0.0, "%s grip regions need feathered material boundaries, not stamped rectangles" % theme):
 			return false
