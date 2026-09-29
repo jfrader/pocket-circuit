@@ -264,7 +264,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "horizontal matte steel tablespoon, oval bowl seen directly overhead and a slim handle",
@@ -1125,7 +1125,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "kitchen ruler painted",
@@ -1170,7 +1170,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "kitchen craft stick",
@@ -1215,7 +1215,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "two slender horizontal wooden chopsticks lying side by side, subtle tapered ends",
@@ -1260,7 +1260,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "kitchen butter knife",
@@ -1624,7 +1624,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 5,
+    "max_repeats": 24,
     "collision": "alpha",
     "shadow": "contact",
     "description": "a steel bolt lying flat horizontally: hexagonal head at one end and a long visible threaded shaft, NOT a round bolt head alone",
@@ -1670,7 +1670,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 5,
+    "max_repeats": 24,
     "collision": "alpha",
     "shadow": "contact",
     "description": "a steel wood screw lying flat horizontally: narrow pointed threaded shaft and small slotted head, NOT just a circular screw head",
@@ -1715,7 +1715,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 5,
+    "max_repeats": 24,
     "collision": "alpha",
     "shadow": "contact",
     "description": "one slender steel nail lying flat horizontally: straight long narrow shaft, sharp point left, small flat head right. No cross slot. NOT a round head seen from above",
@@ -1849,7 +1849,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "one slender straight horizontal wooden dowel,160mm long and12mm wide, with rounded ends, not a thick rolling pin",
@@ -1894,7 +1894,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "workshop paint stirrer rail",
@@ -1943,7 +1943,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "ruler plank",
@@ -2358,7 +2358,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "pencil",
@@ -2722,7 +2722,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 1,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "one horizontal slate-blue capped fountain pen, long narrow silhouette and a small steel clip",
@@ -4089,7 +4089,7 @@
       "apron"
     ],
     "clearance_mm": 36,
-    "max_repeats": 8,
+    "max_repeats": 48,
     "collision": "alpha",
     "shadow": "contact",
     "description": "one slender horizontal wooden chopstick, long tapered silhouette",
