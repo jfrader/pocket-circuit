@@ -1,0 +1,14 @@
+{
+	"first": [
+		"Alex", "Blake", "Casey", "Drew", "Ellis", "Finley", "Gray", "Harper",
+		"Ivy", "Jordan", "Kai", "Logan", "Morgan", "Nico", "Parker", "Quinn",
+		"Riley", "Sage", "Taylor", "Val", "Wren", "Avery", "Cameron", "Dakota",
+		"Emerson", "Hayden", "Jamie", "Kendall", "Reese", "Skyler"
+	],
+	"last": [
+		"Bolt", "Circuit", "Dash", "Gear", "Relay", "Spark", "Wrench", "Sprocket",
+		"Piston", "Axle", "Turbo", "Drift", "Grip", "Shift", "Rev", "Clutch",
+		"Spanner", "Socket", "Rivet", "Gauge", "Lumen", "Vortex", "Forge", "Quill",
+		"Strut", "Valve", "Rotor", "Camber", "Lash", "Torque"
+	]
+}
