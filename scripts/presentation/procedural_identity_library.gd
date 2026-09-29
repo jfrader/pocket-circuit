@@ -12,6 +12,17 @@ const CAR_SPRITES := preload("res://scripts/vendor/procedural_2d/procedural_car_
 const REST_STEER_POSE := 2
 const RACE_WHEEL_ROLL_DISTANCE := 64.0
 
+## Generated rivals receive a fresh id every race, so their portraits and liveries
+## must age out; otherwise a long session accumulates image textures without limit,
+## which is what made later races progressively heavy. The shipped cast and the
+## player are requested every race, so a modest cap keeps them resident. Entries are
+## only evaluated when a new one is added, never on a hit, so the hot paths stay
+## allocation free.
+const MAX_AVATAR_ENTRIES := 24
+const MAX_CAR_ENTRIES := 48
+static var _avatar_entry_order: Array[String] = []
+static var _car_entry_order: Array[String] = []
+
 static var _avatar_payload_cache: Dictionary = {}
 static var _avatar_texture_cache: Dictionary = {}
 static var _car_payload_cache: Dictionary = {}
@@ -19,6 +30,30 @@ static var _car_texture_cache: Dictionary = {}
 static var _car_spin_cache: Dictionary = {}
 static var _visual_resolutions: Dictionary = {}
 static var motion_image_generations := 0
+
+
+## A new avatar id ages out the oldest portrait, payload and texture together so
+## the image object is actually released.
+static func _note_avatar_entry(driver_id: String) -> void:
+	_avatar_entry_order.append(driver_id)
+	while _avatar_entry_order.size() > MAX_AVATAR_ENTRIES:
+		var oldest: String = _avatar_entry_order[0]
+		_avatar_entry_order.remove_at(0)
+		_avatar_payload_cache.erase(oldest)
+		_avatar_texture_cache.erase(oldest)
+
+
+## A new livery key ages out that key's payload, textures, spin poses and resolved
+## cosmetics as one unit.
+static func _note_car_entry(visual_key: String) -> void:
+	_car_entry_order.append(visual_key)
+	while _car_entry_order.size() > MAX_CAR_ENTRIES:
+		var oldest: String = _car_entry_order[0]
+		_car_entry_order.remove_at(0)
+		_car_payload_cache.erase(oldest)
+		_car_texture_cache.erase(oldest)
+		_car_spin_cache.erase(oldest)
+		_visual_resolutions.erase(oldest)
 
 
 static func avatar_payload(driver_id: String) -> Dictionary:
@@ -35,6 +70,7 @@ static func avatar_payload(driver_id: String) -> Dictionary:
 		push_error("Avatar art for '%s' is invalid: %s" % [driver_id, payload_error])
 		return {}
 	_avatar_payload_cache[driver_id] = payload
+	_note_avatar_entry(driver_id)
 	return payload.duplicate(true)
 
 
@@ -65,6 +101,7 @@ static func car_payload(vehicle_id: String) -> Dictionary:
 		push_error("Car art for '%s' is invalid: %s" % [vehicle_id, payload_error])
 		return {}
 	_car_payload_cache[key] = payload
+	_note_car_entry(key)
 	if not _visual_resolutions.has(key):
 		_visual_resolutions[key] = {"vehicle_id": vehicle_id, "cosmetic": {}}
 	return payload.duplicate(true)
@@ -206,6 +243,7 @@ static func car_payload_for_key(visual_key: String) -> Dictionary:
 		push_error("Car art for visual key '%s' is invalid: %s" % [visual_key, payload_error])
 		return {}
 	_car_payload_cache[visual_key] = payload
+	_note_car_entry(visual_key)
 	return payload.duplicate(true)
 
 
