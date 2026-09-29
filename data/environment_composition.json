@@ -1,8 +1,8 @@
 {
   "version":3,
   "boundary_density":{
-    "minimum":12,"maximum":192,
-    "outer_coverage":[0.28,0.38],"outer_runs":[4,32],"run_span_mm":600,
+    "minimum":12,"maximum":280,
+    "outer_coverage":[0.55,0.78],"outer_runs":[6,48],"run_span_mm":600,
     "rail_members":[3,5],"rail_min_length_mm":100,"rail_min_aspect":3.0,
     "peg_runs":[1,2],"peg_members":[8,12],"peg_length_mm":[30,60],"peg_min_aspect":2.0,
     "inner_members":[4,8],"gap_mm":[8,14],"max_join_gap_mm":40,"run_separation_mm":120,
