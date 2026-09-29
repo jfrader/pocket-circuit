@@ -65,13 +65,18 @@ const DEFAULT_PERSONALITY: Dictionary = {
 	"shortcut_preference": 1.0,
 	"line_commitment": 1.0,
 }
+## Legal personality range, wide enough for every authored rival: the cast's
+## tuned values are the intent, and a tighter range silently clamped them so
+## rivals drove less like themselves than their data claimed. Difficulty still
+## scales the realised effect (see _configure_personality), which is where the
+## safety lives, so these bounds only reject values nobody authored.
 const PERSONALITY_BOUNDS: Dictionary = {
-	"corner_pace": Vector2(1.0, 1.04),
+	"corner_pace": Vector2(0.96, 1.04),
 	"brake_timing": Vector2(0.9, 1.1),
 	"boost_eagerness": Vector2(0.9, 1.18),
-	"overtake_aggression": Vector2(0.85, 1.13),
+	"overtake_aggression": Vector2(0.85, 1.22),
 	"shortcut_preference": Vector2(0.9, 1.16),
-	"line_commitment": Vector2(0.95, 1.06),
+	"line_commitment": Vector2(0.95, 1.1),
 }
 const DIFFICULTY_TUNING: Dictionary = {
 	"sunday_drive": {

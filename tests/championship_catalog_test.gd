@@ -1,6 +1,7 @@
 extends SceneTree
 
 const CATALOG := preload("res://data/championship/catalog.gd")
+const AI_CONTROLLER := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
 
 
@@ -22,6 +23,16 @@ func _run_test() -> void:
 		rival_styles[driver_id] = style
 	if not _expect(rival_styles["juniper"] != rival_styles["milo"] and rival_styles["milo"] != rival_styles["tess"] and rival_styles["tess"] != rival_styles["cass"], "the four rivals should not share identical driving behavior"):
 		return
+	# An authored value outside the controller's bounds is silently clamped, so the
+	# rival no longer drives the way its data says. The bounds must contain the cast.
+	for driver_id: String in rival_styles:
+		var style: Dictionary = rival_styles[driver_id]
+		for trait_key: String in style:
+			var limits: Vector2 = AI_CONTROLLER.PERSONALITY_BOUNDS[trait_key]
+			var value := float(style[trait_key])
+			var epsilon := 0.0001
+			if not _expect(value >= limits.x - epsilon and value <= limits.y + epsilon, "%s.%s (%.2f) must stay inside the AI controller's %.2f-%.2f bounds, or it will be silently clamped" % [driver_id, trait_key, value, limits.x, limits.y]):
+				return
 	for event: Dictionary in CATALOG.EVENTS:
 		if not _expect(String(event.get("theme", "")) in ["kitchen", "workshop", "office"], "every event should declare a supported track theme"):
 			return
