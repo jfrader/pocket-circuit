@@ -29,7 +29,8 @@ placement zones and clearance, repetition, collision and shadow behavior.
 - **Values:** broad material masses carry recognition. Small scratches and grain
   remain subordinate to the object, the racing line and the cars.
 - **Light:** warm upper-left highlights and soft down-right contact shadows.
-  Shadows follow physical footprints; they do not become oversized grey cards.
+  Shadows follow the sprite silhouette and stay in contact with it; they do not
+  become oversized grey cards or detached silhouettes beneath thin utensils.
 - **Materials:** wood, ceramic, matte metal, cloth, cork, paper and food retain
   recognizable surface cues without photorealism or glossy room reflections.
 - **Scale:** one world unit is one millimetre. Both axes derive from visible alpha
@@ -118,8 +119,12 @@ loading yields. Procedural and saved track fixtures use the same model.
 Technical surfaces, the faster low-grip shortcut, direction-specific hazards,
 the speed section, finish approaches and ordered gates remain gameplay data.
 Their art must remain visible and understandable. Grip-region paint uses the
-authoritative polygons, feathered boundaries and physically scaled artwork;
-rectangular texture stamps must not cover the course or hide solid edges.
+authoritative polygons and feathered boundaries. Flat debris and spill stamps
+fit inside those regions without overlapping each other or slicing their natural
+outlines into rectangular cards. Their presentation size may decrease to fit a
+narrow grip zone; physical props and gameplay polygons retain their sizes. No
+zone-wide tint sits beneath the artwork: bare track between scraps and droplets
+keeps its original color.
 
 ## Vehicle and Effects
 

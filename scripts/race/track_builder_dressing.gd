@@ -624,7 +624,6 @@ static func build_edge_and_apron_decor(
 			TrackBuilderCore._mark_solid_body(body, tex_path, &"apron_prop")
 			container.add_child(body)
 			var offset := TrackBuilderCore._add_scaled_texture_collision(body, tex, sprite_scale, shape_kind)
-			TrackBuilderCore._add_directional_shadow(body, tex_path, sz, 1.0, visible_footprint)
 			var spr := Sprite2D.new()
 			spr.name = "Sprite"
 			spr.texture = tex
@@ -634,6 +633,7 @@ static func build_edge_and_apron_decor(
 			spr.modulate = Color.WHITE
 			TrackBuilderCore._mark_solid_visual(spr, tex_path, &"apron_prop")
 			body.add_child(spr)
+			TrackBuilderCore._add_directional_shadow(spr)
 		placed += 1
 		if placed >= target:
 			break
@@ -735,7 +735,7 @@ static func build_giant_landmarks(
 		spr.scale = Vector2.ONE * sprite_scale
 		TrackBuilderCore._mark_solid_visual(spr, tex_path, &"giant")
 		landmark.add_child(spr)
-		TrackBuilderCore._add_directional_shadow(landmark, tex_path, desired_size, 1.0, world_shape_size, true, local_footprint_rotation)
+		TrackBuilderCore._add_directional_shadow(spr, true)
 		var body := StaticBody2D.new()
 		body.name = "GiantBody"
 		body.collision_layer = 4 | 16
@@ -1112,28 +1112,16 @@ static func add_surface_decals(
 		texture_path: String,
 		lateral_offset: float = 0.0
 ) -> void:
-	var texture := load(texture_path) as Texture2D
-	if texture == null:
+	var asset := WorldEnvironmentCatalog.for_path(texture_path)
+	if asset.is_empty():
 		return
-	var decal_count := 7
-	for decal_index in decal_count:
-		var fraction := float(decal_index) / float(decal_count - 1)
-		var offset := int(round(lerpf(float(-half_span), float(half_span), fraction)))
-		var index := posmod(center_index + offset, centerline.size())
-		var sprite := Sprite2D.new()
-		sprite.name = "CenterlineDecal%02d" % decal_index
-		sprite.texture = texture
-		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-		var normal := TrackBuilderCore._sample_tangent(centerline, index).rotated(PI * 0.5)
-		sprite.position = centerline[index] + normal * lateral_offset
-		sprite.rotation = TrackBuilderCore._sample_tangent(centerline, index).angle() + float(decal_index % 2) * 0.31
-		var longest := maxf(texture.get_width(), texture.get_height())
-		sprite.scale = Vector2.ONE * (104.0 / maxf(longest, 1.0))
-		sprite.modulate = Color(1.0, 1.0, 1.0, 0.78)
-		sprite.z_index = -6
-		sprite.set_meta("asset_path", texture_path)
-		TrackBuilderCore._mark_flat_visual(sprite, texture_path, &"surface_decal")
-		parent.add_child(sprite)
+	var polygon: PackedVector2Array = parent.get_meta("polygon", PackedVector2Array())
+	if polygon.is_empty():
+		var path := centerline.duplicate()
+		for index in path.size():
+			path[index] += TrackBuilderCore._sample_tangent(centerline, index).rotated(PI * 0.5) * lateral_offset
+		polygon = surface_strip(path, center_index, half_span, TrackBuilderCore.HALF_WIDTH)
+	WorldEnvironmentArt._draw_grip_surface(parent, "SurfaceRegion", asset, polygon, center_index)
 
 
 static func shortcut_lane_geometry(centerline: PackedVector2Array, center_index: int) -> Dictionary:

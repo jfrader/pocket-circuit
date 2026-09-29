@@ -384,7 +384,6 @@ static func add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: 
 		prop.collision_layer = 4
 		TrackBuilderCore._mark_solid_body(prop, texture_path, &"corner_giant")
 		root.add_child(prop)
-		TrackBuilderCore._add_directional_shadow(prop, texture_path, 168.0, 1.0, Vector2(168.0, 168.0), true)
 		var sprite := Sprite2D.new()
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -396,6 +395,7 @@ static func add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: 
 		sprite.position = -offset
 		TrackBuilderCore._mark_solid_visual(sprite, texture_path, &"corner_giant")
 		prop.add_child(sprite)
+		TrackBuilderCore._add_directional_shadow(sprite, true)
 		placed += 1
 
 
@@ -451,5 +451,4 @@ static func add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Packe
 			placed += 1
 		index = (index + 2) % count
 		attempts += 1
-
 

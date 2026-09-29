@@ -1158,15 +1158,10 @@ static func _add_fill_prop(parent: Node, position: Vector2, radius: float, textu
 
 
 static func _add_directional_shadow(
-		parent: Node2D,
-		texture_path: String,
-		fallback_diameter: float,
-		size_scale: float = 1.0,
-		footprint_override: Vector2 = Vector2.ZERO,
-		add_cast_shadow: bool = false,
-		footprint_rotation: float = 0.0
+		sprite: Sprite2D,
+		add_cast_shadow: bool = false
 ) -> void:
-	TRACK_BUILDER_COLLISION.add_directional_shadow(parent, texture_path, fallback_diameter, size_scale, footprint_override, add_cast_shadow, footprint_rotation)
+	TRACK_BUILDER_COLLISION.add_directional_shadow(sprite, add_cast_shadow)
 
 
 static func _build_generated_obstacles(root: Node2D, spec: Dictionary) -> void:
