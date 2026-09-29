@@ -212,8 +212,7 @@ func _register_voice(sound_name: StringName, voice: OneShotVoice) -> void:
 	_generated_streams[sound_name] = _make_tier_streams(voice)
 
 
-## Generates this car's crash and boost one-shots. A few milliseconds of work, so
-## it rides along with the vehicle handoff instead of needing its own warm step.
+## Generates this car's crash and boost one-shots behind the loading screen.
 func _prepare_vehicle_sfx(stats: VehicleStats, vehicle_id: String) -> void:
 	var resolved_id := vehicle_id
 	if resolved_id.is_empty():
@@ -683,7 +682,8 @@ func _update_positional_engines(delta: float) -> void:
 ## Generates and caches a vehicle's engine voice and one-shots ahead of the race
 ## scene, so the first race frame never pays for synthesis. Headless runs generate
 ## nothing: there is no listener and tests should not pay the cost.
-func warm_vehicle_audio(vehicle_id: String) -> bool:
+## Loading callers provide a checkpoint to separate the synthesis stages.
+func warm_vehicle_audio(vehicle_id: String, progress: Callable = Callable()) -> bool:
 	if _headless or vehicle_id.is_empty():
 		return false
 	var entry: Dictionary = ChampionshipCatalogScript.get_vehicle(vehicle_id)
@@ -694,7 +694,11 @@ func warm_vehicle_audio(vehicle_id: String) -> bool:
 		return false
 	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
 	var warmed := EngineVoiceGenerator.generate_cached(recipe) != null
+	if progress.is_valid():
+		await progress.call()
 	EngineLoopGeneratorScript.generate_cached(recipe)
+	if progress.is_valid():
+		await progress.call()
 	_prepare_vehicle_sfx(stats, vehicle_id)
 	return warmed
 

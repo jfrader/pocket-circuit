@@ -196,7 +196,7 @@ func _test_legacy_vehicle_selections(store: SaveStore) -> bool:
 
 
 func _test_generator_version_migration(store: SaveStore) -> bool:
-	# A pre-v7 championship record keeps its master seed and story progress, but
+	# A pre-v8 championship record keeps its master seed and story progress, but
 	# its circuit fingerprints advance so old-geometry ghosts and mastery keys no
 	# longer compare as the current circuit.
 	_write_raw(TEST_PATH, JSON.stringify({
@@ -217,7 +217,7 @@ func _test_generator_version_migration(store: SaveStore) -> bool:
 	}))
 	var loaded := store.load_data()
 	var migrated: Dictionary = loaded["championship_circuit"]
-	if not _expect(int(migrated["seed"]) == 123456789 and int(migrated["generator_version"]) == 7, "a pre-v7 championship save should keep its master seed while advancing the generator version"):
+	if not _expect(int(migrated["seed"]) == 123456789 and int(migrated["generator_version"]) == 8, "a pre-v8 championship save should keep its master seed while advancing the generator version"):
 		return false
 	if not _expect(
 			loaded["completed_events"] == ["kitchen_crumb_rush", "kitchen_mug_run", "kitchen_clean_line"]
@@ -239,7 +239,7 @@ func _test_generator_version_migration(store: SaveStore) -> bool:
 	])["ghosts"]
 	if not _expect(legacy_ghost.size() == 1, "the migration fixture must contain an actual old-geometry ghost"):
 		return false
-	if not _expect(PERSONAL_GHOST.compatible_best(legacy_ghost, migrated_identity).is_empty(), "a ghost recorded under the pre-v7 identity must not be accepted against the v7 circuit"):
+	if not _expect(PERSONAL_GHOST.compatible_best(legacy_ghost, migrated_identity).is_empty(), "a ghost recorded under the pre-v8 identity must not be accepted against the v8 circuit"):
 		return false
 	return true
 

@@ -127,16 +127,17 @@ their original unscaled canvases.
   these with the asset contract and `data/environment_composition.json` support
   families. A single `WorldEnvironmentPlan` replaces independent scatter passes.
 - The planner selects one fitted focal, then supporting groups, restrained micro
-  dressing, sparse boundary pieces and bounded ground/decal dressing. Role streams
+  dressing, seeded boundary clusters and bounded ground/decal dressing. Role streams
   are seeded independently. Focal alternatives retain their real dimensions;
   a failed fit is not permission to shrink or stretch an object.
 - Repetition is keyed by canonical asset id rather than output alias. The plan
   enforces the catalog budgets; visual gameplay-surface paint has its own bounded
   sampling. Flat ground can underlay objects but cannot straddle a solid rim.
 - Gate footprints and sealed bay polygons are reserved before placement. Every
-  planned object stays inside the room and outside the full 125-unit corridor
-  plus its declared clearance. Solid footprints cannot overlap. One deliberately
-  open apron sector is preserved.
+  planned environment object stays inside the room and outside the full 125-unit
+  corridor plus its declared clearance. Solid footprints cannot overlap each other,
+  on-course obstacles or hazard sweeps. The planner reserves an actual vehicle-width
+  exit into the apron before placing scenery, plus an empty boundary sector.
 - Procedural surface profiles live in `data/household_material_patterns.json`.
   Story families and curated palette identities constrain the independent material
   stream; profile, pattern layout, spacing, orientation, seams and grain vary
@@ -214,9 +215,9 @@ line.
 
 ## Visual and Collision Language
 
-- No white edge lines, dashed centerlines, kerbs, painted route borders, or
-  hard-edged gameplay-zone rectangles. Household objects and material changes
-  communicate the course. The checker is the only painted race marking.
+- The approved translucent course paint may have subtle hand-painted edge markings.
+  No highway-style dashed centerlines, raised kerbs, or hard-edged gameplay-zone
+  rectangles. Household objects, material changes and the checker remain readable.
 - Generated routes use the themed `TrackSurface` directly and must not add the
   old `TrackRibbon`, whose triangulation produced artifacts in concave routes.
 - Gameplay surfaces use feathered low-opacity material tints and seeded,
@@ -252,8 +253,12 @@ line.
   side-face, theme-colored edge and top lip. Recovery begins at that
   visible contact edge; do not send the concave island through convex
   decomposition.
-- Themed course rails are deliberately sparse real assets. Eight deterministic
-  sectors describe the actual placed sides, with a reserved open-apron sector.
+- Themed course rails are real assets drawn from the existing layout boundary pool
+  and story delimiters. `boundary_density` in `data/environment_composition.json`
+  controls seed-varying count and cluster size, scaled by lap length and bounded
+  for large circuits without collapsing every long seed to the same count.
+  Eight deterministic sectors describe the actual placed sides, including both-sided
+  clusters and a reserved open-apron sector with a collision-free exit path.
   A physically tight placement selects another legal object or location rather
   than shrinking art or violating clearance. Kitchen mixes fork, spoon, chopstick,
   and cork rails; Workshop mixes paint stirrer, dowel, clamp, ruler, and nail
@@ -262,6 +267,13 @@ line.
   center. Neighboring rail footprints do not overlap, and story placement
   reserves the existing physical boundaries and posts. An empty run means open
   drivable apron, never hidden collision.
+- Permanent on-course obstacles use the existing AI-safe planner, with target
+  ranges of 1–4, 2–6 and 3–8 by act. Targets may underfill if no safe placement
+  exists; never reduce the 1.6-car viable corridor or either racing-line clearance
+  to reach a quota. The obstacle stream remains independent of route geometry.
+- Footprint sweeps reject distant segment AABBs before the unchanged narrow-phase
+  checks. The optimized result is regression-checked against an exhaustive sweep;
+  denser scenery must not trade collision accuracy for placement speed.
 - Every ordered checkpoint `Area2D` is asymmetric: its inner endpoint stops at
   `HALF_WIDTH` or the raised island, while its outer endpoint reaches the room
   wall. Inner grass does not trip the gate, but legal outer-apron lines do. The

@@ -275,7 +275,7 @@ func _prepare_race_async() -> void:
 		# The director swaps in this circuit's score directly on Starting Grid.
 		director.call("play_race_music")
 		for entry: Dictionary in _build_field_racers_for_preparation():
-			director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")))
+			await director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")), _loading_step.bind("Preparing race audio"))
 			await _loading_step("Preparing race audio")
 	for frame in 3:
 		await _loading_step("Warming graphics for the starting grid")

@@ -1,5 +1,9 @@
 {
-  "version":1,
+  "version":2,
+  "boundary_density":{
+    "per_1000_mm":[2.8,5.8],"minimum":12,"maximum":72,
+    "cluster_size":[2,4],"gap_mm":[8,22],"search_stride_mm":24,"search_attempts":24
+  },
   "themes":{
     "kitchen":{
       "support":["tabletop/mug_patterned.png","tabletop/bowl_patterned.png","imagine/bottle_top.png","kitchen/apple_cartoon.png","tabletop/espresso_mug.png"],

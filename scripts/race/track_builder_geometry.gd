@@ -288,12 +288,19 @@ static func line_sweep_clears_footprint(
 		return true
 	if shape_kind == &"circle":
 		var radius := maxf(size.x, size.y) * 0.5 + hull_radius
+		var bounds := Rect2(center - Vector2.ONE * radius, Vector2.ONE * radius * 2.0)
 		for index in line.size():
+			if not bounds.intersects(Rect2(line[index], line[(index + 1) % line.size()] - line[index]).abs(), true):
+				continue
 			if point_to_segment_distance(center, line[index], line[(index + 1) % line.size()]) < radius:
 				return false
 		return true
 	var expanded_half_size := size * 0.5 + Vector2.ONE * hull_radius
+	var radius := expanded_half_size.length()
+	var bounds := Rect2(center - Vector2.ONE * radius, Vector2.ONE * radius * 2.0)
 	for index in line.size():
+		if not bounds.intersects(Rect2(line[index], line[(index + 1) % line.size()] - line[index]).abs(), true):
+			continue
 		var local_from := (line[index] - center).rotated(-rotation)
 		var local_to := (line[(index + 1) % line.size()] - center).rotated(-rotation)
 		if segment_intersects_axis_rect(local_from, local_to, expanded_half_size):

@@ -83,7 +83,7 @@ func _ready() -> void:
 	if director:
 		for racer: Dictionary in field_racers:
 			await _pilot_stage("Preparing race audio")
-			director.call("warm_vehicle_audio", String(racer["vehicle_id"]))
+			await director.call("warm_vehicle_audio", String(racer["vehicle_id"]), _pilot_stage.bind("Preparing race audio"))
 	await _pilot_stage("Setting the starting grid")
 	_complete_race_setup(not capture_mode)
 	is_preparing = false
