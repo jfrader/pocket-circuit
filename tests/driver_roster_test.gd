@@ -55,6 +55,19 @@ func _run_test() -> void:
 	if not _expect(ids.size() == 3 and names.size() == 3, "exactly 3 unique driver identities"):
 		return
 
+	# every field mixes routing personalities: a short-cut taker and a patient
+	# driver are always present, so no roster is three identical strangers
+	for probe_seed in [5, 77, 4242, 900001]:
+		var field := ROSTER.create(probe_seed, vehicles8, 3)
+		if not _expect(not field.is_empty(), "field probe seed %d should generate" % probe_seed):
+			return
+		var takers := 0
+		for op: Dictionary in field["opponents"]:
+			if float(op["ai_style"]["shortcut_preference"]) >= 1.10:
+				takers += 1
+		if not _expect(takers >= 1 and takers < 3, "seed %d should field both a short-cut taker and a patient driver, not %d takers of 3" % [probe_seed, takers]):
+			return
+
 	# car variety (without replacement where possible)
 	var used_v := {}
 	for op: Dictionary in r1["opponents"]:
@@ -116,7 +129,7 @@ func _run_test() -> void:
 		return
 	var bad_ai := r1.duplicate(true)
 	bad_ai["opponents"][0]["ai_style"]["corner_pace"] = 9.9
-	if not _expect(ROSTER.normalize(bad_ai, vehicles4, 3).is_empty(), "out of range ai_style -> empty"):
+	if not _expect(ROSTER.normalize(bad_ai, vehicles4, 3).is_empty(), "an invented ai_style must be rejected, not clamped"):
 		return
 	var bad_art := r1.duplicate(true)
 	bad_art["opponents"][0]["avatar_art"]["seed"] = -1

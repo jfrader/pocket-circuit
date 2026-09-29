@@ -27,16 +27,21 @@ func _run_test() -> void:
 			return
 		if not _expect(event.has("reverse") and event.has("race_format") and event.has("opponent_count"), "every event should declare direction, race format, and opponent count"):
 			return
+		if not _expect(not event.has("opponents"), "the catalog should not name drivers; the active roster supplies them"):
+			return
 		var expected_opponents := 1 if String(event["race_format"]) == "rival_duel" else 3
-		if not _expect(int(event["opponent_count"]) == expected_opponents and (event["opponents"] as Array).size() == expected_opponents, "catalog race size should match its explicit format"):
+		if not _expect(int(event["opponent_count"]) == expected_opponents, "catalog race size should match its explicit format"):
+			return
+		var text := "%s %s" % [String(event.get("story", "")), String(event.get("rival_line", ""))]
+		if not _expect(text.contains(CATALOG.RIVAL_TOKEN) and not text.contains("Juniper") and not text.contains("Milo") and not text.contains("Tess") and not text.contains("Cass"), "event narrative should name the rival through the roster token, not a fixed cast member"):
 			return
 	if not _expect(bool(CATALOG.get_event("kitchen_mug_run")["reverse"]) and bool(CATALOG.get_event("workshop_ruler_drop")["reverse"]) and bool(CATALOG.get_event("office_keyboard_cut")["reverse"]), "each act's second event should run in reverse"):
 		return
 	if not _expect(not bool(CATALOG.get_event("office_last_light")["reverse"]) and String(CATALOG.get_event("office_last_light")["race_format"]) == "circuit", "the grand final should remain a four-car forward circuit"):
 		return
-	if not _expect(CATALOG.get_event("kitchen_clean_line")["opponents"] == ["juniper"] and CATALOG.get_event("workshop_heavy_metal")["opponents"] == ["milo"], "rival duels should name exactly one opponent"):
+	if not _expect(int(CATALOG.get_event("kitchen_clean_line")["opponent_count"]) == 1 and int(CATALOG.get_event("workshop_heavy_metal")["opponent_count"]) == 1, "rival duels should face exactly one opponent"):
 		return
-	if not _expect(CATALOG.get_event("kitchen_crumb_rush")["opponents"].size() == 3 and CATALOG.get_event("office_last_light")["opponents"].size() == 3, "normal events should retain three opponents"):
+	if not _expect(int(CATALOG.get_event("kitchen_crumb_rush")["opponent_count"]) == 3 and int(CATALOG.get_event("office_last_light")["opponent_count"]) == 3, "normal events should field three opponents"):
 		return
 	if not _expect([CATALOG.score_for_finish(1), CATALOG.score_for_finish(2), CATALOG.score_for_finish(3), CATALOG.score_for_finish(4)] == [10, 7, 5, 3], "finish points should be 10/7/5/3"):
 		return

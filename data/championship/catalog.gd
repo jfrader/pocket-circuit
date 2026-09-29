@@ -1,6 +1,12 @@
 class_name ChampionshipCatalog
 extends RefCounted
 
+const DriverDirectory := preload("res://scripts/progression/driver_directory.gd")
+
+## Narrative placeholders. `{rival}` is the generated opponent who fronts the
+## event; the cast names are gone so any roster can tell the same story.
+const RIVAL_TOKEN := "{rival}"
+
 const POINTS_BY_FINISH := {1: 10, 2: 7, 3: 5, 4: 3}
 const SECOND_EVENT_GATE := 10
 const FINALE_GATE := 20
@@ -332,8 +338,7 @@ const EVENTS := [
 		"theme": "kitchen", "reverse": false, "race_format": "circuit", "opponent_count": 3,
 		"unlock": "Start", "gate": 0, "finale": false,
 		"story": "Inez rolls the repaired Rustbug onto the counter: one clean run before the kettle clicks off.",
-		"rival_line": "Juniper: Keep the crumbs behind you, rookie. They hide bad lines.",
-		"opponents": ["juniper", "milo", "tess"],
+		"rival_line": "{rival}: Keep the crumbs behind you, rookie. They hide bad lines.",
 		"length_tier": "compact",
 	},
 	{
@@ -342,8 +347,7 @@ const EVENTS := [
 		"theme": "kitchen", "reverse": true, "race_format": "circuit", "opponent_count": 3,
 		"unlock": "10 act points", "gate": 10, "finale": false,
 		"story": "The circuit turns back through the mug shadows, where every shortcut narrows to a saucer's edge.",
-		"rival_line": "Juniper: Reverse lines expose every lazy turn. Show me yours.",
-		"opponents": ["juniper", "milo", "cass"],
+		"rival_line": "{rival}: Reverse lines expose every lazy turn. Show me yours.",
 		"length_tier": "standard",
 	},
 	{
@@ -351,9 +355,8 @@ const EVENTS := [
 		"environment": "Kitchen Counter", "format": "Rival duel, first to finish", "laps": 3,
 		"theme": "kitchen", "reverse": false, "race_format": "rival_duel", "opponent_count": 1,
 		"unlock": "20 act points; Pinbolt", "gate": 20, "finale": true,
-		"story": "Juniper waits at the chalk line while Inez tightens one last wheel nut by hand.",
-		"rival_line": "Juniper: Beat my clean line and the Pinbolt is yours to understand.",
-		"opponents": ["juniper"],
+		"story": "{rival} waits at the chalk line while Inez tightens one last wheel nut by hand.",
+		"rival_line": "{rival}: Beat my clean line and the Pinbolt is yours to understand.",
 		"length_tier": "standard",
 	},
 	{
@@ -362,8 +365,7 @@ const EVENTS := [
 		"theme": "workshop", "reverse": false, "race_format": "circuit", "opponent_count": 3,
 		"unlock": "Win Act I", "gate": 0, "finale": false,
 		"story": "The workshop league starts between loose washers and a drill bit still warm from the day shift.",
-		"rival_line": "Milo: If it rattles, it races. Try not to become another spare part.",
-		"opponents": ["milo", "juniper", "cass"],
+		"rival_line": "{rival}: If it rattles, it races. Try not to become another spare part.",
 		"length_tier": "long",
 	},
 	{
@@ -372,8 +374,7 @@ const EVENTS := [
 		"theme": "workshop", "reverse": true, "race_format": "circuit", "opponent_count": 3,
 		"unlock": "10 act points", "gate": 10, "finale": false,
 		"story": "A steel ruler bridges the return route, flexing under four tiny machines and one enormous wager.",
-		"rival_line": "Milo: The ruler only feels narrow if you plan on braking.",
-		"opponents": ["milo", "tess", "juniper"],
+		"rival_line": "{rival}: The ruler only feels narrow if you plan on braking.",
 		"length_tier": "long",
 	},
 	{
@@ -381,9 +382,8 @@ const EVENTS := [
 		"environment": "Workshop Bench", "format": "Rival duel, first to finish", "laps": 3,
 		"theme": "workshop", "reverse": false, "race_format": "rival_duel", "opponent_count": 1,
 		"unlock": "20 act points; Scrapjaw", "gate": 20, "finale": true,
-		"story": "Milo parks the Scrapjaw across the start stripe, grinning as the bench lamps hum awake.",
-		"rival_line": "Milo: Win this and I stop calling that Rustbug a paperweight.",
-		"opponents": ["milo"],
+		"story": "{rival} parks across the start stripe, grinning as the bench lamps hum awake.",
+		"rival_line": "{rival}: Win this and I stop calling that Rustbug a paperweight.",
 		"length_tier": "endurance",
 	},
 	{
@@ -391,9 +391,8 @@ const EVENTS := [
 		"environment": "Office Desk", "format": "2-lap circuit", "laps": 2,
 		"theme": "office", "reverse": false, "race_format": "circuit", "opponent_count": 3,
 		"unlock": "Win Act II", "gate": 0, "finale": false,
-		"story": "Rae reaches the silent office with sunrise paling the blinds and Cass already watching the clock.",
-		"rival_line": "Tess: Paper moves under pressure. So do drivers.",
-		"opponents": ["tess", "cass", "milo"],
+		"story": "Rae reaches the silent office with sunrise paling the blinds and {rival} already watching the clock.",
+		"rival_line": "{rival}: Paper moves under pressure. So do drivers.",
 		"length_tier": "endurance",
 	},
 	{
@@ -402,8 +401,7 @@ const EVENTS := [
 		"theme": "office", "reverse": true, "race_format": "circuit", "opponent_count": 3,
 		"unlock": "10 act points", "gate": 10, "finale": false,
 		"story": "The reverse route dives between keycaps, each gap daring Rae to trade patience for speed.",
-		"rival_line": "Tess: Hold the drift past Enter. Lift early and Cass will notice.",
-		"opponents": ["tess", "cass", "juniper"],
+		"rival_line": "{rival}: Hold the drift past Enter. Lift early and the others will notice.",
 		"length_tier": "endurance",
 	},
 	{
@@ -412,8 +410,7 @@ const EVENTS := [
 		"theme": "office", "reverse": false, "race_format": "circuit", "opponent_count": 3,
 		"unlock": "20 act points; Flicker and ending", "gate": 20, "finale": true,
 		"story": "The last desk lamp burns above the Grand Household Circuit. One race decides whether rookies keep a place on it.",
-		"rival_line": "Cass: You earned the grid, Rae. Now earn the circuit.",
-		"opponents": ["cass", "tess", "milo"],
+		"rival_line": "{rival}: You earned the grid, Rae. Now earn the circuit.",
 		"length_tier": "marathon",
 	},
 ]
@@ -445,6 +442,9 @@ static func get_vehicle(vehicle_id: String) -> Dictionary:
 
 
 static func get_driver(driver_id: String) -> Dictionary:
+	var generated := DriverDirectory.get_driver(driver_id)
+	if not generated.is_empty():
+		return generated
 	for driver: Dictionary in CAST:
 		if String(driver["id"]) == driver_id:
 			return driver.duplicate(true)

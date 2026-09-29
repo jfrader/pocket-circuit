@@ -4,6 +4,7 @@ extends Control
 const CATALOG := preload("res://data/championship/catalog.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
+const DriverDirectory := preload("res://scripts/progression/driver_directory.gd")
 const CAR_ASPECT := 0.75
 const CARD_ASPECT := 1.24
 const STAT_KEYS: Array[String] = ["speed", "grip", "mass", "drift"]
@@ -68,6 +69,8 @@ static func draw_car(item: CanvasItem, center: Vector2, length: float, id: Strin
 
 
 static func draw_portrait_card(item: CanvasItem, center: Vector2, width: float, id: String, angle: float, captioned: bool = true) -> void:
+	if id.is_empty():
+		return
 	var payload := IDENTITIES.avatar_payload(id)
 	var texture := IDENTITIES.avatar_texture(id)
 	if payload.is_empty() or texture == null:
@@ -116,7 +119,12 @@ static func smooth_path(points: Array[Vector2], samples: int) -> PackedVector2Ar
 	return path
 
 
+## The rival who fronts an act. A generated roster answers first, using the same
+## per-act slot the duel itself takes, so the map shows the driver you actually face.
 static func act_rival(act_number: int) -> String:
+	var installed := DriverDirectory.installed_ids()
+	if not installed.is_empty():
+		return installed[(maxi(1, act_number) - 1) % installed.size()]
 	for event: Dictionary in CATALOG.EVENTS:
 		var opponents: Array = event.get("opponents", [])
 		if int(event.get("act", 0)) == act_number and not opponents.is_empty():
