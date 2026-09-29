@@ -25,11 +25,12 @@ func _run_test() -> void:
 				return
 			var layers: Dictionary = art.render(p, true)
 			var face_layer: Image = layers["face"]
-			var mismatches: int = _count_opaque_mirror_mismatches(face_layer, 0.05)
-			# tol=90 (~0.55%) justified for subsample raster of _symmetric head in face layer (y 22-104 clip).
-			# This and facing-mirror are the cheap fixture that would have failed on pre-GURI-1302 3/4-turned art.
-			var tol: int = 90
-			if not _expect(mismatches <= tol, "face_shape=%s seed=%d head not mirror sym (mismatches=%d > %d)" % [fs, sd, mismatches, tol]):
+			var mismatches: int = _count_silhouette_edge_mismatches(face_layer, 22, 104)
+			# The head silhouette is symmetric by construction; interior shading is
+			# deliberately one-sided (single light), so only the outline is asserted.
+			# This and the facing mirror are the cheap fixtures that would have failed
+			# on the pre-GURI-1302 three-quarter-turned art.
+			if not _expect(mismatches == 0, "face_shape=%s seed=%d head silhouette not mirror sym (rows=%d)" % [fs, sd, mismatches]):
 				return
 
 	# sample every trait value
@@ -65,26 +66,31 @@ func _run_test() -> void:
 		var rp: Image = art.render(pr, true)["portrait"]
 		var lp: Image = art.render(pl, true)["portrait"]
 		var md: int = _count_facing_mirror_mismatches(rp, lp, 0.004)
-		var mtol: int = 66
-		if not _expect(md <= mtol, "facing not mirror seed=%d (mismatches=%d)" % [sd, md]): return
+		if not _expect(md == 0, "facing not an exact mirror seed=%d (mismatches=%d)" % [sd, md]): return
 
 	print("AVATAR_EXPRESSION_TEST PASS")
 	quit(0)
 
 
-func _count_opaque_mirror_mismatches(img: Image, a_thresh: float) -> int:
+func _count_silhouette_edge_mismatches(img: Image, y_from: int, y_to: int) -> int:
 	var cx: int = int(Art.CX)
-	var mis: int = 0
-	var h: int = Art.SIZE
-	for y in range(22, 104):
-		for d in range(1, cx):
-			var xl: int = cx - d
-			var xr: int = cx + d
-			if xr >= h: break
-			var al: bool = img.get_pixel(xl, y).a > a_thresh
-			var ar: bool = img.get_pixel(xr, y).a > a_thresh
-			if al != ar: mis += 1
-	return mis
+	var rows: int = 0
+	for y in range(y_from, y_to):
+		var left := -1
+		var right := -1
+		for x in range(0, cx):
+			if img.get_pixel(x, y).a > 0.05:
+				left = x
+				break
+		for x in range(Art.SIZE - 1, cx - 1, -1):
+			if img.get_pixel(x, y).a > 0.05:
+				right = x
+				break
+		if left < 0 or right < 0:
+			continue
+		if absi((cx - left) - (right - cx)) > 1:
+			rows += 1
+	return rows
 
 
 func _count_facing_mirror_mismatches(rp: Image, lp: Image, tol: float) -> int:
@@ -105,7 +111,7 @@ func _check_no_drooping_mouth(mimg: Image, ms: String) -> bool:
 	var my := _bottom_ink_y(mimg, 64, reg, th)
 	var ly := _bottom_ink_y(mimg, reg.position.x + 4, reg, th)
 	var ry := _bottom_ink_y(mimg, reg.end.x - 5, reg, th)
-	var tol := 2
+	var tol := 1
 	if not _expect(ly <= my + tol, "mouth %s left corner y lower than mid" % ms): return false
 	if not _expect(ry <= my + tol, "mouth %s right corner y lower than mid" % ms): return false
 	return true
@@ -159,7 +165,7 @@ func _check_eyes_centred_clean(eimg: Image, pay: Dictionary, port: Image) -> boo
 					il.append(Vector2(x, y))
 				else:
 					ir.append(Vector2(x, y))
-	if not _expect(abs(wl - wr) <= 12, "eye white not symmetric L=%d R=%d" % [wl, wr]): return false
+	if not _expect(abs(wl - wr) <= 6, "eye white not symmetric L=%d R=%d" % [wl, wr]): return false
 	var cl := _centroid(il)
 	var cr := _centroid(ir)
 	if cl.x >= 0.0 and cr.x >= 0.0:
