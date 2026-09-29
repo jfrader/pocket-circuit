@@ -8,20 +8,38 @@ const GENERATOR_VERSION := 1
 const MAX_SEED := 0x7FFFFFFF
 const MAX_OPPONENTS := 8
 const MAX_NAME_LENGTH := 64
-const AI_STEP := 0.01
 const PLAYER_ID := "player"
 const OPPONENT_ROLE := "Racer"
 
 const NAMES_PATH := "res://data/drivers/names.json"
 
-const AI_RANGES := {
-	"corner_pace": Vector2(0.96, 1.04),
-	"brake_timing": Vector2(0.90, 1.10),
-	"boost_eagerness": Vector2(0.94, 1.18),
-	"overtake_aggression": Vector2(0.90, 1.22),
-	"shortcut_preference": Vector2(0.96, 1.16),
-	"line_commitment": Vector2(0.96, 1.10),
+## Opponents are not six independent dice rolls: they get one of the shipped
+## rival personalities, so a field always mixes a short-cut taker, a patient
+## driver and two all-rounders instead of three identical strangers. These are
+## the cast's own tuned profiles, which the AI controller and its tests already
+## validate.
+const PERSONALITIES := {
+	"shortcut": {
+		"corner_pace": 0.96, "brake_timing": 1.02, "boost_eagerness": 1.18,
+		"overtake_aggression": 1.04, "shortcut_preference": 1.16, "line_commitment": 0.96,
+	},
+	"patient": {
+		"corner_pace": 1.01, "brake_timing": 1.1, "boost_eagerness": 0.94,
+		"overtake_aggression": 0.9, "shortcut_preference": 0.96, "line_commitment": 1.1,
+	},
+	"precise": {
+		"corner_pace": 1.04, "brake_timing": 0.9, "boost_eagerness": 1.0,
+		"overtake_aggression": 1.0, "shortcut_preference": 1.0, "line_commitment": 1.06,
+	},
+	"bold": {
+		"corner_pace": 1.02, "brake_timing": 0.97, "boost_eagerness": 1.04,
+		"overtake_aggression": 1.22, "shortcut_preference": 1.08, "line_commitment": 1.04,
+	},
 }
+## The short-cut taker and the patient driver lead every field so a full grid is
+## guaranteed to differ in routing; the two all-rounders swap order per roster.
+const PERSONALITY_ORDER := ["shortcut", "patient", "precise", "bold"]
+const GUARANTEED_PERSONALITIES := 2
 
 static var _names_cache: Dictionary = {}
 
@@ -58,7 +76,7 @@ static func create(seed: int, vehicle_ids: Array, count: int) -> Dictionary:
 		var vehicle_id := _assign_vehicle(opp_seed, vids, used_vehicles)
 
 		var avatar_seed := _derive_avatar_seed(opp_seed, i)
-		var ai_style := _generate_ai_style(opp_seed)
+		var ai_style := _personality_for(seed, i)
 
 		var opp := {
 			"id": op_id,
@@ -128,22 +146,12 @@ static func normalize(raw: Variant, vehicle_ids: Array, count: int) -> Dictionar
 		if style_v is not Dictionary:
 			return {}
 		var style := style_v as Dictionary
-		if style.size() != AI_RANGES.size():
+		if not _is_known_personality(style):
 			return {}
-		var normalized_style := {}
-		for t: String in AI_RANGES:
-			var val: Variant = style.get(t)
-			if (val is not int and val is not float):
-				return {}
-			var f := float(val)
-			var limits: Vector2 = AI_RANGES[t]
-			if not is_finite(f) or not is_equal_approx(f, clampf(f, limits.x, limits.y)):
-				return {}
-			normalized_style[t] = snappedf(f, AI_STEP)
 		norm_opps.append({
 			"id": op["id"], "name": oname, "vehicle_id": ovid,
 			"avatar_art": {"seed": int(art["seed"]), "options": {}},
-			"ai_style": normalized_style, "role": OPPONENT_ROLE,
+			"ai_style": style.duplicate(true), "role": OPPONENT_ROLE,
 		})
 
 	var norm := {
@@ -262,16 +270,40 @@ static func _derive_avatar_seed(opp_seed: int, index: int) -> int:
 	return posmod(_mix_seed(opp_seed, "avatar:%d" % index), MAX_SEED)
 
 
-static func _generate_ai_style(opp_seed: int) -> Dictionary:
-	var out := {}
-	var base := _mix_seed(opp_seed, "ai")
-	for trait_key: String in AI_RANGES:
-		var tseed := _mix_seed(base, trait_key)
-		var rng := RandomNumberGenerator.new()
-		rng.seed = tseed
-		var limits: Vector2 = AI_RANGES[trait_key]
-		out[trait_key] = snappedf(rng.randf_range(limits.x, limits.y), AI_STEP)
-	return out
+## Slot `index` in a roster of `seed`. The first two slots are always the
+## short-cut taker and the patient driver; the rest follow a seeded order, so a
+## full grid mixes behaviour and no two rosters order the all-rounders the same.
+static func _personality_for(seed: int, index: int) -> Dictionary:
+	if index < GUARANTEED_PERSONALITIES:
+		return (PERSONALITIES[PERSONALITY_ORDER[index]] as Dictionary).duplicate()
+	var tail := _seeded_order(seed, PERSONALITY_ORDER.slice(GUARANTEED_PERSONALITIES))
+	return (PERSONALITIES[tail[(index - GUARANTEED_PERSONALITIES) % tail.size()]] as Dictionary).duplicate()
+
+
+## Deterministic ordering: sort by a seed-derived key rather than the global RNG.
+static func _seeded_order(seed: int, names: Array) -> Array:
+	var keyed: Array = []
+	for name: String in names:
+		keyed.append({"name": name, "key": _mix_seed(seed, "order:" + name)})
+	keyed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["key"]) < int(b["key"]))
+	var order: Array = []
+	for entry: Dictionary in keyed:
+		order.append(String(entry["name"]))
+	return order
+
+
+## A saved personality must be one of the shipped profiles, so a roster can never
+## smuggle in an out-of-bounds or half-written style.
+static func _is_known_personality(style: Dictionary) -> bool:
+	for personality: Dictionary in PERSONALITIES.values():
+		var matches := true
+		for trait_key: String in personality:
+			if not style.has(trait_key) or not is_equal_approx(float(style[trait_key]), float(personality[trait_key])):
+				matches = false
+				break
+		if matches and style.size() == personality.size():
+			return true
+	return false
 
 
 static func _roster_fingerprint(roster: Dictionary) -> String:

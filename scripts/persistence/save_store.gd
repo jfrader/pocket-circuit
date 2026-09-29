@@ -36,6 +36,7 @@ func default_data() -> Dictionary:
 		"unlocked_vehicles": ["rustbug"],
 		"selected_vehicle": "rustbug",
 		"player_avatar_seed": PLAYER_AVATAR_DEFAULT_SEED,
+		"driver_roster": {},
 		"mastery_circuit_metrics": {},
 		"mastery_records": [],
 		"personal_ghosts": [],
@@ -197,6 +198,10 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	var selected: Variant = raw.get("selected_vehicle", "rustbug")
 	normalized["selected_vehicle"] = str(selected) if selected is String and selected in unlocked else "rustbug"
 	normalized["player_avatar_seed"] = _bounded_int(raw.get("player_avatar_seed"), 0, PLAYER_AVATAR_MAX_SEED, PLAYER_AVATAR_DEFAULT_SEED)
+	# The stored shape is validated where the roster model lives, so persistence
+	# only guarantees it is a dictionary rather than inventing domain rules.
+	var stored_roster: Variant = raw.get("driver_roster")
+	normalized["driver_roster"] = (stored_roster as Dictionary).duplicate(true) if stored_roster is Dictionary else {}
 
 	var difficulty: Variant = raw.get("difficulty", "club_circuit")
 	if difficulty is String and difficulty in VALID_DIFFICULTIES:
@@ -224,7 +229,10 @@ func _derive_progress(raw_finishes: Dictionary) -> Dictionary:
 	}
 	for event: Dictionary in CATALOG.EVENTS:
 		var event_id := String(event["id"])
-		var racer_count := clampi((event.get("opponents", []) as Array).size() + 1, 1, 4)
+		# The event's declared field size survives a roster that supplies the
+		# drivers, so a stored finish is bounded by the race, not by the lineup.
+		var declared := maxi((event.get("opponents", []) as Array).size(), int(event.get("opponent_count", 0)))
+		var racer_count := clampi(declared + 1, 1, 4)
 		var finish := _bounded_int(raw_finishes.get(event_id), 1, racer_count, 0)
 		if finish == 0 or not CATALOG.is_event_unlocked(event_id, progress):
 			continue

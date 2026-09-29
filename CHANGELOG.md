@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Every new championship fields its own generated rivals, and each Quick Race brings a new lineup driving different cars. Rival names follow the roster into briefings, the route board and the race, so no two campaigns share the same grid.
 - Outer track edges now have coherent, colliding sets of pencils, pens, utensils, straightedges and workshop hardware. Each set stays on the outside and follows the edge as a unit; inner props and scattered crumbs no longer count as outer framing. This physical-layout update advances the generator version.
 - Generated tracks restore colliding household objects along both sides of the course, with seed-varying clusters and quantities. Pens, rulers, sticks, utensils and workshop rails keep their real sizes and leave an open exit to the apron.
 - On-course obstacle targets now vary from 1–4, 2–6 and 3–8 by act, with more small household objects to steer around. AI passing space, checkpoints and recovery clearances are unchanged. These physical-layout changes advance the generator version; older circuit codes and lap/ghost records no longer match.
