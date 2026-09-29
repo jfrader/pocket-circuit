@@ -67,6 +67,26 @@ const APRON_COLLIDER_CLEARANCE := 36.0
 const FLAT_DRESSING_ROUTE_CLEARANCE := 12.0
 const ROOM_EDGE_TILE_WORLD_LENGTH := 1024.0
 const RACING_LINE_HULL_RADIUS := 22.0
+## An exploitable corner cut is one where the outside line leaves the road deeply
+## for a sustained stretch and is meaningfully shorter than the road itself. The
+## island wall already stops cuts into the middle; this describes the outer side,
+## which is bounded only by physical props. Clipping the painted edge or using the
+## apron to recover is intended, so those excursions must not count.
+const CUT_TURN_THRESHOLD := 0.18
+const CUT_MIN_LOOKAHEAD := 5
+const CUT_MAX_LOOKAHEAD := 32
+const CUT_SAMPLES := 41
+const CUT_MIN_OFF_CORRIDOR_MM := 40.0
+const CUT_MIN_DEEP_SAMPLES := 3
+const CUT_MIN_SAVED_MM := 50.0
+const CUT_MIN_ARC_RATIO := 1.25
+## A fold is two stretches of lap that pass close together but sit far apart along
+## the lap. Crossing the apron between them skips the most track, and it is the
+## shape the user described: a corner that turns in toward the island and then
+## back out again.
+const CUT_FOLD_MAX_SPACING_MM := 1400.0
+const CUT_FOLD_MIN_LAP_FRACTION := 0.12
+
 const VEHICLE_WIDTH := 44.0
 const MIN_VIABLE_CORRIDOR_WIDTH := VEHICLE_WIDTH * 1.6
 const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
@@ -647,6 +667,38 @@ static func _pick_straight_candidate(
 		minimum_separation: int
 ) -> int:
 	return TRACK_BUILDER_DRESSING.pick_straight_candidate(candidates, centerline, gate_samples, excluded, minimum_separation)
+
+
+## The shared definition of an exploitable cut, used by both the planner, which
+## must block these arcs, and the regression, which checks none survive.
+static func exploitable_cut(centerline: PackedVector2Array, start: int, lookahead: int) -> Dictionary:
+	var verdict := {"exploitable": false, "deep": 0, "saved": 0.0, "ratio": 1.0}
+	var count := centerline.size()
+	if count < CUT_MAX_LOOKAHEAD * 2:
+		return verdict
+	var a: Vector2 = centerline[start]
+	var finish := (start + lookahead) % count
+	var b: Vector2 = centerline[finish]
+	var deep := 0
+	for sample in CUT_SAMPLES:
+		var t := float(sample) / float(CUT_SAMPLES - 1)
+		var point := a.lerp(b, t)
+		if _distance_to_centerline(point, centerline) > HALF_WIDTH + CUT_MIN_OFF_CORRIDOR_MM:
+			deep += 1
+	verdict["deep"] = deep
+	if deep < CUT_MIN_DEEP_SAMPLES:
+		return verdict
+	var arc := 0.0
+	var walk := start
+	while walk != finish:
+		var following := (walk + 1) % count
+		arc += centerline[walk].distance_to(centerline[following])
+		walk = following
+	var chord := a.distance_to(b)
+	verdict["saved"] = arc - chord
+	verdict["ratio"] = arc / maxf(chord, 0.001)
+	verdict["exploitable"] = arc - chord >= CUT_MIN_SAVED_MM and arc >= chord * CUT_MIN_ARC_RATIO
+	return verdict
 
 
 static func _turn_strength(centerline: PackedVector2Array, index: int, span: int) -> float:
