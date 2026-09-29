@@ -323,7 +323,8 @@ func _check_environment_plan(track: Node2D, theme: StringName, seed: int) -> boo
 			return false
 	if not _expect(int(counts.get("focal", 0)) == 1 and int(counts.get("support", 0)) >= 2, "%s/%d requires one focal anchor with supporting objects" % [theme, seed]):
 		return false
-	if not _expect(int(counts.get("micro", 0)) <= 8 and int(counts.get("boundary", 0)) <= 8 and plan.size() <= 37, "density must stay clustered and restrained"):
+	var boundary_limit := int(WorldEnvironmentCatalog.boundary_density()["maximum"])
+	if not _expect(int(counts.get("micro", 0)) <= 8 and int(counts.get("boundary", 0)) <= boundary_limit and plan.size() <= 29 + boundary_limit, "density must respect the configured bounded role budgets"):
 		return false
 	return true
 
@@ -442,6 +443,16 @@ func _check_open_boundary_assets(track: Node2D, theme: StringName, seed: int) ->
 
 
 func _has_clear_open_apron_path(track: Node2D, visuals: Node, centerline: PackedVector2Array) -> bool:
+	var planned_exit: PackedVector2Array = visuals.get_meta("open_exit", PackedVector2Array())
+	if planned_exit.size() == 2:
+		var room: PackedVector2Array = track.get_meta("room_polygon")
+		var island: PackedVector2Array = track.get_meta("island_invalid_polygon")
+		if not Geometry2D.is_point_in_polygon(planned_exit[1], room) or Geometry2D.is_point_in_polygon(planned_exit[1], island):
+			return false
+		for step in 7:
+			if not _point_clear_of_static_colliders(track, planned_exit[0].lerp(planned_exit[1], float(step + 1) / 7.0), 16.0):
+				return false
+		return true
 	var run_modes: Array = visuals.get_meta("run_modes", [])
 	var open_run := run_modes.find(&"none")
 	if open_run < 0:

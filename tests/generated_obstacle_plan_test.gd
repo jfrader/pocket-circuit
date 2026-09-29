@@ -6,9 +6,9 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const VISUAL_ROLE := preload("res://scripts/race/generated_world_visual_role.gd")
 
 const CASES := [
-	{"theme": &"kitchen", "act": 1, "range": Vector2i(0, 1), "seed": 3},
-	{"theme": &"workshop", "act": 2, "range": Vector2i(1, 2), "seed": 5},
-	{"theme": &"office", "act": 3, "range": Vector2i(2, 3), "seed": 8},
+	{"theme": &"kitchen", "act": 1, "range": Vector2i(1, 4), "seed": 3},
+	{"theme": &"workshop", "act": 2, "range": Vector2i(2, 6), "seed": 5},
+	{"theme": &"office", "act": 3, "range": Vector2i(3, 8), "seed": 8},
 ]
 
 
@@ -152,7 +152,7 @@ func _check_built_metadata() -> bool:
 	var track := (built["scene"] as PackedScene).instantiate() as Node2D
 	var container := track.get_node_or_null("PermanentObstacles") as Node2D
 	var plan: Array = track.get_meta("generated_obstacle_plan", [])
-	if not _expect(container != null and container.get_child_count() == plan.size() and plan.size() >= 2, "built Office track should realize its 2-3 planned permanent obstacles"):
+	if not _expect(container != null and container.get_child_count() == plan.size() and plan.size() >= 3, "built Office track should realize its planned permanent obstacles"):
 		track.free()
 		return false
 	var plan_by_id := {}

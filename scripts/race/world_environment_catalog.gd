@@ -46,6 +46,11 @@ static func all_assets() -> Array[Dictionary]:
 	return result
 
 
+static func boundary_density() -> Dictionary:
+	_load()
+	return (_composition["boundary_density"] as Dictionary).duplicate(true)
+
+
 static func candidates(theme: StringName, story: Dictionary, layout: Dictionary) -> Array[Dictionary]:
 	_load()
 	var selected := {}
@@ -56,14 +61,18 @@ static func candidates(theme: StringName, story: Dictionary, layout: Dictionary)
 	_include(selected, theme, story.get("landmarks", []), "focal", 3.0)
 	_include(selected, theme, story.get("object_line", {}), "support", 2.0)
 	_include(selected, theme, story.get("delimiter", {}), "boundary", 1.0)
+	_include(selected, theme, (layout.get("generated_boundary", {}) as Dictionary).get("sections", []), "boundary", 1.0)
 	_include(selected, theme, layout.get("ground_sections", []), "ground", 1.0)
 	_include(selected, theme, layout.get("edge_decor", []), "micro", 1.0)
+	_include(selected, theme, layout.get("edge_decor", []), "boundary", 1.0)
 	_include(selected, theme, layout.get("ambient_props", []), "support", 2.0)
 	_include(selected, theme, layout.get("decals", []), "decal", 0.5)
 	var supporting_families: Dictionary = _composition["themes"][String(theme)]
 	for role: String in supporting_families:
 		for path: String in supporting_families[role]:
 			_include(selected, theme, PREFIX + path, role, 1.5)
+			if role == "micro":
+				_include(selected, theme, PREFIX + path, "boundary", 1.0)
 	var result: Array[Dictionary] = []
 	for asset: Dictionary in selected.values():
 		result.append(asset)
@@ -80,6 +89,8 @@ static func _include(selected: Dictionary, theme: StringName, value: Variant, ro
 	elif (value is String or value is StringName) and String(value).begins_with(PREFIX):
 		var asset := for_path(String(value))
 		if asset.is_empty() or String(theme) not in asset["themes"] or asset.get("kind", "prop") != "prop" or not bool(asset.get("scenery", true)):
+			return
+		if role == "boundary" and String(asset.get("collision", "flat")) == "flat":
 			return
 		var id := String(asset["id"])
 		if not selected.has(id):

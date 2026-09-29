@@ -13,15 +13,24 @@ static var GENERATED_OBSTACLE_TYPES := {
 	&"kitchen": [
 		{"id": &"dropped_strawberry", "asset": "res://assets/textures/imagine/strawberry.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 		{"id": &"biscuit", "asset": "res://assets/textures/tabletop/biscuit.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"round_biscuit", "asset": "res://assets/textures/tabletop/biscuit_round.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"jar_lid", "asset": "res://assets/textures/tabletop/jar_lid.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"cereal_ring", "asset": "res://assets/textures/tabletop/cereal_ring.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 	],
 	&"workshop": [
 		{"id": &"loose_washer", "asset": "res://assets/textures/edge_dressing/workshop_washer_micro.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 		{"id": &"loose_nut", "asset": "res://assets/textures/imagine/hazard_workshop_socket.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"loose_bolt", "asset": "res://assets/textures/imagine/bolt.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"loose_screw", "asset": "res://assets/textures/imagine/screw.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"loose_nail", "asset": "res://assets/textures/edge_dressing/workshop_nail_micro.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 	],
 	&"office": [
 		{"id": &"loose_paperclip", "asset": "res://assets/textures/imagine/paperclip.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 		{"id": &"dropped_eraser", "asset": "res://assets/textures/tabletop/eraser.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 		{"id": &"binder_clip", "asset": "res://assets/textures/edge_dressing/office_binder_clip_micro.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"pen_cap", "asset": "res://assets/textures/edge_dressing/office_pen_cap_micro.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"push_pin", "asset": "res://assets/textures/edge_dressing/office_push_pin_micro.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
+		{"id": &"loose_pencil", "asset": "res://assets/textures/imagine/pencil.png", "clearance": OBSTACLE_ROUTE_CLEARANCE, "role": &"permanent_obstacle"},
 	],
 }
 

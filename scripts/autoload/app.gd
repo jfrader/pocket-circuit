@@ -651,13 +651,13 @@ func _begin_race_transition(vehicle_id: String = "") -> void:
 		_leave_race_loading()
 		return
 	if is_instance_valid(audio_director):
-		audio_director.call("warm_vehicle_audio", vehicle_id)
+		await audio_director.call("warm_vehicle_audio", vehicle_id, loading_step.bind("Tuning the engine"))
 		for opponent_id in _opponent_audio_vehicle_ids():
 			if _loading_cancelled:
 				_leave_race_loading()
 				return
 			await loading_step("Tuning the engine")
-			audio_director.call("warm_vehicle_audio", opponent_id)
+			await audio_director.call("warm_vehicle_audio", opponent_id, loading_step.bind("Tuning the engine"))
 	await loading_step("Opening the circuit")
 	if _loading_cancelled:
 		_leave_race_loading()
