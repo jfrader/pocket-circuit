@@ -206,7 +206,7 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 			patch_definitions.append(definition)
 	if not _expect(definitions_by_role.has(&"technical") and definitions_by_role.has(&"shortcut"), "%s should expose technical and shortcut surface roles" % theme):
 		return false
-	if not _expect(patch_definitions.size() >= BUILDER.GRIP_PATCH_MIN_COUNT and patch_definitions.size() <= BUILDER.GRIP_PATCH_MAX_COUNT, "%s should expose 4-8 deterministic grip-patch definitions" % theme):
+	if not _expect(patch_definitions.size() >= BUILDER.GRIP_PATCH_MIN_COUNT and patch_definitions.size() <= BUILDER.GRIP_PATCH_MAX_COUNT, "%s should expose 0-%d deterministic grip-patch definitions" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
 		return false
 	var gate_positions := PackedVector2Array()
 	for checkpoint_index in 8:
