@@ -222,10 +222,12 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	var shortcut := track.get_node_or_null("GeneratedMoments/ShortcutDecision")
 	if not _expect(technical_surface != null and shortcut != null, "%s should expose technical and shortcut moments" % theme):
 		return false
-	var surface_regions := track.find_children("SurfaceRegion*", "Polygon2D", false, false)
+	var surface_regions := track.find_children("SurfaceRegion*", "Node2D", false, false)
 	if not _expect(surface_regions.size() == definitions.size(), "%s must render every authoritative grip region" % theme):
 		return false
-	for region: Polygon2D in surface_regions:
+	for region: Node2D in surface_regions:
+		if not _expect(region.get_child_count() > 0, "%s every grip region must retain visible artwork after fitting around solids" % theme):
+			return false
 		var material := region.material as ShaderMaterial
 		if not _expect(material != null and float(material.get_shader_parameter("feather_mm")) > 0.0, "%s grip regions need feathered material boundaries, not stamped rectangles" % theme):
 			return false
@@ -374,11 +376,11 @@ func _check_shadow_helpers() -> bool:
 	var valid := _expect(
 		obstacle_shadow != null
 		and apron_shadow != null
-		and StringName(obstacle_shadow.get_meta("shadow_shape", &"")) == &"rect"
-		and StringName(apron_shadow.get_meta("shadow_shape", &"")) == &"circle"
-		and obstacle_shadow.position.dot(BUILDER.SHADOW_DIRECTION) > 0.0
-		and apron_shadow.position.dot(BUILDER.SHADOW_DIRECTION) > 0.0,
-		"obstacles and apron props should share the shape-aware down-right shadow system"
+		and StringName(obstacle_shadow.get_meta("shadow_shape", &"")) == &"silhouette"
+		and StringName(apron_shadow.get_meta("shadow_shape", &"")) == &"silhouette"
+		and (obstacle_shadow.position - (obstacle.get_node("Sprite") as Sprite2D).position).dot(BUILDER.SHADOW_DIRECTION) > 0.0
+		and (apron_shadow.position - (apron.get_node("Sprite") as Sprite2D).position).dot(BUILDER.SHADOW_DIRECTION) > 0.0,
+		"obstacles and apron props should share silhouette-aligned down-right contact shadows"
 	)
 	sample.free()
 	return valid
@@ -719,7 +721,7 @@ func _check_density_systems(track: Node2D, theme: StringName, seed: int) -> bool
 			return false
 		var contact_shadow := landmark.get_node_or_null("ContactShadow") as Sprite2D
 		var cast_shadow := landmark.get_node_or_null("CastShadow") as Sprite2D
-		var contact_offset := contact_shadow.global_position - landmark.global_position if contact_shadow else Vector2.ZERO
+		var contact_offset := contact_shadow.global_position - (landmark.get_node("Sprite") as Sprite2D).global_position if contact_shadow else Vector2.ZERO
 		var cast_offset := cast_shadow.global_position - landmark.global_position if cast_shadow else Vector2.ZERO
 		if not _expect(contact_shadow != null and cast_shadow != null and contact_offset.dot(BUILDER.SHADOW_DIRECTION) > 0.0 and cast_offset.dot(BUILDER.SHADOW_DIRECTION) > contact_offset.dot(BUILDER.SHADOW_DIRECTION), "%s giant landmark should carry grounded and elongated down-right shadows" % label):
 			return false
@@ -803,8 +805,8 @@ func _check_room_dressing(track: Node2D, theme: StringName, seed: int) -> bool:
 			return false
 		assets[String(prop.get_meta("asset_path", ""))] = true
 		var shadow := prop.get_node_or_null("ContactShadow") as Sprite2D
-		var shadow_offset := shadow.global_position - prop.global_position if shadow else Vector2.ZERO
-		if not _expect(shadow != null and shadow_offset.dot(BUILDER.SHADOW_DIRECTION) > 0.0 and StringName(shadow.get_meta("shadow_shape", &"")) in [&"circle", &"rect"], "%s seed %d ambient prop %s (asset=%s) should use the unified down-right shape-aware shadow (shadow=%s dot=%.3f)" % [theme, seed, prop.name, prop.get_meta("asset_path", "?"), shadow.name if shadow else "null", shadow_offset.dot(BUILDER.SHADOW_DIRECTION)]):
+		var shadow_offset := shadow.global_position - (prop.get_node("Sprite") as Sprite2D).global_position if shadow else Vector2.ZERO
+		if not _expect(shadow != null and shadow_offset.dot(BUILDER.SHADOW_DIRECTION) > 0.0 and StringName(shadow.get_meta("shadow_shape", &"")) == &"silhouette", "%s seed %d ambient prop %s (asset=%s) should use the unified down-right silhouette shadow (shadow=%s dot=%.3f)" % [theme, seed, prop.name, prop.get_meta("asset_path", "?"), shadow.name if shadow else "null", shadow_offset.dot(BUILDER.SHADOW_DIRECTION)]):
 			return false
 		var normalized: Vector2 = (position - bounds.position) / bounds.size
 		sectors[Vector2i(clampi(int(normalized.x * 3.0), 0, 2), clampi(int(normalized.y * 2.0), 0, 1))] = true

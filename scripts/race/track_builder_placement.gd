@@ -288,12 +288,10 @@ static func add_generated_prop(
 	prop.set_meta("formation_index", formation_index)
 	prop.set_meta("size_scale", size_scale)
 	parent.add_child(prop)
-	var radius := asset_radius(texture_path, 24.0) * size_scale
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var bounds := TrackBuilderCore._texture_opaque_rect(texture)
 		var sprite_scale := TrackBuilderCore.PROP_SCALE.sprite_scale(texture, bounds, TrackBuilderCore._prop_visual_size(texture_path, 48.0)) * size_scale
-		TrackBuilderCore._add_directional_shadow(prop, texture_path, radius * 2.0, 1.0, bounds.size * sprite_scale)
 		var entry: Dictionary = TrackBuilderCore.PROP_SHAPES.get(texture_path.get_file(), {})
 		var offset := TrackBuilderCore._add_scaled_texture_collision(prop, texture, sprite_scale, StringName(entry.get("shape", &"circle")))
 		var sprite := Sprite2D.new()
@@ -304,6 +302,7 @@ static func add_generated_prop(
 		sprite.position = -offset
 		TrackBuilderCore._mark_solid_visual(sprite, texture_path, moment_kind)
 		prop.add_child(sprite)
+		TrackBuilderCore._add_directional_shadow(sprite)
 
 
 static func mix_seed(seed: int, stream: String) -> int:

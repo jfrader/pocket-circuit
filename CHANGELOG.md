@@ -16,6 +16,8 @@
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 
 ### Fixed
+- Pencils, utensils and other scenery now have close silhouette-shaped contact shadows instead of appearing suspended above the tabletop.
+- Dirt, spills and paper on Kitchen, Workshop and Office courses retain their natural outlines and gaps instead of overlapping into rectangular slabs. The pale wash beneath them is removed; grip zones and collisions are unchanged.
 - Vehicle-audio warm-up now yields between engine voice, loop and effect synthesis so it does not stall the loading screen in one long batch.
 - Quick Race entries and rerolls cycle through Kitchen, Workshop and Office instead of remaining pinned to Kitchen. The preview and Play action use the selected theme.
 - Course palettes now contrast with both the tabletop and the island, including their appearance after translucent paint is blended over the room surface.

@@ -175,7 +175,6 @@ static func build_generated_outer_boundary_visuals(
 		TrackBuilderCore._mark_solid_body(accent_body, accent_path, &"boundary_prop")
 		container.add_child(accent_body)
 		var accent_offset := TrackBuilderCore._add_texture_collision(accent_body, accent_texture, accent_scale, &"convex", true, 2.0)
-		TrackBuilderCore._add_directional_shadow(accent_body, accent_path, 160.0, 1.0, accent_size)
 		var accent_sprite := Sprite2D.new()
 		accent_sprite.name = "Sprite"
 		accent_sprite.texture = accent_texture
@@ -184,6 +183,7 @@ static func build_generated_outer_boundary_visuals(
 		accent_sprite.position = -accent_offset
 		TrackBuilderCore._mark_solid_visual(accent_sprite, accent_path, &"boundary_prop")
 		accent_body.add_child(accent_sprite)
+		TrackBuilderCore._add_directional_shadow(accent_sprite)
 		accent_count += 1
 	container.set_meta("section_count", section_count)
 	container.set_meta("outer_section_count", outer_section_count)
@@ -297,7 +297,6 @@ static func _try_boundary_section(
 	container.add_child(body)
 	var offset := TrackBuilderCore._add_texture_collision(body, texture, sprite_scale, &"convex", true, 0.0)
 	(body.get_node("AssetCollision") as CollisionShape2D).name = "RailCollision"
-	TrackBuilderCore._add_directional_shadow(body, texture.resource_path, 156.0, 1.0, footprint_size)
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
@@ -306,6 +305,7 @@ static func _try_boundary_section(
 	sprite.position = -offset
 	TrackBuilderCore._mark_solid_visual(sprite, texture.resource_path, &"rail")
 	body.add_child(sprite)
+	TrackBuilderCore._add_directional_shadow(sprite)
 	return true
 
 
