@@ -50,6 +50,7 @@ func _run() -> void:
 		if DisplayServer.get_name() != "headless":
 			await _check_grip_pixels(path)
 	_check(props > 0 and paths.size() > 0, "the regression must exercise actual catalog assets")
+	_check_grip_exclusions()
 	if not failures.is_empty():
 		for message: String in failures:
 			printerr("ENVIRONMENT_GROUNDING_TEST FAIL: ", message)
@@ -122,6 +123,20 @@ func _check_grip_pixels(path: String) -> void:
 	_check(coverage > 0.01 and coverage < 0.5, "%s rendered grip cue must be visible with open gaps, not a filled card (coverage %.3f)" % [path.get_file(), coverage])
 	print("GRIP_PIXEL_COVERAGE ", path, " ", coverage)
 	viewport.free()
+
+func _check_grip_exclusions() -> void:
+	var polygon := PackedVector2Array([Vector2.ZERO, Vector2(240, 0), Vector2(240, 92), Vector2(0, 92)])
+	var post := PackedVector2Array([Vector2(105, 0), Vector2(145, 0), Vector2(145, 70), Vector2(105, 70)])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 6
+	var stamps := ART._grip_stamp_layout(polygon, 40.0, 6, rng, [post])
+	_check(not stamps.is_empty(), "grip art must use the remaining driveable area beside a reserved solid")
+	for stamp: Dictionary in stamps:
+		var point: Vector2 = stamp["position"]
+		_check(not Geometry2D.is_point_in_polygon(point, post), "grip art must not sit on a reserved solid")
+		for edge in post.size():
+			var closest := Geometry2D.get_closest_point_to_segment(point, post[edge], post[(edge + 1) % post.size()])
+			_check(point.distance_to(closest) >= float(stamp["radius"]), "the whole grip stamp must clear reserved collision, not just its center")
 
 func _check(condition: bool, message: String) -> void:
 	if not condition:

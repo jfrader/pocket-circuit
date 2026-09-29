@@ -98,7 +98,7 @@ static func compose(root: Node2D, spec: Dictionary, centerline: PackedVector2Arr
 		if asset.is_empty():
 			continue
 		var name := "SurfaceRegion" + str(surface_index)
-		_draw_grip_surface(root, name, asset, surface["points"], int(spec.get("material_seed", 0)))
+		_draw_grip_surface(root, name, asset, surface["points"], int(spec.get("material_seed", 0)), spec.get("surface_art_exclusions", []))
 		if stage.is_valid():
 			await stage.call("Preparing grip surfaces")
 	if stage.is_valid():
@@ -106,7 +106,7 @@ static func compose(root: Node2D, spec: Dictionary, centerline: PackedVector2Arr
 	SURFACES.apply(root, spec["surface_identity"])
 
 
-static func _draw_grip_surface(root: Node2D, name: String, asset: Dictionary, polygon: PackedVector2Array, seed_value: int) -> void:
+static func _draw_grip_surface(root: Node2D, name: String, asset: Dictionary, polygon: PackedVector2Array, seed_value: int, exclusions: Array[PackedVector2Array] = []) -> void:
 	var points := polygon.duplicate()
 	if points.size() > 64:
 		push_error("Grip contour exceeds shader boundary capacity")
@@ -129,7 +129,7 @@ static func _draw_grip_surface(root: Node2D, name: String, asset: Dictionary, po
 	var used := TrackBuilderCore._texture_opaque_rect(texture)
 	var scale := TrackBuilderCore.PROP_SCALE.sprite_scale(texture, used, float(asset["length_mm"]))
 	var nominal_radius := used.size.length() * scale * 0.5
-	var stamps := _grip_stamp_layout(polygon, nominal_radius, mini(int(asset["max_repeats"]), GRIP_MAX_STAMPS), rng)
+	var stamps := _grip_stamp_layout(polygon, nominal_radius, mini(int(asset["max_repeats"]), GRIP_MAX_STAMPS), rng, exclusions)
 	for index in stamps.size():
 		var stamp: Dictionary = stamps[index]
 		var sprite := Sprite2D.new()
@@ -145,8 +145,12 @@ static func _draw_grip_surface(root: Node2D, name: String, asset: Dictionary, po
 		region.add_child(sprite)
 
 
-static func _grip_stamp_layout(polygon: PackedVector2Array, nominal_radius: float, count: int, rng: RandomNumberGenerator) -> Array[Dictionary]:
+static func _grip_stamp_layout(polygon: PackedVector2Array, nominal_radius: float, count: int, rng: RandomNumberGenerator, exclusions: Array[PackedVector2Array] = []) -> Array[Dictionary]:
 	var bounds := TrackBuilderCore._polygon_bounds_rect(polygon)
+	var nearby: Array[PackedVector2Array] = []
+	for exclusion: PackedVector2Array in exclusions:
+		if bounds.grow(GRIP_STAMP_GAP_MM).intersects(TrackBuilderCore._polygon_bounds_rect(exclusion)):
+			nearby.append(exclusion)
 	var stamps: Array[Dictionary] = []
 	for index in count:
 		var best := {}
@@ -159,6 +163,13 @@ static func _grip_stamp_layout(polygon: PackedVector2Array, nominal_radius: floa
 			for edge in polygon.size():
 				var closest := Geometry2D.get_closest_point_to_segment(point, polygon[edge], polygon[(edge + 1) % polygon.size()])
 				radius = minf(radius, point.distance_to(closest) - GRIP_STAMP_GAP_MM)
+			for exclusion: PackedVector2Array in nearby:
+				if Geometry2D.is_point_in_polygon(point, exclusion):
+					radius = 0.0
+					break
+				for edge in exclusion.size():
+					var closest := Geometry2D.get_closest_point_to_segment(point, exclusion[edge], exclusion[(edge + 1) % exclusion.size()])
+					radius = minf(radius, point.distance_to(closest) - GRIP_STAMP_GAP_MM)
 			for other: Dictionary in stamps:
 				radius = minf(radius, point.distance_to(other["position"]) - float(other["radius"]) - GRIP_STAMP_GAP_MM)
 			if radius > best_radius:
