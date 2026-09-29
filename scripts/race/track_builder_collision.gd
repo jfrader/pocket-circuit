@@ -1,6 +1,11 @@
 class_name TrackBuilderCollision
 ## Texture footprints, colliders, shadows, obstacles, and surface tiles.
 
+const CONTACT_SHADER := preload("res://assets/shaders/prop_contact_shadow.gdshader")
+const CONTACT_OFFSET_WIDTH_RATIO := 0.08
+const CONTACT_MAX_OFFSET_MM := 3.0
+const CONTACT_SOFTNESS_MM := 0.8
+static var _contact_material: ShaderMaterial
 
 static func mark_solid_body(body: CollisionObject2D, texture_path: String, solid_class: StringName) -> void:
 	body.set_meta("collision_contract", TrackBuilderCore.COLLISION_SOLID)
@@ -418,7 +423,6 @@ static func add_boundary_prop(parent: Node, position: Vector2, radius: float, te
 	prop.collision_layer = 16
 	mark_solid_body(prop, texture_path, &"boundary_prop")
 	parent.add_child(prop)
-	add_directional_shadow(prop, texture_path, radius * 2.2)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -432,6 +436,7 @@ static func add_boundary_prop(parent: Node, position: Vector2, radius: float, te
 		sprite.position = -offset
 		mark_solid_visual(sprite, texture_path, &"boundary_prop")
 		prop.add_child(sprite)
+		add_directional_shadow(sprite)
 
 
 static func add_fill_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
@@ -442,7 +447,6 @@ static func add_fill_prop(parent: Node, position: Vector2, radius: float, textur
 	prop.collision_layer = 16
 	mark_solid_body(prop, texture_path, &"island_prop")
 	parent.add_child(prop)
-	add_directional_shadow(prop, texture_path, radius * 2.2)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -457,45 +461,41 @@ static func add_fill_prop(parent: Node, position: Vector2, radius: float, textur
 		sprite.position = -offset
 		mark_solid_visual(sprite, texture_path, &"island_prop")
 		prop.add_child(sprite)
+		add_directional_shadow(sprite)
 
 
 static func add_directional_shadow(
-		parent: Node2D,
-		texture_path: String,
-		fallback_diameter: float,
-		size_scale: float = 1.0,
-		footprint_override: Vector2 = Vector2.ZERO,
-		add_cast_shadow: bool = false,
-		footprint_rotation: float = 0.0
+		sprite: Sprite2D,
+		add_cast_shadow: bool = false
 ) -> void:
-	var entry: Dictionary = TrackBuilderCore.PROP_SHAPES.get(texture_path.get_file(), {})
-	var override: Dictionary = TrackBuilderCore.ASSET_FOOTPRINT_OVERRIDES.get(texture_path.get_file(), {})
-	var shape_kind := StringName(entry.get("shadow_shape", override.get("kind", entry.get("shape", "circle"))))
-	var footprint: Vector2 = footprint_override
-	if footprint.is_zero_approx():
-		footprint = (entry.get("size", Vector2.ONE * fallback_diameter) as Vector2) * size_scale
-	if footprint.x <= 0.0 or footprint.y <= 0.0:
-		footprint = Vector2.ONE * fallback_diameter
-	var shadow_path := TrackBuilderCore.SHADOW_CIRCLE_TEXTURE if shape_kind == &"circle" else TrackBuilderCore.SHADOW_RECT_TEXTURE
-	var shadow_texture := load(shadow_path) as Texture2D
-	if shadow_texture == null:
-		push_error("TrackBuilderCore: directional shadow asset is missing: %s" % shadow_path)
+	var texture_path := sprite.texture.resource_path
+	var asset := WorldEnvironmentCatalog.for_path(texture_path)
+	if asset.get("shadow", "contact") == "none":
 		return
-	var visual_shadow_kind := &"circle" if shape_kind == &"circle" else &"rect"
+	var parent := sprite.get_parent() as Node2D
+	var footprint := texture_opaque_rect(sprite.texture).size * sprite.scale.abs()
 	var longest := maxf(footprint.x, footprint.y)
-	var local_light_direction := TrackBuilderCore.SHADOW_DIRECTION.rotated(-parent.rotation).normalized()
+	var local_light_direction := TrackBuilderCore.SHADOW_DIRECTION.rotated(-parent.global_rotation).normalized()
+	var offset := minf(minf(footprint.x, footprint.y) * CONTACT_OFFSET_WIDTH_RATIO, CONTACT_MAX_OFFSET_MM)
 	var contact := Sprite2D.new()
 	contact.name = "ContactShadow"
-	contact.texture = shadow_texture
+	contact.texture = sprite.texture
 	contact.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	contact.position = local_light_direction * longest * 0.10
-	contact.rotation = footprint_rotation
-	contact.scale = Vector2(footprint.x * 1.08 / shadow_texture.get_width(), footprint.y * 1.08 / shadow_texture.get_height())
+	contact.position = sprite.position + local_light_direction * offset
+	contact.rotation = sprite.rotation
+	contact.scale = sprite.scale
+	contact.flip_h = sprite.flip_h
+	contact.flip_v = sprite.flip_v
+	if _contact_material == null:
+		_contact_material = ShaderMaterial.new()
+		_contact_material.shader = CONTACT_SHADER
+		_contact_material.set_shader_parameter("softness_mm", CONTACT_SOFTNESS_MM)
+	contact.material = _contact_material
 	contact.modulate = TrackBuilderCore.SHADOW_TINT
 	contact.z_index = -2
-	contact.set_meta("shadow_shape", visual_shadow_kind)
+	contact.set_meta("shadow_shape", &"silhouette")
 	contact.set_meta("light_direction", TrackBuilderCore.SHADOW_DIRECTION)
-	mark_flat_visual(contact, shadow_path, &"shadow")
+	mark_flat_visual(contact, texture_path, &"shadow")
 	parent.add_child(contact)
 	if not add_cast_shadow:
 		return
@@ -507,7 +507,7 @@ static func add_directional_shadow(
 	cast.texture = cast_texture
 	cast.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	cast.position = local_light_direction * longest * 0.34
-	cast.rotation = TrackBuilderCore.SHADOW_DIRECTION.angle() - parent.rotation
+	cast.rotation = TrackBuilderCore.SHADOW_DIRECTION.angle() - parent.global_rotation
 	cast.scale = Vector2(longest * 0.56 / cast_texture.get_width(), minf(footprint.x, footprint.y) * 0.66 / cast_texture.get_height())
 	cast.modulate = TrackBuilderCore.GIANT_CAST_SHADOW_TINT
 	cast.z_index = -3
@@ -556,7 +556,6 @@ static func add_planned_obstacle(parent: Node2D, data: Dictionary) -> void:
 	obstacle.set_meta("collision_footprint_size", data["footprint_size"])
 	obstacle.set_meta("collision_shape_kind", shape_kind)
 	obstacle.set_meta("collision_footprint_rotation", 0.0)
-	add_directional_shadow(obstacle, asset_path, maxf(visual_size.x, visual_size.y), 1.0, data["footprint_size"])
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
@@ -566,6 +565,7 @@ static func add_planned_obstacle(parent: Node2D, data: Dictionary) -> void:
 	mark_solid_visual(sprite, asset_path, &"permanent_obstacle")
 	sprite.set_meta("visual_bounds", data["visual_bounds"])
 	obstacle.add_child(sprite)
+	add_directional_shadow(sprite)
 
 
 static func add_obstacle(parent: Node, node_name: String, position: Vector2, radius: float, texture_path: String) -> void:
@@ -575,7 +575,6 @@ static func add_obstacle(parent: Node, node_name: String, position: Vector2, rad
 	obstacle.collision_layer = 2
 	mark_solid_body(obstacle, texture_path, &"obstacle")
 	parent.add_child(obstacle)
-	add_directional_shadow(obstacle, texture_path, radius * 2.4)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -590,6 +589,7 @@ static func add_obstacle(parent: Node, node_name: String, position: Vector2, rad
 		sprite.position = -offset
 		mark_solid_visual(sprite, texture_path, &"obstacle")
 		obstacle.add_child(sprite)
+		add_directional_shadow(sprite)
 
 
 static func add_prop_with_collision(parent: Node, position: Vector2, radius: float, texture_path: String) -> void:
@@ -599,10 +599,10 @@ static func add_prop_with_collision(parent: Node, position: Vector2, radius: flo
 	prop.collision_layer = 2
 	mark_solid_body(prop, texture_path, &"apron_prop")
 	parent.add_child(prop)
-	add_directional_shadow(prop, texture_path, radius * 2.4)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
+		sprite.name = "Sprite"
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
@@ -613,6 +613,7 @@ static func add_prop_with_collision(parent: Node, position: Vector2, radius: flo
 		sprite.position = -offset
 		mark_solid_visual(sprite, texture_path, &"apron_prop")
 		prop.add_child(sprite)
+		add_directional_shadow(sprite)
 
 
 static func add_textured_polygon(

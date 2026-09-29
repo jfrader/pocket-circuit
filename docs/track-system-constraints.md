@@ -291,9 +291,10 @@ line.
   symmetrically at the corridor ends so the same landmark reads in forward and
   reverse races. Other checkpoints use two small colliding themed posts without
   blocking the racing line.
-- All physical scenery uses the same upper-left key light: soft warm contact
-  shadows offset down-right by 8-12% of the footprint, rectangular or circular
-  to match the prop. Giants add a faint elongated down-right cast shadow.
+- Physical scenery uses the same upper-left key light. Contact shadows follow
+  the visible sprite alpha and transform, with a down-right offset of 8% of its
+  short extent capped at 3 mm and 0.8 mm softening. The catalog can disable a
+  shadow. Giants additionally retain a faint elongated cast shadow.
 - Generated roots persist in the `track` group so runtime AI can discover the
   260-point `RacingLine`.
 - Collision layers remain: vehicles 1, room walls/raised island 2, player-only

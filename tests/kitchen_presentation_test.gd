@@ -67,8 +67,11 @@ func _run_test() -> void:
 			return
 	var shadow_root := Node2D.new()
 	world.add_child(shadow_root)
-	BUILDER._add_directional_shadow(shadow_root, "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", 160.0)
-	if not _expect(shadow_root.get_node("ContactShadow").get_meta("shadow_shape") == &"circle", "round hero props should have round contact shadows even when their collider is convex"):
+	var plate := Sprite2D.new()
+	plate.texture = load("res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png")
+	shadow_root.add_child(plate)
+	BUILDER._add_directional_shadow(plate)
+	if not _expect((shadow_root.get_node("ContactShadow") as Sprite2D).texture == plate.texture, "round hero shadows must follow the plate silhouette even when its collider is convex"):
 		return
 	world.queue_free()
 	await process_frame
