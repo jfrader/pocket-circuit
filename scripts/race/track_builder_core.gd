@@ -276,7 +276,16 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 					var size := PROP_SCALE.size_for(path, GATE_POST_SIZE) + Vector2.ONE * 6.0
 					var offset := FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET
 					reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side, size, tangent.angle()))
-		spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved}, candidates, {})
+		var obstacle_footprints: Array[PackedVector2Array] = []
+		for obstacle: Dictionary in spec.get("obstacle_plan", []):
+			obstacle_footprints.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(obstacle["position"], obstacle["footprint_size"], obstacle["rotation"]))
+		var hazard: Dictionary = spec.get("hazard_plan", {})
+		if bool(hazard.get("present", false)):
+			var half_size: Vector2 = hazard["footprint_size"] * 0.5
+			for path: PackedVector2Array in hazard["paths"].values():
+				var bounds := _polygon_bounds_rect(path).grow_individual(half_size.x, half_size.y, half_size.x, half_size.y)
+				obstacle_footprints.append(_rect_points(bounds.get_center(), bounds.size))
+		spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved,"solid_footprints":obstacle_footprints}, candidates, {})
 		spec["surface_identity"] = HouseholdSurfaceMaterials.resolve(theme, int(spec.get("material_seed", _mix_seed(maxi(seed, 0), "material"))), String(spec.get("material_id", "")), String(spec.get("palette_id", "")), spec.get("floor_modulate", Color.WHITE))
 		spec["floor_texture"] = spec["surface_identity"]["floor"]["texture"]
 		spec["track_texture"] = spec["surface_identity"]["course"]["texture"]

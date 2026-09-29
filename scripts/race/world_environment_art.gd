@@ -55,7 +55,7 @@ static func compose(root: Node2D, spec: Dictionary, centerline: PackedVector2Arr
 	root.add_child(boundary)
 	containers["boundary"] = boundary
 	var run_modes: Array[StringName] = []
-	run_modes.resize(8)
+	run_modes.resize(WorldEnvironmentPlan.SECTOR_COUNT)
 	run_modes.fill(&"none")
 	for placement: Dictionary in plan["placements"]:
 		var asset := CATALOG.get_asset(placement["asset_id"])
@@ -64,17 +64,19 @@ static func compose(root: Node2D, spec: Dictionary, centerline: PackedVector2Arr
 			root.set_meta("environment_focal", node.position)
 		elif placement["role"] == "boundary":
 			var closest := TrackBuilderCore._closest_point_on_loop(node.position, centerline)
-			var run := mini(7, int(float(closest["index"]) / centerline.size() * 8.0))
-			run_modes[run] = &"outer" if placement["zone"] == "apron" else &"inner"
+			var run := mini(WorldEnvironmentPlan.SECTOR_COUNT - 1, int(float(closest["index"]) / centerline.size() * WorldEnvironmentPlan.SECTOR_COUNT))
+			var side := &"outer" if placement["zone"] == "apron" else &"inner"
+			run_modes[run] = side if run_modes[run] == &"none" or run_modes[run] == side else &"both"
 			node.set_meta("boundary_kind", &"partial_section")
 			node.set_meta("run_index", run)
-			node.set_meta("boundary_side", run_modes[run])
+			node.set_meta("boundary_side", side)
 		if stage.is_valid():
 			await stage.call("Placing room objects")
 	root.set_meta("environment_diagnostics", plan["diagnostics"])
 	root.set_meta("environment_placements", plan["placements"])
 	boundary.set_meta("run_modes", run_modes)
 	boundary.set_meta("empty_run_count", run_modes.count(&"none"))
+	boundary.set_meta("open_exit", plan["diagnostics"].get("open_exit", PackedVector2Array()))
 	var gates := TrackBuilderCore._layout_gate_samples(centerline, spec)
 	var gameplay := TrackBuilderCore._analyze_track_moments(centerline, gates)
 	TrackBuilderStory.build_gameplay_moments(root, moments, spec, gameplay, centerline, 0)
