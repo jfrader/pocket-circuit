@@ -234,7 +234,7 @@ func save_player_avatar(seed: int) -> bool:
 
 
 func random_player_avatar_seed() -> int:
-	return randi() % (SAVE_STORE_SCRIPT.PLAYER_AVATAR_MAX_SEED + 1)
+	return _random_seed(SAVE_STORE_SCRIPT.PLAYER_AVATAR_MAX_SEED)
 
 
 ## Mirrors the save store's rule so an accepted seed always round-trips exactly.

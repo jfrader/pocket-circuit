@@ -20,12 +20,12 @@ const NAMES_PATH := "res://data/drivers/names.json"
 ## validate.
 const PERSONALITIES := {
 	"shortcut": {
-		"corner_pace": 0.96, "brake_timing": 1.02, "boost_eagerness": 1.18,
+		"corner_pace": 1.0, "brake_timing": 1.02, "boost_eagerness": 1.18,
 		"overtake_aggression": 1.04, "shortcut_preference": 1.16, "line_commitment": 0.96,
 	},
 	"patient": {
 		"corner_pace": 1.01, "brake_timing": 1.1, "boost_eagerness": 0.94,
-		"overtake_aggression": 0.9, "shortcut_preference": 0.96, "line_commitment": 1.1,
+		"overtake_aggression": 0.9, "shortcut_preference": 0.96, "line_commitment": 1.06,
 	},
 	"precise": {
 		"corner_pace": 1.04, "brake_timing": 0.9, "boost_eagerness": 1.0,
@@ -33,7 +33,7 @@ const PERSONALITIES := {
 	},
 	"bold": {
 		"corner_pace": 1.02, "brake_timing": 0.97, "boost_eagerness": 1.04,
-		"overtake_aggression": 1.22, "shortcut_preference": 1.08, "line_commitment": 1.04,
+		"overtake_aggression": 1.13, "shortcut_preference": 1.08, "line_commitment": 1.04,
 	},
 }
 ## The short-cut taker and the patient driver lead every field so a full grid is
@@ -285,7 +285,10 @@ static func _seeded_order(seed: int, names: Array) -> Array:
 	var keyed: Array = []
 	for name: String in names:
 		keyed.append({"name": name, "key": _mix_seed(seed, "order:" + name)})
-	keyed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["key"]) < int(b["key"]))
+	keyed.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		if int(a["key"]) != int(b["key"]):
+			return int(a["key"]) < int(b["key"])
+		return String(a["name"]) < String(b["name"]))
 	var order: Array = []
 	for entry: Dictionary in keyed:
 		order.append(String(entry["name"]))

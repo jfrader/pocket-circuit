@@ -1,6 +1,7 @@
 extends SceneTree
 
 const ROSTER := preload("res://scripts/progression/driver_roster.gd")
+const AI_CONTROLLER := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 
 
 func _initialize() -> void:
@@ -54,6 +55,19 @@ func _run_test() -> void:
 		av_seeds[avs] = true
 	if not _expect(ids.size() == 3 and names.size() == 3, "exactly 3 unique driver identities"):
 		return
+
+	# The profiles are the roster's own vocabulary, but they must stay inside the
+	# bounds the AI controller applies, or a generated driver would be clamped.
+	for personality_name: String in ROSTER.PERSONALITIES:
+		var profile: Dictionary = ROSTER.PERSONALITIES[personality_name]
+		for trait_key: String in profile:
+			var limits: Vector2 = AI_CONTROLLER.PERSONALITY_BOUNDS[trait_key]
+			var value := float(profile[trait_key])
+			# Vector2 stores 32-bit components while the profile holds 64-bit
+			# floats, so the declared bounds must be compared with a tolerance.
+			var epsilon := 0.0001
+			if not _expect(value >= limits.x - epsilon and value <= limits.y + epsilon, "%s.%s (%.2f) must stay inside the AI controller's %.2f-%.2f bounds" % [personality_name, trait_key, value, limits.x, limits.y]):
+				return
 
 	# every field mixes routing personalities: a short-cut taker and a patient
 	# driver are always present, so no roster is three identical strangers
