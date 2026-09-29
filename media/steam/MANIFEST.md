@@ -43,7 +43,7 @@ capture script. `SHA256SUMS` covers every upload asset and that build manifest.
 30-frames-per-second H.264/yuv420p video encoded above 5 Mbps, with 48 kHz
 stereo AAC audio. Its three gameplay themes and four vehicle segments are direct
 packaged-build captures of Kitchen, Workshop, and Office.
-The audio bed is the original in-game `assets/audio/race_loop.wav` track.
+The audio bed is the synthesized race music that shipped when this cut was recorded. The current build generates its music at runtime and ships no music file, so re-capturing the trailer needs a bed supplied explicitly (`TRAILER_MUSIC_BED`).
 
 The trailer opens on Kitchen racing, uses the opening card as a short title
 stinger, then returns to racing before the ending card. Both cards are included
