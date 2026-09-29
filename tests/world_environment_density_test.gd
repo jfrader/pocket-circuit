@@ -17,7 +17,7 @@ func _run() -> void:
 	for seed_value in 64:
 		var rng := RandomNumberGenerator.new()
 		rng.seed = seed_value
-		var target := PLANNER._boundary_target(48000.0, settings, rng)
+		var target := int(PLANNER._run_targets(48000.0, settings, rng)["members"])
 		assert(target >= int(settings["minimum"]) and target <= int(settings["maximum"]))
 		long_counts[target] = true
 	assert(long_counts.size() >= 8, "long circuits must retain count variation rather than all saturate at the cap")

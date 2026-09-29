@@ -70,10 +70,14 @@ static func compose(root: Node2D, spec: Dictionary, centerline: PackedVector2Arr
 			node.set_meta("boundary_kind", &"partial_section")
 			node.set_meta("run_index", run)
 			node.set_meta("boundary_side", side)
+			if placement.has("boundary_run_id"):
+				node.set_meta("boundary_run_id",placement["boundary_run_id"])
+				node.set_meta("boundary_member",placement["boundary_member"])
 		if stage.is_valid():
 			await stage.call("Placing room objects")
 	root.set_meta("environment_diagnostics", plan["diagnostics"])
 	root.set_meta("environment_placements", plan["placements"])
+	root.set_meta("boundary_runs", plan.get("boundary_runs",[]))
 	boundary.set_meta("run_modes", run_modes)
 	boundary.set_meta("empty_run_count", run_modes.count(&"none"))
 	boundary.set_meta("open_exit", plan["diagnostics"].get("open_exit", PackedVector2Array()))

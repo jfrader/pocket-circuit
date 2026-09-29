@@ -101,10 +101,13 @@ loading yields. Procedural and saved track fixtures use the same model.
 - Preserve negative space around the full nominal corridor and its clearances.
   Reserve gate posts, sealed bays, on-course obstacles and hazard sweeps before
   planning scenery.
-- Boundary props reuse the layout's household rails and story delimiters in
-  seed-varying clusters on both sides. Quantity varies independently of the route,
-  within a bounded density range. An actual collision-free exit and open apron
-  sector remain drivable; never back bare floor with an invisible outer wall.
+- Outer boundaries use completed sets, not totals of loose objects. Long items
+  form end-to-end runs; workshop hardware forms side-by-side rows. A set uses one
+  family, follows the actual outer-edge arc and is fitted atomically without an
+  inner-side fallback. Outer sets are reserved before supporting clutter.
+- Quantity, family and run length vary within configured budgets. Inner accents
+  are counted separately. An actual collision-free exit and open apron sector
+  remain drivable; never back bare floor with an invisible outer wall.
 - Solid objects retain their registered sizes and cannot intersect other planned
   solid footprints. The planner reports an unsuccessful fit instead of distorting
   a prop or changing the requested seed.
