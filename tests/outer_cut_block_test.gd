@@ -5,10 +5,21 @@ const IDS := preload("res://scripts/race/generated_circuit_identity.gd")
 
 const CASES := {"kitchen":[0,1,4,5,7,8,10,11], "workshop":[0,1,2,4,5,11,13,20], "office":[0,1,3,5,6,8,14,23]}
 const SECTOR_COUNT := 8
-const MIN_LOOKAHEAD := 5
-const MAX_LOOKAHEAD := 32
-const CHORD_SAMPLES := 9
-const TURN_THRESHOLD := 0.18
+const MIN_LOOKAHEAD := 5  # mirrors CORE.CUT_MIN_LOOKAHEAD
+const MAX_LOOKAHEAD := 32  # mirrors CORE.CUT_MAX_LOOKAHEAD
+const CHORD_SAMPLES := 41
+## A cut only matters if a whole car fits through it, so colliders are inflated
+## by the vehicle's real physical half-width: the Rustbug collision capsule has
+## radius 18 (scenes/vehicles/rustbug.tscn), which is what the physics actually
+## sweeps — the 44 in TrackBuilderCore.VEHICLE_WIDTH is a corridor-planning figure.
+const MIN_CAR_CLEARANCE_MM := 18.0
+const TURN_THRESHOLD := 0.18  # mirrors CORE.CUT_TURN_THRESHOLD
+## Folds, like the cut definition itself, come from TrackBuilderCore so the
+## planner that blocks them and this regression cannot drift apart.
+const FOLD_MAX_SPACING_MM := CORE.CUT_FOLD_MAX_SPACING_MM
+const FOLD_MIN_LAP_FRACTION := CORE.CUT_FOLD_MIN_LAP_FRACTION
+## What makes a cut exploitable is defined once, in TrackBuilderCore, so the
+## planner that blocks cuts and this regression cannot drift apart.
 
 func _initialize() -> void:
 	call_deferred("_run")
@@ -44,29 +55,23 @@ func _run() -> void:
 			var colliders: Array = _collect_colliders(track)
 			var n := centerline.size()
 			var theme_cuts := 0
-			for i in n:
-				if CORE._turn_strength(centerline, i, 6) < TURN_THRESHOLD:
-					continue
-				for kk in range(MIN_LOOKAHEAD, MAX_LOOKAHEAD + 1):
-					var k := kk
-					var j := (i + k) % n
-					var cdist := CORE._cyclic_index_distance(i, j, n)
-					if cdist < MIN_LOOKAHEAD or cdist > (n / 3):
-						continue
+			for pair: Vector2i in _candidate_pairs(centerline):
+				var i := int(pair.x)
+				var j := int(pair.y)
+				var k := CORE._cyclic_index_distance(i, j, n)
+				if true:
 					var a: Vector2 = centerline[i]
 					var b: Vector2 = centerline[j]
 					var samples: PackedVector2Array = []
 					for s in CHORD_SAMPLES:
 						var t := float(s) / float(CHORD_SAMPLES - 1)
 						samples.append(a.lerp(b, t))
-					# (a) leaves corridor
-					var leaves := false
-					for p in samples:
-						if CORE._distance_to_centerline(p, centerline) > CORE.HALF_WIDTH + 0.5:
-							leaves = true
-							break
-					if not leaves:
+					# (a) the shared definition of an exploitable cut
+					var verdict: Dictionary = CORE.exploitable_cut(centerline, i, k)
+					if not bool(verdict["exploitable"]):
 						continue
+					var deep := int(verdict["deep"])
+					var saved := float(verdict["saved"])
 					# (d) open sector
 					var in_open := false
 					for p in samples:
@@ -92,7 +97,7 @@ func _run() -> void:
 					for c in colliders:
 						var cs: CollisionShape2D = c["cs"]
 						var shp: Shape2D = c["shape"]
-						if _chord_hits_shape(a, b, cs, shp):
+						if _chord_hits_shape(a, b, cs, shp, MIN_CAR_CLEARANCE_MM):
 							hits_solid = true
 							break
 					if hits_solid:
@@ -100,10 +105,10 @@ func _run() -> void:
 					# exploitable cut
 					theme_cuts += 1
 					total_cuts += 1
-					var line := "CUTTABLE %s seed=%d start=%d look-ahead=%d" % [theme, seed_value, i, k]
+					var line := "CUTTABLE %s seed=%d start=%d end=%d gap_indices=%d saved_mm=%.0f deep=%d/%d" % [theme, seed_value, i, j, k, saved, deep, CHORD_SAMPLES]
 					print(line)
 					if first_offender.is_empty():
-						first_offender = "%s seed=%d i=%d k=%d" % [theme, seed_value, i, k]
+						first_offender = "%s seed=%d i=%d j=%d gap=%d" % [theme, seed_value, i, j, k]
 			track.free()
 			counts[theme][seed_value] = theme_cuts
 			await process_frame
@@ -122,6 +127,16 @@ func _atomic_sanity() -> bool:
 	# basic that core apis are present and a trivial chord test works
 	var dummy := PackedVector2Array([Vector2(0,0), Vector2(100,0), Vector2(100,100), Vector2(0,100)])
 	if not _check(CORE.HALF_WIDTH == 125.0, "HALF_WIDTH must be 125.0"): return false
+	if not _check(CORE.CUT_MIN_OFF_CORRIDOR_MM == 40.0 and CORE.CUT_MIN_DEEP_SAMPLES == 3 and CORE.CUT_MIN_SAVED_MM == 50.0 and CORE.CUT_MIN_ARC_RATIO == 1.25, "the shared cut definition must stay the one the planner blocks"): return false
+	var straight := PackedVector2Array()
+	for step in 200:
+		straight.append(Vector2(step * 10.0, 0.0))
+	if not _check(not bool(CORE.exploitable_cut(straight, 0, 20)["exploitable"]), "the shared cut definition must not call a straight road a cut"): return false
+	var anchor_identity := IDS.create(&"kitchen", IDS.room_for_route_seed(7), 7)
+	var anchor := CORE.prepare_layout(&"kitchen", StringName(anchor_identity["room"]), 7, IDS.generation_options(anchor_identity))
+	var anchor_line: PackedVector2Array = anchor["centerline"]
+	if not _check(bool(CORE.exploitable_cut(anchor_line, 223, 22)["exploitable"]), "the shared cut definition must recognise the measured kitchen seed 7 bend that can be cut across"): return false
+	if not _check(not bool(CORE.exploitable_cut(anchor_line, 223, 2)["exploitable"]), "the shared cut definition must not call a two-step hop a cut"): return false
 	var d := CORE._distance_to_centerline(Vector2(0, 300), dummy)
 	if not _check(d > 190.0, "distance helper must report far points"): return false
 	var ts := CORE._turn_strength(dummy, 1, 1)
@@ -161,7 +176,57 @@ func _collect_colliders(track: Node2D) -> Array:
 				res.append({"cs": cs, "shape": cs.shape})
 	return res
 
-func _chord_hits_shape(world_a: Vector2, world_b: Vector2, cs: CollisionShape2D, shape: Shape2D) -> bool:
+## Chords worth testing: a short look-ahead out of a sharp bend, and a fold where
+## the lap comes back near itself, which is where crossing the apron skips the most
+## track. Folds are the ones a plain look-ahead scan never sees.
+func _candidate_pairs(centerline: PackedVector2Array) -> Array[Vector2i]:
+	var pairs: Array[Vector2i] = []
+	var n := centerline.size()
+	var seen: Dictionary = {}
+	for i in n:
+		if CORE._turn_strength(centerline, i, 6) < TURN_THRESHOLD:
+			continue
+		for kk in range(MIN_LOOKAHEAD, MAX_LOOKAHEAD + 1):
+			var j := (i + kk) % n
+			var key := i * n + j
+			if seen.has(key):
+				continue
+			seen[key] = true
+			pairs.append(Vector2i(i, j))
+	var cell := FOLD_MAX_SPACING_MM
+	var buckets: Dictionary = {}
+	for index in n:
+		var key := Vector2i(floori(centerline[index].x / cell), floori(centerline[index].y / cell))
+		if not buckets.has(key):
+			buckets[key] = PackedInt32Array()
+		buckets[key].append(index)
+	var minimum_skip := int(float(n) * FOLD_MIN_LAP_FRACTION)
+	for index in n:
+		var key := Vector2i(floori(centerline[index].x / cell), floori(centerline[index].y / cell))
+		for dx in [-1, 0, 1]:
+			for dy in [-1, 0, 1]:
+				var neighbour := key + Vector2i(dx, dy)
+				if not buckets.has(neighbour):
+					continue
+				for other: int in buckets[neighbour]:
+					if other == index:
+						continue
+					var skip := CORE._cyclic_index_distance(index, other, n)
+					if skip < minimum_skip:
+						continue
+					if centerline[index].distance_to(centerline[other]) > FOLD_MAX_SPACING_MM:
+						continue
+					var first := mini(index, other)
+					var second := maxi(index, other)
+					var pair_key := first * n + second
+					if seen.has(pair_key):
+						continue
+					seen[pair_key] = true
+					pairs.append(Vector2i(index, other))
+	return pairs
+
+
+func _chord_hits_shape(world_a: Vector2, world_b: Vector2, cs: CollisionShape2D, shape: Shape2D, margin: float = 0.0) -> bool:
 	var body := cs.get_parent() as Node2D
 	if body == null:
 		body = cs
@@ -171,13 +236,13 @@ func _chord_hits_shape(world_a: Vector2, world_b: Vector2, cs: CollisionShape2D,
 	var inv := full.affine_inverse()
 	var la := inv * world_a
 	var lb := inv * world_b
-	return _seg_hits_local(la, lb, shape)
+	return _seg_hits_local(la, lb, shape, margin)
 
-func _seg_hits_local(la: Vector2, lb: Vector2, shape: Shape2D) -> bool:
+func _seg_hits_local(la: Vector2, lb: Vector2, shape: Shape2D, margin: float = 0.0) -> bool:
 	if shape is CircleShape2D:
-		return _seg_circle(la, lb, Vector2.ZERO, (shape as CircleShape2D).radius)
+		return _seg_circle(la, lb, Vector2.ZERO, (shape as CircleShape2D).radius + margin)
 	if shape is RectangleShape2D:
-		var half := (shape as RectangleShape2D).size * 0.5
+		var half := (shape as RectangleShape2D).size * 0.5 + Vector2.ONE * margin
 		var pts := PackedVector2Array([
 			Vector2(-half.x, -half.y), Vector2(half.x, -half.y),
 			Vector2(half.x, half.y), Vector2(-half.x, half.y)
@@ -185,7 +250,7 @@ func _seg_hits_local(la: Vector2, lb: Vector2, shape: Shape2D) -> bool:
 		return _seg_poly(la, lb, pts)
 	if shape is CapsuleShape2D:
 		var cap := shape as CapsuleShape2D
-		var rad := cap.radius
+		var rad := cap.radius + margin
 		var sh := maxf(0.0, cap.height * 0.5 - rad)
 		var m1 := Vector2(0.0, -sh)
 		var m2 := Vector2(0.0, sh)
@@ -193,7 +258,10 @@ func _seg_hits_local(la: Vector2, lb: Vector2, shape: Shape2D) -> bool:
 			return true
 		return _seg_to_seg_dist(la, lb, m1, m2) <= rad + 0.01
 	if shape is ConvexPolygonShape2D:
-		return _seg_poly(la, lb, (shape as ConvexPolygonShape2D).points)
+		var convex_pts: PackedVector2Array = (shape as ConvexPolygonShape2D).points
+		if _seg_poly(la, lb, convex_pts):
+			return true
+		return _seg_within_poly(la, lb, convex_pts, margin)
 	if shape is ConcavePolygonShape2D:
 		var segs: PackedVector2Array = (shape as ConcavePolygonShape2D).segments
 		for si in range(0, segs.size(), 2):
@@ -201,11 +269,23 @@ func _seg_hits_local(la: Vector2, lb: Vector2, shape: Shape2D) -> bool:
 			var sb := segs[si + 1]
 			if Geometry2D.segment_intersects_segment(la, lb, sa, sb) != null:
 				return true
+			if _seg_to_seg_dist(la, lb, sa, sb) <= margin + 0.01:
+				return true
 		return false
 	# unsupported: fail loudly, never green
 	push_error("OUTER_CUT_BLOCK_TEST FAIL: unsupported shape type in detector: " + shape.get_class())
 	quit(1)
 	return true
+
+func _seg_within_poly(la: Vector2, lb: Vector2, points: PackedVector2Array, margin: float) -> bool:
+	if margin <= 0.0 or points.size() < 2:
+		return false
+	for index in points.size():
+		var a := points[index]
+		var b := points[(index + 1) % points.size()]
+		if _seg_to_seg_dist(la, lb, a, b) <= margin + 0.01:
+			return true
+	return false
 
 func _seg_circle(p1: Vector2, p2: Vector2, c: Vector2, r: float) -> bool:
 	var d := p2 - p1
