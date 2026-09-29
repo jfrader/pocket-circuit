@@ -190,7 +190,10 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
 	var definitions: Variant = track.get_meta("generated_surfaces", null)
-	if not _expect(definitions is Array and (definitions as Array).size() >= 6 and (definitions as Array).size() <= 10, "%s should define two designed surfaces plus 4-8 grip patches" % theme):
+	# Two designed gameplay moments are always present; the loose debris around
+	# them varies per track, including none at all, so only the upper bound holds
+	# here. Per-track variety is asserted in track_debris_variation_test.
+	if not _expect(definitions is Array and (definitions as Array).size() >= 2 and (definitions as Array).size() <= 2 + BUILDER.GRIP_PATCH_MAX_COUNT, "%s should define two designed surfaces plus 0-%d grip patches" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
 		return false
 	var definitions_by_role := {}
 	var patch_definitions: Array[Dictionary] = []

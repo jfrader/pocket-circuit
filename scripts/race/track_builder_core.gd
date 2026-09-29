@@ -38,8 +38,11 @@ const APEX_MAX_INWARD_OFFSET := 90.0
 const APEX_MAX_ENTRY_OFFSET := 32.0
 const APEX_SAMPLE_SPAN := 10
 const FINISH_APPROACH_SPAN := 20
-const GRIP_PATCH_MIN_COUNT := 4
-const GRIP_PATCH_MAX_COUNT := 8
+## Some tracks carry no loose debris at all and others a lot; the count is
+## drawn from this range per track, so debris is a property of the circuit
+## rather than a constant of the game.
+const GRIP_PATCH_MIN_COUNT := 0
+const GRIP_PATCH_MAX_COUNT := 10
 const ISLAND_SIDE_FACE_WIDTH := 38.0
 const ISLAND_TEXTURED_RIM_WIDTH := 26.0
 const ISLAND_TOP_LIP_WIDTH := 8.0
