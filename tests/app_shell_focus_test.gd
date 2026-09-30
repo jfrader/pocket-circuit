@@ -60,6 +60,12 @@ class TestApp extends Node:
 	func get_save_data() -> Dictionary:
 		return save_data
 
+	func update_setting(key: String, value: Variant) -> bool:
+		if key == "difficulty" and value is String:
+			save_data["difficulty"] = value
+			return true
+		return false
+
 	func get_mastery_state(event_id: String, vehicle_id: String = "") -> Dictionary:
 		if mastery_calibrating:
 			return {
@@ -192,6 +198,17 @@ func _run_test() -> void:
 	focus_owner = root.get_viewport().gui_get_focus_owner()
 	if focus_owner == null or focus_owner.get("text") != "PLAY":
 		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should open with PLAY focused for a one-click start")
+		quit(1)
+		return
+	var difficulty_picker := shell.find_child("Difficulty", true, false) as OptionButton
+	if difficulty_picker == null:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should surface the shared difficulty picker")
+		quit(1)
+		return
+	difficulty_picker.select(2)
+	difficulty_picker.item_selected.emit(2)
+	if app.save_data["difficulty"] != "clockwork":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race difficulty should persist through update_setting")
 		quit(1)
 		return
 	shell.call("go_back")
