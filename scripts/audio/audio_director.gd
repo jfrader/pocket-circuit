@@ -366,6 +366,12 @@ func get_live_section() -> String:
 func get_sfx_player_count() -> int:
 	return _sfx_players.size()
 
+## How long a section must play before another may replace it. Exposed so callers
+## and tests can reason about the music's settling time without duplicating it.
+func get_live_section_dwell() -> float:
+	return LiveMusic.SECTION_CHANGE_DWELL
+
+
 func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result: String = "") -> void:
 	_live.set_race_state(phase, intensity, pressure, final_lap, finish_result)
 
