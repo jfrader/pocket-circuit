@@ -13,10 +13,6 @@ const SURFACE_GATE_CLEARANCE := 155.0
 
 static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array, surface_seed: int = 0) -> Dictionary:
 	var count := centerline.size()
-	var arc_positions := centerline_arc_positions(centerline)
-	var total_length := arc_positions[arc_positions.size() - 1] + centerline[centerline.size() - 1].distance_to(centerline[0])
-	var conflict_forward := pick_conflict_candidate(centerline, gate_samples, arc_positions, total_length, 0.14, 0.23)
-	var conflict_reverse := pick_conflict_candidate(centerline, gate_samples, arc_positions, total_length, 0.77, 0.86)
 	var straight_candidates: Array[Dictionary] = []
 	var corner_candidates: Array[Dictionary] = []
 	for index in range(0, count, 2):
@@ -34,8 +30,6 @@ static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: 
 		var index := int(candidate["index"])
 		if TrackBuilderCore._cyclic_index_distance(index, 0, count) < 24:
 			continue
-		if TrackBuilderCore._cyclic_index_distance(index, conflict_forward, count) < 24 or TrackBuilderCore._cyclic_index_distance(index, conflict_reverse, count) < 24:
-			continue
 		var separated := true
 		for chosen: int in corners:
 			if TrackBuilderCore._cyclic_index_distance(index, chosen, count) < 38:
@@ -50,7 +44,7 @@ static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: 
 		if corners.size() >= 2:
 			break
 		var fallback := int(round(float(count) * fallback_fraction)) % count
-		var separated := TrackBuilderCore._cyclic_index_distance(fallback, conflict_forward, count) >= 24 and TrackBuilderCore._cyclic_index_distance(fallback, conflict_reverse, count) >= 24
+		var separated := true
 		for chosen: int in corners:
 			if TrackBuilderCore._cyclic_index_distance(fallback, chosen, count) < 38:
 				separated = false
@@ -71,10 +65,6 @@ static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: 
 	var technical := pick_calm_surface_index(centerline, gate_samples, clearance, TECHNICAL_HALF_SPAN, PackedInt32Array([shortcut]), surface_seed)
 	return {
 		"opening": 0,
-		"early_conflict_forward": conflict_forward,
-		"early_conflict_reverse": conflict_reverse,
-		"early_conflict_forward_fraction": arc_positions[conflict_forward] / maxf(total_length, 1.0),
-		"early_conflict_reverse_fraction": 1.0 - arc_positions[conflict_reverse] / maxf(total_length, 1.0),
 		"longest_straight": longest,
 		"second_straight": second,
 		"corners": corners,
@@ -130,39 +120,6 @@ static func layout_gate_samples(centerline: PackedVector2Array, spec: Dictionary
 	for gate_index in TrackBuilderCore.GATE_COUNT:
 		samples.append(TrackBuilderCore._sample_at_arc(centerline, arc, total * float(fractions[gate_index])))
 	return samples
-
-
-static func centerline_arc_positions(centerline: PackedVector2Array) -> PackedFloat32Array:
-	var positions := PackedFloat32Array([0.0])
-	for index in range(1, centerline.size()):
-		positions.append(positions[index - 1] + centerline[index - 1].distance_to(centerline[index]))
-	return positions
-
-
-static func pick_conflict_candidate(
-		centerline: PackedVector2Array,
-		gate_samples: PackedVector2Array,
-		arc_positions: PackedFloat32Array,
-		total_length: float,
-		minimum_fraction: float,
-		maximum_fraction: float
-) -> int:
-	var best_index := int(round(float(centerline.size()) * (minimum_fraction + maximum_fraction) * 0.5))
-	var best_score := -INF
-	for index in range(0, centerline.size(), 2):
-		var fraction := arc_positions[index] / maxf(total_length, 1.0)
-		if fraction < minimum_fraction or fraction > maximum_fraction:
-			continue
-		var turn := TrackBuilderCore._turn_strength(centerline, index, 7)
-		var chord := centerline[posmod(index + 10, centerline.size())].distance_to(centerline[posmod(index - 10, centerline.size())])
-		var gate_clearance := INF
-		for gate: Vector2 in gate_samples:
-			gate_clearance = minf(gate_clearance, centerline[index].distance_to(gate))
-		var score := chord - turn * 540.0 + minf(gate_clearance, 180.0) * 0.35
-		if score > best_score or (is_equal_approx(score, best_score) and index < best_index):
-			best_score = score
-			best_index = index
-	return best_index
 
 
 static func build_opening_landmark(

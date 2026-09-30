@@ -100,8 +100,8 @@ loading yields. Procedural and saved track fixtures use the same model.
 - Keep object repetition within the catalog limits. Ground/decal placement and
   clipped gameplay-surface paint are bounded separately.
 - Preserve negative space around the full nominal corridor and its clearances.
-  Reserve gate posts, sealed bays, on-course obstacles and hazard sweeps before
-  planning scenery.
+  Reserve gate posts, sealed bays and on-course obstacles before planning
+  scenery.
 - Outer boundaries use completed sets, not totals of loose objects. Long items
   form end-to-end runs; workshop hardware forms side-by-side rows. A set uses one
   family, follows the actual outer-edge arc and is fitted atomically without an
@@ -116,7 +116,7 @@ loading yields. Procedural and saved track fixtures use the same model.
   beyond it. Island and pocket surfaces have a visible side face and lip matching
   their physical boundary.
 
-Technical surfaces, the faster low-grip shortcut, direction-specific hazards,
+Technical surfaces, the faster low-grip shortcut, on-course obstacles,
 the speed section, finish approaches and ordered gates remain gameplay data.
 Their art must remain visible and understandable. Grip-region paint uses the
 authoritative polygons and feathered boundaries. Flat debris and spill stamps

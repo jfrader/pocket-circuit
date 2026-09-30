@@ -4,8 +4,7 @@ extends RefCounted
 const META_KEY := &"visual_role"
 const SOLID := &"SOLID"
 const FLAT := &"FLAT"
-const MOVING_HAZARD := &"MOVING_HAZARD"
-const VALUES: Array[StringName] = [SOLID, FLAT, MOVING_HAZARD]
+const VALUES: Array[StringName] = [SOLID, FLAT]
 
 
 static func assign(node: Node, role: StringName) -> void:
