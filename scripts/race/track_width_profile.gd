@@ -1,8 +1,8 @@
 class_name TrackWidthProfile
 ## Per-sample road half-width fitted to an accepted route. Width never rejects a
-## route: a seeded wave widens the road where the geometry affords it (turn
-## radius, nearest other leg, room wall) and pinches it at the wave's low points,
-## then eases so the island keeps most of its flat-road area. Pure and
+## route: most of the lap keeps today's width, with a few seeded swells where the
+## geometry affords them (turn radius, nearest other leg, room wall) and one
+## pinch, eased so the island keeps most of its flat-road area. Pure and
 ## deterministic.
 
 const GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
@@ -13,12 +13,24 @@ const MAX_HALF_WIDTH := 240.0
 ## Narrowest pinch. Keeps the shortcut lane (70 + 26), the technical strip (92)
 ## and grip patches (up to 54) inside the road.
 const NARROW_HALF_WIDTH := 100.0
-## Share of the wave's range spent pinching below the base width; the rest widens.
-const NARROW_SHARE := 0.2
-## The start/finish straight keeps at least the base width for the grid: no pinch
-## within the first distance of the finish line, full pinch after the second.
+## Sporadic width events: 1-2 swells and one pinch per lap; everywhere else the
+## road keeps the base width.
+const SECOND_SWELL_CHANCE := 0.5
+const SWELL_ARC := Vector2(700.0, 1400.0)
+const PINCH_ARC := Vector2(400.0, 700.0)
+## Short laps shrink the events so at most about 38% of any lap varies.
+const SWELL_MAX_LAP_SHARE := 0.15
+const PINCH_MAX_LAP_SHARE := 0.08
+## Swells vary between this share of the amplitude and all of it.
+const SWELL_DEPTH_SPREAD := 0.6
+## A swell only goes where the route affords at least this much extra width.
+const MIN_SWELL_ROOM := 20.0
+const PINCH_DEPTH_SHARE := 0.2
+const EVENT_CANDIDATES := 12
+const EVENT_GAP := 300.0
+## No pinch reaches this close to the finish line, so the start grid keeps a
+## full-width straight.
 const FINISH_CLEAR_ARC := 500.0
-const FINISH_TAPER_ARC := 900.0
 const HULL_RADIUS := 22.0
 ## Tightest inner road-edge radius allowed. Today's 125 road at its 180 minimum
 ## fillet leaves 55; tighter, the offset normals cross and the island folds into
@@ -142,27 +154,83 @@ static func affordable_caps(centerline: PackedVector2Array, room_polygon: Packed
 	return caps
 
 
+## Most of the lap keeps the base width. A few seeded events swell or pinch it:
+## swells go where the route affords the most extra width, the pinch stays off
+## the start/finish straight and clear of the swells.
 static func _fit(arc: PackedFloat32Array, caps: PackedFloat32Array, seed: int, amplitude: float) -> PackedFloat32Array:
 	var n := caps.size()
 	var total: float = arc[n]
-	var f1 := 1.0 + floorf(_unit(seed, 3) * 3.0)
-	var f2 := 3.0 + floorf(_unit(seed, 4) * 4.0)
-	var phase1 := _unit(seed, 5) * TAU
-	var phase2 := _unit(seed, 6) * TAU
+	var events := _place_events(arc, caps, seed, amplitude)
 	var widths := PackedFloat32Array()
 	widths.resize(n)
-	var pinch_depth := minf(BASE_HALF_WIDTH - NARROW_HALF_WIDTH, amplitude * NARROW_SHARE)
 	for i in n:
-		var t := arc[i] / total
-		var wave := 0.65 * (0.5 + 0.5 * sin(TAU * f1 * t + phase1)) + 0.35 * (0.5 + 0.5 * sin(TAU * f2 * t + phase2))
-		if wave >= NARROW_SHARE:
-			var widen := amplitude * (wave - NARROW_SHARE) / (1.0 - NARROW_SHARE)
-			widths[i] = clampf(BASE_HALF_WIDTH + widen, BASE_HALF_WIDTH, maxf(BASE_HALF_WIDTH, caps[i]))
-		else:
-			var finish_distance := minf(arc[i], total - arc[i])
-			var allowed := smoothstep(FINISH_CLEAR_ARC, FINISH_TAPER_ARC, finish_distance)
-			widths[i] = BASE_HALF_WIDTH - pinch_depth * (1.0 - wave / NARROW_SHARE) * allowed
+		var swell := 0.0
+		var pinch := 0.0
+		for event: Dictionary in events:
+			var along := fposmod(arc[i] - float(event["start"]), total)
+			if along > float(event["length"]):
+				continue
+			var shape := 0.5 - 0.5 * cos(TAU * along / float(event["length"]))
+			if float(event["depth"]) > 0.0:
+				swell = maxf(swell, float(event["depth"]) * shape)
+			else:
+				pinch = maxf(pinch, -float(event["depth"]) * shape)
+		widths[i] = clampf(BASE_HALF_WIDTH + swell, BASE_HALF_WIDTH, maxf(BASE_HALF_WIDTH, caps[i])) - pinch
 	return widths
+
+
+## Events as {start, length, depth}: positive depth swells, negative pinches.
+static func _place_events(arc: PackedFloat32Array, caps: PackedFloat32Array, seed: int, amplitude: float) -> Array[Dictionary]:
+	var total: float = arc[caps.size()]
+	var events: Array[Dictionary] = []
+	var swell_count := 1 + int(_unit(seed, 3) < SECOND_SWELL_CHANCE)
+	var candidates: Array[Dictionary] = []
+	for k in EVENT_CANDIDATES:
+		var length := minf(lerpf(SWELL_ARC.x, SWELL_ARC.y, _unit(seed, 20 + k)), total * SWELL_MAX_LAP_SHARE)
+		var start := total * _unit(seed, 40 + k)
+		candidates.append({"start": start, "length": length, "room": _mean_cap(arc, caps, start, length) - BASE_HALF_WIDTH})
+	candidates.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["room"]) > float(b["room"]))
+	for candidate: Dictionary in candidates:
+		if events.size() >= swell_count or float(candidate["room"]) < MIN_SWELL_ROOM:
+			break
+		if _overlaps(candidate, events, total):
+			continue
+		candidate["depth"] = amplitude * lerpf(SWELL_DEPTH_SPREAD, 1.0, _unit(seed, 60 + events.size()))
+		events.append(candidate)
+	var pinch_depth := minf(BASE_HALF_WIDTH - NARROW_HALF_WIDTH, amplitude * PINCH_DEPTH_SHARE)
+	for k in EVENT_CANDIDATES:
+		var length := minf(lerpf(PINCH_ARC.x, PINCH_ARC.y, _unit(seed, 80 + k)), total * PINCH_MAX_LAP_SHARE)
+		var start := total * _unit(seed, 100 + k)
+		var center := fposmod(start + length * 0.5, total)
+		if minf(center, total - center) < FINISH_CLEAR_ARC + length * 0.5:
+			continue
+		var pinch := {"start": start, "length": length, "depth": -pinch_depth}
+		if not _overlaps(pinch, events, total):
+			events.append(pinch)
+			break
+	return events
+
+
+static func _mean_cap(arc: PackedFloat32Array, caps: PackedFloat32Array, start: float, length: float) -> float:
+	var total: float = arc[caps.size()]
+	var sum := 0.0
+	var count := 0
+	for i in caps.size():
+		if fposmod(arc[i] - start, total) <= length:
+			sum += minf(caps[i], MAX_HALF_WIDTH)
+			count += 1
+	return sum / float(count) if count > 0 else BASE_HALF_WIDTH
+
+
+static func _overlaps(candidate: Dictionary, events: Array[Dictionary], total: float) -> bool:
+	for event: Dictionary in events:
+		var a_start := float(candidate["start"]) - EVENT_GAP
+		var a_length := float(candidate["length"]) + EVENT_GAP * 2.0
+		var b_start := float(event["start"])
+		var b_length := float(event["length"])
+		if fposmod(b_start - a_start, total) < a_length or fposmod(a_start - b_start, total) < b_length:
+			return true
+	return false
 
 
 ## Sliding minimum then box blur over CAP_SMOOTH_ARC, never above the raw cap,

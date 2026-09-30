@@ -11,6 +11,8 @@ const TOL := 0.5
 ## Sampled edges measured against a sampled centerline lose a little to chord
 ## sag on curves (35-unit samples); a flat 125 road reads the same.
 const CHORD_TOL := 3.0
+## Width changes are occasional features: most of every lap keeps today's road.
+const SPORADIC_BASE_SHARE := 0.55
 
 
 func _initialize() -> void:
@@ -22,6 +24,7 @@ func _run_test() -> void:
 	var pinched := 0
 	var widest := PROFILE.BASE_HALF_WIDTH
 	var narrowest := PROFILE.BASE_HALF_WIDTH
+	var lowest_base_share := 1.0
 	for tier: StringName in [&"standard", &"long"]:
 		for room in ROOMS:
 			for seed: int in SEEDS:
@@ -39,6 +42,10 @@ func _run_test() -> void:
 					return
 				if not _check_limits(line, polygon, widths, "%s/%s/%d" % [tier, room, seed]):
 					return
+				var base_share := _base_share(widths)
+				if not _expect(base_share >= SPORADIC_BASE_SHARE, "%s/%s/%d only %.0f%% of the lap keeps today's width" % [tier, room, seed, base_share * 100.0]):
+					return
+				lowest_base_share = minf(lowest_base_share, base_share)
 				widest = maxf(widest, PROFILE.widest(widths))
 				for value: float in widths:
 					narrowest = minf(narrowest, value)
@@ -55,8 +62,15 @@ func _run_test() -> void:
 		return
 	if not _expect(PROFILE.amplitude_for_option(PROFILE.MODE_FLAT, 5) == 0.0 and PROFILE.amplitude_for_option(null, 5) == 0.0, "flat is the default road width"):
 		return
-	print("TRACK_WIDTH_PROFILE_TEST PASS routes=%d widest=%.0f narrowest=%.0f pinched=%d flat_seeds=%d/400" % [checked, widest, narrowest, pinched, flat_seeds])
+	print("TRACK_WIDTH_PROFILE_TEST PASS routes=%d widest=%.0f narrowest=%.0f pinched=%d lowest_base_share=%.0f%% flat_seeds=%d/400" % [checked, widest, narrowest, pinched, lowest_base_share * 100.0, flat_seeds])
 	quit(0)
+
+
+func _base_share(widths: PackedFloat32Array) -> float:
+	var base := 0
+	for value: float in widths:
+		base += 1 if absf(value - PROFILE.BASE_HALF_WIDTH) < 0.5 else 0
+	return float(base) / float(widths.size())
 
 
 func _has_pinch(widths: PackedFloat32Array) -> bool:
