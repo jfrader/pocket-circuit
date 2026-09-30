@@ -1056,7 +1056,7 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 		var candidate := node as VehicleController
 		if candidate == null or candidate == vehicle:
 			continue
-		if race_manager.is_racer_finished(candidate) or bool(race_manager.get_racer_state(candidate).get("dnf", false)):
+		if race_manager.is_racer_finished(candidate) or bool(race_manager.get_racer_state_ref(candidate).get("dnf", false)):
 			continue
 		var separation := candidate.global_position - vehicle.global_position
 		var distance_ahead := separation.dot(forward)
