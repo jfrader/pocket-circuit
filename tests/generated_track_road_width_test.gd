@@ -41,7 +41,7 @@ func _run_test() -> void:
 			var track := (built["scene"] as PackedScene).instantiate() as Node2D
 			root.add_child(track)
 			var widest := PROFILE.widest(widths)
-			widened += 1 if widest > PROFILE.MIN_HALF_WIDTH + 20.0 else 0
+			widened += 1 if widest > PROFILE.BASE_HALF_WIDTH + 20.0 else 0
 			if not _check_surface(track, widest, label):
 				return
 			if not _check_island(track, centerline, widths, label):

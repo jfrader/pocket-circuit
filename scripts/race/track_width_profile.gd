@@ -1,13 +1,24 @@
 class_name TrackWidthProfile
 ## Per-sample road half-width fitted to an accepted route. Width never rejects a
-## route: a seeded desired width is clamped to what the geometry affords at each
-## centerline sample (turn radius, nearest other leg, room wall), then eased so
-## the island keeps most of its flat-road area. Pure and deterministic.
+## route: a seeded wave widens the road where the geometry affords it (turn
+## radius, nearest other leg, room wall) and pinches it at the wave's low points,
+## then eases so the island keeps most of its flat-road area. Pure and
+## deterministic.
 
 const GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 
-const MIN_HALF_WIDTH := GEOMETRY.HALF_WIDTH
+## Today's fixed road; the widening wave starts here.
+const BASE_HALF_WIDTH := GEOMETRY.HALF_WIDTH
 const MAX_HALF_WIDTH := 240.0
+## Narrowest pinch. Keeps the shortcut lane (70 + 26), the technical strip (92)
+## and grip patches (up to 54) inside the road.
+const NARROW_HALF_WIDTH := 100.0
+## Share of the wave's range spent pinching below the base width; the rest widens.
+const NARROW_SHARE := 0.2
+## The start/finish straight keeps at least the base width for the grid: no pinch
+## within the first distance of the finish line, full pinch after the second.
+const FINISH_CLEAR_ARC := 500.0
+const FINISH_TAPER_ARC := 900.0
 const HULL_RADIUS := 22.0
 ## Tightest inner road-edge radius allowed. Today's 125 road at its 180 minimum
 ## fillet leaves 55; tighter, the offset normals cross and the island folds into
@@ -33,7 +44,7 @@ const MODE_SEEDED := &"seeded"
 static func amplitude_for_seed(seed: int) -> float:
 	if _unit(seed, 1) < FLAT_SHARE:
 		return 0.0
-	return lerpf(MIN_SEEDED_AMPLITUDE, MAX_HALF_WIDTH - MIN_HALF_WIDTH, _unit(seed, 2))
+	return lerpf(MIN_SEEDED_AMPLITUDE, MAX_HALF_WIDTH - BASE_HALF_WIDTH, _unit(seed, 2))
 
 
 ## Resolves a `road_width` generation option: MODE_FLAT (default), MODE_SEEDED,
@@ -49,7 +60,7 @@ static func amplitude_for_option(option: Variant, seed: int) -> float:
 static func flat(count: int) -> PackedFloat32Array:
 	var widths := PackedFloat32Array()
 	widths.resize(count)
-	widths.fill(MIN_HALF_WIDTH)
+	widths.fill(BASE_HALF_WIDTH)
 	return widths
 
 
@@ -71,7 +82,7 @@ static func build(centerline: PackedVector2Array, seed: int, room_polygon: Packe
 
 
 static func widest(widths: PackedFloat32Array) -> float:
-	var w := MIN_HALF_WIDTH
+	var w := BASE_HALF_WIDTH
 	for value: float in widths:
 		w = maxf(w, value)
 	return w
@@ -92,10 +103,10 @@ static func line_width_curve(centerline: PackedVector2Array, widths: PackedFloat
 	return curve
 
 
-## Half-width of the sample nearest to `point`; MIN_HALF_WIDTH for flat roads.
+## Half-width of the sample nearest to `point`; BASE_HALF_WIDTH for flat roads.
 static func at_point(centerline: PackedVector2Array, widths: PackedFloat32Array, point: Vector2) -> float:
 	if widths.size() != centerline.size() or widths.is_empty():
-		return MIN_HALF_WIDTH
+		return BASE_HALF_WIDTH
 	var best := 0
 	var best_distance := INF
 	for index in centerline.size():
@@ -140,10 +151,17 @@ static func _fit(arc: PackedFloat32Array, caps: PackedFloat32Array, seed: int, a
 	var phase2 := _unit(seed, 6) * TAU
 	var widths := PackedFloat32Array()
 	widths.resize(n)
+	var pinch_depth := minf(BASE_HALF_WIDTH - NARROW_HALF_WIDTH, amplitude * NARROW_SHARE)
 	for i in n:
 		var t := arc[i] / total
 		var wave := 0.65 * (0.5 + 0.5 * sin(TAU * f1 * t + phase1)) + 0.35 * (0.5 + 0.5 * sin(TAU * f2 * t + phase2))
-		widths[i] = clampf(MIN_HALF_WIDTH + amplitude * wave, MIN_HALF_WIDTH, maxf(MIN_HALF_WIDTH, caps[i]))
+		if wave >= NARROW_SHARE:
+			var widen := amplitude * (wave - NARROW_SHARE) / (1.0 - NARROW_SHARE)
+			widths[i] = clampf(BASE_HALF_WIDTH + widen, BASE_HALF_WIDTH, maxf(BASE_HALF_WIDTH, caps[i]))
+		else:
+			var finish_distance := minf(arc[i], total - arc[i])
+			var allowed := smoothstep(FINISH_CLEAR_ARC, FINISH_TAPER_ARC, finish_distance)
+			widths[i] = BASE_HALF_WIDTH - pinch_depth * (1.0 - wave / NARROW_SHARE) * allowed
 	return widths
 
 
