@@ -105,6 +105,7 @@ static func apply(track: Node2D, profile: Dictionary, substrate_material: Shader
 		material.set_shader_parameter(key, profile[key])
 	material.set_shader_parameter("grain_noise", grain)
 	material.set_shader_parameter("width_mm", surface.width)
+	material.set_shader_parameter("variable_width", surface.width_curve != null)
 	var length := _path_length(surface)
 	material.set_shader_parameter("brush_repeats", maxf(1.0, roundf(length / float(profile["brush_period_mm"]))))
 	surface.texture = load(profile["texture"]) as Texture2D
