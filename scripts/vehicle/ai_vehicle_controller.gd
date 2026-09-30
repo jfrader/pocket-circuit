@@ -717,14 +717,13 @@ func _physics_process(delta: float) -> void:
 	var catch_up_max := float(catch_up["max_power"])
 	var catch_up_power := 0.0
 	if catch_up_max > 0.0:
-		var progress_deficit := _leader_progress_deficit()
-		catch_up_power = minf(
-			catch_up_max,
-			maxf(
-				float(maxi(0, position - 1)) * float(catch_up["position_weight"]),
-				progress_deficit * float(catch_up["progress_weight"])
-			)
-		)
+		for racer: Node in _group_nodes(&"race_vehicle"):
+			if is_instance_valid(racer) and racer.is_in_group("player_vehicle"):
+				var progress := race_manager.get_racer_progress(vehicle)
+				var player_progress := race_manager.get_racer_progress(racer as Node2D)
+				if progress < player_progress:
+					catch_up_power = calculate_catch_up_power(tuning, position, progress, player_progress, _leader_progress_deficit())
+				break
 	vehicle.set_external_power_multiplier(baseline_power + float((tuning["assist"] as Dictionary)["power"]) + catch_up_power)
 	_apply_drafting_recharge(delta, traffic_plan, should_brake)
 	if catch_up_power > 0.0 and not should_brake:
@@ -773,6 +772,17 @@ func _physics_process(delta: float) -> void:
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
 	_update_stuck_recovery(delta, stuck_target_key, distance_to_target)
+
+
+static func calculate_catch_up_power(tuning: Dictionary, position: int, progress: float, player_progress: float, leader_deficit: float) -> float:
+	if progress >= player_progress:
+		return 0.0
+	var catch_up := tuning["catch_up"] as Dictionary
+	var baseline := float(tuning["baseline_power"]) + float((tuning["assist"] as Dictionary)["power"])
+	return minf(
+		minf(float(catch_up["max_power"]), maxf(0.0, VehicleController.MAX_EXTERNAL_POWER_MULTIPLIER - baseline)),
+		maxf(float(maxi(0, position - 1)) * float(catch_up["position_weight"]), leader_deficit * float(catch_up["progress_weight"]))
+	)
 
 
 func _corner_mistake(delta: float, tuning: Dictionary, checkpoint_index: int, radius: float) -> float:

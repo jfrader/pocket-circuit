@@ -52,6 +52,17 @@ func _run_test() -> void:
 		return
 	if not _expect(is_equal_approx(vehicle.boost_amount, vehicle.stats.boost_capacity * 0.58), "Club Circuit should start with its difficulty-scaled legal boost reserve"):
 		return
+	for tier: String in AI_CONTROLLER_SCRIPT.DIFFICULTY_TUNING:
+		var tuning := AI_CONTROLLER_SCRIPT.DIFFICULTY_TUNING[tier] as Dictionary
+		var baseline := float(tuning["baseline_power"]) + float((tuning["assist"] as Dictionary)["power"])
+		var max_catch := AIVehicleController.calculate_catch_up_power(tuning, 4, 0.0, 100.0, 100.0)
+		if not _expect(baseline + max_catch <= VehicleController.MAX_EXTERNAL_POWER_MULTIPLIER + 0.00001, "%s must stay within the legal 1.15x power cap, including assists and full catch-up" % tier):
+			return
+		if not _expect(is_zero_approx(AIVehicleController.calculate_catch_up_power(tuning, 4, 101.0, 100.0, 100.0)) and is_zero_approx(AIVehicleController.calculate_catch_up_power(tuning, 4, 100.0, 100.0, 100.0)), "%s must never give catch-up to a car ahead of or tied with the player" % tier):
+			return
+	var club_tuning := AI_CONTROLLER_SCRIPT.DIFFICULTY_TUNING["club_circuit"] as Dictionary
+	if not _expect(AIVehicleController.calculate_catch_up_power(club_tuning, 4, 99.0, 100.0, 1.0) > 0.0, "Club catch-up should remain available only when behind the player"):
+		return
 	controller.configure(
 		vehicle,
 		manager,
