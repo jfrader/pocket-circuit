@@ -26,7 +26,7 @@ func _capture() -> void:
 	if frozen:
 		var packed := load(RACE_SCENE) as PackedScene
 		var fixture := packed.instantiate()
-		fixture.set("_session", {"vehicle_id": "rustbug", "event": {"circuit": "generated", "theme": theme, "room": room, "seed": int(seed_text), "laps": 3}})
+		fixture.set("_session", {"vehicle_id": "rustbug", "event": {"circuit": "generated", "theme": theme, "room": room, "seed": int(seed_text), "laps": 3, "length_tier": OS.get_environment("PC_LENGTH_TIER") if OS.get_environment("PC_LENGTH_TIER") != "" else "standard"}})
 		root.add_child(fixture)
 		current_scene = fixture
 	else:
