@@ -14,6 +14,7 @@ signal position_changed(racer: Node2D, position: int, racer_count: int)
 signal wrong_way_changed(racer: Node2D, wrong_way: bool)
 signal results_ready(results: Array)
 signal racer_recovered(racer: Node2D)
+signal racer_registered(racer: Node2D)
 
 @export_range(1, 99) var laps_to_finish: int = 3
 @export_range(0.0, 30.0, 0.5) var finish_grace_seconds: float = 8.0
@@ -130,6 +131,7 @@ func register_racer(
 		vehicle_name: String,
 		is_player: bool = false
 ) -> void:
+	var is_new_racer := false
 	if _racers.has(vehicle):
 		var existing: Dictionary = _racers[vehicle]
 		existing["driver_name"] = driver_name
@@ -159,11 +161,14 @@ func register_racer(
 		}
 		_racers[vehicle] = state
 		_registration_order.append(vehicle)
+		is_new_racer = true
 	if is_player:
 		_player_vehicle = vehicle
 		_sync_player_compatibility()
 	_prepared = false
 	_rankings_dirty = true
+	if is_new_racer:
+		racer_registered.emit(vehicle)
 
 
 func prepare_race() -> void:

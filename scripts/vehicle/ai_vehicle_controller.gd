@@ -244,6 +244,8 @@ func configure(
 		race_manager.race_started.connect(_restore_racing_collisions)
 	if not race_manager.racer_recovered.is_connected(_on_external_recovery):
 		race_manager.racer_recovered.connect(_on_external_recovery)
+	if not race_manager.racer_registered.is_connected(_on_racer_registered):
+		race_manager.racer_registered.connect(_on_racer_registered)
 
 
 func _cache_checkpoints() -> void:
@@ -338,6 +340,17 @@ func _arc_tables_for(path: PackedVector2Array) -> Dictionary:
 		cumulative[index] = total
 		total += lengths[index]
 	return {"lengths": lengths, "cumulative": cumulative, "total": total}
+
+
+func _ensure_arc_tables_current() -> void:
+	## The arc-length tables are a derived cache of _racing_line/_reference_path,
+	## rebuilt in _cache_checkpoints. Both source paths can also be replaced
+	## directly (route fixtures and tests set them without going through
+	## _cache_checkpoints), so a stale table would silently describe a different
+	## loop. Rebuild lazily when the cached table sizes no longer match their
+	## source path, keeping the hot paths consistent with whatever line is active.
+	if _racing_line_segment_lengths.size() != _racing_line.size() or _reference_segment_lengths.size() != _reference_path.size():
+		_build_arc_tables()
 
 
 ## Nearest loop segment by projection, searched around `cached_index` (temporal
@@ -903,6 +916,7 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 	## plus the look-ahead distance actually used (the pursuit radius).
 	if _reference_path.size() < 2:
 		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
+	_ensure_arc_tables_current()
 	var count := _reference_path.size()
 	var segment_lengths := _reference_segment_lengths
 	var cumulative := _reference_cumulative
@@ -938,6 +952,8 @@ func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
 		return desired_direction
 	var avoid := Vector2.ZERO
 	for node: Node in _group_nodes(&"track_hazard"):
+		if not is_instance_valid(node):
+			continue
 		var hazard := node as EnvironmentalHazard
 		if hazard == null:
 			continue
@@ -970,6 +986,8 @@ func _leader_progress_deficit() -> float:
 	var mine := race_manager.get_racer_progress(vehicle)
 	var best := mine
 	for racer: Node in _group_nodes(&"race_vehicle"):
+		if not is_instance_valid(racer):
+			continue
 		best = maxf(best, race_manager.get_racer_progress(racer as Node2D))
 	return maxf(0.0, best - mine)
 
@@ -1053,6 +1071,8 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 	var nearest_lateral := 0.0
 	var lateral_axis := forward.orthogonal()
 	for node: Node in _group_nodes(&"race_vehicle"):
+		if not is_instance_valid(node):
+			continue
 		var candidate := node as VehicleController
 		if candidate == null or candidate == vehicle:
 			continue
@@ -1669,6 +1689,7 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var nearest := _room_cut_start + segment * fraction
 		return {"arc": segment.length() * fraction, "length": segment.length(), "distance": vehicle.global_position.distance_to(nearest), "closed": false}
 	if _racing_line.size() >= 2:
+		_ensure_arc_tables_current()
 		var count := _racing_line.size()
 		var nearest := _nearest_segment_local(_racing_line, vehicle.global_position, _racing_line_nearest_index)
 		_racing_line_nearest_index = int(nearest["index"])
@@ -1833,6 +1854,16 @@ func _on_external_recovery(racer: Node2D) -> void:
 		_reset_route_watchdog()
 		_racing_line_nearest_index = -1
 		_reference_nearest_index = -1
+
+
+func _on_racer_registered(_racer: Node2D) -> void:
+	## The per-race scene-tree cache (hazards, surface zones, race vehicles) is
+	## only valid once the field is fully placed. A racer registered after this
+	## controller first populated the cache means the cached vehicle list is
+	## stale — a grid-launch traffic scan would otherwise miss cars still being
+	## placed and treat the track as empty. Mark the cache dirty so the next
+	## scan re-reads the tree instead of trusting the frozen list.
+	_tree_cache_dirty = true
 
 
 func _nearest_line_index(position: Vector2) -> int:
