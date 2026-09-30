@@ -523,7 +523,7 @@ func _race_session_size() -> int:
 	var app := root.get_node_or_null(APP_PATH)
 	if app == null:
 		return -1
-	var sess: Dictionary = app.get("current_race_session")
+	var sess: Variant = app.get("current_race_session")
 	return sess.size() if sess is Dictionary else 0
 
 
@@ -531,7 +531,7 @@ func _quick_roster_size() -> int:
 	var app := root.get_node_or_null(APP_PATH)
 	if app == null:
 		return -1
-	var qr: Dictionary = app.get("_quick_roster")
+	var qr: Variant = app.get("_quick_roster")
 	return qr.size() if qr is Dictionary else 0
 
 
