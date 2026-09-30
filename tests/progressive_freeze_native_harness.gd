@@ -7,12 +7,14 @@ extends SceneTree
 ## (Deliberately omits --audio-driver Dummy and --headless so Gamestruments live
 ## audio and real renderer run; this is the only way to reproduce the user freeze.)
 ##
-## Drives 4 quick races (enough to see per-race growth), records per-race:
-##   frame time (last process), fps, draw calls, objects_in_frame, primitives,
-##   static mem, object/node/orphan counts,
-##   plus audio-side: audio_stream_player count, AudioDirector child count,
-##   GamestrumentsPlayer child count, LiveStream presence, connected signals on App.
-## Prints full snapshots and deltas so growth can be named by counting instances.
+## Drives NUM_RACES with REAL LAPS (several seconds of actual driving in _physics_process
+## and _process, no result shortcut until after drive window) to measure per-frame cost.
+## Records per race during driving window:
+##   avg/max physics frame time, process frame time, fps (min/avg), collision pairs,
+##   PHYSICS_2D_* monitors, render draw/objects/prims, plus track props:
+##   route_length, surface_zone count, StaticBody2D collider count.
+## Also full before/after snapshots for accumulation.
+## Keep total wall time bounded (<2min for 3 races x ~6s drive + load).
 
 const APP_PATH := "/root/App"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
@@ -23,8 +25,9 @@ const TRACK_CORE := preload("res://scripts/race/track_builder_core.gd")
 const ENGINE_LOOP_GEN := preload("res://scripts/audio/engine/engine_loop_generator.gd")
 const ENGINE_VOICE_GEN := preload("res://scripts/audio/engine/engine_voice_generator.gd")
 
-const NUM_RACES := 4
+const NUM_RACES := 3
 const BASE_SEED := 424242
+const DRIVE_SECONDS := 5.5  # real driving time per race to exercise per-tick costs
 
 var _race_results: Array[Dictionary] = []
 
@@ -54,7 +57,8 @@ func _run_test() -> void:
 	for r in NUM_RACES:
 		var seed := BASE_SEED + r * 1000
 		var before := _snapshot("before_race_%d" % r)
-		if not await _run_one_quick_race(app, seed):
+		var drive := await _run_one_real_drive_race(app, seed)
+		if drive.is_empty():
 			return
 		# Let a couple rendered frames so Performance and audio children settle
 		await process_frame
@@ -64,6 +68,7 @@ func _run_test() -> void:
 			"race": r,
 			"before": before,
 			"after": after,
+			"drive": drive,
 		})
 		await _ensure_back_in_boot(app)
 
@@ -76,23 +81,27 @@ func _run_test() -> void:
 	quit(0)
 
 
-func _run_one_quick_race(app: Node, seed: int) -> bool:
+func _run_one_real_drive_race(app: Node, seed: int) -> Dictionary:
 	var ok: bool = app.call("start_circuit_race", &"kitchen", &"classic", seed, "rustbug")
 	if not _expect(ok, "start_circuit_race must succeed for seed %d" % seed):
-		return false
+		return {}
 
 	var deadline := Time.get_ticks_msec() + 30000
 	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
 		await process_frame
 	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d"):
-		return false
+		return {}
 	if app.get("_loading_failed"):
 		_expect(false, "loading must not fail")
-		return false
+		return {}
 
 	var race := current_scene
 	if not _expect(race != null and race.scene_file_path == RACE_SCENE, "must be in race scene"):
-		return false
+		return {}
+
+	var race_manager := race.get_node_or_null("RaceManager") as Node
+	if not _expect(race_manager != null, "RaceManager must exist"):
+		return {}
 
 	# Touch identity for opponents (same as headless harness)
 	var ev: Dictionary = app.call("get_current_race_session").get("event", {})
@@ -103,7 +112,49 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 			var _p := IDENTITIES.avatar_payload(did)
 			var _t := IDENTITIES.avatar_texture(did)
 
-	# Force result immediately (exercises full post-load + audio paths)
+	# Wait for race to actually start driving (countdown ends, is_running)
+	var start_deadline := Time.get_ticks_msec() + 15000
+	while not bool(race_manager.get("is_running")) and Time.get_ticks_msec() < start_deadline:
+		await process_frame
+	if not _expect(bool(race_manager.get("is_running")), "race must start running for seed %d" % seed):
+		return {}
+
+	# Capture track scale properties once (these drive per-frame cost)
+	var route_len := float(race_manager.get("_route_length"))
+	var surface_zones: int = get_nodes_in_group("surface_zone").size()
+	var collider_count := _count_static_colliders()
+
+	# Drive for real seconds: AI controllers execute _physics_process hot paths,
+	# rankings update per frame, surface/hazard queries run every tick.
+	var drive_start := Time.get_ticks_msec()
+	var drive_end := drive_start + int(DRIVE_SECONDS * 1000)
+	var physics_sum := 0.0
+	var physics_max := 0.0
+	var process_sum := 0.0
+	var process_max := 0.0
+	var fps_sum := 0.0
+	var fps_min := 9999.0
+	var pairs_max: int = 0
+	var active_max: int = 0
+	var samples: int = 0
+	while Time.get_ticks_msec() < drive_end and current_scene != null and current_scene.scene_file_path == RACE_SCENE:
+		await process_frame
+		var phys := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)
+		var proc := Performance.get_monitor(Performance.TIME_PROCESS)
+		var fps := Performance.get_monitor(Performance.TIME_FPS)
+		physics_sum += phys
+		physics_max = maxf(physics_max, phys)
+		process_sum += proc
+		process_max = maxf(process_max, proc)
+		fps_sum += fps
+		fps_min = minf(fps_min, fps)
+		var pairs := int(Performance.get_monitor(Performance.PHYSICS_2D_COLLISION_PAIRS))
+		pairs_max = maxi(pairs_max, pairs)
+		var act := int(Performance.get_monitor(Performance.PHYSICS_2D_ACTIVE_OBJECTS))
+		active_max = maxi(active_max, act)
+		samples += 1
+
+	# Now end the race cleanly with fake result (after real driving exercised)
 	var fake_results: Array = [
 		{"position": 1, "driver_name": "Rae", "vehicle_name": "Rustbug", "time": 45.0, "finished": true, "dnf": false},
 		{"position": 2, "driver_name": "Opp1", "vehicle_name": "Pinbolt", "time": 46.0, "finished": true, "dnf": false},
@@ -111,8 +162,8 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 		{"position": 4, "driver_name": "Opp3", "vehicle_name": "Flicker", "time": 48.0, "finished": true, "dnf": false},
 	]
 	var committed: bool = app.call("report_race_result", 1, 45.0, fake_results, false, {})
-	if not _expect(committed, "report must succeed for quick race"):
-		return false
+	if not _expect(committed, "report must succeed after real drive for seed %d" % seed):
+		return {}
 
 	await process_frame
 
@@ -124,7 +175,21 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 	await process_frame
 	await process_frame
 
-	return true
+	var n: int = maxi(1, samples)
+	return {
+		"physics_avg": physics_sum / n,
+		"physics_max": physics_max,
+		"process_avg": process_sum / n,
+		"process_max": process_max,
+		"fps_avg": fps_sum / n,
+		"fps_min": fps_min,
+		"collision_pairs_max": pairs_max,
+		"physics_2d_active_max": active_max,
+		"samples": samples,
+		"route_length": route_len,
+		"surface_zones": surface_zones,
+		"collider_count": collider_count,
+	}
 
 
 func _ensure_back_in_boot(app: Node) -> bool:
@@ -153,6 +218,9 @@ func _snapshot(label: String) -> Dictionary:
 		"draw_calls": Performance.get_monitor(Performance.RENDER_TOTAL_DRAW_CALLS_IN_FRAME),
 		"objects_in_frame": Performance.get_monitor(Performance.RENDER_TOTAL_OBJECTS_IN_FRAME),
 		"primitives": Performance.get_monitor(Performance.RENDER_TOTAL_PRIMITIVES_IN_FRAME),
+		"physics_2d_active": Performance.get_monitor(Performance.PHYSICS_2D_ACTIVE_OBJECTS),
+		"physics_2d_pairs": Performance.get_monitor(Performance.PHYSICS_2D_COLLISION_PAIRS),
+		"physics_2d_islands": Performance.get_monitor(Performance.PHYSICS_2D_ISLAND_COUNT),
 		"avatar_payloads": IDENTITIES._avatar_payload_cache.size(),
 		"avatar_textures": IDENTITIES._avatar_texture_cache.size(),
 		"car_payloads": IDENTITIES._car_payload_cache.size(),
@@ -281,7 +349,7 @@ func _print_report() -> void:
 		var a: Dictionary = res["after"]
 		print("RACE %d BEFORE %s" % [res["race"], str(b)])
 		print("RACE %d AFTER  %s" % [res["race"], str(a)])
-		print("RACE %d DELTA fps=%.1f process_ms=%.4f draw=%d objs_in_frame=%d prim=%d objects=%d nodes=%d orphans=%d mem=%.0f audio_pl=%d adir_ch=%d gm_ch=%d live=%s app_conns=%d app_ch=%d spins=%d outline=%d footprint=%d eng_loop=%d eng_vox=%d sess=%d qroster=%d" % [
+		print("RACE %d DELTA fps=%.1f process_ms=%.4f draw=%d objs_in_frame=%d prim=%d objects=%d nodes=%d orphans=%d mem=%.0f pairs=%d active=%d audio_pl=%d adir_ch=%d gm_ch=%d live=%s app_conns=%d app_ch=%d spins=%d outline=%d footprint=%d eng_loop=%d eng_vox=%d sess=%d qroster=%d" % [
 			res["race"],
 			float(a["fps"]) - float(b["fps"]),
 			float(a["process_ms"]) - float(b["process_ms"]),
@@ -292,6 +360,8 @@ func _print_report() -> void:
 			int(a["node_count"]) - int(b["node_count"]),
 			int(a["orphan_count"]) - int(b["orphan_count"]),
 			float(a["mem_static"]) - float(b["mem_static"]),
+			int(a["physics_2d_pairs"]) - int(b["physics_2d_pairs"]),
+			int(a["physics_2d_active"]) - int(b["physics_2d_active"]),
 			int(a["audio_stream_players"]) - int(b["audio_stream_players"]),
 			int(a["audio_director_children"]) - int(b["audio_director_children"]),
 			int(a["gamestruments_children"]) - int(b["gamestruments_children"]),
@@ -306,7 +376,42 @@ func _print_report() -> void:
 			int(a["race_session_keys"]) - int(b["race_session_keys"]),
 			int(a["quick_roster_size"]) - int(b["quick_roster_size"]),
 		])
+		if res.has("drive"):
+			var d: Dictionary = res["drive"]
+			print("RACE %d DRIVE physics_avg=%.4f physics_max=%.4f process_avg=%.4f process_max=%.4f fps_avg=%.1f fps_min=%.1f pairs_max=%d active_max=%d samples=%d route=%.1f surfaces=%d colliders=%d" % [
+				res["race"],
+				float(d.get("physics_avg", 0.0)),
+				float(d.get("physics_max", 0.0)),
+				float(d.get("process_avg", 0.0)),
+				float(d.get("process_max", 0.0)),
+				float(d.get("fps_avg", 0.0)),
+				float(d.get("fps_min", 0.0)),
+				int(d.get("collision_pairs_max", 0)),
+				int(d.get("physics_2d_active_max", 0)),
+				int(d.get("samples", 0)),
+				float(d.get("route_length", 0.0)),
+				int(d.get("surface_zones", 0)),
+				int(d.get("collider_count", 0)),
+			])
 	print("NATIVE_FREEZE_SNAPSHOTS end")
+
+
+func _count_static_colliders() -> int:
+	# Count StaticBody2D that carry collision shapes (the dense decor after boundary/obstacle work).
+	var count: int = 0
+	var to_visit: Array[Node] = [root]
+	while not to_visit.is_empty():
+		var n: Node = to_visit.pop_back()
+		if n is StaticBody2D:
+			var has_shape: bool = false
+			for c: Node in n.get_children():
+				if c is CollisionShape2D or c is CollisionPolygon2D:
+					has_shape = true
+					break
+			if has_shape:
+				count += 1
+		to_visit.append_array(n.get_children())
+	return count
 
 
 func _expect(condition: bool, message: String) -> bool:
