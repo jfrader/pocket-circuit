@@ -9,6 +9,10 @@ const GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const MIN_HALF_WIDTH := GEOMETRY.HALF_WIDTH
 const MAX_HALF_WIDTH := 240.0
 const HULL_RADIUS := 22.0
+## Tightest inner road-edge radius allowed. Today's 125 road at its 180 minimum
+## fillet leaves 55; tighter, the offset normals cross and the island folds into
+## the road.
+const MIN_INNER_EDGE_RADIUS := 55.0
 const LEG_GAP := 70.0
 const WALL_GUARD := 20.0
 const NONLOCAL_ARC := 900.0
@@ -112,7 +116,7 @@ static func affordable_caps(centerline: PackedVector2Array, room_polygon: Packed
 	var caps := PackedFloat32Array()
 	caps.resize(n)
 	for i in n:
-		var cap := minf(MAX_HALF_WIDTH, _local_radius(centerline, i) - HULL_RADIUS)
+		var cap := minf(MAX_HALF_WIDTH, _local_radius(centerline, i) - maxf(HULL_RADIUS, MIN_INNER_EDGE_RADIUS))
 		var cell := Vector2i(floori(centerline[i].x / reach), floori(centerline[i].y / reach))
 		for dx in range(-1, 2):
 			for dy in range(-1, 2):
