@@ -14,6 +14,7 @@ signal position_changed(racer: Node2D, position: int, racer_count: int)
 signal wrong_way_changed(racer: Node2D, wrong_way: bool)
 signal results_ready(results: Array)
 signal racer_recovered(racer: Node2D)
+signal racer_registered(racer: Node2D)
 
 @export_range(1, 99) var laps_to_finish: int = 3
 @export_range(0.0, 30.0, 0.5) var finish_grace_seconds: float = 8.0
@@ -35,6 +36,11 @@ var _player_vehicle: Node2D
 var _prepared: bool = false
 var _finish_grace_remaining: float = -1.0
 var _results_finalized: bool = false
+# Cached sorted order. Rebuilt only when the racer set changes or an adjacent
+# pair is detected out of order, so a quiet field costs an O(n) verify instead
+# of an O(n log n) sort per tick.
+var _rankings_cache: Array[Node2D] = []
+var _rankings_dirty := true
 
 # ── Route reference (wrong-way tangent seam) ─────────────────────────
 # A closed polyline describing the actual drivable route, in global coords and
@@ -46,12 +52,26 @@ var _route_points: PackedVector2Array = PackedVector2Array()
 var _route_cumulative: PackedFloat32Array = PackedFloat32Array()
 var _route_length := 0.0
 var _route_checkpoint_arc: Dictionary = {}
+# Reused result plus a window-range cache for _nearest_route_segment so the
+# per-tick wrong-way tangent path neither allocates a Dictionary per call nor
+# re-derives the arc window's index span (the window is fixed between
+# checkpoint crossings, so temporal coherence makes the binary search rare).
+var _route_segment_result := {"index": -1, "fraction": 0.0, "distance_squared": INF}
+var _route_window_lo := INF
+var _route_window_hi := -INF
+var _route_window_start := 0
+var _route_window_span := 0
 const ROUTE_SECTION_MARGIN := 200.0
 # Beyond this distance from the car the nearest route tangent stops being a
 # reliable "forward" reference: an off-corridor car can be closest to a folded
 # return leg and be judged backward. Corridor half-width (125) plus the maximum
 # racing-line inward offset (90) bounds every legal on-road position.
 const ROUTE_TANGENT_MAX_DISTANCE := 215.0
+
+# ── Per-frame hot-path counters (read by the progressive-freeze harness and the
+# regression test). Static so they survive the instance and are cheap to bump.
+static var route_tangent_query_count := 0  # get_route_forward_direction(...) route-window scans
+static var ranking_sort_count := 0         # get_rankings() full-order sorts
 
 
 func _ready() -> void:
@@ -111,6 +131,7 @@ func register_racer(
 		vehicle_name: String,
 		is_player: bool = false
 ) -> void:
+	var is_new_racer := false
 	if _racers.has(vehicle):
 		var existing: Dictionary = _racers[vehicle]
 		existing["driver_name"] = driver_name
@@ -140,10 +161,14 @@ func register_racer(
 		}
 		_racers[vehicle] = state
 		_registration_order.append(vehicle)
+		is_new_racer = true
 	if is_player:
 		_player_vehicle = vehicle
 		_sync_player_compatibility()
 	_prepared = false
+	_rankings_dirty = true
+	if is_new_racer:
+		racer_registered.emit(vehicle)
 
 
 func prepare_race() -> void:
@@ -173,6 +198,7 @@ func prepare_race() -> void:
 		_racers[vehicle] = state
 		_set_vehicle_controls_locked(vehicle, true)
 	_prepared = true
+	_rankings_dirty = true
 	_sync_player_compatibility()
 	refresh_rankings()
 
@@ -274,12 +300,37 @@ func refresh_rankings() -> Array[Node2D]:
 
 
 func get_rankings() -> Array[Node2D]:
-	var rankings: Array[Node2D] = []
+	if _rankings_dirty or not _rankings_still_sorted():
+		# A racer freed without unregistering still sits in the registration order;
+		# dropping it here keeps it out of the standings and, more importantly, out
+		# of the comparator, which cannot take a freed object.
+		_registration_order = _live_registrations()
+		_rankings_cache = _registration_order.duplicate()
+		ranking_sort_count += 1
+		_rankings_cache.sort_custom(_racer_precedes)
+		_rankings_dirty = false
+	return _rankings_cache
+
+
+func _live_registrations() -> Array[Node2D]:
+	var live: Array[Node2D] = []
 	for vehicle: Node2D in _registration_order:
 		if is_instance_valid(vehicle):
-			rankings.append(vehicle)
-	rankings.sort_custom(_racer_precedes)
-	return rankings
+			live.append(vehicle)
+	return live
+
+
+func _rankings_still_sorted() -> bool:
+	## Adjacent-pair check against the same comparator. Progress changes a little
+	## every tick but only crosses another racer occasionally; until it does the
+	## cached order is still correct and no sort is needed.
+	for i in _rankings_cache.size():
+		if not is_instance_valid(_rankings_cache[i]):
+			return false
+	for i in range(1, _rankings_cache.size()):
+		if _racer_precedes(_rankings_cache[i], _rankings_cache[i - 1]):
+			return false
+	return true
 
 
 func get_results() -> Array:
@@ -302,6 +353,13 @@ func get_results() -> Array:
 
 func get_racer_state(vehicle: Node2D) -> Dictionary:
 	return _racers[vehicle].duplicate() if _racers.has(vehicle) else {}
+
+
+func get_racer_state_ref(vehicle: Node2D) -> Dictionary:
+	## Non-allocating read of the live racer state. Callers must only read the
+	## returned dictionary, never mutate it — the AI's per-frame field scan uses
+	## this to avoid duplicating a Dictionary per candidate per tick.
+	return _racers[vehicle] if _racers.has(vehicle) else {}
 
 
 func get_racer_position(vehicle: Node2D) -> int:
@@ -412,6 +470,7 @@ func get_route_forward_direction(position: Vector2, previous_checkpoint_index: i
 	## resolved, so the caller falls back to the direct checkpoint chord.
 	if _route_points.size() < 2:
 		return Vector2.ZERO
+	route_tangent_query_count += 1
 	var previous_arc := float(_route_checkpoint_arc.get(previous_checkpoint_index, -1.0))
 	var expected_arc := float(_route_checkpoint_arc.get(expected_checkpoint_index, -1.0))
 	if previous_arc < 0.0 or expected_arc < 0.0:
@@ -442,13 +501,37 @@ func get_route_forward_direction(position: Vector2, previous_checkpoint_index: i
 func _nearest_route_segment(position: Vector2, arc_lo: float, arc_hi: float) -> Dictionary:
 	## Nearest route segment whose arc falls within [arc_lo, arc_hi] on the
 	## closed loop (may wrap). A window spanning the whole loop searches it all.
+	## The arc window maps to a contiguous run of cumulative-arc indices, found by
+	## binary search and cached until the window changes, so the hot path only
+	## projects over the section the racer is actually in.
+	var count := _route_points.size()
+	if count < 2:
+		_route_segment_result["index"] = -1
+		_route_segment_result["fraction"] = 0.0
+		_route_segment_result["distance_squared"] = INF
+		return _route_segment_result
+	var start := 0
+	var span := count
+	if arc_hi - arc_lo < _route_length:
+		if arc_lo != _route_window_lo or arc_hi != _route_window_hi:
+			_route_window_lo = arc_lo
+			_route_window_hi = arc_hi
+			var lo := fposmod(arc_lo, _route_length)
+			var hi := fposmod(arc_hi, _route_length)
+			if lo <= hi:
+				var begin := _route_lower_bound(lo)
+				_route_window_start = begin
+				_route_window_span = maxi(0, _route_upper_bound(hi) - begin)
+			else:
+				_route_window_start = _route_lower_bound(lo)
+				_route_window_span = count - _route_window_start + _route_upper_bound(hi)
+		start = _route_window_start
+		span = _route_window_span
 	var best_index := -1
 	var best_fraction := 0.0
 	var best_distance := INF
-	var count := _route_points.size()
-	for index in count:
-		if arc_hi - arc_lo < _route_length and not _arc_in_window(_route_cumulative[index], arc_lo, arc_hi):
-			continue
+	for offset in span:
+		var index := (start + offset) % count
 		var from := _route_points[index]
 		var to := _route_points[(index + 1) % count]
 		var segment := to - from
@@ -458,20 +541,40 @@ func _nearest_route_segment(position: Vector2, arc_lo: float, arc_hi: float) -> 
 			fraction = clampf((position - from).dot(segment) / length_squared, 0.0, 1.0)
 		var nearest := from + segment * fraction
 		var distance := position.distance_squared_to(nearest)
-		if distance < best_distance:
+		if distance < best_distance or (distance == best_distance and index < best_index):
 			best_distance = distance
 			best_index = index
 			best_fraction = fraction
-	return {"index": best_index, "fraction": best_fraction, "distance_squared": best_distance}
+	_route_segment_result["index"] = best_index
+	_route_segment_result["fraction"] = best_fraction
+	_route_segment_result["distance_squared"] = best_distance
+	return _route_segment_result
 
 
-func _arc_in_window(arc: float, arc_lo: float, arc_hi: float) -> bool:
-	var lo := fposmod(arc_lo, _route_length)
-	var hi := fposmod(arc_hi, _route_length)
-	var a := fposmod(arc, _route_length)
-	if lo <= hi:
-		return a >= lo and a <= hi
-	return a >= lo or a <= hi
+func _route_lower_bound(value: float) -> int:
+	## First route index whose cumulative arc is >= value (or count when none).
+	var lo := 0
+	var hi := _route_points.size()
+	while lo < hi:
+		var mid := (lo + hi) >> 1
+		if _route_cumulative[mid] < value:
+			lo = mid + 1
+		else:
+			hi = mid
+	return lo
+
+
+func _route_upper_bound(value: float) -> int:
+	## First route index whose cumulative arc is > value (or count when none).
+	var lo := 0
+	var hi := _route_points.size()
+	while lo < hi:
+		var mid := (lo + hi) >> 1
+		if _route_cumulative[mid] <= value:
+			lo = mid + 1
+		else:
+			hi = mid
+	return lo
 
 
 func get_checkpoint_after(checkpoint_index: int) -> Node:

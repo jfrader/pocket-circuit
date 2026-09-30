@@ -39,6 +39,8 @@ var _collision: CollisionShape2D
 var _hazard_sprite: Sprite2D
 var _hit_body_ids: Dictionary = {}
 
+# ── Per-frame hot-path counter (read by the progressive-freeze harness).
+static var overlap_poll_count := 0  # get_overlapping_bodies() polls in advance()
 
 func configure(hazard_theme: StringName, travel_start: Vector2, travel_end: Vector2, plan: Dictionary = {}) -> void:
 	theme = hazard_theme
@@ -99,7 +101,10 @@ func advance(delta: float) -> void:
 	if delta <= 0.0:
 		return
 	if is_static():
-		_apply_overlapping_bodies()
+		# Static hazards never move or change phase. A body driving in already
+		# fires body_entered -> _apply_hit, so polling get_overlapping_bodies()
+		# every physics tick only re-asserts the same single-shot hit. Nothing
+		# to advance; the signal owns static hit handling.
 		return
 	var remaining := delta
 	while remaining > 0.000001:
@@ -277,6 +282,7 @@ func _on_body_entered(body: Node2D) -> void:
 func _apply_overlapping_bodies() -> void:
 	if not is_inside_tree():
 		return
+	overlap_poll_count += 1
 	for body: Node2D in get_overlapping_bodies():
 		_apply_hit(body)
 
