@@ -112,8 +112,13 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   byte-identical scenes), `seeded` (a per-seed amplitude; about a quarter of
   seeds stay flat), or a numeric amplitude. Race events pass `road_width`
   through; the AI harness and capture tool read `PC_ROAD_WIDTH`.
-- A seeded wave (1–3 and 3–6 cycles per lap) sets the desired half-width
-  `125 + A · wave`. Each centerline sample is clamped to what the route affords:
+- A seeded wave (1–3 and 3–6 cycles per lap) drives the width. Its lowest 20%
+  pinches the road below 125, by at most `min(25, 0.2 · A)`, so never under a
+  100 half-width. That floor keeps the shortcut lane (70 + 26), technical strip
+  (92) and grip patches inside the road. Pinches fade out within 500–900 units
+  of the finish line so the start grid keeps a full-width straight.
+- The rest of the wave widens the road up to `125 + A`. Each widened sample is
+  clamped to what the route affords:
   `min(240, turn radius − 55, (nearest non-local leg − 70) / 2, room wall − 20)`,
   smoothed over 350 units so the road tapers. The 55 inner-edge radius is
   today's tightest (180 fillet − 125); tighter, the offset normals cross and the

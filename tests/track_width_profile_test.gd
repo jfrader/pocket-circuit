@@ -19,7 +19,9 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	var checked := 0
-	var widest := PROFILE.MIN_HALF_WIDTH
+	var pinched := 0
+	var widest := PROFILE.BASE_HALF_WIDTH
+	var narrowest := PROFILE.BASE_HALF_WIDTH
 	for tier: StringName in [&"standard", &"long"]:
 		for room in ROOMS:
 			for seed: int in SEEDS:
@@ -30,7 +32,7 @@ func _run_test() -> void:
 					return
 				var flat := PROFILE.build(line, seed, polygon, 0.0)
 				for value: float in flat:
-					if not _expect(is_equal_approx(value, PROFILE.MIN_HALF_WIDTH), "flat amplitude must keep today's half-width"):
+					if not _expect(is_equal_approx(value, PROFILE.BASE_HALF_WIDTH), "flat amplitude must keep today's half-width"):
 						return
 				var widths := PROFILE.build(line, seed, polygon, DRAMATIC)
 				if not _expect(widths == PROFILE.build(line, seed, polygon, DRAMATIC), "%s/%s/%d width must be deterministic" % [tier, room, seed]):
@@ -38,8 +40,13 @@ func _run_test() -> void:
 				if not _check_limits(line, polygon, widths, "%s/%s/%d" % [tier, room, seed]):
 					return
 				widest = maxf(widest, PROFILE.widest(widths))
+				for value: float in widths:
+					narrowest = minf(narrowest, value)
+				pinched += 1 if _has_pinch(widths) else 0
 				checked += 1
-	if not _expect(widest > PROFILE.MIN_HALF_WIDTH + 40.0, "dramatic amplitude should visibly widen some road (widest %.0f)" % widest):
+	if not _expect(widest > PROFILE.BASE_HALF_WIDTH + 40.0, "dramatic amplitude should visibly widen some road (widest %.0f)" % widest):
+		return
+	if not _expect(narrowest < PROFILE.BASE_HALF_WIDTH - 15.0 and pinched * 2 >= checked, "dramatic amplitude should pinch most routes somewhere (%d/%d, narrowest %.0f)" % [pinched, checked, narrowest]):
 		return
 	var flat_seeds := 0
 	for seed in 400:
@@ -48,8 +55,15 @@ func _run_test() -> void:
 		return
 	if not _expect(PROFILE.amplitude_for_option(PROFILE.MODE_FLAT, 5) == 0.0 and PROFILE.amplitude_for_option(null, 5) == 0.0, "flat is the default road width"):
 		return
-	print("TRACK_WIDTH_PROFILE_TEST PASS routes=%d widest=%.0f flat_seeds=%d/400" % [checked, widest, flat_seeds])
+	print("TRACK_WIDTH_PROFILE_TEST PASS routes=%d widest=%.0f narrowest=%.0f pinched=%d flat_seeds=%d/400" % [checked, widest, narrowest, pinched, flat_seeds])
 	quit(0)
+
+
+func _has_pinch(widths: PackedFloat32Array) -> bool:
+	for value: float in widths:
+		if value < PROFILE.BASE_HALF_WIDTH - 10.0:
+			return true
+	return false
 
 
 func _check_limits(line: PackedVector2Array, polygon: PackedVector2Array, widths: PackedFloat32Array, label: String) -> bool:
@@ -58,9 +72,13 @@ func _check_limits(line: PackedVector2Array, polygon: PackedVector2Array, widths
 	var total: float = arc[n]
 	for i in n:
 		var w := widths[i]
-		if not _expect(w >= PROFILE.MIN_HALF_WIDTH - TOL and w <= PROFILE.MAX_HALF_WIDTH + TOL, "%s half-width %.1f outside [125, 240]" % [label, w]):
+		if not _expect(w >= PROFILE.NARROW_HALF_WIDTH - TOL and w <= PROFILE.MAX_HALF_WIDTH + TOL, "%s half-width %.1f outside [100, 240]" % [label, w]):
 			return false
-		if w <= PROFILE.MIN_HALF_WIDTH + TOL:
+		if w < PROFILE.BASE_HALF_WIDTH - TOL:
+			if not _expect(minf(arc[i], total - arc[i]) >= PROFILE.FINISH_CLEAR_ARC - TOL, "%s pinch at sample %d reaches the start/finish straight" % [label, i]):
+				return false
+			continue
+		if w <= PROFILE.BASE_HALF_WIDTH + TOL:
 			continue
 		if not _expect(w <= PROFILE._local_radius(line, i) - maxf(PROFILE.HULL_RADIUS, PROFILE.MIN_INNER_EDGE_RADIUS) + TOL, "%s widened sample %d pinches its turn" % [label, i]):
 			return false
@@ -73,14 +91,15 @@ func _check_limits(line: PackedVector2Array, polygon: PackedVector2Array, widths
 			var gap := line[i].distance_to(line[j]) - w - widths[j]
 			if not _expect(gap >= PROFILE.LEG_GAP - TOL, "%s samples %d/%d merge (gap %.1f)" % [label, i, j, gap]):
 				return false
-	# A widened road must never pull its inner edge closer to the centerline than
-	# today's flat road does at the same sample; closer means the edge folded.
+	# The inner edge must never come closer to the centerline than today's flat
+	# edge at the same sample, less any intended pinch; closer means it folded.
 	var inner := PROFILE._inner_edge(line, widths)
 	var flat_inner := PROFILE._inner_edge(line, PROFILE.flat(n))
 	for i in n:
-		var widened := _distance_to_line(inner[i], line)
+		var fitted := _distance_to_line(inner[i], line)
 		var flat := _distance_to_line(flat_inner[i], line)
-		if not _expect(widened >= flat - CHORD_TOL, "%s inner road edge folds at sample %d (%.1f vs flat %.1f)" % [label, i, widened, flat]):
+		var pinch := maxf(0.0, PROFILE.BASE_HALF_WIDTH - widths[i])
+		if not _expect(fitted >= flat - pinch - CHORD_TOL, "%s inner road edge folds at sample %d (%.1f vs flat %.1f)" % [label, i, fitted, flat]):
 			return false
 	var flat_island := absf(GEOM.polygon_area(PROFILE._inner_edge(line, PROFILE.flat(n))))
 	var island := absf(GEOM.polygon_area(PROFILE._inner_edge(line, widths)))
