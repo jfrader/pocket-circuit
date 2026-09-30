@@ -272,13 +272,3 @@ func _grip_patches(track: Node2D, recipe: Dictionary, centerline: PackedVector2A
 		await stage.call("Laying grip surfaces")
 	track.set_meta("generated_surfaces", surfaces)
 
-
-func restyle_hazard(presenter: TrackVariantPresenter) -> void:
-	if presenter.hazard == null:
-		return
-	var geometry := PROPS.measure(_theme, _assets["hazard"])
-	var sprite := presenter.hazard.get("_hazard_sprite") as Sprite2D
-	sprite.texture = geometry["texture"]
-	sprite.scale = Vector2.ONE * float(geometry["scale"])
-	sprite.position = Vector2.ZERO
-	sprite.set_meta("asset_path", sprite.texture.resource_path)

@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Slippery patches, the technical surface and on-course obstacles now sit only on calm stretches, away from corners and the braking zones before them in both race directions. Some tracks carry fewer of them as a result. This layout change advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Outer track edges now have coherent, colliding sets of pencils, pens, utensils, straightedges and workshop hardware. Each set stays on the outside and follows the edge as a unit; inner props and scattered crumbs no longer count as outer framing. This physical-layout update advances the generator version.
 - Generated tracks restore colliding household objects along both sides of the course, with seed-varying clusters and quantities. Pens, rulers, sticks, utensils and workshop rails keep their real sizes and leave an open exit to the apron.
 - On-course obstacle targets now vary from 1–4, 2–6 and 3–8 by act, with more small household objects to steer around. AI passing space, checkpoints and recovery clearances are unchanged. These physical-layout changes advance the generator version; older circuit codes and lap/ghost records no longer match.
@@ -14,6 +15,9 @@
 - The championship is the route board. Each race is a stop on the road. Focus follows the road.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
+
+### Removed
+- The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
 - Pencils, utensils and other scenery now have close silhouette-shaped contact shadows instead of appearing suspended above the tabletop.

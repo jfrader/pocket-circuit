@@ -66,8 +66,6 @@ func _ready() -> void:
 	add_child(track_root)
 	await TRACK_BUILDER.assemble_runtime(track_root, prepared, _pilot_stage, Callable() if production_environment else pilot_art.dress)
 	_apply_track_variant(StringName(pilot_theme))
-	if not production_environment:
-		pilot_art.restyle_hazard(_track_variant_presenter)
 	var field_racers: Array[Dictionary] = _build_field_racers_for_preparation()
 	var visual_keys: Dictionary = IDENTITIES.resolve_field_visual_keys(field_racers)
 	for visual_key: String in visual_keys.values():

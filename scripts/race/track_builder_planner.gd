@@ -1,8 +1,7 @@
 class_name TrackBuilderPlanner
-## Deterministic obstacle and hazard plans. Does not build nodes.
+## Deterministic obstacle plans. Does not build nodes.
 
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
-const VISUAL_ROLE := preload("res://scripts/race/generated_world_visual_role.gd")
 const GEOM := preload("res://scripts/race/track_builder_geometry.gd")
 const HALF_WIDTH := 125.0
 const VEHICLE_WIDTH := 44.0
@@ -30,8 +29,6 @@ static func plan_obstacles(
 	var target_count := GENERATED_RULES.roll_obstacle_count(act, rng)
 	var protected_indices := PackedInt32Array([
 		0,
-		int(moments.get("early_conflict_forward", 0)),
-		int(moments.get("early_conflict_reverse", 0)),
 		int(moments.get("shortcut", 0)),
 		int(moments.get("technical", 0)),
 	])
@@ -99,46 +96,3 @@ static func plan_obstacles(
 		if not placed:
 			push_warning("TrackBuilderPlanner: skipped an obstacle that had no AI-safe placement")
 	return plan
-
-
-static func plan_hazard(theme: StringName, spec: Dictionary, centerline: PackedVector2Array, moments: Dictionary) -> Dictionary:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = int(spec.get("hazard_seed", 0))
-	var act := clampi(int(spec.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
-	var footprint_size := WorldPropScale.hazard_size(theme)
-	var footprint_kind := &"rect" if theme == &"office" else &"circle"
-	var motion := &"static" if theme == &"office" else &"rolling"
-	var paths := {}
-	for direction: String in ["forward", "reverse"]:
-		var index := int(moments["early_conflict_%s" % direction])
-		var crossing := GEOM.crossing_path(centerline, index, 96.0)
-		if motion == &"static":
-			var rest: Vector2 = crossing[0]
-			paths[direction] = PackedVector2Array([rest, rest])
-		else:
-			paths[direction] = crossing
-	return {
-		"version": 1,
-		"id": &"%s_crossing" % String(theme),
-		"seed": int(spec.get("hazard_seed", 0)),
-		"act": act,
-		"theme": theme,
-		"present": GENERATED_RULES.roll_hazard_present(act, rng),
-		"presence_chance": GENERATED_RULES.hazard_chance(act),
-		"role": &"moving_hazard" if motion != &"static" else &"static_hazard",
-		"motion": motion,
-		"visual_role": VISUAL_ROLE.MOVING_HAZARD,
-		"footprint_kind": footprint_kind,
-		"footprint_size": footprint_size,
-		"visual_bounds": Rect2(-footprint_size * 0.5, footprint_size),
-		"clearance": OBSTACLE_ROUTE_CLEARANCE,
-		"paths": paths,
-		"entry_distance": 78.0,
-		"exit_distance": 92.0,
-		"idle_duration": rng.randf_range(0.8, 1.35),
-		"warning_duration": rng.randf_range(1.45, 1.65) - float(act - 1) * 0.14,
-		"active_duration": rng.randf_range(1.35, 1.7),
-		"exit_duration": rng.randf_range(0.45, 0.7),
-		"cooldown_duration": rng.randf_range(3.1, 3.8) - float(act - 1) * 0.25,
-		"danger_states": PackedStringArray(["active"] if motion == &"static" else ["active", "exit"]),
-	}

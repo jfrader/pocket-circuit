@@ -24,18 +24,15 @@ func _run_test() -> void:
 				var spec: Dictionary = prepared["spec"]
 				var danger: Dictionary = identity["danger_profile"]
 				var obstacle_count := (spec.get("obstacle_plan", []) as Array).size()
-				var hazard: Dictionary = spec.get("hazard_plan", {})
 				var story_text := String(spec["story_id"]).replace("_", " ").capitalize()
 				var obstacle_target := int(danger["obstacle_count"])
-				var obstacle_text := "no static obstacles" if obstacle_target == 0 else "up to %d static obstacle%s" % [obstacle_target, "" if obstacle_target == 1 else "s"]
+				var obstacle_text := "no obstacles" if obstacle_target == 0 else "up to %d obstacle%s" % [obstacle_target, "" if obstacle_target == 1 else "s"]
 				if not _expect(
 					String(identity["story_id"]) == String(spec["story_id"])
 					and obstacle_count <= obstacle_target
-					and bool(danger["hazard_present"]) == bool(hazard.get("present", false))
-					and is_equal_approx(float(danger["hazard_chance"]), float(hazard.get("presence_chance", -1.0)))
 					and String(identity["summary"]).contains(story_text)
 					and String(identity["summary"]).contains(obstacle_text)
-					and String(identity["summary"]).contains("moving hazard" if bool(hazard.get("present", false)) else "no moving hazard"),
+					and not String(identity["summary"]).contains("hazard"),
 					"summary story and danger must exactly match prepared %s act %d seed %d" % [theme, danger_level, seed]
 				):
 					return
