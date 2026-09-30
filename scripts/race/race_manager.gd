@@ -301,20 +301,32 @@ func refresh_rankings() -> Array[Node2D]:
 
 func get_rankings() -> Array[Node2D]:
 	if _rankings_dirty or not _rankings_still_sorted():
-		_rankings_cache.clear()
-		for vehicle: Node2D in _registration_order:
-			if is_instance_valid(vehicle):
-				_rankings_cache.append(vehicle)
+		# A racer freed without unregistering still sits in the registration order;
+		# dropping it here keeps it out of the standings and, more importantly, out
+		# of the comparator, which cannot take a freed object.
+		_registration_order = _live_registrations()
+		_rankings_cache = _registration_order.duplicate()
 		ranking_sort_count += 1
 		_rankings_cache.sort_custom(_racer_precedes)
 		_rankings_dirty = false
 	return _rankings_cache
 
 
+func _live_registrations() -> Array[Node2D]:
+	var live: Array[Node2D] = []
+	for vehicle: Node2D in _registration_order:
+		if is_instance_valid(vehicle):
+			live.append(vehicle)
+	return live
+
+
 func _rankings_still_sorted() -> bool:
 	## Adjacent-pair check against the same comparator. Progress changes a little
 	## every tick but only crosses another racer occasionally; until it does the
 	## cached order is still correct and no sort is needed.
+	for i in _rankings_cache.size():
+		if not is_instance_valid(_rankings_cache[i]):
+			return false
 	for i in range(1, _rankings_cache.size()):
 		if _racer_precedes(_rankings_cache[i], _rankings_cache[i - 1]):
 			return false
