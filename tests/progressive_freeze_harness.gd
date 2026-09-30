@@ -3,7 +3,6 @@ extends SceneTree
 const APP_PATH := "/root/App"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
-const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
 
 const NUM_RACES := 12
 const BASE_SEED := 424242
@@ -147,12 +146,11 @@ func _snapshot(label: String) -> Dictionary:
 		# Cache sizes (access via preload; _ vars are readable by convention in tests)
 		"avatar_payloads": IDENTITIES._avatar_payload_cache.size(),
 		"avatar_textures": IDENTITIES._avatar_texture_cache.size(),
-		"avatar_overrides": IDENTITIES._avatar_seed_overrides.size(),
 		"car_payloads": IDENTITIES._car_payload_cache.size(),
 		"car_textures": IDENTITIES._car_texture_cache.size(),
 		"car_spins": IDENTITIES._car_spin_cache.size(),
 		"visual_resolutions": IDENTITIES._visual_resolutions.size(),
-		"generated_drivers": DRIVER_DIRECTORY.installed_ids().size(),
+		"generated_drivers": _generated_driver_count(),
 		"motion_gens": IDENTITIES.motion_image_generations,
 	}
 	return snap
@@ -177,6 +175,16 @@ func _print_report() -> void:
 			int(a["mem_static"]) - int(b["mem_static"]),
 		])
 	print("PROGRESSIVE_SNAPSHOTS end")
+
+
+## Roster identities are a later subsystem; this measurement must run without them.
+func _generated_driver_count() -> int:
+	if not ResourceLoader.exists("res://scripts/progression/driver_directory.gd"):
+		return 0
+	var script := load("res://scripts/progression/driver_directory.gd")
+	if script == null or not script.has_method("installed_ids"):
+		return 0
+	return int((script as Object).call("installed_ids").size())
 
 
 func _expect(condition: bool, message: String) -> bool:
