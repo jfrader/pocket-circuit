@@ -90,8 +90,8 @@ static func _plan_generated_obstacles(
 		gate_samples,
 		moments,
 		GENERATED_OBSTACLE_TYPES.get(theme, []),
-		_racing_line_points(centerline, moments, false),
-		_racing_line_points(centerline, moments, true)
+		_racing_line_points(centerline, moments, false, spec.get("half_widths", PackedFloat32Array())),
+		_racing_line_points(centerline, moments, true, spec.get("half_widths", PackedFloat32Array()))
 	)
 
 
@@ -342,7 +342,7 @@ static func racing_line_metrics_from_prepared(prepared: Dictionary) -> Dictionar
 	var spec: Dictionary = prepared["spec"]
 	var gate_samples := _layout_gate_samples(centerline, spec)
 	var moments := _analyze_track_moments(centerline, gate_samples)
-	var racing_line := _racing_line_points(centerline, moments, false)
+	var racing_line := _racing_line_points(centerline, moments, false, spec.get("half_widths", PackedFloat32Array()))
 	if racing_line.size() < 3:
 		return {}
 	var racing_line_length := 0.0
@@ -391,6 +391,8 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 		root.set_meta("target_length", spec.get("target_length", spec["loop_length"]))
 		root.set_meta("corner_profiles", spec.get("corner_profiles", {}))
 		root.set_meta("motifs", spec.get("motifs", []))
+		root.set_meta("corridor_max_half_width", TrackWidthProfile.widest(spec.get("half_widths", PackedFloat32Array())))
+		root.set_meta("road_width_amplitude", float(spec.get("road_width_amplitude", 0.0)))
 		root.set_meta("theme", prepared["theme"])
 		root.set_meta("room_shape", prepared["room_shape"])
 		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
@@ -1056,12 +1058,12 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 	TRACK_BUILDER_RACING.line_boundary_props(root, spec, centerline, outer_loop, corridor, room_polygon)
 
 
-static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}) -> void:
-	TRACK_BUILDER_RACING.build_racing_line(root, centerline, moments)
+static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}, half_widths: PackedFloat32Array = PackedFloat32Array()) -> void:
+	TRACK_BUILDER_RACING.build_racing_line(root, centerline, moments, half_widths)
 
 
-static func _racing_line_points(centerline: PackedVector2Array, moments: Dictionary, use_shortcut: bool) -> PackedVector2Array:
-	return TRACK_BUILDER_RACING.racing_line_points(centerline, moments, use_shortcut)
+static func _racing_line_points(centerline: PackedVector2Array, moments: Dictionary, use_shortcut: bool, half_widths: PackedFloat32Array = PackedFloat32Array()) -> PackedVector2Array:
+	return TRACK_BUILDER_RACING.racing_line_points(centerline, moments, use_shortcut, half_widths)
 
 
 static func _add_hidden_racing_line(parent: Node2D, line_name: String, points: PackedVector2Array) -> Line2D:

@@ -9,6 +9,9 @@ const VEHICLE_WIDTH := 44.0
 const MIN_VIABLE_CORRIDOR_WIDTH := VEHICLE_WIDTH * 1.6
 const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
 const OBSTACLE_EDGE_INSET := 8.0
+## Hazard crossing reach from the centerline on a 125 half-width road; scaled by
+## the local half-width on wider roads.
+const HAZARD_CROSSING_HALF_SPAN := 96.0
 
 
 static func plan_obstacles(
@@ -106,9 +109,11 @@ static func plan_hazard(theme: StringName, spec: Dictionary, centerline: PackedV
 	var footprint_kind := &"rect" if theme == &"office" else &"circle"
 	var motion := &"static" if theme == &"office" else &"rolling"
 	var paths := {}
+	var half_widths: PackedFloat32Array = spec.get("half_widths", PackedFloat32Array())
 	for direction: String in ["forward", "reverse"]:
 		var index := int(moments["early_conflict_%s" % direction])
-		var crossing := GEOM.crossing_path(centerline, index, 96.0)
+		var local_half := half_widths[index] if half_widths.size() == centerline.size() else HALF_WIDTH
+		var crossing := GEOM.crossing_path(centerline, index, HAZARD_CROSSING_HALF_SPAN * local_half / HALF_WIDTH)
 		if motion == &"static":
 			var rest: Vector2 = crossing[0]
 			paths[direction] = PackedVector2Array([rest, rest])

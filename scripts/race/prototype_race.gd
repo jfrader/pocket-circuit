@@ -615,7 +615,7 @@ func _configure_route_reference() -> void:
 			for tile: Node in tiles.get_children():
 				if tile is Node2D:
 					route.append((tile as Node2D).global_position)
-	race_manager.configure_route_reference(route)
+	race_manager.configure_route_reference(route, float(track_root.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)))
 
 
 func _abort_failed_race() -> void:

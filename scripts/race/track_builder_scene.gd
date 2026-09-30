@@ -150,7 +150,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 
 	# Racing line the AI follows (curvature-offset ideal path, stored invisibly).
 	# Generated AI stays on the safe side of the optional risk shortcut.
-	TrackBuilderCore._build_racing_line(root, centerline, generated_moments)
+	TrackBuilderCore._build_racing_line(root, centerline, generated_moments, half_widths)
 	if stage.is_valid():
 		await stage.call("Building trackside scenery")
 
