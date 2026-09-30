@@ -175,6 +175,11 @@ var _race_collision_layer := 0
 var _race_collision_mask := 0
 var _finished_ghosted := false
 
+# ── Per-frame hot-path counters (read by the progressive-freeze harness and the
+# regression test). Static so they survive the instance and are cheap to bump.
+static var tree_group_scan_count := 0      # get_nodes_in_group(...) from _physics_process
+static var surface_zone_probe_count := 0   # SurfaceZone.contains_global_point(...)
+
 
 func configure(
 		controlled_vehicle: VehicleController,
@@ -848,7 +853,7 @@ func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
 	if not vehicle.is_inside_tree():
 		return desired_direction
 	var avoid := Vector2.ZERO
-	for node: Node in vehicle.get_tree().get_nodes_in_group("track_hazard"):
+	for node: Node in _group_nodes(&"track_hazard"):
 		var hazard := node as EnvironmentalHazard
 		if hazard == null:
 			continue
@@ -880,7 +885,7 @@ func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
 func _leader_progress_deficit() -> float:
 	var mine := race_manager.get_racer_progress(vehicle)
 	var best := mine
-	for racer: Node in vehicle.get_tree().get_nodes_in_group("race_vehicle"):
+	for racer: Node in _group_nodes(&"race_vehicle"):
 		best = maxf(best, race_manager.get_racer_progress(racer as Node2D))
 	return maxf(0.0, best - mine)
 
@@ -963,7 +968,7 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 	var nearest_distance := INF
 	var nearest_lateral := 0.0
 	var lateral_axis := forward.orthogonal()
-	for node: Node in vehicle.get_tree().get_nodes_in_group("race_vehicle"):
+	for node: Node in _group_nodes(&"race_vehicle"):
 		var candidate := node as VehicleController
 		if candidate == null or candidate == vehicle:
 			continue
@@ -1066,6 +1071,16 @@ func _apply_drafting_recharge(delta: float, traffic_plan: Dictionary, should_bra
 	if should_brake or not bool(traffic_plan.get("drafting", false)):
 		return
 	vehicle.add_boost(vehicle.stats.boost_recharge * DRAFT_RECHARGE_MULTIPLIER * delta, "drafting")
+
+
+func _group_nodes(group_name: StringName) -> Array[Node]:
+	tree_group_scan_count += 1
+	return vehicle.get_tree().get_nodes_in_group(group_name)
+
+
+func _zone_contains(zone: SurfaceZone, point: Vector2) -> bool:
+	surface_zone_probe_count += 1
+	return zone.contains_global_point(point)
 
 
 func _difficulty_tuning() -> Dictionary:
@@ -1177,12 +1192,12 @@ func _surface_driving_speed_scale(speed_scale: float, grip_scale: float, directi
 
 func _surface_model(direction: Vector2) -> Dictionary:
 	var model := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
-	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
+	for node: Node in _group_nodes(&"surface_zone"):
 		var zone := node as SurfaceZone
 		if zone == null:
 			continue
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if not zone.contains_global_point(vehicle.global_position + direction * distance):
+			if not _zone_contains(zone, vehicle.global_position + direction * distance):
 				continue
 			var risk := _surface_zone_risk(zone)
 			if risk >= float(model["risk"]):
@@ -1194,21 +1209,21 @@ func _surface_model(direction: Vector2) -> Dictionary:
 func _upcoming_shortcut_zone(direction: Vector2) -> SurfaceZone:
 	if not uses_shortcut_line:
 		return null
-	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
+	for node: Node in _group_nodes(&"surface_zone"):
 		var zone := node as SurfaceZone
 		if zone == null or StringName(zone.get_meta("role", &"")) != &"shortcut":
 			continue
 		if not bool(zone.get_meta("ai_path_clear", false)):
 			continue
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if zone.contains_global_point(vehicle.global_position + direction * distance):
+			if _zone_contains(zone, vehicle.global_position + direction * distance):
 				return zone
 	return null
 
 
 func _surface_exposure(direction: Vector2) -> float:
 	var exposure := 0.0
-	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
+	for node: Node in _group_nodes(&"surface_zone"):
 		var zone := node as SurfaceZone
 		if zone == null:
 			continue
@@ -1216,7 +1231,7 @@ func _surface_exposure(direction: Vector2) -> float:
 		if zone_risk <= 0.0:
 			continue
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if zone.contains_global_point(vehicle.global_position + direction * distance):
+			if _zone_contains(zone, vehicle.global_position + direction * distance):
 				exposure = maxf(exposure, zone_risk)
 				break
 	return exposure
@@ -1224,7 +1239,7 @@ func _surface_exposure(direction: Vector2) -> float:
 
 func _surface_route_can_avoid(direction: Vector2) -> bool:
 	var found_risk := false
-	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
+	for node: Node in _group_nodes(&"surface_zone"):
 		var zone := node as SurfaceZone
 		if zone == null:
 			continue
@@ -1232,7 +1247,7 @@ func _surface_route_can_avoid(direction: Vector2) -> bool:
 		if zone_risk <= 0.0:
 			continue
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if not zone.contains_global_point(vehicle.global_position + direction * distance):
+			if not _zone_contains(zone, vehicle.global_position + direction * distance):
 				continue
 			found_risk = true
 			if StringName(zone.get_meta("lane", &"full")) == &"full":
