@@ -19,7 +19,6 @@ extends SceneTree
 const APP_PATH := "/root/App"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
-const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
 const AUDIO_DIRECTOR_SCRIPT := preload("res://scripts/audio/audio_director.gd")
 const TRACK_CORE := preload("res://scripts/race/track_builder_core.gd")
 const ENGINE_LOOP_GEN := preload("res://scripts/audio/engine/engine_loop_generator.gd")
@@ -419,7 +418,7 @@ func _snapshot(label: String) -> Dictionary:
 		"avatar_textures": IDENTITIES._avatar_texture_cache.size(),
 		"car_payloads": IDENTITIES._car_payload_cache.size(),
 		"car_textures": IDENTITIES._car_texture_cache.size(),
-		"generated_drivers": DRIVER_DIRECTORY.installed_ids().size(),
+		"generated_drivers": _generated_driver_count(),
 		"motion_gens": IDENTITIES.motion_image_generations,
 		"audio_stream_players": _count_audio_stream_players(),
 		"audio_director_children": _audio_director_child_count(),
@@ -606,6 +605,16 @@ func _count_static_colliders() -> int:
 				count += 1
 		to_visit.append_array(n.get_children())
 	return count
+
+
+## Roster identities are a later subsystem; this measurement must run without them.
+func _generated_driver_count() -> int:
+	if not ResourceLoader.exists("res://scripts/progression/driver_directory.gd"):
+		return 0
+	var script := load("res://scripts/progression/driver_directory.gd")
+	if script == null or not script.has_method("installed_ids"):
+		return 0
+	return int((script as Object).call("installed_ids").size())
 
 
 func _expect(condition: bool, message: String) -> bool:
