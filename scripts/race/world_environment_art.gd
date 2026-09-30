@@ -87,7 +87,7 @@ static func compose(root: Node2D, spec: Dictionary, centerline: PackedVector2Arr
 	boundary.set_meta("empty_run_count", run_modes.count(&"none"))
 	boundary.set_meta("open_exit", plan["diagnostics"].get("open_exit", PackedVector2Array()))
 	var gates := TrackBuilderCore._layout_gate_samples(centerline, spec)
-	var gameplay := TrackBuilderCore._analyze_track_moments(centerline, gates)
+	var gameplay := TrackBuilderCore._analyze_track_moments(centerline, gates, spec)
 	TrackBuilderStory.build_gameplay_moments(root, moments, spec, gameplay, centerline, 0)
 	TrackBuilderCore._build_finish_moments(moments, centerline)
 	TrackBuilderDressing.build_generated_surfaces(root, moments, spec["story_kit"], spec, gameplay, centerline, gates, false)

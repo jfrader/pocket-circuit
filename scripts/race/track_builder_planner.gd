@@ -36,6 +36,11 @@ static func plan_obstacles(
 		int(moments.get("technical", 0)),
 	])
 	var occupied: Array[Dictionary] = []
+	# Obstacles stay out of corners and out of the braking zone before any corner
+	# in either race direction.
+	var corner_clearance: PackedFloat32Array = moments.get("corner_clearance", PackedFloat32Array())
+	if corner_clearance.size() != centerline.size():
+		corner_clearance = TrackCornerMap.clearances(centerline)
 	for slot in target_count:
 		var definition: Dictionary = (roster[posmod(rng.randi(), roster.size())] as Dictionary).duplicate(true)
 		var footprint_size := TrackBuilderCore.PROP_SCALE.size_for(String(definition["asset"]), Vector2(40.0, 40.0))
@@ -48,11 +53,11 @@ static func plan_obstacles(
 		var placed := false
 		for attempt in centerline.size():
 			var index := posmod(preferred_index + attempt * 37, centerline.size())
-			if GEOM.turn_strength(centerline, index, 10) > 0.10:
+			if GEOM.turn_strength(centerline, index, 10) > 0.10 or not TrackCornerMap.is_calm(corner_clearance, index, 0):
 				continue
 			var protected := false
 			for protected_index: int in protected_indices:
-				if GEOM.cyclic_index_distance(index, protected_index, centerline.size()) < 22:
+				if protected_index >= 0 and GEOM.cyclic_index_distance(index, protected_index, centerline.size()) < 22:
 					protected = true
 					break
 			if protected:
