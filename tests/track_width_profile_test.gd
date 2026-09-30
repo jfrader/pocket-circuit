@@ -8,6 +8,9 @@ const ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"long", &"squar
 const SEEDS := [7919, 15838, 23757]
 const DRAMATIC := 115.0
 const TOL := 0.5
+## Sampled edges measured against a sampled centerline lose a little to chord
+## sag on curves (35-unit samples); a flat 125 road reads the same.
+const CHORD_TOL := 3.0
 
 
 func _initialize() -> void:
@@ -59,7 +62,7 @@ func _check_limits(line: PackedVector2Array, polygon: PackedVector2Array, widths
 			return false
 		if w <= PROFILE.MIN_HALF_WIDTH + TOL:
 			continue
-		if not _expect(w <= PROFILE._local_radius(line, i) - PROFILE.HULL_RADIUS + TOL, "%s widened sample %d pinches its turn" % [label, i]):
+		if not _expect(w <= PROFILE._local_radius(line, i) - maxf(PROFILE.HULL_RADIUS, PROFILE.MIN_INNER_EDGE_RADIUS) + TOL, "%s widened sample %d pinches its turn" % [label, i]):
 			return false
 		if not _expect(PROFILE._distance_to_polygon(line[i], polygon) >= w + PROFILE.WALL_GUARD - TOL, "%s widened sample %d crosses the room wall" % [label, i]):
 			return false
@@ -70,9 +73,25 @@ func _check_limits(line: PackedVector2Array, polygon: PackedVector2Array, widths
 			var gap := line[i].distance_to(line[j]) - w - widths[j]
 			if not _expect(gap >= PROFILE.LEG_GAP - TOL, "%s samples %d/%d merge (gap %.1f)" % [label, i, j, gap]):
 				return false
+	# A widened road must never pull its inner edge closer to the centerline than
+	# today's flat road does at the same sample; closer means the edge folded.
+	var inner := PROFILE._inner_edge(line, widths)
+	var flat_inner := PROFILE._inner_edge(line, PROFILE.flat(n))
+	for i in n:
+		var widened := _distance_to_line(inner[i], line)
+		var flat := _distance_to_line(flat_inner[i], line)
+		if not _expect(widened >= flat - CHORD_TOL, "%s inner road edge folds at sample %d (%.1f vs flat %.1f)" % [label, i, widened, flat]):
+			return false
 	var flat_island := absf(GEOM.polygon_area(PROFILE._inner_edge(line, PROFILE.flat(n))))
 	var island := absf(GEOM.polygon_area(PROFILE._inner_edge(line, widths)))
 	return _expect(island >= flat_island * PROFILE.ISLAND_KEEP - TOL, "%s island shrank to %.0f%% of flat" % [label, 100.0 * island / flat_island])
+
+
+func _distance_to_line(point: Vector2, line: PackedVector2Array) -> float:
+	var best := INF
+	for k in line.size():
+		best = minf(best, point.distance_to(Geometry2D.get_closest_point_to_segment(point, line[k], line[(k + 1) % line.size()])))
+	return best
 
 
 func _route(room: StringName, tier: StringName, seed: int) -> Dictionary:
