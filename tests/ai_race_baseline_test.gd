@@ -33,23 +33,23 @@ const STARTUP_WAIT_FRAMES := 180
 const MAX_PHYSICS_FRAMES := 7200
 
 const GATE_SEEDS := [
-	{&"theme": &"kitchen", &"room": &"long", &"seed": 24469},
-	{&"theme": &"workshop", &"room": &"square", &"seed": 51940},
-	{&"theme": &"office", &"room": &"classic", &"seed": 8001},
+	{"theme": &"kitchen", "room": &"long", "seed": 24469},
+	{"theme": &"workshop", "room": &"square", "seed": 51940},
+	{"theme": &"office", "room": &"classic", "seed": 8001},
 ]
 const FULL_SEEDS := [
-	{&"theme": &"kitchen", &"room": &"long", &"seed": 24469},
-	{&"theme": &"workshop", &"room": &"square", &"seed": 51940},
-	{&"theme": &"office", &"room": &"classic", &"seed": 8001},
-	{&"theme": &"kitchen", &"room": &"classic", &"seed": 42},
-	{&"theme": &"kitchen", &"room": &"wide", &"seed": 12345},
-	{&"theme": &"workshop", &"room": &"tall", &"seed": 30000},
-	{&"theme": &"office", &"room": &"long", &"seed": 9999},
-	{&"theme": &"kitchen", &"room": &"square", &"seed": 7777},
-	{&"theme": &"workshop", &"room": &"classic", &"seed": 55555},
-	{&"theme": &"office", &"room": &"el", &"seed": 11111},
-	{&"theme": &"kitchen", &"room": &"el", &"seed": 43210},
-	{&"theme": &"workshop", &"room": &"wide", &"seed": 65000},
+	{"theme": &"kitchen", "room": &"long", "seed": 24469},
+	{"theme": &"workshop", "room": &"square", "seed": 51940},
+	{"theme": &"office", "room": &"classic", "seed": 8001},
+	{"theme": &"kitchen", "room": &"classic", "seed": 42},
+	{"theme": &"kitchen", "room": &"wide", "seed": 12345},
+	{"theme": &"workshop", "room": &"tall", "seed": 30000},
+	{"theme": &"office", "room": &"long", "seed": 9999},
+	{"theme": &"kitchen", "room": &"square", "seed": 7777},
+	{"theme": &"workshop", "room": &"classic", "seed": 55555},
+	{"theme": &"office", "room": &"el", "seed": 11111},
+	{"theme": &"kitchen", "room": &"el", "seed": 43210},
+	{"theme": &"workshop", "room": &"wide", "seed": 65000},
 ]
 
 
@@ -77,16 +77,16 @@ func _run() -> void:
 		entries.append(result)
 
 	var document := {
-		&"schema_version": SCHEMA_VERSION,
-		&"godot_version": String(Engine.get_version_info().get("string", "")),
-		&"config": {
-			&"difficulty": DIFFICULTY,
-			&"laps": LAPS,
-			&"field_size": FIELD_SIZE,
-			&"physics_ticks_per_second": Engine.physics_ticks_per_second,
-			&"time_scale": Engine.time_scale,
+		"schema_version": SCHEMA_VERSION,
+		"godot_version": String(Engine.get_version_info().get("string", "")),
+		"config": {
+			"difficulty": DIFFICULTY,
+			"laps": LAPS,
+			"field_size": FIELD_SIZE,
+			"physics_ticks_per_second": Engine.physics_ticks_per_second,
+			"time_scale": Engine.time_scale,
 		},
-		&"seeds": entries,
+		"seeds": entries,
 	}
 
 	if record:
@@ -109,41 +109,46 @@ func _run() -> void:
 
 
 func _seed_cases() -> Array[Dictionary]:
+	var cases: Array[Dictionary] = []
 	var single := OS.get_environment("PC_BASELINE_SEED")
 	if single.is_valid_int():
 		var theme := OS.get_environment("PC_BASELINE_THEME")
 		var room := OS.get_environment("PC_BASELINE_ROOM")
-		return [{
-			&"theme": StringName(theme) if not theme.is_empty() else &"kitchen",
-			&"room": StringName(room) if not room.is_empty() else &"classic",
-			&"seed": int(single),
-		}]
-	return FULL_SEEDS if not OS.get_environment("PC_BASELINE_FULL").is_empty() else GATE_SEEDS
+		cases.append({
+			"theme": StringName(theme) if not theme.is_empty() else &"kitchen",
+			"room": StringName(room) if not room.is_empty() else &"classic",
+			"seed": int(single),
+		})
+		return cases
+	var source: Array = FULL_SEEDS if not OS.get_environment("PC_BASELINE_FULL").is_empty() else GATE_SEEDS
+	for entry: Dictionary in source:
+		cases.append(entry)
+	return cases
 
 
 func _run_race(case: Dictionary) -> Dictionary:
 	var prototype := PROTOTYPE_SCENE.instantiate()
 	prototype.set("_session", {
-		&"event": {
-			&"theme": case[&"theme"],
-			&"circuit": &"generated",
-			&"room": case[&"room"],
-			&"seed": case[&"seed"],
-			&"reverse": false,
-			&"laps": LAPS,
-			&"length_tier": StringName("standard"),
-			&"opponents": [&"juniper", &"milo", &"tess"],
-			&"opponent_count": FIELD_SIZE - 1,
+		"event": {
+			"theme": case["theme"],
+			"circuit": "generated",
+			"room": case["room"],
+			"seed": case["seed"],
+			"reverse": false,
+			"laps": LAPS,
+			"length_tier": StringName("standard"),
+			"opponents": ["juniper", "milo", "tess"],
+			"opponent_count": FIELD_SIZE - 1,
 		},
-		&"difficulty": DIFFICULTY,
-		&"vehicle_id": &"rustbug",
+		"difficulty": DIFFICULTY,
+		"vehicle_id": "rustbug",
 	})
 	var manager := prototype.get_node("RaceManager") as RaceManager
 	manager.finish_grace_seconds = 8.0
 	root.add_child(prototype)
 	current_scene = prototype
 	var player := get_first_node_in_group("player_vehicle") as VehicleController
-	if not _expect(player != null, "%s/%s/%d produced no player vehicle" % [case[&"theme"], case[&"room"], case[&"seed"]]):
+	if not _expect(player != null, "%s/%s/%d produced no player vehicle" % [case["theme"], case["room"], case["seed"]]):
 		current_scene = null
 		root.remove_child(prototype)
 		prototype.free()
@@ -153,7 +158,7 @@ func _run_race(case: Dictionary) -> Dictionary:
 	player.add_child(player_controller)
 	player_controller.configure(player, manager, -10.0, DIFFICULTY, "cass", cass.get("ai_style", {}) as Dictionary)
 	var racers: Array[Node2D] = manager.get_rankings()
-	if not _expect(racers.size() == FIELD_SIZE, "%s/%s/%d created %d racers, expected %d" % [case[&"theme"], case[&"room"], case[&"seed"], racers.size(), FIELD_SIZE]):
+	if not _expect(racers.size() == FIELD_SIZE, "%s/%s/%d created %d racers, expected %d" % [case["theme"], case["room"], case["seed"], racers.size(), FIELD_SIZE]):
 		current_scene = null
 		root.remove_child(prototype)
 		prototype.free()
@@ -167,7 +172,7 @@ func _run_race(case: Dictionary) -> Dictionary:
 	while not manager.is_running and startup_waits < STARTUP_WAIT_FRAMES:
 		await physics_frame
 		startup_waits += 1
-	if not _expect(manager.is_running, "%s/%s/%d never reached GO" % [case[&"theme"], case[&"room"], case[&"seed"]]):
+	if not _expect(manager.is_running, "%s/%s/%d never reached GO" % [case["theme"], case["room"], case["seed"]]):
 		current_scene = null
 		root.remove_child(prototype)
 		prototype.free()
@@ -189,10 +194,10 @@ func _run_race(case: Dictionary) -> Dictionary:
 		if driver.is_empty():
 			driver = racer.name
 		results.append({
-			&"driver": driver,
-			&"position": int(state.get("finish_position", 0)),
-			&"finish_time": _round_time(finish_time),
-			&"dnf": dnf,
+			"driver": driver,
+			"position": int(state.get("finish_position", 0)),
+			"finish_time": _round_time(finish_time),
+			"dnf": dnf,
 		})
 	results.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["position"]) < int(b["position"]))
 	var finish_order: Array[String] = []
@@ -208,14 +213,14 @@ func _run_race(case: Dictionary) -> Dictionary:
 	await process_frame
 	await physics_frame
 	return {
-		&"key": "%s/%s/%d" % [case[&"theme"], case[&"room"], case[&"seed"]],
-		&"theme": case[&"theme"],
-		&"room": case[&"room"],
-		&"seed": case[&"seed"],
-		&"finish_order": finish_order,
-		&"racers": results,
-		&"hash": outcome_hash,
-		&"frames": frame,
+		"key": "%s/%s/%d" % [case["theme"], case["room"], case["seed"]],
+		"theme": String(case["theme"]),
+		"room": String(case["room"]),
+		"seed": int(case["seed"]),
+		"finish_order": finish_order,
+		"racers": results,
+		"hash": outcome_hash,
+		"frames": frame,
 	}
 
 
@@ -237,7 +242,9 @@ func _load_baseline() -> Dictionary:
 	if file == null:
 		return {}
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
-	return parsed as Dictionary if parsed is Dictionary else {}
+	if parsed is Dictionary:
+		return parsed as Dictionary
+	return {}
 
 
 func _write_baseline(document: Dictionary) -> void:
