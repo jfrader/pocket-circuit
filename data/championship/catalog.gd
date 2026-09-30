@@ -335,6 +335,7 @@ const EVENTS := [
 		"rival_line": "Juniper: Keep the crumbs behind you, rookie. They hide bad lines.",
 		"opponents": ["juniper", "milo", "tess"],
 		"length_tier": "compact",
+		"difficulty": "sunday_drive",
 	},
 	{
 		"id": "kitchen_mug_run", "act": 1, "name": "Mug Run",
@@ -345,6 +346,7 @@ const EVENTS := [
 		"rival_line": "Juniper: Reverse lines expose every lazy turn. Show me yours.",
 		"opponents": ["juniper", "milo", "cass"],
 		"length_tier": "standard",
+		"difficulty": "sunday_drive",
 	},
 	{
 		"id": "kitchen_clean_line", "act": 1, "name": "The Clean Line",
@@ -355,6 +357,7 @@ const EVENTS := [
 		"rival_line": "Juniper: Beat my clean line and the Pinbolt is yours to understand.",
 		"opponents": ["juniper"],
 		"length_tier": "standard",
+		"difficulty": "club_circuit",
 	},
 	{
 		"id": "workshop_screw_loose", "act": 2, "name": "Screw Loose",
@@ -365,6 +368,7 @@ const EVENTS := [
 		"rival_line": "Milo: If it rattles, it races. Try not to become another spare part.",
 		"opponents": ["milo", "juniper", "cass"],
 		"length_tier": "long",
+		"difficulty": "club_circuit",
 	},
 	{
 		"id": "workshop_ruler_drop", "act": 2, "name": "Ruler Drop",
@@ -375,6 +379,7 @@ const EVENTS := [
 		"rival_line": "Milo: The ruler only feels narrow if you plan on braking.",
 		"opponents": ["milo", "tess", "juniper"],
 		"length_tier": "long",
+		"difficulty": "club_circuit",
 	},
 	{
 		"id": "workshop_heavy_metal", "act": 2, "name": "Heavy Metal",
@@ -385,6 +390,7 @@ const EVENTS := [
 		"rival_line": "Milo: Win this and I stop calling that Rustbug a paperweight.",
 		"opponents": ["milo"],
 		"length_tier": "endurance",
+		"difficulty": "clockwork",
 	},
 	{
 		"id": "office_paper_trail", "act": 3, "name": "Paper Trail",
@@ -395,6 +401,7 @@ const EVENTS := [
 		"rival_line": "Tess: Paper moves under pressure. So do drivers.",
 		"opponents": ["tess", "cass", "milo"],
 		"length_tier": "endurance",
+		"difficulty": "clockwork",
 	},
 	{
 		"id": "office_keyboard_cut", "act": 3, "name": "Keyboard Cut",
@@ -405,6 +412,7 @@ const EVENTS := [
 		"rival_line": "Tess: Hold the drift past Enter. Lift early and Cass will notice.",
 		"opponents": ["tess", "cass", "juniper"],
 		"length_tier": "endurance",
+		"difficulty": "clockwork",
 	},
 	{
 		"id": "office_last_light", "act": 3, "name": "Last Light Grand Final",
@@ -415,6 +423,7 @@ const EVENTS := [
 		"rival_line": "Cass: You earned the grid, Rae. Now earn the circuit.",
 		"opponents": ["cass", "tess", "milo"],
 		"length_tier": "marathon",
+		"difficulty": "clockwork",
 	},
 ]
 
@@ -428,6 +437,14 @@ static func get_event(event_id: String) -> Dictionary:
 		if String(event["id"]) == event_id:
 			return event.duplicate(true)
 	return {}
+
+
+static func race_difficulty(event: Dictionary, quick_race: bool, mastery_run: bool, selected: String) -> String:
+	if mastery_run:
+		return "club_circuit"
+	if quick_race:
+		return selected
+	return String(event.get("difficulty", selected))
 
 
 static func get_act(act_number: int) -> Dictionary:
