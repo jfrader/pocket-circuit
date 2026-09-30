@@ -79,8 +79,8 @@ const CORNER_FLOOR_MIN := 0.90
 # The hot paths read these values directly; there are no per-tier branches left
 # in the code (see configure/_physics_process/_configure_personality/
 # _shortcut_route_is_suitable/_v1_speed_envelope). Values that do not yet drive
-# a code path are neutral: no power/grip/brake assist, zero mistake rate, drift
-# disabled, and no catch-up for tiers that never had it.
+# a code path are neutral: zero mistake rate, drift disabled, and no catch-up
+# for tiers that never had it.
 const DIFFICULTY_TUNING: Dictionary = {
 	"sunday_drive": {
 		"pace": 0.94,
@@ -110,7 +110,7 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"shortcut_min_retention": 0.70,
 		"shortcut_min_grip": 0.38,
 		"catch_up": {"max_power": 0.0, "position_weight": 0.0, "progress_weight": 0.0},
-		"assist": {"power": 0.0, "grip": 0.0, "brake": 0.0},
+		"assist": {"power": 0.01, "grip": 0.01, "brake": 0.01},
 		"mistake_rate": 0.0,
 		"drift_policy": "disabled",
 	},
@@ -142,7 +142,7 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"shortcut_min_retention": 0.70,
 		"shortcut_min_grip": 0.38,
 		"catch_up": {"max_power": 0.09, "position_weight": 0.03, "progress_weight": 0.04},
-		"assist": {"power": 0.0, "grip": 0.0, "brake": 0.0},
+		"assist": {"power": 0.01, "grip": 0.01, "brake": 0.01},
 		"mistake_rate": 0.0,
 		"drift_policy": "disabled",
 	},
@@ -278,6 +278,15 @@ func configure(
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
+	var assist := tuning["assist"] as Dictionary
+	if float(assist["grip"]) > 0.0 or float(assist["brake"]) > 0.0:
+		# VehicleStats is a shared resource. Give this AI its own copy so neither
+		# other racers nor the human inherit its tire and brake forces.
+		var assisted_stats := vehicle.stats.duplicate() as VehicleStats
+		assisted_stats.front_grip *= 1.0 + float(assist["grip"])
+		assisted_stats.rear_grip *= 1.0 + float(assist["grip"])
+		assisted_stats.brake_force *= 1.0 + float(assist["brake"])
+		vehicle.apply_stats(assisted_stats)
 	vehicle.boost_amount = minf(
 		vehicle.get_boost_capacity(),
 		vehicle.get_boost_capacity()
@@ -703,7 +712,7 @@ func _physics_process(delta: float) -> void:
 				progress_deficit * float(catch_up["progress_weight"])
 			)
 		)
-	vehicle.set_external_power_multiplier(baseline_power + catch_up_power)
+	vehicle.set_external_power_multiplier(baseline_power + float((tuning["assist"] as Dictionary)["power"]) + catch_up_power)
 	_apply_drafting_recharge(delta, traffic_plan, should_brake)
 	if catch_up_power > 0.0 and not should_brake:
 		vehicle.add_boost(
