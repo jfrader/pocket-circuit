@@ -80,6 +80,16 @@ func _run() -> void:
 		if result.is_empty():
 			return
 		entries.append(result)
+	var p1_sum := 0.0
+	var spread_sum := 0.0
+	var dnf_count := 0
+	for entry: Dictionary in entries:
+		var racers: Array = entry["racers"]
+		p1_sum += float(racers[0]["finish_time"]) / LAPS
+		spread_sum += (float(racers[-1]["finish_time"]) - float(racers[0]["finish_time"])) / LAPS
+		for racer: Dictionary in racers:
+			dnf_count += int(bool(racer["dnf"]))
+	print("AI_BASELINE_METRICS difficulty=%s mean_p1_lap=%.3f mean_spread=%.3f dnf=%d" % [difficulty, p1_sum / entries.size(), spread_sum / entries.size(), dnf_count])
 
 	var document := {
 		"schema_version": SCHEMA_VERSION,
@@ -219,6 +229,11 @@ func _run_race(case: Dictionary, difficulty: String) -> Dictionary:
 			"dnf": dnf,
 		})
 	results.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["position"]) < int(b["position"]))
+	if not OS.get_environment("PC_MISTAKE_TRACE").is_empty():
+		for racer: Node2D in racers:
+			for child: Node in racer.get_children():
+				if child is AIVehicleController:
+					print("MISTAKE_TRACE %s/%s/%d %s count=%d" % [case["theme"], case["room"], case["seed"], racer.name, child.mistake_count])
 	var finish_order: Array[String] = []
 	var hash_parts: Array[String] = []
 	for entry: Dictionary in results:
