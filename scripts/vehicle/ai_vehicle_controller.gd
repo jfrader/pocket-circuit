@@ -79,8 +79,7 @@ const CORNER_FLOOR_MIN := 0.90
 # The hot paths read these values directly; there are no per-tier branches left
 # in the code (see configure/_physics_process/_configure_personality/
 # _shortcut_route_is_suitable/_v1_speed_envelope). Values that do not yet drive
-# a code path are neutral: zero mistake rate, drift disabled, and no catch-up
-# for tiers that never had it.
+# a code path are neutral: drift disabled and no catch-up for tiers that never had it.
 const DIFFICULTY_TUNING: Dictionary = {
 	"sunday_drive": {
 		"pace": 0.94,
@@ -111,7 +110,7 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"shortcut_min_grip": 0.38,
 		"catch_up": {"max_power": 0.0, "position_weight": 0.0, "progress_weight": 0.0},
 		"assist": {"power": 0.01, "grip": 0.01, "brake": 0.01},
-		"mistake_rate": 0.0,
+		"mistake_rate": 0.12,
 		"drift_policy": "disabled",
 	},
 	"club_circuit": {
@@ -228,6 +227,10 @@ var _static_contact_time := 0.0
 var _escape_time_remaining := 0.0
 var _escape_steer := 0.0
 var static_escape_attempt_count := 0
+var mistake_count := 0
+var _mistake_key := ""
+var _mistake_steer := 0.0
+var _mistake_remaining := 0.0
 var _race_collision_layer := 0
 var _race_collision_mask := 0
 var _finished_ghosted := false
@@ -307,6 +310,10 @@ func configure(
 	_finished_ghosted = false
 	_recovery_cooldown_remaining = 0.0
 	recovery_reasons.clear()
+	mistake_count = 0
+	_mistake_key = ""
+	_mistake_steer = 0.0
+	_mistake_remaining = 0.0
 	_stuck_time = 0.0
 	_reset_route_watchdog()
 	_tree_cache_dirty = true
@@ -599,6 +606,7 @@ func _physics_process(delta: float) -> void:
 			requested_steer = 1.0 if steering_angle >= 0.0 else -1.0
 	else:
 		requested_steer = clampf(steering_angle / float(tuning["steering_divisor"]), -1.0, 1.0)
+	requested_steer = clampf(requested_steer + _corner_mistake(delta, tuning, expected_index, line_radius), -1.0, 1.0)
 	var steering_response := float(tuning["steering_response"])
 	_smoothed_steer = lerpf(_smoothed_steer, requested_steer, 1.0 - exp(-steering_response * delta))
 	var turn_severity := _checkpoint_turn_severity(expected_index)
@@ -765,6 +773,30 @@ func _physics_process(delta: float) -> void:
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
 	_update_stuck_recovery(delta, stuck_target_key, distance_to_target)
+
+
+func _corner_mistake(delta: float, tuning: Dictionary, checkpoint_index: int, radius: float) -> float:
+	if float(tuning["mistake_rate"]) <= 0.0:
+		return 0.0
+	var lap := int(race_manager.get_racer_state(vehicle).get("lap", 0))
+	var key := "%d:%d" % [lap, checkpoint_index]
+	if key != _mistake_key:
+		_mistake_key = key
+		_mistake_steer = 0.0
+		_mistake_remaining = 0.0
+		if radius > 100.0 and radius < 650.0 and vehicle.speed >= 160.0 and not vehicle.has_static_contact:
+			var rng := RandomNumberGenerator.new()
+			rng.seed = ("%s:%s" % [personality_id, key]).hash()
+			if rng.randf() < float(tuning["mistake_rate"]):
+				_mistake_steer = 0.025 if rng.randf() < 0.5 else -0.025
+				_mistake_remaining = 0.18
+				mistake_count += 1
+	# Only a momentary line correction on a corner; normal pure pursuit recovers
+	# as the steering unwinds. No changes to collision, brake or vehicle physics.
+	if radius < 100.0 or radius > 650.0 or vehicle.speed < 160.0 or vehicle.has_static_contact:
+		return 0.0
+	_mistake_remaining = maxf(0.0, _mistake_remaining - delta)
+	return _mistake_steer if _mistake_remaining > 0.0 else 0.0
 
 
 func _update_room_cut(expected_index: int, forward: Vector2) -> void:

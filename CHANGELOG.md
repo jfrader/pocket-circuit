@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Sunday Drive rivals occasionally make a small, recoverable line error in corners; Clockwork drivers remain clean.
 - Rival cars on Sunday Drive get small tire, brake, and acceleration assists; Club Circuit gets a smaller tire and brake assist. Your car's handling is unchanged.
 - Outer track edges now have coherent, colliding sets of pencils, pens, utensils, straightedges and workshop hardware. Each set stays on the outside and follows the edge as a unit; inner props and scattered crumbs no longer count as outer framing. This physical-layout update advances the generator version.
 - Generated tracks restore colliding household objects along both sides of the course, with seed-varying clusters and quantities. Pens, rulers, sticks, utensils and workshop rails keep their real sizes and leave an open exit to the apron.
