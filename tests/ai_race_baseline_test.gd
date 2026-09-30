@@ -119,7 +119,7 @@ func _run() -> void:
 	var problems := _compare(document, baseline)
 	if not _expect(problems.is_empty(), "AI_RACE_BASELINE MISMATCH:\n%s" % "\n".join(problems)):
 		return
-	print("AI_RACE_BASELINE PASS seeds=%d" % entries.size())
+	print("AI_RACE_BASELINE_TEST PASS seeds=%d" % entries.size())
 	quit(0)
 
 
