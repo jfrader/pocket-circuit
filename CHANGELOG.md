@@ -19,6 +19,7 @@
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 
 ### Fixed
+- Club Circuit rivals no longer receive catch-up power while ahead of your car; their total engine assist remains capped at 15%.
 - Pencils, utensils and other scenery now have close silhouette-shaped contact shadows instead of appearing suspended above the tabletop.
 - Dirt, spills and paper on Kitchen, Workshop and Office courses retain their natural outlines and gaps instead of overlapping into rectangular slabs. The pale wash beneath them is removed; grip zones and collisions are unchanged.
 - Vehicle-audio warm-up now yields between engine voice, loop and effect synthesis so it does not stall the loading screen in one long batch.
