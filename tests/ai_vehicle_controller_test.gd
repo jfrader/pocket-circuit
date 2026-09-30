@@ -41,11 +41,15 @@ func _run_test() -> void:
 	root.add_child(manager)
 	root.add_child(vehicle)
 	vehicle.add_child(controller)
+	var original_stats := vehicle.stats
+	var original_grip := vehicle.stats.front_grip
 	vehicle.set_physics_process(false)
 	controller.set_physics_process(false)
 	manager.configure_checkpoints(checkpoints)
 	manager.register_racer(vehicle, "Test AI", "Rustbug")
 	controller.configure(vehicle, manager, 0.0)
+	if not _expect(vehicle.stats != original_stats and is_equal_approx(original_stats.front_grip, original_grip), "AI assists must not mutate the original shared/player stats"):
+		return
 	if not _expect(is_equal_approx(vehicle.boost_amount, vehicle.stats.boost_capacity * 0.58), "Club Circuit should start with its difficulty-scaled legal boost reserve"):
 		return
 	controller.configure(
@@ -56,6 +60,8 @@ func _run_test() -> void:
 		"juniper",
 		{"corner_pace": 1.04, "brake_timing": 0.9, "overtake_aggression": 1.0}
 	)
+	if not _expect(is_equal_approx(vehicle.stats.front_grip, original_grip * 1.005), "reconfiguring Club AI must not stack tire assists"):
+		return
 	if not _expect(controller.personality_id == "juniper" and float(controller.personality["corner_pace"]) > 1.0 and float(controller.personality["brake_timing"]) < 1.0, "Club Circuit should preserve a bounded, scaled driver personality"):
 		return
 	controller.configure(
@@ -66,6 +72,8 @@ func _run_test() -> void:
 		"juniper",
 		{"corner_pace": 1.04, "brake_timing": 0.9}
 	)
+	if not _expect(is_equal_approx(vehicle.stats.front_grip, original_grip * 1.01), "Sunday Drive must replace rather than stack Club tire assists"):
+		return
 	if not _expect(float(controller.personality["corner_pace"]) < 1.02 and float(controller.personality["brake_timing"]) > 0.96, "Sunday Drive should narrow personality differences"):
 		return
 	controller.configure(vehicle, manager, 0.0)
