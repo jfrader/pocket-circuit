@@ -189,6 +189,10 @@ var _hazard_nodes: Array[Node] = []
 var _surface_zone_nodes: Array[Node] = []
 var _race_vehicle_nodes: Array[Node] = []
 var _tree_cache_dirty := true
+# Per-race surface-zone records: the raw node plus a global-space bounding circle
+# and the derived risk/lane/role flags, built once per race so the per-tick
+# polygon probes can reject far zones with a single distance check.
+var _surface_zone_records: Array[Dictionary] = []
 
 # ── Precomputed arc-length tables for the reference/racing-line loops ──
 # The pure-pursuit and route-watchdog hot paths used to re-derive every segment
@@ -1172,7 +1176,68 @@ func _refresh_tree_cache() -> void:
 	_hazard_nodes = _scan_group(&"track_hazard")
 	_surface_zone_nodes = _scan_group(&"surface_zone")
 	_race_vehicle_nodes = _scan_group(&"race_vehicle")
+	_rebuild_surface_zone_records()
 	_tree_cache_dirty = false
+
+
+func _rebuild_surface_zone_records() -> void:
+	_surface_zone_records.clear()
+	for node: Node in _surface_zone_nodes:
+		_surface_zone_records.append(_surface_zone_record(node as SurfaceZone))
+
+
+func _surface_zone_record(zone: SurfaceZone) -> Dictionary:
+	## Per-race snapshot of a surface zone: a global-space bounding circle around
+	## the collision polygon (conservative — the polygon lies entirely inside it)
+	## plus the derived risk and meta flags the probe loops re-read every tick.
+	if zone == null or not is_instance_valid(zone):
+		return {"zone": null, "center": Vector2.ZERO, "radius_sq": INF}
+	var center := Vector2.ZERO
+	var radius_sq := 0.0
+	var vertex_count := 0
+	var collision := zone.get_node_or_null("SurfaceCollision") as CollisionPolygon2D
+	var polygon := collision.polygon if collision != null else PackedVector2Array()
+	for point: Vector2 in polygon:
+		center += zone.to_global(point)
+		vertex_count += 1
+	if vertex_count > 0:
+		center /= float(vertex_count)
+		for point: Vector2 in polygon:
+			radius_sq = maxf(radius_sq, center.distance_squared_to(zone.to_global(point)))
+	else:
+		center = zone.global_position
+	return {
+		"zone": zone,
+		"center": center,
+		"radius_sq": radius_sq,
+		"risk": _surface_zone_risk(zone),
+		"lane": StringName(zone.get_meta("lane", &"full")),
+		"role": StringName(zone.get_meta("role", &"")),
+		"ai_path_clear": bool(zone.get_meta("ai_path_clear", false)),
+		"grip": zone.grip_multiplier,
+		"speed": zone.speed_multiplier,
+	}
+
+
+func _surface_zone_records_for_tick() -> Array[Dictionary]:
+	if _tree_cache_dirty:
+		_refresh_tree_cache()
+	return _surface_zone_records
+
+
+func _probe_ray_near_zone(record: Dictionary, origin: Vector2, direction: Vector2) -> bool:
+	## Broad phase: does the zone's bounding circle intersect the probe ray
+	## [origin, origin + direction * max_probe]? If not, no probe point along it
+	## can lie inside the polygon, so the polygon test is skipped entirely.
+	var center: Vector2 = record["center"]
+	var radius_sq: float = record["radius_sq"]
+	var ray := direction * SURFACE_PROBE_DISTANCES[-1]
+	var to_center := center - origin
+	var ray_length_sq := ray.length_squared()
+	if ray_length_sq < 0.001:
+		return to_center.length_squared() <= radius_sq
+	var t := clampf(to_center.dot(ray) / ray_length_sq, 0.0, 1.0)
+	return (origin + ray * t).distance_squared_to(center) <= radius_sq
 
 
 func _scan_group(group_name: StringName) -> Array[Node]:
@@ -1294,16 +1359,19 @@ func _surface_driving_speed_scale(speed_scale: float, grip_scale: float, directi
 
 func _surface_model(direction: Vector2) -> Dictionary:
 	var model := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
-	for node: Node in _group_nodes(&"surface_zone"):
-		var zone := node as SurfaceZone
-		if zone == null:
+	var model_risk := 0.0
+	var origin := vehicle.global_position
+	for record: Dictionary in _surface_zone_records_for_tick():
+		if not _probe_ray_near_zone(record, origin, direction):
 			continue
+		var zone := record["zone"] as SurfaceZone
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if not _zone_contains(zone, vehicle.global_position + direction * distance):
+			if not _zone_contains(zone, origin + direction * distance):
 				continue
-			var risk := _surface_zone_risk(zone)
-			if risk >= float(model["risk"]):
-				model = {"risk": risk, "grip": zone.grip_multiplier, "speed": zone.speed_multiplier}
+			var risk := float(record["risk"])
+			if risk >= model_risk:
+				model_risk = risk
+				model = {"risk": risk, "grip": float(record["grip"]), "speed": float(record["speed"])}
 			break
 	return model
 
@@ -1311,29 +1379,33 @@ func _surface_model(direction: Vector2) -> Dictionary:
 func _upcoming_shortcut_zone(direction: Vector2) -> SurfaceZone:
 	if not uses_shortcut_line:
 		return null
-	for node: Node in _group_nodes(&"surface_zone"):
-		var zone := node as SurfaceZone
-		if zone == null or StringName(zone.get_meta("role", &"")) != &"shortcut":
+	var origin := vehicle.global_position
+	for record: Dictionary in _surface_zone_records_for_tick():
+		if StringName(record["role"]) != &"shortcut":
 			continue
-		if not bool(zone.get_meta("ai_path_clear", false)):
+		if not bool(record["ai_path_clear"]):
 			continue
+		if not _probe_ray_near_zone(record, origin, direction):
+			continue
+		var zone := record["zone"] as SurfaceZone
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if _zone_contains(zone, vehicle.global_position + direction * distance):
+			if _zone_contains(zone, origin + direction * distance):
 				return zone
 	return null
 
 
 func _surface_exposure(direction: Vector2) -> float:
 	var exposure := 0.0
-	for node: Node in _group_nodes(&"surface_zone"):
-		var zone := node as SurfaceZone
-		if zone == null:
-			continue
-		var zone_risk := _surface_zone_risk(zone)
+	var origin := vehicle.global_position
+	for record: Dictionary in _surface_zone_records_for_tick():
+		var zone_risk := float(record["risk"])
 		if zone_risk <= 0.0:
 			continue
+		if not _probe_ray_near_zone(record, origin, direction):
+			continue
+		var zone := record["zone"] as SurfaceZone
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if _zone_contains(zone, vehicle.global_position + direction * distance):
+			if _zone_contains(zone, origin + direction * distance):
 				exposure = maxf(exposure, zone_risk)
 				break
 	return exposure
@@ -1341,18 +1413,19 @@ func _surface_exposure(direction: Vector2) -> float:
 
 func _surface_route_can_avoid(direction: Vector2) -> bool:
 	var found_risk := false
-	for node: Node in _group_nodes(&"surface_zone"):
-		var zone := node as SurfaceZone
-		if zone == null:
-			continue
-		var zone_risk := _surface_zone_risk(zone)
+	var origin := vehicle.global_position
+	for record: Dictionary in _surface_zone_records_for_tick():
+		var zone_risk := float(record["risk"])
 		if zone_risk <= 0.0:
 			continue
+		if not _probe_ray_near_zone(record, origin, direction):
+			continue
+		var zone := record["zone"] as SurfaceZone
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if not _zone_contains(zone, vehicle.global_position + direction * distance):
+			if not _zone_contains(zone, origin + direction * distance):
 				continue
 			found_risk = true
-			if StringName(zone.get_meta("lane", &"full")) == &"full":
+			if StringName(record["lane"]) == &"full":
 				return false
 			break
 	return found_risk
