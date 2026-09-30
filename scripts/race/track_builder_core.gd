@@ -267,7 +267,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		edges["inner_boundary"] = _simple_inner_boundary_loop(inner, centerline)
 		edges["outer_boundary"] = _simple_boundary_loop(outer, centerline)
 		var gate_samples := _layout_gate_samples(centerline, spec)
-		var moments := _analyze_track_moments(centerline, gate_samples)
+		var moments := _analyze_track_moments(centerline, gate_samples, spec)
 		spec["obstacle_plan"] = _plan_generated_obstacles(theme, spec, centerline, gate_samples, moments)
 		spec["hazard_plan"] = _plan_generated_hazard(theme, spec, centerline, moments)
 	var prepared := {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed}
@@ -330,7 +330,7 @@ static func racing_line_metrics_from_prepared(prepared: Dictionary) -> Dictionar
 	var centerline: PackedVector2Array = prepared["centerline"]
 	var spec: Dictionary = prepared["spec"]
 	var gate_samples := _layout_gate_samples(centerline, spec)
-	var moments := _analyze_track_moments(centerline, gate_samples)
+	var moments := _analyze_track_moments(centerline, gate_samples, spec)
 	var racing_line := _racing_line_points(centerline, moments, false)
 	if racing_line.size() < 3:
 		return {}
@@ -618,8 +618,9 @@ static func _compose_generated_story(
 	await TRACK_BUILDER_STORY.compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, moments, stage)
 
 
-static func _analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array) -> Dictionary:
-	return TRACK_BUILDER_DRESSING.analyze_track_moments(centerline, gate_samples)
+static func _analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array, spec: Dictionary = {}) -> Dictionary:
+	var surface_seed := _mix_seed(int(spec.get("requested_seed", spec.get("seed", 0))), "technical_surface")
+	return TRACK_BUILDER_DRESSING.analyze_track_moments(centerline, gate_samples, surface_seed)
 
 
 static func _default_act_for_theme(theme: StringName) -> int:
