@@ -36,6 +36,7 @@ static func plan_obstacles(
 		int(moments.get("technical", 0)),
 	])
 	var occupied: Array[Dictionary] = []
+	var half_widths: PackedFloat32Array = spec.get("half_widths", PackedFloat32Array())
 	for slot in target_count:
 		var definition: Dictionary = (roster[posmod(rng.randi(), roster.size())] as Dictionary).duplicate(true)
 		var footprint_size := TrackBuilderCore.PROP_SCALE.size_for(String(definition["asset"]), Vector2(40.0, 40.0))
@@ -63,9 +64,10 @@ static func plan_obstacles(
 			var lateral_extent := GEOM.footprint_projected_extent(footprint_size, shape_kind, rotation, normal)
 			var route_offset := (standard_route[index] - centerline[index]).dot(normal)
 			var side := -signf(route_offset) if not is_zero_approx(route_offset) else preferred_side
-			var lateral_offset := HALF_WIDTH - OBSTACLE_EDGE_INSET - lateral_extent
+			var local_half := half_widths[index] if half_widths.size() == centerline.size() else HALF_WIDTH
+			var lateral_offset := local_half - OBSTACLE_EDGE_INSET - lateral_extent
 			var candidate := centerline[index] + normal * side * lateral_offset
-			var viable_width := HALF_WIDTH + absf(lateral_offset) - lateral_extent
+			var viable_width := local_half + absf(lateral_offset) - lateral_extent
 			if viable_width + 0.001 < MIN_VIABLE_CORRIDOR_WIDTH:
 				continue
 			if not GEOM.clear_of_points(candidate, gate_samples, maxf(90.0, footprint_size.length())):
