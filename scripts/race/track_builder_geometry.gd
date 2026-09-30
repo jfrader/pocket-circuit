@@ -11,15 +11,17 @@ static func sample_centerline(controls: PackedVector2Array) -> PackedVector2Arra
 	return CURVE_SAMPLING.sample(controls)
 
 
-static func corridor_edges(centerline: PackedVector2Array) -> Dictionary:
+static func corridor_edges(centerline: PackedVector2Array, half_widths: PackedFloat32Array = PackedFloat32Array()) -> Dictionary:
 	var left := PackedVector2Array()
 	var right := PackedVector2Array()
 	var count := centerline.size()
+	var variable := half_widths.size() == count
 	for index in count:
 		var tangent := (centerline[(index + 1) % count] - centerline[(index - 1 + count) % count]).normalized()
 		var normal := tangent.rotated(PI * 0.5)
-		left.append(centerline[index] + normal * HALF_WIDTH)
-		right.append(centerline[index] - normal * HALF_WIDTH)
+		var half := half_widths[index] if variable else HALF_WIDTH
+		left.append(centerline[index] + normal * half)
+		right.append(centerline[index] - normal * half)
 	return {"left": left, "right": right, "centerline": centerline}
 
 static func rounded_rect_points(center: Vector2, size: Vector2, radius: float, corner_segments: int) -> PackedVector2Array:
@@ -154,6 +156,17 @@ static func simple_corridor_boundary_loop(_points: PackedVector2Array, centerlin
 			result = cleaned
 			largest_area = area
 	return result
+
+
+## Road edge for a variable-width corridor: the per-sample offset edge itself.
+## TrackWidthProfile keeps every width below the local turn radius, so it cannot
+## fold; if it ever does, fall back to the fixed-width contour.
+static func variable_boundary_loop(points: PackedVector2Array, centerline: PackedVector2Array, select_outer: bool) -> PackedVector2Array:
+	var cleaned := simplify_loop(deduplicate_loop(points), 0.05)
+	if cleaned.size() >= 3 and not has_self_intersection(cleaned):
+		return cleaned
+	push_warning("TrackBuilderGeometry: variable road edge folded; using the fixed-width contour")
+	return simple_corridor_boundary_loop(points, centerline, select_outer)
 
 
 static func deduplicate_loop(points: PackedVector2Array) -> PackedVector2Array:
@@ -304,6 +317,36 @@ static func line_sweep_clears_footprint(
 		var local_from := (line[index] - center).rotated(-rotation)
 		var local_to := (line[(index + 1) % line.size()] - center).rotated(-rotation)
 		if segment_intersects_axis_rect(local_from, local_to, expanded_half_size):
+			return false
+	return true
+
+
+## line_sweep_clears_footprint for a variable-width road: each closed-loop
+## segment is inflated by its wider endpoint's half-width plus `clearance`.
+static func variable_sweep_clears_footprint(
+		line: PackedVector2Array,
+		half_widths: PackedFloat32Array,
+		center: Vector2,
+		size: Vector2,
+		shape_kind: StringName,
+		rotation: float,
+		clearance: float
+) -> bool:
+	var count := line.size()
+	if count < 2 or half_widths.size() != count:
+		return line_sweep_clears_footprint(line, center, size, shape_kind, rotation, HALF_WIDTH + clearance)
+	for index in count:
+		var next := (index + 1) % count
+		var from := line[index]
+		var to := line[next]
+		var hull := maxf(half_widths[index], half_widths[next]) + clearance
+		var reach := maxf(size.x, size.y) * 0.5 + hull if shape_kind == &"circle" else (size * 0.5 + Vector2.ONE * hull).length()
+		if not Rect2(center - Vector2.ONE * reach, Vector2.ONE * reach * 2.0).intersects(Rect2(from, to - from).abs(), true):
+			continue
+		if shape_kind == &"circle":
+			if point_to_segment_distance(center, from, to) < maxf(size.x, size.y) * 0.5 + hull:
+				return false
+		elif segment_intersects_axis_rect((from - center).rotated(-rotation), (to - center).rotated(-rotation), size * 0.5 + Vector2.ONE * hull):
 			return false
 	return true
 
