@@ -35,6 +35,11 @@ var _player_vehicle: Node2D
 var _prepared: bool = false
 var _finish_grace_remaining: float = -1.0
 var _results_finalized: bool = false
+# Cached sorted order. Rebuilt only when the racer set changes or an adjacent
+# pair is detected out of order, so a quiet field costs an O(n) verify instead
+# of an O(n log n) sort per tick.
+var _rankings_cache: Array[Node2D] = []
+var _rankings_dirty := true
 
 # ── Route reference (wrong-way tangent seam) ─────────────────────────
 # A closed polyline describing the actual drivable route, in global coords and
@@ -158,6 +163,7 @@ func register_racer(
 		_player_vehicle = vehicle
 		_sync_player_compatibility()
 	_prepared = false
+	_rankings_dirty = true
 
 
 func prepare_race() -> void:
@@ -187,6 +193,7 @@ func prepare_race() -> void:
 		_racers[vehicle] = state
 		_set_vehicle_controls_locked(vehicle, true)
 	_prepared = true
+	_rankings_dirty = true
 	_sync_player_compatibility()
 	refresh_rankings()
 
@@ -288,13 +295,25 @@ func refresh_rankings() -> Array[Node2D]:
 
 
 func get_rankings() -> Array[Node2D]:
-	var rankings: Array[Node2D] = []
-	for vehicle: Node2D in _registration_order:
-		if is_instance_valid(vehicle):
-			rankings.append(vehicle)
-	ranking_sort_count += 1
-	rankings.sort_custom(_racer_precedes)
-	return rankings
+	if _rankings_dirty or not _rankings_still_sorted():
+		_rankings_cache.clear()
+		for vehicle: Node2D in _registration_order:
+			if is_instance_valid(vehicle):
+				_rankings_cache.append(vehicle)
+		ranking_sort_count += 1
+		_rankings_cache.sort_custom(_racer_precedes)
+		_rankings_dirty = false
+	return _rankings_cache
+
+
+func _rankings_still_sorted() -> bool:
+	## Adjacent-pair check against the same comparator. Progress changes a little
+	## every tick but only crosses another racer occasionally; until it does the
+	## cached order is still correct and no sort is needed.
+	for i in range(1, _rankings_cache.size()):
+		if _racer_precedes(_rankings_cache[i], _rankings_cache[i - 1]):
+			return false
+	return true
 
 
 func get_results() -> Array:
