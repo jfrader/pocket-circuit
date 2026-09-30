@@ -14,6 +14,9 @@ extends SceneTree
 ##   PC_BASELINE_RECORD=1      run and (re)write the baseline file
 ##   PC_BASELINE_FULL=1        run the full seed list instead of the gate list
 ##   PC_BASELINE_SEED=<n>      run a single ad-hoc seed (theme/room via env)
+##   PC_BASELINE_DIFFICULTY=<tier>  run a difficulty tier (sunday_drive /
+##                                  club_circuit / clockwork); records to and
+##                                  verifies against a per-tier baseline file
 ##
 ## The gate globs `tests/*.gd`, so the default list is small (3 seeds x 2 laps).
 ## The full sweep is opt-in because it is long at real time-scale.
@@ -25,7 +28,8 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const BASELINE_PATH := "res://tests/ai_race_baseline.json"
 const SCHEMA_VERSION := 1
 
-const DIFFICULTY := "club_circuit"
+const DEFAULT_DIFFICULTY := "club_circuit"
+const VALID_DIFFICULTIES := ["sunday_drive", "club_circuit", "clockwork"]
 const LAPS := 2
 const FIELD_SIZE := 4
 const SETTLE_FRAMES := 36
@@ -59,6 +63,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var record := not OS.get_environment("PC_BASELINE_RECORD").is_empty()
+	var difficulty := _baseline_difficulty()
 	var seed_cases := _seed_cases()
 	var baseline := _load_baseline()
 
@@ -71,7 +76,7 @@ func _run() -> void:
 
 	var entries: Array[Dictionary] = []
 	for case: Dictionary in seed_cases:
-		var result := await _run_race(case)
+		var result := await _run_race(case, difficulty)
 		if result.is_empty():
 			return
 		entries.append(result)
@@ -80,7 +85,7 @@ func _run() -> void:
 		"schema_version": SCHEMA_VERSION,
 		"godot_version": String(Engine.get_version_info().get("string", "")),
 		"config": {
-			"difficulty": DIFFICULTY,
+			"difficulty": difficulty,
 			"laps": LAPS,
 			"field_size": FIELD_SIZE,
 			"physics_ticks_per_second": Engine.physics_ticks_per_second,
@@ -91,13 +96,13 @@ func _run() -> void:
 
 	if record:
 		_write_baseline(document)
-		print("AI_RACE_BASELINE RECORDED seeds=%d -> %s" % [entries.size(), BASELINE_PATH])
+		print("AI_RACE_BASELINE RECORDED difficulty=%s seeds=%d -> %s" % [difficulty, entries.size(), _baseline_path()])
 		quit(0)
 		return
 
 	if baseline.is_empty():
 		# Baseline not recorded yet. Keep the gate green but make the gap loud.
-		print("AI_RACE_BASELINE SKIP: %s missing; run with PC_BASELINE_RECORD=1 to record" % BASELINE_PATH)
+		print("AI_RACE_BASELINE SKIP: %s missing; run with PC_BASELINE_RECORD=1 to record" % _baseline_path())
 		quit(0)
 		return
 
@@ -106,6 +111,20 @@ func _run() -> void:
 		return
 	print("AI_RACE_BASELINE PASS seeds=%d" % entries.size())
 	quit(0)
+
+
+func _baseline_difficulty() -> String:
+	var difficulty := OS.get_environment("PC_BASELINE_DIFFICULTY")
+	if difficulty in VALID_DIFFICULTIES:
+		return difficulty
+	return DEFAULT_DIFFICULTY
+
+
+func _baseline_path() -> String:
+	var difficulty := _baseline_difficulty()
+	if difficulty == DEFAULT_DIFFICULTY:
+		return BASELINE_PATH
+	return "res://tests/ai_race_baseline_%s.json" % difficulty
 
 
 func _seed_cases() -> Array[Dictionary]:
@@ -126,7 +145,7 @@ func _seed_cases() -> Array[Dictionary]:
 	return cases
 
 
-func _run_race(case: Dictionary) -> Dictionary:
+func _run_race(case: Dictionary, difficulty: String) -> Dictionary:
 	var prototype := PROTOTYPE_SCENE.instantiate()
 	prototype.set("_session", {
 		"event": {
@@ -140,7 +159,7 @@ func _run_race(case: Dictionary) -> Dictionary:
 			"opponents": ["juniper", "milo", "tess"],
 			"opponent_count": FIELD_SIZE - 1,
 		},
-		"difficulty": DIFFICULTY,
+		"difficulty": difficulty,
 		"vehicle_id": "rustbug",
 	})
 	var manager := prototype.get_node("RaceManager") as RaceManager
@@ -156,7 +175,7 @@ func _run_race(case: Dictionary) -> Dictionary:
 	var cass := CATALOG.get_driver("cass")
 	var player_controller := AI_CONTROLLER_SCRIPT.new() as AIVehicleController
 	player.add_child(player_controller)
-	player_controller.configure(player, manager, -10.0, DIFFICULTY, "cass", cass.get("ai_style", {}) as Dictionary)
+	player_controller.configure(player, manager, -10.0, difficulty, "cass", cass.get("ai_style", {}) as Dictionary)
 	var racers: Array[Node2D] = manager.get_rankings()
 	if not _expect(racers.size() == FIELD_SIZE, "%s/%s/%d created %d racers, expected %d" % [case["theme"], case["room"], case["seed"], racers.size(), FIELD_SIZE]):
 		current_scene = null
@@ -236,9 +255,9 @@ func _round_time(value: float) -> float:
 
 
 func _load_baseline() -> Dictionary:
-	if not FileAccess.file_exists(BASELINE_PATH):
+	if not FileAccess.file_exists(_baseline_path()):
 		return {}
-	var file := FileAccess.open(BASELINE_PATH, FileAccess.READ)
+	var file := FileAccess.open(_baseline_path(), FileAccess.READ)
 	if file == null:
 		return {}
 	var parsed: Variant = JSON.parse_string(file.get_as_text())
@@ -248,9 +267,9 @@ func _load_baseline() -> Dictionary:
 
 
 func _write_baseline(document: Dictionary) -> void:
-	var file := FileAccess.open(BASELINE_PATH, FileAccess.WRITE)
+	var file := FileAccess.open(_baseline_path(), FileAccess.WRITE)
 	if file == null:
-		push_error("AI_RACE_BASELINE FAIL: cannot write %s" % BASELINE_PATH)
+		push_error("AI_RACE_BASELINE FAIL: cannot write %s" % _baseline_path())
 		quit(1)
 		return
 	file.store_string(JSON.stringify(document, "  ") + "\n")
@@ -261,6 +280,8 @@ func _compare(document: Dictionary, baseline: Dictionary) -> Array[String]:
 	var problems: Array[String] = []
 	var doc_config: Dictionary = document.get("config", {})
 	var base_config: Dictionary = baseline.get("config", {})
+	if String(doc_config.get("difficulty", "")) != String(base_config.get("difficulty", "")):
+		problems.append("config.difficulty: current=%s baseline=%s" % [doc_config.get("difficulty"), base_config.get("difficulty")])
 	if int(doc_config.get("physics_ticks_per_second", -1)) != int(base_config.get("physics_ticks_per_second", -1)):
 		problems.append("config.physics_ticks_per_second: current=%s baseline=%s" % [doc_config.get("physics_ticks_per_second"), base_config.get("physics_ticks_per_second")])
 	if int(doc_config.get("laps", -1)) != int(base_config.get("laps", -1)):
