@@ -24,10 +24,19 @@ const AUDIO_DIRECTOR_SCRIPT := preload("res://scripts/audio/audio_director.gd")
 const TRACK_CORE := preload("res://scripts/race/track_builder_core.gd")
 const ENGINE_LOOP_GEN := preload("res://scripts/audio/engine/engine_loop_generator.gd")
 const ENGINE_VOICE_GEN := preload("res://scripts/audio/engine/engine_voice_generator.gd")
+const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
+const RACE_MANAGER_SCRIPT := preload("res://scripts/race/race_manager.gd")
+const ENV_HAZARD_SCRIPT := preload("res://scripts/race/environmental_hazard.gd")
 
 const NUM_RACES := 3
 const BASE_SEED := 424242
 const DRIVE_SECONDS := 5.5  # real driving time per race to exercise per-tick costs
+
+## Long single-race trace (PC_LONG_TRACE=1): drive one race for a minute+ and
+## sample ~once per second so we can see exactly what grows (or does not) over a
+## long driving session instead of the ~5s window every prior harness used.
+const LONG_TRACE_SECONDS := 90.0
+const LONG_TRACE_SAMPLE_SECONDS := 1.0
 
 var _race_results: Array[Dictionary] = []
 
@@ -52,6 +61,10 @@ func _run_test() -> void:
 		change_scene_to_file("res://scenes/boot/boot.tscn")
 		await process_frame
 		await process_frame
+
+	if OS.get_environment("PC_LONG_TRACE") == "1":
+		await _run_long_trace(app)
+		return
 
 	_race_results.clear()
 	for r in NUM_RACES:
@@ -81,10 +94,191 @@ func _run_test() -> void:
 	quit(0)
 
 
+func _run_long_trace(app: Node) -> void:
+	# Real-game conditions: 60 Hz physics (the project never overrides the
+	# default) and a 60 fps cap approximating vsync, so per-frame time budget
+	# matches what the user experiences rather than the 240 Hz stress rate the
+	# short harness used to reproduce accumulation.
+	Engine.physics_ticks_per_second = 60
+	Engine.time_scale = 1.0
+	Engine.max_fps = 60
+
+	var seed := int(OS.get_environment("PC_LONG_TRACE_SEED")) if OS.get_environment("PC_LONG_TRACE_SEED").is_valid_int() else BASE_SEED
+	var ok: bool = app.call("start_circuit_race", &"kitchen", &"classic", seed, "rustbug")
+	if not _expect(ok, "start_circuit_race must succeed for long trace seed %d" % seed):
+		return
+
+	var deadline := Time.get_ticks_msec() + 60000
+	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
+		await process_frame
+	if not _expect(not app.call("is_race_loading") and not app.get("_loading_failed"), "loading must complete for long trace"):
+		return
+
+	var race := current_scene
+	if not _expect(race != null and race.scene_file_path == RACE_SCENE, "must be in race scene"):
+		return
+	var race_manager := race.get_node_or_null("RaceManager") as Node
+	if not _expect(race_manager != null, "RaceManager must exist"):
+		return
+
+	var start_deadline := Time.get_ticks_msec() + 15000
+	while not bool(race_manager.get("is_running")) and Time.get_ticks_msec() < start_deadline:
+		await process_frame
+	if not _expect(bool(race_manager.get("is_running")), "race must start running"):
+		return
+
+	# Baseline counters (statics persist across the process; we measure deltas
+	# over the drive window).
+	var base_scans := int(AI_CONTROLLER_SCRIPT.tree_group_scan_count)
+	var base_probes := int(AI_CONTROLLER_SCRIPT.surface_zone_probe_count)
+	var base_route := int(RACE_MANAGER_SCRIPT.route_tangent_query_count)
+	var base_ranks := int(RACE_MANAGER_SCRIPT.ranking_sort_count)
+	var base_overlap := int(ENV_HAZARD_SCRIPT.overlap_poll_count)
+
+	var race_time_prev := float(race_manager.get("race_time"))
+	var wall_prev := Time.get_ticks_msec()
+	var duration_seconds := LONG_TRACE_SECONDS
+	var requested_seconds := OS.get_environment("PC_LONG_TRACE_SECONDS")
+	if requested_seconds.is_valid_float():
+		duration_seconds = clampf(float(requested_seconds), 1.0, 600.0)
+	var duration_ms := int(duration_seconds * 1000.0)
+	var drive_start := Time.get_ticks_msec()
+	var drive_end := drive_start + duration_ms
+	var sample_start := drive_start
+	var sample_end := sample_start + int(LONG_TRACE_SAMPLE_SECONDS * 1000.0)
+
+	var physics_sum := 0.0
+	var physics_max := 0.0
+	var process_sum := 0.0
+	var process_max := 0.0
+	var fps_sum := 0.0
+	var fps_min := 9999.0
+	var frames := 0
+	var physics_ticks := 0
+	var sample_index := 0
+
+	print("LONG_TRACE_HEADER t_s physics_avg_ms physics_max_ms process_avg_ms process_max_ms fps_min audio_avail underruns scans probes route_queries ranking_sorts overlap_polls ghost lap race_dt_s objects nodes mem_kb pairs active speed")
+
+	while Time.get_ticks_msec() < drive_end and current_scene != null and current_scene.scene_file_path == RACE_SCENE:
+		await process_frame
+		var phys := Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)
+		var proc := Performance.get_monitor(Performance.TIME_PROCESS)
+		var fps := Performance.get_monitor(Performance.TIME_FPS)
+		physics_sum += phys
+		physics_max = maxf(physics_max, phys)
+		process_sum += proc
+		process_max = maxf(process_max, proc)
+		fps_sum += fps
+		fps_min = minf(fps_min, fps)
+		frames += 1
+
+		var now := Time.get_ticks_msec()
+		if now < sample_end:
+			continue
+		# One wall-second elapsed: emit a sample.
+		var n := maxi(1, frames)
+		var race_time_now := float(race_manager.get("race_time"))
+		var audio_avail := _engine_voice_frames_available()
+		var underruns := _engine_voice_underruns()
+		var ghost := _ghost_sample_count(race)
+		var speed := _player_speed(race)
+		print("LONG_TRACE t=%.0f phys_avg=%.3f phys_max=%.3f proc_avg=%.3f proc_max=%.3f fps_min=%.1f audio=%d underruns=%d scans=%d probes=%d route=%d ranks=%d overlap=%d ghost=%d lap=%d race_dt=%.3f objects=%d nodes=%d mem=%.0f pairs=%d active=%d speed=%.1f" % [
+			float(sample_index) * LONG_TRACE_SAMPLE_SECONDS,
+			physics_sum / n,
+			physics_max,
+			process_sum / n,
+			process_max,
+			fps_min,
+			audio_avail,
+			underruns,
+			int(AI_CONTROLLER_SCRIPT.tree_group_scan_count) - base_scans,
+			int(AI_CONTROLLER_SCRIPT.surface_zone_probe_count) - base_probes,
+			int(RACE_MANAGER_SCRIPT.route_tangent_query_count) - base_route,
+			int(RACE_MANAGER_SCRIPT.ranking_sort_count) - base_ranks,
+			int(ENV_HAZARD_SCRIPT.overlap_poll_count) - base_overlap,
+			ghost,
+			int(race_manager.get("lap_count")),
+			race_time_now - race_time_prev,
+			Performance.get_monitor(Performance.OBJECT_COUNT),
+			Performance.get_monitor(Performance.OBJECT_NODE_COUNT),
+			Performance.get_monitor(Performance.MEMORY_STATIC),
+			int(Performance.get_monitor(Performance.PHYSICS_2D_COLLISION_PAIRS)),
+			int(Performance.get_monitor(Performance.PHYSICS_2D_ACTIVE_OBJECTS)),
+			speed,
+		])
+		race_time_prev = race_time_now
+		wall_prev = now
+		sample_start = now
+		sample_end = now + int(LONG_TRACE_SAMPLE_SECONDS * 1000.0)
+		physics_sum = 0.0
+		physics_max = 0.0
+		process_sum = 0.0
+		process_max = 0.0
+		fps_sum = 0.0
+		fps_min = 9999.0
+		frames = 0
+		sample_index += 1
+
+	# Clean up: leave the race and return to boot so a repeated run stays clean.
+	var fake_results: Array = [
+		{"position": 1, "driver_name": "Rae", "vehicle_name": "Rustbug", "time": 45.0, "finished": true, "dnf": false},
+	]
+	app.call("report_race_result", 1, 45.0, fake_results, false, {})
+	await process_frame
+	app.call("continue_after_race", true)
+	print("PROGRESSIVE_FREEZE_LONG_TRACE PASS samples=%d" % sample_index)
+	quit(0)
+
+
+func _engine_voice_frames_available() -> int:
+	var player := _find_node_named(root, "EngineVoicePlayer")
+	if player == null:
+		return -1
+	var playback: Variant = (player as AudioStreamPlayer).get_stream_playback()
+	if playback == null:
+		return -1
+	return int((playback as AudioStreamGeneratorPlayback).get_frames_available())
+
+
+func _engine_voice_underruns() -> int:
+	var app := root.get_node_or_null(APP_PATH)
+	if app == null:
+		return -1
+	var director: Variant = app.get("audio_director")
+	if not is_instance_valid(director):
+		return -1
+	var voice := (director as Node).get_node_or_null("EngineVoice")
+	if not is_instance_valid(voice):
+		return -1
+	return int(voice.get("_underruns"))
+
+
+func _ghost_sample_count(race: Node) -> int:
+	var samples: Variant = race.get("_ghost_samples")
+	return int(samples.size()) if samples is Array else -1
+
+
+func _player_speed(race: Node) -> float:
+	var player := race.get_tree().get_first_node_in_group("player_vehicle") as Node
+	if player == null:
+		return -1.0
+	return float(player.get("speed"))
+
+
+func _find_node_named(from: Node, wanted: String) -> Node:
+	if from == null:
+		return null
+	if from.name == wanted:
+		return from
+	for child: Node in from.get_children():
+		var hit := _find_node_named(child, wanted)
+		if hit != null:
+			return hit
+	return null
+
+
 func _run_one_real_drive_race(app: Node, seed: int) -> Dictionary:
 	var ok: bool = app.call("start_circuit_race", &"kitchen", &"classic", seed, "rustbug")
-	if not _expect(ok, "start_circuit_race must succeed for seed %d" % seed):
-		return {}
 
 	var deadline := Time.get_ticks_msec() + 30000
 	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:

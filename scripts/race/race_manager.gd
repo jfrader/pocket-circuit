@@ -53,6 +53,11 @@ const ROUTE_SECTION_MARGIN := 200.0
 # racing-line inward offset (90) bounds every legal on-road position.
 const ROUTE_TANGENT_MAX_DISTANCE := 215.0
 
+# ── Per-frame hot-path counters (read by the progressive-freeze harness and the
+# regression test). Static so they survive the instance and are cheap to bump.
+static var route_tangent_query_count := 0  # get_route_forward_direction(...) route-window scans
+static var ranking_sort_count := 0         # get_rankings() full-order sorts
+
 
 func _ready() -> void:
 	call_deferred("_initialize_race")
@@ -278,6 +283,7 @@ func get_rankings() -> Array[Node2D]:
 	for vehicle: Node2D in _registration_order:
 		if is_instance_valid(vehicle):
 			rankings.append(vehicle)
+	ranking_sort_count += 1
 	rankings.sort_custom(_racer_precedes)
 	return rankings
 
@@ -412,6 +418,7 @@ func get_route_forward_direction(position: Vector2, previous_checkpoint_index: i
 	## resolved, so the caller falls back to the direct checkpoint chord.
 	if _route_points.size() < 2:
 		return Vector2.ZERO
+	route_tangent_query_count += 1
 	var previous_arc := float(_route_checkpoint_arc.get(previous_checkpoint_index, -1.0))
 	var expected_arc := float(_route_checkpoint_arc.get(expected_checkpoint_index, -1.0))
 	if previous_arc < 0.0 or expected_arc < 0.0:
