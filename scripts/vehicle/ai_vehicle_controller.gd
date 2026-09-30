@@ -142,7 +142,7 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"shortcut_min_retention": 0.70,
 		"shortcut_min_grip": 0.38,
 		"catch_up": {"max_power": 0.09, "position_weight": 0.03, "progress_weight": 0.04},
-		"assist": {"power": 0.01, "grip": 0.01, "brake": 0.01},
+		"assist": {"power": 0.0, "grip": 0.005, "brake": 0.005},
 		"mistake_rate": 0.0,
 		"drift_policy": "disabled",
 	},
@@ -181,6 +181,7 @@ const DIFFICULTY_TUNING: Dictionary = {
 }
 
 var vehicle: VehicleController
+var _unassisted_stats: VehicleStats
 var race_manager: RaceManager
 var lane_offset: float = 0.0
 var difficulty: String = "club_circuit"
@@ -272,7 +273,11 @@ func configure(
 		driver_id: String = "baseline",
 		driver_style: Dictionary = {}
 ) -> void:
+	if vehicle != controlled_vehicle or _unassisted_stats == null:
+		_unassisted_stats = controlled_vehicle.stats
 	vehicle = controlled_vehicle
+	if vehicle.stats != _unassisted_stats:
+		vehicle.apply_stats(_unassisted_stats)
 	race_manager = manager
 	lane_offset = preferred_lane_offset
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
