@@ -543,6 +543,8 @@ func _track_generation_options(event: Dictionary) -> Dictionary:
 	}
 	if int(options["act"]) <= 0:
 		options.erase("act")
+	if event.has("road_width"):
+		options["road_width"] = event["road_width"]
 	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
 	if identity is Dictionary:
 		var identity_record := identity as Dictionary
