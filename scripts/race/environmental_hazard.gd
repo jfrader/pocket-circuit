@@ -101,7 +101,10 @@ func advance(delta: float) -> void:
 	if delta <= 0.0:
 		return
 	if is_static():
-		_apply_overlapping_bodies()
+		# Static hazards never move or change phase. A body driving in already
+		# fires body_entered -> _apply_hit, so polling get_overlapping_bodies()
+		# every physics tick only re-asserts the same single-shot hit. Nothing
+		# to advance; the signal owns static hit handling.
 		return
 	var remaining := delta
 	while remaining > 0.000001:
