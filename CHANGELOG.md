@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Changed
-- Every new championship fields its own generated rivals, and each Quick Race brings a new lineup driving different cars. Rival names follow the roster into briefings, the route board and the race, so no two campaigns share the same grid.
+- Every new championship fields its own generated rivals, and each Quick Race brings a new lineup driving different cars. Rival names follow the roster into briefings, the route board and the race.
 - Slippery patches, the technical surface and on-course obstacles now sit only on calm stretches, away from corners and the braking zones before them in both race directions. Some tracks carry fewer of them as a result. This layout change advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Quick Race has a difficulty picker beside its race controls, shared with Settings.
 - Championship rivals progress from Sunday Drive in Act I to Club Circuit in Act II and Clockwork in Act III; rival duels step up one tier. Quick Race keeps your chosen difficulty, and solo time trials keep theirs.

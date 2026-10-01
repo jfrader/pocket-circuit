@@ -339,7 +339,6 @@ func _render_driver() -> void:
 	_app.call("preview_player_avatar", _preview_avatar_seed)
 	_add_kicker("DRIVER")
 	_add_heading("Who's behind the wheel?")
-	_add_copy("Your portrait appears in the garage, briefings, and results.", SKIN.CREAM_DIM)
 	_add_spacer(10)
 	_add_button("SHUFFLE LOOK", Callable(self, "_shuffle_driver"))
 	var saved_seed := int(_app.call("get_player_avatar_seed"))
