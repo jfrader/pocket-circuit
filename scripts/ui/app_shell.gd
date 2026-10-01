@@ -360,7 +360,7 @@ func _keep_driver() -> void:
 	if not bool(_app.call("save_player_avatar", _preview_avatar_seed)):
 		_show_driver_save_error()
 		return
-	_render_driver()
+	show_driver(_driver_return)
 
 
 func _leave_driver() -> void:
@@ -373,7 +373,9 @@ func _leave_driver() -> void:
 
 func _show_driver_save_error() -> void:
 	var retry := Callable(self, "_keep_driver")
-	_app.call("show_save_error", "Portrait not saved", "The driver portrait could not be written.", retry, Callable(self, "show_driver"))
+	var back := Callable(self, "show_driver").bind(_driver_return)
+	var detail := "Save is read-only." if bool(_app.call("is_save_read_only")) else String(_app.call("get_last_save_error"))
+	show_save_error("Portrait not saved", detail, retry, back)
 
 
 func show_settings() -> void:

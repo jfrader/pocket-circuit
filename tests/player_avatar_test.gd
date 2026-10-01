@@ -6,6 +6,7 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const SHELL := preload("res://scripts/ui/app_shell.gd")
 
 const CANDIDATE_SEED := 424242
+const TEST_SAVE_ERROR := "The test save is not writable."
 
 
 class TestShell extends CanvasLayer:
@@ -25,11 +26,16 @@ class TestShell extends CanvasLayer:
 
 class RecordingSaveStore extends SaveStore:
 	var save_count := 0
+	var fail_write := false
 
 	func _init() -> void:
 		super("user://tests/pocket_circuit_player_avatar_test.json")
 
-	func save_data(data: Dictionary) -> bool:
+	func save_data(_data: Dictionary) -> bool:
+		if fail_write:
+			last_save_error = TEST_SAVE_ERROR
+			return false
+		last_save_error = ""
 		save_count += 1
 		return true
 
@@ -179,12 +185,83 @@ func _run_test() -> void:
 			return
 	if not _expect(store.save_count == writes_before_preview and int(app.call("get_player_avatar_seed")) == CANDIDATE_SEED, "discarding previews must never write or change the saved seed"):
 		return
+	if not _check_driver_save_recovery(app, ui, store, player_id):
+		return
 	app.set("_shell", shell)
 	ui.queue_free()
 	shell.queue_free()
 	await process_frame
 	print("PLAYER_AVATAR_TEST PASS")
 	quit(0)
+
+
+func _check_driver_save_recovery(app: Node, ui: CanvasLayer, store: RecordingSaveStore, player_id: String) -> bool:
+	for failure_mode: String in ["read_only", "write"]:
+		for recovery: String in ["button", "cancel", "retry"]:
+			var context := "%s/%s" % [failure_mode, recovery]
+			ui.call("show_driver", Callable(ui, "show_vehicle_select").bind("", true))
+			var saved_data: Dictionary = app.call("get_save_data")
+			var saved_seed := int(saved_data["player_avatar_seed"])
+			var saved_hash := _hash(IDENTITIES.avatar_texture(player_id))
+			var writes_before := store.save_count
+			var candidate_seed := saved_seed + 1
+			ui.set("_preview_avatar_seed", candidate_seed)
+			ui.call("_render_driver")
+			var candidate_hash := _hash(IDENTITIES.avatar_texture(player_id))
+			store.is_read_only = failure_mode == "read_only"
+			store.fail_write = failure_mode == "write"
+			var keep_button := _driver_button(ui, "KEEP THIS LOOK")
+			if not _expect(keep_button != null and not keep_button.disabled, context + ": Keep should be actionable"):
+				return false
+			keep_button.pressed.emit()
+			if not _expect(String(ui.get("_screen")) == "save_error", context + ": failed Keep should open the save error screen"):
+				return false
+			if not _expect(app.call("get_save_data") == saved_data and store.save_count == writes_before, context + ": failed Keep must not change saved progress or commit a write"):
+				return false
+			if not _expect(_hash(IDENTITIES.avatar_texture(player_id)) == candidate_hash, context + ": failed Keep should retain the preview for retry"):
+				return false
+			var expected_detail := "Save is read-only." if failure_mode == "read_only" else TEST_SAVE_ERROR
+			if not _expect(_driver_has_copy(ui, expected_detail), context + ": the save error should show the actual failure"):
+				return false
+			var retry_button := _driver_button(ui, "TRY AGAIN")
+			var back_button := _driver_button(ui, "BACK")
+			if not _expect(retry_button != null and not retry_button.disabled and back_button != null and not back_button.disabled, context + ": Retry and Back should be actionable"):
+				return false
+			store.is_read_only = false
+			store.fail_write = false
+			if recovery == "retry":
+				retry_button.pressed.emit()
+				if not _expect(store.save_count == writes_before + 1 and int(app.call("get_player_avatar_seed")) == candidate_seed, context + ": successful Retry should commit the candidate exactly once"):
+					return false
+				if not _expect(String(ui.get("_screen")) == "driver" and int(ui.get("_preview_avatar_seed")) == candidate_seed and _hash(IDENTITIES.avatar_texture(player_id)) == candidate_hash, context + ": Retry should restore the driver screen with the kept look"):
+					return false
+			else:
+				if recovery == "button":
+					back_button.pressed.emit()
+				else:
+					ui.call("go_back")
+				if not _expect(String(ui.get("_screen")) == "driver" and int(ui.get("_preview_avatar_seed")) == saved_seed and _hash(IDENTITIES.avatar_texture(player_id)) == saved_hash, context + ": Back should restore the saved driver look"):
+					return false
+				if not _expect(app.call("get_save_data") == saved_data and store.save_count == writes_before, context + ": Back must not commit the failed preview"):
+					return false
+			ui.call("go_back")
+			if not _expect(String(ui.get("_screen")) == "vehicle_select" and bool(ui.get("_quick_race")), context + ": leaving the driver screen should return to the original Quick Race garage"):
+				return false
+	return true
+
+
+func _driver_button(ui: CanvasLayer, text: String) -> Button:
+	for node: Node in (ui.get("_content") as Control).get_children():
+		if node is Button and node.text == text:
+			return node
+	return null
+
+
+func _driver_has_copy(ui: CanvasLayer, text: String) -> bool:
+	for node: Node in (ui.get("_content") as Control).find_children("*", "Label", true, false):
+		if text in (node as Label).text:
+			return true
+	return false
 
 
 func _expect(condition: bool, message: String) -> bool:
