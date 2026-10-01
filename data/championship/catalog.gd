@@ -340,6 +340,7 @@ const EVENTS := [
 		"story": "Inez rolls the repaired Rustbug onto the counter: one clean run before the kettle clicks off.",
 		"rival_line": "{rival}: Keep the crumbs behind you, rookie. They hide bad lines.",
 		"length_tier": "compact",
+		"difficulty": "sunday_drive",
 	},
 	{
 		"id": "kitchen_mug_run", "act": 1, "name": "Mug Run",
@@ -349,6 +350,7 @@ const EVENTS := [
 		"story": "The circuit turns back through the mug shadows, where every shortcut narrows to a saucer's edge.",
 		"rival_line": "{rival}: Reverse lines expose every lazy turn. Show me yours.",
 		"length_tier": "standard",
+		"difficulty": "sunday_drive",
 	},
 	{
 		"id": "kitchen_clean_line", "act": 1, "name": "The Clean Line",
@@ -358,6 +360,7 @@ const EVENTS := [
 		"story": "{rival} waits at the chalk line while Inez tightens one last wheel nut by hand.",
 		"rival_line": "{rival}: Beat my clean line and the Pinbolt is yours to understand.",
 		"length_tier": "standard",
+		"difficulty": "club_circuit",
 	},
 	{
 		"id": "workshop_screw_loose", "act": 2, "name": "Screw Loose",
@@ -367,6 +370,7 @@ const EVENTS := [
 		"story": "The workshop league starts between loose washers and a drill bit still warm from the day shift.",
 		"rival_line": "{rival}: If it rattles, it races. Try not to become another spare part.",
 		"length_tier": "long",
+		"difficulty": "club_circuit",
 	},
 	{
 		"id": "workshop_ruler_drop", "act": 2, "name": "Ruler Drop",
@@ -376,6 +380,7 @@ const EVENTS := [
 		"story": "A steel ruler bridges the return route, flexing under four tiny machines and one enormous wager.",
 		"rival_line": "{rival}: The ruler only feels narrow if you plan on braking.",
 		"length_tier": "long",
+		"difficulty": "club_circuit",
 	},
 	{
 		"id": "workshop_heavy_metal", "act": 2, "name": "Heavy Metal",
@@ -385,6 +390,7 @@ const EVENTS := [
 		"story": "{rival} parks across the start stripe, grinning as the bench lamps hum awake.",
 		"rival_line": "{rival}: Win this and I stop calling that Rustbug a paperweight.",
 		"length_tier": "endurance",
+		"difficulty": "clockwork",
 	},
 	{
 		"id": "office_paper_trail", "act": 3, "name": "Paper Trail",
@@ -394,6 +400,7 @@ const EVENTS := [
 		"story": "Rae reaches the silent office with sunrise paling the blinds and {rival} already watching the clock.",
 		"rival_line": "{rival}: Paper moves under pressure. So do drivers.",
 		"length_tier": "endurance",
+		"difficulty": "clockwork",
 	},
 	{
 		"id": "office_keyboard_cut", "act": 3, "name": "Keyboard Cut",
@@ -403,6 +410,7 @@ const EVENTS := [
 		"story": "The reverse route dives between keycaps, each gap daring Rae to trade patience for speed.",
 		"rival_line": "{rival}: Hold the drift past Enter. Lift early and the others will notice.",
 		"length_tier": "endurance",
+		"difficulty": "clockwork",
 	},
 	{
 		"id": "office_last_light", "act": 3, "name": "Last Light Grand Final",
@@ -412,6 +420,7 @@ const EVENTS := [
 		"story": "The last desk lamp burns above the Grand Household Circuit. One race decides whether rookies keep a place on it.",
 		"rival_line": "{rival}: You earned the grid, Rae. Now earn the circuit.",
 		"length_tier": "marathon",
+		"difficulty": "clockwork",
 	},
 ]
 
@@ -425,6 +434,14 @@ static func get_event(event_id: String) -> Dictionary:
 		if String(event["id"]) == event_id:
 			return event.duplicate(true)
 	return {}
+
+
+static func race_difficulty(event: Dictionary, quick_race: bool, mastery_run: bool, selected: String) -> String:
+	if mastery_run:
+		return "club_circuit"
+	if quick_race:
+		return selected
+	return String(event.get("difficulty", selected))
 
 
 static func get_act(act_number: int) -> Dictionary:

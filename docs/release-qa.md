@@ -43,10 +43,10 @@ recovery where applicable.
 
 ## Runtime presentation and options
 
-- [ ] Pause freezes race time, racers, hazards, countdown, and results changes;
+- [ ] Pause freezes race time, racers, countdown, and results changes;
   resume, retry, settings, and abandon behave correctly.
-- [ ] Menu/race music, engine, countdown, go, UI, drift, boost, impact, and
-  hazard-warning audio play once and route through Master/Music/SFX controls.
+- [ ] Menu/race music, engine, countdown, go, UI, drift, boost, and impact
+  audio play once and route through Master/Music/SFX controls.
 - [ ] Mute and minimum/maximum volume persist after restart.
 - [ ] Reduced camera shake and reduced motion work independently, preserve all
   cues/content, and persist after restart.
@@ -63,7 +63,7 @@ recovery where applicable.
   1280x800 readability, suspend/resume, and no mandatory keyboard prompt.
 - [ ] Start and complete races with networking disabled. No login, unavailable
   online mode, premium currency, telemetry failure, or network timeout appears.
-- [ ] Run every room theme and vehicle long enough to cover race start, hazards,
+- [ ] Run every room theme and vehicle long enough to cover race start, obstacles,
   collisions, recovery, pause, and results. Record average and worst observed
   frame rate/frame time; investigate sustained missed 60 Hz frames, hitches,
   runaway memory, audio breakup, or input latency on target hardware.
