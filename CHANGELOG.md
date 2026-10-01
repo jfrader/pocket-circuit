@@ -20,6 +20,7 @@
 - The championship is the route board. Each race is a stop on the road. Focus follows the road.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
+- The music no longer stutters for a moment as a section blend finishes or a held section loops (Gamestruments 1.1.0).
 
 ### Removed
 - The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
