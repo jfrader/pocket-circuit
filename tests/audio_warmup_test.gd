@@ -1,6 +1,18 @@
 extends SceneTree
 
 const DIRECTOR := preload("res://scripts/audio/audio_director.gd")
+
+
+class StatsVehicle extends Node:
+	var stats: VehicleStats = preload("res://data/vehicles/rustbug.tres")
+	var speed := 0.0
+
+	func get_engine_load() -> float:
+		return 0.0
+
+	func get_throttle_input() -> float:
+		return 0.0
+
 var checkpoints: Array[int] = []
 var frame_signals := 0
 
@@ -24,6 +36,17 @@ func _run() -> void:
 	if not _expect(not await director.call("warm_vehicle_audio", "rustbug", _checkpoint), "normal headless warming must remain a no-op"):
 		return
 	if not _expect(checkpoints.is_empty(), "headless warming must not yield synthesis checkpoints"):
+		return
+	EngineVoiceGenerator.clear_cache()
+	var silent_vehicle := StatsVehicle.new()
+	director.set_local_vehicle(silent_vehicle, "rustbug")
+	var vehicle_bound: bool = director.get("_local_vehicle") == silent_vehicle and is_equal_approx(float(director.get("_vehicle_max_speed")), silent_vehicle.stats.max_speed)
+	var silent: bool = not director.has_engine_voice() and not director.has_generated_sfx(&"impact") and not director.has_generated_sfx(&"boost") and EngineVoiceGenerator._cache.is_empty()
+	director.clear_local_vehicle()
+	silent_vehicle.free()
+	if not _expect(vehicle_bound, "headless handoff must retain the vehicle and its speed range"):
+		return
+	if not _expect(silent, "headless handoff must not synthesize vehicle audio"):
 		return
 	# Exercise real synthesis without needing a listener or wall-clock timing.
 	var stats := load("res://data/vehicles/scrapjaw.tres") as VehicleStats
@@ -50,6 +73,13 @@ func _run() -> void:
 	var cached: Variant = director.call("warm_vehicle_audio", "scrapjaw")
 	if not _expect(cached is bool and cached, "cached callers without progress must retain the synchronous path"):
 		return
+	var voiced_vehicle := StatsVehicle.new()
+	voiced_vehicle.stats = stats
+	director.set_local_vehicle(voiced_vehicle, "scrapjaw")
+	if not _expect(director.has_engine_voice() and String(director.get_engine_voice_signature()).contains("scrapjaw") and director.has_generated_sfx(&"impact") and director.has_generated_sfx(&"boost"), "a listening handoff must still bind its generated engine and effects"):
+		return
+	director.clear_local_vehicle()
+	voiced_vehicle.free()
 	director.queue_free()
 	await process_frame
 	print("AUDIO_WARMUP_TEST PASS yielded_synthesis_headless_noop_cached_compatibility")

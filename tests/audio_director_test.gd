@@ -131,6 +131,8 @@ func _run_test() -> void:
 		return
 	if not _expect(engine_player.pitch_scale >= 1.55, "wide-open throttle should sit near the high-rev ceiling"):
 		return
+	# Exercise listening vehicle preparation even with the headless test driver.
+	director.set("_headless", false)
 	var voiced := StatsVehicle.new()
 	voiced.speed = 300.0
 	voiced.engine_load = 1.0

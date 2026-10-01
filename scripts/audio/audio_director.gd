@@ -194,6 +194,8 @@ func set_local_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 	var vehicle_stats: Variant = vehicle.get("stats")
 	if vehicle_stats is Object:
 		_vehicle_max_speed = maxf(1.0, float((vehicle_stats as Object).get("max_speed")))
+	if _headless:
+		return
 	if vehicle_stats is VehicleStats:
 		_prepare_vehicle_sfx(vehicle_stats, vehicle_id)
 	if not _prepare_engine_voice(vehicle, vehicle_id) and not _headless and not _engine_player.playing:
