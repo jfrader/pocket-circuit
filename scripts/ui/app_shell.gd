@@ -194,7 +194,7 @@ func show_discovery() -> void:
 
 
 func show_briefing(event_id: String) -> void:
-	var event := CATALOG.get_event(event_id)
+	var event: Dictionary = _app.call("get_championship_event", event_id)
 	if event.is_empty():
 		show_map()
 		return
@@ -203,7 +203,7 @@ func show_briefing(event_id: String) -> void:
 	_reset_quick_race_state()
 	_clear_content()
 	var opponent_ids: Array = event.get("opponents", [])
-	var rival_id := String(opponent_ids[0]) if not opponent_ids.is_empty() else "juniper"
+	var rival_id := String(opponent_ids[0]) if not opponent_ids.is_empty() else ""
 	var progress: Dictionary = _app.call("get_save_data")
 	_current_vehicle_select_id = _selected_vehicle(progress)
 	_configure_stage(&"briefing", _current_vehicle_select_id, rival_id, String(event.get("theme", "kitchen")), "rae")
@@ -345,7 +345,7 @@ func _render_driver() -> void:
 	var saved_seed := int(_app.call("get_player_avatar_seed"))
 	if _preview_avatar_seed != saved_seed:
 		_add_button("KEEP THIS LOOK", Callable(self, "_keep_driver"), true)
-	_add_button("BACK", _driver_return)
+	_add_button("BACK", Callable(self, "_leave_driver"))
 	var suffix := "PORTRAIT SAVED" if _preview_avatar_seed == saved_seed else "UNSAVED LOOK"
 	_footer.text = ("SAVE READ-ONLY  ·  " if bool(_app.call("is_save_read_only")) else "") + suffix
 	_focus_first()
@@ -361,6 +361,14 @@ func _keep_driver() -> void:
 		_show_driver_save_error()
 		return
 	_render_driver()
+
+
+func _leave_driver() -> void:
+	_app.call("preview_player_avatar", int(_app.call("get_player_avatar_seed")))
+	if _driver_return.is_valid():
+		_driver_return.call()
+	else:
+		show_title()
 
 
 func _show_driver_save_error() -> void:
@@ -449,7 +457,10 @@ func show_ending() -> void:
 	_screen = "ending"
 	_clear_content()
 	var progress: Dictionary = _app.call("get_save_data")
-	_configure_stage(&"ending", _selected_vehicle(progress), "rae", "office", "cass")
+	var finale: Dictionary = _app.call("get_championship_event", String(CATALOG.ACTS.back()["final_event"]))
+	var opponent_ids: Array = finale.get("opponents", [])
+	var rival_id := String(opponent_ids[0]) if not opponent_ids.is_empty() else ""
+	_configure_stage(&"ending", _selected_vehicle(progress), CATALOG.player_driver_id(), String(finale.get("theme", "")), rival_id)
 	_add_kicker("CHAMPIONSHIP COMPLETE")
 	_add_heading("Champion.")
 	_add_copy("Grand Household Circuit complete.", SKIN.YELLOW)
@@ -480,10 +491,7 @@ func go_back() -> void:
 		"map", "settings", "credits", "reset_confirmation", "quick_race":
 			show_title()
 		"driver":
-			if _driver_return.is_valid():
-				_driver_return.call()
-			else:
-				show_title()
+			_leave_driver()
 		"discovery":
 			if not is_instance_valid(_discovery_panel) or not _discovery_panel.go_back():
 				show_title()

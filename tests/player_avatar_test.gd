@@ -3,6 +3,7 @@ extends SceneTree
 const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const SHELL := preload("res://scripts/ui/app_shell.gd")
 
 const CANDIDATE_SEED := 424242
 
@@ -144,6 +145,44 @@ func _run_test() -> void:
 	if not _expect(seen.size() > 30, "randomized seeds should be varied, not repeating"):
 		return
 
+	for index in IDENTITIES.MAX_AVATAR_ENTRIES + 2:
+		app.call("preview_player_avatar", CANDIDATE_SEED + index)
+		var texture := IDENTITIES.avatar_texture(player_id)
+		var payload := IDENTITIES.avatar_payload(player_id)
+		if not _expect(texture != null and not payload.is_empty() and IDENTITIES.avatar_texture(player_id) == texture, "reading a shuffled portrait payload must keep its current texture cached"):
+			return
+		if not _expect(IDENTITIES._avatar_entry_order.count(player_id) == 1 and IDENTITIES._avatar_entry_order.size() <= IDENTITIES.MAX_AVATAR_ENTRIES, "shuffling one portrait must not create duplicate cache entries or evade the bound"):
+			return
+	app.call("_install_player_avatar")
+	var ui := SHELL.new()
+	root.add_child(ui)
+	ui.configure(app)
+	app.set("_shell", ui)
+	var writes_before_preview := store.save_count
+	for back_path in ["button", "cancel"]:
+		ui.show_driver()
+		ui.set("_preview_avatar_seed", CANDIDATE_SEED + 1)
+		ui.call("_render_driver")
+		if not _expect(_hash(IDENTITIES.avatar_texture(player_id)) != kept_hash, "the UI should render the unkept preview before leaving"):
+			return
+		if back_path == "button":
+			var back_button: Button
+			for node: Node in (ui.get("_content") as Control).get_children():
+				if node is Button and node.text == "BACK":
+					back_button = node
+			if not _expect(back_button != null, "the driver screen should provide a Back button"):
+				return
+			back_button.pressed.emit()
+		else:
+			ui.go_back()
+		if not _expect(_hash(IDENTITIES.avatar_texture(player_id)) == kept_hash and String(ui.get("_screen")) == "title", "%s Back must restore the saved look before showing the return screen" % back_path):
+			return
+	if not _expect(store.save_count == writes_before_preview and int(app.call("get_player_avatar_seed")) == CANDIDATE_SEED, "discarding previews must never write or change the saved seed"):
+		return
+	app.set("_shell", shell)
+	ui.queue_free()
+	shell.queue_free()
+	await process_frame
 	print("PLAYER_AVATAR_TEST PASS")
 	quit(0)
 

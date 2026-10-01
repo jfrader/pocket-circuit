@@ -205,6 +205,10 @@ func get_save_data() -> Dictionary:
 	return _save_data.duplicate(true)
 
 
+func get_championship_event(event_id: String) -> Dictionary:
+	return _event_with_roster(CATALOG.get_event(event_id), _championship_roster())
+
+
 ## The player drives one cast slot; only its portrait seed is customizable.
 func get_player_avatar_seed() -> int:
 	return int(_save_data.get("player_avatar_seed", SAVE_STORE_SCRIPT.PLAYER_AVATAR_DEFAULT_SEED))
@@ -1171,6 +1175,9 @@ func _sync_current_scene() -> void:
 			audio_director.play_menu_music()
 		_hide_boot_placeholder(scene)
 		_ensure_shell()
+		current_race_session.clear()
+		_quick_roster = {}
+		_install_active_roster()
 		_shell.visible = true
 		match _destination:
 			"map":
@@ -1186,9 +1193,6 @@ func _sync_current_scene() -> void:
 					_shell.call("show_title")
 		_last_result_summary = {}
 		_destination = "title"
-		current_race_session.clear()
-		_quick_roster = {}
-		_install_active_roster()
 	else:
 		if scene.scene_file_path == RACE_SCENE and is_instance_valid(audio_director) and not _transitioning_to_race:
 			audio_director.play_race_music()

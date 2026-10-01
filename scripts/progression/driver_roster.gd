@@ -298,6 +298,11 @@ static func _seeded_order(seed: int, names: Array) -> Array:
 ## A saved personality must be one of the shipped profiles, so a roster can never
 ## smuggle in an out-of-bounds or half-written style.
 static func _is_known_personality(style: Dictionary) -> bool:
+	for value: Variant in style.values():
+		if value is not int and value is not float:
+			return false
+		if not is_finite(float(value)):
+			return false
 	for personality: Dictionary in PERSONALITIES.values():
 		var matches := true
 		for trait_key: String in personality:

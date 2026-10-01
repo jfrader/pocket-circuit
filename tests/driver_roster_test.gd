@@ -188,10 +188,13 @@ func _run_test() -> void:
 	bad_options["opponents"][0]["avatar_art"]["options"] = "wrong"
 	if not _expect(ROSTER.normalize(bad_options, vehicles4, 3).is_empty(), "avatar options must match the stored generated-profile contract"):
 		return
-	var nan_ai := r1.duplicate(true)
-	nan_ai["opponents"][0]["ai_style"]["corner_pace"] = NAN
-	if not _expect(ROSTER.normalize(nan_ai, vehicles4, 3).is_empty(), "non-finite AI values must not enter physics"):
-		return
+	for trait_key: String in ROSTER.PERSONALITIES["shortcut"]:
+		for invalid: Variant in [{}, [], null, true, "0.96", NAN, INF, -INF]:
+			var malformed := r1.duplicate(true)
+			malformed["opponents"][0]["ai_style"][trait_key] = invalid
+			malformed["fingerprint"] = ROSTER._roster_fingerprint(malformed)
+			if not _expect(ROSTER.normalize(malformed, vehicles4, 3).is_empty(), "trait %s must reject nonnumeric or nonfinite values without a script error" % trait_key):
+				return
 	for seed_value in 50:
 		var sample := ROSTER.create(seed_value, vehicles8, ROSTER.MAX_OPPONENTS)
 		if not _expect(not sample.is_empty() and ROSTER.normalize(JSON.parse_string(JSON.stringify(sample)), vehicles8, ROSTER.MAX_OPPONENTS) == sample, "generated rosters must survive save/load across many seeds"):

@@ -2,6 +2,13 @@ extends SceneTree
 
 const SHELL := preload("res://scripts/ui/app_shell.gd")
 const FIXTURE := preload("res://tests/app_shell_focus_test.gd")
+const ROSTER := preload("res://scripts/progression/driver_roster.gd")
+const CATALOG := preload("res://data/championship/catalog.gd")
+const RIVAL_EVENTS := [
+	{"id": "kitchen_clean_line", "slot": 0},
+	{"id": "workshop_heavy_metal", "slot": 1},
+	{"id": "office_last_light", "slot": 0},
+]
 
 
 func _initialize() -> void:
@@ -90,7 +97,34 @@ func _run_test() -> void:
 	shell.queue_free()
 	app.queue_free()
 	await process_frame
-	print("CHAMPIONSHIP_PRESENTATION_TEST PASS visible_actions_720p_800p_selected_car_and_back_flow")
+	var real_app := root.get_node("App")
+	var real_shell := SHELL.new()
+	root.add_child(real_shell)
+	real_shell.configure(real_app)
+	for seed_value in [123, 424242]:
+		var progress: Dictionary = real_app.call("get_save_data")
+		var roster := ROSTER.create(seed_value, CATALOG.championship_vehicle_ids(), 3)
+		progress["driver_roster"] = roster
+		real_app.set("_save_data", progress)
+		real_app.call("_install_active_roster")
+		for rival_event: Dictionary in RIVAL_EVENTS:
+			real_shell.show_briefing(String(rival_event["id"]))
+			var opponent: Dictionary = roster["opponents"][int(rival_event["slot"])]
+			if not _expect(String(real_shell.get("_stage").get("driver_id")) == String(opponent["id"]), "each briefing should show the generated driver assigned to its event"):
+				return
+			var named_rival := false
+			for label: Label in real_shell.find_children("*", "Label", true, false):
+				named_rival = named_rival or label.text.contains(String(opponent["name"]))
+			if not _expect(named_rival, "the lead-rival text and portrait should agree"):
+				return
+		real_shell.show_ending()
+		if not _expect(String(real_shell.get("_stage").get("secondary_driver_id")) == String(roster["opponents"][0]["id"]), "the ending should show the generated final rival, not the former cast"):
+			return
+		if not _expect(real_app.call("get_save_data") == progress, "presenting a saved roster must not rewrite progress"):
+			return
+	real_shell.queue_free()
+	await process_frame
+	print("CHAMPIONSHIP_PRESENTATION_TEST PASS visible_actions_720p_800p_selected_car_and_back_flow_generated_rivals")
 	quit(0)
 
 

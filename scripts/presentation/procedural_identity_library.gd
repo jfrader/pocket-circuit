@@ -50,6 +50,7 @@ static func set_avatar_seed_override(driver_id: String, seed: int, configured_se
 ## A new avatar id ages out the oldest portrait, payload and texture together so
 ## the image object is actually released.
 static func _note_avatar_entry(driver_id: String) -> void:
+	_avatar_entry_order.erase(driver_id)
 	_avatar_entry_order.append(driver_id)
 	while _avatar_entry_order.size() > MAX_AVATAR_ENTRIES:
 		var oldest: String = _avatar_entry_order[0]
