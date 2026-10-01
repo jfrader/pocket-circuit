@@ -664,7 +664,7 @@ func _add_difficulty_picker() -> OptionButton:
 	for label: String in ["Sunday Drive · Earlier braking", "Club Circuit · Balanced", "Clockwork · Later braking"]:
 		difficulty.add_item(label)
 	var settings: Dictionary = _app.call("get_save_data")
-	difficulty.select(maxi(0, difficulty_ids.find(String(settings["difficulty"]))))
+	difficulty.select(maxi(0, difficulty_ids.find(String(settings.get("difficulty", "club_circuit")))))
 	difficulty.item_selected.connect(func(index: int) -> void: _app.call("update_setting", "difficulty", difficulty_ids[index]))
 	_wire_button_audio(difficulty)
 	_content.add_child(difficulty)
