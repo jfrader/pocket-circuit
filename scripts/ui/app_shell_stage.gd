@@ -4,6 +4,7 @@ extends Control
 const CATALOG := preload("res://data/championship/catalog.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
+const DriverDirectory := preload("res://scripts/progression/driver_directory.gd")
 const CAR_ASPECT := 0.75
 const CARD_ASPECT := 1.24
 const STAT_KEYS: Array[String] = ["speed", "grip", "mass", "drift"]
@@ -68,6 +69,8 @@ static func draw_car(item: CanvasItem, center: Vector2, length: float, id: Strin
 
 
 static func draw_portrait_card(item: CanvasItem, center: Vector2, width: float, id: String, angle: float, captioned: bool = true) -> void:
+	if id.is_empty():
+		return
 	var payload := IDENTITIES.avatar_payload(id)
 	var texture := IDENTITIES.avatar_texture(id)
 	if payload.is_empty() or texture == null:
@@ -116,7 +119,12 @@ static func smooth_path(points: Array[Vector2], samples: int) -> PackedVector2Ar
 	return path
 
 
+## The rival who fronts an act. A generated roster answers first, using the same
+## per-act slot the duel itself takes, so the map shows the driver you actually face.
 static func act_rival(act_number: int) -> String:
+	var installed := DriverDirectory.installed_ids()
+	if not installed.is_empty():
+		return installed[(maxi(1, act_number) - 1) % installed.size()]
 	for event: Dictionary in CATALOG.EVENTS:
 		var opponents: Array = event.get("opponents", [])
 		if int(event.get("act", 0)) == act_number and not opponents.is_empty():
@@ -147,6 +155,8 @@ func _draw() -> void:
 			_draw_map_stage()
 		&"settings":
 			_draw_mechanic_stage()
+		&"driver":
+			_draw_driver_stage()
 		&"credits":
 			_draw_cast_stage()
 		&"ending":
@@ -231,6 +241,14 @@ func _draw_mechanic_stage() -> void:
 	_draw_gear(self, mat.position + mat.size * Vector2(0.26, 0.78), minf(mat.size.x * 0.06, 34.0), SKIN.YELLOW)
 	_draw_wrench(mat.position + mat.size * Vector2(0.84, 0.62), minf(mat.size.y / 420.0, 1.5))
 	draw_portrait_card(self, mat.position + mat.size * Vector2(0.5, 0.28), minf(mat.size.x * 0.42, 220.0), driver_id, -0.05)
+
+
+func _draw_driver_stage() -> void:
+	var mat := Rect2(12.0, 12.0, size.x - 24.0, size.y - 24.0)
+	SKIN.draw_plate(self, mat, SKIN.CREAM, 16)
+	SKIN.draw_tape(self, mat.position + Vector2(mat.size.x * 0.5 - 64.0, 4.0), Vector2(128.0, 26.0), 0.28)
+	draw_portrait_card(self, mat.position + mat.size * Vector2(0.5, 0.46), minf(mat.size.x * 0.44, 260.0), driver_id, -0.04)
+	_draw_roster(Rect2(mat.position.x + 16.0, mat.end.y - mat.size.y * 0.18, mat.size.x - 32.0, mat.size.y * 0.15), CATALOG.quick_race_vehicle_ids())
 
 
 func _draw_cast_stage() -> void:

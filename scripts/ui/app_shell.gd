@@ -38,6 +38,10 @@ var _entrance_generation := 0
 var _save_error_back_action := Callable()
 var _current_vehicle_select_id := ""
 var _quick_race_vehicle_id := ""
+## Candidate portrait seed shown on the Driver screen before the player keeps it.
+var _preview_avatar_seed := 0
+## Where the Driver screen returns to, so it can be opened from more than one screen.
+var _driver_return: Callable
 var _page: MarginContainer
 var _art_menu: Control
 var _discovery_panel: CircuitDiscoveryPanel
@@ -190,7 +194,7 @@ func show_discovery() -> void:
 
 
 func show_briefing(event_id: String) -> void:
-	var event := CATALOG.get_event(event_id)
+	var event: Dictionary = _app.call("get_championship_event", event_id)
 	if event.is_empty():
 		show_map()
 		return
@@ -199,7 +203,7 @@ func show_briefing(event_id: String) -> void:
 	_reset_quick_race_state()
 	_clear_content()
 	var opponent_ids: Array = event.get("opponents", [])
-	var rival_id := String(opponent_ids[0]) if not opponent_ids.is_empty() else "juniper"
+	var rival_id := String(opponent_ids[0]) if not opponent_ids.is_empty() else ""
 	var progress: Dictionary = _app.call("get_save_data")
 	_current_vehicle_select_id = _selected_vehicle(progress)
 	_configure_stage(&"briefing", _current_vehicle_select_id, rival_id, String(event.get("theme", "kitchen")), "rae")
@@ -319,6 +323,60 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	_art_menu.call("show_garage", selected_vehicle, unlocked_vehicles, context, "NEXT: TRACK" if quick_race and event_id.is_empty() else "PLAY", roster)
 
 
+func show_driver(return_action: Callable = Callable()) -> void:
+	_screen = "driver"
+	_driver_return = return_action if return_action.is_valid() else Callable(self, "show_title")
+	_preview_avatar_seed = int(_app.call("get_player_avatar_seed"))
+	_render_driver()
+
+
+func _render_driver() -> void:
+	_clear_content()
+	_content.add_theme_constant_override("separation", 2)
+	var progress: Dictionary = _app.call("get_save_data")
+	var player_id := String(CATALOG.player_driver_id())
+	_configure_stage(&"driver", _selected_vehicle(progress), player_id)
+	_app.call("preview_player_avatar", _preview_avatar_seed)
+	_add_kicker("DRIVER")
+	_add_heading("Who's behind the wheel?")
+	_add_spacer(10)
+	_add_button("SHUFFLE LOOK", Callable(self, "_shuffle_driver"))
+	var saved_seed := int(_app.call("get_player_avatar_seed"))
+	if _preview_avatar_seed != saved_seed:
+		_add_button("KEEP THIS LOOK", Callable(self, "_keep_driver"), true)
+	_add_button("BACK", Callable(self, "_leave_driver"))
+	var suffix := "PORTRAIT SAVED" if _preview_avatar_seed == saved_seed else "UNSAVED LOOK"
+	_footer.text = ("SAVE READ-ONLY  ·  " if bool(_app.call("is_save_read_only")) else "") + suffix
+	_focus_first()
+
+
+func _shuffle_driver() -> void:
+	_preview_avatar_seed = int(_app.call("random_player_avatar_seed"))
+	_render_driver()
+
+
+func _keep_driver() -> void:
+	if not bool(_app.call("save_player_avatar", _preview_avatar_seed)):
+		_show_driver_save_error()
+		return
+	show_driver(_driver_return)
+
+
+func _leave_driver() -> void:
+	_app.call("preview_player_avatar", int(_app.call("get_player_avatar_seed")))
+	if _driver_return.is_valid():
+		_driver_return.call()
+	else:
+		show_title()
+
+
+func _show_driver_save_error() -> void:
+	var retry := Callable(self, "_keep_driver")
+	var back := Callable(self, "show_driver").bind(_driver_return)
+	var detail := "Save is read-only." if bool(_app.call("is_save_read_only")) else String(_app.call("get_last_save_error"))
+	show_save_error("Portrait not saved", detail, retry, back)
+
+
 func show_settings() -> void:
 	_screen = "settings"
 	_clear_content()
@@ -400,7 +458,10 @@ func show_ending() -> void:
 	_screen = "ending"
 	_clear_content()
 	var progress: Dictionary = _app.call("get_save_data")
-	_configure_stage(&"ending", _selected_vehicle(progress), "rae", "office", "cass")
+	var finale: Dictionary = _app.call("get_championship_event", String(CATALOG.ACTS.back()["final_event"]))
+	var opponent_ids: Array = finale.get("opponents", [])
+	var rival_id := String(opponent_ids[0]) if not opponent_ids.is_empty() else ""
+	_configure_stage(&"ending", _selected_vehicle(progress), CATALOG.player_driver_id(), String(finale.get("theme", "")), rival_id)
 	_add_kicker("CHAMPIONSHIP COMPLETE")
 	_add_heading("Champion.")
 	_add_copy("Grand Household Circuit complete.", SKIN.YELLOW)
@@ -430,6 +491,8 @@ func go_back() -> void:
 			return
 		"map", "settings", "credits", "reset_confirmation", "quick_race":
 			show_title()
+		"driver":
+			_leave_driver()
 		"discovery":
 			if not is_instance_valid(_discovery_panel) or not _discovery_panel.go_back():
 				show_title()
@@ -586,6 +649,11 @@ func _on_art_action(action: StringName) -> void:
 			_app.call("open_discovery")
 		&"options":
 			show_settings()
+		&"driver":
+			if _screen == "vehicle_select":
+				show_driver(Callable(self, "show_vehicle_select").bind(_event_id, _quick_race))
+			else:
+				show_driver()
 		&"credits":
 			show_credits()
 		&"quit":
