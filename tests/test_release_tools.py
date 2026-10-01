@@ -1,6 +1,9 @@
 from pathlib import Path
+from contextlib import contextmanager
 import json
+import mmap
 import os
+import select
 import shutil
 import subprocess
 import sys
@@ -131,3 +134,168 @@ class GodotGateTests(unittest.TestCase):
     def test_missing_completion_marker_fails(self):
         result = self.run_worker('print("still preparing")')
         self.assertNotEqual(result.returncode, 0)
+
+
+class NativeAddonSyncTests(unittest.TestCase):
+    @contextmanager
+    def fixture(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "tools").mkdir()
+            shutil.copyfile(ROOT / "tools/sync_gamestruments.sh", root / "tools/sync_gamestruments.sh")
+            source = root / "source"
+            (source / "bin").mkdir(parents=True)
+            (source / "gamestruments.gdextension").write_text("fixture descriptor\n")
+            (source / "bin/libgamestruments_godot.so").write_bytes(b"N" * mmap.PAGESIZE)
+            (source / "bin/gamestruments_godot.dll").write_bytes(b"windows fixture")
+            destination = root / "addons/gamestruments/bin/libgamestruments_godot.so"
+            destination.parent.mkdir(parents=True)
+            destination.write_bytes(b"A" * (mmap.PAGESIZE * 3))
+            yield root, source, destination
+
+    def sync(self, root, source, extra_env=None):
+        return subprocess.run(
+            ["bash", str(root / "tools/sync_gamestruments.sh")],
+            env={**os.environ, "GAMESTRUMENTS_ADDON_DIR": str(source), **(extra_env or {})},
+            capture_output=True, text=True, timeout=10,
+        )
+
+    def test_changed_library_preserves_live_mapping(self):
+        reader_code = '''
+import ctypes, mmap, resource, sys
+resource.setrlimit(resource.RLIMIT_CORE, (0, 0))
+# This Linux shell-tool test must not write a core dump when testing the old bug.
+PR_SET_DUMPABLE = 4
+libc = ctypes.CDLL(None)
+libc.prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+assert libc.prctl(PR_SET_DUMPABLE, 0, 0, 0, 0) == 0
+with open(sys.argv[1], "rb") as library:
+    with mmap.mmap(library.fileno(), 0, access=mmap.ACCESS_READ) as mapped:
+        print("MAPPED_READY", flush=True)
+        sys.stdin.readline()
+        assert mapped[-1] == ord("A")
+print("MAPPED_READER PASS", flush=True)
+'''
+        with self.fixture() as (root, source, destination):
+            with subprocess.Popen(
+                [sys.executable, "-c", reader_code, str(destination)],
+                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+            ) as reader:
+                try:
+                    ready, _, _ = select.select([reader.stdout], [], [], 10)
+                    self.assertTrue(ready, "mapped reader did not become ready")
+                    self.assertEqual(reader.stdout.readline(), "MAPPED_READY\n")
+                    result = self.sync(root, source)
+                    self.assertEqual(result.returncode, 0, result.stderr)
+                    stdout, stderr = reader.communicate("read\n", timeout=10)
+                    self.assertEqual(reader.returncode, 0, f"live mapping died (SIGBUS is -7): {stderr}")
+                    self.assertIn("MAPPED_READER PASS", stdout)
+                    self.assertEqual(destination.read_bytes(), (source / "bin/libgamestruments_godot.so").read_bytes())
+                finally:
+                    if reader.poll() is None:
+                        reader.kill()
+                        reader.communicate()
+
+    def test_unchanged_files_are_not_rewritten(self):
+        with self.fixture() as (root, source, destination):
+            result = self.sync(root, source)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            files = sorted((root / "addons/gamestruments").rglob("*"))
+            files = [path for path in files if path.is_file()]
+            for path in files:
+                os.utime(path, ns=(0, 0))
+            before = {path: path.stat() for path in files}
+            result = self.sync(root, source)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            for path, previous in before.items():
+                with self.subTest(file=path.name):
+                    self.assertEqual(path.stat().st_ino, previous.st_ino)
+                    self.assertEqual(path.stat().st_mtime_ns, previous.st_mtime_ns)
+
+    def test_failed_copy_preserves_library_and_cleans_staging(self):
+        with self.fixture() as (root, source, destination):
+            original = destination.read_bytes()
+            executables = root / "executables"
+            executables.mkdir()
+            copy = executables / "cp"
+            copy.write_text(
+                '#!/usr/bin/env python3\nimport os,sys\nfrom pathlib import Path\n'
+                'if Path(sys.argv[-2]).name == "libgamestruments_godot.so":\n'
+                '    Path(sys.argv[-1]).write_bytes(b"partial")\n    sys.exit(42)\n'
+                'os.execv(os.environ["REAL_CP"], ["cp", *sys.argv[1:]])\n'
+            )
+            copy.chmod(0o755)
+            result = self.sync(root, source, {
+                "PATH": f"{executables}{os.pathsep}{os.environ['PATH']}", "REAL_CP": shutil.which("cp"),
+            })
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(destination.read_bytes(), original)
+            self.assertEqual(sorted(path.name for path in destination.parent.iterdir()), [destination.name])
+
+    def test_flat_packaged_layout_is_supported(self):
+        with self.fixture() as (root, source, destination):
+            for path in (source / "bin").iterdir():
+                path.rename(source / path.name)
+            result = self.sync(root, source)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(destination.read_bytes(), (source / destination.name).read_bytes())
+            self.assertEqual(
+                (destination.parent / "gamestruments_godot.dll").read_bytes(),
+                (source / "gamestruments_godot.dll").read_bytes(),
+            )
+
+    def test_missing_packaged_library_does_not_publish_any_file(self):
+        with self.fixture() as (root, source, destination):
+            original = destination.read_bytes()
+            (source / "bin/gamestruments_godot.dll").unlink()
+            result = self.sync(root, source)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(destination.read_bytes(), original)
+            self.assertFalse((destination.parent.parent / "gamestruments.gdextension").exists())
+
+    def test_comparison_error_does_not_overwrite_library(self):
+        with self.fixture() as (root, source, destination):
+            original = destination.read_bytes()
+            executables = root / "executables"
+            executables.mkdir()
+            comparison = executables / "cmp"
+            comparison.write_text("#!/usr/bin/env bash\nexit 2\n")
+            comparison.chmod(0o755)
+            result = self.sync(root, source, {"PATH": f"{executables}{os.pathsep}{os.environ['PATH']}"})
+            self.assertEqual(result.returncode, 2)
+            self.assertEqual(destination.read_bytes(), original)
+
+    def test_missing_comparison_tool_fails_before_publishing(self):
+        with self.fixture() as (root, source, destination):
+            original = destination.read_bytes()
+            executables = root / "executables"
+            executables.mkdir()
+            (executables / "bash").symlink_to(shutil.which("bash"))
+            result = self.sync(root, source, {"PATH": str(executables)})
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("cmp is required", result.stderr)
+            self.assertEqual(destination.read_bytes(), original)
+            self.assertFalse((destination.parent.parent / "gamestruments.gdextension").exists())
+
+    def test_source_backend_preserves_open_library(self):
+        with self.fixture() as (root, source, destination):
+            original = destination.read_bytes()
+            (source / "Cargo.toml").write_text("# source-copy fixture\n")
+            (source / "crates/godot").mkdir(parents=True)
+            (source / "target/release").mkdir(parents=True)
+            (source / "gamestruments.gdextension").rename(source / "crates/godot/gamestruments.gdextension")
+            compiled = source / "target/release/libgamestruments_godot.so"
+            (source / "bin/libgamestruments_godot.so").rename(compiled)
+            executables = root / "executables"
+            executables.mkdir()
+            cargo = executables / "cargo"
+            cargo.write_text("#!/usr/bin/env bash\nexit 0\n")
+            cargo.chmod(0o755)
+            with destination.open("rb") as loaded:
+                result = self.sync(root, source, {
+                    "GAMESTRUMENTS_ADDON_DIR": "", "GAMESTRUMENTS_ROOT": str(source),
+                    "PATH": f"{executables}{os.pathsep}{os.environ['PATH']}",
+                })
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(loaded.read(), original)
+            self.assertEqual(destination.read_bytes(), compiled.read_bytes())
