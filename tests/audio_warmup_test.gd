@@ -80,6 +80,8 @@ func _run() -> void:
 		return
 	director.clear_local_vehicle()
 	voiced_vehicle.free()
+	if not await _check_voice_cache_recency():
+		return
 	director.queue_free()
 	await process_frame
 	print("AUDIO_WARMUP_TEST PASS yielded_synthesis_headless_noop_cached_compatibility")
@@ -88,6 +90,53 @@ func _run() -> void:
 func _checkpoint() -> void:
 	checkpoints.append(frame_signals)
 	await process_frame
+
+
+func _check_voice_cache_recency() -> bool:
+	var recipes: Array[EngineRecipe] = []
+	for vehicle_id: String in ["rustbug", "spindle", "dustmite", "thimble", "flicker"]:
+		var stats := load("res://data/vehicles/%s.tres" % vehicle_id) as VehicleStats
+		recipes.append(EngineRecipeLibrary.resolve(vehicle_id, stats))
+	for yielded: bool in [false, true]:
+		EngineVoiceGenerator.clear_cache()
+		var banks: Array[EngineVoice] = []
+		for index in EngineVoiceGenerator.CACHE_LIMIT:
+			banks.append(await _cached_voice(recipes[index], yielded))
+		for index in [0, 3, 2]:
+			if not _expect(await _cached_voice(recipes[index], yielded) == banks[index], "warming a reused recipe must keep its cached voice"):
+				return false
+		await _cached_voice(recipes.back(), yielded)
+		var evicted_unused := not EngineVoiceGenerator._cache.has(recipes[1].signature())
+		var retained_count := EngineVoiceGenerator._cache.size()
+		var player_rebound := EngineVoiceGenerator.generate_cached(recipes[0])
+		EngineVoiceGenerator.clear_cache()
+		if not _expect(player_rebound == banks[0], "a fresh opponent must not evict the player voice just warmed for that grid (yielded=%s)" % yielded):
+			return false
+		if not _expect(evicted_unused and retained_count == EngineVoiceGenerator.CACHE_LIMIT, "the bounded cache must evict the unused previous opponent instead"):
+			return false
+	return await _check_overlapping_voice_cache(recipes)
+
+
+func _check_overlapping_voice_cache(recipes: Array[EngineRecipe]) -> bool:
+	EngineVoiceGenerator.clear_cache()
+	var overlapping: Array[EngineVoice] = []
+	var checkpoint := func() -> void:
+		if overlapping.is_empty():
+			overlapping.append(EngineVoiceGenerator.generate_cached(recipes[0]))
+			for index in range(1, EngineVoiceGenerator.CACHE_LIMIT):
+				EngineVoiceGenerator.generate_cached(recipes[index])
+		await process_frame
+	var prepared := await EngineVoiceGenerator.prepare_cached(recipes[0], checkpoint)
+	EngineVoiceGenerator.generate_cached(recipes.back())
+	var player_rebound := EngineVoiceGenerator.generate_cached(recipes[0])
+	EngineVoiceGenerator.clear_cache()
+	return _expect(prepared == overlapping[0] and player_rebound == prepared, "overlapping warm-up must reuse and retain the bank another caller cached during its yield")
+
+
+func _cached_voice(recipe: EngineRecipe, yielded: bool) -> EngineVoice:
+	if yielded:
+		return await EngineVoiceGenerator.prepare_cached(recipe, _checkpoint)
+	return EngineVoiceGenerator.generate_cached(recipe)
 
 
 func _expect(condition: bool, message: String) -> bool:

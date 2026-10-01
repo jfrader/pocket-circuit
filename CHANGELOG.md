@@ -31,6 +31,7 @@
 - Pencils, utensils and other scenery now have close silhouette-shaped contact shadows instead of appearing suspended above the tabletop.
 - Dirt, spills and paper on Kitchen, Workshop and Office courses retain their natural outlines and gaps instead of overlapping into rectangular slabs. The pale wash beneath them is removed; grip zones and collisions are unchanged.
 - Vehicle-audio warm-up yields between engine RPM banks, loops and effects, keeping the first race's loading screen responsive without changing the generated sounds.
+- Warmed engine voices stay cached when the next race changes the opponent lineup.
 - Quick Race entries and rerolls cycle through Kitchen, Workshop and Office instead of remaining pinned to Kitchen. The preview and Play action use the selected theme.
 - Course palettes now contrast with both the tabletop and the island, including their appearance after translucent paint is blended over the room surface.
 - Starting grids stay clear of rotated finish sensors and nearby furniture edges in both race directions. Scenery placement reserves gate posts and sealed bays, and grip artwork no longer hides solid rims behind rectangular texture stamps.
