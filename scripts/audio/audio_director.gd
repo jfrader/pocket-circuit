@@ -699,14 +699,14 @@ func warm_vehicle_audio(vehicle_id: String, progress: Callable = Callable()) -> 
 	if stats == null:
 		return false
 	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
-	var warmed := EngineVoiceGenerator.generate_cached(recipe) != null
+	var voice := await EngineVoiceGenerator.prepare_cached(recipe, progress)
 	if progress.is_valid():
 		await progress.call()
 	EngineLoopGeneratorScript.generate_cached(recipe)
 	if progress.is_valid():
 		await progress.call()
 	_prepare_vehicle_sfx(stats, vehicle_id)
-	return warmed
+	return voice != null
 
 
 func get_engine_voice_signature() -> String:
