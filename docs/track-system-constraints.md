@@ -103,6 +103,39 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 - No figure-eight or self-crossing routes: checkpoint order and reverse racing
   require one simple closed loop.
 
+## Road Width
+
+- Routes are always generated and validated at the fixed 125 half-width. Width
+  is fitted afterwards by `TrackWidthProfile` and never rejects or reshapes a
+  route.
+- The `road_width` generation option selects it: `flat` (default, today's road,
+  byte-identical scenes), `seeded` (a per-seed amplitude; about a quarter of
+  seeds stay flat), or a numeric amplitude. Race events pass `road_width`
+  through; the AI harness and capture tool read `PC_ROAD_WIDTH`.
+- Width changes are sporadic: most of every lap keeps 125. Each lap gets one or
+  two swells (700–1400 units, at most 15% of the lap each) and one pinch
+  (400–700 units, at most 8%), each a smooth rise and fall, 300 units apart.
+- Swells go where the route affords the most extra width (at least 20 more)
+  and reach `125 + 0.6..1.0 · A`.
+- The pinch narrows by at most `min(25, 0.2 · A)`, never under a 100
+  half-width. That floor keeps the shortcut lane (70 + 26), technical strip (92)
+  and grip patches inside the road. No pinch comes within 500 units of the
+  finish line, so the start grid keeps a full-width straight.
+- Each widened sample is clamped to what the route affords:
+  `min(240, turn radius − 55, (nearest non-local leg − 70) / 2, room wall − 20)`,
+  smoothed over 350 units so the road tapers. The 55 inner-edge radius is
+  today's tightest (180 fillet − 125); tighter, the offset normals cross and the
+  island folds into the road. The amplitude is eased back until the island
+  keeps at least 60% of its flat area.
+- The prepared spec carries one `half_widths` array; empty means the fixed
+  road. Corridor edges, island, outer boundary, `TrackSurface` width curve,
+  gate sensors and posts, finish checker, bay seals, obstacles, hazard crossing,
+  environment props (per-segment sweep) and the racing-line apex envelope all
+  read it. Generated roots record `corridor_max_half_width`; the race manager's
+  wrong-way reach and the AI off-route distance widen by it.
+- The handmade course shader measures the local width per fragment when the
+  surface has a width curve, so edge paint keeps its real size.
+
 ## Room Canvases
 
 | Key | Authored fixture | Generated canvas |
@@ -382,6 +415,8 @@ Run after generator, builder, surface, collision, or AI changes:
 1. `godot --headless --path . --script res://tests/track_seed_gen_test.gd`
 2. `godot --headless --path . --script res://tests/asset_collision_integrity_test.gd`
 3. `godot --headless --path . --script res://tests/generated_track_composition_test.gd`
+   plus `track_width_profile_test.gd` and `generated_track_road_width_test.gd`
+   after width, builder or collision changes
 4. `godot --headless --path . --script res://tests/generated_race_runtime_test.gd`
 5. Representative family/room seeds through `tests/theme_ai_harness.gd` in
    both directions using `PC_THEME`, `PC_ROOM`, `PC_SEED`, and

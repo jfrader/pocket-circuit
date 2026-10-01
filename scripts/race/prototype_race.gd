@@ -543,6 +543,8 @@ func _track_generation_options(event: Dictionary) -> Dictionary:
 	}
 	if int(options["act"]) <= 0:
 		options.erase("act")
+	if event.has("road_width"):
+		options["road_width"] = event["road_width"]
 	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
 	if identity is Dictionary:
 		var identity_record := identity as Dictionary
@@ -613,7 +615,7 @@ func _configure_route_reference() -> void:
 			for tile: Node in tiles.get_children():
 				if tile is Node2D:
 					route.append((tile as Node2D).global_position)
-	race_manager.configure_route_reference(route)
+	race_manager.configure_route_reference(route, float(track_root.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)))
 
 
 func _abort_failed_race() -> void:
