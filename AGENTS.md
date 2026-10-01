@@ -48,8 +48,8 @@ matching export templates. Verify scripts with `validate_script` and check
 For source tests, `run_godot_test_checked` in `tools/godot_gate.sh` checks the
 terminal completion marker and applies a test's optional `FIXED_FPS` clock.
 Direct invocations of those tests must pass the matching `--fixed-fps` value.
-Run full verification and imports in an isolated snapshot of the committed
-candidate, separate from the checkout handed to the operator for playtesting.
+Run full verification and imports in an isolated, detached git worktree at the
+committed candidate, separate from the operator's playtesting checkout.
 Native addon sync must preserve live mappings: skip unchanged files and stage
 changed files beside their destination before atomic replacement.
 
