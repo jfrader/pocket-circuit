@@ -545,6 +545,11 @@ func _track_generation_options(event: Dictionary) -> Dictionary:
 		options.erase("act")
 	if event.has("road_width"):
 		options["road_width"] = event["road_width"]
+	else:
+		# Playtest only: PC_ROAD_WIDTH=seeded (or a 0..1 amplitude) turns width on for every race.
+		var playtest_width := OS.get_environment("PC_ROAD_WIDTH")
+		if not playtest_width.is_empty():
+			options["road_width"] = float(playtest_width) if playtest_width.is_valid_float() else StringName(playtest_width)
 	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
 	if identity is Dictionary:
 		var identity_record := identity as Dictionary
