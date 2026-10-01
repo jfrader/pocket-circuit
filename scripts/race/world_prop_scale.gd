@@ -49,4 +49,3 @@ static func small_assets(paths: Array) -> Array[String]:
 		if length_for(path, INF) <= SMALL_PROP_LIMIT:
 			result.append(path)
 	return result
-
