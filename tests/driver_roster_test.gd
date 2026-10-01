@@ -56,18 +56,25 @@ func _run_test() -> void:
 	if not _expect(ids.size() == 3 and names.size() == 3, "exactly 3 unique driver identities"):
 		return
 
-	# The profiles are the roster's own vocabulary, but they must stay inside the
-	# bounds the AI controller applies, or a generated driver would be clamped.
-	for personality_name: String in ROSTER.PERSONALITIES:
-		var profile: Dictionary = ROSTER.PERSONALITIES[personality_name]
-		for trait_key: String in profile:
-			var limits: Vector2 = AI_CONTROLLER.PERSONALITY_BOUNDS[trait_key]
-			var value := float(profile[trait_key])
-			# Vector2 stores 32-bit components while the profile holds 64-bit
-			# floats, so the declared bounds must be compared with a tolerance.
-			var epsilon := 0.0001
-			if not _expect(value >= limits.x - epsilon and value <= limits.y + epsilon, "%s.%s (%.2f) must stay inside the AI controller's %.2f-%.2f bounds" % [personality_name, trait_key, value, limits.x, limits.y]):
-				return
+	# Saved profiles retain their vocabulary; the existing controller applies the
+	# same safety clamps and difficulty scaling to authored and generated drivers.
+	for tier: String in AI_CONTROLLER.DIFFICULTY_TUNING:
+		var realized_styles := {}
+		for personality_name: String in ROSTER.PERSONALITIES:
+			var controller := AI_CONTROLLER.new()
+			controller.difficulty = tier
+			controller.call("_configure_personality", personality_name, ROSTER.PERSONALITIES[personality_name])
+			var style: Dictionary = controller.personality.duplicate()
+			controller.free()
+			for trait_key: String in style:
+				var limits: Vector2 = AI_CONTROLLER.PERSONALITY_BOUNDS[trait_key]
+				var value := float(style[trait_key])
+				var epsilon := 0.0001
+				if not _expect(is_finite(value) and value >= limits.x - epsilon and value <= limits.y + epsilon, "%s/%s.%s must use the existing AI safety bounds" % [tier, personality_name, trait_key]):
+					return
+			realized_styles[JSON.stringify(style)] = true
+		if not _expect(realized_styles.size() == ROSTER.PERSONALITIES.size(), "the realized roster personalities must remain distinct on every difficulty"):
+			return
 
 	# every field mixes routing personalities: a short-cut taker and a patient
 	# driver are always present, so no roster is three identical strangers
