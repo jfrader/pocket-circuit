@@ -102,7 +102,10 @@ func _run_test() -> void:
 		"a race should load a score seeded from the circuit, not the menu score"
 	):
 		return
-	if not _expect(director.cue_live_section("cooldown"), "cue_live_section should forward a known racing section to the live player"):
+	# A section may only be replaced once the current one has had its dwell, so let
+	# the race score settle before asserting that a known section is forwarded.
+	director.call("_process", float(director.call("get_live_section_dwell")) + 1.0)
+	if not _expect(director.cue_live_section("cooldown"), "cue_live_section should forward a known racing section to the live player once the dwell has passed"):
 		return
 	director.set_race_paused(true)
 	if not _expect(is_equal_approx(music_player.volume_db, -9.0), "pausing should duck race music"):

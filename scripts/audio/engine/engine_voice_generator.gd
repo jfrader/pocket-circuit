@@ -24,6 +24,9 @@ const CACHE_LIMIT := 4
 static var _cache: Dictionary = {}
 
 var _rng_state := 1
+var _runner_gains := PackedFloat32Array()
+var _runner_detune := PackedFloat32Array()
+var _global_peak := 0.000001
 
 
 ## Generates a voice, reusing one already in memory for the same recipe. This is
@@ -32,7 +35,27 @@ static func generate_cached(recipe: EngineRecipe) -> EngineVoice:
 	var key := recipe.signature()
 	if _cache.has(key):
 		return _cache[key]
-	var voice := EngineVoiceGenerator.new().generate(recipe)
+	return _store_cached(key, EngineVoiceGenerator.new().generate(recipe))
+
+
+## Loading callers yield between RPM banks; synchronous callers use generate_cached.
+static func prepare_cached(recipe: EngineRecipe, progress: Callable) -> EngineVoice:
+	var key := recipe.signature()
+	if _cache.has(key):
+		return _cache[key]
+	if not progress.is_valid():
+		return generate_cached(recipe)
+	var generator := EngineVoiceGenerator.new()
+	var voice := generator._begin(recipe)
+	for rpm in voice.rpm_bands:
+		generator._append_band(voice, rpm)
+		await progress.call()
+	return _store_cached(key, generator._finish(voice))
+
+
+static func _store_cached(key: String, voice: EngineVoice) -> EngineVoice:
+	if _cache.has(key):
+		return _cache[key]
 	if _cache.size() >= CACHE_LIMIT:
 		_cache.erase(_cache.keys()[0])
 	_cache[key] = voice
@@ -44,32 +67,45 @@ static func clear_cache() -> void:
 
 
 func generate(recipe: EngineRecipe) -> EngineVoice:
+	var voice := _begin(recipe)
+	for rpm in voice.rpm_bands:
+		_append_band(voice, rpm)
+	return _finish(voice)
+
+
+func _begin(recipe: EngineRecipe) -> EngineVoice:
 	var voice := EngineVoice.new(recipe.signature(), recipe)
 	voice.sample_count = TABLE_SIZE
 	voice.load_bands = PackedFloat32Array(LOAD_BANDS)
 	voice.rpm_bands = _rpm_bands_for(recipe)
 	_rng_state = _stable_seed(recipe.identity_seed)
-	var runner_gains := PackedFloat32Array()
-	var runner_detune := PackedFloat32Array()
+	_runner_gains.clear()
+	_runner_detune.clear()
+	_global_peak = 0.000001
 	for cylinder in recipe.cylinder_count:
-		runner_gains.append(0.88 + _random_unit() * 0.24)
-		runner_detune.append((_random_unit() * 2.0 - 1.0) * 0.035)
-	var global_peak := 0.000001
-	for rpm in voice.rpm_bands:
-		var layers: Array = []
-		for load in voice.load_bands:
-			var table := _build_cycle_table(recipe, rpm, load, runner_gains, runner_detune)
-			for sample in table:
-				global_peak = maxf(global_peak, absf(sample))
-			layers.append(table)
-		voice.tables.append(layers)
-	var table_gain := TABLE_GAIN / global_peak
+		_runner_gains.append(0.88 + _random_unit() * 0.24)
+		_runner_detune.append((_random_unit() * 2.0 - 1.0) * 0.035)
+	return voice
+
+
+func _append_band(voice: EngineVoice, rpm: float) -> void:
+	var layers: Array = []
+	for load in voice.load_bands:
+		var table := _build_cycle_table(voice.recipe, rpm, load, _runner_gains, _runner_detune)
+		for sample in table:
+			_global_peak = maxf(_global_peak, absf(sample))
+		layers.append(table)
+	voice.tables.append(layers)
+
+
+func _finish(voice: EngineVoice) -> EngineVoice:
+	var table_gain := TABLE_GAIN / _global_peak
 	for rpm_index in voice.tables.size():
 		for load_index in (voice.tables[rpm_index] as Array).size():
 			var table: PackedFloat32Array = voice.tables[rpm_index][load_index]
 			for index in table.size():
 				table[index] *= table_gain
-	voice.mechanical = _build_mechanical_table(recipe)
+	voice.mechanical = _build_mechanical_table(voice.recipe)
 	return voice
 
 

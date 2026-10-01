@@ -254,14 +254,6 @@ static func footprint_projected_extent(footprint_size: Vector2, shape_kind: Stri
 	return absf(normalized_axis.dot(local_x)) * footprint_size.x * 0.5 + absf(normalized_axis.dot(local_y)) * footprint_size.y * 0.5
 
 
-static func crossing_path(centerline: PackedVector2Array, center_index: int, half_width: float) -> PackedVector2Array:
-	var normal := sample_tangent(centerline, center_index).rotated(PI * 0.5)
-	return PackedVector2Array([
-		centerline[center_index] - normal * half_width,
-		centerline[center_index] + normal * half_width,
-	])
-
-
 static func clear_of_points(point: Vector2, points: PackedVector2Array, clearance: float) -> bool:
 	for other: Vector2 in points:
 		if point.distance_to(other) < clearance:

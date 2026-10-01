@@ -135,8 +135,8 @@ their original unscaled canvases.
   sampling. Flat ground can underlay objects but cannot straddle a solid rim.
 - Gate footprints and sealed bay polygons are reserved before placement. Every
   planned environment object stays inside the room and outside the full 125-unit
-  corridor plus its declared clearance. Solid footprints cannot overlap each other,
-  on-course obstacles or hazard sweeps. The planner reserves an actual vehicle-width
+  corridor plus its declared clearance. Solid footprints cannot overlap each other
+  or on-course obstacles. The planner reserves an actual vehicle-width
   exit into the apron before placing scenery, plus an empty boundary sector.
 - Procedural surface profiles live in `data/household_material_patterns.json`.
   Story families and curated palette identities constrain the independent material
@@ -181,6 +181,18 @@ their original unscaled canvases.
 - Trackside placement must remain clear of checkpoint recovery corridors:
   230 units along the route and 48 units across it, plus the prop radius.
 
+## Calm Stretches
+
+- `TrackCornerMap` marks a centerline sample as corner when the heading turns
+  more than 0.5 rad (~29°) over 5 samples each side, and records each sample's
+  arc distance to the nearest corner sample ahead or behind.
+- Races run both ways, so a spot is calm only when it is at least 250 units
+  from any corner in either direction: a corner exit in one direction is the
+  braking zone in the other.
+- Low-grip surfaces (except the optional shortcut lane) and permanent on-course
+  obstacles must sit entirely on calm stretches. Placement underfills rather
+  than falling back to a corner. `track_surface_placement_test.gd` enforces it.
+
 ## Track Moments
 
 Generated tracks implement the design contract in `game-design-spec.md` section
@@ -188,27 +200,24 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 
 - `environment_focal`: the fitted household anchor; opening index metadata remains
   available independently of the chosen physical placement.
-- `EarlyConflictForward` and `EarlyConflictReverse`: kitchen and workshop roll
-  a hazard across the corridor 12-25% into the lap in either direction. Office
-  parks a coiled cable at that pose. There is no countdown overlay.
-- `TechnicalSurfaceMoment`: a full-width low-grip or low-speed zone on a
-  separated high-turn section.
+- `TechnicalSurfaceMoment`: a full-width low-grip or low-speed zone on a seeded
+  random calm stretch (see Calm Stretches). A lap without one has none.
 - `ShortcutDecision`: a visibly decaled inside lane that is geometrically
   shorter and at least 1.06x faster, but has lower grip. The outer lane remains
   longer and safe for every vehicle build.
-- Four to eight additional `patch` surface definitions add deterministic
-  themed grip and speed changes. They remain inside the corridor and clear of
-  every gate and the two designed surface moments. `TrackVariantPresenter`
+- Up to eight additional `patch` surface definitions (target 4-8) add
+  deterministic themed grip and speed changes on calm stretches only. They
+  remain inside the corridor and clear of every gate and the two designed
+  surface moments; a lap short of calm room gets fewer. `TrackVariantPresenter`
   remains the only creator of authoritative runtime `SurfaceZone` nodes.
 - `SpeedSection`: the unobstructed start/finish straight.
 - `DramaticFinish`: clear forward and reverse run-ups ending at the checker.
   Its visible paint stays on the nominal corridor while its invisible ordered
   sensor reaches the real room/island boundaries.
 
-`generated_moment_indices`, `generated_hazard_paths`, and
-`generated_surfaces` expose these contracts for runtime presentation and tests.
-The surface array contains the technical moment, shortcut, and 4-8 grip
-patches. `RacingLine` takes the safe outer lane through the shortcut window,
+`generated_moment_indices` and `generated_surfaces` expose these contracts for
+runtime presentation and tests. The surface array contains the shortcut, the
+technical moment when a calm stretch exists, and up to 8 grip patches. `RacingLine` takes the safe outer lane through the shortcut window,
 while `ShortcutRacingLine` exposes the shorter lane to competitive AI when its
 speed and grip metadata are suitable. Sunday Drive always stays on the safe
 line.
@@ -233,9 +242,10 @@ line.
   contour bevel along open stretches. Players may leave the nominal racing
   corridor and drive across the room apron wherever no real visible asset is
   present. Collision belongs only to visible household props, rail sections,
-  hazards, giants, the raised island, gate posts, and room perimeter walls.
-- Every generated world visual declares one `visual_role`: `SOLID`, `FLAT`, or
-  `MOVING_HAZARD`. `SOLID` means the owning `StaticBody2D` is on a
+  on-course obstacles, giants, the raised island, gate posts, and room perimeter
+  walls.
+- Every generated world visual declares one `visual_role`: `SOLID` or `FLAT`.
+  `SOLID` means the owning `StaticBody2D` is on a
   vehicle-visible layer (`2`, `4`, or `16`) and its circle, local rotated
   rectangle, or composed shape covers the
   visible center and ends. Circular colliders reach at least 90% of the visible
@@ -244,10 +254,9 @@ line.
   `FLAT` means presentation only and never owns collision: floor decals, broad
   cloth/paper/cardboard ground sections, corridor material patterns, surface
   tints and grip decals, worn-floor hints, shadows, and checker paint. Solid
-  objects must never use a sprite-only placement path. `MOVING_HAZARD` means a
-  colliding hazard whose visible asset is the object itself: kitchen/workshop
-  pieces roll along a path; the office coiled cable stays put. Hazard art is
-  never reused as island or edge scenery.
+  objects must never use a sprite-only placement path.
+- There is no moving hazard. The circuit identity keeps its `hazard` sub-seed
+  as a reserved slot so the identity and share-code format do not change.
 - The island is one visibly raised solid object. Its closed layer-2
   `ConcavePolygonShape2D` segment chain follows the outer contact edge of a dark
   side-face, theme-colored edge and top lip. Recovery begins at that
@@ -277,8 +286,8 @@ line.
   reserves the existing physical boundaries and posts. An empty run means open
   drivable apron, never hidden collision.
 - Permanent on-course obstacles use the existing AI-safe planner, with target
-  ranges of 1–4, 2–6 and 3–8 by act. Targets may underfill if no safe placement
-  exists; never reduce the 1.6-car viable corridor or either racing-line clearance
+  ranges of 1–4, 2–6 and 3–8 by act, on calm stretches only. Targets may
+  underfill if no safe placement exists; never reduce the 1.6-car viable corridor or either racing-line clearance
   to reach a quota. The obstacle stream remains independent of route geometry.
 - Footprint sweeps reject distant segment AABBs before the unchanged narrow-phase
   checks. The optimized result is regression-checked against an exhaustive sweep;
