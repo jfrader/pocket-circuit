@@ -26,7 +26,6 @@ func _initialize() -> void:
 
 func _run() -> void:
 	if not _atomic_sanity(): return
-	var total_cuts := 0
 	var first_offender := ""
 	var counts: Dictionary = {}
 	for theme: String in CASES:
@@ -104,22 +103,21 @@ func _run() -> void:
 						continue
 					# exploitable cut
 					theme_cuts += 1
-					total_cuts += 1
 					var line := "CUTTABLE %s seed=%d start=%d end=%d gap_indices=%d saved_mm=%.0f deep=%d/%d" % [theme, seed_value, i, j, k, saved, deep, CHORD_SAMPLES]
 					print(line)
 					if first_offender.is_empty():
 						first_offender = "%s seed=%d i=%d j=%d gap=%d" % [theme, seed_value, i, j, k]
 			track.free()
 			counts[theme][seed_value] = theme_cuts
+			if not first_offender.is_empty():
+				push_error("OUTER_CUT_BLOCK_TEST FAIL: exploitable bare outer corner cut: " + first_offender)
+				quit(1)
+				return
 			await process_frame
 	# report counts
 	for theme: String in counts:
 		for sv: int in counts[theme]:
 			print("CUT_COUNT %s seed=%d count=%d" % [theme, sv, int(counts[theme][sv])])
-	if not first_offender.is_empty():
-		push_error("OUTER_CUT_BLOCK_TEST FAIL: exploitable bare outer corner cut: " + first_offender)
-		quit(1)
-		return
 	print("OUTER_CUT_BLOCK_TEST PASS no_cuttable_outer_chords")
 	quit(0)
 
@@ -137,6 +135,9 @@ func _atomic_sanity() -> bool:
 	var anchor_line: PackedVector2Array = anchor["centerline"]
 	if not _check(bool(CORE.exploitable_cut(anchor_line, 223, 22)["exploitable"]), "the shared cut definition must recognise the measured kitchen seed 7 bend that can be cut across"): return false
 	if not _check(not bool(CORE.exploitable_cut(anchor_line, 223, 2)["exploitable"]), "the shared cut definition must not call a two-step hop a cut"): return false
+	for pair: Vector2i in _candidate_pairs(anchor_line):
+		var span := CORE._cyclic_index_distance(pair.x, pair.y, anchor_line.size())
+		if not _check((pair.x + span) % anchor_line.size() == pair.y, "the predicate and collision detector must check the same chord endpoints"): return false
 	var d := CORE._distance_to_centerline(Vector2(0, 300), dummy)
 	if not _check(d > 190.0, "distance helper must report far points"): return false
 	var ts := CORE._turn_strength(dummy, 1, 1)
@@ -188,7 +189,7 @@ func _candidate_pairs(centerline: PackedVector2Array) -> Array[Vector2i]:
 			continue
 		for kk in range(MIN_LOOKAHEAD, MAX_LOOKAHEAD + 1):
 			var j := (i + kk) % n
-			var key := i * n + j
+			var key := mini(i, j) * n + maxi(i, j)
 			if seen.has(key):
 				continue
 			seen[key] = true
@@ -222,7 +223,10 @@ func _candidate_pairs(centerline: PackedVector2Array) -> Array[Vector2i]:
 					if seen.has(pair_key):
 						continue
 					seen[pair_key] = true
-					pairs.append(Vector2i(index, other))
+					var forward_span := posmod(other - index, n)
+					var start := index if forward_span <= float(n) * 0.5 else other
+					var end := other if start == index else index
+					pairs.append(Vector2i(start, end))
 	return pairs
 
 
