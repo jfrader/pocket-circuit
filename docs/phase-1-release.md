@@ -77,25 +77,23 @@ collision-matched polygon fallbacks, safely reposition and recontextualize
 selected obstacle bodies, and add room-specific world markings and oversized
 props.
 
-The current surface and environmental-hazard configuration is exact:
+The current surface configuration is exact:
 
-| Theme | Base surface | Special surfaces (grip / speed) | Moving hazard |
-|---|---|---|---|
-| Kitchen | Polished counter | Wet spill (0.58 / 0.88) | Rolling fruit crosses the top racing line |
-| Workshop | Workbench | Oil slick (0.45 / 0.92); sawdust (0.78 / 0.72) | Sliding socket crosses the bottom racing line |
-| Office | Desk mat | Loose paper (0.84 / 0.78); keyboard (0.70 / 0.64) | Swinging cable crosses the right racing line |
+| Theme | Base surface | Special surfaces (grip / speed) |
+|---|---|---|
+| Kitchen | Polished counter | Wet spill (0.58 / 0.88) |
+| Workshop | Workbench | Oil slick (0.45 / 0.92); sawdust (0.78 / 0.72) |
+| Office | Desk mat | Loose paper (0.84 / 0.78); keyboard (0.70 / 0.64) |
 
 Surface multipliers are transient vehicle state and never mutate the selected
 VehicleStats resource. They apply equally to player and AI, support overlapping
-zones, and reset to the room's base surface after exit or recovery. Each hazard
-uses a deterministic 1.2-second warning, 1.6-second crossing, and 2.8-second
-cooldown. Contact applies a bounded 90-unit impulse after a 0.78 velocity slow;
-hazards use Area2D collision, never modify checkpoints, and stop with the paused
-scene tree.
+zones, and reset to the room's base surface after exit or recovery. Slippery
+surfaces and on-course obstacles sit only on calm stretches, away from corners
+in both race directions. There is no moving hazard.
 
 All three rooms use the championship's homologated collision and checkpoint
 footprint, letting players carry learned racing lines between acts. Distinct
-room dressing, surface physics, warning language, moving hazards, lap counts,
+room dressing, surface physics, on-course obstacles, lap counts,
 field formats, and reverse events change how that footprint races in each act.
 
 ## Vehicles

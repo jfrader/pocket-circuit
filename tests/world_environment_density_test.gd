@@ -54,12 +54,6 @@ func _run() -> void:
 					for obstacle: Dictionary in spec["obstacle_plan"]:
 						var obstacle_shape := TrackBuilderBoundary._footprint_polygon(obstacle["position"], obstacle["footprint_size"], obstacle["rotation"])
 						assert(Geometry2D.intersect_polygons(shape, obstacle_shape).is_empty(), "environment and on-course obstacles must not overlap")
-					var hazard: Dictionary = spec["hazard_plan"]
-					if hazard["present"]:
-						var half_size: Vector2 = hazard["footprint_size"] * 0.5
-						for path: PackedVector2Array in hazard["paths"].values():
-							var bounds := CORE._polygon_bounds_rect(path).grow_individual(half_size.x,half_size.y,half_size.x,half_size.y)
-							assert(Geometry2D.intersect_polygons(shape,CORE._rect_points(bounds.get_center(),bounds.size)).is_empty(), "scenery must not block either hazard sweep")
 				if placement["role"] == "boundary":
 					assert(asset["collision"] != "flat", "boundary props must have physical collision")
 					seen_assets[asset["id"]] = true

@@ -7,42 +7,42 @@
     "physics_ticks_per_second": 60,
     "time_scale": 1.0
   },
-  "godot_version": "4.7.2-stable (arch_linux)",
+  "godot_version": "4.7.2-stable (official)",
   "schema_version": 2,
   "seeds": [
     {
       "finish_order": [
         "Tess Circuit",
         "Milo Dash",
-        "Juniper Gear",
-        "Rae Sparks"
+        "Rae Sparks",
+        "Juniper Gear"
       ],
-      "frames": 2232,
-      "hash": "5698f784c435e8df22c824ac0895626ee67e618b62d2859467f0cd765e74e607",
+      "frames": 2255,
+      "hash": "b5599fe6044bc05529567d78ea7d0cf01ad1640ff9a1e2ee3a0f686fc6281a0d",
       "key": "kitchen/long/24469",
       "racers": [
         {
           "dnf": false,
           "driver": "Tess Circuit",
-          "finish_time": 35.233,
+          "finish_time": 35.317,
           "position": 1
         },
         {
           "dnf": false,
           "driver": "Milo Dash",
-          "finish_time": 36.667,
+          "finish_time": 37.0,
           "position": 2
         },
         {
           "dnf": false,
-          "driver": "Juniper Gear",
-          "finish_time": 37.083,
+          "driver": "Rae Sparks",
+          "finish_time": 37.367,
           "position": 3
         },
         {
           "dnf": false,
-          "driver": "Rae Sparks",
-          "finish_time": 37.2,
+          "driver": "Juniper Gear",
+          "finish_time": 37.583,
           "position": 4
         }
       ],
@@ -54,35 +54,35 @@
       "finish_order": [
         "Milo Dash",
         "Tess Circuit",
-        "Juniper Gear",
-        "Rae Sparks"
+        "Rae Sparks",
+        "Juniper Gear"
       ],
-      "frames": 2318,
-      "hash": "6411d77f241e8d0e51ae96b0ccc2daff31028171b4f9bb0fe1250f043c923615",
+      "frames": 2186,
+      "hash": "0e3516eaa64bd3b13e42de3c7e60212e69c0c0213a946f7ac884f560b304bee1",
       "key": "workshop/square/51940",
       "racers": [
         {
           "dnf": false,
           "driver": "Milo Dash",
-          "finish_time": 37.667,
+          "finish_time": 35.3,
           "position": 1
         },
         {
           "dnf": false,
           "driver": "Tess Circuit",
-          "finish_time": 38.083,
+          "finish_time": 35.8,
           "position": 2
         },
         {
           "dnf": false,
-          "driver": "Juniper Gear",
-          "finish_time": 38.517,
+          "driver": "Rae Sparks",
+          "finish_time": 36.283,
           "position": 3
         },
         {
           "dnf": false,
-          "driver": "Rae Sparks",
-          "finish_time": 38.633,
+          "driver": "Juniper Gear",
+          "finish_time": 36.433,
           "position": 4
         }
       ],
@@ -93,36 +93,36 @@
     {
       "finish_order": [
         "Milo Dash",
-        "Tess Circuit",
         "Juniper Gear",
+        "Tess Circuit",
         "Rae Sparks"
       ],
-      "frames": 1933,
-      "hash": "383661c82f093f13fe942fe3cd53fd39972278fa73690675a18c5516e7840c63",
+      "frames": 1867,
+      "hash": "c028bf45da8064bd6cae14ec8bf68554c41aed624b6671382dc99a94db91c219",
       "key": "office/classic/8001",
       "racers": [
         {
           "dnf": false,
           "driver": "Milo Dash",
-          "finish_time": 31.45,
+          "finish_time": 30.433,
           "position": 1
         },
         {
           "dnf": false,
-          "driver": "Tess Circuit",
-          "finish_time": 31.717,
+          "driver": "Juniper Gear",
+          "finish_time": 30.667,
           "position": 2
         },
         {
           "dnf": false,
-          "driver": "Juniper Gear",
-          "finish_time": 32.017,
+          "driver": "Tess Circuit",
+          "finish_time": 30.883,
           "position": 3
         },
         {
           "dnf": false,
           "driver": "Rae Sparks",
-          "finish_time": 32.217,
+          "finish_time": 31.117,
           "position": 4
         }
       ],
