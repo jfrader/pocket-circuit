@@ -1,126 +1,90 @@
 extends SceneTree
+## Road-width review renders. For each room and tier, generates the real route,
+## fits TrackWidthProfile at flat/subtle/dramatic amplitude and writes one SVG
+## per amplitude, then prints the affordable half-width per room and tier.
+## PC_OUT=<dir> (default /tmp/opencode/road-width) PC_SEEDS=<count> (default 2)
 
-const TrackSeedGen = preload("res://scripts/race/track_seed_gen.gd")
+const WORLD_SCALE := 1.75
+const ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"long", &"square", &"el"]
+const RENDER_TIERS: Array[StringName] = [&"standard", &"long"]
+const AFFORD_TIERS: Array[StringName] = [&"compact", &"standard", &"long", &"endurance", &"marathon"]
+const AMPLITUDES := {"flat": 0.0, "subtle": 50.0, "dramatic": 115.0}
+const SEED_STRIDE := 7919
 
-func _init():
-	print("Running variable width renders...")
-	
-	_render_shape("classic", "standard")
-	_render_shape("long", "marathon")
-	
-	_print_affordability_table()
-	
-	print("PASS")
+
+func _initialize() -> void:
+	var out_dir := OS.get_environment("PC_OUT")
+	if out_dir.is_empty():
+		out_dir = "/tmp/opencode/road-width"
+	DirAccess.make_dir_recursive_absolute(out_dir)
+	var seeds := int(OS.get_environment("PC_SEEDS")) if OS.get_environment("PC_SEEDS").is_valid_int() else 2
+	for tier in RENDER_TIERS:
+		for room in ROOMS:
+			for k in seeds:
+				var seed := (k + 1) * SEED_STRIDE
+				var route := _route(room, tier, seed)
+				if route["line"].is_empty():
+					continue
+				for label: String in AMPLITUDES:
+					var widths := TrackWidthProfile.build(route["line"], seed, route["room"], AMPLITUDES[label])
+					_write_svg("%s/%s_%s_%d_%s.svg" % [out_dir, tier, room, seed, label], route["room"], route["line"], widths)
+	print("| Tier | Room | Median affordable half-width | p90 |")
+	print("|---|---|---|---|")
+	for tier in AFFORD_TIERS:
+		for room in ROOMS:
+			var medians := []
+			var p90s := []
+			for k in seeds:
+				var route := _route(room, tier, (k + 1) * SEED_STRIDE)
+				if route["line"].is_empty():
+					continue
+				var line: PackedVector2Array = route["line"]
+				var caps := Array(TrackWidthProfile.affordable_caps(line, route["room"], TrackWidthProfile._closed_arc(line)))
+				caps.sort()
+				medians.append(caps[int(caps.size() * 0.5)])
+				p90s.append(caps[int(caps.size() * 0.9)])
+			print("| %s | %s | %.0f | %.0f |" % [tier, room, _mean(medians), _mean(p90s)])
+	print("ROAD_WIDTH_RENDERS PASS dir=%s" % out_dir)
 	quit()
 
-func _render_shape(shape_name: String, tier: String):
-	var amplitudes = [0.0, 40.0, 115.0]
-	var rect = Rect2(0, 0, 4000, 4000)
-	if shape_name == "marathon" or tier == "marathon":
-		rect = Rect2(0, 0, 6000, 6000)
-		
-	var seeds = [1001, 1002]
-	for current_seed in seeds:
-		var params = {"room_shape": shape_name, "length_tier": tier}
-		var res = TrackSeedGen.generate_with_retries(current_seed, rect, params)
-		var centerline = res.get("points", PackedVector2Array())
-		if centerline.is_empty():
-			continue
-			
-		for A in amplitudes:
-			var widths = TrackSeedGen.compute_width_profile(centerline, current_seed, A)
-			_draw_svg_render(shape_name, current_seed, A, centerline, widths)
-		print("Rendered shape ", shape_name, " with seed ", current_seed)
+
+func _route(room: StringName, tier: StringName, seed: int) -> Dictionary:
+	var scale := float(TrackSeedGen.length_profile(tier).get("room_scale", 1.0))
+	var polygon := PackedVector2Array()
+	for point: Vector2 in TrackBuilderCore.ROOM_SHAPES[room]:
+		polygon.append(point * scale)
+	var params := {
+		"margin": 190.0, "min_self_distance": 320.0, "min_loop_length": 1900.0 * WORLD_SCALE,
+		"room_polygon": polygon, "room_shape": room, "length_tier": tier,
+	}
+	var gen := TrackSeedGen.generate_with_retries(seed, Rect2(-940, -540, 1880, 1080), params)
+	var points: PackedVector2Array = gen["points"]
+	var line := TrackBuilderGeometry.sample_centerline(points) if not points.is_empty() else PackedVector2Array()
+	return {"room": polygon, "line": line}
 
 
-func _draw_svg_render(shape_name: String, seed: int, A: float, centerline: PackedVector2Array, widths: PackedFloat32Array):
-	var n = centerline.size()
-	var min_x = 99999.0
-	var min_y = 99999.0
-	var max_x = -99999.0
-	var max_y = -99999.0
-	
-	for p in centerline:
-		min_x = min(min_x, p.x - 300)
-		max_x = max(max_x, p.x + 300)
-		min_y = min(min_y, p.y - 300)
-		max_y = max(max_y, p.y + 300)
-		
-	var w = max_x - min_x
-	var h = max_y - min_y
-	
-	var file = FileAccess.open("/tmp/opencode/render_%s_%d_A%d.svg" % [shape_name, seed, int(A)], FileAccess.WRITE)
-	file.store_string("<svg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"%f %f %f %f\">\n" % [min_x, min_y, w, h])
-	file.store_string("<rect x=\"%f\" y=\"%f\" width=\"%f\" height=\"%f\" fill=\"#222\"/>\n" % [min_x, min_y, w, h])
-	
-	for i in n:
-		var i_next = (i + 1) % n
-		var p1 = centerline[i]
-		var p2 = centerline[i_next]
-		var dir = (p2 - p1).normalized()
-		var right = Vector2(-dir.y, dir.x)
-		var w1 = widths[i]
-		var w2 = widths[i_next]
-		
-		var v1 = p1 - right * w1
-		var v2 = p2 - right * w2
-		var v3 = p2 + right * w2
-		var v4 = p1 + right * w1
-		
-		file.store_string("<polygon points=\"%f,%f %f,%f %f,%f %f,%f\" fill=\"#555\"/>\n" % [v1.x, v1.y, v2.x, v2.y, v3.x, v3.y, v4.x, v4.y])
-	
-	file.store_string("<polyline points=\"")
-	for p in centerline:
-		file.store_string("%f,%f " % [p.x, p.y])
-	file.store_string("%f,%f\" fill=\"none\" stroke=\"#ff0\" stroke-width=\"4\"/>\n" % [centerline[0].x, centerline[0].y])
-	file.store_string("</svg>")
+func _write_svg(path: String, room: PackedVector2Array, line: PackedVector2Array, widths: PackedFloat32Array) -> void:
+	var bounds := Rect2(room[0], Vector2.ZERO)
+	for point: Vector2 in room:
+		bounds = bounds.expand(point)
+	var edges := TrackBuilderGeometry.corridor_edges(line, widths)
+	var file := FileAccess.open(path, FileAccess.WRITE)
+	file.store_string('<svg xmlns="http://www.w3.org/2000/svg" viewBox="%f %f %f %f">\n' % [bounds.position.x, bounds.position.y, bounds.size.x, bounds.size.y])
+	file.store_string('<polygon points="%s" fill="#efe7d6" stroke="#b9ad96" stroke-width="12"/>\n' % _points(room))
+	file.store_string('<path d="M %s Z M %s Z" fill="#4a4640" fill-rule="evenodd"/>\n' % [_points(edges["left"]), _points(edges["right"])])
+	file.store_string('<polygon points="%s" fill="none" stroke="#c4552b" stroke-width="6"/>\n' % _points(line))
+	file.store_string("</svg>\n")
 
-func _print_affordability_table():
-	print("\n--- Affordability Table ---")
-	print("| Room Shape | Tier | Max Half-Width |")
-	print("|------------|------|----------------|")
-	var shapes = ["classic", "wide", "tall", "long", "square", "el"]
-	var tiers = ["compact", "standard", "long", "endurance", "marathon"]
-	for shape in shapes:
-		for tier in tiers:
-			if shape == "el" and tier == "long":
-				continue
-			var res = _find_max_affordable_width(shape, tier)
-			var max_w = res["success_w"]
-			var baseline_failed = res["baseline_failed"]
-			var extra = ""
-			if max_w == 0.0:
-				if baseline_failed:
-					extra = " (Baseline 125 also fails)"
-				else:
-					extra = " (Artefact)"
-			print("| %s | %s | %d%s |" % [shape, tier, int(max_w), extra])
-	print("---------------------------\n")
 
-func _find_max_affordable_width(shape: String, tier: String) -> Dictionary:
-	var w = 125.0
-	var step = 10.0
-	var success_w = 0.0
-	var baseline_failed_at_all = false
-	var rect = Rect2(0, 0, 4000, 4000)
-	if shape == "marathon" or tier == "marathon":
-		rect = Rect2(0, 0, 6000, 6000)
-		
-	while w <= 400.0:
-		var found = false
-		var all_seeds_failed = true
-		for s in range(5):
-			var params = {"room_shape": shape, "length_tier": tier, "forced_half_width": w}
-			var res = TrackSeedGen.generate_with_retries(s * 100, rect, params)
-			if not res.get("points", PackedVector2Array()).is_empty():
-				found = true
-				all_seeds_failed = false
-				break
-		if found:
-			success_w = w
-			w += step
-		else:
-			if w == 125.0:
-				baseline_failed_at_all = true
-			break
-	return {"success_w": success_w, "baseline_failed": baseline_failed_at_all}
+func _points(points: PackedVector2Array) -> String:
+	var parts := PackedStringArray()
+	for point: Vector2 in points:
+		parts.append("%.1f,%.1f" % [point.x, point.y])
+	return " ".join(parts)
+
+
+func _mean(values: Array) -> float:
+	var total := 0.0
+	for value: float in values:
+		total += value
+	return total / maxf(1.0, values.size())

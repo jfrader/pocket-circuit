@@ -19,6 +19,8 @@ var outer_arc: PackedFloat32Array
 var boundary_runs: Array[Dictionary] = []
 var last_rejection := ""
 var half_width := 125.0
+## Per-centerline-sample half-widths; empty means the fixed `half_width` road.
+var half_widths := PackedFloat32Array()
 var world_seed := 0
 var open_sector := 0
 var pools: Dictionary = {}
@@ -40,6 +42,9 @@ static func plan(theme: StringName, seed: int, geometry: Dictionary, candidates:
 	planner.island = geometry.get("island_polygon", PackedVector2Array())
 	planner.line = geometry.get("centerline", PackedVector2Array())
 	planner.half_width = float(geometry.get("corridor_half_width", 125.0))
+	planner.half_widths = geometry.get("corridor_half_widths", PackedFloat32Array())
+	if planner.half_widths.size() != planner.line.size():
+		planner.half_widths = PackedFloat32Array()
 	if planner.room.size() < 3 or planner.line.size() < 3:
 		return {"placements":[],"diagnostics":{"error":"insufficient_geometry"}}
 	planner.arc = TrackBuilderCore._arc_lengths(planner.line)
@@ -325,7 +330,7 @@ func _boundary_near(distance: float, side: float, rng: RandomNumberGenerator) ->
 				normal = -normal
 			var angle := tangent.angle() + (PI * 0.5 if size.y > size.x else 0.0)
 			var clearance := float(asset.get("clearance_mm", 36.0))
-			var candidate := point + normal * side * (half_width + minf(size.x, size.y) * 0.5 + clearance + gap)
+			var candidate := point + normal * side * (_half_width_at(at) + minf(size.x, size.y) * 0.5 + clearance + gap)
 			var nearest := TrackBuilderCore._closest_point_on_loop(candidate, line)
 			if mini(SECTOR_COUNT - 1, int(float(nearest["index"]) / line.size() * SECTOR_COUNT)) == open_sector:
 				continue
@@ -350,7 +355,15 @@ func _route_anchor(fraction: float, offset: float) -> Dictionary:
 	var tangent := TrackBuilderCore._tangent_at_arc(line, arc, distance)
 	var closest := TrackBuilderCore._closest_point_on_loop(point, island) if not island.is_empty() else {"position":TrackBuilderCore._polygon_bounds_rect(room).get_center()}
 	var outward := (point - (closest["position"] as Vector2)).normalized()
-	return {"position":point + outward * (half_width + offset),"alternate_position":point - outward * (half_width + offset),"rotation":tangent.angle()}
+	var local_half := _half_width_at(distance)
+	return {"position":point + outward * (local_half + offset),"alternate_position":point - outward * (local_half + offset),"rotation":tangent.angle()}
+
+
+## Half-width at an arc distance along `line`; the fixed width when flat.
+func _half_width_at(distance: float) -> float:
+	if half_widths.is_empty():
+		return half_width
+	return half_widths[clampi(arc.bsearch(distance) - 1, 0, half_widths.size() - 1)]
 
 
 func _focal_fit(asset: Dictionary, rng: RandomNumberGenerator) -> Dictionary:
@@ -424,7 +437,9 @@ func _validate(asset: Dictionary, point: Vector2, angle: float) -> Dictionary:
 		if sector == open_sector:
 			return _reject("open_sector")
 	var clearance := float(asset.get("clearance_mm", 36.0))
-	if not TrackBuilderCore._line_sweep_clears_footprint(line, point, size, &"rect", angle, half_width + clearance + 2.0):
+	var clears := TrackBuilderCore._line_sweep_clears_footprint(line, point, size, &"rect", angle, half_width + clearance + 2.0) if half_widths.is_empty() \
+		else TrackBuilderGeometry.variable_sweep_clears_footprint(line, half_widths, point, size, &"rect", angle, clearance + 2.0)
+	if not clears:
 		return _reject("corridor")
 	if String(asset.get("collision", "alpha")) != "flat":
 		for other: PackedVector2Array in occupied:
