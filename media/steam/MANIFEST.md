@@ -66,7 +66,8 @@ From the repository root, after creating the exact release candidate:
 
 ```bash
 python3 tools/generate_steam_art.py
-./tools/capture_steam_media.sh /absolute/path/to/release-candidate
+TRAILER_MUSIC_BED=/absolute/path/to/recorded-race-music.wav \
+  ./tools/capture_steam_media.sh /absolute/path/to/release-candidate
 (cd media/steam && sha256sum --check SHA256SUMS)
 ```
 

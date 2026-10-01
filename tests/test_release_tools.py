@@ -33,6 +33,19 @@ class CompletionMarkerTests(unittest.TestCase):
                 marker_for(path)
 
 
+class AudioDocumentationTests(unittest.TestCase):
+    def test_recorded_audio_has_one_shipped_provenance_entry(self):
+        provenance = (ROOT / "ASSET_PROVENANCE.md").read_text()
+        shipped = provenance.split("## Shipped asset groups", 1)[1].split("\n## ", 1)[0]
+        for path in sorted((ROOT / "assets/audio").iterdir()):
+            if path.suffix not in {".ogg", ".wav", ".mp3"}:
+                continue
+            with self.subTest(asset=path.name):
+                row_prefix = f"| `{path.relative_to(ROOT).as_posix()}` |"
+                rows = [line for line in shipped.splitlines() if line.startswith(row_prefix)]
+                self.assertEqual(len(rows), 1, "A shipped recording must have one unambiguous source")
+
+
 class GodotGateTests(unittest.TestCase):
     def run_worker(self, code):
         return subprocess.run(

@@ -118,10 +118,11 @@ existing VehicleStats, transform, common collision geometry, and save identity.
 
 ## Audio and Feedback
 
-Music, engine notes and effects are generated at runtime by the first-party
-Gamestruments engine; the build ships no recorded music or effects. Menu and race
-scores are composed from the circuit seed, so a circuit always sounds the same
-while different circuits differ. Exact sources, transformations, and pack
+Music, engine notes and effects are generated at runtime by first-party project
+code and the Gamestruments engine. No recorded music ships; the only recorded
+audio is the Kenney CC0 `engine_loop.ogg` fallback. Menu and race scores are
+composed from the circuit seed, so a circuit always sounds the same while
+different circuits differ. Exact sources, transformations, and pack
 hashes live in `ASSET_PROVENANCE.md` and `assets/audio/LICENSE.md`.
 
 One persistent AudioDirector owns a single music player, a local-player engine
