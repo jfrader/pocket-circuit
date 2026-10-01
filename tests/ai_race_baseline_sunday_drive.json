@@ -2,12 +2,13 @@
   "config": {
     "difficulty": "sunday_drive",
     "field_size": 4,
+    "fixed_fps": 60,
     "laps": 2,
     "physics_ticks_per_second": 60,
     "time_scale": 1.0
   },
   "godot_version": "4.7.2-stable (arch_linux)",
-  "schema_version": 1,
+  "schema_version": 2,
   "seeds": [
     {
       "finish_order": [

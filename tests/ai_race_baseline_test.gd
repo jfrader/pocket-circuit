@@ -2,8 +2,8 @@ extends SceneTree
 
 ## Strict deterministic race-outcome baseline.
 ##
-## Runs a fixed seed list at the project's REAL physics settings — it does NOT
-## change Engine.physics_ticks_per_second or Engine.time_scale (unlike
+## Runs a fixed seed list with --fixed-fps 60 at the project's physics settings.
+## It does NOT change Engine.physics_ticks_per_second or Engine.time_scale (unlike
 ## ai_seed_sweep_test.gd, which forces 240 Hz / 4x to stay fast). For each seed
 ## it records the finishing order, every racer's finish time, DNF flags, and a
 ## SHA-256 hash of that outcome, then compares the run against the checked-in
@@ -19,14 +19,16 @@ extends SceneTree
 ##                                  verifies against a per-tier baseline file
 ##
 ## The gate globs `tests/*.gd`, so the default list is small (3 seeds x 2 laps).
-## The full sweep is opt-in because it is long at real time-scale.
+## The full sweep is opt-in. FIXED_FPS is read by the source-test gate; direct
+## invocations must also pass --fixed-fps 60 to disable wall-clock synchronization.
 
 const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 
 const BASELINE_PATH := "res://tests/ai_race_baseline.json"
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 2
+const FIXED_FPS := 60
 
 const DEFAULT_DIFFICULTY := "club_circuit"
 const VALID_DIFFICULTIES := ["sunday_drive", "club_circuit", "clockwork"]
@@ -67,11 +69,18 @@ func _run() -> void:
 	var seed_cases := _seed_cases()
 	var baseline := _load_baseline()
 
+	if not record and not _expect(not baseline.is_empty(), "missing or invalid baseline: %s" % _baseline_path()):
+		return
 	# This baseline only means something at the project's default tick rate and
 	# time scale. A project tick-rate change must fail here, not drift silently.
-	if not _expect(Engine.physics_ticks_per_second == 60, "physics_ticks_per_second must be 60 (project default), got %d" % Engine.physics_ticks_per_second):
+	if not _expect(Engine.physics_ticks_per_second == FIXED_FPS, "physics_ticks_per_second must be %d (project default), got %d" % [FIXED_FPS, Engine.physics_ticks_per_second]):
 		return
 	if not _expect(is_equal_approx(Engine.time_scale, 1.0), "time_scale must be 1.0, got %f" % Engine.time_scale):
+		return
+	# Godot consumes --fixed-fps before exposing script arguments. Check its
+	# effective process step, not the wall-clock FPS cap or physics tick rate.
+	await process_frame
+	if not _expect(root.get_process_delta_time() == 1.0 / FIXED_FPS, "run with --fixed-fps %d for the deterministic simulation clock" % FIXED_FPS):
 		return
 
 	var entries: Array[Dictionary] = []
@@ -96,6 +105,7 @@ func _run() -> void:
 		"godot_version": String(Engine.get_version_info().get("string", "")),
 		"config": {
 			"difficulty": difficulty,
+			"fixed_fps": FIXED_FPS,
 			"laps": LAPS,
 			"field_size": FIELD_SIZE,
 			"physics_ticks_per_second": Engine.physics_ticks_per_second,
@@ -107,12 +117,6 @@ func _run() -> void:
 	if record:
 		_write_baseline(document)
 		print("AI_RACE_BASELINE RECORDED difficulty=%s seeds=%d -> %s" % [difficulty, entries.size(), _baseline_path()])
-		quit(0)
-		return
-
-	if baseline.is_empty():
-		# Baseline not recorded yet. Keep the gate green but make the gap loud.
-		print("AI_RACE_BASELINE SKIP: %s missing; run with PC_BASELINE_RECORD=1 to record" % _baseline_path())
 		quit(0)
 		return
 
@@ -292,17 +296,17 @@ func _write_baseline(document: Dictionary) -> void:
 
 
 func _compare(document: Dictionary, baseline: Dictionary) -> Array[String]:
+	# JSON numbers become floats; nested Dictionary/Array equality distinguishes
+	# them from native integers. Compare the same representation the writer stores.
+	document = JSON.parse_string(JSON.stringify(document)) as Dictionary
 	var problems: Array[String] = []
+	if document.get("schema_version") != baseline.get("schema_version"):
+		problems.append("schema_version: current=%s baseline=%s" % [document.get("schema_version"), baseline.get("schema_version")])
 	var doc_config: Dictionary = document.get("config", {})
 	var base_config: Dictionary = baseline.get("config", {})
-	if String(doc_config.get("difficulty", "")) != String(base_config.get("difficulty", "")):
-		problems.append("config.difficulty: current=%s baseline=%s" % [doc_config.get("difficulty"), base_config.get("difficulty")])
-	if int(doc_config.get("physics_ticks_per_second", -1)) != int(base_config.get("physics_ticks_per_second", -1)):
-		problems.append("config.physics_ticks_per_second: current=%s baseline=%s" % [doc_config.get("physics_ticks_per_second"), base_config.get("physics_ticks_per_second")])
-	if int(doc_config.get("laps", -1)) != int(base_config.get("laps", -1)):
-		problems.append("config.laps: current=%s baseline=%s" % [doc_config.get("laps"), base_config.get("laps")])
-	if int(doc_config.get("field_size", -1)) != int(base_config.get("field_size", -1)):
-		problems.append("config.field_size: current=%s baseline=%s" % [doc_config.get("field_size"), base_config.get("field_size")])
+	for key: String in ["difficulty", "fixed_fps", "physics_ticks_per_second", "time_scale", "laps", "field_size"]:
+		if doc_config.get(key) != base_config.get(key):
+			problems.append("config.%s: current=%s baseline=%s" % [key, doc_config.get(key), base_config.get(key)])
 	var base_by_key := {}
 	for entry: Dictionary in baseline.get("seeds", []):
 		base_by_key[String(entry.get("key", ""))] = entry
@@ -312,7 +316,9 @@ func _compare(document: Dictionary, baseline: Dictionary) -> Array[String]:
 		if base.is_empty():
 			problems.append("seed %s not present in baseline" % key)
 			continue
-		if String(entry.get("hash", "")) != String(base.get("hash", "")):
+		if entry.get("frames") != base.get("frames"):
+			problems.append("seed %s physics frames: current=%s baseline=%s" % [key, entry.get("frames"), base.get("frames")])
+		if entry.get("hash") != base.get("hash") or entry.get("finish_order") != base.get("finish_order") or entry.get("racers") != base.get("racers"):
 			problems.append(
 				"seed %s outcome changed\n  current  order=%s times=%s\n  baseline order=%s times=%s" % [
 					key,
