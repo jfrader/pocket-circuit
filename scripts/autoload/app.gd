@@ -262,7 +262,7 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false, 
 		"event_id": event_id,
 		"event": event,
 		"vehicle_id": vehicle_id,
-		"difficulty": "club_circuit" if mastery_run else String(_save_data["difficulty"]),
+		"difficulty": CATALOG.race_difficulty(event, quick_race, mastery_run, String(_save_data["difficulty"])),
 		"result_committed": false,
 	}
 	if mastery_run:
