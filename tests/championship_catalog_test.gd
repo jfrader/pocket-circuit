@@ -18,8 +18,12 @@ func _run_test() -> void:
 	for driver_id: String in ["juniper", "milo", "tess", "cass"]:
 		var driver := CATALOG.get_driver(driver_id)
 		var style: Dictionary = driver.get("ai_style", {})
-		if not _expect(style.size() == 6, "%s should define all bounded AI personality dimensions" % driver_id):
+		if not _expect(style.size() == AI_CONTROLLER.DEFAULT_PERSONALITY.size(), "%s should define all bounded AI personality dimensions" % driver_id):
 			return
+		for trait_key: String in style:
+			var value: Variant = style[trait_key]
+			if not _expect(AI_CONTROLLER.DEFAULT_PERSONALITY.has(trait_key) and (value is int or value is float) and is_finite(float(value)), "%s.%s should be a known finite numeric AI trait" % [driver_id, trait_key]):
+				return
 		rival_styles[driver_id] = style
 	if not _expect(rival_styles["juniper"] != rival_styles["milo"] and rival_styles["milo"] != rival_styles["tess"] and rival_styles["tess"] != rival_styles["cass"], "the four rivals should not share identical driving behavior"):
 		return
