@@ -27,7 +27,8 @@ func _capture() -> void:
 		var packed := load(RACE_SCENE) as PackedScene
 		var fixture := packed.instantiate()
 		var road_width := OS.get_environment("PC_ROAD_WIDTH")
-		var event := {"circuit": "generated", "theme": theme, "room": room, "seed": int(seed_text), "laps": 3}
+		var length_tier := OS.get_environment("PC_LENGTH_TIER")
+		var event := {"circuit": "generated", "theme": theme, "room": room, "seed": int(seed_text), "laps": 3, "length_tier": length_tier if length_tier != "" else "standard"}
 		if not road_width.is_empty():
 			event["road_width"] = float(road_width) if road_width.is_valid_float() else StringName(road_width)
 		fixture.set("_session", {"vehicle_id": "rustbug", "event": event})

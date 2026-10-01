@@ -381,7 +381,9 @@ static func _family_controls(
 		var size := Vector2(usable_rect.size.y, usable_rect.size.x) if tall else usable_rect.size
 		var bias := clampf(inverse_lerp(8500.0, 9600.0, target_length), 0.0, 1.0)
 		var rhythm_seed := _hash32(seed ^ (attempt * RHYTHM_SALT))
-		if tier == &"marathon":
+		if OS.get_environment("PC_PROTO") == "occupancy":
+			definition = ProtoOccupancyRoute.construct(rhythm_seed, Rect2(-size * 0.5, size), target_length, max_length)
+		elif tier == &"marathon":
 			definition = ROUTE_GRAMMAR.construct_marathon(_route_index(seed, attempt, tier), rhythm_seed, bias, Rect2(-size * 0.5, size))
 		else:
 			definition = ROUTE_GRAMMAR.construct(_route_index(seed, attempt), rhythm_seed, bias, Rect2(-size * 0.5, size))
