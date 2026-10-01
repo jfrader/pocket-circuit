@@ -271,4 +271,3 @@ func _grip_patches(track: Node2D, recipe: Dictionary, centerline: PackedVector2A
 		surfaces.append({"name": StringName(recipe["surface_name"]), "grip": float(recipe["grip"]), "speed": float(recipe["speed"]), "points": points, "role": &"grip_patch"})
 		await stage.call("Laying grip surfaces")
 	track.set_meta("generated_surfaces", surfaces)
-
