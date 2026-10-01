@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Quick Race has a difficulty picker beside its race controls, shared with Settings.
 - Championship rivals progress from Sunday Drive in Act I to Club Circuit in Act II and Clockwork in Act III; rival duels step up one tier. Quick Race keeps your chosen difficulty, and solo time trials keep theirs.
 - Sunday Drive rivals occasionally make a small, recoverable line error in corners; Clockwork drivers remain clean.
 - Rival cars on Sunday Drive get small tire, brake, and acceleration assists; Club Circuit gets a smaller tire and brake assist. Your car's handling is unchanged.
@@ -19,6 +20,8 @@
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
 
 ### Fixed
+- Rapid changes between race results and menus no longer switch the music section repeatedly.
+- Vehicle movement is interpolated between physics ticks for smoother presentation.
 - Club Circuit rivals no longer receive catch-up power while ahead of your car; their total engine assist remains capped at 15%.
 - Pencils, utensils and other scenery now have close silhouette-shaped contact shadows instead of appearing suspended above the tabletop.
 - Dirt, spills and paper on Kitchen, Workshop and Office courses retain their natural outlines and gaps instead of overlapping into rectangular slabs. The pale wash beneath them is removed; grip zones and collisions are unchanged.
