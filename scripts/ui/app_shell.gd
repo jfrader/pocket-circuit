@@ -158,6 +158,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_quick_identity_summary.name = "QuickCircuitSummary"
 	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
 	_content.add_child(_quick_identity_summary)
+	_register_button_focus(_add_difficulty_picker())
 	var play_button := _add_big_play_button(Callable(self, "_start_quick_race"), false)
 	var seed_controls: Array[Control] = []
 	if OS.is_debug_build():
@@ -326,18 +327,7 @@ func show_settings() -> void:
 	_configure_stage(&"settings", _selected_vehicle(settings), "inez")
 	_add_kicker("SETTINGS")
 	_add_heading("Race your way")
-	_add_section("DIFFICULTY", "")
-	var difficulty := OptionButton.new()
-	difficulty.name = "Difficulty"
-	difficulty.custom_minimum_size = Vector2(460.0, 48.0)
-	var difficulty_ids := ["sunday_drive", "club_circuit", "clockwork"]
-	for label: String in ["Sunday Drive · Earlier braking", "Club Circuit · Balanced", "Clockwork · Later braking"]:
-		difficulty.add_item(label)
-	var selected_index := maxi(0, difficulty_ids.find(String(settings["difficulty"])))
-	difficulty.select(selected_index)
-	difficulty.item_selected.connect(func(index: int) -> void: _app.call("update_setting", "difficulty", difficulty_ids[index]))
-	_wire_button_audio(difficulty)
-	_content.add_child(difficulty)
+	_add_difficulty_picker()
 	_add_section("AUDIO", "")
 	_add_slider("Master", float(settings["master_volume"]), "master_volume")
 	_add_slider("Music", float(settings["music_volume"]), "music_volume")
@@ -660,6 +650,25 @@ func _add_section(left: String, right: String) -> Label:
 	row.add_child(right_label)
 	_content.add_child(row)
 	return right_label
+
+
+func _add_difficulty_picker() -> OptionButton:
+	## One difficulty control shared by Settings and Quick Race. It reads and
+	## writes the single persisted difficulty through update_setting, so both
+	## screens present the same stored value instead of duplicating state.
+	_add_section("DIFFICULTY", "")
+	var difficulty := OptionButton.new()
+	difficulty.name = "Difficulty"
+	difficulty.custom_minimum_size = Vector2(460.0, 48.0)
+	var difficulty_ids := ["sunday_drive", "club_circuit", "clockwork"]
+	for label: String in ["Sunday Drive · Earlier braking", "Club Circuit · Balanced", "Clockwork · Later braking"]:
+		difficulty.add_item(label)
+	var settings: Dictionary = _app.call("get_save_data")
+	difficulty.select(maxi(0, difficulty_ids.find(String(settings.get("difficulty", "club_circuit")))))
+	difficulty.item_selected.connect(func(index: int) -> void: _app.call("update_setting", "difficulty", difficulty_ids[index]))
+	_wire_button_audio(difficulty)
+	_content.add_child(difficulty)
+	return difficulty
 
 
 func _result_notice_text(summary: Dictionary) -> String:

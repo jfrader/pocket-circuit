@@ -1,0 +1,134 @@
+{
+  "config": {
+    "difficulty": "club_circuit",
+    "field_size": 4,
+    "fixed_fps": 60,
+    "laps": 2,
+    "physics_ticks_per_second": 60,
+    "time_scale": 1.0
+  },
+  "godot_version": "4.7.2-stable (arch_linux)",
+  "schema_version": 2,
+  "seeds": [
+    {
+      "finish_order": [
+        "Tess Circuit",
+        "Milo Dash",
+        "Juniper Gear",
+        "Rae Sparks"
+      ],
+      "frames": 2154,
+      "hash": "fd5d4bc7e12f2f59e5f5d09078176e7e0c3e38e06cc315899eef31e9781f18ef",
+      "key": "kitchen/long/24469",
+      "racers": [
+        {
+          "dnf": false,
+          "driver": "Tess Circuit",
+          "finish_time": 34.517,
+          "position": 1
+        },
+        {
+          "dnf": false,
+          "driver": "Milo Dash",
+          "finish_time": 35.217,
+          "position": 2
+        },
+        {
+          "dnf": false,
+          "driver": "Juniper Gear",
+          "finish_time": 35.467,
+          "position": 3
+        },
+        {
+          "dnf": false,
+          "driver": "Rae Sparks",
+          "finish_time": 35.9,
+          "position": 4
+        }
+      ],
+      "room": "long",
+      "seed": 24469,
+      "theme": "kitchen"
+    },
+    {
+      "finish_order": [
+        "Milo Dash",
+        "Tess Circuit",
+        "Juniper Gear",
+        "Rae Sparks"
+      ],
+      "frames": 2099,
+      "hash": "3715ad64b16e255718162c35a3afd6796aa9ee7a9c538150f55345c3306e5685",
+      "key": "workshop/square/51940",
+      "racers": [
+        {
+          "dnf": false,
+          "driver": "Milo Dash",
+          "finish_time": 32.717,
+          "position": 1
+        },
+        {
+          "dnf": false,
+          "driver": "Tess Circuit",
+          "finish_time": 33.567,
+          "position": 2
+        },
+        {
+          "dnf": false,
+          "driver": "Juniper Gear",
+          "finish_time": 34.183,
+          "position": 3
+        },
+        {
+          "dnf": false,
+          "driver": "Rae Sparks",
+          "finish_time": 34.983,
+          "position": 4
+        }
+      ],
+      "room": "square",
+      "seed": 51940,
+      "theme": "workshop"
+    },
+    {
+      "finish_order": [
+        "Milo Dash",
+        "Rae Sparks",
+        "Tess Circuit",
+        "Juniper Gear"
+      ],
+      "frames": 1732,
+      "hash": "96a928105501a123b4cab9db4550aa992765437c50acf43af0df8d6437a5fd3d",
+      "key": "office/classic/8001",
+      "racers": [
+        {
+          "dnf": false,
+          "driver": "Milo Dash",
+          "finish_time": 27.45,
+          "position": 1
+        },
+        {
+          "dnf": false,
+          "driver": "Rae Sparks",
+          "finish_time": 27.767,
+          "position": 2
+        },
+        {
+          "dnf": false,
+          "driver": "Tess Circuit",
+          "finish_time": 28.683,
+          "position": 3
+        },
+        {
+          "dnf": false,
+          "driver": "Juniper Gear",
+          "finish_time": 28.867,
+          "position": 4
+        }
+      ],
+      "room": "classic",
+      "seed": 8001,
+      "theme": "office"
+    }
+  ]
+}
