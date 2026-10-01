@@ -13,6 +13,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from test_success_marker import fixed_fps_for, marker_for
+from validate_release_config import validate_gamestruments_readme
 
 
 class CompletionMarkerTests(unittest.TestCase):
@@ -134,6 +135,30 @@ class GodotGateTests(unittest.TestCase):
     def test_missing_completion_marker_fails(self):
         result = self.run_worker('print("still preparing")')
         self.assertNotEqual(result.returncode, 0)
+
+
+class NativeAddonDocumentationTests(unittest.TestCase):
+    def readme(self):
+        return (ROOT / "vendor/gamestruments/README.md").read_text(encoding="utf-8")
+
+    def test_current_vendored_release_passes_documentation_gate(self):
+        errors = []
+        validate_gamestruments_readme(self.readme(), errors)
+        self.assertEqual(errors, [])
+
+    def test_historical_version_mention_cannot_replace_release_heading(self):
+        readme = self.readme().replace("# Gamestruments v1.1.0", "# Gamestruments v1.0.5-rc1", 1)
+        self.assertIn("v1.1.0", readme)
+        errors = []
+        validate_gamestruments_readme(readme, errors)
+        self.assertTrue(errors, "The current release must be the documented pin, not a historical mention")
+
+    def test_credential_documentation_remains_required(self):
+        for phrase in ("credential-free", "fine-grained GitHub PAT", "Contents: read"):
+            with self.subTest(phrase=phrase):
+                errors = []
+                validate_gamestruments_readme(self.readme().replace(phrase, ""), errors)
+                self.assertIn(f"vendor/gamestruments/README.md must document {phrase}", errors)
 
 
 class NativeAddonSyncTests(unittest.TestCase):

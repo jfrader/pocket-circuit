@@ -61,6 +61,7 @@ REQUIRED_RELEASE_NOTICES = {
     "data/vendor/procedural_2d/*.json",
     "data/drivers/names.json",
 }
+EXPECTED_GAMESTRUMENTS_VERSION = "1.1.0"
 EXPECTED_GAMESTRUMENTS_VENDOR_FILES = {
     "LICENSE.md",
     "README.md",
@@ -338,6 +339,16 @@ def validate_media_integrity(media_root: Path, errors: list[str]) -> None:
             errors.append(f"Steam trailer duration must be 25 seconds, found {duration:.3f}")
 
 
+def validate_gamestruments_readme(readme_text: str, errors: list[str]) -> None:
+    expected_heading = f"# Gamestruments v{EXPECTED_GAMESTRUMENTS_VERSION}"
+    lines = readme_text.splitlines()
+    if not lines or lines[0] != expected_heading:
+        errors.append(f"vendor/gamestruments/README.md must start with {expected_heading}")
+    for required_text in ("credential-free", "fine-grained GitHub PAT", "Contents: read"):
+        if required_text not in readme_text:
+            errors.append(f"vendor/gamestruments/README.md must document {required_text}")
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -487,10 +498,7 @@ def main() -> int:
         errors.append("vendor/.gdignore must prevent Godot from loading the vendored descriptor beside the synced addon")
     vendor_readme = gamestruments_vendor / "README.md"
     if vendor_readme.is_file():
-        readme_text = vendor_readme.read_text(encoding="utf-8")
-        for required_text in ("v1.0.5-rc1", "credential-free", "fine-grained GitHub PAT", "Contents: read"):
-            if required_text not in readme_text:
-                errors.append(f"vendor/gamestruments/README.md must document {required_text}")
+        validate_gamestruments_readme(vendor_readme.read_text(encoding="utf-8"), errors)
 
     media_root = ROOT / "media" / "steam"
     validate_png_decoder(errors)
