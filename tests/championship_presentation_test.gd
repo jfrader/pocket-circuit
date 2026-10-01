@@ -17,20 +17,27 @@ func _run_test() -> void:
 	for height in [720, 800]:
 		root.content_scale_size = Vector2i(1280, height)
 		root.size = Vector2i(1280, height)
-		for screen in ["title", "garage", "quick_race", "briefing"]:
+		await process_frame
+		await process_frame
+		for screen in ["title", "garage", "quick_race", "settings", "briefing"]:
 			match screen:
 				"title": shell.show_title()
 				"garage": shell.show_vehicle_select("kitchen_crumb_rush")
 				"quick_race": shell.show_quick_race()
+				"settings": shell.show_settings()
 				"briefing": shell.show_briefing("kitchen_crumb_rush")
 			await process_frame
 			await process_frame
 			if not _expect(root.get_visible_rect().size == Vector2(1280, height), "the test must exercise the requested logical viewport"):
 				return
-			var primary_text := "REPLAY EVENT" if screen == "briefing" else "PLAY"
-			var primary := _button(shell, primary_text)
-			if not _expect(primary != null and not primary.disabled, "%s must expose an enabled primary race action without additional selections at %dp" % [screen, height]):
+			var stage := shell.get("_stage") as Control
+			if stage.is_visible_in_tree() and not _expect(root.get_visible_rect().encloses(stage.get_global_rect()), "%s illustration must remain entirely visible at %dp" % [screen, height]):
 				return
+			if screen != "settings":
+				var primary_text := "REPLAY EVENT" if screen == "briefing" else "PLAY"
+				var primary := _button(shell, primary_text)
+				if not _expect(primary != null and not primary.disabled, "%s must expose an enabled primary race action without additional selections at %dp" % [screen, height]):
+					return
 			for node: Node in shell.find_children("*", "Button", true, false):
 				var button := node as Button
 				if not button.is_visible_in_tree():

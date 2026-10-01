@@ -21,3 +21,17 @@ run_godot_checked() (
 	fi
 	rm -f -- "$command_log"
 )
+
+run_godot_test_checked() (
+	local project_root="$1" godot_bin="$2" test_relative="$3"
+	local test_path="$project_root/$test_relative"
+	local expected_marker fixed_fps
+	expected_marker="$(python3 "$project_root/tools/test_success_marker.py" "$test_path")" || return 1
+	fixed_fps="$(python3 "$project_root/tools/test_success_marker.py" --fixed-fps "$test_path")" || return 1
+	local clock_args=()
+	if [[ -n "$fixed_fps" ]]; then
+		clock_args=(--fixed-fps "$fixed_fps")
+	fi
+	POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" run_godot_checked timeout 1200 "$godot_bin" \
+		--path "$project_root" --headless "${clock_args[@]}" --script "res://$test_relative"
+)
