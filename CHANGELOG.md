@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Slippery patches, the technical surface and on-course obstacles now sit only on calm stretches, away from corners and the braking zones before them in both race directions. Some tracks carry fewer of them as a result. This layout change advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Quick Race has a difficulty picker beside its race controls, shared with Settings.
 - Championship rivals progress from Sunday Drive in Act I to Club Circuit in Act II and Clockwork in Act III; rival duels step up one tier. Quick Race keeps your chosen difficulty, and solo time trials keep theirs.
 - Sunday Drive rivals occasionally make a small, recoverable line error in corners; Clockwork drivers remain clean.
@@ -18,6 +19,9 @@
 - The championship is the route board. Each race is a stop on the road. Focus follows the road.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
 - The Garage score now carries its chord and bass through each bar, and Ignition builds from low to full intensity across its eight bars instead of replaying Garage quietly.
+
+### Removed
+- The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
 - Rapid changes between race results and menus no longer switch the music section repeatedly.

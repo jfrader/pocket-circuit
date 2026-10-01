@@ -25,7 +25,6 @@ const ENGINE_LOOP_GEN := preload("res://scripts/audio/engine/engine_loop_generat
 const ENGINE_VOICE_GEN := preload("res://scripts/audio/engine/engine_voice_generator.gd")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const RACE_MANAGER_SCRIPT := preload("res://scripts/race/race_manager.gd")
-const ENV_HAZARD_SCRIPT := preload("res://scripts/race/environmental_hazard.gd")
 
 const NUM_RACES := 3
 const BASE_SEED := 424242
@@ -132,7 +131,6 @@ func _run_long_trace(app: Node) -> void:
 	var base_probes := int(AI_CONTROLLER_SCRIPT.surface_zone_probe_count)
 	var base_route := int(RACE_MANAGER_SCRIPT.route_tangent_query_count)
 	var base_ranks := int(RACE_MANAGER_SCRIPT.ranking_sort_count)
-	var base_overlap := int(ENV_HAZARD_SCRIPT.overlap_poll_count)
 
 	var race_time_prev := float(race_manager.get("race_time"))
 	var wall_prev := Time.get_ticks_msec()
@@ -156,7 +154,7 @@ func _run_long_trace(app: Node) -> void:
 	var physics_ticks := 0
 	var sample_index := 0
 
-	print("LONG_TRACE_HEADER t_s physics_avg_ms physics_max_ms process_avg_ms process_max_ms fps_min audio_avail underruns scans probes route_queries ranking_sorts overlap_polls ghost lap race_dt_s objects nodes mem_kb pairs active speed")
+	print("LONG_TRACE_HEADER t_s physics_avg_ms physics_max_ms process_avg_ms process_max_ms fps_min audio_avail underruns scans probes route_queries ranking_sorts ghost lap race_dt_s objects nodes mem_kb pairs active speed")
 
 	while Time.get_ticks_msec() < drive_end and current_scene != null and current_scene.scene_file_path == RACE_SCENE:
 		await process_frame
@@ -181,7 +179,7 @@ func _run_long_trace(app: Node) -> void:
 		var underruns := _engine_voice_underruns()
 		var ghost := _ghost_sample_count(race)
 		var speed := _player_speed(race)
-		print("LONG_TRACE t=%.0f phys_avg=%.3f phys_max=%.3f proc_avg=%.3f proc_max=%.3f fps_min=%.1f audio=%d underruns=%d scans=%d probes=%d route=%d ranks=%d overlap=%d ghost=%d lap=%d race_dt=%.3f objects=%d nodes=%d mem=%.0f pairs=%d active=%d speed=%.1f" % [
+		print("LONG_TRACE t=%.0f phys_avg=%.3f phys_max=%.3f proc_avg=%.3f proc_max=%.3f fps_min=%.1f audio=%d underruns=%d scans=%d probes=%d route=%d ranks=%d ghost=%d lap=%d race_dt=%.3f objects=%d nodes=%d mem=%.0f pairs=%d active=%d speed=%.1f" % [
 			float(sample_index) * LONG_TRACE_SAMPLE_SECONDS,
 			physics_sum / n,
 			physics_max,
@@ -194,7 +192,6 @@ func _run_long_trace(app: Node) -> void:
 			int(AI_CONTROLLER_SCRIPT.surface_zone_probe_count) - base_probes,
 			int(RACE_MANAGER_SCRIPT.route_tangent_query_count) - base_route,
 			int(RACE_MANAGER_SCRIPT.ranking_sort_count) - base_ranks,
-			int(ENV_HAZARD_SCRIPT.overlap_poll_count) - base_overlap,
 			ghost,
 			int(race_manager.get("lap_count")),
 			race_time_now - race_time_prev,
@@ -318,7 +315,7 @@ func _run_one_real_drive_race(app: Node, seed: int) -> Dictionary:
 	var collider_count := _count_static_colliders()
 
 	# Drive for real seconds: AI controllers execute _physics_process hot paths,
-	# rankings update per frame, surface/hazard queries run every tick.
+	# rankings update per frame, surface queries run every tick.
 	var drive_start := Time.get_ticks_msec()
 	var drive_end := drive_start + int(DRIVE_SECONDS * 1000)
 	var physics_sum := 0.0

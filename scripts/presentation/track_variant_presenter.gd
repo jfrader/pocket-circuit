@@ -2,7 +2,6 @@ class_name TrackVariantPresenter
 extends Node2D
 
 const SURFACE_ZONE_SCRIPT := preload("res://scripts/race/surface_zone.gd")
-const HAZARD_SCRIPT := preload("res://scripts/race/environmental_hazard.gd")
 
 const INK := Color("172033")
 const PAPER := Color("f2ead7")
@@ -12,15 +11,12 @@ const AMBER := Color("f4bf3a")
 var theme: StringName = &"kitchen"
 var base_surface_name: StringName = &"polished counter"
 var surface_zones: Array[SurfaceZone] = []
-var hazard: EnvironmentalHazard
 
 var _track: Node2D
-var _reverse_direction := false
 
 
-func configure(track_root: Node2D, requested_theme: StringName, reverse_direction: bool = false) -> void:
+func configure(track_root: Node2D, requested_theme: StringName) -> void:
 	_track = track_root
-	_reverse_direction = reverse_direction
 	theme = requested_theme if requested_theme in [&"kitchen", &"workshop", &"office"] else &"kitchen"
 	name = "TrackVariantPresenter"
 	match theme:
@@ -32,7 +28,6 @@ func configure(track_root: Node2D, requested_theme: StringName, reverse_directio
 			base_surface_name = &"polished counter"
 			_build_kitchen_presentation()
 	_create_surface_zones()
-	_create_hazard()
 
 
 func _build_kitchen_presentation() -> void:
@@ -79,47 +74,6 @@ func _create_surface_zones() -> void:
 			if data.has(key):
 				zone.set_meta(key, data[key])
 		surface_zones.append(zone)
-
-
-func _create_hazard() -> void:
-	var travel_start: Vector2
-	var travel_end: Vector2
-	var plan: Dictionary = {}
-	var generated_path: Variant = null
-	var generated_plan: Variant = _track.get_meta("generated_hazard_plan") if is_instance_valid(_track) and _track.has_meta("generated_hazard_plan") else null
-	var generated_paths: Variant = _track.get_meta("generated_hazard_paths") if is_instance_valid(_track) and _track.has_meta("generated_hazard_paths") else null
-	var direction := "reverse" if _reverse_direction else "forward"
-	if generated_plan is Dictionary:
-		plan = (generated_plan as Dictionary).duplicate(true)
-		if not bool(plan.get("present", false)):
-			return
-		var planned_paths: Variant = plan.get("paths")
-		if planned_paths is Dictionary:
-			generated_path = (planned_paths as Dictionary).get(direction)
-	if generated_paths is Dictionary:
-		generated_path = generated_path if generated_path is PackedVector2Array else (generated_paths as Dictionary).get(direction)
-	elif is_instance_valid(_track) and _track.has_meta("generated_hazard_path"):
-		generated_path = _track.get_meta("generated_hazard_path")
-	if generated_path is PackedVector2Array and (generated_path as PackedVector2Array).size() >= 2:
-		travel_start = (generated_path as PackedVector2Array)[0]
-		travel_end = (generated_path as PackedVector2Array)[1]
-	else:
-		match theme:
-			&"workshop":
-				travel_start = Vector2(610.0, -40.0)
-				travel_end = Vector2(850.0, -40.0)
-			&"office":
-				travel_start = Vector2(610.0, -40.0)
-				travel_end = Vector2(850.0, -40.0)
-			_:
-				travel_start = Vector2(430.0, -185.0)
-				travel_end = Vector2(430.0, -545.0)
-	hazard = HAZARD_SCRIPT.new() as EnvironmentalHazard
-	hazard.name = "%sHazard" % String(theme).to_pascal_case()
-	hazard.set_meta("direction", StringName(direction))
-	hazard.set_meta("plan", plan.duplicate(true))
-	add_child(hazard)
-	hazard.configure(theme, travel_start, travel_end, plan)
 
 
 func _add_line(parent: Node2D, points: PackedVector2Array, color: Color, width: float) -> Line2D:

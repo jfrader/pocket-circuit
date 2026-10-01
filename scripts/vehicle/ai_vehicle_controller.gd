@@ -25,7 +25,6 @@ const OBSTACLE_FEELER_ANGLES: Array[float] = [-0.95, -0.5, 0.0, 0.5, 0.95]
 const OBSTACLE_FRONT_OFFSET := 30.0
 const OBSTACLE_FEELER_HALF_WIDTH := 14.0
 const GATE_TARGET_OFFSETS: Array[float] = [-72.0, -48.0, -24.0, 0.0, 24.0, 48.0, 72.0]
-const HAZARD_AVOID_DISTANCE := 160.0
 const SURFACE_PROBE_ANGLES: Array[float] = [0.0, -0.34, 0.34]
 const SURFACE_PROBE_DISTANCES: Array[float] = [90.0, 170.0, 250.0]
 const MAX_RACING_LINE_RADIUS := 2600.0
@@ -241,11 +240,10 @@ static var tree_group_scan_count := 0      # get_nodes_in_group(...) from _physi
 static var surface_zone_probe_count := 0   # SurfaceZone.contains_global_point(...)
 
 # ── Per-race tree cache ──────────────────────────────────────────────
-# Hazards, surface zones and race vehicles are fixed for a race's lifetime, but
+# Surface zones and race vehicles are fixed for a race's lifetime, but
 # the old hot paths re-scanned the whole scene tree for them every physics tick
 # (a ~2800-node walk plus a fresh Array, per AI, several times per tick). Cache
 # them once and invalidate when the field is (re)spawned.
-var _hazard_nodes: Array[Node] = []
 var _surface_zone_nodes: Array[Node] = []
 var _race_vehicle_nodes: Array[Node] = []
 var _tree_cache_dirty := true
@@ -550,7 +548,6 @@ func _physics_process(delta: float) -> void:
 	target_position = traffic_plan["target_position"] as Vector2
 	var goal_chord := vehicle.global_position.distance_to(target_position)
 	var desired_direction := vehicle.global_position.direction_to(target_position)
-	desired_direction = _avoid_hazards(desired_direction, forward)
 	var surface_plan := _surface_anticipation(desired_direction)
 	_anticipated_grip = _planned_surface_grip(surface_plan)
 	if float(surface_plan["weight"]) > 0.0:
@@ -1069,41 +1066,6 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 	return {"goal": goal, "lookahead": lookahead}
 
 
-func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
-	if not vehicle.is_inside_tree():
-		return desired_direction
-	var avoid := Vector2.ZERO
-	for node: Node in _group_nodes(&"track_hazard"):
-		if not is_instance_valid(node):
-			continue
-		var hazard := node as EnvironmentalHazard
-		if hazard == null:
-			continue
-		var danger_center := hazard.to_global(hazard.start_position.lerp(hazard.end_position, 0.5))
-		var arrival_horizon := clampf(vehicle.global_position.distance_to(danger_center) / maxf(vehicle.speed, 180.0), 0.15, 1.2)
-		var prediction := hazard.get_prediction(arrival_horizon)
-		if not bool(prediction["collision_active"]):
-			if hazard.is_collision_active():
-				prediction = hazard.get_prediction(0.0)
-			else:
-				var time_until_danger := hazard.get_time_until_danger()
-				if time_until_danger > arrival_horizon + 0.35:
-					continue
-				prediction = hazard.get_prediction(time_until_danger + hazard.active_duration * 0.45)
-		if not bool(prediction["collision_active"]):
-			continue
-		var offset := hazard.to_global(prediction["position"]) - vehicle.global_position
-		if offset.length() > HAZARD_AVOID_DISTANCE or offset.dot(forward) < 0.0:
-			continue
-		var away := offset.orthogonal().normalized()
-		if away.dot(desired_direction) < 0.0:
-			away = -away
-		avoid += away * (1.0 - offset.length() / HAZARD_AVOID_DISTANCE)
-	if avoid.length_squared() < 0.001:
-		return desired_direction
-	return desired_direction.lerp(avoid.normalized(), 0.48).normalized()
-
-
 func _leader_progress_deficit() -> float:
 	var mine := race_manager.get_racer_progress(vehicle)
 	var best := mine
@@ -1303,8 +1265,6 @@ func _group_nodes(group_name: StringName) -> Array[Node]:
 	if _tree_cache_dirty:
 		_refresh_tree_cache()
 	match group_name:
-		&"track_hazard":
-			return _hazard_nodes
 		&"surface_zone":
 			return _surface_zone_nodes
 		&"race_vehicle":
@@ -1315,7 +1275,6 @@ func _group_nodes(group_name: StringName) -> Array[Node]:
 func _refresh_tree_cache() -> void:
 	if not is_instance_valid(vehicle) or not vehicle.is_inside_tree():
 		return
-	_hazard_nodes = _scan_group(&"track_hazard")
 	_surface_zone_nodes = _scan_group(&"surface_zone")
 	_race_vehicle_nodes = _scan_group(&"race_vehicle")
 	_rebuild_surface_zone_records()
@@ -1981,7 +1940,7 @@ func _on_external_recovery(racer: Node2D) -> void:
 
 
 func _on_racer_registered(_racer: Node2D) -> void:
-	## The per-race scene-tree cache (hazards, surface zones, race vehicles) is
+	## The per-race scene-tree cache (surface zones, race vehicles) is
 	## only valid once the field is fully placed. A racer registered after this
 	## controller first populated the cache means the cached vehicle list is
 	## stale — a grid-launch traffic scan would otherwise miss cars still being
