@@ -105,6 +105,28 @@ static var _texture_footprint_cache: Dictionary = {}
 static var _texture_hull_cache: Dictionary = {}
 static var _texture_opaque_rect_cache: Dictionary = {}
 static var _texture_outline_cache: Dictionary = {}
+
+## Textures built while generating a track have no resource path, so the cache key
+## falls back to the texture instance id, and those ids never repeat between races.
+## Without a bound the game permanently retains outline and footprint data for art
+## that will never be asked for again, which made later races heavier and heavier.
+## The cap is several tracks' worth of entries, so a single build never thrashes;
+## entries are only examined when one is added, never on a hit.
+const MAX_TEXTURE_CACHE_ENTRIES := 384
+static var _texture_opaque_rect_order: Array[String] = []
+static var _texture_outline_order: Array[String] = []
+static var _texture_footprint_order: Array[String] = []
+
+
+static func cache_texture_entry(cache: Dictionary, order: Array[String], key: String, value: Variant) -> void:
+	if order.has(key):
+		order.erase(key)
+	order.append(key)
+	cache[key] = value
+	while order.size() > MAX_TEXTURE_CACHE_ENTRIES:
+		var oldest: String = order[0]
+		order.remove_at(0)
+		cache.erase(oldest)
 static var synchronous_outline_builds := 0
 static var ASSET_FOOTPRINT_OVERRIDES: Dictionary = {}
 static var ROOM_SHAPES: Dictionary = {}

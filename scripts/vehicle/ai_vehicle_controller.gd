@@ -175,6 +175,38 @@ var _race_collision_layer := 0
 var _race_collision_mask := 0
 var _finished_ghosted := false
 
+# ── Per-frame hot-path counters (read by the progressive-freeze harness and the
+# regression test). Static so they survive the instance and are cheap to bump.
+static var tree_group_scan_count := 0      # get_nodes_in_group(...) from _physics_process
+static var surface_zone_probe_count := 0   # SurfaceZone.contains_global_point(...)
+
+# ── Per-race tree cache ──────────────────────────────────────────────
+# Hazards, surface zones and race vehicles are fixed for a race's lifetime, but
+# the old hot paths re-scanned the whole scene tree for them every physics tick
+# (a ~2800-node walk plus a fresh Array, per AI, several times per tick). Cache
+# them once and invalidate when the field is (re)spawned.
+var _hazard_nodes: Array[Node] = []
+var _surface_zone_nodes: Array[Node] = []
+var _race_vehicle_nodes: Array[Node] = []
+var _tree_cache_dirty := true
+# Per-race surface-zone records: the raw node plus a global-space bounding circle
+# and the derived risk/lane/role flags, built once per race so the per-tick
+# polygon probes can reject far zones with a single distance check.
+var _surface_zone_records: Array[Dictionary] = []
+
+# ── Precomputed arc-length tables for the reference/racing-line loops ──
+# The pure-pursuit and route-watchdog hot paths used to re-derive every segment
+# length (sqrt) and cumulative arc each call, and re-scan the whole loop for the
+# nearest segment. Build the tables once per race and walk them incrementally.
+var _racing_line_segment_lengths := PackedFloat32Array()
+var _racing_line_cumulative := PackedFloat32Array()
+var _racing_line_total := 0.0
+var _reference_segment_lengths := PackedFloat32Array()
+var _reference_cumulative := PackedFloat32Array()
+var _reference_total := 0.0
+var _racing_line_nearest_index := -1
+var _reference_nearest_index := -1
+
 
 func configure(
 		controlled_vehicle: VehicleController,
@@ -207,10 +239,13 @@ func configure(
 	recovery_reasons.clear()
 	_stuck_time = 0.0
 	_reset_route_watchdog()
+	_tree_cache_dirty = true
 	if not race_manager.race_started.is_connected(_restore_racing_collisions):
 		race_manager.race_started.connect(_restore_racing_collisions)
 	if not race_manager.racer_recovered.is_connected(_on_external_recovery):
 		race_manager.racer_recovered.connect(_on_external_recovery)
+	if not race_manager.racer_registered.is_connected(_on_racer_registered):
+		race_manager.racer_registered.connect(_on_racer_registered)
 
 
 func _cache_checkpoints() -> void:
@@ -275,6 +310,94 @@ func _cache_checkpoints() -> void:
 	# their corner-guide apexes, so every fixture gets consistent path
 	# following rather than steering at a faraway gate.
 	_reference_path = _racing_line if _racing_line.size() >= 2 else _build_checkpoint_reference_path()
+	_build_arc_tables()
+
+
+func _build_arc_tables() -> void:
+	var racing_line_tables := _arc_tables_for(_racing_line)
+	_racing_line_segment_lengths = racing_line_tables["lengths"]
+	_racing_line_cumulative = racing_line_tables["cumulative"]
+	_racing_line_total = racing_line_tables["total"]
+	var reference_tables := _arc_tables_for(_reference_path)
+	_reference_segment_lengths = reference_tables["lengths"]
+	_reference_cumulative = reference_tables["cumulative"]
+	_reference_total = reference_tables["total"]
+	_racing_line_nearest_index = -1
+	_reference_nearest_index = -1
+
+
+func _arc_tables_for(path: PackedVector2Array) -> Dictionary:
+	var count := path.size()
+	var lengths := PackedFloat32Array()
+	var cumulative := PackedFloat32Array()
+	if count < 2:
+		return {"lengths": lengths, "cumulative": cumulative, "total": 0.0}
+	lengths.resize(count)
+	cumulative.resize(count)
+	var total := 0.0
+	for index in count:
+		lengths[index] = path[index].distance_to(path[(index + 1) % count])
+		cumulative[index] = total
+		total += lengths[index]
+	return {"lengths": lengths, "cumulative": cumulative, "total": total}
+
+
+func _ensure_arc_tables_current() -> void:
+	## The arc-length tables are a derived cache of _racing_line/_reference_path,
+	## rebuilt in _cache_checkpoints. Both source paths can also be replaced
+	## directly (route fixtures and tests set them without going through
+	## _cache_checkpoints), so a stale table would silently describe a different
+	## loop. Rebuild lazily when the cached table sizes no longer match their
+	## source path, keeping the hot paths consistent with whatever line is active.
+	if _racing_line_segment_lengths.size() != _racing_line.size() or _reference_segment_lengths.size() != _reference_path.size():
+		_build_arc_tables()
+
+
+## Nearest loop segment by projection, searched around `cached_index` (temporal
+## coherence). Cars move far less than one segment per tick, so the true nearest
+## is always a few indices from last frame's; a cold cache (or a teleport that
+## reset it) falls back to a full scan. Returns index, fraction and squared
+## distance so every caller can skip re-projecting.
+func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_index: int) -> Dictionary:
+	var count := path.size()
+	if cached_index >= 0 and cached_index < count:
+		var best_index := cached_index
+		var best_fraction := 0.0
+		var best_dsq := INF
+		for delta in 65:
+			var index := posmod(cached_index - 32 + delta, count)
+			var from := path[index]
+			var to := path[(index + 1) % count]
+			var segment := to - from
+			var length_squared := segment.length_squared()
+			var fraction := 0.0
+			if length_squared > 0.001:
+				fraction = clampf((position - from).dot(segment) / length_squared, 0.0, 1.0)
+			var nearest := from + segment * fraction
+			var dsq := position.distance_squared_to(nearest)
+			if dsq < best_dsq:
+				best_dsq = dsq
+				best_index = index
+				best_fraction = fraction
+		return {"index": best_index, "fraction": best_fraction, "distance_squared": best_dsq}
+	var best_index := 0
+	var best_fraction := 0.0
+	var best_dsq := INF
+	for index in count:
+		var from := path[index]
+		var to := path[(index + 1) % count]
+		var segment := to - from
+		var length_squared := segment.length_squared()
+		var fraction := 0.0
+		if length_squared > 0.001:
+			fraction = clampf((position - from).dot(segment) / length_squared, 0.0, 1.0)
+		var nearest := from + segment * fraction
+		var dsq := position.distance_squared_to(nearest)
+		if dsq < best_dsq:
+			best_dsq = dsq
+			best_index = index
+			best_fraction = fraction
+	return {"index": best_index, "fraction": best_fraction, "distance_squared": best_dsq}
 
 
 func _physics_process(delta: float) -> void:
@@ -793,38 +916,18 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 	## plus the look-ahead distance actually used (the pursuit radius).
 	if _reference_path.size() < 2:
 		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
+	_ensure_arc_tables_current()
 	var count := _reference_path.size()
-	var segment_lengths := PackedFloat32Array()
-	var cumulative := PackedFloat32Array()
-	segment_lengths.resize(count)
-	cumulative.resize(count)
-	var total := 0.0
-	for i in count:
-		segment_lengths[i] = _reference_path[i].distance_to(_reference_path[(i + 1) % count])
-		cumulative[i] = total
-		total += segment_lengths[i]
+	var segment_lengths := _reference_segment_lengths
+	var cumulative := _reference_cumulative
+	var total := _reference_total
 	if total < 0.001:
 		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
 
-	# Nearest point on the loop (segment projection, not nearest vertex) and
-	# its forward-order arc position.
-	var best_index := 0
-	var best_fraction := 0.0
-	var best_distance_squared := INF
-	for i in count:
-		var from := _reference_path[i]
-		var to := _reference_path[(i + 1) % count]
-		var segment := to - from
-		var fraction := 0.0
-		var length_squared := segment.length_squared()
-		if length_squared > 0.001:
-			fraction = clampf((vehicle.global_position - from).dot(segment) / length_squared, 0.0, 1.0)
-		var nearest := from + segment * fraction
-		var distance_squared := vehicle.global_position.distance_squared_to(nearest)
-		if distance_squared < best_distance_squared:
-			best_distance_squared = distance_squared
-			best_index = i
-			best_fraction = fraction
+	var nearest := _nearest_segment_local(_reference_path, vehicle.global_position, _reference_nearest_index)
+	_reference_nearest_index = int(nearest["index"])
+	var best_index := int(nearest["index"])
+	var best_fraction := float(nearest["fraction"])
 
 	var arc := cumulative[best_index] + segment_lengths[best_index] * best_fraction
 	var direction := -1.0 if race_manager.is_reverse_direction() else 1.0
@@ -848,7 +951,9 @@ func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
 	if not vehicle.is_inside_tree():
 		return desired_direction
 	var avoid := Vector2.ZERO
-	for node: Node in vehicle.get_tree().get_nodes_in_group("track_hazard"):
+	for node: Node in _group_nodes(&"track_hazard"):
+		if not is_instance_valid(node):
+			continue
 		var hazard := node as EnvironmentalHazard
 		if hazard == null:
 			continue
@@ -880,7 +985,9 @@ func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
 func _leader_progress_deficit() -> float:
 	var mine := race_manager.get_racer_progress(vehicle)
 	var best := mine
-	for racer: Node in vehicle.get_tree().get_nodes_in_group("race_vehicle"):
+	for racer: Node in _group_nodes(&"race_vehicle"):
+		if not is_instance_valid(racer):
+			continue
 		best = maxf(best, race_manager.get_racer_progress(racer as Node2D))
 	return maxf(0.0, best - mine)
 
@@ -963,11 +1070,13 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 	var nearest_distance := INF
 	var nearest_lateral := 0.0
 	var lateral_axis := forward.orthogonal()
-	for node: Node in vehicle.get_tree().get_nodes_in_group("race_vehicle"):
+	for node: Node in _group_nodes(&"race_vehicle"):
+		if not is_instance_valid(node):
+			continue
 		var candidate := node as VehicleController
 		if candidate == null or candidate == vehicle:
 			continue
-		if race_manager.is_racer_finished(candidate) or bool(race_manager.get_racer_state(candidate).get("dnf", false)):
+		if race_manager.is_racer_finished(candidate) or bool(race_manager.get_racer_state_ref(candidate).get("dnf", false)):
 			continue
 		var separation := candidate.global_position - vehicle.global_position
 		var distance_ahead := separation.dot(forward)
@@ -1066,6 +1175,99 @@ func _apply_drafting_recharge(delta: float, traffic_plan: Dictionary, should_bra
 	if should_brake or not bool(traffic_plan.get("drafting", false)):
 		return
 	vehicle.add_boost(vehicle.stats.boost_recharge * DRAFT_RECHARGE_MULTIPLIER * delta, "drafting")
+
+
+func _group_nodes(group_name: StringName) -> Array[Node]:
+	if _tree_cache_dirty:
+		_refresh_tree_cache()
+	match group_name:
+		&"track_hazard":
+			return _hazard_nodes
+		&"surface_zone":
+			return _surface_zone_nodes
+		&"race_vehicle":
+			return _race_vehicle_nodes
+	return _scan_group(group_name)
+
+
+func _refresh_tree_cache() -> void:
+	if not is_instance_valid(vehicle) or not vehicle.is_inside_tree():
+		return
+	_hazard_nodes = _scan_group(&"track_hazard")
+	_surface_zone_nodes = _scan_group(&"surface_zone")
+	_race_vehicle_nodes = _scan_group(&"race_vehicle")
+	_rebuild_surface_zone_records()
+	_tree_cache_dirty = false
+
+
+func _rebuild_surface_zone_records() -> void:
+	_surface_zone_records.clear()
+	for node: Node in _surface_zone_nodes:
+		_surface_zone_records.append(_surface_zone_record(node as SurfaceZone))
+
+
+func _surface_zone_record(zone: SurfaceZone) -> Dictionary:
+	## Per-race snapshot of a surface zone: a global-space bounding circle around
+	## the collision polygon (conservative — the polygon lies entirely inside it)
+	## plus the derived risk and meta flags the probe loops re-read every tick.
+	if zone == null or not is_instance_valid(zone):
+		return {"zone": null, "center": Vector2.ZERO, "radius_sq": INF}
+	var center := Vector2.ZERO
+	var radius_sq := 0.0
+	var vertex_count := 0
+	var collision := zone.get_node_or_null("SurfaceCollision") as CollisionPolygon2D
+	var polygon := collision.polygon if collision != null else PackedVector2Array()
+	for point: Vector2 in polygon:
+		center += zone.to_global(point)
+		vertex_count += 1
+	if vertex_count > 0:
+		center /= float(vertex_count)
+		for point: Vector2 in polygon:
+			radius_sq = maxf(radius_sq, center.distance_squared_to(zone.to_global(point)))
+	else:
+		center = zone.global_position
+	return {
+		"zone": zone,
+		"center": center,
+		"radius_sq": radius_sq,
+		"risk": _surface_zone_risk(zone),
+		"lane": StringName(zone.get_meta("lane", &"full")),
+		"role": StringName(zone.get_meta("role", &"")),
+		"ai_path_clear": bool(zone.get_meta("ai_path_clear", false)),
+		"grip": zone.grip_multiplier,
+		"speed": zone.speed_multiplier,
+	}
+
+
+func _surface_zone_records_for_tick() -> Array[Dictionary]:
+	if _tree_cache_dirty:
+		_refresh_tree_cache()
+	return _surface_zone_records
+
+
+func _probe_ray_near_zone(record: Dictionary, origin: Vector2, direction: Vector2) -> bool:
+	## Broad phase: does the zone's bounding circle intersect the probe ray
+	## [origin, origin + direction * max_probe]? If not, no probe point along it
+	## can lie inside the polygon, so the polygon test is skipped entirely.
+	var center: Vector2 = record["center"]
+	var radius_sq: float = record["radius_sq"]
+	var ray := direction * SURFACE_PROBE_DISTANCES[-1]
+	var to_center := center - origin
+	var ray_length_sq := ray.length_squared()
+	if ray_length_sq < 0.001:
+		return to_center.length_squared() <= radius_sq
+	var t := clampf(to_center.dot(ray) / ray_length_sq, 0.0, 1.0)
+	return (origin + ray * t).distance_squared_to(center) <= radius_sq
+
+
+func _scan_group(group_name: StringName) -> Array[Node]:
+	tree_group_scan_count += 1
+	return vehicle.get_tree().get_nodes_in_group(group_name)
+
+
+func _zone_contains(zone: SurfaceZone, point: Vector2) -> bool:
+	surface_zone_probe_count += 1
+	return zone.contains_global_point(point)
 
 
 func _difficulty_tuning() -> Dictionary:
@@ -1177,16 +1379,19 @@ func _surface_driving_speed_scale(speed_scale: float, grip_scale: float, directi
 
 func _surface_model(direction: Vector2) -> Dictionary:
 	var model := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
-	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
-		var zone := node as SurfaceZone
-		if zone == null:
+	var model_risk := 0.0
+	var origin := vehicle.global_position
+	for record: Dictionary in _surface_zone_records_for_tick():
+		if not _probe_ray_near_zone(record, origin, direction):
 			continue
+		var zone := record["zone"] as SurfaceZone
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if not zone.contains_global_point(vehicle.global_position + direction * distance):
+			if not _zone_contains(zone, origin + direction * distance):
 				continue
-			var risk := _surface_zone_risk(zone)
-			if risk >= float(model["risk"]):
-				model = {"risk": risk, "grip": zone.grip_multiplier, "speed": zone.speed_multiplier}
+			var risk := float(record["risk"])
+			if risk >= model_risk:
+				model_risk = risk
+				model = {"risk": risk, "grip": float(record["grip"]), "speed": float(record["speed"])}
 			break
 	return model
 
@@ -1194,29 +1399,33 @@ func _surface_model(direction: Vector2) -> Dictionary:
 func _upcoming_shortcut_zone(direction: Vector2) -> SurfaceZone:
 	if not uses_shortcut_line:
 		return null
-	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
-		var zone := node as SurfaceZone
-		if zone == null or StringName(zone.get_meta("role", &"")) != &"shortcut":
+	var origin := vehicle.global_position
+	for record: Dictionary in _surface_zone_records_for_tick():
+		if StringName(record["role"]) != &"shortcut":
 			continue
-		if not bool(zone.get_meta("ai_path_clear", false)):
+		if not bool(record["ai_path_clear"]):
 			continue
+		if not _probe_ray_near_zone(record, origin, direction):
+			continue
+		var zone := record["zone"] as SurfaceZone
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if zone.contains_global_point(vehicle.global_position + direction * distance):
+			if _zone_contains(zone, origin + direction * distance):
 				return zone
 	return null
 
 
 func _surface_exposure(direction: Vector2) -> float:
 	var exposure := 0.0
-	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
-		var zone := node as SurfaceZone
-		if zone == null:
-			continue
-		var zone_risk := _surface_zone_risk(zone)
+	var origin := vehicle.global_position
+	for record: Dictionary in _surface_zone_records_for_tick():
+		var zone_risk := float(record["risk"])
 		if zone_risk <= 0.0:
 			continue
+		if not _probe_ray_near_zone(record, origin, direction):
+			continue
+		var zone := record["zone"] as SurfaceZone
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if zone.contains_global_point(vehicle.global_position + direction * distance):
+			if _zone_contains(zone, origin + direction * distance):
 				exposure = maxf(exposure, zone_risk)
 				break
 	return exposure
@@ -1224,18 +1433,19 @@ func _surface_exposure(direction: Vector2) -> float:
 
 func _surface_route_can_avoid(direction: Vector2) -> bool:
 	var found_risk := false
-	for node: Node in vehicle.get_tree().get_nodes_in_group("surface_zone"):
-		var zone := node as SurfaceZone
-		if zone == null:
-			continue
-		var zone_risk := _surface_zone_risk(zone)
+	var origin := vehicle.global_position
+	for record: Dictionary in _surface_zone_records_for_tick():
+		var zone_risk := float(record["risk"])
 		if zone_risk <= 0.0:
 			continue
+		if not _probe_ray_near_zone(record, origin, direction):
+			continue
+		var zone := record["zone"] as SurfaceZone
 		for distance: float in SURFACE_PROBE_DISTANCES:
-			if not zone.contains_global_point(vehicle.global_position + direction * distance):
+			if not _zone_contains(zone, origin + direction * distance):
 				continue
 			found_risk = true
-			if StringName(zone.get_meta("lane", &"full")) == &"full":
+			if StringName(record["lane"]) == &"full":
 				return false
 			break
 	return found_risk
@@ -1479,27 +1689,15 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var nearest := _room_cut_start + segment * fraction
 		return {"arc": segment.length() * fraction, "length": segment.length(), "distance": vehicle.global_position.distance_to(nearest), "closed": false}
 	if _racing_line.size() >= 2:
-		var best_distance_squared := INF
-		var best_arc := 0.0
-		var walked := 0.0
-		var total := 0.0
-		for index in _racing_line.size():
-			var from := _racing_line[index]
-			var to := _racing_line[(index + 1) % _racing_line.size()]
-			var segment := to - from
-			var segment_length := segment.length()
-			var fraction := clampf(
-				(vehicle.global_position - from).dot(segment) / maxf(segment.length_squared(), 0.001),
-				0.0,
-				1.0
-			)
-			var nearest := from + segment * fraction
-			var distance_squared := vehicle.global_position.distance_squared_to(nearest)
-			if distance_squared < best_distance_squared:
-				best_distance_squared = distance_squared
-				best_arc = walked + segment_length * fraction
-			walked += segment_length
-			total += segment_length
+		_ensure_arc_tables_current()
+		var count := _racing_line.size()
+		var nearest := _nearest_segment_local(_racing_line, vehicle.global_position, _racing_line_nearest_index)
+		_racing_line_nearest_index = int(nearest["index"])
+		var best_index := int(nearest["index"])
+		var best_fraction := float(nearest["fraction"])
+		var best_distance_squared := float(nearest["distance_squared"])
+		var total := _racing_line_total
+		var best_arc := _racing_line_cumulative[best_index] + _racing_line_segment_lengths[best_index] * best_fraction
 		var directional_arc := fposmod(total - best_arc, total) if race_manager.is_reverse_direction() else best_arc
 		return {
 			"arc": directional_arc,
@@ -1581,6 +1779,8 @@ func _recover_vehicle(reason: StringName = &"unknown") -> void:
 	vehicle.linear_velocity = Vector2.ZERO
 	vehicle.angular_velocity = 0.0
 	vehicle.reset_surface_modifiers()
+	_racing_line_nearest_index = -1
+	_reference_nearest_index = -1
 	if vehicle.has_method("reset_dynamics_state"):
 		vehicle.call("reset_dynamics_state")
 	vehicle.collision_layer = 0
@@ -1652,16 +1852,41 @@ func _on_external_recovery(racer: Node2D) -> void:
 	## watchdog so the arc discontinuity is not charged as backward travel.
 	if racer == vehicle:
 		_reset_route_watchdog()
+		_racing_line_nearest_index = -1
+		_reference_nearest_index = -1
+
+
+func _on_racer_registered(_racer: Node2D) -> void:
+	## The per-race scene-tree cache (hazards, surface zones, race vehicles) is
+	## only valid once the field is fully placed. A racer registered after this
+	## controller first populated the cache means the cached vehicle list is
+	## stale — a grid-launch traffic scan would otherwise miss cars still being
+	## placed and treat the track as empty. Mark the cache dirty so the next
+	## scan re-reads the tree instead of trusting the frozen list.
+	_tree_cache_dirty = true
 
 
 func _nearest_line_index(position: Vector2) -> int:
+	var count := _racing_line.size()
+	if _racing_line_nearest_index >= 0 and _racing_line_nearest_index < count:
+		var best := _racing_line_nearest_index
+		var best_distance := _racing_line[best].distance_squared_to(position)
+		for delta in 65:
+			var index := posmod(_racing_line_nearest_index - 32 + delta, count)
+			var distance := _racing_line[index].distance_squared_to(position)
+			if distance < best_distance:
+				best_distance = distance
+				best = index
+		_racing_line_nearest_index = best
+		return best
 	var best := 0
 	var best_distance := INF
-	for index in _racing_line.size():
+	for index in count:
 		var distance := _racing_line[index].distance_squared_to(position)
 		if distance < best_distance:
 			best_distance = distance
 			best = index
+	_racing_line_nearest_index = best
 	return best
 
 
