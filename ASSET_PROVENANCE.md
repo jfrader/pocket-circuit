@@ -13,9 +13,13 @@ It contains no third-party source images, characters, vehicle or track designs,
 logos, branding, or borrowed melodies.
 
 The deterministic portrait and car generators are adapted from the first-party
-Gurisitos Games Procedural 2D project at revision
-`9fc832c9638471739a61aeac1e84fe44408212f5`. The vendored source, catalogs,
-local compatibility edits, and MIT terms are shipped with the game.
+Gurisitos Games Procedural 2D project. Portrait artwork follows the friendly,
+front-facing redraw at revision
+`c341efaccefd9c9e530a24282ed1957494e54b0a` (Procedural 2D GURI-1292); the car
+generator, car artwork, catalogs and shared trait contract remain at the
+previously reconciled revision `9fc832c9638471739a61aeac1e84fe44408212f5`. The
+vendored source, catalogs, local compatibility edits, and MIT terms are shipped
+with the game.
 
 Third-party material includes Godot Engine and the Kenney CC0 engine-loop
 fallback documented below. Notices are reproduced in `THIRD_PARTY_NOTICES.md`.

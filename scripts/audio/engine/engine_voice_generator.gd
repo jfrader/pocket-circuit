@@ -17,8 +17,8 @@ const LOAD_BANDS: Array[float] = [0.0, 0.35, 0.70, 1.0]
 const HISTORY_CYCLES := 3
 const MAX_IMPULSE_SECONDS := 0.075
 const TABLE_GAIN := 0.76
-## Voice banks are pure functions of the recipe signature, so a bounded cache is
-## always correct. Four covers a grid plus a session's worth of garage visits.
+## Voice banks are pure functions of the recipe signature. Keep the four most
+## recently used voices so warming a new field does not evict its player voice.
 const CACHE_LIMIT := 4
 
 static var _cache: Dictionary = {}
@@ -34,7 +34,7 @@ var _global_peak := 0.000001
 static func generate_cached(recipe: EngineRecipe) -> EngineVoice:
 	var key := recipe.signature()
 	if _cache.has(key):
-		return _cache[key]
+		return _reuse_cached(key)
 	return _store_cached(key, EngineVoiceGenerator.new().generate(recipe))
 
 
@@ -42,7 +42,7 @@ static func generate_cached(recipe: EngineRecipe) -> EngineVoice:
 static func prepare_cached(recipe: EngineRecipe, progress: Callable) -> EngineVoice:
 	var key := recipe.signature()
 	if _cache.has(key):
-		return _cache[key]
+		return _reuse_cached(key)
 	if not progress.is_valid():
 		return generate_cached(recipe)
 	var generator := EngineVoiceGenerator.new()
@@ -55,9 +55,16 @@ static func prepare_cached(recipe: EngineRecipe, progress: Callable) -> EngineVo
 
 static func _store_cached(key: String, voice: EngineVoice) -> EngineVoice:
 	if _cache.has(key):
-		return _cache[key]
+		return _reuse_cached(key)
 	if _cache.size() >= CACHE_LIMIT:
 		_cache.erase(_cache.keys()[0])
+	_cache[key] = voice
+	return voice
+
+
+static func _reuse_cached(key: String) -> EngineVoice:
+	var voice := _cache[key] as EngineVoice
+	_cache.erase(key)
 	_cache[key] = voice
 	return voice
 

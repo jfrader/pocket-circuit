@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Every new championship fields its own generated rivals, and each Quick Race brings a new lineup driving different cars. Rival names follow the roster into briefings, the route board and the race.
 - Slippery patches, the technical surface and on-course obstacles now sit only on calm stretches, away from corners and the braking zones before them in both race directions. Some tracks carry fewer of them as a result. This layout change advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Quick Race has a difficulty picker beside its race controls, shared with Settings.
 - Championship rivals progress from Sunday Drive in Act I to Club Circuit in Act II and Clockwork in Act III; rival duels step up one tier. Quick Race keeps your chosen difficulty, and solo time trials keep theirs.
@@ -31,6 +32,7 @@
 - Pencils, utensils and other scenery now have close silhouette-shaped contact shadows instead of appearing suspended above the tabletop.
 - Dirt, spills and paper on Kitchen, Workshop and Office courses retain their natural outlines and gaps instead of overlapping into rectangular slabs. The pale wash beneath them is removed; grip zones and collisions are unchanged.
 - Vehicle-audio warm-up yields between engine RPM banks, loops and effects, keeping the first race's loading screen responsive without changing the generated sounds.
+- Warmed engine voices stay cached when the next race changes the opponent lineup.
 - Quick Race entries and rerolls cycle through Kitchen, Workshop and Office instead of remaining pinned to Kitchen. The preview and Play action use the selected theme.
 - Course palettes now contrast with both the tabletop and the island, including their appearance after translucent paint is blended over the room surface.
 - Starting grids stay clear of rotated finish sensors and nearby furniture edges in both race directions. Scenery placement reserves gate posts and sealed bays, and grip artwork no longer hides solid rims behind rectangular texture stamps.
@@ -49,6 +51,7 @@
 - Shipped the live Gamestruments engine into the release gate (sync + hard `ClassDB.class_exists("GamestrumentsPlayer")` check at the start of `tools/build_release.sh`). Removed rendered WAV fallbacks (`assets/audio/menu_loop.wav`, `race_loop.wav` and their `.import`s); the live engine is now mandatory — there is no silent-music or WAV fallback mode.
 
 ### Added
+- Driver portraits are now the friendly, front-facing set, and you can pick your own: `DRIVER LOOK` in the garage shuffles your portrait, and the look you keep follows you through every screen and reload.
 
 - Drifting now makes a continuous tyre scrub that follows the slide instead of a
   single scratch at the start of it, and it bites harder the faster and more

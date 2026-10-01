@@ -60,6 +60,9 @@ class TestApp extends Node:
 	func get_save_data() -> Dictionary:
 		return save_data
 
+	func get_championship_event(event_id: String) -> Dictionary:
+		return get_tree().root.get_node("App").call("get_championship_event", event_id)
+
 	func update_setting(key: String, value: Variant) -> bool:
 		if key == "difficulty" and value is String:
 			save_data["difficulty"] = value
