@@ -116,10 +116,11 @@ existing VehicleStats, transform, common collision geometry, and save identity.
 
 ## Audio and Feedback
 
-The current review build keeps original synthesized menu and race loops pending
-the project composer's final cues. Engine, countdown, go, UI, drift, boost,
-and impact effects use edited 48 kHz audio from Kenney's CC0
-Interface, Impact, and Sci-Fi packs. Exact sources, transformations, and pack
+Music, engine notes and effects are generated at runtime by first-party project
+code and the Gamestruments engine. No recorded music ships; the only recorded
+audio is the Kenney CC0 `engine_loop.ogg` fallback. Menu and race scores are
+composed from the circuit seed, so a circuit always sounds the same while
+different circuits differ. Exact sources, transformations, and pack
 hashes live in `ASSET_PROVENANCE.md` and `assets/audio/LICENSE.md`.
 
 One persistent AudioDirector owns a single music player, a local-player engine
@@ -219,10 +220,16 @@ rules rather than holding this release open.
 
 ## Exact Release Commands
 
-Run the full gate on CI compute, not on the desktop used for playtesting. The
-`Release gates` workflow uses a trusted repository runner labeled
-`pocket-circuit-ci`, read-only repository permissions and checksum-pinned
-official Godot inputs from `tools/godot_release.json`.
+Run the full gate locally for development closeout, following `AGENTS.md`'s
+verification policy. Use the checksum-pinned official Godot inputs from
+`tools/godot_release.json`; `tools/install_ci_godot.py` installs the editor and
+native templates and prints the `GODOT_BIN` and `XDG_DATA_HOME` environment
+values to export. Check host load before interpreting wall-clock tests and
+keep graphical QA separate from the full gate.
+
+The manually dispatched `Release gates` workflow retains the same gate on a
+trusted repository runner labeled `pocket-circuit-ci`, with read-only
+repository permissions. It builds candidates, not published releases.
 
 ```bash
 ./tools/build_release.sh /absolute/path/to/pocket-circuit-release
@@ -245,8 +252,9 @@ For bounded development checks, run only the relevant script:
 ```
 
 Headless results do not certify rendered frame pacing, physical controller
-behavior or Windows/Deck hardware. Runner/network unavailability leaves CI
-blocked; it is not a successful check and does not waive those manual gates.
+behavior or Windows/Deck hardware. An unavailable dependency or runner leaves
+that verification blocked; it is not a successful check and does not waive
+those manual gates.
 
 ## Current External Steam Blockers
 

@@ -72,11 +72,20 @@ const PERSONALITY_BOUNDS: Dictionary = {
 	"shortcut_preference": Vector2(0.9, 1.16),
 	"line_commitment": Vector2(0.95, 1.06),
 }
+const CORNER_FLOOR_MIN := 0.90
+
+# Single source of truth for every per-tier behaviour the AI controller uses.
+# The hot paths read these values directly; there are no per-tier branches left
+# in the code (see configure/_physics_process/_configure_personality/
+# _shortcut_route_is_suitable/_v1_speed_envelope). Values that do not yet drive
+# a code path are neutral: drift disabled and no catch-up for tiers that never had it.
 const DIFFICULTY_TUNING: Dictionary = {
 	"sunday_drive": {
 		"pace": 0.94,
 		"corner_constant": 13.0,
 		"corner_floor": 0.48,
+		"corner_floor_base": 1.0,
+		"corner_floor_commit_bias": 0.0,
 		"sharp_corner_ratio": 0.50,
 		"heading_cap": 0.60,
 		"wrong_way_cap": 0.42,
@@ -88,11 +97,27 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"clean_line_recharge": 0.0,
 		"boost_turn_threshold": 0.24,
 		"boost_radius": 1500.0,
+		"reaction_seconds": 0.34,
+		"steering_divisor": 0.72,
+		"steering_response": 11.0,
+		"corner_margin": 0.86,
+		"personality_scale": 0.3,
+		"room_cuts_allowed": false,
+		"shortcut_enabled": false,
+		"shortcut_min_steering_rate": 0.0,
+		"shortcut_min_retention": 0.70,
+		"shortcut_min_grip": 0.38,
+		"catch_up": {"max_power": 0.0, "position_weight": 0.0, "progress_weight": 0.0},
+		"assist": {"power": 0.01, "grip": 0.01, "brake": 0.01},
+		"mistake_rate": 0.12,
+		"drift_policy": "disabled",
 	},
 	"club_circuit": {
 		"pace": 1.08,
 		"corner_constant": 15.2,
 		"corner_floor": 0.53,
+		"corner_floor_base": 0.99,
+		"corner_floor_commit_bias": 0.10,
 		"sharp_corner_ratio": 0.59,
 		"heading_cap": 0.67,
 		"wrong_way_cap": 0.48,
@@ -104,11 +129,27 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"clean_line_recharge": 0.50,
 		"boost_turn_threshold": 0.34,
 		"boost_radius": 1150.0,
+		"reaction_seconds": 0.22,
+		"steering_divisor": 0.72,
+		"steering_response": 13.0,
+		"corner_margin": 0.96,
+		"personality_scale": 0.78,
+		"room_cuts_allowed": true,
+		"shortcut_enabled": true,
+		"shortcut_min_steering_rate": 3.25,
+		"shortcut_min_retention": 0.70,
+		"shortcut_min_grip": 0.38,
+		"catch_up": {"max_power": 0.09, "position_weight": 0.03, "progress_weight": 0.04},
+		"assist": {"power": 0.0, "grip": 0.005, "brake": 0.005},
+		"mistake_rate": 0.0,
+		"drift_policy": "disabled",
 	},
 	"clockwork": {
 		"pace": 1.12,
 		"corner_constant": 16.4,
 		"corner_floor": 0.58,
+		"corner_floor_base": 1.0,
+		"corner_floor_commit_bias": 0.0,
 		"sharp_corner_ratio": 0.64,
 		"heading_cap": 0.72,
 		"wrong_way_cap": 0.52,
@@ -120,10 +161,25 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"clean_line_recharge": 0.80,
 		"boost_turn_threshold": 0.42,
 		"boost_radius": 900.0,
+		"reaction_seconds": 0.15,
+		"steering_divisor": 0.64,
+		"steering_response": 16.0,
+		"corner_margin": 0.99,
+		"personality_scale": 1.0,
+		"room_cuts_allowed": true,
+		"shortcut_enabled": true,
+		"shortcut_min_steering_rate": 0.0,
+		"shortcut_min_retention": 0.64,
+		"shortcut_min_grip": 0.34,
+		"catch_up": {"max_power": 0.0, "position_weight": 0.0, "progress_weight": 0.0},
+		"assist": {"power": 0.0, "grip": 0.0, "brake": 0.0},
+		"mistake_rate": 0.0,
+		"drift_policy": "disabled",
 	},
 }
 
 var vehicle: VehicleController
+var _unassisted_stats: VehicleStats
 var race_manager: RaceManager
 var lane_offset: float = 0.0
 var difficulty: String = "club_circuit"
@@ -170,6 +226,10 @@ var _static_contact_time := 0.0
 var _escape_time_remaining := 0.0
 var _escape_steer := 0.0
 var static_escape_attempt_count := 0
+var mistake_count := 0
+var _mistake_key := ""
+var _mistake_steer := 0.0
+var _mistake_remaining := 0.0
 var _race_collision_layer := 0
 var _race_collision_mask := 0
 var _finished_ghosted := false
@@ -214,12 +274,25 @@ func configure(
 		driver_id: String = "baseline",
 		driver_style: Dictionary = {}
 ) -> void:
+	if vehicle != controlled_vehicle or _unassisted_stats == null:
+		_unassisted_stats = controlled_vehicle.stats
 	vehicle = controlled_vehicle
+	if vehicle.stats != _unassisted_stats:
+		vehicle.apply_stats(_unassisted_stats)
 	race_manager = manager
 	lane_offset = preferred_lane_offset
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
+	var assist := tuning["assist"] as Dictionary
+	if float(assist["grip"]) > 0.0 or float(assist["brake"]) > 0.0:
+		# VehicleStats is a shared resource. Give this AI its own copy so neither
+		# other racers nor the human inherit its tire and brake forces.
+		var assisted_stats := vehicle.stats.duplicate() as VehicleStats
+		assisted_stats.front_grip *= 1.0 + float(assist["grip"])
+		assisted_stats.rear_grip *= 1.0 + float(assist["grip"])
+		assisted_stats.brake_force *= 1.0 + float(assist["brake"])
+		vehicle.apply_stats(assisted_stats)
 	vehicle.boost_amount = minf(
 		vehicle.get_boost_capacity(),
 		vehicle.get_boost_capacity()
@@ -235,6 +308,10 @@ func configure(
 	_finished_ghosted = false
 	_recovery_cooldown_remaining = 0.0
 	recovery_reasons.clear()
+	mistake_count = 0
+	_mistake_key = ""
+	_mistake_steer = 0.0
+	_mistake_remaining = 0.0
 	_stuck_time = 0.0
 	_reset_route_watchdog()
 	_tree_cache_dirty = true
@@ -266,7 +343,7 @@ func _cache_checkpoints() -> void:
 		while track != null and not track.is_in_group("track"):
 			track = track.get_parent()
 	if track:
-		_allow_room_cuts = bool(track.get_meta("generated_track", false)) and difficulty != "sunday_drive"
+		_allow_room_cuts = bool(track.get_meta("generated_track", false)) and bool(_difficulty_tuning()["room_cuts_allowed"])
 		var racing_line := track.get_node_or_null("RacingLine") as Line2D
 		if racing_line:
 			for point: Vector2 in racing_line.points:
@@ -525,9 +602,9 @@ func _physics_process(delta: float) -> void:
 			# target so the vehicle turns around instead of arcing wide.
 			requested_steer = 1.0 if steering_angle >= 0.0 else -1.0
 	else:
-		var steering_divisor := 0.64 if difficulty == "clockwork" else 0.72
-		requested_steer = clampf(steering_angle / steering_divisor, -1.0, 1.0)
-	var steering_response := 11.0 if difficulty == "sunday_drive" else (16.0 if difficulty == "clockwork" else 13.0)
+		requested_steer = clampf(steering_angle / float(tuning["steering_divisor"]), -1.0, 1.0)
+	requested_steer = clampf(requested_steer + _corner_mistake(delta, tuning, expected_index, line_radius), -1.0, 1.0)
+	var steering_response := float(tuning["steering_response"])
 	_smoothed_steer = lerpf(_smoothed_steer, requested_steer, 1.0 - exp(-steering_response * delta))
 	var turn_severity := _checkpoint_turn_severity(expected_index)
 	var next_turn_severity := 0.0
@@ -547,9 +624,12 @@ func _physics_process(delta: float) -> void:
 		hazard_distance = float(curvature_hazard["distance"])
 		corner_speed = float(curvature_hazard.get("speed_limit", _v1_speed_envelope(upcoming_radius, hazard_distance)))
 	elif line_radius > 40.0:
-		var floor_adj := 1.0
-		if difficulty == "club_circuit":
-			floor_adj = clampf(0.99 - 0.10 * (commit - 1.0), 0.90, 0.99)
+		var floor_base := float(tuning["corner_floor_base"])
+		var floor_adj := clampf(
+			floor_base - float(tuning["corner_floor_commit_bias"]) * (commit - 1.0),
+			CORNER_FLOOR_MIN,
+			floor_base
+		)
 		var corner_floor := float(tuning["corner_floor"]) * floor_adj
 		corner_speed = clampf(
 			float(tuning["corner_constant"]) * sqrt(line_radius) * pace_multiplier * float(personality["corner_pace"]),
@@ -595,7 +675,7 @@ func _physics_process(delta: float) -> void:
 	var braking_distance := 0.0
 	if vehicle.stats.physics_model_version != 0:
 		var surface_grip := _planned_surface_grip(surface_plan)
-		var reaction_seconds := 0.34 if difficulty == "sunday_drive" else (0.15 if difficulty == "clockwork" else 0.22)
+		var reaction_seconds := float(tuning["reaction_seconds"])
 		var reaction_margin := vehicle.speed * reaction_seconds
 		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, surface_grip) + reaction_margin
 		braking_distance *= float(personality["brake_timing"])
@@ -630,15 +710,22 @@ func _physics_process(delta: float) -> void:
 	) if should_brake else 0.0
 	var position := race_manager.get_racer_position(vehicle)
 	var baseline_power := float(tuning["baseline_power"])
+	var catch_up := tuning["catch_up"] as Dictionary
+	var catch_up_max := float(catch_up["max_power"])
 	var catch_up_power := 0.0
-	if difficulty == "club_circuit":
-		var progress_deficit := _leader_progress_deficit()
-		catch_up_power = minf(0.09, maxf(float(maxi(0, position - 1)) * 0.03, progress_deficit * 0.04))
-	vehicle.set_external_power_multiplier(baseline_power + catch_up_power)
+	if catch_up_max > 0.0:
+		for racer: Node in _group_nodes(&"race_vehicle"):
+			if is_instance_valid(racer) and racer.is_in_group("player_vehicle"):
+				var progress := race_manager.get_racer_progress(vehicle)
+				var player_progress := race_manager.get_racer_progress(racer as Node2D)
+				if progress < player_progress:
+					catch_up_power = calculate_catch_up_power(tuning, position, progress, player_progress, _leader_progress_deficit())
+				break
+	vehicle.set_external_power_multiplier(baseline_power + float((tuning["assist"] as Dictionary)["power"]) + catch_up_power)
 	_apply_drafting_recharge(delta, traffic_plan, should_brake)
-	if difficulty == "club_circuit" and catch_up_power > 0.0 and not should_brake:
+	if catch_up_power > 0.0 and not should_brake:
 		vehicle.add_boost(
-			vehicle.stats.boost_recharge * (catch_up_power / 0.09) * 0.75 * delta,
+			vehicle.stats.boost_recharge * (catch_up_power / catch_up_max) * 0.75 * delta,
 			"catch-up",
 		)
 	# Boost gating uses local safe distance + curvature (not stale checkpoint dist/turn_severity) so clear straights get boosts.
@@ -682,6 +769,41 @@ func _physics_process(delta: float) -> void:
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
 	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
 	_update_stuck_recovery(delta, stuck_target_key, distance_to_target)
+
+
+static func calculate_catch_up_power(tuning: Dictionary, position: int, progress: float, player_progress: float, leader_deficit: float) -> float:
+	if progress >= player_progress:
+		return 0.0
+	var catch_up := tuning["catch_up"] as Dictionary
+	var baseline := float(tuning["baseline_power"]) + float((tuning["assist"] as Dictionary)["power"])
+	return minf(
+		minf(float(catch_up["max_power"]), maxf(0.0, VehicleController.MAX_EXTERNAL_POWER_MULTIPLIER - baseline)),
+		maxf(float(maxi(0, position - 1)) * float(catch_up["position_weight"]), leader_deficit * float(catch_up["progress_weight"]))
+	)
+
+
+func _corner_mistake(delta: float, tuning: Dictionary, checkpoint_index: int, radius: float) -> float:
+	if float(tuning["mistake_rate"]) <= 0.0:
+		return 0.0
+	var lap := int(race_manager.get_racer_state(vehicle).get("lap", 0))
+	var key := "%d:%d" % [lap, checkpoint_index]
+	if key != _mistake_key:
+		_mistake_key = key
+		_mistake_steer = 0.0
+		_mistake_remaining = 0.0
+		if radius > 100.0 and radius < 650.0 and vehicle.speed >= 160.0 and not vehicle.has_static_contact:
+			var rng := RandomNumberGenerator.new()
+			rng.seed = ("%s:%s" % [personality_id, key]).hash()
+			if rng.randf() < float(tuning["mistake_rate"]):
+				_mistake_steer = 0.025 if rng.randf() < 0.5 else -0.025
+				_mistake_remaining = 0.18
+				mistake_count += 1
+	# Only a momentary line correction on a corner; normal pure pursuit recovers
+	# as the steering unwinds. No changes to collision, brake or vehicle physics.
+	if radius < 100.0 or radius > 650.0 or vehicle.speed < 160.0 or vehicle.has_static_contact:
+		return 0.0
+	_mistake_remaining = maxf(0.0, _mistake_remaining - delta)
+	return _mistake_steer if _mistake_remaining > 0.0 else 0.0
 
 
 func _update_room_cut(expected_index: int, forward: Vector2) -> void:
@@ -1236,17 +1358,19 @@ func _difficulty_tuning() -> Dictionary:
 func _configure_personality(driver_id: String, driver_style: Dictionary) -> void:
 	personality_id = driver_id if not driver_id.is_empty() else "baseline"
 	personality = DEFAULT_PERSONALITY.duplicate()
-	var difficulty_scale := 0.3 if difficulty == "sunday_drive" else (1.0 if difficulty == "clockwork" else 0.78)
+	var personality_scale := float(_difficulty_tuning()["personality_scale"])
 	for key: String in DEFAULT_PERSONALITY:
 		var bounds: Vector2 = PERSONALITY_BOUNDS[key]
 		var requested := clampf(float(driver_style.get(key, 1.0)), bounds.x, bounds.y)
-		personality[key] = lerpf(1.0, requested, difficulty_scale)
+		personality[key] = lerpf(1.0, requested, personality_scale)
 
 
 func _shortcut_route_is_suitable(track: Node) -> bool:
-	if difficulty == "sunday_drive" or _shortcut_racing_line.is_empty():
+	var tuning := _difficulty_tuning()
+	if not bool(tuning["shortcut_enabled"]) or _shortcut_racing_line.is_empty():
 		return false
-	if difficulty == "club_circuit" and vehicle.stats.physics_model_version != 0 and vehicle.stats.steering_rate < 3.25:
+	var min_steering_rate := float(tuning["shortcut_min_steering_rate"])
+	if min_steering_rate > 0.0 and vehicle.stats.physics_model_version != 0 and vehicle.stats.steering_rate < min_steering_rate:
 		return false
 	var definitions: Variant = track.get_meta("generated_surfaces", [])
 	if definitions is not Array:
@@ -1262,10 +1386,10 @@ func _shortcut_route_is_suitable(track: Node) -> bool:
 			var dry_corner := vehicle.get_safe_corner_speed(300.0, 1.0)
 			var shortcut_corner := vehicle.get_safe_corner_speed(300.0, shortcut_grip)
 			var retained_corner_speed := shortcut_corner / maxf(dry_corner, 0.001)
-			var minimum_retention := (0.64 if difficulty == "clockwork" else 0.70) / preference
+			var minimum_retention := float(tuning["shortcut_min_retention"]) / preference
 			return retained_corner_speed >= minimum_retention and float(definition.get("speed", 0.0)) >= 1.0
 		var combined_grip := float(definition.get("grip", 0.0)) * vehicle.stats.grip
-		var minimum_grip := (0.34 if difficulty == "clockwork" else 0.38) / preference
+		var minimum_grip := float(tuning["shortcut_min_grip"]) / preference
 		return combined_grip >= minimum_grip and float(definition.get("speed", 0.0)) >= 1.0
 	return false
 
@@ -1940,12 +2064,13 @@ func _v1_speed_envelope(radius: float, distance: float) -> float:
 	# Reserve some tire capacity for braking and tracking corrections instead
 	# of planning every corner at the theoretical steady-state grip peak.
 	var lateral_accel := minf(vehicle.stats.front_grip, vehicle.stats.rear_grip) * grip * DYNAMICS.REFERENCE_GRAVITY * _tracking_grip_utilization
-	var margin := 0.86 if difficulty == "sunday_drive" else (0.99 if difficulty == "clockwork" else 0.96)
+	var tuning := _difficulty_tuning()
+	var margin := float(tuning["corner_margin"])
 	var corner := minf(maximum, sqrt(lateral_accel * radius) * margin * float(personality["corner_pace"]))
 	var rack := DYNAMICS.calculate_target_steer_angle(1.0, vehicle.stats.max_steer_angle_deg, corner, maximum, vehicle.stats.high_speed_steer_ratio, vehicle.stats.steer_fade_start_ratio)
 	var minimum_radius := vehicle.stats.wheelbase / maxf(tan(rack), 0.001)
 	corner *= minf(1.0, radius / minimum_radius)
-	var reaction_seconds := 0.34 if difficulty == "sunday_drive" else (0.15 if difficulty == "clockwork" else 0.22)
+	var reaction_seconds := float(tuning["reaction_seconds"])
 	var braking_distance := maxf(0.0, distance - vehicle.speed * reaction_seconds * float(personality["brake_timing"]))
 	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip)
 	return minf(maximum, sqrt(corner * corner + 2.0 * braking_accel * braking_distance))
