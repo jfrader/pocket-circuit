@@ -96,7 +96,7 @@ func _run_test() -> void:
 
 
 func _valid_footprint(points: PackedVector2Array) -> bool:
-	return points.size() >= 4 and not Geometry2D.triangulate_polygon(points).is_empty()
+	return points.size() >= 4 and not is_zero_approx(CORE._polygon_area(points)) and not Geometry2D.triangulate_polygon(points).is_empty()
 
 
 func _expect(condition: bool, message: String) -> bool:
