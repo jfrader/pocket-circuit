@@ -41,12 +41,13 @@ static func candidates(
 		normals.append(tangent.rotated(PI * 0.5) * outward_sign)
 		prefix[index + 1] = prefix[index] + line[index].distance_to(line[(index + 1) % count])
 	var total := prefix[count]
+	var open_bounds := _open_segment_bounds(line, open_sector)
 	var seen := {}
 	for start in count:
 		if CORE._turn_strength(line, start, 6) < CORE.CUT_TURN_THRESHOLD:
 			continue
 		for span in range(CORE.CUT_MIN_LOOKAHEAD, CORE.CUT_MAX_LOOKAHEAD + 1):
-			_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, start, (start + span) % count, seen, found)
+			_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, start, (start + span) % count, seen, found)
 
 	# Nearby non-local folds need not be sharp at either endpoint.
 	var buckets := {}
@@ -68,17 +69,41 @@ static func candidates(
 					if mini(forward, count - forward) < int(CORE.CUT_FOLD_MIN_LAP_FRACTION * count):
 						continue
 					if forward <= count - forward:
-						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, index, other, seen, found)
+						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, index, other, seen, found)
 					else:
-						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, other, index, seen, found)
+						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, other, index, seen, found)
 	found.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return float(left["saved_mm"]) > float(right["saved_mm"]))
 	return found
+
+
+static func _open_segment_bounds(line: PackedVector2Array, open_sector: int) -> Rect2:
+	if open_sector < 0:
+		return Rect2()
+	var bounds := Rect2()
+	var initialized := false
+	for index in line.size():
+		if mini(SECTOR_COUNT - 1, int(float(index) / line.size() * SECTOR_COUNT)) != open_sector:
+			continue
+		if not initialized:
+			bounds = Rect2(line[index], Vector2.ZERO)
+			initialized = true
+		bounds = bounds.expand(line[index]).expand(line[(index + 1) % line.size()])
+	return bounds
+
+
+static func _cannot_be_nearest_open(point: Vector2, line: PackedVector2Array, start: int, finish: int, bounds: Rect2) -> bool:
+	# Every open segment lies inside bounds. Either known route vertex gives an
+	# upper bound on the globally nearest segment; reject only a strict gap.
+	var nearest_in_bounds := point.clamp(bounds.position, bounds.end)
+	var lower := point.distance_squared_to(nearest_in_bounds)
+	var upper := minf(point.distance_squared_to(line[start]), point.distance_squared_to(line[finish]))
+	return lower > upper and not is_equal_approx(lower, upper)
 
 
 static func _consider(
 		line: PackedVector2Array, normals: PackedVector2Array, prefix: PackedFloat64Array,
 		total: float, expanded: PackedVector2Array, island: PackedVector2Array,
-		fractions: Array, lane_reach: float, open_sector: int, start: int, finish: int,
+		fractions: Array, lane_reach: float, open_sector: int, open_bounds: Rect2, start: int, finish: int,
 		seen: Dictionary, found: Array[Dictionary]
 ) -> void:
 	var count := line.size()
@@ -115,6 +140,9 @@ static func _consider(
 			if open_sector >= 0:
 				crosses_open = true
 				for point in deep:
+					if _cannot_be_nearest_open(point, line, start, finish, open_bounds):
+						crosses_open = false
+						break
 					var nearest := CORE._closest_point_on_loop(point, line)
 					var sector := mini(SECTOR_COUNT - 1, int(float(nearest["index"]) / count * SECTOR_COUNT))
 					if sector != open_sector:
