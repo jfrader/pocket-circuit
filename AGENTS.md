@@ -44,6 +44,10 @@ still verify `git status` is clean first.
 Godot version pin: **4.7.2**. Do not change it without a Linear decision and
 matching export templates. Verify scripts with `validate_script` and check
 `get_errors` after scene changes.
+If the local MCP bridge rejects a fresh unpathed `class_name` script as hiding
+a global class, check the committed file with Godot `--check-only --script`
+and the checked test helper below. An empty `get_errors` result alone does not
+verify parsing or test completion.
 
 For source tests, `run_godot_test_checked` in `tools/godot_gate.sh` checks the
 terminal completion marker and applies a test's optional `FIXED_FPS` clock.
