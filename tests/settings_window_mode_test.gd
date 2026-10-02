@@ -11,6 +11,13 @@ const VOLUME_BUSES := {
 }
 const NATIVE_SETTLE_SECONDS := 0.25
 
+class DisplayProbe extends "res://scripts/autoload/app.gd":
+	var window_requests := 0
+
+	func _apply_window_mode() -> void:
+		window_requests += 1
+
+
 class TestSaveStore extends SaveStore:
 	var attempts := 0
 	var fail_writes := false
@@ -45,6 +52,8 @@ func _run_test() -> void:
 	_app.call("_ensure_shell")
 	_shell = _app.get("_shell")
 	root.focus_exited.connect(func() -> void: _focus_losses += 1)
+	if not _test_display_boundary():
+		return
 	if not await _test_volume_sliders():
 		return
 	if not await _test_other_settings():
@@ -59,6 +68,27 @@ func _run_test() -> void:
 	await process_frame
 	print("SETTINGS_WINDOW_MODE_TEST PASS")
 	quit(0)
+
+
+func _test_display_boundary() -> bool:
+	var probe := DisplayProbe.new()
+	probe.set("_save_store", _store)
+	probe.set("_save_data", _store.default_data())
+	probe.call("_apply_settings")
+	var restored := probe.window_requests == 1
+	var updated := true
+	for key: String in VOLUME_BUSES:
+		updated = bool(probe.call("update_setting", key, 0.43)) and updated
+	for entry: Array in [["difficulty", "clockwork"], ["reduced_camera_shake", true], ["reduced_motion", true]]:
+		updated = bool(probe.call("update_setting", entry[0], entry[1])) and updated
+	_store.is_read_only = true
+	updated = bool(probe.call("update_setting", "music_volume", 0.62)) and updated
+	_store.is_read_only = false
+	var unchanged := probe.window_requests == 1
+	updated = bool(probe.call("update_setting", "fullscreen", true)) and updated
+	var explicit := probe.window_requests == 2
+	probe.free()
+	return _expect(updated and restored and unchanged and explicit, "startup and explicit fullscreen choices should reach the display boundary; volume, difficulty, comfort and read-only audio updates must not, including headless runs")
 
 
 func _test_volume_sliders() -> bool:
