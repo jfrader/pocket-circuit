@@ -258,7 +258,7 @@ static func clear_of_recovery_lanes(
 
 
 static func asset_radius(texture_path: String, fallback_radius: float) -> float:
-	var texture := load(texture_path) as Texture2D
+	var texture := TrackBuilderCore.asset_texture(texture_path)
 	if texture == null:
 		return fallback_radius
 	var bounds := TrackBuilderCore._texture_opaque_rect(texture)
@@ -288,7 +288,7 @@ static func add_generated_prop(
 	prop.set_meta("formation_index", formation_index)
 	prop.set_meta("size_scale", size_scale)
 	parent.add_child(prop)
-	var texture := load(texture_path) as Texture2D
+	var texture := TrackBuilderCore.asset_texture(texture_path)
 	if texture:
 		var bounds := TrackBuilderCore._texture_opaque_rect(texture)
 		var sprite_scale := TrackBuilderCore.PROP_SCALE.sprite_scale(texture, bounds, TrackBuilderCore._prop_visual_size(texture_path, 48.0)) * size_scale
