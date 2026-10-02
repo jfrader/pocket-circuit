@@ -275,6 +275,17 @@ var _leader_result: Dictionary = {}
 var _surface_result := {"weight": 0.0, "speed_scale": 1.0, "grip_scale": 1.0, "risk": 0.0, "avoid_direction": Vector2.ZERO}
 var _surface_model_result := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
 var _obstacle_result := {"weight": 0.0, "speed_scale": 1.0, "speed_limit": INF, "avoid_direction": Vector2.ZERO, "static_contact": false, "escape_steer": 0.0}
+# Tick-local results: callers consume these before calling the same helper again.
+var _segment_result := {"index": 0, "fraction": 0.0, "distance_squared": INF}
+var _route_sample_result := {"arc": 0.0, "length": 1.0, "distance": 0.0, "closed": false}
+var _watchdog_result := {"made_progress": false}
+var _hazard_result := {"radius": 0.0, "distance": INF, "speed_limit": INF}
+# A wide probe needs all three results alive until the nearest is selected.
+var _ray_results := [
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+]
 
 
 func configure(
@@ -467,7 +478,10 @@ func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_
 				best_dsq = dsq
 				best_index = index
 				best_fraction = fraction
-		return {"index": best_index, "fraction": best_fraction, "distance_squared": best_dsq}
+		_segment_result["index"] = best_index
+		_segment_result["fraction"] = best_fraction
+		_segment_result["distance_squared"] = best_dsq
+		return _segment_result
 	var best_index := 0
 	var best_fraction := 0.0
 	var best_dsq := INF
@@ -485,7 +499,10 @@ func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_
 			best_dsq = dsq
 			best_index = index
 			best_fraction = fraction
-	return {"index": best_index, "fraction": best_fraction, "distance_squared": best_dsq}
+	_segment_result["index"] = best_index
+	_segment_result["fraction"] = best_fraction
+	_segment_result["distance_squared"] = best_dsq
+	return _segment_result
 
 
 func _physics_process(delta: float) -> void:
@@ -544,7 +561,7 @@ func _physics_process(delta: float) -> void:
 		var correction := clampf(maxf(route_error / 70.0, absf(vehicle.slip_angle) / 20.0), 0.0, 1.0)
 		_tracking_grip_utilization = lerpf(CORNER_GRIP_UTILIZATION, CORRECTION_GRIP_UTILIZATION, correction)
 	var line_radius := _racing_line_radius(vehicle.global_position)
-	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version != 0 else {}
+	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version != 0 else _hazard_result
 	var pursuit_lookahead := _lookahead_distance()
 	if line_radius > 0.0:
 		# Steering follows local curvature. A future hairpin may constrain
@@ -1645,11 +1662,15 @@ func _ray_probe_from(
 		excluded_rids: Array[RID] = []
 ) -> Dictionary:
 	if feeler_length <= 0.001:
-		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
+		var empty: Dictionary = _ray_results[0]
+		empty["clearance"] = 1.0
+		empty["is_vehicle"] = false
+		empty["normal"] = Vector2.ZERO
+		return empty
 	var side_offset := direction.orthogonal() * OBSTACLE_FEELER_HALF_WIDTH
-	var center := _single_ray_probe(origin, direction, feeler_length, mask, excluded_rids)
-	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask, excluded_rids)
-	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask, excluded_rids)
+	var center := _single_ray_probe(origin, direction, feeler_length, mask, excluded_rids, 0)
+	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask, excluded_rids, 1)
+	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask, excluded_rids, 2)
 	var closest := center
 	if float(left["clearance"]) < float(closest["clearance"]):
 		closest = left
@@ -1663,8 +1684,10 @@ func _single_ray_probe(
 		direction: Vector2,
 		feeler_length: float,
 		mask: int,
-		excluded_rids: Array[RID] = []
+		excluded_rids: Array[RID] = [],
+		slot: int = 0
 ) -> Dictionary:
+	var result: Dictionary = _ray_results[slot]
 	if _ray_query == null:
 		_ray_query = PhysicsRayQueryParameters2D.new()
 	_ray_excludes.clear()
@@ -1677,15 +1700,17 @@ func _single_ray_probe(
 	query.exclude = _ray_excludes
 	var hit := vehicle.get_world_2d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
-		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
+		result["clearance"] = 1.0
+		result["is_vehicle"] = false
+		result["normal"] = Vector2.ZERO
+		return result
 	var collider: Variant = hit.get("collider")
 	var is_vehicle := collider is Node and (collider as Node).is_in_group("race_vehicle")
 	var hit_normal := (hit.get("normal", Vector2.ZERO) as Vector2).normalized()
-	return {
-		"clearance": origin.distance_to(hit["position"]) / feeler_length,
-		"is_vehicle": is_vehicle,
-		"normal": hit_normal,
-	}
+	result["clearance"] = origin.distance_to(hit["position"]) / feeler_length
+	result["is_vehicle"] = is_vehicle
+	result["normal"] = hit_normal
+	return result
 
 
 func _update_spin_recovery(delta: float) -> bool:
@@ -1735,7 +1760,8 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 		_off_route_time = 0.0
 		_no_progress_time = 0.0
 		_wrong_way_progress_time = 0.0
-		return {"made_progress": true}
+		_watchdog_result["made_progress"] = true
+		return _watchdog_result
 
 	var route_length := maxf(float(sample["length"]), 0.001)
 	var route_delta := float(sample["arc"]) - _last_route_arc
@@ -1786,7 +1812,8 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 	):
 		if not _recovery_cooldown_active():
 			_recover_vehicle(&"wrong_way" if _wrong_way_progress_time >= WRONG_WAY_PROGRESS_TIMEOUT else &"no_progress")
-	return {"made_progress": made_progress}
+	_watchdog_result["made_progress"] = made_progress
+	return _watchdog_result
 
 
 func _active_route_sample(expected_index: int) -> Dictionary:
@@ -1794,7 +1821,11 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var segment := _room_cut_end - _room_cut_start
 		var fraction := clampf((vehicle.global_position - _room_cut_start).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
 		var nearest := _room_cut_start + segment * fraction
-		return {"arc": segment.length() * fraction, "length": segment.length(), "distance": vehicle.global_position.distance_to(nearest), "closed": false}
+		_route_sample_result["arc"] = segment.length() * fraction
+		_route_sample_result["length"] = segment.length()
+		_route_sample_result["distance"] = vehicle.global_position.distance_to(nearest)
+		_route_sample_result["closed"] = false
+		return _route_sample_result
 	if _racing_line.size() >= 2:
 		_ensure_arc_tables_current()
 		var count := _racing_line.size()
@@ -1806,17 +1837,20 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var total := _racing_line_total
 		var best_arc := _racing_line_cumulative[best_index] + _racing_line_segment_lengths[best_index] * best_fraction
 		var directional_arc := fposmod(total - best_arc, total) if race_manager.is_reverse_direction() else best_arc
-		return {
-			"arc": directional_arc,
-			"length": total,
-			"distance": sqrt(best_distance_squared),
-			"closed": true,
-		}
+		_route_sample_result["arc"] = directional_arc
+		_route_sample_result["length"] = total
+		_route_sample_result["distance"] = sqrt(best_distance_squared)
+		_route_sample_result["closed"] = true
+		return _route_sample_result
 
 	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
 	var previous := race_manager.get_checkpoint_before(expected_index) as Node2D
 	if checkpoint == null or previous == null:
-		return {"arc": 0.0, "length": 1.0, "distance": 0.0, "closed": false}
+		_route_sample_result["arc"] = 0.0
+		_route_sample_result["length"] = 1.0
+		_route_sample_result["distance"] = 0.0
+		_route_sample_result["closed"] = false
+		return _route_sample_result
 	var segment := checkpoint.global_position - previous.global_position
 	var fraction := clampf(
 		(vehicle.global_position - previous.global_position).dot(segment) / maxf(segment.length_squared(), 0.001),
@@ -1824,12 +1858,11 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		1.0
 	)
 	var nearest := previous.global_position + segment * fraction
-	return {
-		"arc": segment.length() * fraction,
-		"length": segment.length(),
-		"distance": vehicle.global_position.distance_to(nearest),
-		"closed": false,
-	}
+	_route_sample_result["arc"] = segment.length() * fraction
+	_route_sample_result["length"] = segment.length()
+	_route_sample_result["distance"] = vehicle.global_position.distance_to(nearest)
+	_route_sample_result["closed"] = false
+	return _route_sample_result
 
 
 func _update_static_escape(delta: float, obstacle_plan: Dictionary, made_progress: bool) -> bool:
@@ -2074,7 +2107,10 @@ func _racing_line_curvature_hazard() -> Dictionary:
 		var next := (index + direction + count) % count
 		walked += _racing_line[index].distance_to(_racing_line[next])
 		index = next
-	return {"radius": hazard_radius, "distance": hazard_distance, "speed_limit": speed_limit}
+	_hazard_result["radius"] = hazard_radius
+	_hazard_result["distance"] = hazard_distance
+	_hazard_result["speed_limit"] = speed_limit
+	return _hazard_result
 
 
 func _v1_speed_envelope(radius: float, distance: float) -> float:
@@ -2103,13 +2139,19 @@ func _v1_speed_envelope(radius: float, distance: float) -> float:
 func _checkpoint_curvature_hazard(expected_index: int) -> Dictionary:
 	var radius := _checkpoint_derived_radius(expected_index)
 	if radius >= MAX_RACING_LINE_RADIUS:
-		return {"radius": radius, "distance": INF}
+		_hazard_result["radius"] = radius
+		_hazard_result["distance"] = INF
+		_hazard_result.erase("speed_limit")
+		return _hazard_result
 	# The corner apex is at the checkpoint itself (direction-independent); the
 	# entry guide is forward-biased and would mis-measure the brake distance in
 	# reverse. Braking to reach corner speed at the apex is correct either way.
 	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
 	var corner_point: Vector2 = checkpoint.global_position if checkpoint != null else vehicle.global_position
-	return {"radius": radius, "distance": vehicle.global_position.distance_to(corner_point)}
+	_hazard_result["radius"] = radius
+	_hazard_result["distance"] = vehicle.global_position.distance_to(corner_point)
+	_hazard_result.erase("speed_limit")
+	return _hazard_result
 
 
 func _checkpoint_derived_radius(checkpoint_index: int) -> float:
