@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Changed
-- Loose debris varies in number, size and position across generated circuits, including tracks with none. Patches remain on calm stretches.
+- Loose debris varies in number, size and position across generated circuits, including tracks with none. Patches remain on calm stretches. This debris and outer-corner layout update advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Every new championship fields its own generated rivals, and each Quick Race brings a new lineup driving different cars. Rival names follow the roster into briefings, the route board and the race.
 - Slippery patches, the technical surface and on-course obstacles now sit only on calm stretches, away from corners and the braking zones before them in both race directions. Some tracks carry fewer of them as a result. This layout change advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Quick Race has a difficulty picker beside its race controls, shared with Settings.
