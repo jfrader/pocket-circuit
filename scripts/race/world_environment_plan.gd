@@ -55,10 +55,12 @@ static func plan(theme: StringName, seed: int, geometry: Dictionary, candidates:
 	for polygon: PackedVector2Array in geometry.get("reserved_polygons", []):
 		planner.occupied.append(polygon)
 		planner.reservations.append(polygon)
-		planner.solid_polygons.append(polygon)
 	for polygon: PackedVector2Array in geometry.get("solid_footprints", []):
 		planner.occupied.append(polygon)
+	for polygon: PackedVector2Array in geometry.get("solid_polygons", []):
 		planner.solid_polygons.append(polygon)
+	for core: Vector3 in geometry.get("solid_cores", []):
+		planner.solid_cores.append(core)
 	planner._reserve_open_exit()
 	planner._catalog(theme, candidates, story)
 	planner._compose()
@@ -241,10 +243,11 @@ func _close_outer_cuts() -> void:
 	diagnostics["corner_blockers"] = 0
 	diagnostics["unfit_corner_cuts"] = 0
 	var rng := _rng("boundary:corner_cuts")
+	var limit := mini(int(density["maximum"]), int(diagnostics["boundary_target"]))
 	for cut: Dictionary in cuts:
 		if _covered_cut(cut["a"], cut["b"]):
 			continue
-		if int(diagnostics["boundary_count"]) >= int(density["maximum"]):
+		if int(diagnostics["boundary_count"]) >= limit:
 			diagnostics["unfit_corner_cuts"] += 1
 			continue
 		var placed := false

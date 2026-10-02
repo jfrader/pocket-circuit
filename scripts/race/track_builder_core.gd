@@ -299,9 +299,13 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		var candidates := WorldEnvironmentCatalog.candidates(theme, story, spec)
 		spec["environment_assets"] = candidates
 		var reserved: Array[PackedVector2Array] = []
+		var solid_polygons: Array[PackedVector2Array] = []
+		var solid_cores: Array[Vector3] = []
+		var core_ratio := float(WorldEnvironmentCatalog.boundary_density()["corner_cuts"]["solid_core_ratio"])
 		spec["pocket_regions"] = TrackBuilderCollision.pocket_regions(spec, centerline, room_polygon)
 		for pocket: Dictionary in spec["pocket_regions"]:
 			reserved.append(pocket["collision"])
+			solid_polygons.append(pocket["collision"])
 		var gate_points := _layout_gate_samples(centerline, spec)
 		var post_assets: Array = spec.get("gate_props", [])
 		if not post_assets.is_empty():
@@ -310,18 +314,23 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 				var tangent := _sample_tangent(centerline, int(closest["index"]))
 				for side in [-1, 1]:
 					var path := String(post_assets[posmod(gate_index * 2 + (1 if side > 0 else 0), post_assets.size())])
-					var size := PROP_SCALE.size_for(path, GATE_POST_SIZE) + Vector2.ONE * 6.0
+					var size := PROP_SCALE.size_for(path, GATE_POST_SIZE)
 					var offset := FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET
-					reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side, size, tangent.angle()))
+					var position := gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side
+					reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(position, size + Vector2.ONE * 6.0, tangent.angle()))
+					solid_cores.append(Vector3(position.x, position.y, minf(size.x, size.y) * core_ratio))
 		var obstacle_footprints: Array[PackedVector2Array] = []
 		for obstacle: Dictionary in spec.get("obstacle_plan", []):
 			obstacle_footprints.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(obstacle["position"], obstacle["footprint_size"], obstacle["rotation"]))
+			var position: Vector2 = obstacle["position"]
+			var size: Vector2 = obstacle["footprint_size"]
+			solid_cores.append(Vector3(position.x, position.y, minf(size.x, size.y) * core_ratio))
 		var surface_art_exclusions: Array[PackedVector2Array] = reserved.duplicate()
 		surface_art_exclusions.append_array(obstacle_footprints)
 		surface_art_exclusions.append(inner)
 		spec["surface_art_exclusions"] = surface_art_exclusions
 		var outer: PackedVector2Array = edges.get("outer_boundary", left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right)
-		spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"outer_boundary":outer,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved,"solid_footprints":obstacle_footprints}, candidates, {})
+		spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"outer_boundary":outer,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved,"solid_footprints":obstacle_footprints,"solid_polygons":solid_polygons,"solid_cores":solid_cores}, candidates, {})
 		spec["surface_identity"] = HouseholdSurfaceMaterials.resolve(theme, int(spec.get("material_seed", _mix_seed(maxi(seed, 0), "material"))), String(spec.get("material_id", "")), String(spec.get("palette_id", "")), spec.get("floor_modulate", Color.WHITE))
 		spec["floor_texture"] = spec["surface_identity"]["floor"]["texture"]
 		spec["track_texture"] = spec["surface_identity"]["course"]["texture"]
