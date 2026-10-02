@@ -7,12 +7,16 @@ const IDS := preload("res://scripts/race/generated_circuit_identity.gd")
 const RUSTBUG := preload("res://scenes/vehicles/rustbug.tscn")
 const CASES := {"kitchen": [0, 1, 4, 5, 7, 8, 10, 11], "workshop": [0, 1, 2, 4, 5, 11, 13, 20], "office": [0, 1, 3, 5, 6, 8, 14, 23]}
 const SECTOR_COUNT := WorldEnvironmentPlan.SECTOR_COUNT
-const CHORD_SAMPLES := CORE.CUT_SAMPLES
-const TURN_THRESHOLD := CORE.CUT_TURN_THRESHOLD
-const MIN_LOOKAHEAD := CORE.CUT_MIN_LOOKAHEAD
-const MAX_LOOKAHEAD := CORE.CUT_MAX_LOOKAHEAD
-const FOLD_MAX_SPACING_MM := CORE.CUT_FOLD_MAX_SPACING_MM
-const FOLD_MIN_LAP_FRACTION := CORE.CUT_FOLD_MIN_LAP_FRACTION
+const CHORD_SAMPLES := 41
+const TURN_THRESHOLD := 0.18
+const MIN_LOOKAHEAD := 5
+const MAX_LOOKAHEAD := 32
+const FOLD_MAX_SPACING_MM := 1400.0
+const FOLD_MIN_LAP_FRACTION := 0.12
+const MIN_OFF_CORRIDOR_MM := 40.0
+const MIN_DEEP_SAMPLES := 3
+const MIN_SAVED_MM := 50.0
+const MIN_ARC_RATIO := 1.25
 
 var _viewport: SubViewport
 var _space: PhysicsDirectSpaceState2D
@@ -114,7 +118,7 @@ func _run() -> void:
 							var a_local := centerline[pair.x] + normals[pair.x] * from_offset
 							var b_local := centerline[pair.y] + normals[pair.y] * to_offset
 							var chord := a_local.distance_to(b_local)
-							if arc - chord < CORE.CUT_MIN_SAVED_MM or arc < chord * CORE.CUT_MIN_ARC_RATIO:
+							if arc - chord < MIN_SAVED_MM or arc < chord * MIN_ARC_RATIO:
 								continue
 							var a := track.global_transform * a_local
 							var b := track.global_transform * b_local
@@ -125,7 +129,7 @@ func _run() -> void:
 							if circle_hit:
 								continue
 							var excursion := _pose_excursion(a_local, b_local, centerline, open_sector)
-							if int(excursion["deep"]) < CORE.CUT_MIN_DEEP_SAMPLES or bool(excursion["open"]):
+							if int(excursion["deep"]) < MIN_DEEP_SAMPLES or bool(excursion["open"]):
 								continue
 							var capsule_hit := _hits_solid(a, b, _capsule)
 							if _query_failed:
@@ -169,7 +173,9 @@ func _load_vehicle() -> bool:
 		ok = _check(_vehicle_mask != 0 and _capsule.height > _capsule.radius * 2.0, "Rustbug must have a longer-than-wide capsule and solid mask")
 	car.free()
 	if ok:
-		ok = _check(is_equal_approx(float(WorldEnvironmentCatalog.boundary_density()["corner_cuts"]["vehicle_radius_mm"]), _circle.radius), "corner placement must use the scene's actual physical radius")
+		var corner_settings: Dictionary = WorldEnvironmentCatalog.boundary_density().get("corner_cuts", {})
+		if not corner_settings.is_empty():
+			ok = _check(is_equal_approx(float(corner_settings["vehicle_radius_mm"]), _circle.radius), "corner placement must use the scene's actual physical radius")
 	return ok
 
 
@@ -195,7 +201,7 @@ func _pose_excursion(a: Vector2, b: Vector2, centerline: PackedVector2Array, sec
 	for sample in CHORD_SAMPLES:
 		var point := a.lerp(b, float(sample) / float(CHORD_SAMPLES - 1))
 		var near: Dictionary = CORE._closest_point_on_loop(point, centerline)
-		if point.distance_to(near["position"]) <= CORE.HALF_WIDTH + CORE.CUT_MIN_OFF_CORRIDOR_MM:
+		if point.distance_to(near["position"]) <= CORE.HALF_WIDTH + MIN_OFF_CORRIDOR_MM:
 			continue
 		var index := int(near.get("index", -1))
 		if index < 0:
@@ -205,7 +211,7 @@ func _pose_excursion(a: Vector2, b: Vector2, centerline: PackedVector2Array, sec
 
 
 func _all_deep_sectors_open(deep_sectors: PackedInt32Array, open_sector: int) -> bool:
-	if deep_sectors.size() < CORE.CUT_MIN_DEEP_SAMPLES:
+	if deep_sectors.size() < MIN_DEEP_SAMPLES:
 		return false
 	for sector in deep_sectors:
 		if sector != open_sector:
@@ -333,8 +339,11 @@ func _sync_space() -> bool:
 
 
 func _physics_atomics() -> bool:
-	if not _check(CORE.CUT_MIN_OFF_CORRIDOR_MM == 40.0 and CORE.CUT_MIN_DEEP_SAMPLES == 3 and CORE.CUT_MIN_SAVED_MM == 50.0 and CORE.CUT_MIN_ARC_RATIO == 1.25 and CHORD_SAMPLES == 41, "cut contract changed"):
-		return false
+	var contract := {"CUT_MIN_OFF_CORRIDOR_MM": MIN_OFF_CORRIDOR_MM, "CUT_MIN_DEEP_SAMPLES": MIN_DEEP_SAMPLES, "CUT_MIN_SAVED_MM": MIN_SAVED_MM, "CUT_MIN_ARC_RATIO": MIN_ARC_RATIO, "CUT_SAMPLES": CHORD_SAMPLES}
+	var constants := CORE.get_script_constant_map()
+	for key: String in contract:
+		if constants.has(key) and not _check(constants[key] == contract[key], "cut contract changed: " + key):
+			return false
 	if not _check(_all_deep_sectors_open(PackedInt32Array([3, 3, 3]), 3) and not _all_deep_sectors_open(PackedInt32Array([3, 2, 3]), 3) and not _all_deep_sectors_open(PackedInt32Array([3, 3]), 3), "mixed or too-short deep excursion cannot inherit the open-sector exemption"):
 		return false
 	var straight := PackedVector2Array()
