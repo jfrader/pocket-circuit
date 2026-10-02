@@ -75,48 +75,6 @@ static func candidates(
 	return found
 
 
-static func _outside_samples(a: Vector2, b: Vector2, polygon: PackedVector2Array, fragments: Array[PackedVector2Array]) -> PackedVector2Array:
-	var deep := PackedVector2Array()
-	var span := b - a
-	var length_squared := span.length_squared()
-	var intervals := PackedVector2Array()
-	var boundary_points := PackedVector2Array()
-	if length_squared == 0.0 or fragments.is_empty():
-		for sample in CORE.CUT_SAMPLES:
-			var point := a.lerp(b, float(sample) / float(CORE.CUT_SAMPLES - 1))
-			if not Geometry2D.is_point_in_polygon(point, polygon):
-				deep.append(point)
-		return deep
-	for fragment in fragments:
-		if fragment.is_empty():
-			continue
-		var first := clampf((fragment[0] - a).dot(span) / length_squared, 0.0, 1.0)
-		var last := clampf((fragment[-1] - a).dot(span) / length_squared, 0.0, 1.0)
-		intervals.append(Vector2(minf(first, last), maxf(first, last)))
-		boundary_points.append(fragment[0])
-		boundary_points.append(fragment[-1])
-	for sample in CORE.CUT_SAMPLES:
-		var t := float(sample) / float(CORE.CUT_SAMPLES - 1)
-		var point := a.lerp(b, t)
-		var outside := false
-		var on_boundary := false
-		for interval in intervals:
-			if is_equal_approx(t, interval.x) or is_equal_approx(t, interval.y):
-				on_boundary = true
-			if t > interval.x and t < interval.y:
-				outside = true
-		if not on_boundary:
-			for boundary_point in boundary_points:
-				if point.is_equal_approx(boundary_point):
-					on_boundary = true
-					break
-		if on_boundary:
-			outside = not Geometry2D.is_point_in_polygon(point, polygon)
-		if outside:
-			deep.append(point)
-	return deep
-
-
 static func _consider(
 		line: PackedVector2Array, normals: PackedVector2Array, prefix: PackedFloat64Array,
 		total: float, expanded: PackedVector2Array, island: PackedVector2Array,
@@ -144,15 +102,19 @@ static func _consider(
 			var segment := PackedVector2Array([a, b])
 			if island.size() >= 3 and not Geometry2D.intersect_polyline_with_polygon(segment, island).is_empty():
 				continue
-			var outside: Array[PackedVector2Array] = Geometry2D.clip_polyline_with_polygon(segment, expanded)
-			if outside.is_empty():
+			if Geometry2D.clip_polyline_with_polygon(segment, expanded).is_empty():
 				continue
-			var deep := _outside_samples(a, b, expanded, outside)
+			var deep := PackedVector2Array()
+			for sample in CORE.CUT_SAMPLES:
+				var point := a.lerp(b, float(sample) / float(CORE.CUT_SAMPLES - 1))
+				if not Geometry2D.is_point_in_polygon(point, expanded):
+					deep.append(point)
 			if deep.size() < CORE.CUT_MIN_DEEP_SAMPLES:
 				continue
 			var crosses_open := false
 			if open_sector >= 0:
 				crosses_open = true
+				# Check rejoining samples first; any non-open point ends the same all-points predicate.
 				for index in range(deep.size() - 1, -1, -1):
 					var point := deep[index]
 					var nearest := CORE._closest_point_on_loop(point, line)
