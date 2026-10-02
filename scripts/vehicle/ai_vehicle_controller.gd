@@ -709,7 +709,7 @@ func _physics_process(delta: float) -> void:
 		var surface_grip := _planned_surface_grip(surface_plan)
 		var reaction_seconds := float(tuning["reaction_seconds"])
 		var reaction_margin := vehicle.speed * reaction_seconds
-		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, surface_grip) + reaction_margin
+		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, surface_grip, _brake_prediction, _brake_prediction_loads) + reaction_margin
 		braking_distance *= float(personality["brake_timing"])
 	else:
 		braking_distance = lerpf(
