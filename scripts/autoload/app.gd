@@ -1136,7 +1136,9 @@ func update_setting(key: String, value: Variant) -> bool:
 	_save_data = candidate
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
-	_apply_settings()
+	_apply_audio_settings()
+	if key == "fullscreen":
+		_apply_window_mode()
 	return true
 
 
@@ -1218,13 +1220,23 @@ func _hide_boot_placeholder(scene: Node) -> void:
 
 
 func _apply_settings() -> void:
+	_apply_audio_settings()
+	_apply_window_mode()
+
+
+func _apply_audio_settings() -> void:
 	_apply_bus_volume("Master", float(_save_data["master_volume"]))
 	_apply_bus_volume("Music", float(_save_data["music_volume"]))
 	_apply_bus_volume("SFX", float(_save_data["sfx_volume"]))
 	_apply_bus_volume("Engine", float(_save_data["engine_volume"]))
 	_apply_bus_volume("Tyre", float(_save_data["tyre_volume"]))
-	if DisplayServer.get_name().to_lower() != "headless":
-		var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if bool(_save_data["fullscreen"]) else DisplayServer.WINDOW_MODE_WINDOWED
+
+
+func _apply_window_mode() -> void:
+	if DisplayServer.get_name().to_lower() == "headless":
+		return
+	var mode := DisplayServer.WINDOW_MODE_FULLSCREEN if bool(_save_data["fullscreen"]) else DisplayServer.WINDOW_MODE_WINDOWED
+	if DisplayServer.window_get_mode() != mode:
 		DisplayServer.window_set_mode(mode)
 
 
