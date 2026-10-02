@@ -85,11 +85,6 @@ const CUT_MIN_ARC_RATIO := 1.25
 ## back out again.
 const CUT_FOLD_MAX_SPACING_MM := 1400.0
 const CUT_FOLD_MIN_LAP_FRACTION := 0.12
-## Physical width a car occupies, taken from the vehicle collision capsule
-## (scenes/vehicles/rustbug.tscn: radius 18, height 52). The 44 in VEHICLE_WIDTH is
-## a corridor-planning figure, not what the physics sweeps.
-const CAR_COLLISION_DIAMETER := 36.0
-
 const VEHICLE_WIDTH := 44.0
 const MIN_VIABLE_CORRIDOR_WIDTH := VEHICLE_WIDTH * 1.6
 const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
@@ -666,8 +661,7 @@ static func _pick_straight_candidate(
 	return TRACK_BUILDER_DRESSING.pick_straight_candidate(candidates, centerline, gate_samples, excluded, minimum_separation)
 
 
-## The shared definition of an exploitable cut, used by both the planner, which
-## must block these arcs, and the regression, which checks none survive.
+## Geometric chord classification; registered physics decides whether it is clear.
 static func exploitable_cut(centerline: PackedVector2Array, start: int, lookahead: int) -> Dictionary:
 	var verdict := {"exploitable": false, "deep": 0, "saved": 0.0, "ratio": 1.0}
 	var count := centerline.size()
