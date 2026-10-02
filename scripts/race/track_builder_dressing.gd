@@ -1,10 +1,18 @@
 class_name TrackBuilderDressing
 ## Generated dressing: moments, formations, giants, room details, surfaces.
 
+## Loose debris varies per track: how many pieces, how big, and where across the
+## road. A patch never touches the corridor edge, so it stays a thing to drive
+## over rather than a wall.
+const GRIP_PATCH_MIN_HALF_WIDTH := 26.0
+const GRIP_PATCH_MAX_HALF_WIDTH := 64.0
+const GRIP_PATCH_MIN_HALF_SPAN := 2
+const GRIP_PATCH_MAX_HALF_SPAN := 5
+const GRIP_PATCH_EDGE_MARGIN := 12.0
+
 
 ## Technical surface strip reach, in samples each side of its centre.
 const TECHNICAL_HALF_SPAN := 6
-const GRIP_PATCH_HALF_SPAN := 3
 ## Surfaces keep this many samples from the finish line and from each other.
 const SURFACE_START_CLEARANCE := 18
 const SURFACE_SEPARATION := 16
@@ -1033,7 +1041,7 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 	# on calm stretches (see TrackCornerMap), separated from gates, the grids and
 	# the two designed surface moments; a lap short of calm room gets fewer.
 	var extra_patches: Array = spec.get("grip_patches", [])
-	var calm_patch_centres := TrackCornerMap.calm_indices(moments["corner_clearance"], GRIP_PATCH_HALF_SPAN)
+	var calm_patch_centres := TrackCornerMap.calm_indices(moments["corner_clearance"], GRIP_PATCH_MIN_HALF_SPAN)
 	if extra_patches.size() > 0 and not calm_patch_centres.is_empty():
 		var patch_rng := RandomNumberGenerator.new()
 		patch_rng.seed = TrackBuilderCore._mix_seed(int(spec.get("material_seed", spec.get("requested_seed", 0))), "grip_patches:%s" % String(story.get("id", "")))
@@ -1053,9 +1061,17 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 					break
 			if not separated or not TrackBuilderCore._clear_of_points(centerline[pidx_center], gate_samples, SURFACE_GATE_CLEARANCE):
 				continue
+			var half_span := patch_rng.randi_range(GRIP_PATCH_MIN_HALF_SPAN, GRIP_PATCH_MAX_HALF_SPAN)
+			if not TrackCornerMap.is_calm(moments["corner_clearance"], pidx_center, half_span):
+				continue
 			var data: Dictionary = extra_patches[added % extra_patches.size()]
-			var halfw := 42.0 + patch_rng.randf_range(0, 12)
-			var poly := surface_strip(centerline, pidx_center, GRIP_PATCH_HALF_SPAN, halfw)
+			var halfw := patch_rng.randf_range(GRIP_PATCH_MIN_HALF_WIDTH, GRIP_PATCH_MAX_HALF_WIDTH)
+			# Debris is not a centre stripe: each patch sits somewhere across the
+			# road, either side, and only sometimes near the racing line.
+			var room := maxf(0.0, TrackBuilderCore.HALF_WIDTH - halfw - GRIP_PATCH_EDGE_MARGIN)
+			var lateral := (-1.0 if patch_rng.randi() % 2 == 0 else 1.0) * patch_rng.randf_range(0.15, 1.0) * room
+			var shifted := offset_centerline(centerline, lateral)
+			var poly := surface_strip(shifted, pidx_center, half_span, halfw)
 			var patch_node := Node2D.new()
 			patch_node.name = "ExtraGripPatch%d" % added
 			patch_node.set_meta("moment_kind", &"grip_patch")
@@ -1063,10 +1079,12 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 			patch_node.set_meta("grip", float(data["grip"]))
 			patch_node.set_meta("speed", float(data.get("speed", data["grip"])))
 			patch_node.set_meta("polygon", poly)
+			patch_node.set_meta("lateral_mm", lateral)
+			patch_node.set_meta("half_span", half_span)
 			patch_node.set_meta("decal_texture", String(data["decal"]))
 			parent.add_child(patch_node)
 			if emit_decals:
-				add_surface_decals(patch_node, centerline, pidx_center, GRIP_PATCH_HALF_SPAN, String(data["decal"]), 0.0)
+				add_surface_decals(patch_node, centerline, pidx_center, half_span, String(data["decal"]), lateral)
 			var def := {
 				"name": StringName(data["name"]),
 				"role": &"patch",
@@ -1076,12 +1094,26 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 				"points": poly,
 				"decal": String(data["decal"]),
 				"centerline_index": pidx_center,
+				"lateral_mm": lateral,
+				"half_span": half_span,
 			}
 			definitions.append(def)
 			used_indices.append(pidx_center)
 			added += 1
 		parent.set_meta("grip_patch_count", added)
 	root.set_meta("generated_surfaces", definitions)
+
+
+## Every point of the racing line moved sideways, so a strip built from it lies
+## off-centre like real debris instead of tracing the driving line.
+static func offset_centerline(centerline: PackedVector2Array, lateral: float) -> PackedVector2Array:
+	if is_zero_approx(lateral):
+		return centerline
+	var shifted := PackedVector2Array()
+	shifted.resize(centerline.size())
+	for index in centerline.size():
+		shifted[index] = centerline[index] + TrackBuilderCore._sample_tangent(centerline, index).rotated(PI * 0.5) * lateral
+	return shifted
 
 
 static func surface_strip(centerline: PackedVector2Array, center_index: int, half_span: int, half_width: float) -> PackedVector2Array:

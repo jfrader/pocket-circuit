@@ -287,16 +287,21 @@ static func line_sweep_clears_footprint(
 			if point_to_segment_distance(center, line[index], line[(index + 1) % line.size()]) < radius:
 				return false
 		return true
-	var expanded_half_size := size * 0.5 + Vector2.ONE * hull_radius
-	var radius := expanded_half_size.length()
+	var half_size := size * 0.5
+	var radius := half_size.length() + hull_radius
 	var bounds := Rect2(center - Vector2.ONE * radius, Vector2.ONE * radius * 2.0)
+	var corners := rect_points(Vector2.ZERO, size)
 	for index in line.size():
 		if not bounds.intersects(Rect2(line[index], line[(index + 1) % line.size()] - line[index]).abs(), true):
 			continue
 		var local_from := (line[index] - center).rotated(-rotation)
 		var local_to := (line[(index + 1) % line.size()] - center).rotated(-rotation)
-		if segment_intersects_axis_rect(local_from, local_to, expanded_half_size):
+		if segment_intersects_axis_rect(local_from, local_to, half_size):
 			return false
+		for edge in corners.size():
+			var nearest := Geometry2D.get_closest_points_between_segments(local_from, local_to, corners[edge], corners[(edge + 1) % corners.size()])
+			if nearest[0].distance_squared_to(nearest[1]) < hull_radius * hull_radius:
+				return false
 	return true
 
 

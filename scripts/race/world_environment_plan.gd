@@ -25,6 +25,8 @@ var pools: Dictionary = {}
 var assets_by_id: Dictionary = {}
 var used: Dictionary = {}
 var occupied: Array[PackedVector2Array] = []
+var solid_polygons: Array[PackedVector2Array] = []
+var solid_cores: Array[Vector3] = []
 var reservations: Array[PackedVector2Array] = []
 var density: Dictionary = {}
 var placements: Array[Dictionary] = []
@@ -55,6 +57,10 @@ static func plan(theme: StringName, seed: int, geometry: Dictionary, candidates:
 		planner.reservations.append(polygon)
 	for polygon: PackedVector2Array in geometry.get("solid_footprints", []):
 		planner.occupied.append(polygon)
+	for polygon: PackedVector2Array in geometry.get("solid_polygons", []):
+		planner.solid_polygons.append(polygon)
+	for core: Vector3 in geometry.get("solid_cores", []):
+		planner.solid_cores.append(core)
 	planner._reserve_open_exit()
 	planner._catalog(theme, candidates, story)
 	planner._compose()
@@ -147,6 +153,7 @@ func _compose() -> void:
 	if int(diagnostics["focal_count"]) == 0:
 		diagnostics["notes"].append("no_focal_fit")
 	_compose_boundary()
+	_close_outer_cuts()
 	for group in GROUP_COUNT:
 		rng = _rng("group:%d" % group)
 		var sector := _route_anchor((float(group) + rng.randf_range(0.1, 0.5)) / GROUP_COUNT, 120.0)
@@ -227,6 +234,66 @@ func _run_kind(asset: Dictionary) -> String:
 	if length >= float(density["rail_min_length_mm"]) and aspect >= float(density["rail_min_aspect"]): return "rail"
 	if length >= float(density["peg_length_mm"][0]) and length <= float(density["peg_length_mm"][1]) and aspect >= float(density["peg_min_aspect"]): return "peg"
 	return ""
+
+
+func _close_outer_cuts() -> void:
+	var settings: Dictionary = density["corner_cuts"]
+	var cuts := TrackOuterCutMap.candidates(line, outer_line, island, half_width, open_sector, settings)
+	diagnostics["corner_cut_candidates"] = cuts.size()
+	diagnostics["corner_blockers"] = 0
+	diagnostics["unfit_corner_cuts"] = 0
+	var rng := _rng("boundary:corner_cuts")
+	var limit := mini(int(density["maximum"]), int(diagnostics["boundary_target"]))
+	for cut: Dictionary in cuts:
+		if _covered_cut(cut["a"], cut["b"]):
+			continue
+		if int(diagnostics["boundary_count"]) >= limit:
+			diagnostics["unfit_corner_cuts"] += 1
+			continue
+		var placed := false
+		var points: PackedVector2Array = cut["deep_points"]
+		var assets := _available("boundary", rng)
+		for asset: Dictionary in assets:
+			if String(asset.get("collision", "flat")) == "flat":
+				continue
+			var size: Vector2 = asset["dimensions_mm"]
+			var heading: float = (cut["b"] - cut["a"]).angle()
+			var axis := PI * 0.5 if size.y > size.x else 0.0
+			for attempt in points.size():
+				var offset := ceili(float(attempt) * 0.5) * (1 if attempt % 2 == 0 else -1)
+				var index := clampi(points.size() / 2 + offset, 0, points.size() - 1)
+				var closest := TrackBuilderCore._closest_point_on_loop(points[index], line)
+				var outward := (points[index] - (closest["position"] as Vector2)).normalized()
+				for orientation: float in [heading + PI * 0.5, heading]:
+					for outset: float in [0.0, float(settings["vehicle_radius_mm"])]:
+						var point := points[index] + outward * outset
+						var fit := _validate(asset, point, orientation + axis)
+						if fit.is_empty() or fit["zone"] != "apron":
+							continue
+						fit["corner_cut_indices"] = Vector2i(cut["start_index"], cut["end_index"])
+						_store(asset, "boundary", fit)
+						diagnostics["corner_blockers"] += 1
+						placed = true
+						break
+					if placed:
+						break
+				if placed:
+					break
+			if placed:
+				break
+		if not placed:
+			diagnostics["unfit_corner_cuts"] += 1
+
+
+func _covered_cut(a: Vector2, b: Vector2) -> bool:
+	for core: Vector3 in solid_cores:
+		if Geometry2D.segment_intersects_circle(a, b, Vector2(core.x, core.y), core.z + float(density["corner_cuts"]["vehicle_radius_mm"])) >= 0.0:
+			return true
+	var chord := PackedVector2Array([a, b])
+	for polygon: PackedVector2Array in solid_polygons:
+		if not Geometry2D.intersect_polyline_with_polygon(chord, polygon).is_empty():
+			return true
+	return false
 
 
 func _search_outer_run(asset: Dictionary, preferred: float, maximum: int, minimum: int, gap: float) -> Array[Dictionary]:
@@ -447,6 +514,9 @@ func _store(asset: Dictionary, role: String, fit: Dictionary) -> void:
 	diagnostics[role + "_count"] += 1
 	if String(asset.get("collision", "alpha")) != "flat":
 		occupied.append(_make_oriented_rect(fit["position"], asset["dimensions_mm"], float(fit["rotation"])))
+		var size: Vector2 = asset["dimensions_mm"]
+		var position: Vector2 = fit["position"]
+		solid_cores.append(Vector3(position.x, position.y, minf(size.x, size.y) * float(density["corner_cuts"]["solid_core_ratio"])))
 
 
 static func _make_oriented_rect(center: Vector2, size: Vector2, rotation: float) -> PackedVector2Array:
