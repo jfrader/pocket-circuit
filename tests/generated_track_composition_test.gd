@@ -176,7 +176,7 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	var definitions: Variant = track.get_meta("generated_surfaces", null)
 	# Slippery surfaces only go on calm stretches, so a lap may carry fewer
 	# patches, or no technical surface, rather than one in a corner.
-	if not _expect(definitions is Array and (definitions as Array).size() >= 1 and (definitions as Array).size() <= 2 + BUILDER.GRIP_PATCH_MAX_COUNT, "%s should define a shortcut, an optional technical surface and up to 8 grip patches" % theme):
+	if not _expect(definitions is Array and (definitions as Array).size() >= 1 and (definitions as Array).size() <= 2 + BUILDER.GRIP_PATCH_MAX_COUNT, "%s should define a shortcut, an optional technical surface and up to %d grip patches" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
 		return false
 	var definitions_by_role := {}
 	var patch_definitions: Array[Dictionary] = []
@@ -189,7 +189,7 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 			patch_definitions.append(definition)
 	if not _expect(definitions_by_role.has(&"shortcut"), "%s should expose the shortcut surface role" % theme):
 		return false
-	if not _expect(patch_definitions.size() <= BUILDER.GRIP_PATCH_MAX_COUNT, "%s should expose at most 8 deterministic grip-patch definitions" % theme):
+	if not _expect(patch_definitions.size() >= BUILDER.GRIP_PATCH_MIN_COUNT and patch_definitions.size() <= BUILDER.GRIP_PATCH_MAX_COUNT, "%s should expose 0-%d deterministic grip-patch definitions" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
 		return false
 	var gate_positions := PackedVector2Array()
 	for checkpoint_index in 8:

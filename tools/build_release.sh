@@ -111,6 +111,7 @@ serial_tests=(
 	"tests/race_start_timing_test.gd"
 	"tests/reset_manager_test.gd"
 	"tests/menu_feedback_test.gd"
+	"tests/track_outer_cut_map_test.gd"
 )
 
 run_test_serial() {

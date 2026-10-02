@@ -38,8 +38,11 @@ const APEX_MAX_INWARD_OFFSET := 90.0
 const APEX_MAX_ENTRY_OFFSET := 32.0
 const APEX_SAMPLE_SPAN := 10
 const FINISH_APPROACH_SPAN := 20
-const GRIP_PATCH_MIN_COUNT := 4
-const GRIP_PATCH_MAX_COUNT := 8
+## Some tracks carry no loose debris at all and others a lot; the count is
+## drawn from this range per track, so debris is a property of the circuit
+## rather than a constant of the game.
+const GRIP_PATCH_MIN_COUNT := 0
+const GRIP_PATCH_MAX_COUNT := 10
 const ISLAND_SIDE_FACE_WIDTH := 38.0
 const ISLAND_TEXTURED_RIM_WIDTH := 26.0
 const ISLAND_TOP_LIP_WIDTH := 8.0
@@ -63,6 +66,25 @@ const APRON_COLLIDER_CLEARANCE := 36.0
 const FLAT_DRESSING_ROUTE_CLEARANCE := 12.0
 const ROOM_EDGE_TILE_WORLD_LENGTH := 1024.0
 const RACING_LINE_HULL_RADIUS := 22.0
+## An exploitable corner cut is one where the outside line leaves the road deeply
+## for a sustained stretch and is meaningfully shorter than the road itself. The
+## island wall already stops cuts into the middle; this describes the outer side,
+## which is bounded only by physical props. Clipping the painted edge or using the
+## apron to recover is intended, so those excursions must not count.
+const CUT_TURN_THRESHOLD := 0.18
+const CUT_MIN_LOOKAHEAD := 5
+const CUT_MAX_LOOKAHEAD := 32
+const CUT_SAMPLES := 41
+const CUT_MIN_OFF_CORRIDOR_MM := 40.0
+const CUT_MIN_DEEP_SAMPLES := 3
+const CUT_MIN_SAVED_MM := 50.0
+const CUT_MIN_ARC_RATIO := 1.25
+## A fold is two stretches of lap that pass close together but sit far apart along
+## the lap. Crossing the apron between them skips the most track, and it is the
+## shape the user described: a corner that turns in toward the island and then
+## back out again.
+const CUT_FOLD_MAX_SPACING_MM := 1400.0
+const CUT_FOLD_MIN_LAP_FRACTION := 0.12
 const VEHICLE_WIDTH := 44.0
 const MIN_VIABLE_CORRIDOR_WIDTH := VEHICLE_WIDTH * 1.6
 const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
@@ -161,7 +183,7 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int, g
 	return {"scene": packed, "seed": prepared["seed"], "racing_line_metrics": (prepared.get("racing_line_metrics", {}) as Dictionary).duplicate(true)}
 
 
-static func prepare_layout(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
+static func prepare_route(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
 	if not LAYOUTS.has(theme) or not ROOM_SHAPES.has(room_shape):
 		return {}
 	var spec: Dictionary = LAYOUTS[theme]
@@ -265,49 +287,68 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["obstacle_plan"] = _plan_generated_obstacles(theme, spec, centerline, gate_samples, moments)
 	var prepared := {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed}
 	prepared["racing_line_metrics"] = racing_line_metrics_from_prepared(prepared)
-	if not bool(generation_options.get("preview_composer", false)):
-		var left: PackedVector2Array = edges["left"]
-		var right: PackedVector2Array = edges["right"]
-		var inner: PackedVector2Array = edges["inner_boundary"] if edges.has("inner_boundary") else _simple_inner_boundary_loop(left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right, centerline)
-		var story: Dictionary = spec.get("story_kit", STORY_KITS[theme][0]).duplicate(true)
-		spec["story_kit"] = story
-		spec["environment_theme"] = theme
-		spec["environment_room_polygon"] = room_polygon
-		spec["environment_island_polygon"] = inner
-		var candidates := WorldEnvironmentCatalog.candidates(theme, story, spec)
-		spec["environment_assets"] = candidates
-		var reserved: Array[PackedVector2Array] = []
-		spec["pocket_regions"] = TrackBuilderCollision.pocket_regions(spec, centerline, room_polygon)
-		for pocket: Dictionary in spec["pocket_regions"]:
-			reserved.append(pocket["collision"])
-		var gate_points := _layout_gate_samples(centerline, spec)
-		var post_assets: Array = spec.get("gate_props", [])
-		if not post_assets.is_empty():
-			for gate_index in gate_points.size():
-				var closest := _closest_point_on_loop(gate_points[gate_index], centerline)
-				var tangent := _sample_tangent(centerline, int(closest["index"]))
-				for side in [-1, 1]:
-					var path := String(post_assets[posmod(gate_index * 2 + (1 if side > 0 else 0), post_assets.size())])
-					var size := PROP_SCALE.size_for(path, GATE_POST_SIZE) + Vector2.ONE * 6.0
-					var offset := FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET
-					reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side, size, tangent.angle()))
-		var obstacle_footprints: Array[PackedVector2Array] = []
-		for obstacle: Dictionary in spec.get("obstacle_plan", []):
-			obstacle_footprints.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(obstacle["position"], obstacle["footprint_size"], obstacle["rotation"]))
-		var surface_art_exclusions: Array[PackedVector2Array] = reserved.duplicate()
-		surface_art_exclusions.append_array(obstacle_footprints)
-		surface_art_exclusions.append(inner)
-		spec["surface_art_exclusions"] = surface_art_exclusions
-		var outer: PackedVector2Array = edges.get("outer_boundary", left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right)
-		spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"outer_boundary":outer,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved,"solid_footprints":obstacle_footprints}, candidates, {})
-		spec["surface_identity"] = HouseholdSurfaceMaterials.resolve(theme, int(spec.get("material_seed", _mix_seed(maxi(seed, 0), "material"))), String(spec.get("material_id", "")), String(spec.get("palette_id", "")), spec.get("floor_modulate", Color.WHITE))
-		spec["floor_texture"] = spec["surface_identity"]["floor"]["texture"]
-		spec["track_texture"] = spec["surface_identity"]["course"]["texture"]
-		spec["island_material_texture"] = spec["surface_identity"]["island"]["texture"]
-		spec["floor_modulate"] = Color.WHITE
-		spec["ambient_props"] = []
-		spec["corridor_patterns"] = []
-		prepared["spec"] = spec
+	return prepared
+
+
+static func prepare_layout(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
+	var prepared := prepare_route(theme, room_shape, seed, generation_options)
+	if prepared.is_empty():
+		return {}
+	var spec: Dictionary = prepared["spec"]
+	var centerline: PackedVector2Array = prepared["centerline"]
+	var edges: Dictionary = prepared["edges"]
+	var room_polygon: PackedVector2Array = prepared["room_polygon"]
+	var left: PackedVector2Array = edges["left"]
+	var right: PackedVector2Array = edges["right"]
+	var inner: PackedVector2Array = edges["inner_boundary"] if edges.has("inner_boundary") else _simple_inner_boundary_loop(left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right, centerline)
+	var story: Dictionary = spec.get("story_kit", STORY_KITS[theme][0]).duplicate(true)
+	spec["story_kit"] = story
+	spec["environment_theme"] = theme
+	spec["environment_room_polygon"] = room_polygon
+	spec["environment_island_polygon"] = inner
+	var candidates := WorldEnvironmentCatalog.candidates(theme, story, spec)
+	spec["environment_assets"] = candidates
+	var reserved: Array[PackedVector2Array] = []
+	var solid_polygons: Array[PackedVector2Array] = []
+	var solid_cores: Array[Vector3] = []
+	var core_ratio := float(WorldEnvironmentCatalog.boundary_density()["corner_cuts"]["solid_core_ratio"])
+	spec["pocket_regions"] = TrackBuilderCollision.pocket_regions(spec, centerline, room_polygon)
+	for pocket: Dictionary in spec["pocket_regions"]:
+		reserved.append(pocket["collision"])
+		solid_polygons.append(pocket["collision"])
+	var gate_points := _layout_gate_samples(centerline, spec)
+	var post_assets: Array = spec.get("gate_props", [])
+	if not post_assets.is_empty():
+		for gate_index in gate_points.size():
+			var closest := _closest_point_on_loop(gate_points[gate_index], centerline)
+			var tangent := _sample_tangent(centerline, int(closest["index"]))
+			for side in [-1, 1]:
+				var path := String(post_assets[posmod(gate_index * 2 + (1 if side > 0 else 0), post_assets.size())])
+				var size := PROP_SCALE.size_for(path, GATE_POST_SIZE)
+				var offset := FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET
+				var position: Vector2 = gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side
+				reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(position, size + Vector2.ONE * 6.0, tangent.angle()))
+				solid_cores.append(Vector3(position.x, position.y, minf(size.x, size.y) * core_ratio))
+	var obstacle_footprints: Array[PackedVector2Array] = []
+	for obstacle: Dictionary in spec.get("obstacle_plan", []):
+		obstacle_footprints.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(obstacle["position"], obstacle["footprint_size"], obstacle["rotation"]))
+		var position: Vector2 = obstacle["position"]
+		var size: Vector2 = obstacle["footprint_size"]
+		solid_cores.append(Vector3(position.x, position.y, minf(size.x, size.y) * core_ratio))
+	var surface_art_exclusions: Array[PackedVector2Array] = reserved.duplicate()
+	surface_art_exclusions.append_array(obstacle_footprints)
+	surface_art_exclusions.append(inner)
+	spec["surface_art_exclusions"] = surface_art_exclusions
+	var outer: PackedVector2Array = edges.get("outer_boundary", left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right)
+	spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"outer_boundary":outer,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved,"solid_footprints":obstacle_footprints,"solid_polygons":solid_polygons,"solid_cores":solid_cores}, candidates, {})
+	spec["surface_identity"] = HouseholdSurfaceMaterials.resolve(theme, int(spec.get("material_seed", _mix_seed(maxi(seed, 0), "material"))), String(spec.get("material_id", "")), String(spec.get("palette_id", "")), spec.get("floor_modulate", Color.WHITE))
+	spec["floor_texture"] = spec["surface_identity"]["floor"]["texture"]
+	spec["track_texture"] = spec["surface_identity"]["course"]["texture"]
+	spec["island_material_texture"] = spec["surface_identity"]["island"]["texture"]
+	spec["floor_modulate"] = Color.WHITE
+	spec["ambient_props"] = []
+	spec["corridor_patterns"] = []
+	prepared["spec"] = spec
 	return prepared
 
 

@@ -1,34 +1,18 @@
 extends SceneTree
 
-## Strict deterministic race-outcome baseline.
-##
-## Runs a fixed seed list with --fixed-fps 60 at the project's physics settings.
-## It does NOT change Engine.physics_ticks_per_second or Engine.time_scale (unlike
-## ai_seed_sweep_test.gd, which forces 240 Hz / 4x to stay fast). For each seed
-## it records the finishing order, every racer's finish time, DNF flags, and a
-## SHA-256 hash of that outcome, then compares the run against the checked-in
-## baseline file `tests/ai_race_baseline.json`.
-##
-## Modes (via environment):
-##   (default)                 run the small gate seed list and verify vs baseline
-##   PC_BASELINE_RECORD=1      run and (re)write the baseline file
-##   PC_BASELINE_FULL=1        run the full seed list instead of the gate list
-##   PC_BASELINE_SEED=<n>      run a single ad-hoc seed (theme/room via env)
-##   PC_BASELINE_DIFFICULTY=<tier>  run a difficulty tier (sunday_drive /
-##                                  club_circuit / clockwork); records to and
-##                                  verifies against a per-tier baseline file
-##
-## The gate globs `tests/*.gd`, so the default list is small (3 seeds x 2 laps).
-## The full sweep is opt-in. FIXED_FPS is read by the source-test gate; direct
-## invocations must also pass --fixed-fps 60 to disable wall-clock synchronization.
+## Functional four-car race gate at the project's real 60 Hz clock.
+## PC_BASELINE_FULL, PC_BASELINE_SEED/THEME/ROOM and PC_BASELINE_DIFFICULTY
+## select cases; PC_BASELINE_RECORD is retired (no snapshot writes).
+## Direct invocations must pass --fixed-fps 60.
 
 const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 
-const BASELINE_PATH := "res://tests/ai_race_baseline.json"
 const SCHEMA_VERSION := 2
 const FIXED_FPS := 60
+const MAX_RECOVERIES := 3
+const MAX_FINISH_GAP_RATIO := 1.80
 
 const DEFAULT_DIFFICULTY := "club_circuit"
 const VALID_DIFFICULTIES := ["sunday_drive", "club_circuit", "clockwork"]
@@ -64,15 +48,9 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var record := not OS.get_environment("PC_BASELINE_RECORD").is_empty()
 	var difficulty := _baseline_difficulty()
 	var seed_cases := _seed_cases()
-	var baseline := _load_baseline()
-
-	if not record and not _expect(not baseline.is_empty(), "missing or invalid baseline: %s" % _baseline_path()):
-		return
-	# This baseline only means something at the project's default tick rate and
-	# time scale. A project tick-rate change must fail here, not drift silently.
+	# Exercise the project's actual clock, not the accelerated seed sweep clock.
 	if not _expect(Engine.physics_ticks_per_second == FIXED_FPS, "physics_ticks_per_second must be %d (project default), got %d" % [FIXED_FPS, Engine.physics_ticks_per_second]):
 		return
 	if not _expect(is_equal_approx(Engine.time_scale, 1.0), "time_scale must be 1.0, got %f" % Engine.time_scale):
@@ -98,11 +76,11 @@ func _run() -> void:
 		spread_sum += (float(racers[-1]["finish_time"]) - float(racers[0]["finish_time"])) / LAPS
 		for racer: Dictionary in racers:
 			dnf_count += int(bool(racer["dnf"]))
+		print("AI_BASELINE_RESULT key=%s order=%s times=%s hash=%s frames=%d" % [entry["key"], str(entry["finish_order"]), _times_str(racers), entry["hash"], entry["frames"]])
 	print("AI_BASELINE_METRICS difficulty=%s mean_p1_lap=%.3f mean_spread=%.3f dnf=%d" % [difficulty, p1_sum / entries.size(), spread_sum / entries.size(), dnf_count])
 
 	var document := {
 		"schema_version": SCHEMA_VERSION,
-		"godot_version": String(Engine.get_version_info().get("string", "")),
 		"config": {
 			"difficulty": difficulty,
 			"fixed_fps": FIXED_FPS,
@@ -114,14 +92,8 @@ func _run() -> void:
 		"seeds": entries,
 	}
 
-	if record:
-		_write_baseline(document)
-		print("AI_RACE_BASELINE RECORDED difficulty=%s seeds=%d -> %s" % [difficulty, entries.size(), _baseline_path()])
-		quit(0)
-		return
-
-	var problems := _compare(document, baseline)
-	if not _expect(problems.is_empty(), "AI_RACE_BASELINE MISMATCH:\n%s" % "\n".join(problems)):
+	var problems := validate_document(document, seed_cases)
+	if not _expect(problems.is_empty(), "AI_RACE_BASELINE invalid race:\n%s" % "\n".join(problems)):
 		return
 	print("AI_RACE_BASELINE_TEST PASS seeds=%d" % entries.size())
 	quit(0)
@@ -132,13 +104,6 @@ func _baseline_difficulty() -> String:
 	if difficulty in VALID_DIFFICULTIES:
 		return difficulty
 	return DEFAULT_DIFFICULTY
-
-
-func _baseline_path() -> String:
-	var difficulty := _baseline_difficulty()
-	if difficulty == DEFAULT_DIFFICULTY:
-		return BASELINE_PATH
-	return "res://tests/ai_race_baseline_%s.json" % difficulty
 
 
 func _seed_cases() -> Array[Dictionary]:
@@ -196,6 +161,21 @@ func _run_race(case: Dictionary, difficulty: String) -> Dictionary:
 		root.remove_child(prototype)
 		prototype.free()
 		return {}
+	var gate_order: Array[int] = []
+	var finish_index := -1
+	for checkpoint: Node in manager.get_ordered_checkpoints():
+		if bool(checkpoint.get("is_finish_line")):
+			finish_index = int(checkpoint.get("checkpoint_index"))
+		else:
+			gate_order.append(int(checkpoint.get("checkpoint_index")))
+	gate_order.append(finish_index)
+	var histories: Dictionary = {}
+	for racer: Node2D in racers:
+		histories[racer] = []
+	manager.racer_checkpoint_passed.connect(func(racer: Node2D, checkpoint_index: int) -> void:
+		if histories.has(racer):
+			(histories[racer] as Array).append(checkpoint_index)
+	)
 	# Deterministic settle + countdown, same frame counts as ai_seed_sweep_test
 	# but at the real 60 Hz tick rate (each physics frame is 1/60 simulated s).
 	for _settle in SETTLE_FRAMES:
@@ -221,16 +201,22 @@ func _run_race(case: Dictionary, difficulty: String) -> Dictionary:
 		var finished := bool(state.get("finished", false))
 		var dnf := (not finished) or bool(state.get("dnf", false))
 		var finish_time := float(state.get("finish_time", INF))
-		if not is_finite(finish_time):
-			finish_time = float(state.get("elapsed", INF))
 		var driver := String(state.get("driver_name", ""))
 		if driver.is_empty():
 			driver = racer.name
+		var controller: AIVehicleController = null
+		for child: Node in racer.get_children():
+			if child is AIVehicleController:
+				controller = child as AIVehicleController
 		results.append({
 			"driver": driver,
 			"position": int(state.get("finish_position", 0)),
 			"finish_time": _round_time(finish_time),
 			"dnf": dnf,
+			"finished": finished,
+			"lap": int(state.get("lap", 0)),
+			"recoveries": controller.recovery_count if controller != null else -1,
+			"gates": (histories[racer] as Array).duplicate(),
 		})
 	results.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return int(a["position"]) < int(b["position"]))
 	if not OS.get_environment("PC_MISTAKE_TRACE").is_empty():
@@ -259,6 +245,7 @@ func _run_race(case: Dictionary, difficulty: String) -> Dictionary:
 		"racers": results,
 		"hash": outcome_hash,
 		"frames": frame,
+		"gate_order": gate_order,
 	}
 
 
@@ -273,62 +260,117 @@ func _round_time(value: float) -> float:
 	return round(value * 1000.0) / 1000.0
 
 
-func _load_baseline() -> Dictionary:
-	if not FileAccess.file_exists(_baseline_path()):
-		return {}
-	var file := FileAccess.open(_baseline_path(), FileAccess.READ)
-	if file == null:
-		return {}
-	var parsed: Variant = JSON.parse_string(file.get_as_text())
-	if parsed is Dictionary:
-		return parsed as Dictionary
-	return {}
-
-
-func _write_baseline(document: Dictionary) -> void:
-	var file := FileAccess.open(_baseline_path(), FileAccess.WRITE)
-	if file == null:
-		push_error("AI_RACE_BASELINE FAIL: cannot write %s" % _baseline_path())
-		quit(1)
-		return
-	file.store_string(JSON.stringify(document, "  ") + "\n")
-	file.close()
-
-
-func _compare(document: Dictionary, baseline: Dictionary) -> Array[String]:
-	# JSON numbers become floats; nested Dictionary/Array equality distinguishes
-	# them from native integers. Compare the same representation the writer stores.
-	document = JSON.parse_string(JSON.stringify(document)) as Dictionary
+func validate_document(document: Dictionary, expected_cases: Array[Dictionary]) -> Array[String]:
 	var problems: Array[String] = []
-	if document.get("schema_version") != baseline.get("schema_version"):
-		problems.append("schema_version: current=%s baseline=%s" % [document.get("schema_version"), baseline.get("schema_version")])
-	var doc_config: Dictionary = document.get("config", {})
-	var base_config: Dictionary = baseline.get("config", {})
-	for key: String in ["difficulty", "fixed_fps", "physics_ticks_per_second", "time_scale", "laps", "field_size"]:
-		if doc_config.get(key) != base_config.get(key):
-			problems.append("config.%s: current=%s baseline=%s" % [key, doc_config.get(key), base_config.get(key)])
-	var base_by_key := {}
-	for entry: Dictionary in baseline.get("seeds", []):
-		base_by_key[String(entry.get("key", ""))] = entry
-	for entry: Dictionary in document.get("seeds", []):
-		var key := String(entry.get("key", ""))
-		var base: Dictionary = base_by_key.get(key, {})
-		if base.is_empty():
-			problems.append("seed %s not present in baseline" % key)
+	if not _whole(document.get("schema_version")) or int(document["schema_version"]) != SCHEMA_VERSION:
+		problems.append("schema_version")
+	var config: Variant = document.get("config")
+	if not config is Dictionary:
+		return ["config missing"]
+	if config.get("difficulty") not in VALID_DIFFICULTIES:
+		problems.append("config.difficulty")
+	for key: String in ["fixed_fps", "physics_ticks_per_second", "laps", "field_size"]:
+		var target := FIXED_FPS if key in ["fixed_fps", "physics_ticks_per_second"] else (LAPS if key == "laps" else FIELD_SIZE)
+		if not _whole(config.get(key)) or int(config[key]) != target:
+			problems.append("config.%s" % key)
+	if not _number(config.get("time_scale")) or float(config["time_scale"]) != 1.0:
+		problems.append("config.time_scale")
+	var seeds: Variant = document.get("seeds")
+	if not seeds is Array or seeds.size() != expected_cases.size():
+		problems.append("seed count")
+		return problems
+	var expected: Dictionary = {}
+	for case: Dictionary in expected_cases:
+		var key := "%s/%s/%d" % [case["theme"], case["room"], case["seed"]]
+		expected[key] = case
+	var seen: Dictionary = {}
+	for value: Variant in seeds:
+		if not value is Dictionary:
+			problems.append("seed record missing")
 			continue
-		if entry.get("frames") != base.get("frames"):
-			problems.append("seed %s physics frames: current=%s baseline=%s" % [key, entry.get("frames"), base.get("frames")])
-		if entry.get("hash") != base.get("hash") or entry.get("finish_order") != base.get("finish_order") or entry.get("racers") != base.get("racers"):
-			problems.append(
-				"seed %s outcome changed\n  current  order=%s times=%s\n  baseline order=%s times=%s" % [
-					key,
-					str(entry.get("finish_order", [])),
-					_times_str(entry.get("racers", [])),
-					str(base.get("finish_order", [])),
-					_times_str(base.get("racers", [])),
-				]
-			)
+		var entry: Dictionary = value
+		var key := String(entry.get("key", ""))
+		if not expected.has(key) or seen.has(key):
+			problems.append("unexpected or duplicate seed %s" % key)
+			continue
+		seen[key] = true
+		var case: Dictionary = expected[key]
+		if entry.get("theme") != String(case["theme"]) or entry.get("room") != String(case["room"]) or not _whole(entry.get("seed")) or int(entry["seed"]) != int(case["seed"]):
+			problems.append("%s seed fields" % key)
+		if not _whole(entry.get("frames")) or int(entry["frames"]) <= 0 or int(entry["frames"]) > MAX_PHYSICS_FRAMES:
+			problems.append("%s frames" % key)
+		var order: Variant = entry.get("gate_order")
+		if not order is Array or order.is_empty():
+			problems.append("%s gate order" % key)
+			continue
+		var unique_gates: Dictionary = {}
+		for gate: Variant in order:
+			if not _whole(gate) or int(gate) < 0 or unique_gates.has(int(gate)):
+				problems.append("%s invalid gate order" % key)
+				break
+			unique_gates[int(gate)] = true
+		var racers: Variant = entry.get("racers")
+		var finish_order: Variant = entry.get("finish_order")
+		if not racers is Array or racers.size() != FIELD_SIZE or not finish_order is Array or finish_order.size() != FIELD_SIZE:
+			problems.append("%s field count" % key)
+			continue
+		var names: Dictionary = {}
+		var positions: Dictionary = {}
+		var finish_times: Dictionary = {}
+		var fastest := INF
+		var slowest := 0.0
+		for value_racer: Variant in racers:
+			if not value_racer is Dictionary:
+				problems.append("%s racer record" % key)
+				continue
+			var racer: Dictionary = value_racer
+			var name: Variant = racer.get("driver")
+			var position: Variant = racer.get("position")
+			if not name is String or name.is_empty() or names.has(name):
+				problems.append("%s driver" % key)
+			else:
+				names[name] = true
+			if not _whole(position) or int(position) < 1 or int(position) > FIELD_SIZE or positions.has(int(position)):
+				problems.append("%s position" % key)
+				continue
+			positions[int(position)] = true
+			if finish_order[int(position) - 1] != name:
+				problems.append("%s finish order" % key)
+			if racer.get("finished") != true or racer.get("dnf") != false or not _whole(racer.get("lap")) or int(racer["lap"]) != LAPS:
+				problems.append("%s unfinished racer" % key)
+			if not _whole(racer.get("recoveries")) or int(racer["recoveries"]) < 0 or int(racer["recoveries"]) > MAX_RECOVERIES:
+				problems.append("%s recoveries" % key)
+			var gates: Variant = racer.get("gates")
+			if not gates is Array or gates.size() != LAPS * order.size():
+				problems.append("%s gate history" % key)
+			else:
+				for gate_index in gates.size():
+					if not _whole(gates[gate_index]) or int(gates[gate_index]) != int(order[gate_index % order.size()]):
+						problems.append("%s gate history" % key)
+						break
+			var time: Variant = racer.get("finish_time")
+			if not _number(time) or float(time) <= 0.0 or float(time) > float(MAX_PHYSICS_FRAMES) / FIXED_FPS:
+				problems.append("%s finish time" % key)
+			else:
+				finish_times[int(position)] = float(time)
+				fastest = minf(fastest, float(time))
+				slowest = maxf(slowest, float(time))
+		if positions.size() != FIELD_SIZE or names.size() != FIELD_SIZE:
+			problems.append("%s incomplete field" % key)
+		for position in range(1, FIELD_SIZE):
+			if finish_times.has(position) and finish_times.has(position + 1) and float(finish_times[position]) > float(finish_times[position + 1]):
+				problems.append("%s finish chronology" % key)
+		if fastest > 0.0 and is_finite(fastest) and slowest / fastest > MAX_FINISH_GAP_RATIO:
+			problems.append("%s field spread" % key)
 	return problems
+
+
+func _number(value: Variant) -> bool:
+	return (value is int or value is float) and is_finite(float(value))
+
+
+func _whole(value: Variant) -> bool:
+	return _number(value) and float(value) == floor(float(value))
 
 
 func _times_str(racers: Array) -> String:

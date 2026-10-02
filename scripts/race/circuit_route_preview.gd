@@ -12,7 +12,7 @@ static func prepare(identity_value: Variant) -> Dictionary:
 	if identity.is_empty():
 		return {}
 	var seeds: Dictionary = identity["sub_seeds"]
-	var prepared := TRACK_BUILDER.prepare_layout(
+	var prepared := TRACK_BUILDER.prepare_route(
 		StringName(identity["theme"]),
 		StringName(identity["room"]),
 		int(seeds["route"]),

@@ -5,8 +5,6 @@ const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 const ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"square"]
 const SEEDS := [7919, 23757]
-## Surface strips reach this many samples each side of their centre.
-const SPAN_BY_ROLE := {&"technical": TrackBuilderDressing.TECHNICAL_HALF_SPAN, &"patch": TrackBuilderDressing.GRIP_PATCH_HALF_SPAN}
 
 
 func _initialize() -> void:
@@ -38,7 +36,12 @@ func _run_test() -> void:
 					if role == &"shortcut" or float(surface["grip"]) >= 1.0:
 						continue
 					var index := int(surface["centerline_index"])
-					if not _expect(TrackCornerMap.is_calm(clearance, index, int(SPAN_BY_ROLE[role])), "%s %s surface at sample %d sits in or near a corner" % [label, role, index]):
+					var half_span := TrackBuilderDressing.TECHNICAL_HALF_SPAN
+					if role == &"patch":
+						if not _expect(surface.has("half_span"), "%s patch must declare its actual span" % label):
+							return
+						half_span = int(surface["half_span"])
+					if not _expect(TrackCornerMap.is_calm(clearance, index, half_span), "%s %s surface at sample %d sits in or near a corner" % [label, role, index]):
 						return
 					patches += 1 if role == &"patch" else 0
 					technical += 1 if role == &"technical" else 0

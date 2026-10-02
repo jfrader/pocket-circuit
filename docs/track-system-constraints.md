@@ -24,6 +24,10 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   pool. Quick Race and championship events build arbitrary seeds live through
   staged `TrackBuilderCore.prepare_layout` / `assemble_runtime` preparation.
   `build_packed` remains the synchronous tooling and fixture API.
+- `TrackBuilderCore.prepare_route` is the shared validated route stage for
+  previews and full layouts: centerline, corridor edges, room, story/material
+  identity, obstacle plan and racing-line metrics. `prepare_layout` adds the
+  physical environment plan and surface art identity before scene assembly.
 - The three authored track scenes remain regression fixtures for their themed
   collision and AI smoke tests. They are not a whitelist for generated play.
 - The builder is runtime-safe and headless-safe. It does not depend on the
@@ -205,10 +209,11 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 - `ShortcutDecision`: a visibly decaled inside lane that is geometrically
   shorter and at least 1.06x faster, but has lower grip. The outer lane remains
   longer and safe for every vehicle build.
-- Up to eight additional `patch` surface definitions (target 4-8) add
+- Up to ten additional `patch` surface definitions (target 0-10) add
   deterministic themed grip and speed changes on calm stretches only. They
-  remain inside the corridor and clear of every gate and the two designed
-  surface moments; a lap short of calm room gets fewer. `TrackVariantPresenter`
+  vary in footprint and lateral position, remain inside the corridor and stay
+  clear of every gate and the two designed surface moments; a lap short of calm
+  room gets fewer. `TrackVariantPresenter`
   remains the only creator of authoritative runtime `SurfaceZone` nodes.
 - `SpeedSection`: the unobstructed start/finish straight.
 - `DramaticFinish`: clear forward and reverse run-ups ending at the checker.
@@ -217,7 +222,8 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 
 `generated_moment_indices` and `generated_surfaces` expose these contracts for
 runtime presentation and tests. The surface array contains the shortcut, the
-technical moment when a calm stretch exists, and up to 8 grip patches. `RacingLine` takes the safe outer lane through the shortcut window,
+technical moment when a calm stretch exists, and up to 10 grip patches.
+`RacingLine` takes the safe outer lane through the shortcut window,
 while `ShortcutRacingLine` exposes the shorter lane to competitive AI when its
 speed and grip metadata are suitable. Sunday Drive always stays on the safe
 line.
@@ -272,6 +278,14 @@ line.
   the outer edge or to a bounded parallel outset, never silently to the island.
   Coverage counts actual rail lengths, excluding the empty gaps between items
   and sets. Physical front/back gaps are checked independently of arc metadata.
+- `TrackOuterCutMap` identifies outside corner chords and folds from the route,
+  including outward lane positions. The planner fits existing colliding props
+  directly across uncovered chords within the same boundary budget. These props
+  must pass the normal room, corridor, reservation and open-sector fit checks;
+  registered engine collision, not the planner's conservative cores, is the
+  acceptance gate.
+  Reserved fit footprints are not collision coverage. Exact pocket boundary
+  polygons and conservative unexpanded prop cores supply coverage separately.
 - Common reusable rails and hardware have explicit repeat budgets in the asset
   contract. The single-focal composition rule does not impose a global one-copy
   limit on a pen that is also used in boundary sets.
@@ -289,9 +303,11 @@ line.
   ranges of 1–4, 2–6 and 3–8 by act, on calm stretches only. Targets may
   underfill if no safe placement exists; never reduce the 1.6-car viable corridor or either racing-line clearance
   to reach a quota. The obstacle stream remains independent of route geometry.
-- Footprint sweeps reject distant segment AABBs before the unchanged narrow-phase
-  checks. The optimized result is regression-checked against an exhaustive sweep;
-  denser scenery must not trade collision accuracy for placement speed.
+- Footprint sweeps reject distant segment AABBs before checking circular
+  clearance against the actual oriented rectangle edges or circle. The result
+  is regression-checked against registered engine shape queries; square corner
+  inflation must not reject physically clear space. Denser scenery must not
+  trade collision accuracy for placement speed.
 - Every ordered checkpoint `Area2D` is asymmetric: its inner endpoint stops at
   `HALF_WIDTH` or the raised island, while its outer endpoint reaches the room
   wall. Inner grass does not trip the gate, but legal outer-apron lines do. The
@@ -370,6 +386,9 @@ line.
   least one position exchange and deliberate pass attempt, no more than three
   recoveries per racer, and a slowest/fastest finish-time ratio no greater than
   1.80.
+- The 60 Hz race acceptance harness checks legal bounded finishes, recovery and
+  field spread with fixed seed and driver inputs. Historical outcome snapshots
+  are diagnostics, not required winners or lap times after layout changes.
 - `ai_recovery_scenarios_test.gd` pins a sustained giant-contact jam and a
   finished car parked on the racing line. The jammed AI must exercise escape or
   recovery and finish legally; the trailing AI must ignore and pass through the
