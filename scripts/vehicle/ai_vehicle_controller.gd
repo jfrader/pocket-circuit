@@ -267,6 +267,14 @@ var _reference_cumulative := PackedFloat32Array()
 var _reference_total := 0.0
 var _racing_line_nearest_index := -1
 var _reference_nearest_index := -1
+# Scratch results are owned by this controller. Callers must consume them before
+# calling the same helper again; none may be retained across physics ticks.
+var _reference_goal_result := {"goal": Vector2.ZERO, "lookahead": 0.0}
+var _traffic_result := {"target_position": Vector2.ZERO, "speed_scale": 1.0, "speed_limit": INF, "passing": false, "drafting": false}
+var _leader_result: Dictionary = {}
+var _surface_result := {"weight": 0.0, "speed_scale": 1.0, "grip_scale": 1.0, "risk": 0.0, "avoid_direction": Vector2.ZERO}
+var _surface_model_result := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
+var _obstacle_result := {"weight": 0.0, "speed_scale": 1.0, "speed_limit": INF, "avoid_direction": Vector2.ZERO, "static_contact": false, "escape_steer": 0.0}
 
 
 func configure(
@@ -1041,15 +1049,18 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 	## Classic pure-pursuit goal: project the vehicle onto the reference loop,
 	## advance by `lookahead` along the race direction, and return that point
 	## plus the look-ahead distance actually used (the pursuit radius).
+	_reference_goal_result["lookahead"] = lookahead
 	if _reference_path.size() < 2:
-		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
+		_reference_goal_result["goal"] = vehicle.global_position + forward * lookahead
+		return _reference_goal_result
 	_ensure_arc_tables_current()
 	var count := _reference_path.size()
 	var segment_lengths := _reference_segment_lengths
 	var cumulative := _reference_cumulative
 	var total := _reference_total
 	if total < 0.001:
-		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
+		_reference_goal_result["goal"] = vehicle.global_position + forward * lookahead
+		return _reference_goal_result
 
 	var nearest := _nearest_segment_local(_reference_path, vehicle.global_position, _reference_nearest_index)
 	_reference_nearest_index = int(nearest["index"])
@@ -1071,7 +1082,8 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 		1.0
 	)
 	var goal := _reference_path[target_index].lerp(_reference_path[(target_index + 1) % count], target_fraction)
-	return {"goal": goal, "lookahead": lookahead}
+	_reference_goal_result["goal"] = goal
+	return _reference_goal_result
 
 
 func _leader_progress_deficit() -> float:
@@ -1099,13 +1111,12 @@ func _traffic_plan(
 			_overtake_cooldown_remaining,
 			OVERTAKE_COOLDOWN / float(personality["overtake_aggression"])
 		)
-	var plan := {
-		"target_position": line_target,
-		"speed_scale": 1.0,
-		"speed_limit": INF,
-		"passing": false,
-		"drafting": false,
-	}
+	var plan := _traffic_result
+	plan["target_position"] = line_target
+	plan["speed_scale"] = 1.0
+	plan["speed_limit"] = INF
+	plan["passing"] = false
+	plan["drafting"] = false
 	if not vehicle.is_inside_tree() or forward.length_squared() < 0.001:
 		return plan
 
@@ -1182,12 +1193,12 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 			nearest_distance = distance_ahead
 			nearest_lateral = lateral_distance
 	if nearest == null:
-		return {}
-	return {
-		"vehicle": nearest,
-		"distance": nearest_distance,
-		"lateral_distance": nearest_lateral,
-	}
+		_leader_result.clear()
+		return _leader_result
+	_leader_result["vehicle"] = nearest
+	_leader_result["distance"] = nearest_distance
+	_leader_result["lateral_distance"] = nearest_lateral
+	return _leader_result
 
 
 func _select_overtake_side(forward: Vector2, leader: VehicleController) -> float:
@@ -1409,13 +1420,12 @@ func _planned_surface_grip(surface_plan: Dictionary) -> float:
 
 
 func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
-	var plan := {
-		"weight": 0.0,
-		"speed_scale": 1.0,
-		"grip_scale": 1.0,
-		"risk": 0.0,
-		"avoid_direction": desired_direction,
-	}
+	var plan := _surface_result
+	plan["weight"] = 0.0
+	plan["speed_scale"] = 1.0
+	plan["grip_scale"] = 1.0
+	plan["risk"] = 0.0
+	plan["avoid_direction"] = desired_direction
 	if not vehicle.is_inside_tree():
 		return plan
 	var shortcut_zone := _upcoming_shortcut_zone(desired_direction)
@@ -1469,7 +1479,10 @@ func _surface_driving_speed_scale(speed_scale: float, grip_scale: float, directi
 
 
 func _surface_model(direction: Vector2) -> Dictionary:
-	var model := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
+	var model := _surface_model_result
+	model["risk"] = 0.0
+	model["grip"] = 1.0
+	model["speed"] = 1.0
 	var model_risk := 0.0
 	var origin := vehicle.global_position
 	for record: Dictionary in _surface_zone_records_for_tick():
@@ -1482,7 +1495,9 @@ func _surface_model(direction: Vector2) -> Dictionary:
 			var risk := float(record["risk"])
 			if risk >= model_risk:
 				model_risk = risk
-				model = {"risk": risk, "grip": float(record["grip"]), "speed": float(record["speed"])}
+				model["risk"] = risk
+				model["grip"] = float(record["grip"])
+				model["speed"] = float(record["speed"])
 			break
 	return model
 
@@ -1550,14 +1565,13 @@ func _surface_zone_risk(zone: SurfaceZone) -> float:
 
 
 func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictionary:
-	var plan := {
-		"weight": 0.0,
-		"speed_scale": 1.0,
-		"speed_limit": INF,
-		"avoid_direction": desired_direction,
-		"static_contact": false,
-		"escape_steer": 0.0,
-	}
+	var plan := _obstacle_result
+	plan["weight"] = 0.0
+	plan["speed_scale"] = 1.0
+	plan["speed_limit"] = INF
+	plan["avoid_direction"] = desired_direction
+	plan["static_contact"] = false
+	plan["escape_steer"] = 0.0
 	if not vehicle.is_inside_tree():
 		return plan
 	var origin := vehicle.global_position + forward * OBSTACLE_FRONT_OFFSET
