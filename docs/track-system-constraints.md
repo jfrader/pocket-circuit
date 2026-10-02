@@ -382,6 +382,9 @@ line.
   least one position exchange and deliberate pass attempt, no more than three
   recoveries per racer, and a slowest/fastest finish-time ratio no greater than
   1.80.
+- The 60 Hz race acceptance harness checks legal bounded finishes, recovery and
+  field spread with fixed seed and driver inputs. Historical outcome snapshots
+  are diagnostics, not required winners or lap times after layout changes.
 - `ai_recovery_scenarios_test.gd` pins a sustained giant-contact jam and a
   finished car parked on the racing line. The jammed AI must exercise escape or
   recovery and finish legally; the trailing AI must ignore and pass through the

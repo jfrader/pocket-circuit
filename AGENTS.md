@@ -56,6 +56,9 @@ Run full verification and imports in an isolated, detached git worktree at the
 committed candidate, separate from the operator's playtesting checkout.
 Native addon sync must preserve live mappings: skip unchanged files and stage
 changed files beside their destination before atomic replacement.
+AI acceptance checks legal completion, recovery, field spread and difficulty,
+not historical finish orders or exact-time hashes. Keep seeded inputs and
+physics/assist limits fixed; generated-layout changes may change race results.
 
 ## Branches and verification
 
