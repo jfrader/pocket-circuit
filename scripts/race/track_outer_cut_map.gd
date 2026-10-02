@@ -42,12 +42,15 @@ static func candidates(
 		prefix[index + 1] = prefix[index] + line[index].distance_to(line[(index + 1) % count])
 	var total := prefix[count]
 	var open_bounds := _open_segment_bounds(line, open_sector)
+	var route_curve: Curve2D = null
+	if not open_bounds.is_empty():
+		route_curve = _route_curve(line, total)
 	var seen := {}
 	for start in count:
 		if CORE._turn_strength(line, start, 6) < CORE.CUT_TURN_THRESHOLD:
 			continue
 		for span in range(CORE.CUT_MIN_LOOKAHEAD, CORE.CUT_MAX_LOOKAHEAD + 1):
-			_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, start, (start + span) % count, seen, found)
+			_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, route_curve, start, (start + span) % count, seen, found)
 
 	# Nearby non-local folds need not be sharp at either endpoint.
 	var buckets := {}
@@ -69,41 +72,63 @@ static func candidates(
 					if mini(forward, count - forward) < int(CORE.CUT_FOLD_MIN_LAP_FRACTION * count):
 						continue
 					if forward <= count - forward:
-						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, index, other, seen, found)
+						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, route_curve, index, other, seen, found)
 					else:
-						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, other, index, seen, found)
+						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, route_curve, other, index, seen, found)
 	found.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return float(left["saved_mm"]) > float(right["saved_mm"]))
 	return found
 
 
-static func _open_segment_bounds(line: PackedVector2Array, open_sector: int) -> Rect2:
+static func _route_curve(line: PackedVector2Array, total: float) -> Curve2D:
+	var route_curve := Curve2D.new()
+	# Zero handles keep every baked span on the original straight segments.
+	# One interval for the whole loop avoids oversampling long source routes.
+	route_curve.bake_interval = maxf(total, 1.0)
+	for point in line:
+		route_curve.add_point(point)
+	route_curve.add_point(line[0])
+	return route_curve
+
+
+static func _open_segment_bounds(line: PackedVector2Array, open_sector: int) -> Array[Rect2]:
+	var bounds: Array[Rect2] = []
 	if open_sector < 0:
-		return Rect2()
-	var bounds := Rect2()
-	var initialized := false
+		return bounds
 	for index in line.size():
 		if mini(SECTOR_COUNT - 1, int(float(index) / line.size() * SECTOR_COUNT)) != open_sector:
 			continue
-		if not initialized:
-			bounds = Rect2(line[index], Vector2.ZERO)
-			initialized = true
-		bounds = bounds.expand(line[index]).expand(line[(index + 1) % line.size()])
+		bounds.append(Rect2(line[index], Vector2.ZERO).expand(line[(index + 1) % line.size()]))
 	return bounds
 
 
-static func _cannot_be_nearest_open(point: Vector2, line: PackedVector2Array, start: int, finish: int, bounds: Rect2) -> bool:
-	# Every open segment lies inside bounds. Either known route vertex gives an
-	# upper bound on the globally nearest segment; reject only a strict gap.
-	var nearest_in_bounds := point.clamp(bounds.position, bounds.end)
-	var lower := point.distance_squared_to(nearest_in_bounds)
+static func _cannot_be_nearest_open(
+		point: Vector2, line: PackedVector2Array, start: int, finish: int,
+		bounds: Array[Rect2], route_curve: Curve2D, prefix: PackedFloat64Array
+) -> bool:
+	if bounds.is_empty():
+		return false
+	# Each open segment is inside its own box, so the minimum box distance is
+	# a lower bound even if the sector curves around a large empty area.
+	var lower := INF
+	for box in bounds:
+		lower = minf(lower, point.distance_squared_to(point.clamp(box.position, box.end)))
 	var upper := minf(point.distance_squared_to(line[start]), point.distance_squared_to(line[finish]))
+	if lower > upper and not is_equal_approx(lower, upper):
+		return true
+	# The native curve lookup proposes a segment, NEVER the sector result.
+	# Project onto the *original* segment for a guaranteed reachable upper bound.
+	var offset := route_curve.get_closest_offset(point)
+	if is_finite(offset):
+		var index := clampi(prefix.bsearch(offset) - 1, 0, line.size() - 1)
+		var reachable := Geometry2D.get_closest_point_to_segment(point, line[index], line[(index + 1) % line.size()])
+		upper = minf(upper, point.distance_squared_to(reachable))
 	return lower > upper and not is_equal_approx(lower, upper)
 
 
 static func _consider(
 		line: PackedVector2Array, normals: PackedVector2Array, prefix: PackedFloat64Array,
 		total: float, expanded: PackedVector2Array, island: PackedVector2Array,
-		fractions: Array, lane_reach: float, open_sector: int, open_bounds: Rect2, start: int, finish: int,
+		fractions: Array, lane_reach: float, open_sector: int, open_bounds: Array[Rect2], route_curve: Curve2D, start: int, finish: int,
 		seen: Dictionary, found: Array[Dictionary]
 ) -> void:
 	var count := line.size()
@@ -140,7 +165,7 @@ static func _consider(
 			if open_sector >= 0:
 				crosses_open = true
 				for point in deep:
-					if _cannot_be_nearest_open(point, line, start, finish, open_bounds):
+					if _cannot_be_nearest_open(point, line, start, finish, open_bounds, route_curve, prefix):
 						crosses_open = false
 						break
 					var nearest := CORE._closest_point_on_loop(point, line)
