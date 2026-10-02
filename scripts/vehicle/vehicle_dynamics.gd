@@ -357,6 +357,8 @@ static func predict_braking_distance(
 	stats: VehicleStats,
 	surface_grip_mult: float,
 	surface_speed_mult: float = 1.0,
+	scratch: Array[float] = [],
+	loads: Array[float] = [],
 ) -> float:
 	## Deterministic 60 Hz prediction using the same brake, drag, and rolling
 	## terms as the controller. This is the public planner model query.
@@ -368,8 +370,10 @@ static func predict_braking_distance(
 	var speed := v_now
 	var distance := 0.0
 	var delta := 1.0 / 60.0
-	var scratch: Array[float] = [0.0, 0.0]
-	var loads: Array[float] = [0.0, 0.0, 0.0, 0.0]
+	if scratch.is_empty():
+		scratch = [0.0, 0.0]
+	if loads.is_empty():
+		loads = [0.0, 0.0, 0.0, 0.0]
 	for _step in 60 * 30:
 		if speed <= v_target:
 			break

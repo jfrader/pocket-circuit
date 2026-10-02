@@ -288,14 +288,14 @@ func get_safe_corner_speed(radius: float, surface_grip: float = -1.0) -> float:
 	return DYNAMICS.get_safe_corner_speed(radius, lat_accel)
 
 
-func get_braking_distance(v_now: float, v_target: float, surface_grip: float = -1.0) -> float:
+func get_braking_distance(v_now: float, v_target: float, surface_grip: float = -1.0, scratch: Array[float] = [], loads: Array[float] = []) -> float:
 	## AI/public query: braking distance from v_now to v_target.
 	var grip := surface_grip if surface_grip >= 0.0 else surface_grip_multiplier
 	if stats.physics_model_version == 0:
 		var brake_accel := stats.get_legacy_brake_force() / maxf(stats.get_legacy_mass(), 0.001)
 		return DYNAMICS.get_braking_distance(v_now, v_target, brake_accel)
 	return DYNAMICS.predict_braking_distance(
-		v_now, v_target, stats, grip, surface_speed_multiplier,
+		v_now, v_target, stats, grip, surface_speed_multiplier, scratch, loads,
 	)
 
 
