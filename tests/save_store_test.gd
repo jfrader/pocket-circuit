@@ -142,7 +142,7 @@ func _run_test() -> void:
 
 	_write_raw(TEST_PATH, '{"version":1,"best_event_finishes":{"kitchen_crumb_rush":2}}')
 	loaded = store.load_data()
-	if not _expect(loaded["completed_events"] == ["kitchen_crumb_rush"] and int(loaded["best_event_points"]["kitchen_crumb_rush"]) == 7, "older saves should derive current progress fields from finishes"):
+	if not _expect(loaded["completed_events"] == ["kitchen_crumb_rush"] and int(loaded["best_event_points"].get("kitchen_crumb_rush", -1)) == 7, "older saves should derive current progress fields from finishes"):
 		return
 	if not _expect(bool(loaded["championship_started"]) and loaded.has("music_volume") and loaded.has("engine_volume") and loaded.has("tyre_volume") and loaded.has("first_run") and not bool(loaded["reduced_motion"]), "older raced saves should merge the current reduced-motion default"):
 		return
@@ -217,7 +217,7 @@ func _test_generator_version_migration(store: SaveStore) -> bool:
 	}))
 	var loaded := store.load_data()
 	var migrated: Dictionary = loaded["championship_circuit"]
-	if not _expect(int(migrated["seed"]) == 123456789 and int(migrated["generator_version"]) == 9, "an older championship save should keep its master seed while advancing the generator version"):
+	if not _expect(int(migrated["seed"]) == 123456789 and int(migrated["generator_version"]) == 10, "an older championship save should keep its master seed while advancing the generator version"):
 		return false
 	if not _expect(
 			loaded["completed_events"] == ["kitchen_crumb_rush", "kitchen_mug_run", "kitchen_clean_line"]

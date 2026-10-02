@@ -77,25 +77,23 @@ collision-matched polygon fallbacks, safely reposition and recontextualize
 selected obstacle bodies, and add room-specific world markings and oversized
 props.
 
-The current surface and environmental-hazard configuration is exact:
+The current surface configuration is exact:
 
-| Theme | Base surface | Special surfaces (grip / speed) | Moving hazard |
-|---|---|---|---|
-| Kitchen | Polished counter | Wet spill (0.58 / 0.88) | Rolling fruit crosses the top racing line |
-| Workshop | Workbench | Oil slick (0.45 / 0.92); sawdust (0.78 / 0.72) | Sliding socket crosses the bottom racing line |
-| Office | Desk mat | Loose paper (0.84 / 0.78); keyboard (0.70 / 0.64) | Swinging cable crosses the right racing line |
+| Theme | Base surface | Special surfaces (grip / speed) |
+|---|---|---|
+| Kitchen | Polished counter | Wet spill (0.58 / 0.88) |
+| Workshop | Workbench | Oil slick (0.45 / 0.92); sawdust (0.78 / 0.72) |
+| Office | Desk mat | Loose paper (0.84 / 0.78); keyboard (0.70 / 0.64) |
 
 Surface multipliers are transient vehicle state and never mutate the selected
 VehicleStats resource. They apply equally to player and AI, support overlapping
-zones, and reset to the room's base surface after exit or recovery. Each hazard
-uses a deterministic 1.2-second warning, 1.6-second crossing, and 2.8-second
-cooldown. Contact applies a bounded 90-unit impulse after a 0.78 velocity slow;
-hazards use Area2D collision, never modify checkpoints, and stop with the paused
-scene tree.
+zones, and reset to the room's base surface after exit or recovery. Slippery
+surfaces and on-course obstacles sit only on calm stretches, away from corners
+in both race directions. There is no moving hazard.
 
 All three rooms use the championship's homologated collision and checkpoint
 footprint, letting players carry learned racing lines between acts. Distinct
-room dressing, surface physics, warning language, moving hazards, lap counts,
+room dressing, surface physics, on-course obstacles, lap counts,
 field formats, and reverse events change how that footprint races in each act.
 
 ## Vehicles
@@ -118,10 +116,11 @@ existing VehicleStats, transform, common collision geometry, and save identity.
 
 ## Audio and Feedback
 
-The current review build keeps original synthesized menu and race loops pending
-the project composer's final cues. Engine, countdown, go, UI, drift, boost,
-impact, and hazard-warning effects use edited 48 kHz audio from Kenney's CC0
-Interface, Impact, and Sci-Fi packs. Exact sources, transformations, and pack
+Music, engine notes and effects are generated at runtime by first-party project
+code and the Gamestruments engine. No recorded music ships; the only recorded
+audio is the Kenney CC0 `engine_loop.ogg` fallback. Menu and race scores are
+composed from the circuit seed, so a circuit always sounds the same while
+different circuits differ. Exact sources, transformations, and pack
 hashes live in `ASSET_PROVENANCE.md` and `assets/audio/LICENSE.md`.
 
 One persistent AudioDirector owns a single music player, a local-player engine
@@ -221,10 +220,16 @@ rules rather than holding this release open.
 
 ## Exact Release Commands
 
-Run the full gate on CI compute, not on the desktop used for playtesting. The
-`Release gates` workflow uses a trusted repository runner labeled
-`pocket-circuit-ci`, read-only repository permissions and checksum-pinned
-official Godot inputs from `tools/godot_release.json`.
+Run the full gate locally for development closeout, following `AGENTS.md`'s
+verification policy. Use the checksum-pinned official Godot inputs from
+`tools/godot_release.json`; `tools/install_ci_godot.py` installs the editor and
+native templates and prints the `GODOT_BIN` and `XDG_DATA_HOME` environment
+values to export. Check host load before interpreting wall-clock tests and
+keep graphical QA separate from the full gate.
+
+The manually dispatched `Release gates` workflow retains the same gate on a
+trusted repository runner labeled `pocket-circuit-ci`, with read-only
+repository permissions. It builds candidates, not published releases.
 
 ```bash
 ./tools/build_release.sh /absolute/path/to/pocket-circuit-release
@@ -247,8 +252,9 @@ For bounded development checks, run only the relevant script:
 ```
 
 Headless results do not certify rendered frame pacing, physical controller
-behavior or Windows/Deck hardware. Runner/network unavailability leaves CI
-blocked; it is not a successful check and does not waive those manual gates.
+behavior or Windows/Deck hardware. An unavailable dependency or runner leaves
+that verification blocked; it is not a successful check and does not waive
+those manual gates.
 
 ## Current External Steam Blockers
 

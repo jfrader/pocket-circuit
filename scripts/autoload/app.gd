@@ -13,9 +13,89 @@ const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd"
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
 const CIRCUIT_PREVIEW_QUEUE := preload("res://scripts/race/circuit_preview_queue.gd")
 const RACE_ASSET_PRELOADER := preload("res://scripts/race/race_asset_preloader.gd")
+const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
+const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
+## Every race fields the player plus three opponents.
+const ROSTER_SIZE := 3
 const LOADING_FRAME_BUDGET_USEC := 50_000
 
 var current_race_session: Dictionary = {}
+var _quick_roster: Dictionary = {}
+
+
+## The championship's saved roster. An older save has none, so it falls back to a
+## roster derived from that championship's own circuit seed: stable, never written
+## from a read path, and different for every championship.
+func _championship_roster() -> Dictionary:
+	var vehicle_ids: Array = CATALOG.championship_vehicle_ids()
+	var stored := DRIVER_ROSTER.normalize(_save_data.get("driver_roster"), vehicle_ids, ROSTER_SIZE)
+	if not stored.is_empty():
+		return stored
+	var championship: Dictionary = _save_data.get("championship_circuit", {})
+	var seed := int(championship.get("seed", 0))
+	if seed <= 0:
+		seed = DRIVER_ROSTER.MAX_SEED
+	return DRIVER_ROSTER.create(seed, vehicle_ids, ROSTER_SIZE)
+
+
+## A quick race rolls a fresh lineup each time it starts; a retry reuses the
+## session's own event, so its lineup is kept.
+func _roll_quick_roster() -> void:
+	_quick_roster = DRIVER_ROSTER.create(
+		_random_seed(DRIVER_ROSTER.MAX_SEED),
+		CATALOG.quick_race_vehicle_ids(),
+		ROSTER_SIZE
+	)
+
+
+## Generated opponents replace the shipped cast for the current race or campaign.
+static func _roster_ids(roster: Dictionary) -> Array:
+	var ids: Array = []
+	for opponent: Variant in roster.get("opponents", []):
+		if opponent is Dictionary:
+			ids.append(String((opponent as Dictionary).get("id", "")))
+	return ids
+
+
+## Generated opponents replace the shipped cast for the current race or campaign.
+## Race starts install explicitly, because the session is assigned after the
+## event is built; screen syncs can use the session's own mode.
+func _install_roster_for(mode: String) -> void:
+	var roster := _quick_roster if mode == "quick" else _championship_roster()
+	DRIVER_DIRECTORY.install_opponents(roster.get("opponents", []))
+
+
+func _install_active_roster() -> void:
+	_install_roster_for(String(current_race_session.get("mode", "")))
+
+
+## Points the event at its roster slots and names the rival in the story. Slots
+## are derived from the roster and the event, so a retry faces the same drivers.
+func _event_with_roster(event: Dictionary, roster: Dictionary) -> Dictionary:
+	var opponents: Array = roster.get("opponents", [])
+	if event.is_empty() or opponents.is_empty():
+		return event
+	var count := clampi(int(event.get("opponent_count", opponents.size())), 0, ROSTER_SIZE)
+	var updated := event.duplicate(true)
+	var ids: Array = []
+	var lead := ""
+	if count == 1:
+		# A duel picks one rival per act, so acts do not all face the same driver.
+		var slot := (maxi(1, int(event.get("act", 1))) - 1) % opponents.size()
+		ids.append(String((opponents[slot] as Dictionary)["id"]))
+		lead = String((opponents[slot] as Dictionary)["name"])
+	else:
+		for index in mini(count, opponents.size()):
+			ids.append(String((opponents[index] as Dictionary)["id"]))
+		lead = String((opponents[0] as Dictionary)["name"])
+	updated["opponents"] = ids
+	updated["opponent_count"] = ids.size()
+	for key: String in ["story", "rival_line"]:
+		var text := String(updated.get(key, ""))
+		if text.contains(CATALOG.RIVAL_TOKEN):
+			updated[key] = text.replace(CATALOG.RIVAL_TOKEN, lead)
+	return updated
 var reduced_camera_shake := false
 var reduced_motion := false
 var audio_director: Node
@@ -77,6 +157,8 @@ func _ready() -> void:
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
 	_apply_settings()
+	_install_player_avatar()
+	_install_active_roster()
 	if bool(_save_data["first_run"]):
 		_save_data["first_run"] = false
 		if not _test_mode:
@@ -123,6 +205,61 @@ func get_save_data() -> Dictionary:
 	return _save_data.duplicate(true)
 
 
+func get_championship_event(event_id: String) -> Dictionary:
+	return _event_with_roster(CATALOG.get_event(event_id), _championship_roster())
+
+
+## The player drives one cast slot; only its portrait seed is customizable.
+func get_player_avatar_seed() -> int:
+	return int(_save_data.get("player_avatar_seed", SAVE_STORE_SCRIPT.PLAYER_AVATAR_DEFAULT_SEED))
+
+
+## Shows a candidate portrait without writing it to the save.
+func preview_player_avatar(seed: int) -> void:
+	var player_id := CATALOG.player_driver_id()
+	if player_id.is_empty():
+		return
+	IDENTITIES.set_avatar_seed_override(player_id, _bounded_avatar_seed(seed), _player_cast_avatar_seed(player_id))
+
+
+func save_player_avatar(seed: int) -> bool:
+	if is_save_read_only():
+		return false
+	var candidate := _save_data.duplicate(true)
+	candidate["player_avatar_seed"] = _bounded_avatar_seed(seed)
+	if candidate == _save_data:
+		_install_player_avatar()
+		return true
+	if not _save_candidate(candidate):
+		return false
+	_save_data = candidate
+	_install_player_avatar()
+	return true
+
+
+func random_player_avatar_seed() -> int:
+	return _random_seed(SAVE_STORE_SCRIPT.PLAYER_AVATAR_MAX_SEED)
+
+
+## Mirrors the save store's rule so an accepted seed always round-trips exactly.
+func _bounded_avatar_seed(seed: int) -> int:
+	if seed < 0 or seed > SAVE_STORE_SCRIPT.PLAYER_AVATAR_MAX_SEED:
+		return get_player_avatar_seed()
+	return seed
+
+
+func _player_cast_avatar_seed(player_id: String) -> int:
+	var art: Dictionary = CATALOG.get_driver(player_id).get("avatar_art", {})
+	return int(art.get("seed", SAVE_STORE_SCRIPT.PLAYER_AVATAR_DEFAULT_SEED))
+
+
+func _install_player_avatar() -> void:
+	var player_id := CATALOG.player_driver_id()
+	if player_id.is_empty():
+		return
+	IDENTITIES.set_avatar_seed_override(player_id, get_player_avatar_seed(), _player_cast_avatar_seed(player_id))
+
+
 func get_current_race_session() -> Dictionary:
 	return current_race_session.duplicate(true)
 
@@ -145,6 +282,7 @@ func confirm_new_championship() -> bool:
 		"fullscreen": _save_data["fullscreen"],
 		"reduced_camera_shake": _save_data["reduced_camera_shake"],
 		"reduced_motion": _save_data["reduced_motion"],
+		"player_avatar_seed": get_player_avatar_seed(),
 		"first_run": false,
 		"mastery_records": _save_data.get("mastery_records", []).duplicate(true),
 		"personal_ghosts": _save_data.get("personal_ghosts", []).duplicate(true),
@@ -156,6 +294,11 @@ func confirm_new_championship() -> bool:
 		candidate[key] = preserved_settings[key]
 	candidate["championship_started"] = true
 	candidate["championship_circuit"] = CIRCUIT_IDENTITIES.create_championship(_random_seed(CIRCUIT_IDENTITIES.MAX_SEED))
+	candidate["driver_roster"] = DRIVER_ROSTER.create(
+		_random_seed(DRIVER_ROSTER.MAX_SEED),
+		CATALOG.championship_vehicle_ids(),
+		ROSTER_SIZE
+	)
 	if not _save_candidate(candidate):
 		_show_save_error(
 			"Championship not started",
@@ -164,6 +307,7 @@ func confirm_new_championship() -> bool:
 		)
 		return false
 	_save_data = candidate
+	_install_active_roster()
 	_shell.call("show_map")
 	return true
 
@@ -233,6 +377,11 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false, 
 			event = CIRCUIT_IDENTITIES.apply_to_event(event, identity)
 	if not quick_race and not vehicle_id in _save_data["unlocked_vehicles"]:
 		vehicle_id = "rustbug"
+	if quick_race:
+		_roll_quick_roster()
+	_install_roster_for("quick" if quick_race else "")
+	if not mastery_run:
+		event = _event_with_roster(event, _quick_roster if quick_race else _championship_roster())
 	var mastery_context := {}
 	if mastery_run:
 		event = _mastery_solo_event(event)
@@ -262,7 +411,7 @@ func start_race(event_id: String, vehicle_id: String, quick_race: bool = false, 
 		"event_id": event_id,
 		"event": event,
 		"vehicle_id": vehicle_id,
-		"difficulty": "club_circuit" if mastery_run else String(_save_data["difficulty"]),
+		"difficulty": CATALOG.race_difficulty(event, quick_race, mastery_run, String(_save_data["difficulty"])),
 		"result_committed": false,
 	}
 	if mastery_run:
@@ -480,6 +629,8 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 		return false
 	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
 	if identity.is_empty():
+		_roll_quick_roster()
+		_install_roster_for("quick")
 		current_race_session = {
 			"mode": "quick",
 			"event_id": "circuit_%s_%s_%d" % [String(theme), String(room), seed],
@@ -492,8 +643,8 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 				"circuit": "generated",
 				"race_format": "circuit",
 				"reverse": reverse,
-				"opponent_count": 3,
-				"opponents": ["juniper", "milo", "tess"],
+				"opponent_count": ROSTER_SIZE,
+				"opponents": _roster_ids(_quick_roster),
 			},
 			"vehicle_id": vehicle_id,
 			"difficulty": String(_save_data["difficulty"]),
@@ -514,7 +665,13 @@ func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: Stri
 	var identity := GENERATED_CIRCUITS.normalize(identity_value)
 	if identity.is_empty() or not mode in ["quick", "discovery"]:
 		return false
-	var event := GENERATED_CIRCUITS.apply_to_event(identity)
+	if mode == "quick":
+		_roll_quick_roster()
+	_install_roster_for(mode)
+	var event := _event_with_roster(
+		GENERATED_CIRCUITS.apply_to_event(identity, _roster_ids(_quick_roster if mode == "quick" else _championship_roster())),
+		_quick_roster if mode == "quick" else _championship_roster()
+	)
 	if event.is_empty():
 		return false
 	if mode == "quick":
@@ -549,8 +706,11 @@ func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: Stri
 	return true
 
 
+## The event's own opponents are replaced by roster slots afterwards, so this
+## only needs a legal fallback when a caller supplies none.
 func _event_with_generated_identity(base_event: Dictionary, identity_value: Dictionary) -> Dictionary:
-	var generated := GENERATED_CIRCUITS.apply_to_event(identity_value, base_event.get("opponents", ["juniper", "milo", "tess"]))
+	var fallback: Array = base_event.get("opponents", _roster_ids(_championship_roster()))
+	var generated := GENERATED_CIRCUITS.apply_to_event(identity_value, fallback)
 	if generated.is_empty():
 		return {}
 	var event := base_event.duplicate(true)
@@ -762,7 +922,10 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 	if bool(current_race_session.get("result_committed", false)):
 		return true
 	var event: Dictionary = current_race_session.get("event", {})
-	var racer_count := clampi((event.get("opponents", []) as Array).size() + 1, 1, 4)
+	# The declared field size is authoritative: a session may carry its opponents
+	# from a saved roster, but the event always states how many cars it fields.
+	var declared := maxi((event.get("opponents", []) as Array).size(), int(event.get("opponent_count", 0)))
+	var racer_count := clampi(declared + 1, 1, 4)
 	current_race_session["result"] = {
 		"position": clampi(player_position, 1, racer_count),
 		"time": maxf(0.0, total_time),
@@ -1012,6 +1175,9 @@ func _sync_current_scene() -> void:
 			audio_director.play_menu_music()
 		_hide_boot_placeholder(scene)
 		_ensure_shell()
+		current_race_session.clear()
+		_quick_roster = {}
+		_install_active_roster()
 		_shell.visible = true
 		match _destination:
 			"map":
@@ -1027,7 +1193,6 @@ func _sync_current_scene() -> void:
 					_shell.call("show_title")
 		_last_result_summary = {}
 		_destination = "title"
-		current_race_session.clear()
 	else:
 		if scene.scene_file_path == RACE_SCENE and is_instance_valid(audio_director) and not _transitioning_to_race:
 			audio_director.play_race_music()

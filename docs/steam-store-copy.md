@@ -16,8 +16,8 @@ Rustbug, one night, and one chance to prove that the household's biggest race
 belongs to every driver—not only the reigning champion.
 
 Pocket Circuit is a top-down arcade racer built around immediate handling and
-miniature spectacle. Thread between oversized mugs, tools, papers, spills, and
-moving hazards in two-to-five-minute races. Earn points without a lives system,
+miniature spectacle. Thread between oversized mugs, tools, papers and spills in
+two-to-five-minute races. Earn points without a lives system,
 unlock side-grade vehicles, and replay completed events with any machine you
 have earned.
 
@@ -31,7 +31,7 @@ offline with no account required.
 - A complete nine-event single-player championship across three room themes.
 - Four handling identities: balanced Rustbug, grip-focused Pinbolt, heavy
   Scrapjaw, and drift-focused Flicker.
-- Forward and reverse circuits, rival duels, environmental hazards, recovery,
+- Forward and reverse circuits, rival duels, slippery surfaces, recovery,
   drifting, and boost.
 - Three difficulty presets that change racing pressure without locking content.
 - Persistent local progress, event replay, volume controls, reduced camera

@@ -36,7 +36,7 @@ static func texture_opaque_rect(texture: Texture2D) -> Rect2:
 	if TrackBuilderCore._texture_opaque_rect_cache.has(cache_key):
 		return TrackBuilderCore._texture_opaque_rect_cache[cache_key]
 	var result: Rect2 = texture_alpha_outline(texture)["used"]
-	TrackBuilderCore._texture_opaque_rect_cache[cache_key] = result
+	TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_opaque_rect_cache, TrackBuilderCore._texture_opaque_rect_order, cache_key, result)
 	return result
 
 
@@ -46,7 +46,7 @@ static func texture_alpha_outline(texture: Texture2D) -> Dictionary:
 		return TrackBuilderCore._texture_outline_cache[cache_key]
 	TrackBuilderCore.synchronous_outline_builds += 1
 	var result := compute_alpha_outline(texture.get_image(), texture.get_width(), texture.get_height())
-	TrackBuilderCore._texture_outline_cache[cache_key] = result
+	TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_outline_cache, TrackBuilderCore._texture_outline_order, cache_key, result)
 	return result
 
 
@@ -61,7 +61,7 @@ static func has_prepared_outline_path(path: String) -> bool:
 
 static func install_prepared_outline(texture: Texture2D, outline: Dictionary) -> void:
 	var key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
-	TrackBuilderCore._texture_outline_cache[key] = outline
+	TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_outline_cache, TrackBuilderCore._texture_outline_order, key, outline)
 
 
 static func preparation_texture_paths(value: Variant) -> Array[String]:
@@ -145,18 +145,18 @@ static func texture_collision_footprint(texture: Texture2D, shape_kind: StringNa
 	var fallback := {"center": used.get_center(), "size": used.size, "rotation": 0.0, "kind": resolved_kind}
 	if resolved_kind == &"circle":
 		var circle_result := balanced_circle_texture_footprint(texture, used)
-		TrackBuilderCore._texture_footprint_cache[cache_key] = circle_result
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, circle_result)
 		return circle_result
 	if resolved_kind == &"convex":
-		TrackBuilderCore._texture_footprint_cache[cache_key] = fallback
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, fallback)
 		return fallback
 	if no_rotation:
 		var forced_axis_result := axis_aligned_texture_footprint(used, resolved_kind)
-		TrackBuilderCore._texture_footprint_cache[cache_key] = forced_axis_result
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, forced_axis_result)
 		return forced_axis_result
 	var outline := texture_alpha_outline(texture)
 	if (outline["boundary"] as PackedVector2Array).is_empty():
-		TrackBuilderCore._texture_footprint_cache[cache_key] = fallback
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, fallback)
 		return fallback
 	# Gather the first and last opaque pixel on sampled rows and columns. This
 	# keeps diagonal silhouettes tight without scanning every interior pixel or
@@ -180,7 +180,7 @@ static func texture_collision_footprint(texture: Texture2D, shape_kind: StringNa
 			points.append(Vector2(x + 0.5, first_y + 0.5))
 			points.append(Vector2(x + 0.5, last_y + 0.5))
 	if points.size() < 3:
-		TrackBuilderCore._texture_footprint_cache[cache_key] = fallback
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, fallback)
 		return fallback
 	# Use principal axis (covariance) of border points for robust long-axis
 	# orientation. Finishes the cached alpha-derived oriented footprint so that
@@ -241,7 +241,7 @@ static func texture_collision_footprint(texture: Texture2D, shape_kind: StringNa
 	var anisotropy := maxf(fitted_size.x, fitted_size.y) / maxf(minf(fitted_size.x, fitted_size.y), 0.001)
 	if anisotropy < TrackBuilderCore.ORIENTED_FOOTPRINT_MIN_ANISOTROPY:
 		var low_anisotropy_result := axis_aligned_texture_footprint(used, resolved_kind)
-		TrackBuilderCore._texture_footprint_cache[cache_key] = low_anisotropy_result
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, low_anisotropy_result)
 		return low_anisotropy_result
 	var result := {
 		"center": best_axis_x * center_projection.x + best_axis_y * center_projection.y,
@@ -256,7 +256,7 @@ static func texture_collision_footprint(texture: Texture2D, shape_kind: StringNa
 	if sz.x < sz.y:
 		result["size"] = Vector2(sz.y, sz.x)
 		result["rotation"] = float(result["rotation"]) + PI * 0.5
-	TrackBuilderCore._texture_footprint_cache[cache_key] = result
+	TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, result)
 	return result
 
 

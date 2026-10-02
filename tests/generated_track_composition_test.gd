@@ -142,27 +142,11 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 	if not _check_environment_plan(track, theme, seed):
 		return false
 	var moment_indices: Dictionary = track.get_meta("generated_moment_indices", {})
-	for required_moment: String in ["opening", "early_conflict_forward", "early_conflict_reverse", "shortcut", "technical", "speed", "finish"]:
+	for required_moment: String in ["opening", "shortcut", "technical", "speed", "finish"]:
 		if not _expect(moment_indices.has(required_moment), "%s should expose its %s moment index" % [theme, required_moment]):
 			return false
-	var forward_conflict := track.get_node_or_null("GeneratedMoments/EarlyConflictForward")
-	var reverse_conflict := track.get_node_or_null("GeneratedMoments/EarlyConflictReverse")
-	if not _expect(forward_conflict != null and reverse_conflict != null, "%s should expose direction-aware early conflict points" % theme):
+	if not _expect(track.find_children("EarlyConflict*", "", true, false).is_empty() and not track.has_meta("generated_hazard_plan"), "%s should not build a moving hazard" % theme):
 		return false
-	if not _expect(float(forward_conflict.get_meta("lap_fraction", 0.0)) >= 0.12 and float(forward_conflict.get_meta("lap_fraction", 0.0)) <= 0.25, "%s forward conflict should occur early in the lap" % theme):
-		return false
-	if not _expect(float(reverse_conflict.get_meta("lap_fraction", 0.0)) >= 0.12 and float(reverse_conflict.get_meta("lap_fraction", 0.0)) <= 0.25, "%s reverse conflict should occur early in the reverse lap" % theme):
-		return false
-	var hazard_paths: Dictionary = track.get_meta("generated_hazard_paths", {})
-	var hazard_plan_for_paths: Dictionary = track.get_meta("generated_hazard_plan", {})
-	var hazard_motion := StringName(hazard_plan_for_paths.get("motion", &"rolling"))
-	for direction: String in ["forward", "reverse"]:
-		var hazard_path: PackedVector2Array = hazard_paths.get(direction, PackedVector2Array())
-		if hazard_motion == &"static":
-			if not _expect(hazard_path.size() == 2 and hazard_path[0].is_equal_approx(hazard_path[1]), "%s %s coiled cable should rest on one pose" % [theme, direction]):
-				return false
-		elif not _expect(hazard_path.size() == 2 and hazard_path[0].distance_to(hazard_path[1]) >= 160.0, "%s %s conflict hazard should cross most of the corridor" % [theme, direction]):
-			return false
 	var speed_section := track.get_node_or_null("GeneratedMoments/SpeedSection")
 	var dramatic_finish := track.get_node_or_null("GeneratedMoments/DramaticFinish")
 	if not _expect(speed_section != null and dramatic_finish != null, "%s should reserve a speed section and dramatic finish" % theme):
@@ -190,10 +174,9 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
 	var definitions: Variant = track.get_meta("generated_surfaces", null)
-	# Two designed gameplay moments are always present; the loose debris around
-	# them varies per track, including none at all, so only the upper bound holds
-	# here. Per-track variety is asserted in track_debris_variation_test.
-	if not _expect(definitions is Array and (definitions as Array).size() >= 2 and (definitions as Array).size() <= 2 + BUILDER.GRIP_PATCH_MAX_COUNT, "%s should define two designed surfaces plus 0-%d grip patches" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
+	# Slippery surfaces only go on calm stretches, so a lap may carry fewer
+	# patches, or no technical surface, rather than one in a corner.
+	if not _expect(definitions is Array and (definitions as Array).size() >= 1 and (definitions as Array).size() <= 2 + BUILDER.GRIP_PATCH_MAX_COUNT, "%s should define a shortcut, an optional technical surface and up to %d grip patches" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
 		return false
 	var definitions_by_role := {}
 	var patch_definitions: Array[Dictionary] = []
@@ -204,7 +187,7 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 		definitions_by_role[StringName(definition.get("role", &""))] = definition
 		if StringName(definition.get("role", &"")) == &"patch":
 			patch_definitions.append(definition)
-	if not _expect(definitions_by_role.has(&"technical") and definitions_by_role.has(&"shortcut"), "%s should expose technical and shortcut surface roles" % theme):
+	if not _expect(definitions_by_role.has(&"shortcut"), "%s should expose the shortcut surface role" % theme):
 		return false
 	if not _expect(patch_definitions.size() >= BUILDER.GRIP_PATCH_MIN_COUNT and patch_definitions.size() <= BUILDER.GRIP_PATCH_MAX_COUNT, "%s should expose 0-%d deterministic grip-patch definitions" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
 		return false
@@ -223,7 +206,7 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 				return false
 	var technical_surface := track.get_node_or_null("GeneratedMoments/TechnicalSurfaceMoment")
 	var shortcut := track.get_node_or_null("GeneratedMoments/ShortcutDecision")
-	if not _expect(technical_surface != null and shortcut != null, "%s should expose technical and shortcut moments" % theme):
+	if not _expect(shortcut != null and (technical_surface != null) == definitions_by_role.has(&"technical"), "%s should expose the shortcut moment and a technical moment exactly when it has a technical surface" % theme):
 		return false
 	var surface_regions := track.find_children("SurfaceRegion*", "Node2D", false, false)
 	if not _expect(surface_regions.size() == definitions.size(), "%s must render every authoritative grip region" % theme):
@@ -264,7 +247,7 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 
 	var presenter := PRESENTER.new() as TrackVariantPresenter
 	track.add_child(presenter)
-	presenter.configure(track, theme, false)
+	presenter.configure(track, theme)
 	if not _expect(presenter.surface_zones.size() == (definitions as Array).size(), "%s presenter should create one SurfaceZone per generated surface definition" % theme):
 		return false
 	var presented_patch_count := 0
@@ -276,23 +259,7 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 			presented_patch_count += 1
 	if not _expect(presented_patch_count == patch_definitions.size(), "%s grip patches should become authoritative runtime SurfaceZones" % theme):
 		return false
-	var hazard_plan: Dictionary = track.get_meta("generated_hazard_plan", {})
-	var forward_hazard_path: PackedVector2Array = hazard_paths["forward"]
-	if bool(hazard_plan.get("present", false)):
-		if not _expect(presenter.hazard != null and presenter.hazard.start_position == forward_hazard_path[0] and presenter.hazard.end_position == forward_hazard_path[1] and StringName(presenter.hazard.get_meta("direction", &"")) == &"forward", "%s forward race should use the forward conflict path when its deterministic plan is present" % theme):
-			return false
-	elif not _expect(presenter.hazard == null, "%s should omit an occasional hazard when its deterministic plan says absent" % theme):
-		return false
 	presenter.free()
-	var reverse_presenter := PRESENTER.new() as TrackVariantPresenter
-	track.add_child(reverse_presenter)
-	reverse_presenter.configure(track, theme, true)
-	var reverse_hazard_path: PackedVector2Array = hazard_paths["reverse"]
-	if bool(hazard_plan.get("present", false)):
-		if not _expect(reverse_presenter.hazard != null and reverse_presenter.hazard.start_position == reverse_hazard_path[0] and reverse_presenter.hazard.end_position == reverse_hazard_path[1] and StringName(reverse_presenter.hazard.get_meta("direction", &"")) == &"reverse", "%s reverse race should use the reverse conflict path when its deterministic plan is present" % theme):
-			return false
-	elif not _expect(reverse_presenter.hazard == null, "%s reverse race should share the same absent hazard plan" % theme):
-		return false
 	return true
 
 

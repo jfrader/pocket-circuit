@@ -143,7 +143,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 
 	var generated_moments := {}
 	if spec.get("seed_obstacles", false):
-		generated_moments = TrackBuilderCore._analyze_track_moments(centerline, gate_samples)
+		generated_moments = TrackBuilderCore._analyze_track_moments(centerline, gate_samples, spec)
 
 	# Racing line the AI follows (curvature-offset ideal path, stored invisibly).
 	# Generated AI stays on the safe side of the optional risk shortcut.

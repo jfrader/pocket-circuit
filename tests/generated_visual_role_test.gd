@@ -1,10 +1,7 @@
 extends SceneTree
 
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
-const PRESENTER := preload("res://scripts/presentation/track_variant_presenter.gd")
 const VISUAL_ROLE := preload("res://scripts/race/generated_world_visual_role.gd")
-const CABLE_ASSET := "res://assets/textures/imagine/hazard_office_cable.png"
-const OFFICE_SCENE := preload("res://scenes/tracks/office_desk.tscn")
 const SAMPLES: Array[Dictionary] = [
 	{"theme": &"kitchen", "room": &"classic", "seed": 0},
 	{"theme": &"workshop", "room": &"tall", "seed": 1},
@@ -13,7 +10,6 @@ const SAMPLES: Array[Dictionary] = [
 
 var _solid_visuals := 0
 var _flat_visuals := 0
-var _moving_hazard_visuals := 0
 
 
 func _initialize() -> void:
@@ -22,27 +18,12 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	if not _expect(
-		VISUAL_ROLE.VALUES == [VISUAL_ROLE.SOLID, VISUAL_ROLE.FLAT, VISUAL_ROLE.MOVING_HAZARD]
+		VISUAL_ROLE.VALUES == [VISUAL_ROLE.SOLID, VISUAL_ROLE.FLAT]
 		and BUILDER.VISUAL_ROLE_SOLID == VISUAL_ROLE.SOLID
-		and BUILDER.VISUAL_ROLE_FLAT == VISUAL_ROLE.FLAT
-		and BUILDER.VISUAL_ROLE_MOVING_HAZARD == VISUAL_ROLE.MOVING_HAZARD,
-		"generated world roles should expose one authoritative SOLID/FLAT/MOVING_HAZARD vocabulary"
+		and BUILDER.VISUAL_ROLE_FLAT == VISUAL_ROLE.FLAT,
+		"generated world roles should expose one authoritative SOLID/FLAT vocabulary"
 	):
 		return
-	var office_track := OFFICE_SCENE.instantiate()
-	if not _expect(not _scene_uses_texture(office_track, CABLE_ASSET), "the authored office track must not reuse moving cable art as static scenery"):
-		office_track.free()
-		return
-	office_track.free()
-	if not _expect(
-		not _contains_asset(BUILDER.STORY_KITS, CABLE_ASSET)
-		and not _contains_asset(BUILDER.LAYOUTS, CABLE_ASSET)
-		and not BUILDER.PROP_SHAPES.has(CABLE_ASSET.get_file())
-		and not BUILDER.ASSET_FOOTPRINT_OVERRIDES.has(CABLE_ASSET.get_file()),
-		"the moving office cable asset must not remain registered or placed as static scenery"
-	):
-		return
-
 	for sample: Dictionary in SAMPLES:
 		var built: Dictionary = BUILDER.build_packed(sample["theme"], sample["room"], sample["seed"])
 		if not _expect(built.get("scene") is PackedScene, "%s generated sample should build" % sample["theme"]):
@@ -54,24 +35,14 @@ func _run_test() -> void:
 		if not _check_finish(track, sample["theme"]):
 			return
 
-		var presenter := PRESENTER.new() as TrackVariantPresenter
-		track.add_child(presenter)
-		presenter.configure(track, sample["theme"], false)
-		if presenter.hazard != null and not _check_moving_hazard(presenter.hazard, sample["theme"]):
-			return
-		presenter.free()
 		track.free()
 
-	if not _expect(_moving_hazard_visuals > 0, "the sample set should include at least one deterministic occasional moving hazard"):
-		return
-	print("GENERATED_VISUAL_ROLE_TEST PASS samples=%d solid=%d flat=%d moving_hazard=%d" % [SAMPLES.size(), _solid_visuals, _flat_visuals, _moving_hazard_visuals])
+	print("GENERATED_VISUAL_ROLE_TEST PASS samples=%d solid=%d flat=%d" % [SAMPLES.size(), _solid_visuals, _flat_visuals])
 	quit(0)
 
 
 func _check_generated_roles(track: Node2D, theme: StringName) -> bool:
 	for node: Node in track.find_children("*", "", true, false):
-		if String(node.get_meta("asset_path", "")) == CABLE_ASSET:
-			return _expect(false, "%s generated track must not reuse moving cable art as static scenery" % theme)
 		var collision_contract := StringName(node.get_meta("collision_contract", &""))
 		if collision_contract == BUILDER.COLLISION_SOLID and not _expect(VISUAL_ROLE.read(node) == VISUAL_ROLE.SOLID, "%s SOLID collision metadata should agree with visual_role on %s" % [theme, track.get_path_to(node)]):
 			return false
@@ -88,17 +59,7 @@ func _check_generated_roles(track: Node2D, theme: StringName) -> bool:
 				_solid_visuals += 1
 			VISUAL_ROLE.FLAT:
 				_flat_visuals += 1
-			VISUAL_ROLE.MOVING_HAZARD:
-				_moving_hazard_visuals += 1
 	return _expect(_solid_visuals > 0 and _flat_visuals > 0, "%s should exercise both physical and drive-over world art" % theme)
-
-
-func _scene_uses_texture(scene: Node, asset_path: String) -> bool:
-	for node: Node in scene.find_children("*", "Sprite2D", true, false):
-		var sprite := node as Sprite2D
-		if sprite.texture != null and sprite.texture.resource_path == asset_path:
-			return true
-	return false
 
 
 func _check_finish(track: Node2D, theme: StringName) -> bool:
@@ -162,20 +123,6 @@ func _check_finish(track: Node2D, theme: StringName) -> bool:
 	)
 
 
-func _check_moving_hazard(hazard: EnvironmentalHazard, theme: StringName) -> bool:
-	if not _expect(VISUAL_ROLE.read(hazard) == VISUAL_ROLE.MOVING_HAZARD, "%s active hazard should declare MOVING_HAZARD" % theme):
-		return false
-	for node: Node in hazard.find_children("*", "", true, false):
-		if node is not Sprite2D and node is not Polygon2D and node is not Line2D and node.name not in [&"MovingHazard"]:
-			continue
-		if not _expect(VISUAL_ROLE.read(node) == VISUAL_ROLE.MOVING_HAZARD, "%s hazard visual %s should share the dynamic role" % [theme, hazard.get_path_to(node)]):
-			return false
-		_moving_hazard_visuals += 1
-	var sprite := hazard.get_node("MovingHazard/HazardSprite") as Sprite2D
-	var expected_asset := CABLE_ASSET if theme == &"office" else String(sprite.texture.resource_path)
-	return _expect(String(sprite.get_meta("asset_path", "")) == expected_asset, "%s hazard sprite should own its role-specific asset" % theme)
-
-
 func _is_visible_world_drawing(node: Node) -> bool:
 	if node is not CanvasItem or not (node as CanvasItem).visible:
 		return false
@@ -190,20 +137,6 @@ func _is_visible_world_drawing(node: Node) -> bool:
 
 func _owns_collision(node: Node) -> bool:
 	return not node.find_children("*", "CollisionShape2D", true, false).is_empty() or not node.find_children("*", "CollisionPolygon2D", true, false).is_empty()
-
-
-func _contains_asset(value: Variant, asset_path: String) -> bool:
-	if value is Dictionary:
-		for child: Variant in (value as Dictionary).values():
-			if _contains_asset(child, asset_path):
-				return true
-	elif value is Array:
-		for child: Variant in value:
-			if _contains_asset(child, asset_path):
-				return true
-	elif value is String or value is StringName:
-		return String(value) == asset_path
-	return false
 
 
 func _expect(condition: bool, message: String) -> bool:
