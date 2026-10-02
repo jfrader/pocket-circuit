@@ -96,33 +96,50 @@ func _run() -> void:
 				case_ok = _check(not _hits_solid(exit_a, exit_b, _circle) and not _hits_solid(exit_a, exit_b, _capsule) and not _query_failed, "reserved open exit must remain physically clear %s/%d" % [theme, seed_value])
 			if case_ok:
 				var n := centerline.size()
+				var prefix := PackedFloat64Array([0.0])
+				var normals := PackedVector2Array()
+				var outward := -1.0 if CORE._polygon_area(centerline) > 0.0 else 1.0
+				for index in n:
+					prefix.append(prefix[index] + centerline[index].distance_to(centerline[(index + 1) % n]))
+					normals.append(CORE._sample_tangent(centerline, index).rotated(PI * 0.5) * outward)
+				var offsets := PackedFloat32Array([0.0, (CORE.HALF_WIDTH - _capsule.radius) * 0.5, CORE.HALF_WIDTH - _capsule.radius])
 				for pair: Vector2i in _candidate_pairs(centerline):
 					var span := CORE._cyclic_index_distance(pair.x, pair.y, n)
 					if not _check((pair.x + span) % n == pair.y, "predicate and sweep must use the same directed endpoints %s/%d" % [theme, seed_value]):
 						case_ok = false
 						break
-					var a: Vector2 = track.global_transform * centerline[pair.x]
-					var b: Vector2 = track.global_transform * centerline[pair.y]
-					var circle_hit := _hits_solid(a, b, _circle)
-					if _query_failed:
-						case_ok = false
+					var arc := float(prefix[pair.y] - prefix[pair.x]) if pair.y >= pair.x else float(prefix[n] - prefix[pair.x] + prefix[pair.y])
+					for from_offset: float in offsets:
+						for to_offset: float in offsets:
+							var a_local := centerline[pair.x] + normals[pair.x] * from_offset
+							var b_local := centerline[pair.y] + normals[pair.y] * to_offset
+							var chord := a_local.distance_to(b_local)
+							if arc - chord < CORE.CUT_MIN_SAVED_MM or arc < chord * CORE.CUT_MIN_ARC_RATIO:
+								continue
+							var a := track.global_transform * a_local
+							var b := track.global_transform * b_local
+							var circle_hit := _hits_solid(a, b, _circle)
+							if _query_failed:
+								case_ok = false
+								break
+							if circle_hit:
+								continue
+							var excursion := _pose_excursion(a_local, b_local, centerline, open_sector)
+							if int(excursion["deep"]) < CORE.CUT_MIN_DEEP_SAMPLES or bool(excursion["open"]):
+								continue
+							var capsule_hit := _hits_solid(a, b, _capsule)
+							if _query_failed:
+								case_ok = false
+								break
+							if capsule_hit:
+								continue
+							push_error("OUTER_CUT_BLOCK_TEST FAIL: circle- and fixed-heading-capsule-clear outside chord %s/%d start=%d end=%d offsets=%.1f/%.1f saved_mm=%.0f deep=%d/%d" % [theme, seed_value, pair.x, pair.y, from_offset, to_offset, arc - chord, int(excursion["deep"]), CHORD_SAMPLES])
+							case_ok = false
+							break
+						if not case_ok:
+							break
+					if not case_ok:
 						break
-					if circle_hit:
-						continue
-					var verdict: Dictionary = CORE.exploitable_cut(centerline, pair.x, span)
-					if not bool(verdict["exploitable"]):
-						continue
-					var capsule_hit := _hits_solid(a, b, _capsule)
-					if _query_failed:
-						case_ok = false
-						break
-					if capsule_hit:
-						continue
-					if _deep_excursion_in_sector(centerline, pair.x, pair.y, open_sector):
-						continue
-					push_error("OUTER_CUT_BLOCK_TEST FAIL: circle- and fixed-heading-capsule-clear chord %s/%d start=%d end=%d saved_mm=%.0f deep=%d/%d" % [theme, seed_value, pair.x, pair.y, float(verdict["saved"]), int(verdict["deep"]), CHORD_SAMPLES])
-					case_ok = false
-					break
 			track.free()
 			if not case_ok:
 				_finish(false)
@@ -133,7 +150,7 @@ func _run() -> void:
 	if not _check(checked == selected.size(), "completed %d/%d requested cases" % [checked, selected.size()]):
 		_finish(false)
 		return
-	print("OUTER_CUT_BLOCK_TEST PASS completed_cases=%d fixed_heading_capsule" % checked)
+	print("OUTER_CUT_BLOCK_TEST PASS completed_cases=%d lane_combinations=9 fixed_heading_capsule" % checked)
 	_finish(true)
 
 
@@ -170,19 +187,19 @@ func _selected_cases() -> Dictionary:
 	return {key: true}
 
 
-func _deep_excursion_in_sector(centerline: PackedVector2Array, start: int, finish: int, sector: int) -> bool:
+func _pose_excursion(a: Vector2, b: Vector2, centerline: PackedVector2Array, sector: int) -> Dictionary:
 	var sectors := PackedInt32Array()
 	var n := centerline.size()
 	for sample in CHORD_SAMPLES:
-		var point: Vector2 = centerline[start].lerp(centerline[finish], float(sample) / float(CHORD_SAMPLES - 1))
-		if CORE._distance_to_centerline(point, centerline) <= CORE.HALF_WIDTH + CORE.CUT_MIN_OFF_CORRIDOR_MM:
-			continue
+		var point := a.lerp(b, float(sample) / float(CHORD_SAMPLES - 1))
 		var near: Dictionary = CORE._closest_point_on_loop(point, centerline)
+		if point.distance_to(near["position"]) <= CORE.HALF_WIDTH + CORE.CUT_MIN_OFF_CORRIDOR_MM:
+			continue
 		var index := int(near.get("index", -1))
 		if index < 0:
-			return false
+			return {"deep": 0, "open": false}
 		sectors.append(mini(SECTOR_COUNT - 1, int(float(index) / float(n) * float(SECTOR_COUNT))))
-	return _all_deep_sectors_open(sectors, sector)
+	return {"deep": sectors.size(), "open": _all_deep_sectors_open(sectors, sector)}
 
 
 func _all_deep_sectors_open(deep_sectors: PackedInt32Array, open_sector: int) -> bool:
