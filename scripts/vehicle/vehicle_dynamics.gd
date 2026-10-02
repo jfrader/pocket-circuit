@@ -106,8 +106,9 @@ static func calculate_brake_forces(
 
 # Caller-owned Array[float] layouts (64-bit float, not PackedFloat32Array):
 # brakes [front_brake, rear_brake], loads [front, rear, front_ratio, q],
-# slips [front, rear]. Each _into call overwrites every slot, including on
-# early exit; keep arrays sized to the documented layout across physics ticks.
+# slips [front, rear]. Keep arrays sized to the documented layout across physics
+# ticks. With zero brake input, brake forces are cleared but axle loads remain
+# unchanged because no load-transfer calculation is needed.
 static func calculate_brake_forces_into(
 	brake_input: float,
 	forward_speed: float,
