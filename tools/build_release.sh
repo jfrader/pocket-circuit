@@ -116,9 +116,7 @@ serial_tests=(
 run_test_serial() {
 	local test_relative="$1"
 	printf 'Running %s...\n' "$test_relative"
-	local expected_marker
-	expected_marker="$(python3 "$PROJECT_ROOT/tools/test_success_marker.py" "$PROJECT_ROOT/$test_relative")"
-	if ! POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" run_godot_checked timeout 1200 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative"; then
+	if ! run_godot_test_checked "$PROJECT_ROOT" "$godot_bin" "$test_relative"; then
 		printf '%s\n' "$test_relative" >> "$failures_file"
 	fi
 }
@@ -127,12 +125,11 @@ run_test_serial() {
 # user-data dir, so tests touching user:// save files cannot collide.
 run_test_isolated() {
 	local test_relative="$1"
-	local expected_marker iso_dir log_file
-	expected_marker="$(python3 "$PROJECT_ROOT/tools/test_success_marker.py" "$PROJECT_ROOT/$test_relative")"
+	local iso_dir log_file
 	iso_dir="$(mktemp -d "${TMPDIR:-/tmp}/pc-test-userdata.XXXXXX")"
 	log_file="$(mktemp "${TMPDIR:-/tmp}/pc-test-log.XXXXXX")"
 	local status=0
-	if POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" XDG_DATA_HOME="$iso_dir" run_godot_checked timeout 1200 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative" >"$log_file" 2>&1; then
+	if XDG_DATA_HOME="$iso_dir" run_godot_test_checked "$PROJECT_ROOT" "$godot_bin" "$test_relative" >"$log_file" 2>&1; then
 		status=0
 	else
 		status=1
@@ -166,7 +163,7 @@ for test_path in "${tests[@]}"; do
 done
 
 export PROJECT_ROOT godot_bin failures_file
-export -f run_godot_checked run_test_isolated
+export -f run_godot_checked run_godot_test_checked run_test_isolated
 
 gate_parallelism="${PC_GATE_PARALLELISM:-6}"
 if (( ${#parallel_tests[@]} > 0 )); then

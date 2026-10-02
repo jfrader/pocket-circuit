@@ -32,7 +32,6 @@ static func prepare(identity_value: Variant) -> Dictionary:
 		"summary": String(identity["summary"]),
 		"story_id": String(prepared["spec"].get("story_id", "")),
 		"obstacle_count": (prepared["spec"].get("obstacle_plan", []) as Array).size(),
-		"hazard_present": bool((prepared["spec"].get("hazard_plan", {}) as Dictionary).get("present", false)),
 	}
 
 
@@ -53,7 +52,6 @@ static func fingerprint_for_prepared(identity_value: Variant, prepared: Dictiona
 	parts.append("material=%d" % int(spec.get("material_seed", -1)))
 	parts.append("dressing=%d" % int(spec.get("dressing_seed", -1)))
 	parts.append("obstacle=%d" % int(spec.get("obstacle_seed", -1)))
-	parts.append("hazard=%d" % int(spec.get("hazard_seed", -1)))
 	return "|".join(parts).sha256_text().substr(0, 16)
 
 

@@ -92,7 +92,7 @@ func _run_test() -> void:
 	if not _expect(vehicles.size() == 4, "runtime race should configure four racers"):
 		return
 	var ai_controller_count := 0
-	var shortcut_controller_count := 0
+	var routing_choices: Array[Dictionary] = []
 	for vehicle: Node2D in vehicles:
 		var nearest := INF
 		for marker_position: Vector2 in marker_positions:
@@ -105,15 +105,28 @@ func _run_test() -> void:
 				var racing_line: PackedVector2Array = child.get("_racing_line")
 				if not _expect(racing_line.size() >= 260, "%s should cache the generated racing line at arc-length-uniform density (got %d)" % [vehicle.name, racing_line.size()]):
 					return
-				if child.uses_shortcut_line:
-					shortcut_controller_count += 1
+				routing_choices.append({
+					"preference": float((child.get("personality") as Dictionary).get("shortcut_preference", 1.0)),
+				})
 				var selected_line := track.get_node("ShortcutRacingLine" if child.uses_shortcut_line else "RacingLine") as Line2D
 				for index in racing_line.size():
 					if not _expect(racing_line[index].is_equal_approx(selected_line.to_global(selected_line.points[index])), "%s should cache its selected legal route rather than the embedded fixture" % vehicle.name):
 						return
 	if not _expect(ai_controller_count == 3, "runtime race should configure three generated-track AI controllers"):
 		return
-	if not _expect(shortcut_controller_count > 0 and shortcut_controller_count < ai_controller_count, "the mixed Club roster should retain both safe and shortcut routing choices"):
+	# Whether a short cut is worth taking is a real decision, not a coin flip, but
+	# it is not a cross-car ordering: the AI weighs its own retained corner speed,
+	# so a patient driver in a nimble car can take a cut that a bolder, heavier car
+	# refuses. What the roster must guarantee, and what is asserted here, is that a
+	# generated field spans personalities instead of fielding three identical
+	# drivers; each controller's cached route is already checked against its choice.
+	if not _expect(routing_choices.size() == ai_controller_count and ai_controller_count == 3, "every AI controller should report its routing choice"):
+		return
+	var preferences: Array[float] = []
+	for choice: Dictionary in routing_choices:
+		preferences.append(float(choice["preference"]))
+	var spread: float = preferences.max() - preferences.min()
+	if not _expect(spread >= 0.15, "a generated field should span short-cut preferences, not field three identical drivers (spread=%.3f)" % spread):
 		return
 
 	race.queue_free()

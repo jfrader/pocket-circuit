@@ -33,6 +33,9 @@ class TestApp extends Node:
 	func get_save_data() -> Dictionary:
 		return save_data
 
+	func get_championship_event(event_id: String) -> Dictionary:
+		return get_tree().root.get_node("App").call("get_championship_event", event_id)
+
 	func get_mastery_state(_event_id: String, _vehicle_id: String = "") -> Dictionary:
 		if mastery_calibrating:
 			return {"available": false, "calibrating": true, "record": {}, "targets": {}}
@@ -160,6 +163,10 @@ func _run_test() -> void:
 	crumb.pressed.emit()
 	if not _sfx_called(app, "ui_confirm", 0.78):
 		push_error("ROUTE_BOARD_REGRESSION_TEST FAIL: choosing a route stop should play the shared confirm cue")
+		quit(1)
+		return
+	if shell.get("_screen") != "briefing" or shell.get("_event_id") != "kitchen_crumb_rush":
+		push_error("ROUTE_BOARD_REGRESSION_TEST FAIL: choosing a route stop should open its event briefing")
 		quit(1)
 		return
 

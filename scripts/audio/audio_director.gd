@@ -194,6 +194,8 @@ func set_local_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 	var vehicle_stats: Variant = vehicle.get("stats")
 	if vehicle_stats is Object:
 		_vehicle_max_speed = maxf(1.0, float((vehicle_stats as Object).get("max_speed")))
+	if _headless:
+		return
 	if vehicle_stats is VehicleStats:
 		_prepare_vehicle_sfx(vehicle_stats, vehicle_id)
 	if not _prepare_engine_voice(vehicle, vehicle_id) and not _headless and not _engine_player.playing:
@@ -365,6 +367,12 @@ func get_live_section() -> String:
 
 func get_sfx_player_count() -> int:
 	return _sfx_players.size()
+
+## How long a section must play before another may replace it. Exposed so callers
+## and tests can reason about the music's settling time without duplicating it.
+func get_live_section_dwell() -> float:
+	return LiveMusic.SECTION_CHANGE_DWELL
+
 
 func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result: String = "") -> void:
 	_live.set_race_state(phase, intensity, pressure, final_lap, finish_result)
@@ -693,14 +701,14 @@ func warm_vehicle_audio(vehicle_id: String, progress: Callable = Callable()) -> 
 	if stats == null:
 		return false
 	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
-	var warmed := EngineVoiceGenerator.generate_cached(recipe) != null
+	var voice := await EngineVoiceGenerator.prepare_cached(recipe, progress)
 	if progress.is_valid():
 		await progress.call()
 	EngineLoopGeneratorScript.generate_cached(recipe)
 	if progress.is_valid():
 		await progress.call()
 	_prepare_vehicle_sfx(stats, vehicle_id)
-	return warmed
+	return voice != null
 
 
 func get_engine_voice_signature() -> String:

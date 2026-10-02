@@ -119,14 +119,15 @@ func show_garage(selected: String, unlocked: Array, context: String, next_text: 
 		_vehicle_buttons[id] = button
 		car_row.append(button)
 	var back := _button("BACK", Rect2(COLUMN_X, 612, 240, 64), &"back")
+	var driver := _button("DRIVER LOOK", Rect2(COLUMN_X + 258, 612, 300, 64), &"driver")
 	var next := _button(next_text, Rect2(868, 612, 340, 64), &"play_vehicle", true)
 	_garage_primary = next
 	_garage_back = back
 	next.name = "GaragePrimaryAction"
-	_wire_rows([car_row, [back, next]])
+	_wire_rows([car_row, [back, driver, next]])
 	for button: Button in car_row:
 		button.focus_neighbor_bottom = button.get_path_to(next)
-	_label("ENTER / A  CONFIRM", Rect2(330, 632, 520, 26), 14, SKIN.CREAM_DIM).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_label("ENTER / A  CONFIRM", Rect2(630, 632, 238, 26), 14, SKIN.CREAM_DIM).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var initial := selected if selected in unlocked else "rustbug"
 	_choose_vehicle(initial)
 	_focus_later(_vehicle_buttons.get(initial, next), _generation)

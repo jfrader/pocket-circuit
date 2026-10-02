@@ -60,7 +60,6 @@ const COLLISION_SOLID := &"solid"
 const COLLISION_FLAT := &"flat"
 const VISUAL_ROLE_SOLID := VISUAL_ROLE_CONTRACT.SOLID
 const VISUAL_ROLE_FLAT := VISUAL_ROLE_CONTRACT.FLAT
-const VISUAL_ROLE_MOVING_HAZARD := VISUAL_ROLE_CONTRACT.MOVING_HAZARD
 const COLLISION_ALPHA_THRESHOLD := 0.08
 const ORIENTED_FOOTPRINT_MIN_ANISOTROPY := 1.35
 const APRON_COLLIDER_CLEARANCE := 36.0
@@ -122,16 +121,34 @@ static func _plan_generated_obstacles(
 	)
 
 
-static func _plan_generated_hazard(theme: StringName, spec: Dictionary, centerline: PackedVector2Array, moments: Dictionary) -> Dictionary:
-	return TRACK_BUILDER_PLANNER.plan_hazard(theme, spec, centerline, moments)
-
-
 static var SOLID_EDGE_SHAPES: Dictionary = {}
 static var FLAT_EDGE_ASSETS: Dictionary = {}
 static var _texture_footprint_cache: Dictionary = {}
 static var _texture_hull_cache: Dictionary = {}
 static var _texture_opaque_rect_cache: Dictionary = {}
 static var _texture_outline_cache: Dictionary = {}
+
+## Textures built while generating a track have no resource path, so the cache key
+## falls back to the texture instance id, and those ids never repeat between races.
+## Without a bound the game permanently retains outline and footprint data for art
+## that will never be asked for again, which made later races heavier and heavier.
+## The cap is several tracks' worth of entries, so a single build never thrashes;
+## entries are only examined when one is added, never on a hit.
+const MAX_TEXTURE_CACHE_ENTRIES := 384
+static var _texture_opaque_rect_order: Array[String] = []
+static var _texture_outline_order: Array[String] = []
+static var _texture_footprint_order: Array[String] = []
+
+
+static func cache_texture_entry(cache: Dictionary, order: Array[String], key: String, value: Variant) -> void:
+	if order.has(key):
+		order.erase(key)
+	order.append(key)
+	cache[key] = value
+	while order.size() > MAX_TEXTURE_CACHE_ENTRIES:
+		var oldest: String = order[0]
+		order.remove_at(0)
+		cache.erase(oldest)
 static var synchronous_outline_builds := 0
 static var ASSET_FOOTPRINT_OVERRIDES: Dictionary = {}
 static var ROOM_SHAPES: Dictionary = {}
@@ -258,7 +275,6 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		spec["island_expansion"] = 10.0
 		spec.erase("gate_fractions")
 		spec["obstacle_seed"] = int(generation_options.get("obstacle_seed", sub_seeds.get("obstacle", _mix_seed(seed, "obstacle_plan"))))
-		spec["hazard_seed"] = int(generation_options.get("hazard_seed", sub_seeds.get("hazard", _mix_seed(seed, "hazard_plan"))))
 		spec["act"] = clampi(int(generation_options.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
 		spec["obstacles_enabled"] = bool(generation_options.get("obstacles_enabled", true))
 		used_seed = int(gen["seed"])
@@ -272,9 +288,8 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		edges["inner_boundary"] = _simple_inner_boundary_loop(inner, centerline)
 		edges["outer_boundary"] = _simple_boundary_loop(outer, centerline)
 		var gate_samples := _layout_gate_samples(centerline, spec)
-		var moments := _analyze_track_moments(centerline, gate_samples)
+		var moments := _analyze_track_moments(centerline, gate_samples, spec)
 		spec["obstacle_plan"] = _plan_generated_obstacles(theme, spec, centerline, gate_samples, moments)
-		spec["hazard_plan"] = _plan_generated_hazard(theme, spec, centerline, moments)
 	var prepared := {"spec": spec, "centerline": centerline, "edges": edges, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": used_seed}
 	prepared["racing_line_metrics"] = racing_line_metrics_from_prepared(prepared)
 	if not bool(generation_options.get("preview_composer", false)):
@@ -310,12 +325,6 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 		surface_art_exclusions.append_array(obstacle_footprints)
 		surface_art_exclusions.append(inner)
 		spec["surface_art_exclusions"] = surface_art_exclusions
-		var hazard: Dictionary = spec.get("hazard_plan", {})
-		if bool(hazard.get("present", false)):
-			var half_size: Vector2 = hazard["footprint_size"] * 0.5
-			for path: PackedVector2Array in hazard["paths"].values():
-				var bounds := _polygon_bounds_rect(path).grow_individual(half_size.x, half_size.y, half_size.x, half_size.y)
-				obstacle_footprints.append(_rect_points(bounds.get_center(), bounds.size))
 		var outer: PackedVector2Array = edges.get("outer_boundary", left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right)
 		spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"outer_boundary":outer,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved,"solid_footprints":obstacle_footprints}, candidates, {})
 		spec["surface_identity"] = HouseholdSurfaceMaterials.resolve(theme, int(spec.get("material_seed", _mix_seed(maxi(seed, 0), "material"))), String(spec.get("material_id", "")), String(spec.get("palette_id", "")), spec.get("floor_modulate", Color.WHITE))
@@ -335,7 +344,7 @@ static func racing_line_metrics_from_prepared(prepared: Dictionary) -> Dictionar
 	var centerline: PackedVector2Array = prepared["centerline"]
 	var spec: Dictionary = prepared["spec"]
 	var gate_samples := _layout_gate_samples(centerline, spec)
-	var moments := _analyze_track_moments(centerline, gate_samples)
+	var moments := _analyze_track_moments(centerline, gate_samples, spec)
 	var racing_line := _racing_line_points(centerline, moments, false)
 	if racing_line.size() < 3:
 		return {}
@@ -395,10 +404,8 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 		root.set_meta("material_id", String(spec.get("material_id", "")))
 		root.set_meta("palette_id", String(spec.get("palette_id", "")))
 		root.set_meta("obstacle_seed", int(spec["obstacle_seed"]))
-		root.set_meta("hazard_seed", int(spec["hazard_seed"]))
 		root.set_meta("obstacles_enabled", bool(spec["obstacles_enabled"]))
 		root.set_meta("generated_obstacle_plan", (spec.get("obstacle_plan", []) as Array).duplicate(true))
-		root.set_meta("generated_hazard_plan", (spec.get("hazard_plan", {}) as Dictionary).duplicate(true))
 	return root
 
 
@@ -623,8 +630,9 @@ static func _compose_generated_story(
 	await TRACK_BUILDER_STORY.compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, moments, stage)
 
 
-static func _analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array) -> Dictionary:
-	return TRACK_BUILDER_DRESSING.analyze_track_moments(centerline, gate_samples)
+static func _analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array, spec: Dictionary = {}) -> Dictionary:
+	var surface_seed := _mix_seed(int(spec.get("requested_seed", spec.get("seed", 0))), "technical_surface")
+	return TRACK_BUILDER_DRESSING.analyze_track_moments(centerline, gate_samples, surface_seed)
 
 
 static func _default_act_for_theme(theme: StringName) -> int:
@@ -633,21 +641,6 @@ static func _default_act_for_theme(theme: StringName) -> int:
 
 static func _layout_gate_samples(centerline: PackedVector2Array, spec: Dictionary) -> PackedVector2Array:
 	return TRACK_BUILDER_DRESSING.layout_gate_samples(centerline, spec)
-
-
-static func _centerline_arc_positions(centerline: PackedVector2Array) -> PackedFloat32Array:
-	return TRACK_BUILDER_DRESSING.centerline_arc_positions(centerline)
-
-
-static func _pick_conflict_candidate(
-		centerline: PackedVector2Array,
-		gate_samples: PackedVector2Array,
-		arc_positions: PackedFloat32Array,
-		total_length: float,
-		minimum_fraction: float,
-		maximum_fraction: float
-) -> int:
-	return TRACK_BUILDER_DRESSING.pick_conflict_candidate(centerline, gate_samples, arc_positions, total_length, minimum_fraction, maximum_fraction)
 
 
 static func _build_opening_landmark(
@@ -899,9 +892,6 @@ static func _lane_strip(path: PackedVector2Array, half_width: float) -> PackedVe
 static func _open_path_length(path: PackedVector2Array) -> float:
 	return TRACK_BUILDER_DRESSING.open_path_length(path)
 
-
-static func _crossing_path(centerline: PackedVector2Array, center_index: int, half_width: float) -> PackedVector2Array:
-	return TRACK_BUILDER_GEOMETRY.crossing_path(centerline, center_index, half_width)
 
 
 static func _build_finish_moments(parent: Node2D, centerline: PackedVector2Array) -> void:
