@@ -27,6 +27,7 @@
 - The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
+- Changing volume, difficulty or comfort settings no longer exits fullscreen or shrinks a maximized window.
 - Bare outside bends receive colliding household props where an apron shortcut would skip the corner. The reserved apron exit stays open.
 - Rapid changes between race results and menus no longer switch the music section repeatedly.
 - Vehicle movement is interpolated between physics ticks for smoother presentation.
