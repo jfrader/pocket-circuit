@@ -259,15 +259,21 @@ func _close_outer_cuts() -> void:
 			for attempt in points.size():
 				var offset := ceili(float(attempt) * 0.5) * (1 if attempt % 2 == 0 else -1)
 				var index := clampi(points.size() / 2 + offset, 0, points.size() - 1)
+				var closest := TrackBuilderCore._closest_point_on_loop(points[index], line)
+				var outward := (points[index] - (closest["position"] as Vector2)).normalized()
 				for orientation: float in [heading + PI * 0.5, heading]:
-					var fit := _validate(asset, points[index], orientation + axis)
-					if fit.is_empty() or fit["zone"] != "apron":
-						continue
-					fit["corner_cut_indices"] = Vector2i(cut["start_index"], cut["end_index"])
-					_store(asset, "boundary", fit)
-					diagnostics["corner_blockers"] += 1
-					placed = true
-					break
+					for outset: float in [0.0, float(settings["vehicle_radius_mm"])]:
+						var point := points[index] + outward * outset
+						var fit := _validate(asset, point, orientation + axis)
+						if fit.is_empty() or fit["zone"] != "apron":
+							continue
+						fit["corner_cut_indices"] = Vector2i(cut["start_index"], cut["end_index"])
+						_store(asset, "boundary", fit)
+						diagnostics["corner_blockers"] += 1
+						placed = true
+						break
+					if placed:
+						break
 				if placed:
 					break
 			if placed:
@@ -278,7 +284,7 @@ func _close_outer_cuts() -> void:
 
 func _covered_cut(a: Vector2, b: Vector2) -> bool:
 	for core: Vector3 in solid_cores:
-		if Geometry2D.segment_intersects_circle(a, b, Vector2(core.x, core.y), core.z) >= 0.0:
+		if Geometry2D.segment_intersects_circle(a, b, Vector2(core.x, core.y), core.z + float(density["corner_cuts"]["vehicle_radius_mm"])) >= 0.0:
 			return true
 	var chord := PackedVector2Array([a, b])
 	for polygon: PackedVector2Array in solid_polygons:

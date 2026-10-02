@@ -661,37 +661,6 @@ static func _pick_straight_candidate(
 	return TRACK_BUILDER_DRESSING.pick_straight_candidate(candidates, centerline, gate_samples, excluded, minimum_separation)
 
 
-## Geometric chord classification; registered physics decides whether it is clear.
-static func exploitable_cut(centerline: PackedVector2Array, start: int, lookahead: int) -> Dictionary:
-	var verdict := {"exploitable": false, "deep": 0, "saved": 0.0, "ratio": 1.0}
-	var count := centerline.size()
-	if count < CUT_MAX_LOOKAHEAD * 2:
-		return verdict
-	var a: Vector2 = centerline[start]
-	var finish := (start + lookahead) % count
-	var b: Vector2 = centerline[finish]
-	var deep := 0
-	for sample in CUT_SAMPLES:
-		var t := float(sample) / float(CUT_SAMPLES - 1)
-		var point := a.lerp(b, t)
-		if _distance_to_centerline(point, centerline) > HALF_WIDTH + CUT_MIN_OFF_CORRIDOR_MM:
-			deep += 1
-	verdict["deep"] = deep
-	if deep < CUT_MIN_DEEP_SAMPLES:
-		return verdict
-	var arc := 0.0
-	var walk := start
-	while walk != finish:
-		var following := (walk + 1) % count
-		arc += centerline[walk].distance_to(centerline[following])
-		walk = following
-	var chord := a.distance_to(b)
-	verdict["saved"] = arc - chord
-	verdict["ratio"] = arc / maxf(chord, 0.001)
-	verdict["exploitable"] = arc - chord >= CUT_MIN_SAVED_MM and arc >= chord * CUT_MIN_ARC_RATIO
-	return verdict
-
-
 static func _turn_strength(centerline: PackedVector2Array, index: int, span: int) -> float:
 	return TRACK_BUILDER_GEOMETRY.turn_strength(centerline, index, span)
 

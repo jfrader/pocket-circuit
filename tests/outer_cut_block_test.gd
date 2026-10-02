@@ -168,6 +168,8 @@ func _load_vehicle() -> bool:
 		_circle.radius = _capsule.radius
 		ok = _check(_vehicle_mask != 0 and _capsule.height > _capsule.radius * 2.0, "Rustbug must have a longer-than-wide capsule and solid mask")
 	car.free()
+	if ok:
+		ok = _check(is_equal_approx(float(WorldEnvironmentCatalog.boundary_density()["corner_cuts"]["vehicle_radius_mm"]), _circle.radius), "corner placement must use the scene's actual physical radius")
 	return ok
 
 
@@ -338,12 +340,12 @@ func _physics_atomics() -> bool:
 	var straight := PackedVector2Array()
 	for step in 200:
 		straight.append(Vector2(step * 10.0, 0.0))
-	if not _check(not bool(CORE.exploitable_cut(straight, 0, 20)["exploitable"]), "straight must not be a cut"):
+	if not _check(int(_pose_excursion(straight[0], straight[20], straight, -1)["deep"]) == 0, "straight must not be a cut"):
 		return false
 	var anchor_identity := IDS.create(&"kitchen", IDS.room_for_route_seed(7), 7)
 	var anchor: Dictionary = CORE.prepare_layout(&"kitchen", StringName(anchor_identity["room"]), 7, IDS.generation_options(anchor_identity))
 	var anchor_line: PackedVector2Array = anchor["centerline"]
-	if not _check(bool(CORE.exploitable_cut(anchor_line, 223, 22)["exploitable"]) and not bool(CORE.exploitable_cut(anchor_line, 223, 2)["exploitable"]), "known cut versus short hop"):
+	if not _check(int(_pose_excursion(anchor_line[223], anchor_line[245], anchor_line, -1)["deep"]) >= 3 and int(_pose_excursion(anchor_line[223], anchor_line[225], anchor_line, -1)["deep"]) < 3, "known deep chord versus short hop"):
 		return false
 	for pair: Vector2i in _candidate_pairs(anchor_line):
 		var span := CORE._cyclic_index_distance(pair.x, pair.y, anchor_line.size())
