@@ -43,6 +43,7 @@ var _engine_voice: EngineSoundPlayer
 ## Continuous tyre scrub for the local car, driven by its slip angle.
 var _local_tyre_player: AudioStreamPlayer
 var _local_tyre_level := 0.0
+var _tyre_state: Dictionary = {}
 ## Positional WAV-loop voices for AI and remote cars. The local car alone keeps
 ## the per-sample generator above.
 var _positional_tyre_emitters: Array[Node] = []
@@ -517,7 +518,7 @@ func _update_drift(_delta: float) -> void:
 		if is_instance_valid(_engine_voice):
 			_engine_voice.set_duck_db(0.0)
 		return
-	var tyre_state: Dictionary = _local_vehicle.call("get_tyre_state")
+	var tyre_state := _read_tyre_state(_local_vehicle)
 	_drive_local_tyre(tyre_state, maxf(0.0, float(_local_vehicle.get("speed"))), _delta)
 	if is_instance_valid(_engine_voice):
 		var duck := ENGINE_SLIDE_DUCK_DB * clampf(_local_tyre_level / TYRE_LEVEL_CEILING, 0.0, 1.0)
@@ -580,7 +581,7 @@ func _update_positional_tyres() -> void:
 		if not is_instance_valid(vehicle) or not vehicle.has_method("get_tyre_state"):
 			emitter.stop()
 			continue
-		var tyre_state: Dictionary = vehicle.call("get_tyre_state")
+		var tyre_state := _read_tyre_state(vehicle)
 		var profile: Dictionary = TyreSurfaceProfilesScript.profile_for(tyre_state["surface"])
 		emitter.set_stream(_tyre_loop_for(profile))
 		var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
@@ -590,6 +591,14 @@ func _update_positional_tyres() -> void:
 		var level := _tyre_target_level(tyre_state)
 		var pitch := 0.70 + speed_ratio * 0.08 + screech * 0.06
 		emitter.update_voice(listener_position, level, pitch, not _race_paused)
+
+
+func _read_tyre_state(vehicle: Node) -> Dictionary:
+	# Test doubles retain the snapshot API; real vehicles fill our reusable buffer.
+	if vehicle.has_method("write_tyre_state"):
+		vehicle.call("write_tyre_state", _tyre_state)
+		return _tyre_state
+	return vehicle.call("get_tyre_state")
 
 
 func _tyre_loop_for(profile: Dictionary) -> AudioStreamWAV:

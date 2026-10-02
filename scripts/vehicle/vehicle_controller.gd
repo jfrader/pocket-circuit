@@ -224,6 +224,14 @@ func get_throttle_input() -> float:
 ## own the sliding truth; raw slip only shapes intensity after gameplay says the
 ## tyres have broken away.
 func get_tyre_state() -> Dictionary:
+	var state: Dictionary = {}
+	write_tyre_state(state)
+	return state
+
+
+## Fill caller-owned scratch state for per-frame presentation; get_tyre_state()
+## remains a snapshot for callers that retain it.
+func write_tyre_state(state: Dictionary) -> void:
 	var sliding := is_drifting or is_sliding
 	var speed_weight := smoothstep(TYRE_ROLLING_SPEED, TYRE_FULL_SPEED, speed)
 	var steer := maxf(absf(_steer_input) - TYRE_STEER_ONSET, 0.0)
@@ -234,15 +242,13 @@ func get_tyre_state() -> Dictionary:
 	var rear_slip_deg := rad_to_deg(absf(_rear_slip_angle))
 	var span := maxf(SCREECH_FULL_DEG - SCREECH_ONSET_DEG, 1.0)
 	var slip_intensity := pow(clampf((rear_slip_deg - SCREECH_ONSET_DEG) / span, 0.0, 1.0), 1.6)
-	return {
-		"cornering": cornering,
-		"sliding": sliding,
-		"screech": slip_intensity if sliding else 0.0,
-		"drift_state": _drift_state,
-		"surface": current_surface,
-		"grip": get_effective_grip(),
-		"surface_grip": surface_grip_multiplier,
-	}
+	state["cornering"] = cornering
+	state["sliding"] = sliding
+	state["screech"] = slip_intensity if sliding else 0.0
+	state["drift_state"] = _drift_state
+	state["surface"] = current_surface
+	state["grip"] = get_effective_grip()
+	state["surface_grip"] = surface_grip_multiplier
 
 
 ## Compatibility accessors for probes and presentation callers.
