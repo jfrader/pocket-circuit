@@ -30,7 +30,7 @@ static func candidates(
 		return found
 
 	var fractions: Array = settings["lane_fractions"]
-	var edge_margin := float(settings["lane_edge_margin_mm"])
+	var edge_margin := float(settings["vehicle_radius_mm"])
 	var lane_reach := maxf(0.0, half_width - edge_margin)
 	var normals := PackedVector2Array()
 	var outward_sign := -1.0 if CORE._polygon_area(line) > 0.0 else 1.0

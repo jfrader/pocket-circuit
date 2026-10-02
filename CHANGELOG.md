@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Changed
+- Loose debris varies in number, size and position across generated circuits, including tracks with none. Patches remain on calm stretches.
 - Every new championship fields its own generated rivals, and each Quick Race brings a new lineup driving different cars. Rival names follow the roster into briefings, the route board and the race.
 - Slippery patches, the technical surface and on-course obstacles now sit only on calm stretches, away from corners and the braking zones before them in both race directions. Some tracks carry fewer of them as a result. This layout change advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Quick Race has a difficulty picker beside its race controls, shared with Settings.
@@ -26,6 +27,7 @@
 - The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
+- Bare outside bends receive colliding household props where an apron shortcut would skip the corner. The reserved apron exit stays open.
 - Rapid changes between race results and menus no longer switch the music section repeatedly.
 - Vehicle movement is interpolated between physics ticks for smoother presentation.
 - Club Circuit rivals no longer receive catch-up power while ahead of your car; their total engine assist remains capped at 15%.
