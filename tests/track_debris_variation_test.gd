@@ -21,6 +21,12 @@ func _initialize() -> void:
 func _run_test() -> void:
 	if not _expect(int(CORE.GRIP_PATCH_MIN_COUNT) == 0 and int(CORE.GRIP_PATCH_MAX_COUNT) >= 8, "the debris range must allow a clean track and a busy one, not a fixed count"):
 		return
+	var straight := PackedVector2Array([Vector2(0, 0), Vector2(20, 0), Vector2(40, 0), Vector2(60, 0), Vector2(80, 0), Vector2(100, 0), Vector2(120, 0), Vector2(120, 120), Vector2(0, 120)])
+	var rectangle := TrackBuilderDressing.surface_strip(straight, 3, 2, 13.0)
+	if not _expect(rectangle.size() == 4 and _valid_footprint(rectangle), "a straight debris strip should retain its valid four-corner footprint"):
+		return
+	if not _expect(not _valid_footprint(PackedVector2Array([Vector2.ZERO, Vector2(10, 0), Vector2(20, 0), Vector2(30, 0)])), "a collapsed debris footprint must fail"):
+		return
 	var widths := {}
 	var counts := {}
 	var left_signed := false
@@ -61,7 +67,7 @@ func _run_test() -> void:
 			left_signed = left_signed or lateral < 0.0
 			right_signed = right_signed or lateral > 0.0
 			var points: PackedVector2Array = patch["points"]
-			if not _expect(points.size() >= 5, "%s/%d debris needs a real footprint (got %d points)" % [theme, seed_value, points.size()]):
+			if not _expect(_valid_footprint(points), "%s/%d debris needs a nondegenerate footprint (got %d points)" % [theme, seed_value, points.size()]):
 				track.free()
 				return
 			for point: Vector2 in points:
@@ -87,6 +93,10 @@ func _run_test() -> void:
 		return
 	print("TRACK_DEBRIS_VARIATION_TEST PASS pinned_cases=", CASES.size(), " pieces=", total_patches, " distinct_widths=", widths.size())
 	quit(0)
+
+
+func _valid_footprint(points: PackedVector2Array) -> bool:
+	return points.size() >= 4 and not Geometry2D.triangulate_polygon(points).is_empty()
 
 
 func _expect(condition: bool, message: String) -> bool:

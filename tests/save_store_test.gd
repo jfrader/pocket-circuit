@@ -217,7 +217,7 @@ func _test_generator_version_migration(store: SaveStore) -> bool:
 	}))
 	var loaded := store.load_data()
 	var migrated: Dictionary = loaded["championship_circuit"]
-	if not _expect(int(migrated["seed"]) == 123456789 and int(migrated["generator_version"]) == 10, "an older championship save should keep its master seed while advancing the generator version"):
+	if not _expect(int(migrated["seed"]) == 123456789 and int(migrated["generator_version"]) == 11, "an older championship save should keep its master seed while advancing the generator version"):
 		return false
 	if not _expect(
 			loaded["completed_events"] == ["kitchen_crumb_rush", "kitchen_mug_run", "kitchen_clean_line"]

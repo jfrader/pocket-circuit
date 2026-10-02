@@ -19,7 +19,7 @@ func _run_test() -> void:
 		return
 	if not _expect((identity["fingerprints"] as Dictionary).keys().size() == IDENTITIES.DOMAINS.size() + 1, "every domain and the complete circuit should have fingerprints"):
 		return
-	if not _expect(identity["sub_seeds"] == {"route": 246810, "room_composition": 1821677131, "material": 1916693968, "dressing": 493555838, "obstacle": 328509393, "hazard": 1746009985} and String(identity["fingerprint"]) == "d5c1e98f1fe83f24" and String(identity["display_name"]) == "Clockwork Clamp Circuit" and String(identity["material_id"]) == "workshop_oiled" and String(identity["palette_id"]) == "oiled_espresso", "the v10 fixture identity, fingerprint, and every domain sub-seed should stay regression-pinned"):
+	if not _expect(identity["sub_seeds"] == {"route": 246810, "room_composition": 1821677131, "material": 1916693968, "dressing": 493555838, "obstacle": 328509393, "hazard": 1746009985} and int(identity["generator_version"]) == 11 and String(identity["fingerprint"]) == "d608338aa2824876" and String(identity["display_name"]) == "Clockwork Clamp Circuit" and String(identity["material_id"]) == "workshop_oiled" and String(identity["palette_id"]) == "oiled_espresso", "the v11 fixture identity, fingerprint, and every domain sub-seed should stay regression-pinned"):
 		return
 	for domain: String in IDENTITIES.DOMAINS:
 		if not _expect(String(identity["fingerprints"][domain]).length() == 16, "%s should have a stable inspectable fingerprint" % domain):
@@ -59,7 +59,7 @@ func _run_test() -> void:
 	var payload_result := IDENTITIES._base32_decode(compact.substr(3))
 	var payload: PackedByteArray = payload_result["bytes"]
 	var body := payload.slice(0, payload.size() - 4)
-	body[0] = 11
+	body[0] = IDENTITIES.GENERATOR_VERSION + 1
 	var unsupported_payload := body.duplicate()
 	unsupported_payload.append_array(IDENTITIES._checksum(body))
 	var generator_code := "PC1" + IDENTITIES._base32_encode(unsupported_payload)
@@ -68,12 +68,17 @@ func _run_test() -> void:
 		return
 
 	var previous_body := payload.slice(0, payload.size() - 4)
-	previous_body[0] = 9
+	previous_body[0] = 10
 	var previous_payload := previous_body.duplicate()
 	previous_payload.append_array(IDENTITIES._checksum(previous_body))
 	var previous_code := "PC1" + IDENTITIES._base32_encode(previous_payload)
 	var previous_result := IDENTITIES.decode_share_code(previous_code)
 	if not _expect(not bool(previous_result.get("ok", false)) and previous_result.get("kind") == "unsupported_generator", "the previous generator version should be rejected honestly as unsupported"):
+		return
+	var previous_identity := identity.duplicate(true)
+	previous_identity["generator_version"] = 10
+	previous_identity["fingerprint"] = "d5c1e98f1fe83f24"
+	if not _expect(IDENTITIES.normalize(previous_identity).is_empty(), "a version-10 identity must not match a revised physical layout"):
 		return
 
 	var bad_tier_body := payload.slice(0, payload.size() - 4)
