@@ -6,7 +6,8 @@
     "rail_members":[3,5],"rail_min_length_mm":100,"rail_min_aspect":3.0,
     "peg_runs":[1,2],"peg_members":[8,12],"peg_length_mm":[30,60],"peg_min_aspect":2.0,
     "inner_members":[4,8],"gap_mm":[8,14],"max_join_gap_mm":40,"run_separation_mm":120,
-    "search_stride_mm":32,"search_attempts":64,"run_outsets_mm":[0,16,32]
+    "search_stride_mm":32,"search_attempts":64,"run_outsets_mm":[0,16,32],
+    "corner_cuts":{"lane_fractions":[0,0.5,1],"lane_edge_margin_mm":18,"solid_core_ratio":0.44}
   },
   "themes":{
     "kitchen":{
