@@ -340,7 +340,8 @@ func _sync_space() -> bool:
 
 func _physics_atomics() -> bool:
 	var contract := {"CUT_MIN_OFF_CORRIDOR_MM": MIN_OFF_CORRIDOR_MM, "CUT_MIN_DEEP_SAMPLES": MIN_DEEP_SAMPLES, "CUT_MIN_SAVED_MM": MIN_SAVED_MM, "CUT_MIN_ARC_RATIO": MIN_ARC_RATIO, "CUT_SAMPLES": CHORD_SAMPLES}
-	var constants := CORE.get_script_constant_map()
+	var core_script: Script = CORE
+	var constants := core_script.get_script_constant_map()
 	for key: String in contract:
 		if constants.has(key) and not _check(constants[key] == contract[key], "cut contract changed: " + key):
 			return false
