@@ -817,7 +817,7 @@ static func calculate_catch_up_power(tuning: Dictionary, position: int, progress
 func _corner_mistake(delta: float, tuning: Dictionary, checkpoint_index: int, radius: float) -> float:
 	if float(tuning["mistake_rate"]) <= 0.0:
 		return 0.0
-	var lap := int(race_manager.get_racer_state(vehicle).get("lap", 0))
+	var lap := int(race_manager.get_racer_state_ref(vehicle).get("lap", 0))
 	var key := "%d:%d" % [lap, checkpoint_index]
 	if key != _mistake_key:
 		_mistake_key = key
