@@ -286,6 +286,8 @@ var _ray_results := [
 	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
 	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
 ]
+var _brake_prediction: Array[float] = [0.0, 0.0]
+var _brake_prediction_loads: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 
 func configure(
@@ -2132,7 +2134,7 @@ func _v1_speed_envelope(radius: float, distance: float) -> float:
 	corner *= minf(1.0, radius / minimum_radius)
 	var reaction_seconds := float(tuning["reaction_seconds"])
 	var braking_distance := maxf(0.0, distance - vehicle.speed * reaction_seconds * float(personality["brake_timing"]))
-	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip)
+	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip, _brake_prediction, _brake_prediction_loads)
 	return minf(maximum, sqrt(corner * corner + 2.0 * braking_accel * braking_distance))
 
 

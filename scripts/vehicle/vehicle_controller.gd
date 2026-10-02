@@ -86,6 +86,9 @@ var _drift_boost_accumulated := 0.0
 var _drift_grace_timer := 0.0
 var _front_slip_angle := 0.0
 var _rear_slip_angle := 0.0
+var _v1_slips: Array[float] = [0.0, 0.0]
+var _v1_brakes: Array[float] = [0.0, 0.0]
+var _v1_brake_loads: Array[float] = [0.0, 0.0, 0.0, 0.0]
 var _last_speed := 0.0
 var _drift_entry_speed := 0.0
 
@@ -537,12 +540,12 @@ func _v1_physics_step(delta: float) -> void:
 	)
 
 	# ── Slip angles ──
-	var slips := DYNAMICS.calculate_slip_angles(
+	DYNAMICS.calculate_slip_angles_into(
 		fwd_speed, lat_speed, yaw_rate,
-		stats.wheelbase, stats.front_weight_ratio, _rack_angle,
+		stats.wheelbase, stats.front_weight_ratio, _rack_angle, _v1_slips,
 	)
-	_front_slip_angle = float(slips["front"])
-	_rear_slip_angle = float(slips["rear"])
+	_front_slip_angle = _v1_slips[0]
+	_rear_slip_angle = _v1_slips[1]
 
 	var front_normal := DYNAMICS.calculate_axle_normal_load(
 		stats.mass, stats.front_weight_ratio, true,
@@ -729,13 +732,13 @@ func _v1_apply_braking(forward: Vector2, fwd_speed: float, front_pos: Vector2, r
 			linear_velocity *= 0.9
 		return
 
-	var brakes := DYNAMICS.calculate_brake_forces(
+	DYNAMICS.calculate_brake_forces_into(
 		_brake_input, fwd_speed, stats, surface_grip_multiplier,
-		_front_lateral_force, _rear_lateral_force,
+		_front_lateral_force, _rear_lateral_force, _v1_brakes, _v1_brake_loads,
 	)
 	var front_forward := forward.rotated(_rack_angle)
-	apply_force(-front_forward * float(brakes["front_brake"]), front_pos)
-	apply_force(-forward * float(brakes["rear_brake"]), rear_pos)
+	apply_force(-front_forward * _v1_brakes[0], front_pos)
+	apply_force(-forward * _v1_brakes[1], rear_pos)
 
 
 func _v1_apply_boost(delta: float, forward: Vector2, _fwd_speed: float) -> void:
