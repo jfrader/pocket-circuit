@@ -208,8 +208,8 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 - Up to ten additional `patch` surface definitions (target 0-10) add
   deterministic themed grip and speed changes on calm stretches only. They
   vary in footprint and lateral position, remain inside the corridor and stay
-  clear of every gate and the two designed
-  surface moments; a lap short of calm room gets fewer. `TrackVariantPresenter`
+  clear of every gate and the two designed surface moments; a lap short of calm
+  room gets fewer. `TrackVariantPresenter`
   remains the only creator of authoritative runtime `SurfaceZone` nodes.
 - `SpeedSection`: the unobstructed start/finish straight.
 - `DramaticFinish`: clear forward and reverse run-ups ending at the checker.
@@ -218,7 +218,8 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 
 `generated_moment_indices` and `generated_surfaces` expose these contracts for
 runtime presentation and tests. The surface array contains the shortcut, the
-technical moment when a calm stretch exists, and up to 10 grip patches. `RacingLine` takes the safe outer lane through the shortcut window,
+technical moment when a calm stretch exists, and up to 10 grip patches.
+`RacingLine` takes the safe outer lane through the shortcut window,
 while `ShortcutRacingLine` exposes the shorter lane to competitive AI when its
 speed and grip metadata are suitable. Sunday Drive always stays on the safe
 line.
@@ -279,6 +280,8 @@ line.
   must pass the normal room, corridor, reservation and open-sector fit checks;
   registered engine collision, not the planner's conservative cores, is the
   acceptance gate.
+  Reserved fit footprints are not collision coverage. Exact pocket boundary
+  polygons and conservative unexpanded prop cores supply coverage separately.
 - Common reusable rails and hardware have explicit repeat budgets in the asset
   contract. The single-focal composition rule does not impose a global one-copy
   limit on a pen that is also used in boundary sets.
@@ -296,9 +299,11 @@ line.
   ranges of 1–4, 2–6 and 3–8 by act, on calm stretches only. Targets may
   underfill if no safe placement exists; never reduce the 1.6-car viable corridor or either racing-line clearance
   to reach a quota. The obstacle stream remains independent of route geometry.
-- Footprint sweeps reject distant segment AABBs before the unchanged narrow-phase
-  checks. The optimized result is regression-checked against an exhaustive sweep;
-  denser scenery must not trade collision accuracy for placement speed.
+- Footprint sweeps reject distant segment AABBs before checking circular
+  clearance against the actual oriented rectangle edges or circle. The result
+  is regression-checked against registered engine shape queries; square corner
+  inflation must not reject physically clear space. Denser scenery must not
+  trade collision accuracy for placement speed.
 - Every ordered checkpoint `Area2D` is asymmetric: its inner endpoint stops at
   `HALF_WIDTH` or the raised island, while its outer endpoint reaches the room
   wall. Inner grass does not trip the gate, but legal outer-apron lines do. The
