@@ -210,6 +210,9 @@ var _room_cut_checkpoint := -1
 var _room_cut_start := Vector2.ZERO
 var _room_cut_end := Vector2.ZERO
 var _room_cut_shape: CapsuleShape2D
+var _room_cut_query: PhysicsShapeQueryParameters2D
+var _ray_query: PhysicsRayQueryParameters2D
+var _ray_excludes: Array[RID] = []
 var _overtake_offset := 0.0
 var _overtake_hold_remaining := 0.0
 var _overtake_cooldown_remaining := 0.0
@@ -277,6 +280,8 @@ func configure(
 	if vehicle != controlled_vehicle or _unassisted_stats == null:
 		_unassisted_stats = controlled_vehicle.stats
 	vehicle = controlled_vehicle
+	if _room_cut_query != null:
+		_room_cut_query.exclude = [vehicle.get_rid()]
 	if vehicle.stats != _unassisted_stats:
 		vehicle.apply_stats(_unassisted_stats)
 	race_manager = manager
@@ -842,11 +847,14 @@ func _update_room_cut(expected_index: int, forward: Vector2) -> void:
 		_room_cut_shape = CapsuleShape2D.new()
 		_room_cut_shape.radius = 22.0
 		_room_cut_shape.height = 56.0
-	var query := PhysicsShapeQueryParameters2D.new()
+	if _room_cut_query == null:
+		_room_cut_query = PhysicsShapeQueryParameters2D.new()
+		_room_cut_query.exclude = [vehicle.get_rid()]
+	var query := _room_cut_query
 	query.shape = _room_cut_shape
 	query.transform = Transform2D(direction.angle() + PI * 0.5, vehicle.global_position)
 	query.collision_mask = STATIC_OBSTACLE_MASK
-	query.exclude = [vehicle.get_rid()]
+	query.motion = Vector2.ZERO
 	var space := vehicle.get_world_2d().direct_space_state
 	if not space.intersect_shape(query, 1).is_empty():
 		_room_cut_checkpoint = -1
@@ -1643,14 +1651,16 @@ func _single_ray_probe(
 		mask: int,
 		excluded_rids: Array[RID] = []
 ) -> Dictionary:
-	var query_excludes: Array[RID] = [vehicle.get_rid()]
-	query_excludes.append_array(excluded_rids)
-	var query := PhysicsRayQueryParameters2D.create(
-		origin,
-		origin + direction * feeler_length,
-		mask,
-		query_excludes
-	)
+	if _ray_query == null:
+		_ray_query = PhysicsRayQueryParameters2D.new()
+	_ray_excludes.clear()
+	_ray_excludes.append(vehicle.get_rid())
+	_ray_excludes.append_array(excluded_rids)
+	var query := _ray_query
+	query.from = origin
+	query.to = origin + direction * feeler_length
+	query.collision_mask = mask
+	query.exclude = _ray_excludes
 	var hit := vehicle.get_world_2d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
