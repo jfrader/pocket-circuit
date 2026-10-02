@@ -41,16 +41,12 @@ static func candidates(
 		normals.append(tangent.rotated(PI * 0.5) * outward_sign)
 		prefix[index + 1] = prefix[index] + line[index].distance_to(line[(index + 1) % count])
 	var total := prefix[count]
-	var open_bounds := _open_segment_bounds(line, open_sector)
-	var route_curve: Curve2D = null
-	if not open_bounds.is_empty():
-		route_curve = _route_curve(line, total)
 	var seen := {}
 	for start in count:
 		if CORE._turn_strength(line, start, 6) < CORE.CUT_TURN_THRESHOLD:
 			continue
 		for span in range(CORE.CUT_MIN_LOOKAHEAD, CORE.CUT_MAX_LOOKAHEAD + 1):
-			_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, route_curve, start, (start + span) % count, seen, found)
+			_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, start, (start + span) % count, seen, found)
 
 	# Nearby non-local folds need not be sharp at either endpoint.
 	var buckets := {}
@@ -72,63 +68,59 @@ static func candidates(
 					if mini(forward, count - forward) < int(CORE.CUT_FOLD_MIN_LAP_FRACTION * count):
 						continue
 					if forward <= count - forward:
-						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, route_curve, index, other, seen, found)
+						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, index, other, seen, found)
 					else:
-						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, open_bounds, route_curve, other, index, seen, found)
+						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, other, index, seen, found)
 	found.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return float(left["saved_mm"]) > float(right["saved_mm"]))
 	return found
 
 
-static func _route_curve(line: PackedVector2Array, total: float) -> Curve2D:
-	var route_curve := Curve2D.new()
-	# Zero handles keep every baked span on the original straight segments.
-	# One interval for the whole loop avoids oversampling long source routes.
-	route_curve.bake_interval = maxf(total, 1.0)
-	for point in line:
-		route_curve.add_point(point)
-	route_curve.add_point(line[0])
-	return route_curve
-
-
-static func _open_segment_bounds(line: PackedVector2Array, open_sector: int) -> Array[Rect2]:
-	var bounds: Array[Rect2] = []
-	if open_sector < 0:
-		return bounds
-	for index in line.size():
-		if mini(SECTOR_COUNT - 1, int(float(index) / line.size() * SECTOR_COUNT)) != open_sector:
+static func _outside_samples(a: Vector2, b: Vector2, polygon: PackedVector2Array, fragments: Array[PackedVector2Array]) -> PackedVector2Array:
+	var deep := PackedVector2Array()
+	var span := b - a
+	var length_squared := span.length_squared()
+	var intervals := PackedVector2Array()
+	var boundary_points := PackedVector2Array()
+	if length_squared == 0.0 or fragments.is_empty():
+		for sample in CORE.CUT_SAMPLES:
+			var point := a.lerp(b, float(sample) / float(CORE.CUT_SAMPLES - 1))
+			if not Geometry2D.is_point_in_polygon(point, polygon):
+				deep.append(point)
+		return deep
+	for fragment in fragments:
+		if fragment.is_empty():
 			continue
-		bounds.append(Rect2(line[index], Vector2.ZERO).expand(line[(index + 1) % line.size()]))
-	return bounds
-
-
-static func _cannot_be_nearest_open(
-		point: Vector2, line: PackedVector2Array, start: int, finish: int,
-		bounds: Array[Rect2], route_curve: Curve2D, prefix: PackedFloat64Array
-) -> bool:
-	if bounds.is_empty():
-		return false
-	# Each open segment is inside its own box, so the minimum box distance is
-	# a lower bound even if the sector curves around a large empty area.
-	var lower := INF
-	for box in bounds:
-		lower = minf(lower, point.distance_squared_to(point.clamp(box.position, box.end)))
-	var upper := minf(point.distance_squared_to(line[start]), point.distance_squared_to(line[finish]))
-	if lower > upper and not is_equal_approx(lower, upper):
-		return true
-	# The native curve lookup proposes a segment, NEVER the sector result.
-	# Project onto the *original* segment for a guaranteed reachable upper bound.
-	var offset := route_curve.get_closest_offset(point)
-	if is_finite(offset):
-		var index := clampi(prefix.bsearch(offset) - 1, 0, line.size() - 1)
-		var reachable := Geometry2D.get_closest_point_to_segment(point, line[index], line[(index + 1) % line.size()])
-		upper = minf(upper, point.distance_squared_to(reachable))
-	return lower > upper and not is_equal_approx(lower, upper)
+		var first := clampf((fragment[0] - a).dot(span) / length_squared, 0.0, 1.0)
+		var last := clampf((fragment[-1] - a).dot(span) / length_squared, 0.0, 1.0)
+		intervals.append(Vector2(minf(first, last), maxf(first, last)))
+		boundary_points.append(fragment[0])
+		boundary_points.append(fragment[-1])
+	for sample in CORE.CUT_SAMPLES:
+		var t := float(sample) / float(CORE.CUT_SAMPLES - 1)
+		var point := a.lerp(b, t)
+		var outside := false
+		var on_boundary := false
+		for interval in intervals:
+			if is_equal_approx(t, interval.x) or is_equal_approx(t, interval.y):
+				on_boundary = true
+			if t > interval.x and t < interval.y:
+				outside = true
+		if not on_boundary:
+			for boundary_point in boundary_points:
+				if point.is_equal_approx(boundary_point):
+					on_boundary = true
+					break
+		if on_boundary:
+			outside = not Geometry2D.is_point_in_polygon(point, polygon)
+		if outside:
+			deep.append(point)
+	return deep
 
 
 static func _consider(
 		line: PackedVector2Array, normals: PackedVector2Array, prefix: PackedFloat64Array,
 		total: float, expanded: PackedVector2Array, island: PackedVector2Array,
-		fractions: Array, lane_reach: float, open_sector: int, open_bounds: Array[Rect2], route_curve: Curve2D, start: int, finish: int,
+		fractions: Array, lane_reach: float, open_sector: int, start: int, finish: int,
 		seen: Dictionary, found: Array[Dictionary]
 ) -> void:
 	var count := line.size()
@@ -152,22 +144,17 @@ static func _consider(
 			var segment := PackedVector2Array([a, b])
 			if island.size() >= 3 and not Geometry2D.intersect_polyline_with_polygon(segment, island).is_empty():
 				continue
-			if Geometry2D.clip_polyline_with_polygon(segment, expanded).is_empty():
+			var outside: Array[PackedVector2Array] = Geometry2D.clip_polyline_with_polygon(segment, expanded)
+			if outside.is_empty():
 				continue
-			var deep := PackedVector2Array()
-			for sample in CORE.CUT_SAMPLES:
-				var point := a.lerp(b, float(sample) / float(CORE.CUT_SAMPLES - 1))
-				if not Geometry2D.is_point_in_polygon(point, expanded):
-					deep.append(point)
+			var deep := _outside_samples(a, b, expanded, outside)
 			if deep.size() < CORE.CUT_MIN_DEEP_SAMPLES:
 				continue
 			var crosses_open := false
 			if open_sector >= 0:
 				crosses_open = true
-				for point in deep:
-					if _cannot_be_nearest_open(point, line, start, finish, open_bounds, route_curve, prefix):
-						crosses_open = false
-						break
+				for index in range(deep.size() - 1, -1, -1):
+					var point := deep[index]
 					var nearest := CORE._closest_point_on_loop(point, line)
 					var sector := mini(SECTOR_COUNT - 1, int(float(nearest["index"]) / count * SECTOR_COUNT))
 					if sector != open_sector:
