@@ -32,7 +32,7 @@ func _run_test() -> void:
 		var identity := IDS.create(StringName(theme), IDS.room_for_route_seed(seed_value), seed_value)
 		var built := CORE.build_packed(StringName(theme), StringName(identity["room"]), seed_value, IDS.generation_options(identity))
 		var track := (built["scene"] as PackedScene).instantiate()
-		var definitions: Variant = track.get_meta("generated_surfaces", [])
+		var definitions: Array = track.get_meta("generated_surfaces", [])
 		var centerline := (track.get_node("TrackSurface") as Line2D).points
 		var clearance := TrackCornerMap.clearances(centerline)
 		var patches: Array[Dictionary] = []
