@@ -83,7 +83,7 @@ func _run_test() -> void:
 		return
 	if not _expect(widths.size() >= 3, "debris should vary in size, not repeat one footprint (saw %d distinct)" % widths.size()):
 		return
-	if not _expect(counts.size() >= 3 and total_patches <= CASES.size() * int(CORE.GRIP_PATCH_MAX_COUNT), "the corpus should span at least three distinct debris counts, saw %s" % counts.keys()):
+	if not _expect(counts.size() >= 3 and counts.has(0) and int(counts.keys().max()) >= 4, "the corpus should include clean and busy tracks with at least three counts, saw %s" % [counts.keys()]):
 		return
 	print("TRACK_DEBRIS_VARIATION_TEST PASS pinned_cases=", CASES.size(), " pieces=", total_patches, " distinct_widths=", widths.size())
 	quit(0)
