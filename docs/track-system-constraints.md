@@ -24,6 +24,10 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   pool. Quick Race and championship events build arbitrary seeds live through
   staged `TrackBuilderCore.prepare_layout` / `assemble_runtime` preparation.
   `build_packed` remains the synchronous tooling and fixture API.
+- `TrackBuilderCore.prepare_route` is the shared validated route stage for
+  previews and full layouts: centerline, corridor edges, room, story/material
+  identity, obstacle plan and racing-line metrics. `prepare_layout` adds the
+  physical environment plan and surface art identity before scene assembly.
 - The three authored track scenes remain regression fixtures for their themed
   collision and AI smoke tests. They are not a whitelist for generated play.
 - The builder is runtime-safe and headless-safe. It does not depend on the

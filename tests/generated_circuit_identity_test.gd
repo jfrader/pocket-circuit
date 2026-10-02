@@ -99,8 +99,23 @@ func _run_test() -> void:
 		return
 
 	var preview := PREVIEW.prepare(identity)
+	var route := TRACK_BUILDER.prepare_route(&"workshop", &"wide", FIXTURE_SEED, IDENTITIES.generation_options(identity))
 	var prepared := TRACK_BUILDER.prepare_layout(&"workshop", &"wide", FIXTURE_SEED, IDENTITIES.generation_options(identity))
-	if not _expect(not preview.is_empty() and String(preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(identity, prepared), "preview and loaded preparation should resolve to the same fingerprint"):
+	if not _expect(not route.is_empty() and not prepared.is_empty() and not preview.is_empty() and String(preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(identity, prepared) and String(preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(identity, route), "preview and both preparation stages should resolve to the same fingerprint"):
+		return
+	if not _expect(route["centerline"] == prepared["centerline"] and route["edges"] == prepared["edges"] and route["room_polygon"] == prepared["room_polygon"] and route["seed"] == prepared["seed"] and route["racing_line_metrics"] == prepared["racing_line_metrics"], "route and full preparation should share the same geometry, resolved seed, and racing-line metrics"):
+		return
+	var route_spec: Dictionary = route["spec"]
+	var full_spec: Dictionary = prepared["spec"]
+	for key: String in ["controls", "requested_seed", "generation_attempt", "generation_fallback", "family", "route_program", "route_recipe", "route_sequence", "story_id", "story_kit", "material_seed", "dressing_seed", "obstacle_seed", "obstacle_plan", "material_id", "palette_id"]:
+		if not _expect(route_spec.get(key) == full_spec.get(key), "%s should agree between route and full preparation" % key):
+			return
+	if not _expect(not route_spec.has("environment_plan") and not route_spec.has("environment_assets") and not route_spec.has("surface_identity") and full_spec.has("environment_plan") and full_spec.has("surface_identity"), "route preparation should expose identity and obstacles without requiring a physical environment plan"):
+		return
+	if not _expect(String(preview["story_id"]) == String(route_spec["story_id"]) and int(preview["obstacle_count"]) == (route_spec["obstacle_plan"] as Array).size() and not (preview["points"] as PackedVector2Array).is_empty(), "preview should expose the shared route's story, obstacles, and drawable points"):
+		return
+	var reverse_preview := PREVIEW.prepare(reverse)
+	if not _expect(not reverse_preview.is_empty() and String(reverse_preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(reverse, prepared) and reverse_preview["points"] != preview["points"] and reverse_preview["story_id"] == preview["story_id"] and reverse_preview["obstacle_count"] == preview["obstacle_count"], "reverse preview should keep the route composition while reversing its drawn traversal"):
 		return
 	if not _expect(String(prepared["spec"]["story_id"]) == String(identity["story_id"]) and int(prepared["spec"]["material_seed"]) == int(identity["sub_seeds"]["material"]) and int(prepared["spec"]["dressing_seed"]) == int(identity["sub_seeds"]["dressing"]) and int(prepared["spec"]["obstacle_seed"]) == int(identity["sub_seeds"]["obstacle"]), "route preparation should consume every composition seed in its matching domain"):
 		return
