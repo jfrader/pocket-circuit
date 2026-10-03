@@ -3,7 +3,10 @@ extends SceneTree
 const CORE := preload("res://scripts/race/track_builder_core.gd")
 const IDS := preload("res://scripts/race/generated_circuit_identity.gd")
 const CUT_MAP := preload("res://scripts/race/track_outer_cut_map.gd")
-const MAX_SCAN_MS := 8000.0
+# 15000 ms gives real headroom on loaded/shared 8-core hosts (isolated ~7.7s,
+# observed flake 8.8s). tests/track_seed_gen_benchmark.gd owns the fine-grained
+# perf measurement; this is only a coarse regression guard. Keep the assertion.
+const MAX_SCAN_MS := 15000.0
 
 
 func _initialize() -> void:
