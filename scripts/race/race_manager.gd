@@ -36,6 +36,9 @@ var _player_vehicle: Node2D
 var _prepared: bool = false
 var _finish_grace_remaining: float = -1.0
 var _results_finalized: bool = false
+var _strip_first := -1
+var _strip_finish := -1
+var _strip_finish_guard: Callable
 # Cached sorted order. Rebuilt only when the racer set changes or an adjacent
 # pair is detected out of order, so a quiet field costs an O(n) verify instead
 # of an O(n log n) sort per tick.
@@ -51,6 +54,7 @@ var _rankings_dirty := true
 var _route_points: PackedVector2Array = PackedVector2Array()
 var _route_cumulative: PackedFloat32Array = PackedFloat32Array()
 var _route_length := 0.0
+var _route_open := false
 var _route_checkpoint_arc: Dictionary = {}
 # Reused result plus a window-range cache for _nearest_route_segment so the
 # per-tick wrong-way tangent path neither allocates a Dictionary per call nor
@@ -125,6 +129,15 @@ func is_reverse_direction() -> bool:
 	return direction == &"reverse"
 
 
+func configure_strip_route(first_required_index: int, finish_index: int, finish_guard: Callable = Callable()) -> void:
+	_strip_first = first_required_index
+	_strip_finish = finish_index
+	_strip_finish_guard = finish_guard
+	_prepared = false
+	if not checkpoints.is_empty():
+		configure_checkpoints(checkpoints.duplicate())
+
+
 func register_racer(
 		vehicle: Node2D,
 		driver_name: String,
@@ -144,7 +157,7 @@ func register_racer(
 			"driver_name": driver_name,
 			"vehicle_name": vehicle_name,
 			"is_player": is_player,
-			"expected_checkpoint": _first_racing_checkpoint_index(),
+			"expected_checkpoint": _strip_first if _strip_first >= 0 else _first_racing_checkpoint_index(),
 			"last_checkpoint_order": 0,
 			"lap": 0,
 			"elapsed": 0.0,
@@ -177,13 +190,13 @@ func prepare_race() -> void:
 	_finish_order.clear()
 	_finish_grace_remaining = -1.0
 	_results_finalized = false
-	var first_checkpoint := _first_racing_checkpoint_index()
+	var first_checkpoint := _strip_first if _strip_first >= 0 else _first_racing_checkpoint_index()
 	for vehicle: Node2D in _registration_order:
 		if not is_instance_valid(vehicle):
 			continue
 		var state: Dictionary = _racers[vehicle]
 		state["expected_checkpoint"] = first_checkpoint
-		state["last_checkpoint_order"] = 0
+		state["last_checkpoint_order"] = int(_checkpoint_order.get(_strip_first - 1, 0)) if _strip_first >= 0 else 0
 		state["lap"] = 0
 		state["elapsed"] = 0.0
 		state["finished"] = false
@@ -243,7 +256,7 @@ func advance_race_time(delta: float) -> void:
 			_racers[vehicle] = state
 	_refresh_positions()
 	_sync_player_compatibility()
-	if _finish_grace_remaining >= 0.0:
+	if _strip_first < 0 and _finish_grace_remaining >= 0.0:
 		_finish_grace_remaining -= delta
 		if _finish_grace_remaining <= 0.0:
 			finalize_remaining_racers_as_dnf()
@@ -261,6 +274,13 @@ func report_checkpoint(checkpoint: Area2D, body: Node2D) -> bool:
 		# travelling forward. Ignore the extra contact; motion-based tangent
 		# detection catches genuine reverse driving.
 		return false
+	if _strip_first >= 0 and checkpoint_index == _strip_finish:
+		if body != _player_vehicle:
+			return false
+		if _strip_finish_guard.is_valid() and not bool(_strip_finish_guard.call()):
+			return false
+		_finish_strip_player(body, state)
+		return true
 
 	_set_wrong_way(body, state, false)
 	state["wrong_way_time"] = 0.0
@@ -270,7 +290,7 @@ func report_checkpoint(checkpoint: Area2D, body: Node2D) -> bool:
 	if body == _player_vehicle:
 		checkpoint_passed.emit(checkpoint_index)
 
-	if bool(checkpoint.get("is_finish_line")):
+	if bool(checkpoint.get("is_finish_line")) and _strip_first < 0:
 		state["lap"] = int(state["lap"]) + 1
 		state["last_checkpoint_order"] = 0
 		state["expected_checkpoint"] = _first_racing_checkpoint_index()
@@ -281,12 +301,23 @@ func report_checkpoint(checkpoint: Area2D, body: Node2D) -> bool:
 			_finish_racer(body, state)
 			return true
 	else:
-		state["expected_checkpoint"] = get_checkpoint_after_index(checkpoint_index)
+		state["expected_checkpoint"] = checkpoint_index + 1 if _strip_first >= 0 else get_checkpoint_after_index(checkpoint_index)
 
 	_racers[body] = state
 	refresh_rankings()
 	_sync_player_compatibility()
 	return true
+
+
+func _finish_strip_player(vehicle: Node2D, state: Dictionary) -> void:
+	state["finished"] = true
+	state["finish_time"] = race_time
+	state["progress"] = float(_strip_finish)
+	_racers[vehicle] = state
+	_set_vehicle_controls_locked(vehicle, true)
+	is_running = false
+	_sync_player_compatibility()
+	race_finished.emit(race_time)
 
 
 func refresh_rankings() -> Array[Node2D]:
@@ -397,6 +428,8 @@ func report_recovery(vehicle: Node2D) -> void:
 
 
 func finalize_remaining_racers_as_dnf() -> void:
+	if _strip_first >= 0:
+		return
 	if _results_finalized:
 		return
 	var rankings := get_rankings()
@@ -421,13 +454,14 @@ func get_ordered_checkpoints() -> Array[Node]:
 	return checkpoints.duplicate()
 
 
-func configure_route_reference(points: PackedVector2Array) -> void:
+func configure_route_reference(points: PackedVector2Array, open_route: bool = false) -> void:
 	## Route-reference seam. The race scene supplies the actual drivable route
 	## (generated/authored racing line in global coords, forward order) once.
 	## Wrong-way detection then follows the real route tangent within the active
 	## checkpoint section instead of the checkpoint chord, which lies on long
 	## curved sections and reverses across hairpins.
 	_route_points = PackedVector2Array()
+	_route_open = open_route
 	_route_cumulative = PackedFloat32Array()
 	_route_length = 0.0
 	_route_checkpoint_arc.clear()
@@ -437,7 +471,8 @@ func configure_route_reference(points: PackedVector2Array) -> void:
 	_route_cumulative.resize(_route_points.size())
 	for index in _route_points.size():
 		_route_cumulative[index] = _route_length
-		_route_length += _route_points[index].distance_to(_route_points[(index + 1) % _route_points.size()])
+		if not _route_open or index + 1 < _route_points.size():
+			_route_length += _route_points[index].distance_to(_route_points[(index + 1) % _route_points.size()])
 	_refresh_route_checkpoint_arcs()
 
 
@@ -461,7 +496,8 @@ func _nearest_route_arc(position: Vector2) -> float:
 		return -1.0
 	var index := int(nearest["index"])
 	var segment_length := _route_points[index].distance_to(_route_points[(index + 1) % _route_points.size()])
-	return fposmod(_route_cumulative[index] + segment_length * float(nearest["fraction"]), _route_length)
+	var arc := _route_cumulative[index] + segment_length * float(nearest["fraction"])
+	return arc if _route_open else fposmod(arc, _route_length)
 
 
 func get_route_forward_direction(position: Vector2, previous_checkpoint_index: int, expected_checkpoint_index: int) -> Vector2:
@@ -510,6 +546,8 @@ func _nearest_route_segment(position: Vector2, arc_lo: float, arc_hi: float) -> 
 		_route_segment_result["fraction"] = 0.0
 		_route_segment_result["distance_squared"] = INF
 		return _route_segment_result
+	if _route_open:
+		return _nearest_open_route_segment(position, arc_lo, arc_hi)
 	var start := 0
 	var span := count
 	if arc_hi - arc_lo < _route_length:
@@ -542,6 +580,29 @@ func _nearest_route_segment(position: Vector2, arc_lo: float, arc_hi: float) -> 
 		var nearest := from + segment * fraction
 		var distance := position.distance_squared_to(nearest)
 		if distance < best_distance or (distance == best_distance and index < best_index):
+			best_distance = distance
+			best_index = index
+			best_fraction = fraction
+	_route_segment_result["index"] = best_index
+	_route_segment_result["fraction"] = best_fraction
+	_route_segment_result["distance_squared"] = best_distance
+	return _route_segment_result
+
+
+func _nearest_open_route_segment(position: Vector2, arc_lo: float, arc_hi: float) -> Dictionary:
+	var best_index := -1
+	var best_fraction := 0.0
+	var best_distance := INF
+	for index in _route_points.size() - 1:
+		var from_arc := _route_cumulative[index]
+		var to_arc := _route_cumulative[index + 1]
+		if to_arc < arc_lo or from_arc > arc_hi:
+			continue
+		var from := _route_points[index]
+		var segment := _route_points[index + 1] - from
+		var fraction := clampf((position - from).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
+		var distance := position.distance_squared_to(from + segment * fraction)
+		if distance < best_distance:
 			best_distance = distance
 			best_index = index
 			best_fraction = fraction
@@ -585,14 +646,14 @@ func get_checkpoint_before(checkpoint_index: int) -> Node:
 	if checkpoints.is_empty():
 		return null
 	var order := int(_checkpoint_order.get(checkpoint_index, 0))
-	return checkpoints[posmod(order - 1, checkpoints.size())]
+	return checkpoints[maxi(0, order - 1)] if _strip_first >= 0 else checkpoints[posmod(order - 1, checkpoints.size())]
 
 
 func get_checkpoint_after_index(checkpoint_index: int) -> int:
 	if checkpoints.is_empty():
 		return 0
 	var order := int(_checkpoint_order.get(checkpoint_index, 0))
-	return int(checkpoints[(order + 1) % checkpoints.size()].get("checkpoint_index"))
+	return int(checkpoints[mini(checkpoints.size() - 1, order + 1)].get("checkpoint_index")) if _strip_first >= 0 else int(checkpoints[(order + 1) % checkpoints.size()].get("checkpoint_index"))
 
 
 func get_checkpoint_count() -> int:
@@ -736,6 +797,8 @@ func _racer_precedes(a: Node2D, b: Node2D) -> bool:
 
 
 func _first_racing_checkpoint_index() -> int:
+	if _strip_first >= 0:
+		return _strip_first
 	if checkpoints.is_empty():
 		return 0
 	for checkpoint: Node in checkpoints:
@@ -745,6 +808,8 @@ func _first_racing_checkpoint_index() -> int:
 
 
 func _checkpoint_precedes(a: Node, b: Node) -> bool:
+	if _strip_first >= 0:
+		return int(a.get("checkpoint_index")) < int(b.get("checkpoint_index"))
 	var a_finish := bool(a.get("is_finish_line"))
 	var b_finish := bool(b.get("is_finish_line"))
 	if a_finish != b_finish:
