@@ -132,8 +132,16 @@ func cue(section: String, hold_seconds := 0.0) -> bool:
 func set_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result := "") -> bool:
 	if not has_score() or not _player.has_method("set_race_state"):
 		return false
+	# Phase requests (from set_race_state) are protected by the same dwell/drop
+	# as cue(): newest request dropped (not held) while inside SECTION_CHANGE_DWELL.
+	# Same-phase request is never a change and does not reset or restart.
+	var changing := not _requested.is_empty() and phase != _requested
+	if changing and _section_elapsed < SECTION_CHANGE_DWELL:
+		return false
 	if not bool(_player.call("set_race_state", phase, intensity, pressure, final_lap, finish_result)):
 		return false
+	if changing:
+		_section_elapsed = 0.0
 	_requested = phase
 	return true
 
