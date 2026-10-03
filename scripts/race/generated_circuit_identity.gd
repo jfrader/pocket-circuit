@@ -4,7 +4,7 @@ extends RefCounted
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const SCHEMA_VERSION := 1
-const GENERATOR_VERSION := 9
+const GENERATOR_VERSION := 11
 const MAX_SEED := 0x7FFFFFFF
 const SHARE_PREFIX := "PC1"
 const SHARE_ALPHABET := "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -15,6 +15,8 @@ const DOMAINS: Array[String] = [
 	"material",
 	"dressing",
 	"obstacle",
+	# Reserved: the moving hazard was removed, but its sub-seed stays so the
+	# identity and share-code format do not change.
 	"hazard",
 ]
 const THEMES: Array[String] = ["kitchen", "workshop", "office"]
@@ -302,7 +304,7 @@ static func _canonical_identity(theme: String, room: String, reverse: bool, dang
 	palette_id = String(resolved["palette_id"])
 	var material_fallback := "base-%03d" % posmod(int(seeds["material"]), 1000)
 	var palette_fallback := "%s-default-%02d" % [theme, posmod(int(seeds["material"]) / 1000, 32)]
-	var danger := GENERATED_RULES.danger_profile(danger_level, int(seeds["obstacle"]), int(seeds["hazard"]))
+	var danger := GENERATED_RULES.danger_profile(danger_level, int(seeds["obstacle"]))
 	var identity := {
 		"schema_version": SCHEMA_VERSION,
 		"generator_version": GENERATOR_VERSION,
@@ -345,8 +347,7 @@ static func _build_summary(identity: Dictionary) -> String:
 		palette = "fallback %s" % String(identity["palette_fallback_id"])
 	var danger: Dictionary = identity["danger_profile"]
 	var obstacle_count := int(danger["obstacle_count"])
-	var obstacle_text := "no static obstacles" if obstacle_count == 0 else "up to %d static obstacle%s" % [obstacle_count, "" if obstacle_count == 1 else "s"]
-	var danger_text := "%s · %s" % [obstacle_text, "moving hazard" if bool(danger["hazard_present"]) else "no moving hazard"]
+	var obstacle_text := "no obstacles" if obstacle_count == 0 else "up to %d obstacle%s" % [obstacle_count, "" if obstacle_count == 1 else "s"]
 	return "Seed %d · Route %s · %s · %s room / %s · Material %s / palette %s · %s · %s" % [
 		int(seeds["route"]),
 		String(identity["fingerprints"]["route"]).substr(0, 8).to_upper(),
@@ -356,7 +357,7 @@ static func _build_summary(identity: Dictionary) -> String:
 		material,
 		palette,
 		"Reverse" if bool(identity["reverse"]) else "Forward",
-		danger_text,
+		obstacle_text,
 	]
 
 

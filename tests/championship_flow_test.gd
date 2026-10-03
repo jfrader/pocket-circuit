@@ -168,6 +168,23 @@ func _run_test() -> void:
 	progress["difficulty"] = "clockwork"
 	app.set("_save_data", progress)
 	app.current_race_session.clear()
+	var expected_tiers := ["sunday_drive", "sunday_drive", "club_circuit", "club_circuit", "club_circuit", "clockwork", "clockwork", "clockwork", "clockwork"]
+	for index in CATALOG.EVENTS.size():
+		var event := CATALOG.get_event(String(CATALOG.EVENTS[index]["id"]))
+		if not _expect(
+			String(event["difficulty"]) == expected_tiers[index]
+			and CATALOG.race_difficulty(event, false, false, "clockwork") == expected_tiers[index]
+			and CATALOG.race_difficulty(event, true, false, "sunday_drive") == "sunday_drive"
+			and CATALOG.race_difficulty(event, false, true, "clockwork") == "club_circuit",
+			"event %s should override the global setting only in championship, while Quick Race and Mastery keep their own tiers" % event["id"]
+		):
+			return
+	app.call("start_race", "kitchen_crumb_rush", "rustbug", false)
+	if not _expect(String(app.current_race_session.get("difficulty", "")) == "sunday_drive", "launching a championship event should use its tier instead of the saved Clockwork preference"):
+		return
+	app.call("_cancel_race_loading")
+	await process_frame
+	await process_frame
 	app.call("start_mastery_run", "kitchen_crumb_rush", "rustbug")
 	if not _expect(
 		String(app.current_race_session.get("mode", "")) == "mastery"

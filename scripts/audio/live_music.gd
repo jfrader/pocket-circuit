@@ -39,6 +39,14 @@ var _dwell := 12.0
 var _dwell_left := 0.0
 var _rotating := false
 
+## How long a section must play before a different one may replace it. Moving
+## quickly between screens (results, menu, play again) asks for a new section far
+## faster than music can settle, and switching every time never sounds composed.
+## Smoothness is worth more than matching the screen exactly, so a too-soon
+## request is dropped and the current section keeps playing.
+const SECTION_CHANGE_DWELL := 6.0
+var _section_elapsed := 0.0
+
 
 func _init(host: Node) -> void:
 	_host = host
@@ -99,8 +107,15 @@ func current_section() -> String:
 func cue(section: String, hold_seconds := 0.0) -> bool:
 	if not has_score() or not _player.has_method("cue_section"):
 		return false
+	# The first cue of a score is never held back, and asking again for the section
+	# already playing is not a change.
+	var changing := not _requested.is_empty() and section != _requested
+	if changing and _section_elapsed < SECTION_CHANGE_DWELL:
+		return false
 	if not bool(_player.call("cue_section", section)):
 		return false
+	if changing:
+		_section_elapsed = 0.0
 	_requested = section
 	# Keep the rotation clock parked on the section that is actually playing, so
 	# a manual sting resumes the deck from there instead of an old pointer.
@@ -117,8 +132,16 @@ func cue(section: String, hold_seconds := 0.0) -> bool:
 func set_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result := "") -> bool:
 	if not has_score() or not _player.has_method("set_race_state"):
 		return false
+	# Phase requests (from set_race_state) are protected by the same dwell/drop
+	# as cue(): newest request dropped (not held) while inside SECTION_CHANGE_DWELL.
+	# Same-phase request is never a change and does not reset or restart.
+	var changing := not _requested.is_empty() and phase != _requested
+	if changing and _section_elapsed < SECTION_CHANGE_DWELL:
+		return false
 	if not bool(_player.call("set_race_state", phase, intensity, pressure, final_lap, finish_result)):
 		return false
+	if changing:
+		_section_elapsed = 0.0
 	_requested = phase
 	return true
 
@@ -155,6 +178,9 @@ func set_paused(paused: bool) -> void:
 
 ## Advance the phase rotation clock. Called from the director's `_process`.
 func tick(delta: float) -> void:
+	# Section changes happen while the rotation is parked or paused (results, menu),
+	# so this clock cannot sit behind that early return.
+	_section_elapsed += maxf(delta, 0.0)
 	if not _rotating or _paused or _dwell_left <= 0.0:
 		return
 	_dwell_left = maxf(_dwell_left - delta, 0.0)

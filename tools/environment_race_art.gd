@@ -30,7 +30,7 @@ func prepare(theme: String, layout_seed: int = -1, material_seed: int = -1) -> D
 	_assets.merge(definition["support_assets"], true)
 	var recipe: Dictionary = definition["race"]
 	var chosen_seed := int(recipe["seed"]) if layout_seed < 0 else layout_seed
-	_prepared = CORE.prepare_layout(StringName(theme), StringName(recipe["room"]), chosen_seed, {"length_tier": StringName(recipe.get("length_tier", "compact")), "obstacles_enabled": false,"preview_composer":true})
+	_prepared = CORE.prepare_route(StringName(theme), StringName(recipe["room"]), chosen_seed, {"length_tier": StringName(recipe.get("length_tier", "compact")), "obstacles_enabled": false})
 	var spec: Dictionary = _prepared["spec"]
 	_surfaces = SURFACES.resolve(StringName(theme), int(spec["material_seed"]) if material_seed < 0 else material_seed)
 	spec["floor_texture"] = PROPS.TEXTURES + theme + "_floor.png"
@@ -271,14 +271,3 @@ func _grip_patches(track: Node2D, recipe: Dictionary, centerline: PackedVector2A
 		surfaces.append({"name": StringName(recipe["surface_name"]), "grip": float(recipe["grip"]), "speed": float(recipe["speed"]), "points": points, "role": &"grip_patch"})
 		await stage.call("Laying grip surfaces")
 	track.set_meta("generated_surfaces", surfaces)
-
-
-func restyle_hazard(presenter: TrackVariantPresenter) -> void:
-	if presenter.hazard == null:
-		return
-	var geometry := PROPS.measure(_theme, _assets["hazard"])
-	var sprite := presenter.hazard.get("_hazard_sprite") as Sprite2D
-	sprite.texture = geometry["texture"]
-	sprite.scale = Vector2.ONE * float(geometry["scale"])
-	sprite.position = Vector2.ZERO
-	sprite.set_meta("asset_path", sprite.texture.resource_path)

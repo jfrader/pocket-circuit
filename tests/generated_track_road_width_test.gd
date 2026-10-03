@@ -132,7 +132,7 @@ func _check_gates(track: Node2D, centerline: PackedVector2Array, widths: PackedF
 func _check_off_road_bodies(track: Node2D, centerline: PackedVector2Array, widths: PackedFloat32Array, label: String) -> int:
 	var checked := 0
 	for node: Node in track.find_children("*", "StaticBody2D", true, false):
-		if _under_any(node, track, ON_ROAD_CONTAINERS) or VISUAL_ROLE.read(node) == VISUAL_ROLE.MOVING_HAZARD:
+		if _under_any(node, track, ON_ROAD_CONTAINERS):
 			continue
 		for point in _body_outline(node as StaticBody2D):
 			var local := PROFILE.at_point(centerline, widths, point)

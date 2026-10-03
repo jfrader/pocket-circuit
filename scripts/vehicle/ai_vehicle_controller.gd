@@ -25,7 +25,6 @@ const OBSTACLE_FEELER_ANGLES: Array[float] = [-0.95, -0.5, 0.0, 0.5, 0.95]
 const OBSTACLE_FRONT_OFFSET := 30.0
 const OBSTACLE_FEELER_HALF_WIDTH := 14.0
 const GATE_TARGET_OFFSETS: Array[float] = [-72.0, -48.0, -24.0, 0.0, 24.0, 48.0, 72.0]
-const HAZARD_AVOID_DISTANCE := 160.0
 const SURFACE_PROBE_ANGLES: Array[float] = [0.0, -0.34, 0.34]
 const SURFACE_PROBE_DISTANCES: Array[float] = [90.0, 170.0, 250.0]
 const MAX_RACING_LINE_RADIUS := 2600.0
@@ -73,11 +72,20 @@ const PERSONALITY_BOUNDS: Dictionary = {
 	"shortcut_preference": Vector2(0.9, 1.16),
 	"line_commitment": Vector2(0.95, 1.06),
 }
+const CORNER_FLOOR_MIN := 0.90
+
+# Single source of truth for every per-tier behaviour the AI controller uses.
+# The hot paths read these values directly; there are no per-tier branches left
+# in the code (see configure/_physics_process/_configure_personality/
+# _shortcut_route_is_suitable/_v1_speed_envelope). Values that do not yet drive
+# a code path are neutral: drift disabled and no catch-up for tiers that never had it.
 const DIFFICULTY_TUNING: Dictionary = {
 	"sunday_drive": {
 		"pace": 0.94,
 		"corner_constant": 13.0,
 		"corner_floor": 0.48,
+		"corner_floor_base": 1.0,
+		"corner_floor_commit_bias": 0.0,
 		"sharp_corner_ratio": 0.50,
 		"heading_cap": 0.60,
 		"wrong_way_cap": 0.42,
@@ -89,11 +97,27 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"clean_line_recharge": 0.0,
 		"boost_turn_threshold": 0.24,
 		"boost_radius": 1500.0,
+		"reaction_seconds": 0.34,
+		"steering_divisor": 0.72,
+		"steering_response": 11.0,
+		"corner_margin": 0.86,
+		"personality_scale": 0.3,
+		"room_cuts_allowed": false,
+		"shortcut_enabled": false,
+		"shortcut_min_steering_rate": 0.0,
+		"shortcut_min_retention": 0.70,
+		"shortcut_min_grip": 0.38,
+		"catch_up": {"max_power": 0.0, "position_weight": 0.0, "progress_weight": 0.0},
+		"assist": {"power": 0.01, "grip": 0.01, "brake": 0.01},
+		"mistake_rate": 0.12,
+		"drift_policy": "disabled",
 	},
 	"club_circuit": {
 		"pace": 1.08,
 		"corner_constant": 15.2,
 		"corner_floor": 0.53,
+		"corner_floor_base": 0.99,
+		"corner_floor_commit_bias": 0.10,
 		"sharp_corner_ratio": 0.59,
 		"heading_cap": 0.67,
 		"wrong_way_cap": 0.48,
@@ -105,11 +129,27 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"clean_line_recharge": 0.50,
 		"boost_turn_threshold": 0.34,
 		"boost_radius": 1150.0,
+		"reaction_seconds": 0.22,
+		"steering_divisor": 0.72,
+		"steering_response": 13.0,
+		"corner_margin": 0.96,
+		"personality_scale": 0.78,
+		"room_cuts_allowed": true,
+		"shortcut_enabled": true,
+		"shortcut_min_steering_rate": 3.25,
+		"shortcut_min_retention": 0.70,
+		"shortcut_min_grip": 0.38,
+		"catch_up": {"max_power": 0.09, "position_weight": 0.03, "progress_weight": 0.04},
+		"assist": {"power": 0.0, "grip": 0.005, "brake": 0.005},
+		"mistake_rate": 0.0,
+		"drift_policy": "disabled",
 	},
 	"clockwork": {
 		"pace": 1.12,
 		"corner_constant": 16.4,
 		"corner_floor": 0.58,
+		"corner_floor_base": 1.0,
+		"corner_floor_commit_bias": 0.0,
 		"sharp_corner_ratio": 0.64,
 		"heading_cap": 0.72,
 		"wrong_way_cap": 0.52,
@@ -121,10 +161,25 @@ const DIFFICULTY_TUNING: Dictionary = {
 		"clean_line_recharge": 0.80,
 		"boost_turn_threshold": 0.42,
 		"boost_radius": 900.0,
+		"reaction_seconds": 0.15,
+		"steering_divisor": 0.64,
+		"steering_response": 16.0,
+		"corner_margin": 0.99,
+		"personality_scale": 1.0,
+		"room_cuts_allowed": true,
+		"shortcut_enabled": true,
+		"shortcut_min_steering_rate": 0.0,
+		"shortcut_min_retention": 0.64,
+		"shortcut_min_grip": 0.34,
+		"catch_up": {"max_power": 0.0, "position_weight": 0.0, "progress_weight": 0.0},
+		"assist": {"power": 0.0, "grip": 0.0, "brake": 0.0},
+		"mistake_rate": 0.0,
+		"drift_policy": "disabled",
 	},
 }
 
 var vehicle: VehicleController
+var _unassisted_stats: VehicleStats
 var race_manager: RaceManager
 var lane_offset: float = 0.0
 var difficulty: String = "club_circuit"
@@ -141,7 +196,7 @@ var _recovering: bool = false
 var _track_center := Vector2.ZERO
 var _guide_checkpoint_index := -1
 var _guide_reached := false
-var _stuck_target_key := ""
+var _stuck_target_key := 0
 var _best_checkpoint_distance := INF
 var _smoothed_steer := 0.0
 var _racing_line: PackedVector2Array = PackedVector2Array()
@@ -157,6 +212,9 @@ var _room_cut_checkpoint := -1
 var _room_cut_start := Vector2.ZERO
 var _room_cut_end := Vector2.ZERO
 var _room_cut_shape: CapsuleShape2D
+var _room_cut_query: PhysicsShapeQueryParameters2D
+var _ray_query: PhysicsRayQueryParameters2D
+var _ray_excludes: Array[RID] = []
 var _overtake_offset := 0.0
 var _overtake_hold_remaining := 0.0
 var _overtake_cooldown_remaining := 0.0
@@ -167,12 +225,16 @@ var _no_progress_time := 0.0
 var _wrong_way_progress_time := 0.0
 var _spin_time := 0.0
 var _route_progress_accumulator := 0.0
-var _watchdog_target_key := ""
+var _watchdog_target_key := 0
 var _last_route_arc := 0.0
 var _static_contact_time := 0.0
 var _escape_time_remaining := 0.0
 var _escape_steer := 0.0
 var static_escape_attempt_count := 0
+var mistake_count := 0
+var _mistake_key := ""
+var _mistake_steer := 0.0
+var _mistake_remaining := 0.0
 var _race_collision_layer := 0
 var _race_collision_mask := 0
 var _finished_ghosted := false
@@ -183,11 +245,10 @@ static var tree_group_scan_count := 0      # get_nodes_in_group(...) from _physi
 static var surface_zone_probe_count := 0   # SurfaceZone.contains_global_point(...)
 
 # ── Per-race tree cache ──────────────────────────────────────────────
-# Hazards, surface zones and race vehicles are fixed for a race's lifetime, but
+# Surface zones and race vehicles are fixed for a race's lifetime, but
 # the old hot paths re-scanned the whole scene tree for them every physics tick
 # (a ~2800-node walk plus a fresh Array, per AI, several times per tick). Cache
 # them once and invalidate when the field is (re)spawned.
-var _hazard_nodes: Array[Node] = []
 var _surface_zone_nodes: Array[Node] = []
 var _race_vehicle_nodes: Array[Node] = []
 var _tree_cache_dirty := true
@@ -208,6 +269,27 @@ var _reference_cumulative := PackedFloat32Array()
 var _reference_total := 0.0
 var _racing_line_nearest_index := -1
 var _reference_nearest_index := -1
+# Scratch results are owned by this controller. Callers must consume them before
+# calling the same helper again; none may be retained across physics ticks.
+var _reference_goal_result := {"goal": Vector2.ZERO, "lookahead": 0.0}
+var _traffic_result := {"target_position": Vector2.ZERO, "speed_scale": 1.0, "speed_limit": INF, "passing": false, "drafting": false}
+var _leader_result: Dictionary = {}
+var _surface_result := {"weight": 0.0, "speed_scale": 1.0, "grip_scale": 1.0, "risk": 0.0, "avoid_direction": Vector2.ZERO}
+var _surface_model_result := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
+var _obstacle_result := {"weight": 0.0, "speed_scale": 1.0, "speed_limit": INF, "avoid_direction": Vector2.ZERO, "static_contact": false, "escape_steer": 0.0}
+# Tick-local results: callers consume these before calling the same helper again.
+var _segment_result := {"index": 0, "fraction": 0.0, "distance_squared": INF}
+var _route_sample_result := {"arc": 0.0, "length": 1.0, "distance": 0.0, "closed": false}
+var _watchdog_result := {"made_progress": false}
+var _hazard_result := {"radius": 0.0, "distance": INF, "speed_limit": INF}
+# A wide probe needs all three results alive until the nearest is selected.
+var _ray_results := [
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+]
+var _brake_prediction: Array[float] = [0.0, 0.0]
+var _brake_prediction_loads: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 
 func configure(
@@ -218,12 +300,27 @@ func configure(
 		driver_id: String = "baseline",
 		driver_style: Dictionary = {}
 ) -> void:
+	if vehicle != controlled_vehicle or _unassisted_stats == null:
+		_unassisted_stats = controlled_vehicle.stats
 	vehicle = controlled_vehicle
+	if _room_cut_query != null:
+		_room_cut_query.exclude = [vehicle.get_rid()]
+	if vehicle.stats != _unassisted_stats:
+		vehicle.apply_stats(_unassisted_stats)
 	race_manager = manager
 	lane_offset = preferred_lane_offset
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
+	var assist := tuning["assist"] as Dictionary
+	if float(assist["grip"]) > 0.0 or float(assist["brake"]) > 0.0:
+		# VehicleStats is a shared resource. Give this AI its own copy so neither
+		# other racers nor the human inherit its tire and brake forces.
+		var assisted_stats := vehicle.stats.duplicate() as VehicleStats
+		assisted_stats.front_grip *= 1.0 + float(assist["grip"])
+		assisted_stats.rear_grip *= 1.0 + float(assist["grip"])
+		assisted_stats.brake_force *= 1.0 + float(assist["brake"])
+		vehicle.apply_stats(assisted_stats)
 	vehicle.boost_amount = minf(
 		vehicle.get_boost_capacity(),
 		vehicle.get_boost_capacity()
@@ -239,6 +336,10 @@ func configure(
 	_finished_ghosted = false
 	_recovery_cooldown_remaining = 0.0
 	recovery_reasons.clear()
+	mistake_count = 0
+	_mistake_key = ""
+	_mistake_steer = 0.0
+	_mistake_remaining = 0.0
 	_stuck_time = 0.0
 	_reset_route_watchdog()
 	_tree_cache_dirty = true
@@ -270,8 +371,9 @@ func _cache_checkpoints() -> void:
 		while track != null and not track.is_in_group("track"):
 			track = track.get_parent()
 	if track:
-		_allow_room_cuts = bool(track.get_meta("generated_track", false)) and difficulty != "sunday_drive"
+		_allow_room_cuts = bool(track.get_meta("generated_track", false)) and bool(_difficulty_tuning()["room_cuts_allowed"])
 		_off_route_distance = OFF_ROUTE_DISTANCE + maxf(0.0, float(track.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)) - TrackBuilderCore.HALF_WIDTH)
+
 		var racing_line := track.get_node_or_null("RacingLine") as Line2D
 		if racing_line:
 			for point: Vector2 in racing_line.points:
@@ -382,7 +484,10 @@ func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_
 				best_dsq = dsq
 				best_index = index
 				best_fraction = fraction
-		return {"index": best_index, "fraction": best_fraction, "distance_squared": best_dsq}
+		_segment_result["index"] = best_index
+		_segment_result["fraction"] = best_fraction
+		_segment_result["distance_squared"] = best_dsq
+		return _segment_result
 	var best_index := 0
 	var best_fraction := 0.0
 	var best_dsq := INF
@@ -400,7 +505,10 @@ func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_
 			best_dsq = dsq
 			best_index = index
 			best_fraction = fraction
-	return {"index": best_index, "fraction": best_fraction, "distance_squared": best_dsq}
+	_segment_result["index"] = best_index
+	_segment_result["fraction"] = best_fraction
+	_segment_result["distance_squared"] = best_dsq
+	return _segment_result
 
 
 func _physics_process(delta: float) -> void:
@@ -459,7 +567,7 @@ func _physics_process(delta: float) -> void:
 		var correction := clampf(maxf(route_error / 70.0, absf(vehicle.slip_angle) / 20.0), 0.0, 1.0)
 		_tracking_grip_utilization = lerpf(CORNER_GRIP_UTILIZATION, CORRECTION_GRIP_UTILIZATION, correction)
 	var line_radius := _racing_line_radius(vehicle.global_position)
-	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version != 0 else {}
+	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version != 0 else _hazard_result
 	var pursuit_lookahead := _lookahead_distance()
 	if line_radius > 0.0:
 		# Steering follows local curvature. A future hairpin may constrain
@@ -476,7 +584,6 @@ func _physics_process(delta: float) -> void:
 	target_position = traffic_plan["target_position"] as Vector2
 	var goal_chord := vehicle.global_position.distance_to(target_position)
 	var desired_direction := vehicle.global_position.direction_to(target_position)
-	desired_direction = _avoid_hazards(desired_direction, forward)
 	var surface_plan := _surface_anticipation(desired_direction)
 	_anticipated_grip = _planned_surface_grip(surface_plan)
 	if float(surface_plan["weight"]) > 0.0:
@@ -531,9 +638,9 @@ func _physics_process(delta: float) -> void:
 			# target so the vehicle turns around instead of arcing wide.
 			requested_steer = 1.0 if steering_angle >= 0.0 else -1.0
 	else:
-		var steering_divisor := 0.64 if difficulty == "clockwork" else 0.72
-		requested_steer = clampf(steering_angle / steering_divisor, -1.0, 1.0)
-	var steering_response := 11.0 if difficulty == "sunday_drive" else (16.0 if difficulty == "clockwork" else 13.0)
+		requested_steer = clampf(steering_angle / float(tuning["steering_divisor"]), -1.0, 1.0)
+	requested_steer = clampf(requested_steer + _corner_mistake(delta, tuning, expected_index, line_radius), -1.0, 1.0)
+	var steering_response := float(tuning["steering_response"])
 	_smoothed_steer = lerpf(_smoothed_steer, requested_steer, 1.0 - exp(-steering_response * delta))
 	var turn_severity := _checkpoint_turn_severity(expected_index)
 	var next_turn_severity := 0.0
@@ -553,9 +660,12 @@ func _physics_process(delta: float) -> void:
 		hazard_distance = float(curvature_hazard["distance"])
 		corner_speed = float(curvature_hazard.get("speed_limit", _v1_speed_envelope(upcoming_radius, hazard_distance)))
 	elif line_radius > 40.0:
-		var floor_adj := 1.0
-		if difficulty == "club_circuit":
-			floor_adj = clampf(0.99 - 0.10 * (commit - 1.0), 0.90, 0.99)
+		var floor_base := float(tuning["corner_floor_base"])
+		var floor_adj := clampf(
+			floor_base - float(tuning["corner_floor_commit_bias"]) * (commit - 1.0),
+			CORNER_FLOOR_MIN,
+			floor_base
+		)
 		var corner_floor := float(tuning["corner_floor"]) * floor_adj
 		corner_speed = clampf(
 			float(tuning["corner_constant"]) * sqrt(line_radius) * pace_multiplier * float(personality["corner_pace"]),
@@ -601,9 +711,9 @@ func _physics_process(delta: float) -> void:
 	var braking_distance := 0.0
 	if vehicle.stats.physics_model_version != 0:
 		var surface_grip := _planned_surface_grip(surface_plan)
-		var reaction_seconds := 0.34 if difficulty == "sunday_drive" else (0.15 if difficulty == "clockwork" else 0.22)
+		var reaction_seconds := float(tuning["reaction_seconds"])
 		var reaction_margin := vehicle.speed * reaction_seconds
-		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, surface_grip) + reaction_margin
+		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, surface_grip, _brake_prediction, _brake_prediction_loads) + reaction_margin
 		braking_distance *= float(personality["brake_timing"])
 	else:
 		braking_distance = lerpf(
@@ -636,15 +746,22 @@ func _physics_process(delta: float) -> void:
 	) if should_brake else 0.0
 	var position := race_manager.get_racer_position(vehicle)
 	var baseline_power := float(tuning["baseline_power"])
+	var catch_up := tuning["catch_up"] as Dictionary
+	var catch_up_max := float(catch_up["max_power"])
 	var catch_up_power := 0.0
-	if difficulty == "club_circuit":
-		var progress_deficit := _leader_progress_deficit()
-		catch_up_power = minf(0.09, maxf(float(maxi(0, position - 1)) * 0.03, progress_deficit * 0.04))
-	vehicle.set_external_power_multiplier(baseline_power + catch_up_power)
+	if catch_up_max > 0.0:
+		for racer: Node in _group_nodes(&"race_vehicle"):
+			if is_instance_valid(racer) and racer.is_in_group("player_vehicle"):
+				var progress := race_manager.get_racer_progress(vehicle)
+				var player_progress := race_manager.get_racer_progress(racer as Node2D)
+				if progress < player_progress:
+					catch_up_power = calculate_catch_up_power(tuning, position, progress, player_progress, _leader_progress_deficit())
+				break
+	vehicle.set_external_power_multiplier(baseline_power + float((tuning["assist"] as Dictionary)["power"]) + catch_up_power)
 	_apply_drafting_recharge(delta, traffic_plan, should_brake)
-	if difficulty == "club_circuit" and catch_up_power > 0.0 and not should_brake:
+	if catch_up_power > 0.0 and not should_brake:
 		vehicle.add_boost(
-			vehicle.stats.boost_recharge * (catch_up_power / 0.09) * 0.75 * delta,
+			vehicle.stats.boost_recharge * (catch_up_power / catch_up_max) * 0.75 * delta,
 			"catch-up",
 		)
 	# Boost gating uses local safe distance + curvature (not stale checkpoint dist/turn_severity) so clear straights get boosts.
@@ -686,8 +803,43 @@ func _physics_process(delta: float) -> void:
 		throttle = 0.0
 		boost = false
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
-	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
+	var stuck_target_key: int = (expected_index << 1) | (1 if targeting_guide else 0)
 	_update_stuck_recovery(delta, stuck_target_key, distance_to_target)
+
+
+static func calculate_catch_up_power(tuning: Dictionary, position: int, progress: float, player_progress: float, leader_deficit: float) -> float:
+	if progress >= player_progress:
+		return 0.0
+	var catch_up := tuning["catch_up"] as Dictionary
+	var baseline := float(tuning["baseline_power"]) + float((tuning["assist"] as Dictionary)["power"])
+	return minf(
+		minf(float(catch_up["max_power"]), maxf(0.0, VehicleController.MAX_EXTERNAL_POWER_MULTIPLIER - baseline)),
+		maxf(float(maxi(0, position - 1)) * float(catch_up["position_weight"]), leader_deficit * float(catch_up["progress_weight"]))
+	)
+
+
+func _corner_mistake(delta: float, tuning: Dictionary, checkpoint_index: int, radius: float) -> float:
+	if float(tuning["mistake_rate"]) <= 0.0:
+		return 0.0
+	var lap := int(race_manager.get_racer_state_ref(vehicle).get("lap", 0))
+	var key := "%d:%d" % [lap, checkpoint_index]
+	if key != _mistake_key:
+		_mistake_key = key
+		_mistake_steer = 0.0
+		_mistake_remaining = 0.0
+		if radius > 100.0 and radius < 650.0 and vehicle.speed >= 160.0 and not vehicle.has_static_contact:
+			var rng := RandomNumberGenerator.new()
+			rng.seed = ("%s:%s" % [personality_id, key]).hash()
+			if rng.randf() < float(tuning["mistake_rate"]):
+				_mistake_steer = 0.025 if rng.randf() < 0.5 else -0.025
+				_mistake_remaining = 0.18
+				mistake_count += 1
+	# Only a momentary line correction on a corner; normal pure pursuit recovers
+	# as the steering unwinds. No changes to collision, brake or vehicle physics.
+	if radius < 100.0 or radius > 650.0 or vehicle.speed < 160.0 or vehicle.has_static_contact:
+		return 0.0
+	_mistake_remaining = maxf(0.0, _mistake_remaining - delta)
+	return _mistake_steer if _mistake_remaining > 0.0 else 0.0
 
 
 func _update_room_cut(expected_index: int, forward: Vector2) -> void:
@@ -726,11 +878,14 @@ func _update_room_cut(expected_index: int, forward: Vector2) -> void:
 		_room_cut_shape = CapsuleShape2D.new()
 		_room_cut_shape.radius = 22.0
 		_room_cut_shape.height = 56.0
-	var query := PhysicsShapeQueryParameters2D.new()
+	if _room_cut_query == null:
+		_room_cut_query = PhysicsShapeQueryParameters2D.new()
+		_room_cut_query.exclude = [vehicle.get_rid()]
+	var query := _room_cut_query
 	query.shape = _room_cut_shape
 	query.transform = Transform2D(direction.angle() + PI * 0.5, vehicle.global_position)
 	query.collision_mask = STATIC_OBSTACLE_MASK
-	query.exclude = [vehicle.get_rid()]
+	query.motion = Vector2.ZERO
 	var space := vehicle.get_world_2d().direct_space_state
 	if not space.intersect_shape(query, 1).is_empty():
 		_room_cut_checkpoint = -1
@@ -917,15 +1072,18 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 	## Classic pure-pursuit goal: project the vehicle onto the reference loop,
 	## advance by `lookahead` along the race direction, and return that point
 	## plus the look-ahead distance actually used (the pursuit radius).
+	_reference_goal_result["lookahead"] = lookahead
 	if _reference_path.size() < 2:
-		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
+		_reference_goal_result["goal"] = vehicle.global_position + forward * lookahead
+		return _reference_goal_result
 	_ensure_arc_tables_current()
 	var count := _reference_path.size()
 	var segment_lengths := _reference_segment_lengths
 	var cumulative := _reference_cumulative
 	var total := _reference_total
 	if total < 0.001:
-		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
+		_reference_goal_result["goal"] = vehicle.global_position + forward * lookahead
+		return _reference_goal_result
 
 	var nearest := _nearest_segment_local(_reference_path, vehicle.global_position, _reference_nearest_index)
 	_reference_nearest_index = int(nearest["index"])
@@ -947,42 +1105,8 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 		1.0
 	)
 	var goal := _reference_path[target_index].lerp(_reference_path[(target_index + 1) % count], target_fraction)
-	return {"goal": goal, "lookahead": lookahead}
-
-
-func _avoid_hazards(desired_direction: Vector2, forward: Vector2) -> Vector2:
-	if not vehicle.is_inside_tree():
-		return desired_direction
-	var avoid := Vector2.ZERO
-	for node: Node in _group_nodes(&"track_hazard"):
-		if not is_instance_valid(node):
-			continue
-		var hazard := node as EnvironmentalHazard
-		if hazard == null:
-			continue
-		var danger_center := hazard.to_global(hazard.start_position.lerp(hazard.end_position, 0.5))
-		var arrival_horizon := clampf(vehicle.global_position.distance_to(danger_center) / maxf(vehicle.speed, 180.0), 0.15, 1.2)
-		var prediction := hazard.get_prediction(arrival_horizon)
-		if not bool(prediction["collision_active"]):
-			if hazard.is_collision_active():
-				prediction = hazard.get_prediction(0.0)
-			else:
-				var time_until_danger := hazard.get_time_until_danger()
-				if time_until_danger > arrival_horizon + 0.35:
-					continue
-				prediction = hazard.get_prediction(time_until_danger + hazard.active_duration * 0.45)
-		if not bool(prediction["collision_active"]):
-			continue
-		var offset := hazard.to_global(prediction["position"]) - vehicle.global_position
-		if offset.length() > HAZARD_AVOID_DISTANCE or offset.dot(forward) < 0.0:
-			continue
-		var away := offset.orthogonal().normalized()
-		if away.dot(desired_direction) < 0.0:
-			away = -away
-		avoid += away * (1.0 - offset.length() / HAZARD_AVOID_DISTANCE)
-	if avoid.length_squared() < 0.001:
-		return desired_direction
-	return desired_direction.lerp(avoid.normalized(), 0.48).normalized()
+	_reference_goal_result["goal"] = goal
+	return _reference_goal_result
 
 
 func _leader_progress_deficit() -> float:
@@ -1010,13 +1134,12 @@ func _traffic_plan(
 			_overtake_cooldown_remaining,
 			OVERTAKE_COOLDOWN / float(personality["overtake_aggression"])
 		)
-	var plan := {
-		"target_position": line_target,
-		"speed_scale": 1.0,
-		"speed_limit": INF,
-		"passing": false,
-		"drafting": false,
-	}
+	var plan := _traffic_result
+	plan["target_position"] = line_target
+	plan["speed_scale"] = 1.0
+	plan["speed_limit"] = INF
+	plan["passing"] = false
+	plan["drafting"] = false
 	if not vehicle.is_inside_tree() or forward.length_squared() < 0.001:
 		return plan
 
@@ -1093,12 +1216,12 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 			nearest_distance = distance_ahead
 			nearest_lateral = lateral_distance
 	if nearest == null:
-		return {}
-	return {
-		"vehicle": nearest,
-		"distance": nearest_distance,
-		"lateral_distance": nearest_lateral,
-	}
+		_leader_result.clear()
+		return _leader_result
+	_leader_result["vehicle"] = nearest
+	_leader_result["distance"] = nearest_distance
+	_leader_result["lateral_distance"] = nearest_lateral
+	return _leader_result
 
 
 func _select_overtake_side(forward: Vector2, leader: VehicleController) -> float:
@@ -1184,8 +1307,6 @@ func _group_nodes(group_name: StringName) -> Array[Node]:
 	if _tree_cache_dirty:
 		_refresh_tree_cache()
 	match group_name:
-		&"track_hazard":
-			return _hazard_nodes
 		&"surface_zone":
 			return _surface_zone_nodes
 		&"race_vehicle":
@@ -1196,7 +1317,6 @@ func _group_nodes(group_name: StringName) -> Array[Node]:
 func _refresh_tree_cache() -> void:
 	if not is_instance_valid(vehicle) or not vehicle.is_inside_tree():
 		return
-	_hazard_nodes = _scan_group(&"track_hazard")
 	_surface_zone_nodes = _scan_group(&"surface_zone")
 	_race_vehicle_nodes = _scan_group(&"race_vehicle")
 	_rebuild_surface_zone_records()
@@ -1280,17 +1400,19 @@ func _difficulty_tuning() -> Dictionary:
 func _configure_personality(driver_id: String, driver_style: Dictionary) -> void:
 	personality_id = driver_id if not driver_id.is_empty() else "baseline"
 	personality = DEFAULT_PERSONALITY.duplicate()
-	var difficulty_scale := 0.3 if difficulty == "sunday_drive" else (1.0 if difficulty == "clockwork" else 0.78)
+	var personality_scale := float(_difficulty_tuning()["personality_scale"])
 	for key: String in DEFAULT_PERSONALITY:
 		var bounds: Vector2 = PERSONALITY_BOUNDS[key]
 		var requested := clampf(float(driver_style.get(key, 1.0)), bounds.x, bounds.y)
-		personality[key] = lerpf(1.0, requested, difficulty_scale)
+		personality[key] = lerpf(1.0, requested, personality_scale)
 
 
 func _shortcut_route_is_suitable(track: Node) -> bool:
-	if difficulty == "sunday_drive" or _shortcut_racing_line.is_empty():
+	var tuning := _difficulty_tuning()
+	if not bool(tuning["shortcut_enabled"]) or _shortcut_racing_line.is_empty():
 		return false
-	if difficulty == "club_circuit" and vehicle.stats.physics_model_version != 0 and vehicle.stats.steering_rate < 3.25:
+	var min_steering_rate := float(tuning["shortcut_min_steering_rate"])
+	if min_steering_rate > 0.0 and vehicle.stats.physics_model_version != 0 and vehicle.stats.steering_rate < min_steering_rate:
 		return false
 	var definitions: Variant = track.get_meta("generated_surfaces", [])
 	if definitions is not Array:
@@ -1306,10 +1428,10 @@ func _shortcut_route_is_suitable(track: Node) -> bool:
 			var dry_corner := vehicle.get_safe_corner_speed(300.0, 1.0)
 			var shortcut_corner := vehicle.get_safe_corner_speed(300.0, shortcut_grip)
 			var retained_corner_speed := shortcut_corner / maxf(dry_corner, 0.001)
-			var minimum_retention := (0.64 if difficulty == "clockwork" else 0.70) / preference
+			var minimum_retention := float(tuning["shortcut_min_retention"]) / preference
 			return retained_corner_speed >= minimum_retention and float(definition.get("speed", 0.0)) >= 1.0
 		var combined_grip := float(definition.get("grip", 0.0)) * vehicle.stats.grip
-		var minimum_grip := (0.34 if difficulty == "clockwork" else 0.38) / preference
+		var minimum_grip := float(tuning["shortcut_min_grip"]) / preference
 		return combined_grip >= minimum_grip and float(definition.get("speed", 0.0)) >= 1.0
 	return false
 
@@ -1321,13 +1443,12 @@ func _planned_surface_grip(surface_plan: Dictionary) -> float:
 
 
 func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
-	var plan := {
-		"weight": 0.0,
-		"speed_scale": 1.0,
-		"grip_scale": 1.0,
-		"risk": 0.0,
-		"avoid_direction": desired_direction,
-	}
+	var plan := _surface_result
+	plan["weight"] = 0.0
+	plan["speed_scale"] = 1.0
+	plan["grip_scale"] = 1.0
+	plan["risk"] = 0.0
+	plan["avoid_direction"] = desired_direction
 	if not vehicle.is_inside_tree():
 		return plan
 	var shortcut_zone := _upcoming_shortcut_zone(desired_direction)
@@ -1381,7 +1502,10 @@ func _surface_driving_speed_scale(speed_scale: float, grip_scale: float, directi
 
 
 func _surface_model(direction: Vector2) -> Dictionary:
-	var model := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
+	var model := _surface_model_result
+	model["risk"] = 0.0
+	model["grip"] = 1.0
+	model["speed"] = 1.0
 	var model_risk := 0.0
 	var origin := vehicle.global_position
 	for record: Dictionary in _surface_zone_records_for_tick():
@@ -1394,7 +1518,9 @@ func _surface_model(direction: Vector2) -> Dictionary:
 			var risk := float(record["risk"])
 			if risk >= model_risk:
 				model_risk = risk
-				model = {"risk": risk, "grip": float(record["grip"]), "speed": float(record["speed"])}
+				model["risk"] = risk
+				model["grip"] = float(record["grip"])
+				model["speed"] = float(record["speed"])
 			break
 	return model
 
@@ -1462,14 +1588,13 @@ func _surface_zone_risk(zone: SurfaceZone) -> float:
 
 
 func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictionary:
-	var plan := {
-		"weight": 0.0,
-		"speed_scale": 1.0,
-		"speed_limit": INF,
-		"avoid_direction": desired_direction,
-		"static_contact": false,
-		"escape_steer": 0.0,
-	}
+	var plan := _obstacle_result
+	plan["weight"] = 0.0
+	plan["speed_scale"] = 1.0
+	plan["speed_limit"] = INF
+	plan["avoid_direction"] = desired_direction
+	plan["static_contact"] = false
+	plan["escape_steer"] = 0.0
 	if not vehicle.is_inside_tree():
 		return plan
 	var origin := vehicle.global_position + forward * OBSTACLE_FRONT_OFFSET
@@ -1543,11 +1668,15 @@ func _ray_probe_from(
 		excluded_rids: Array[RID] = []
 ) -> Dictionary:
 	if feeler_length <= 0.001:
-		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
+		var empty: Dictionary = _ray_results[0]
+		empty["clearance"] = 1.0
+		empty["is_vehicle"] = false
+		empty["normal"] = Vector2.ZERO
+		return empty
 	var side_offset := direction.orthogonal() * OBSTACLE_FEELER_HALF_WIDTH
-	var center := _single_ray_probe(origin, direction, feeler_length, mask, excluded_rids)
-	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask, excluded_rids)
-	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask, excluded_rids)
+	var center := _single_ray_probe(origin, direction, feeler_length, mask, excluded_rids, 0)
+	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask, excluded_rids, 1)
+	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask, excluded_rids, 2)
 	var closest := center
 	if float(left["clearance"]) < float(closest["clearance"]):
 		closest = left
@@ -1561,27 +1690,33 @@ func _single_ray_probe(
 		direction: Vector2,
 		feeler_length: float,
 		mask: int,
-		excluded_rids: Array[RID] = []
+		excluded_rids: Array[RID] = [],
+		slot: int = 0
 ) -> Dictionary:
-	var query_excludes: Array[RID] = [vehicle.get_rid()]
-	query_excludes.append_array(excluded_rids)
-	var query := PhysicsRayQueryParameters2D.create(
-		origin,
-		origin + direction * feeler_length,
-		mask,
-		query_excludes
-	)
+	var result: Dictionary = _ray_results[slot]
+	if _ray_query == null:
+		_ray_query = PhysicsRayQueryParameters2D.new()
+	_ray_excludes.clear()
+	_ray_excludes.append(vehicle.get_rid())
+	_ray_excludes.append_array(excluded_rids)
+	var query := _ray_query
+	query.from = origin
+	query.to = origin + direction * feeler_length
+	query.collision_mask = mask
+	query.exclude = _ray_excludes
 	var hit := vehicle.get_world_2d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
-		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
+		result["clearance"] = 1.0
+		result["is_vehicle"] = false
+		result["normal"] = Vector2.ZERO
+		return result
 	var collider: Variant = hit.get("collider")
 	var is_vehicle := collider is Node and (collider as Node).is_in_group("race_vehicle")
 	var hit_normal := (hit.get("normal", Vector2.ZERO) as Vector2).normalized()
-	return {
-		"clearance": origin.distance_to(hit["position"]) / feeler_length,
-		"is_vehicle": is_vehicle,
-		"normal": hit_normal,
-	}
+	result["clearance"] = origin.distance_to(hit["position"]) / feeler_length
+	result["is_vehicle"] = is_vehicle
+	result["normal"] = hit_normal
+	return result
 
 
 func _update_spin_recovery(delta: float) -> bool:
@@ -1600,7 +1735,7 @@ func _update_spin_recovery(delta: float) -> bool:
 	return false
 
 
-func _update_stuck_recovery(delta: float, target_key: String, distance_to_target: float) -> void:
+func _update_stuck_recovery(delta: float, target_key: int, distance_to_target: float) -> void:
 	if target_key != _stuck_target_key:
 		_stuck_target_key = target_key
 		_best_checkpoint_distance = distance_to_target
@@ -1623,7 +1758,7 @@ func _update_stuck_recovery(delta: float, target_key: String, distance_to_target
 
 func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool = false) -> Dictionary:
 	var sample := _active_route_sample(expected_index)
-	var target_key := "%d:%d" % [expected_index, _room_cut_checkpoint]
+	var target_key: int = ((expected_index + 1) << 8) | ((_room_cut_checkpoint + 1) & 0xFF)
 	if target_key != _watchdog_target_key:
 		_watchdog_target_key = target_key
 		_last_route_arc = float(sample["arc"])
@@ -1631,7 +1766,8 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 		_off_route_time = 0.0
 		_no_progress_time = 0.0
 		_wrong_way_progress_time = 0.0
-		return {"made_progress": true}
+		_watchdog_result["made_progress"] = true
+		return _watchdog_result
 
 	var route_length := maxf(float(sample["length"]), 0.001)
 	var route_delta := float(sample["arc"]) - _last_route_arc
@@ -1682,7 +1818,8 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 	):
 		if not _recovery_cooldown_active():
 			_recover_vehicle(&"wrong_way" if _wrong_way_progress_time >= WRONG_WAY_PROGRESS_TIMEOUT else &"no_progress")
-	return {"made_progress": made_progress}
+	_watchdog_result["made_progress"] = made_progress
+	return _watchdog_result
 
 
 func _active_route_sample(expected_index: int) -> Dictionary:
@@ -1690,7 +1827,11 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var segment := _room_cut_end - _room_cut_start
 		var fraction := clampf((vehicle.global_position - _room_cut_start).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
 		var nearest := _room_cut_start + segment * fraction
-		return {"arc": segment.length() * fraction, "length": segment.length(), "distance": vehicle.global_position.distance_to(nearest), "closed": false}
+		_route_sample_result["arc"] = segment.length() * fraction
+		_route_sample_result["length"] = segment.length()
+		_route_sample_result["distance"] = vehicle.global_position.distance_to(nearest)
+		_route_sample_result["closed"] = false
+		return _route_sample_result
 	if _racing_line.size() >= 2:
 		_ensure_arc_tables_current()
 		var count := _racing_line.size()
@@ -1702,17 +1843,20 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var total := _racing_line_total
 		var best_arc := _racing_line_cumulative[best_index] + _racing_line_segment_lengths[best_index] * best_fraction
 		var directional_arc := fposmod(total - best_arc, total) if race_manager.is_reverse_direction() else best_arc
-		return {
-			"arc": directional_arc,
-			"length": total,
-			"distance": sqrt(best_distance_squared),
-			"closed": true,
-		}
+		_route_sample_result["arc"] = directional_arc
+		_route_sample_result["length"] = total
+		_route_sample_result["distance"] = sqrt(best_distance_squared)
+		_route_sample_result["closed"] = true
+		return _route_sample_result
 
 	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
 	var previous := race_manager.get_checkpoint_before(expected_index) as Node2D
 	if checkpoint == null or previous == null:
-		return {"arc": 0.0, "length": 1.0, "distance": 0.0, "closed": false}
+		_route_sample_result["arc"] = 0.0
+		_route_sample_result["length"] = 1.0
+		_route_sample_result["distance"] = 0.0
+		_route_sample_result["closed"] = false
+		return _route_sample_result
 	var segment := checkpoint.global_position - previous.global_position
 	var fraction := clampf(
 		(vehicle.global_position - previous.global_position).dot(segment) / maxf(segment.length_squared(), 0.001),
@@ -1720,12 +1864,11 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		1.0
 	)
 	var nearest := previous.global_position + segment * fraction
-	return {
-		"arc": segment.length() * fraction,
-		"length": segment.length(),
-		"distance": vehicle.global_position.distance_to(nearest),
-		"closed": false,
-	}
+	_route_sample_result["arc"] = segment.length() * fraction
+	_route_sample_result["length"] = segment.length()
+	_route_sample_result["distance"] = vehicle.global_position.distance_to(nearest)
+	_route_sample_result["closed"] = false
+	return _route_sample_result
 
 
 func _update_static_escape(delta: float, obstacle_plan: Dictionary, made_progress: bool) -> bool:
@@ -1766,7 +1909,7 @@ func _recover_vehicle(reason: StringName = &"unknown") -> void:
 	_stuck_time = 0.0
 	_guide_checkpoint_index = -1
 	_guide_reached = false
-	_stuck_target_key = ""
+	_stuck_target_key = 0
 	_best_checkpoint_distance = INF
 	_smoothed_steer = 0.0
 	_reset_overtake_state()
@@ -1826,7 +1969,7 @@ func _reset_route_watchdog() -> void:
 	_wrong_way_progress_time = 0.0
 	_spin_time = 0.0
 	_route_progress_accumulator = 0.0
-	_watchdog_target_key = ""
+	_watchdog_target_key = 0
 	_last_route_arc = 0.0
 	_static_contact_time = 0.0
 	_escape_time_remaining = 0.0
@@ -1860,7 +2003,7 @@ func _on_external_recovery(racer: Node2D) -> void:
 
 
 func _on_racer_registered(_racer: Node2D) -> void:
-	## The per-race scene-tree cache (hazards, surface zones, race vehicles) is
+	## The per-race scene-tree cache (surface zones, race vehicles) is
 	## only valid once the field is fully placed. A racer registered after this
 	## controller first populated the cache means the cached vehicle list is
 	## stale — a grid-launch traffic scan would otherwise miss cars still being
@@ -1970,7 +2113,10 @@ func _racing_line_curvature_hazard() -> Dictionary:
 		var next := (index + direction + count) % count
 		walked += _racing_line[index].distance_to(_racing_line[next])
 		index = next
-	return {"radius": hazard_radius, "distance": hazard_distance, "speed_limit": speed_limit}
+	_hazard_result["radius"] = hazard_radius
+	_hazard_result["distance"] = hazard_distance
+	_hazard_result["speed_limit"] = speed_limit
+	return _hazard_result
 
 
 func _v1_speed_envelope(radius: float, distance: float) -> float:
@@ -1984,27 +2130,34 @@ func _v1_speed_envelope(radius: float, distance: float) -> float:
 	# Reserve some tire capacity for braking and tracking corrections instead
 	# of planning every corner at the theoretical steady-state grip peak.
 	var lateral_accel := minf(vehicle.stats.front_grip, vehicle.stats.rear_grip) * grip * DYNAMICS.REFERENCE_GRAVITY * _tracking_grip_utilization
-	var margin := 0.86 if difficulty == "sunday_drive" else (0.99 if difficulty == "clockwork" else 0.96)
+	var tuning := _difficulty_tuning()
+	var margin := float(tuning["corner_margin"])
 	var corner := minf(maximum, sqrt(lateral_accel * radius) * margin * float(personality["corner_pace"]))
 	var rack := DYNAMICS.calculate_target_steer_angle(1.0, vehicle.stats.max_steer_angle_deg, corner, maximum, vehicle.stats.high_speed_steer_ratio, vehicle.stats.steer_fade_start_ratio)
 	var minimum_radius := vehicle.stats.wheelbase / maxf(tan(rack), 0.001)
 	corner *= minf(1.0, radius / minimum_radius)
-	var reaction_seconds := 0.34 if difficulty == "sunday_drive" else (0.15 if difficulty == "clockwork" else 0.22)
+	var reaction_seconds := float(tuning["reaction_seconds"])
 	var braking_distance := maxf(0.0, distance - vehicle.speed * reaction_seconds * float(personality["brake_timing"]))
-	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip)
+	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip, _brake_prediction, _brake_prediction_loads)
 	return minf(maximum, sqrt(corner * corner + 2.0 * braking_accel * braking_distance))
 
 
 func _checkpoint_curvature_hazard(expected_index: int) -> Dictionary:
 	var radius := _checkpoint_derived_radius(expected_index)
 	if radius >= MAX_RACING_LINE_RADIUS:
-		return {"radius": radius, "distance": INF}
+		_hazard_result["radius"] = radius
+		_hazard_result["distance"] = INF
+		_hazard_result.erase("speed_limit")
+		return _hazard_result
 	# The corner apex is at the checkpoint itself (direction-independent); the
 	# entry guide is forward-biased and would mis-measure the brake distance in
 	# reverse. Braking to reach corner speed at the apex is correct either way.
 	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
 	var corner_point: Vector2 = checkpoint.global_position if checkpoint != null else vehicle.global_position
-	return {"radius": radius, "distance": vehicle.global_position.distance_to(corner_point)}
+	_hazard_result["radius"] = radius
+	_hazard_result["distance"] = vehicle.global_position.distance_to(corner_point)
+	_hazard_result.erase("speed_limit")
+	return _hazard_result
 
 
 func _checkpoint_derived_radius(checkpoint_index: int) -> float:

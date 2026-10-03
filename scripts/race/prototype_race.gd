@@ -589,7 +589,7 @@ func _apply_track_variant(requested_theme: StringName) -> void:
 			reset_manager.set("invalid_polygon", track_root.get_meta("island_invalid_polygon", PackedVector2Array()))
 	_track_variant_presenter = TRACK_VARIANT_SCRIPT.new() as TrackVariantPresenter
 	track_root.add_child(_track_variant_presenter)
-	_track_variant_presenter.configure(track_root, requested_theme, race_manager.is_reverse_direction())
+	_track_variant_presenter.configure(track_root, requested_theme)
 	var discovered_checkpoints: Array[Node] = []
 	for child: Node in track_root.get_children():
 		if child.is_in_group("track_checkpoints"):
@@ -665,8 +665,7 @@ func _run_countdown() -> void:
 		_play_sfx(&"countdown", 0.82)
 		race_manager.report_countdown_tick(value)
 		# process_in_physics keeps the countdown on the fixed physics step so the
-		# race-start (and the hazard phase it fixes) is deterministic, instead of
-		# drifting with rendered frame rate.
+		# race start is deterministic instead of drifting with rendered frame rate.
 		await get_tree().create_timer(COUNTDOWN_STEP_SECONDS, false, true).timeout
 	_present_countdown("GO!")
 	_play_sfx(&"go", 0.92)
