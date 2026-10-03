@@ -1,0 +1,29 @@
+{
+  "version":3,
+  "boundary_density":{
+    "minimum":12,"maximum":192,
+    "outer_coverage":[0.28,0.38],"outer_runs":[4,32],"run_span_mm":600,
+    "rail_members":[3,5],"rail_min_length_mm":100,"rail_min_aspect":3.0,
+    "peg_runs":[1,2],"peg_members":[8,12],"peg_length_mm":[30,60],"peg_min_aspect":2.0,
+    "inner_members":[4,8],"gap_mm":[8,14],"max_join_gap_mm":40,"run_separation_mm":120,
+    "search_stride_mm":32,"search_attempts":64,"run_outsets_mm":[0,16,32],
+    "corner_cuts":{"lane_fractions":[0,0.5,1],"vehicle_radius_mm":18,"solid_core_ratio":0.44}
+  },
+  "themes":{
+    "kitchen":{
+      "support":["tabletop/mug_patterned.png","tabletop/bowl_patterned.png","imagine/bottle_top.png","kitchen/apple_cartoon.png","tabletop/espresso_mug.png"],
+      "micro":["tabletop/cereal_ring.png","edge_dressing/kitchen_herb_micro.png","edge_dressing/kitchen_sugar_micro.png"],
+      "ground":["ground_dressing/kitchen_tablecloth_patch.png","ground_dressing/kitchen_dish_towel_blue.png"]
+    },
+    "workshop":{
+      "support":["imagine/wrench.png","imagine/screwdriver.png","imagine/tape_roll.png","imagine/hammer.png"],
+      "micro":["edge_dressing/workshop_washer_micro.png","edge_dressing/workshop_bolt_micro.png","edge_dressing/workshop_nail_micro.png"],
+      "ground":["ground_dressing/workshop_cardboard_scrap.png","ground_dressing/workshop_shop_rag_red.png","ground_dressing/workshop_sandpaper_sheet.png"]
+    },
+    "office":{
+      "support":["giant_props/giant_mouse.png","imagine/stapler_top.png","imagine/book_top.png","imagine/scissors_top.png","imagine/pencil.png"],
+      "micro":["edge_dressing/office_binder_clip_micro.png","edge_dressing/office_push_pin_micro.png","imagine/paperclip.png"],
+      "ground":["ground_dressing/office_envelope_stack.png","ground_dressing/office_sticky_notes.png","ground_dressing/office_notepad_page.png"]
+    }
+  }
+}

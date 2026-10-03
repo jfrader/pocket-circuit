@@ -11,12 +11,12 @@ static func add_polygon(parent: Node, node_name: String, points: PackedVector2Ar
 	parent.add_child(polygon)
 
 
-static func add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2) -> void:
+static func add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2, half_width: float = TrackBuilderCore.HALF_WIDTH) -> void:
 	var along := tangent.normalized()
 	var across := along.rotated(PI * 0.5)
 	var columns := 6
 	var rows := 2
-	var cell_width := TrackBuilderCore.HALF_WIDTH * 2.0 / float(columns)
+	var cell_width := half_width * 2.0 / float(columns)
 	var cell_depth := 36.0
 	var color_counts := {&"White": 0, &"Black": 0}
 	for row in rows:
@@ -47,7 +47,7 @@ static func add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2
 	for color_key: StringName in color_counts:
 		var first := parent.get_node("StartFinish%s" % String(color_key))
 		first.set_meta("checker_cell_count", int(color_counts[color_key]))
-		first.set_meta("corridor_span", TrackBuilderCore.HALF_WIDTH * 2.0)
+		first.set_meta("corridor_span", half_width * 2.0)
 		first.set_meta("bidirectional", true)
 
 
@@ -77,7 +77,7 @@ static func add_wall_segment(parent: Node, node_name: String, position: Vector2,
 	side_face.color = Color("262e3a")
 	TrackBuilderCore._mark_solid_visual(side_face, "", &"room_wall")
 	wall.add_child(side_face)
-	var edge_texture_side := load(edge_texture_path) as Texture2D
+	var edge_texture_side := TrackBuilderCore.asset_texture(edge_texture_path)
 	if edge_texture_side:
 		var side_strip := Sprite2D.new()
 		side_strip.name = "SideStrip"
@@ -99,7 +99,7 @@ static func add_wall_segment(parent: Node, node_name: String, position: Vector2,
 	top_lip.color = Color("e8d9b8", 0.85)
 	TrackBuilderCore._mark_solid_visual(top_lip, "", &"room_wall")
 	wall.add_child(top_lip)
-	var edge_texture := load(edge_texture_path) as Texture2D
+	var edge_texture := TrackBuilderCore.asset_texture(edge_texture_path)
 	if edge_texture:
 		var tile_count := maxi(1, int(ceil((length + 60.0) / TrackBuilderCore.ROOM_EDGE_TILE_WORLD_LENGTH)))
 		for tile in tile_count:
@@ -115,7 +115,7 @@ static func add_wall_segment(parent: Node, node_name: String, position: Vector2,
 			wall.add_child(strip)
 
 
-static func gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:
+static func gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array, half_width: float = TrackBuilderCore.HALF_WIDTH) -> PackedVector2Array:
 	var normal := tangent.rotated(PI * 0.5).normalized()
 	var positive_island := nearest_gate_boundary(sample, normal, PackedVector2Array(), island_polygon)
 	var negative_island := nearest_gate_boundary(sample, -normal, PackedVector2Array(), island_polygon)
@@ -124,15 +124,15 @@ static func gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon:
 	var inner_direction := normal if positive_distance <= negative_distance else -normal
 	var outer_direction := -inner_direction
 	return PackedVector2Array([
-		corridor_gate_endpoint(sample, inner_direction, room_polygon, island_polygon),
+		corridor_gate_endpoint(sample, inner_direction, room_polygon, island_polygon, half_width),
 		nearest_gate_boundary(sample, outer_direction, room_polygon, island_polygon),
 	])
 
 
-static func corridor_gate_endpoint(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
+static func corridor_gate_endpoint(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array, half_width: float = TrackBuilderCore.HALF_WIDTH) -> Vector2:
 	var boundary := nearest_gate_boundary(sample, direction, room_polygon, island_polygon)
 	var projected := (boundary - sample).dot(direction.normalized())
-	return sample + direction.normalized() * minf(projected, TrackBuilderCore.HALF_WIDTH)
+	return sample + direction.normalized() * minf(projected, half_width)
 
 
 static func nearest_gate_boundary(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
@@ -152,7 +152,7 @@ static func nearest_gate_boundary(sample: Vector2, direction: Vector2, room_poly
 	return nearest
 
 
-static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int) -> void:
+static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int, half_width: float = TrackBuilderCore.HALF_WIDTH) -> void:
 	var container := root.get_node_or_null("GatePosts") as Node2D
 	if container == null:
 		container = Node2D.new()
@@ -160,19 +160,18 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 		container.set_meta("placed_count", 0)
 		root.add_child(container)
 	var boundary_assets: Dictionary = spec.get("generated_boundary", {})
-	var asset_paths: Array = boundary_assets.get("sections", [boundary_assets.get("section", "")])
+	var asset_paths: Array = spec.get("gate_props", [])
 	if asset_paths.is_empty():
 		return
 	var normal := tangent.rotated(PI * 0.5).normalized()
 	for side in [-1, 1]:
 		var asset_path := String(asset_paths[posmod(gate_index * 2 + (1 if side > 0 else 0), asset_paths.size())])
-		var texture := load(asset_path) as Texture2D
+		var texture := TrackBuilderCore.asset_texture(asset_path)
 		if texture == null:
 			continue
 		var post := StaticBody2D.new()
 		post.name = "Gate%02d%s" % [gate_index, "Right" if side > 0 else "Left"]
-		var post_size := TrackBuilderCore.FINISH_LANDMARK_SIZE if gate_index == 0 else TrackBuilderCore.GATE_POST_SIZE
-		var post_offset := TrackBuilderCore.FINISH_LANDMARK_OFFSET if gate_index == 0 else TrackBuilderCore.GATE_POST_OFFSET
+		var post_offset := (TrackBuilderCore.FINISH_LANDMARK_OFFSET if gate_index == 0 else TrackBuilderCore.GATE_POST_OFFSET) + half_width - TrackBuilderCore.HALF_WIDTH
 		post.position = sample + normal * post_offset * float(side)
 		post.rotation = tangent.angle()
 		post.collision_layer = 16
@@ -186,12 +185,9 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 			post.set_meta("race_directions", PackedStringArray(["forward", "reverse"]))
 		TrackBuilderCore._mark_solid_body(post, asset_path, &"gate_post")
 		container.add_child(post)
-		var sprite_scale := Vector2(post_size.x / texture.get_width(), post_size.y / texture.get_height())
-		var footprint := TrackBuilderCore._texture_collision_footprint(texture, &"convex", true)
-		var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale + Vector2.ONE * 2.0
+		var sprite_scale := Vector2.ONE * TrackBuilderCore.PROP_SCALE.sprite_scale(texture, TrackBuilderCore._texture_opaque_rect(texture), TrackBuilderCore.GATE_POST_SIZE.x)
 		var offset := TrackBuilderCore._add_texture_collision(post, texture, sprite_scale, &"convex", true, 2.0)
 		(post.get_node("AssetCollision") as CollisionShape2D).name = "PostCollision"
-		TrackBuilderCore._add_directional_shadow(post, asset_path, TrackBuilderCore.GATE_POST_SIZE.x, 1.0, footprint_size)
 		var sprite := Sprite2D.new()
 		sprite.name = "Sprite"
 		sprite.texture = texture
@@ -200,10 +196,11 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 		sprite.position = -offset
 		TrackBuilderCore._mark_solid_visual(sprite, asset_path, &"gate_post")
 		post.add_child(sprite)
+		TrackBuilderCore._add_directional_shadow(sprite)
 		container.set_meta("placed_count", int(container.get_meta("placed_count", 0)) + 1)
 	if gate_index == 0:
 		container.set_meta("finish_landmark_paths", [NodePath("Gate00Left"), NodePath("Gate00Right")])
-		container.set_meta("finish_landmark_offset", TrackBuilderCore.FINISH_LANDMARK_OFFSET)
+		container.set_meta("finish_landmark_offset", TrackBuilderCore.FINISH_LANDMARK_OFFSET + half_width - TrackBuilderCore.HALF_WIDTH)
 
 
 static func add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float, span_endpoints: PackedVector2Array = PackedVector2Array()) -> void:
@@ -256,6 +253,35 @@ static func add_grid(parent: Node, node_name: String, rotation: float, positions
 		grid.add_child(marker)
 
 
+static func grid_arc_distances(centerline: PackedVector2Array, reverse: bool, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Array[float]:
+	var arc := TrackBuilderCore._arc_lengths(centerline)
+	var total := arc[arc.size() - 1]
+	var start := centerline[0]
+	var finish_tangent := (centerline[1] - centerline[centerline.size() - 1]).normalized()
+	for offset_step in 48:
+		var rows: Array[float] = []
+		var clear := true
+		for distance: float in TrackBuilderCore.GRID_ROW_DISTANCES:
+			var shifted := distance + float(offset_step) * 20.0
+			rows.append(shifted)
+			var sample_arc := total - shifted if reverse else shifted
+			var sample := TrackBuilderCore._sample_at_arc(centerline, arc, sample_arc)
+			var normal := TrackBuilderCore._tangent_at_arc(centerline, arc, sample_arc).rotated(PI * 0.5)
+			for side in [-1, 1]:
+				var point := sample + normal * TrackBuilderCore.GRID_LANE_OFFSET * float(side)
+				if absf((point - start).dot(finish_tangent)) < 70.0:
+					clear = false
+				if not TrackBuilderCore._inside_polygon_with_radius(point, 80.0, room_polygon):
+					clear = false
+				var nearest := TrackBuilderCore._closest_point_on_loop(point, island_polygon)
+				if Geometry2D.is_point_in_polygon(point, island_polygon) or point.distance_to(nearest["position"]) < 68.0:
+					clear = false
+		if clear:
+			return rows
+	push_error("Unable to place the starting grid clear of the finish sensor")
+	return []
+
+
 static func scatter_decals(root: Node2D, spec: Dictionary, room_polygon: PackedVector2Array, corridor: PackedVector2Array, rng: RandomNumberGenerator) -> void:
 	var decals: Array = spec.get("decals", [])
 	if decals.is_empty():
@@ -269,7 +295,7 @@ static func scatter_decals(root: Node2D, spec: Dictionary, room_polygon: PackedV
 		var texture_path := String(decals[rng.randi_range(0, decals.size() - 1)])
 		var sprite := Sprite2D.new()
 		sprite.name = "Decal"
-		sprite.texture = load(texture_path) as Texture2D
+		sprite.texture = TrackBuilderCore.asset_texture(texture_path)
 		if sprite.texture == null:
 			sprite.free()
 			continue
@@ -279,4 +305,3 @@ static func scatter_decals(root: Node2D, spec: Dictionary, room_polygon: PackedV
 		sprite.z_index = -15
 		TrackBuilderCore._mark_flat_visual(sprite, texture_path, &"floor_decal")
 		root.add_child(sprite)
-

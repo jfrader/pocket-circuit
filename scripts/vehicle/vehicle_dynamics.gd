@@ -98,23 +98,41 @@ static func calculate_brake_forces(
 ) -> Dictionary:
 	## Returns {front_brake: float, rear_brake: float} accounting for
 	## 62/38 front/rear bias and friction-circle capacity.
+	var result: Array[float] = [0.0, 0.0]
+	var loads: Array[float] = [0.0, 0.0, 0.0, 0.0]
+	calculate_brake_forces_into(brake_input, forward_speed, stats, surface_grip_mult, front_lateral_demand, rear_lateral_demand, result, loads, downforce_q_value)
+	return {"front_brake": result[0], "rear_brake": result[1]}
+
+
+# Caller-owned Array[float] layouts (64-bit float, not PackedFloat32Array):
+# brakes [front_brake, rear_brake], loads [front, rear, front_ratio, q],
+# slips [front, rear]. Keep arrays sized to the documented layout across physics
+# ticks. With zero brake input, brake forces are cleared but axle loads remain
+# unchanged because no load-transfer calculation is needed.
+static func calculate_brake_forces_into(
+	brake_input: float,
+	forward_speed: float,
+	stats: VehicleStats,
+	surface_grip_mult: float,
+	front_lateral_demand: float,
+	rear_lateral_demand: float,
+	out: Array[float],
+	loads: Array[float],
+	downforce_q_value: float = 0.0,
+) -> void:
 	if brake_input <= 0.0:
-		return {"front_brake": 0.0, "rear_brake": 0.0}
+		out[0] = 0.0
+		out[1] = 0.0
+		return
 
 	var total_brake := stats.brake_force * brake_input
 	var raw_front := total_brake * FRONT_BRAKE_BIAS
 	var raw_rear := total_brake * (1.0 - FRONT_BRAKE_BIAS)
 
 	# Friction circle: brake demand limited by remaining capacity after lateral
-	var loads := axle_loads_with_transfer(
-		stats.mass,
-		stats.front_weight_ratio,
-		-brake_input,
-		stats.weight_transfer_ratio,
-		downforce_q_value,
-	)
-	var front_normal := float(loads["front"])
-	var rear_normal := float(loads["rear"])
+	axle_loads_with_transfer_into(stats.mass, stats.front_weight_ratio, -brake_input, stats.weight_transfer_ratio, downforce_q_value, loads)
+	var front_normal := loads[0]
+	var rear_normal := loads[1]
 	var front_peak := stats.front_grip * surface_grip_mult * front_normal
 	var rear_peak := stats.rear_grip * surface_grip_mult * rear_normal
 
@@ -128,7 +146,8 @@ static func calculate_brake_forces(
 	var front_brake := minf(raw_front, front_remaining) * signf(forward_speed)
 	var rear_brake := minf(raw_rear, rear_remaining) * signf(forward_speed)
 
-	return {"front_brake": front_brake, "rear_brake": rear_brake}
+	out[0] = front_brake
+	out[1] = rear_brake
 
 
 static func calculate_handbrake_force(
@@ -194,16 +213,23 @@ static func axle_loads_with_transfer(
 	h_over_l: float,
 	q: float,
 ) -> Dictionary:
+	var result: Array[float] = [0.0, 0.0, 0.0, 0.0]
+	axle_loads_with_transfer_into(mass, front_weight_ratio, longitudinal_demand, h_over_l, q, result)
+	return {"front": result[0], "rear": result[1], "front_ratio": result[2], "q": result[3]}
+
+
+static func axle_loads_with_transfer_into(
+	mass: float, front_weight_ratio: float, longitudinal_demand: float,
+	h_over_l: float, q: float, out: Array[float],
+) -> void:
 	var transfer := clampf(h_over_l * clampf(longitudinal_demand, -1.0, 1.0), -0.12, 0.12)
 	var front_ratio := clampf(front_weight_ratio - transfer, 0.40, 0.66)
 	var extra := clampf(q, 0.0, 0.6) * mass * REFERENCE_GRAVITY
 	var base := mass * REFERENCE_GRAVITY
-	return {
-		"front": (base + extra) * front_ratio,
-		"rear": (base + extra) * (1.0 - front_ratio),
-		"front_ratio": front_ratio,
-		"q": clampf(q, 0.0, 0.6),
-	}
+	out[0] = (base + extra) * front_ratio
+	out[1] = (base + extra) * (1.0 - front_ratio)
+	out[2] = front_ratio
+	out[3] = clampf(q, 0.0, 0.6)
 
 
 static func calculate_progressive_stiffness(surface_grip_mult: float) -> float:
@@ -256,15 +282,28 @@ static func calculate_slip_angles(
 	steer_angle_rad: float,
 ) -> Dictionary:
 	## Returns {front: float, rear: float} slip angles in radians.
+	var result: Array[float] = [0.0, 0.0]
+	calculate_slip_angles_into(forward_speed, lateral_speed, yaw_rate, wheelbase, front_weight_ratio, steer_angle_rad, result)
+	return {"front": result[0], "rear": result[1]}
+
+
+static func calculate_slip_angles_into(
+	forward_speed: float, lateral_speed: float, yaw_rate: float,
+	wheelbase: float, front_weight_ratio: float, steer_angle_rad: float,
+	out: Array[float],
+) -> void:
 	if absf(forward_speed) < 1.0:
-		return {"front": 0.0, "rear": 0.0}
+		out[0] = 0.0
+		out[1] = 0.0
+		return
 	var front_arm := wheelbase * (1.0 - front_weight_ratio)
 	var rear_arm := wheelbase * front_weight_ratio
 	var v_front_lat := lateral_speed + yaw_rate * front_arm
 	var v_rear_lat := lateral_speed - yaw_rate * rear_arm
 	var front_slip := atan2(v_front_lat, absf(forward_speed)) - steer_angle_rad * signf(forward_speed)
 	var rear_slip := atan2(v_rear_lat, absf(forward_speed))
-	return {"front": front_slip, "rear": rear_slip}
+	out[0] = front_slip
+	out[1] = rear_slip
 
 
 # ─── AI query helpers ────────────────────────────────────────────────
@@ -303,10 +342,14 @@ static func get_braking_distance(
 	return (v_now * v_now - v_target * v_target) / (2.0 * effective_brake_accel)
 
 
-static func get_effective_brake_accel(stats: VehicleStats, surface_grip_mult: float) -> float:
+static func get_effective_brake_accel(stats: VehicleStats, surface_grip_mult: float, scratch: Array[float] = [], loads: Array[float] = []) -> float:
 	## Effective braking deceleration in wu/s² for AI predictions.
-	var forces := calculate_brake_forces(1.0, 1.0, stats, surface_grip_mult, 0.0, 0.0)
-	return (float(forces["front_brake"]) + float(forces["rear_brake"])) / maxf(stats.mass, 0.001)
+	if scratch.is_empty():
+		scratch = [0.0, 0.0]
+	if loads.is_empty():
+		loads = [0.0, 0.0, 0.0, 0.0]
+	calculate_brake_forces_into(1.0, 1.0, stats, surface_grip_mult, 0.0, 0.0, scratch, loads)
+	return (scratch[0] + scratch[1]) / maxf(stats.mass, 0.001)
 
 
 static func predict_braking_distance(
@@ -315,6 +358,8 @@ static func predict_braking_distance(
 	stats: VehicleStats,
 	surface_grip_mult: float,
 	surface_speed_mult: float = 1.0,
+	scratch: Array[float] = [],
+	loads: Array[float] = [],
 ) -> float:
 	## Deterministic 60 Hz prediction using the same brake, drag, and rolling
 	## terms as the controller. This is the public planner model query.
@@ -326,10 +371,14 @@ static func predict_braking_distance(
 	var speed := v_now
 	var distance := 0.0
 	var delta := 1.0 / 60.0
+	if scratch.is_empty():
+		scratch = [0.0, 0.0]
+	if loads.is_empty():
+		loads = [0.0, 0.0, 0.0, 0.0]
 	for _step in 60 * 30:
 		if speed <= v_target:
 			break
-		var brake_accel := get_effective_brake_accel(stats, surface_grip_mult)
+		var brake_accel := get_effective_brake_accel(stats, surface_grip_mult, scratch, loads)
 		var drag := calculate_drag_force(speed, stats.aero_drag_coefficient)
 		var rolling := stats.rolling_resistance
 		var decel := brake_accel + (drag + rolling) / maxf(stats.mass, 0.001)
@@ -397,12 +446,14 @@ static func simulate_braking(
 	var steps := int(duration_seconds * 60.0)
 	var speed := initial_speed
 	var distance := 0.0
+	var brakes: Array[float] = [0.0, 0.0]
+	var loads: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 	for step in steps:
 		if speed <= 1.0:
 			return {"stop_distance": distance, "stop_time": float(step) * dt}
-		var brakes := calculate_brake_forces(1.0, speed, stats, surface_grip_mult, 0.0, 0.0)
-		var total_brake := absf(float(brakes["front_brake"])) + absf(float(brakes["rear_brake"]))
+		calculate_brake_forces_into(1.0, speed, stats, surface_grip_mult, 0.0, 0.0, brakes, loads)
+		var total_brake := absf(brakes[0]) + absf(brakes[1])
 		var drag := calculate_drag_force(speed, stats.aero_drag_coefficient)
 		var rolling := calculate_rolling_resistance(speed, stats.rolling_resistance)
 		var decel := (total_brake + absf(drag) + absf(rolling)) / stats.mass

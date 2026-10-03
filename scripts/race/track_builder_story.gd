@@ -20,6 +20,12 @@ static func compose_generated_story(
 	root.add_child(container)
 
 	var occupied: Array[Dictionary] = []
+	for body: StaticBody2D in root.find_children("*", "StaticBody2D", true, false):
+		var sprite := body.get_node_or_null("Sprite") as Sprite2D
+		if sprite == null or sprite.texture == null:
+			continue
+		var size := TrackBuilderCore._texture_opaque_rect(sprite.texture).size * sprite.scale
+		occupied.append({"position": root.to_local(body.global_position), "radius": size.length() * 0.5})
 	var reserved_unique_assets := {}
 	for formation_data: Dictionary in story["island"]:
 		if StringName(formation_data["quantity"]) == &"unique":
@@ -52,9 +58,12 @@ static func compose_generated_story(
 	if int(opening.get_meta("placed_count", 0)) == 1:
 		reserved_unique_assets[String(opening.get_meta("asset_path", ""))] = true
 	await build_island_story(container, story, spec, centerline, inner_loop, room_polygon, gate_samples, occupied, stage)
+	for formation: Node in container.get_node("IslandFocalCluster").get_children():
+		if StringName(formation.get_meta("semantic_quantity", &"")) == &"unique":
+			reserved_unique_assets[String(formation.get_meta("asset_path", ""))] = true
 	if stage.is_valid():
 		await stage.call("Placing track objects")
-	TrackBuilderCore._build_track_formation(
+	await TrackBuilderCore._build_track_formation(
 		container,
 		"ObjectLine",
 		story["object_line"],
@@ -64,20 +73,26 @@ static func compose_generated_story(
 		outer_loop,
 		room_polygon,
 		gate_samples,
-		occupied
+		occupied,
+		stage
 	)
-	TrackBuilderCore._build_track_formation(
+	if stage.is_valid():
+		await stage.call("Placing sparse delimiters")
+	await TrackBuilderCore._build_track_formation(
 		container,
 		"SparseDelimiter",
 		story["delimiter"],
 		&"few",
-		int(moments["early_conflict_forward"]),
+		int(moments["second_straight"]),
 		centerline,
 		outer_loop,
 		room_polygon,
 		gate_samples,
-		occupied
+		occupied,
+		stage
 	)
+	if stage.is_valid():
+		await stage.call("Placing corner landmarks")
 	TrackBuilderCore._build_corner_landmarks(container, story, spec, moments["corners"], centerline, outer_loop, room_polygon, gate_samples, reserved_unique_assets, occupied)
 	if stage.is_valid():
 		await stage.call("Dressing the room")
@@ -86,32 +101,15 @@ static func compose_generated_story(
 		await stage.call("Adding surface detail")
 	await TrackBuilderCore._build_edge_and_apron_decor(container, spec, centerline, room_polygon, gate_samples, occupied, stage)
 	if stage.is_valid():
-		await stage.call("Preparing grip zones and hazards")
+		await stage.call("Preparing grip zones")
 	TrackBuilderCore._build_generated_surfaces(root, container, story, spec, moments, centerline, gate_samples)
 	TrackBuilderCore._build_finish_moments(container, centerline)
+	build_gameplay_moments(root, moments, opening_index)
 
-	var hazard_paths := {}
-	var planned_hazard: Dictionary = spec.get("hazard_plan", {})
-	var planned_paths: Dictionary = planned_hazard.get("paths", {})
-	for direction: String in ["forward", "reverse"]:
-		var hazard_index := int(moments["early_conflict_%s" % direction])
-		var hazard_path: PackedVector2Array = planned_paths.get(direction, TrackBuilderCore._crossing_path(centerline, hazard_index, 96.0))
-		var conflict := Node2D.new()
-		conflict.name = "EarlyConflict%s" % direction.capitalize()
-		conflict.position = centerline[hazard_index]
-		conflict.set_meta("moment_kind", &"early_conflict")
-		conflict.set_meta("direction", StringName(direction))
-		conflict.set_meta("centerline_index", hazard_index)
-		conflict.set_meta("lap_fraction", float(moments["early_conflict_%s_fraction" % direction]))
-		conflict.set_meta("path", hazard_path)
-		container.add_child(conflict)
-		hazard_paths[direction] = hazard_path
-	root.set_meta("generated_hazard_paths", hazard_paths)
-	root.set_meta("generated_hazard_path", hazard_paths["forward"])
+
+static func build_gameplay_moments(root: Node2D, moments: Dictionary, opening_index: int) -> void:
 	root.set_meta("generated_moment_indices", {
 		"opening": opening_index,
-		"early_conflict_forward": int(moments["early_conflict_forward"]),
-		"early_conflict_reverse": int(moments["early_conflict_reverse"]),
 		"longest_straight": int(moments["longest_straight"]),
 		"second_straight": int(moments["second_straight"]),
 		"corners": moments["corners"],
@@ -119,9 +117,7 @@ static func compose_generated_story(
 		"technical": int(moments["technical"]),
 		"speed": 0,
 		"finish": 0,
-		"hazard": int(moments["early_conflict_forward"]),
 	})
-
 
 
 static func build_island_story(
@@ -146,10 +142,9 @@ static func build_island_story(
 		scene_angle += PI
 	var placement_region := &"island"
 	var focal_data: Dictionary = story["island"][0]
-	var focal_path := String(focal_data["asset"])
+	var focal_path := TrackBuilderCore._formation_assets(focal_data)[0]
 	var focal_base_radius := TrackBuilderCore._asset_radius(focal_path, 24.0)
-	var focal_scale := minf(1.0, float(focal_data.get("max_radius", 72.0)) / maxf(focal_base_radius, 1.0))
-	var focal_radius := focal_base_radius * focal_scale
+	var focal_radius := focal_base_radius
 	var focal_offset: Vector2 = focal_data.get("offset", Vector2.ZERO)
 	var focal_preferred := anchor + focal_offset.rotated(scene_angle)
 	var island_fit := TrackBuilderCore._best_island_position(focal_preferred, focal_radius, room_polygon, inner_loop, occupied)
@@ -168,19 +163,21 @@ static func build_island_story(
 		formation.name = "Formation%s" % String(quantity).to_pascal_case()
 		formation.set_meta("semantic_quantity", quantity)
 		formation.set_meta("requested_count", requested_count)
-		formation.set_meta("asset_path", String(formation_data["asset"]))
+		var asset_paths := TrackBuilderCore._formation_assets(formation_data)
+		formation.set_meta("asset_path", asset_paths[0])
+		formation.set_meta("asset_paths", PackedStringArray(asset_paths))
 		cluster.add_child(formation)
-		var asset_path := String(formation_data["asset"])
-		var base_radius := TrackBuilderCore._asset_radius(asset_path, 24.0)
-		var maximum_radius := 72.0 if quantity == &"unique" else (42.0 if quantity == &"few" else 18.0)
-		maximum_radius = float(formation_data.get("max_radius", maximum_radius))
-		var size_scale := minf(1.0, maximum_radius / maxf(base_radius, 1.0))
-		var radius := base_radius * size_scale
+		var size_scale := 1.0
 		var authored_offset: Vector2 = formation_data.get("offset", Vector2.ZERO)
 		var semantic_spread := 1.45 if quantity == &"many" else (1.65 if quantity == &"few" else 1.0)
 		var target: Vector2 = anchor + (authored_offset * semantic_spread).rotated(scene_angle)
+		var variant_start := posmod(TrackBuilderCore._mix_seed(int(spec.get("dressing_seed", spec["requested_seed"])), String(story["id"]) + String(quantity)), asset_paths.size())
 		var placed_count := 0
 		for item_index in requested_count:
+			if stage.is_valid() and item_index > 0:
+				await stage.call("Dressing the start area")
+			var asset_path := asset_paths[(variant_start + item_index) % asset_paths.size()]
+			var radius := TrackBuilderCore._asset_radius(asset_path, 24.0) * size_scale
 			var local_offset := TrackBuilderCore._semantic_formation_offset(StringName(formation_data["formation"]), item_index, requested_count, radius)
 			var placed := false
 			var preferred := target + local_offset.rotated(scene_angle)
@@ -215,23 +212,14 @@ static func build_island_story(
 					placed = true
 					cluster.set_meta("placement_region", &"mixed")
 			if not placed and quantity == &"unique":
-				# A concave infield can have no room for the authored oversized
-				# focal. Keep the unique object readable rather than silently omit it.
-				for factor: float in [0.85, 0.70, 0.55]:
-					var fitted_radius := minf(radius, maxf(72.0, radius * factor))
-					var fitted_scale := size_scale * fitted_radius / radius
-					var fit := TrackBuilderCore._best_island_position(preferred, fitted_radius, room_polygon, inner_loop, occupied)
-					var region := &"island"
-					if not bool(fit["found"]):
-						fit = TrackBuilderCore._best_offtrack_position(preferred, fitted_radius, room_polygon, centerline, gate_samples, occupied)
-						region = &"apron"
-					if bool(fit["found"]):
-						TrackBuilderCore._add_generated_prop(formation, "Item%02d" % item_index, fit["position"], asset_path, scene_angle, region, quantity, item_index, fitted_scale)
-						occupied.append({"position": fit["position"], "radius": fitted_radius})
-						placed_count += 1
-						placed = true
-						cluster.set_meta("placement_region", &"mixed")
-						break
-				break
+				var replacement := String(spec["focal_fallback"])
+				var replacement_radius := TrackBuilderCore._asset_radius(replacement, 24.0)
+				var fit := TrackBuilderCore._best_offtrack_position(preferred, replacement_radius, room_polygon, centerline, gate_samples, occupied)
+				if bool(fit["found"]):
+					TrackBuilderCore._add_generated_prop(formation, "Item%02d" % item_index, fit["position"], replacement, scene_angle, &"apron", quantity, item_index)
+					occupied.append({"position": fit["position"], "radius": replacement_radius})
+					formation.set_meta("asset_path", replacement)
+					formation.set_meta("replaced_asset", asset_path)
+					cluster.set_meta("placement_region", &"mixed")
+					placed_count += 1
 		formation.set_meta("placed_count", placed_count)
-

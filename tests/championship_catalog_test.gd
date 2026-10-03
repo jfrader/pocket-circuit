@@ -1,6 +1,7 @@
 extends SceneTree
 
 const CATALOG := preload("res://data/championship/catalog.gd")
+const AI_CONTROLLER := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
 
 
@@ -17,26 +18,52 @@ func _run_test() -> void:
 	for driver_id: String in ["juniper", "milo", "tess", "cass"]:
 		var driver := CATALOG.get_driver(driver_id)
 		var style: Dictionary = driver.get("ai_style", {})
-		if not _expect(style.size() == 6, "%s should define all bounded AI personality dimensions" % driver_id):
+		if not _expect(style.size() == AI_CONTROLLER.DEFAULT_PERSONALITY.size(), "%s should define all bounded AI personality dimensions" % driver_id):
 			return
+		for trait_key: String in style:
+			var value: Variant = style[trait_key]
+			if not _expect(AI_CONTROLLER.DEFAULT_PERSONALITY.has(trait_key) and (value is int or value is float) and is_finite(float(value)), "%s.%s should be a known finite numeric AI trait" % [driver_id, trait_key]):
+				return
 		rival_styles[driver_id] = style
 	if not _expect(rival_styles["juniper"] != rival_styles["milo"] and rival_styles["milo"] != rival_styles["tess"] and rival_styles["tess"] != rival_styles["cass"], "the four rivals should not share identical driving behavior"):
 		return
+	for tier: String in AI_CONTROLLER.DIFFICULTY_TUNING:
+		var realized_styles := {}
+		for driver_id: String in rival_styles:
+			var controller := AI_CONTROLLER.new()
+			controller.difficulty = tier
+			controller.call("_configure_personality", driver_id, rival_styles[driver_id])
+			var style: Dictionary = controller.personality.duplicate()
+			controller.free()
+			for trait_key: String in style:
+				var limits: Vector2 = AI_CONTROLLER.PERSONALITY_BOUNDS[trait_key]
+				var value := float(style[trait_key])
+				var epsilon := 0.0001
+				if not _expect(is_finite(value) and value >= limits.x - epsilon and value <= limits.y + epsilon, "%s/%s.%s must use the existing AI safety bounds" % [tier, driver_id, trait_key]):
+					return
+			realized_styles[JSON.stringify(style)] = true
+		if not _expect(realized_styles.size() == rival_styles.size(), "the realized cast personalities must remain distinct on every difficulty"):
+			return
 	for event: Dictionary in CATALOG.EVENTS:
 		if not _expect(String(event.get("theme", "")) in ["kitchen", "workshop", "office"], "every event should declare a supported track theme"):
 			return
 		if not _expect(event.has("reverse") and event.has("race_format") and event.has("opponent_count"), "every event should declare direction, race format, and opponent count"):
 			return
+		if not _expect(not event.has("opponents"), "the catalog should not name drivers; the active roster supplies them"):
+			return
 		var expected_opponents := 1 if String(event["race_format"]) == "rival_duel" else 3
-		if not _expect(int(event["opponent_count"]) == expected_opponents and (event["opponents"] as Array).size() == expected_opponents, "catalog race size should match its explicit format"):
+		if not _expect(int(event["opponent_count"]) == expected_opponents, "catalog race size should match its explicit format"):
+			return
+		var text := "%s %s" % [String(event.get("story", "")), String(event.get("rival_line", ""))]
+		if not _expect(text.contains(CATALOG.RIVAL_TOKEN) and not text.contains("Juniper") and not text.contains("Milo") and not text.contains("Tess") and not text.contains("Cass"), "event narrative should name the rival through the roster token, not a fixed cast member"):
 			return
 	if not _expect(bool(CATALOG.get_event("kitchen_mug_run")["reverse"]) and bool(CATALOG.get_event("workshop_ruler_drop")["reverse"]) and bool(CATALOG.get_event("office_keyboard_cut")["reverse"]), "each act's second event should run in reverse"):
 		return
 	if not _expect(not bool(CATALOG.get_event("office_last_light")["reverse"]) and String(CATALOG.get_event("office_last_light")["race_format"]) == "circuit", "the grand final should remain a four-car forward circuit"):
 		return
-	if not _expect(CATALOG.get_event("kitchen_clean_line")["opponents"] == ["juniper"] and CATALOG.get_event("workshop_heavy_metal")["opponents"] == ["milo"], "rival duels should name exactly one opponent"):
+	if not _expect(int(CATALOG.get_event("kitchen_clean_line")["opponent_count"]) == 1 and int(CATALOG.get_event("workshop_heavy_metal")["opponent_count"]) == 1, "rival duels should face exactly one opponent"):
 		return
-	if not _expect(CATALOG.get_event("kitchen_crumb_rush")["opponents"].size() == 3 and CATALOG.get_event("office_last_light")["opponents"].size() == 3, "normal events should retain three opponents"):
+	if not _expect(int(CATALOG.get_event("kitchen_crumb_rush")["opponent_count"]) == 3 and int(CATALOG.get_event("office_last_light")["opponent_count"]) == 3, "normal events should field three opponents"):
 		return
 	if not _expect([CATALOG.score_for_finish(1), CATALOG.score_for_finish(2), CATALOG.score_for_finish(3), CATALOG.score_for_finish(4)] == [10, 7, 5, 3], "finish points should be 10/7/5/3"):
 		return

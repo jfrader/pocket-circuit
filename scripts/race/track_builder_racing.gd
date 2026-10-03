@@ -49,7 +49,7 @@ static func fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector
 		if bool(entry.get("decal", false)):
 			var sprite := Sprite2D.new()
 			sprite.name = "VignetteDecal"
-			sprite.texture = load(texture_path) as Texture2D
+			sprite.texture = TrackBuilderCore.asset_texture(texture_path)
 			if sprite.texture == null:
 				sprite.free()
 				continue
@@ -115,25 +115,25 @@ static func line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pack
 		index += 7
 
 
-static func build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}) -> void:
-	var line_points := racing_line_points(centerline, moments, false)
+static func build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}, half_widths: PackedFloat32Array = PackedFloat32Array()) -> void:
+	var line_points := racing_line_points(centerline, moments, false, half_widths)
 	var shortcut_index := int(moments.get("shortcut", -1))
 	add_hidden_racing_line(root, "RacingLine", line_points)
 	if shortcut_index >= 0:
-		var shortcut_points := racing_line_points(centerline, moments, true)
+		var shortcut_points := racing_line_points(centerline, moments, true, half_widths)
 		var shortcut_line := add_hidden_racing_line(root, "ShortcutRacingLine", shortcut_points)
 		shortcut_line.set_meta("role", &"shortcut")
 		shortcut_line.set_meta("centerline_index", shortcut_index)
 		shortcut_line.set_meta("ai_path_clear", true)
 
 
-static func racing_line_points(centerline: PackedVector2Array, moments: Dictionary, use_shortcut: bool) -> PackedVector2Array:
+static func racing_line_points(centerline: PackedVector2Array, moments: Dictionary, use_shortcut: bool, half_widths: PackedFloat32Array = PackedFloat32Array()) -> PackedVector2Array:
 	# The final line is assembled from a signed lateral offset per sample: the
 	# apex envelope first, then the shortcut/safe lane override, then a single
 	# arc-rate bound applied to the COMBINED offset. Bounding after the override
 	# is what guarantees the lane lerp cannot reintroduce a steep offset change.
 	var count := centerline.size()
-	var offsets := _apex_signed_offsets(centerline)
+	var offsets := _apex_signed_offsets(centerline, half_widths)
 	var shortcut_index := int(moments.get("shortcut", -1))
 	if shortcut_index >= 0:
 		var inside_sign := float(TrackBuilderCore._shortcut_lane_geometry(centerline, shortcut_index)["inside_sign"])
@@ -167,11 +167,13 @@ static func curvature_apex_line(centerline: PackedVector2Array) -> PackedVector2
 	return _offsets_to_points(centerline, _bounded_lateral_offsets(centerline, _apex_signed_offsets(centerline)))
 
 
-static func _apex_signed_offsets(centerline: PackedVector2Array) -> PackedFloat32Array:
+static func _apex_signed_offsets(centerline: PackedVector2Array, half_widths: PackedFloat32Array = PackedFloat32Array()) -> PackedFloat32Array:
 	# Signed lateral offset from the corner apex/setup envelope, one per sample.
 	# Not yet rate-limited: the caller layers the shortcut/safe override on top
-	# and bounds the combined result.
+	# and bounds the combined result. A wider road scales the envelope with its
+	# local half-width; the inward cut stays under the drivable-radius cap.
 	var count := centerline.size()
+	var variable := half_widths.size() == count
 	var offsets := PackedFloat32Array()
 	offsets.resize(count)
 	if count < TrackBuilderCore.APEX_SAMPLE_SPAN * 2 + 1:
@@ -191,9 +193,10 @@ static func _apex_signed_offsets(centerline: PackedVector2Array) -> PackedFloat3
 			continue
 		var apex_weight := clampf(absf(local_turn) / maxf(absf(strongest_turn), 0.001), 0.0, 1.0)
 		apex_weight = pow(apex_weight, 1.45)
-		var inward_offset := TrackBuilderCore.APEX_MAX_INWARD_OFFSET * severity * apex_weight
+		var width_scale := half_widths[index] / TrackBuilderCore.HALF_WIDTH if variable else 1.0
+		var inward_offset := TrackBuilderCore.APEX_MAX_INWARD_OFFSET * width_scale * severity * apex_weight
 		inward_offset = minf(inward_offset, _driveable_inward_cap(centerline, index))
-		var setup_offset := TrackBuilderCore.APEX_MAX_ENTRY_OFFSET * severity * (1.0 - apex_weight)
+		var setup_offset := TrackBuilderCore.APEX_MAX_ENTRY_OFFSET * width_scale * severity * (1.0 - apex_weight)
 		offsets[index] = signf(strongest_turn) * (inward_offset - setup_offset)
 	return _blend_s_curve_inflections(centerline, offsets)
 
@@ -374,7 +377,7 @@ static func add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: 
 		if TrackBuilderCore._distance_to_centerline(candidate, TrackBuilderCore._sample_centerline(spec["controls"])) < 200.0:
 			continue
 		var texture_path := String(giants[placed % giants.size()])
-		var texture := load(texture_path) as Texture2D
+		var texture := TrackBuilderCore.asset_texture(texture_path)
 		if texture == null:
 			continue
 		var prop := StaticBody2D.new()
@@ -384,7 +387,6 @@ static func add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: 
 		prop.collision_layer = 4
 		TrackBuilderCore._mark_solid_body(prop, texture_path, &"corner_giant")
 		root.add_child(prop)
-		TrackBuilderCore._add_directional_shadow(prop, texture_path, 168.0, 1.0, Vector2(168.0, 168.0), true)
 		var sprite := Sprite2D.new()
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
@@ -396,6 +398,7 @@ static func add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: 
 		sprite.position = -offset
 		TrackBuilderCore._mark_solid_visual(sprite, texture_path, &"corner_giant")
 		prop.add_child(sprite)
+		TrackBuilderCore._add_directional_shadow(sprite, true)
 		placed += 1
 
 
@@ -440,7 +443,7 @@ static func add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Packe
 			cs.shape = shape
 			clip.add_child(cs)
 			TrackBuilderCore._record_shape_probe_points(clip, Vector2.ZERO, shape.size, &"rect")
-			var texture := load("res://assets/textures/imagine/paperclip.png") as Texture2D
+			var texture := TrackBuilderCore.asset_texture("res://assets/textures/imagine/paperclip.png")
 			if texture:
 				var sprite := Sprite2D.new()
 				sprite.texture = texture
@@ -451,5 +454,3 @@ static func add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Packe
 			placed += 1
 		index = (index + 2) % count
 		attempts += 1
-
-

@@ -2,7 +2,7 @@ class_name TrackBuilderScene
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
 
-static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable()) -> void:
+static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), environment_composer: Callable = Callable()) -> void:
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
@@ -29,12 +29,6 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	for piece: PackedVector2Array in clipped_pieces:
 		if piece.size() > clipped.size():
 			clipped = piece
-	if not spec.get("seed_obstacles", false):
-		# Canonical tracks retain their authored painted base. Generated tracks use
-		# the themed TrackSurface directly; a translucent annular overlay produces
-		# visible triangulation fans in deep notches and L-shaped routes.
-		TrackBuilderCore._add_polygon(root, "TrackRibbon", clipped, Color(1.0, 0.96, 0.88, 0.17), -10)
-		TrackBuilderCore._mark_flat_visual(root.get_node("TrackRibbon") as Polygon2D, "", &"track_surface")
 	var track_texture := String(spec.get("track_texture", ""))
 	if not track_texture.is_empty():
 		var same_material := track_texture == floor_texture
@@ -47,7 +41,8 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 			spec.get("track_world_tile_size", Vector2.ZERO),
 			1.0 if same_material else float(spec.get("track_opacity", 0.52)),
 			tint,
-			0.0 if same_material else 0.16
+			0.0 if same_material else 0.16,
+			spec.get("half_widths", PackedFloat32Array())
 		)
 
 	if spec.get("seed_obstacles", false):
@@ -60,21 +55,21 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	var outer_loop := left if absf(TrackBuilderCore._polygon_area(left)) > absf(TrackBuilderCore._polygon_area(right)) else right
 	var inner_loop := left if absf(TrackBuilderCore._polygon_area(left)) < absf(TrackBuilderCore._polygon_area(right)) else right
 	var outer_boundary := outer_loop
-	if spec.get("seed_obstacles", false):
+	if spec.get("seed_obstacles", false) or spec.has("environment_plan"):
 		inner_loop = edges["inner_boundary"] if edges.has("inner_boundary") else TrackBuilderCore._simple_inner_boundary_loop(inner_loop, centerline)
 		outer_boundary = edges["outer_boundary"] if edges.has("outer_boundary") else TrackBuilderCore._simple_boundary_loop(outer_loop, centerline)
 	# Generated centerlines are clearance-validated, so their inner offset is the
 	# authoritative island boundary. Boolean subtraction represents the annular
 	# ribbon as nested outer/hole polygons and can otherwise select the whole room
 	# as a solid collision body.
-	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) else TrackBuilderCore._island_region(room_polygon, clipped, inner_loop)
+	var island_region := inner_loop.duplicate() if spec.get("seed_obstacles", false) or spec.has("environment_plan") else TrackBuilderCore._island_region(room_polygon, clipped, inner_loop)
 	await TrackBuilderCore._build_island_prop(root, spec, island_region, inner_loop, centerline, stage)
 	if stage.is_valid():
 		await stage.call("Placing room edges and checkpoints")
 
 	# Legacy authored tracks keep their fixed room-corner dressing. Generated
 	# tracks choose landmarks from geometry-aware story moments below.
-	if not spec.get("seed_obstacles", false):
+	if not spec.get("seed_obstacles", false) and not spec.has("environment_plan"):
 		TrackBuilderCore._add_corner_set_pieces(root, spec, room_polygon, clipped)
 
 	# Room walls (real furniture edges along the room outline)
@@ -94,6 +89,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	# Checkpoints along the arc, aligned to the tangent. The last lap gate sits
 	# slightly past the corner rejoin so its recovery point stays on a straight.
 	var gate_fractions: Array = spec.get("gate_fractions", [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.84])
+	var half_widths: PackedFloat32Array = spec.get("half_widths", PackedFloat32Array())
 	var arc := TrackBuilderCore._arc_lengths(centerline)
 	var total := arc[arc.size() - 1]
 	var start := centerline[0]
@@ -110,60 +106,71 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		var is_finish := gate_index == 0
 		var name := "Checkpoint0Finish" if is_finish else "Checkpoint%d" % gate_index
 		var span_endpoints := PackedVector2Array()
+		var local_half := TrackWidthProfile.at_point(centerline, half_widths, sample)
 		if spec.get("seed_obstacles", false):
-			span_endpoints = TrackBuilderCore._gate_span_endpoints(sample, tangent, room_polygon, island_region)
+			span_endpoints = TrackBuilderCore._gate_span_endpoints(sample, tangent, room_polygon, island_region, local_half)
 		TrackBuilderCore._add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y), span_endpoints)
 		if spec.get("seed_obstacles", false):
-			TrackBuilderCore._add_gate_posts(root, spec, sample, tangent, gate_index)
+			TrackBuilderCore._add_gate_posts(root, spec, sample, tangent, gate_index, local_half)
 
-	# The checker spans the complete nominal corridor. Each color cell is its own
+	# The checker spans the complete local corridor. Each color cell is its own
 	# simple polygon so disconnected checks never become a self-crossing polygon.
-	TrackBuilderCore._add_finish_checker(root, start, start_tangent)
+	TrackBuilderCore._add_finish_checker(root, start, start_tangent, TrackWidthProfile.at_point(centerline, half_widths, start))
 
 	# Follow the centerline arc rather than extending one start tangent through a
 	# nearby corner. This keeps every grid slot inside the drivable corridor on
 	# technical layouts in both directions.
 	var forward_positions: Array[Vector2] = []
 	var forward_rotations: Array[float] = []
-	for grid_distance: float in [100.0, 220.0]:
+	for grid_distance: float in TrackBuilderNodes.grid_arc_distances(centerline, false, room_polygon, island_region):
 		var grid_sample := TrackBuilderCore._sample_at_arc(centerline, arc, grid_distance)
 		var grid_tangent := TrackBuilderCore._tangent_at_arc(centerline, arc, grid_distance)
 		var grid_normal := grid_tangent.rotated(PI * 0.5)
-		forward_positions.append(grid_sample - grid_normal * 45.0)
-		forward_positions.append(grid_sample + grid_normal * 45.0)
+		forward_positions.append(grid_sample - grid_normal * TrackBuilderCore.GRID_LANE_OFFSET)
+		forward_positions.append(grid_sample + grid_normal * TrackBuilderCore.GRID_LANE_OFFSET)
 		forward_rotations.append(atan2(grid_tangent.x, -grid_tangent.y))
 		forward_rotations.append(atan2(grid_tangent.x, -grid_tangent.y))
 	TrackBuilderCore._add_grid(root, "GridForward", 0.0, forward_positions, forward_rotations)
 	var reverse_positions: Array[Vector2] = []
 	var reverse_rotations: Array[float] = []
-	for grid_distance: float in [45.0, 120.0]:
+	for grid_distance: float in TrackBuilderNodes.grid_arc_distances(centerline, true, room_polygon, island_region):
 		var target_arc := maxf(total - grid_distance, 0.0)
 		var grid_sample := TrackBuilderCore._sample_at_arc(centerline, arc, target_arc)
 		var grid_tangent := TrackBuilderCore._tangent_at_arc(centerline, arc, target_arc)
 		var grid_normal := grid_tangent.rotated(PI * 0.5)
-		reverse_positions.append(grid_sample - grid_normal * 45.0)
-		reverse_positions.append(grid_sample + grid_normal * 45.0)
+		reverse_positions.append(grid_sample - grid_normal * TrackBuilderCore.GRID_LANE_OFFSET)
+		reverse_positions.append(grid_sample + grid_normal * TrackBuilderCore.GRID_LANE_OFFSET)
 		reverse_rotations.append(atan2(-grid_tangent.x, grid_tangent.y))
 		reverse_rotations.append(atan2(-grid_tangent.x, grid_tangent.y))
 	TrackBuilderCore._add_grid(root, "GridReverse", 0.0, reverse_positions, reverse_rotations)
 
 	var generated_moments := {}
 	if spec.get("seed_obstacles", false):
-		generated_moments = TrackBuilderCore._analyze_track_moments(centerline, gate_samples)
+		generated_moments = TrackBuilderCore._analyze_track_moments(centerline, gate_samples, spec)
 
 	# Racing line the AI follows (curvature-offset ideal path, stored invisibly).
 	# Generated AI stays on the safe side of the optional risk shortcut.
-	TrackBuilderCore._build_racing_line(root, centerline, generated_moments)
+	TrackBuilderCore._build_racing_line(root, centerline, generated_moments, half_widths)
 	if stage.is_valid():
 		await stage.call("Building trackside scenery")
 
 	if spec.get("seed_obstacles", false):
-		TrackBuilderCore._build_generated_outer_boundary_visuals(root, spec, centerline, inner_loop, outer_boundary, room_polygon, generated_moments)
-		if stage.is_valid():
-			await stage.call("Placing landmarks")
-		await TrackBuilderCore._compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments, stage)
-		TrackBuilderCore._build_generated_obstacles(root, spec)
 		TrackBuilderCore._seal_pockets(root, spec, centerline, room_polygon)
+		if stage.is_valid():
+			await stage.call("Building trackside scenery")
+		if environment_composer.is_valid():
+			await environment_composer.call(root, stage)
+		elif spec.has("environment_plan"):
+			await WorldEnvironmentArt.compose(root, spec, centerline, stage)
+			TrackBuilderCore._build_generated_obstacles(root, spec)
+		else:
+			TrackBuilderCore._build_generated_outer_boundary_visuals(root, spec, centerline, inner_loop, outer_boundary, room_polygon, generated_moments)
+			if stage.is_valid():
+				await stage.call("Placing landmarks")
+			await TrackBuilderCore._compose_generated_story(root, spec, centerline, inner_loop, outer_loop, room_polygon, gate_samples, generated_moments, stage)
+			TrackBuilderCore._build_generated_obstacles(root, spec)
+	elif spec.has("environment_plan"):
+		await WorldEnvironmentArt.compose(root, spec, centerline, stage)
 	else:
 		# Canonical/static tracks retain their authored legacy dressing.
 		TrackBuilderCore._fill_island(root, spec, inner_loop, centerline)

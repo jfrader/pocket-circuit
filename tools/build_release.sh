@@ -50,26 +50,7 @@ if ! command -v sha256sum >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&
 	exit 1
 fi
 
-run_godot_checked() {
-	local command_log
-	local expected_output="${POCKET_CIRCUIT_EXPECT_OUTPUT:-}"
-	command_log="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-godot.XXXXXX")"
-	if ! "$@" 2>&1 | tee "$command_log"; then
-		rm -f -- "$command_log"
-		return 1
-	fi
-	if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' "$command_log"; then
-		printf 'Godot reported an error despite returning success.\n' >&2
-		rm -f -- "$command_log"
-		return 1
-	fi
-	if [[ -n "$expected_output" ]] && ! grep -Fq -- "$expected_output" "$command_log"; then
-		printf 'Godot did not report the expected success marker: %s\n' "$expected_output" >&2
-		rm -f -- "$command_log"
-		return 1
-	fi
-  rm -f -- "$command_log"
-}
+source "$PROJECT_ROOT/tools/godot_gate.sh"
 
 export GAMESTRUMENTS_ADDON_DIR="${GAMESTRUMENTS_ADDON_DIR:-$PROJECT_ROOT/vendor/gamestruments}"
 printf 'Syncing Gamestruments live engine from %s...\n' "$GAMESTRUMENTS_ADDON_DIR"
@@ -127,17 +108,17 @@ failures_file="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-gate-failures.XXXXXX")"
 # Tests that assert on wall-clock responsiveness stay serial so CPU contention
 # from the parallel workers cannot skew their timings.
 serial_tests=(
+	"tests/ai_seed_sweep_test.gd"
 	"tests/race_start_timing_test.gd"
 	"tests/reset_manager_test.gd"
 	"tests/menu_feedback_test.gd"
+	"tests/track_outer_cut_map_test.gd"
 )
 
 run_test_serial() {
 	local test_relative="$1"
 	printf 'Running %s...\n' "$test_relative"
-	local expected_marker
-	expected_marker="$(python3 "$PROJECT_ROOT/tools/test_success_marker.py" "$PROJECT_ROOT/$test_relative")"
-	if ! POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" run_godot_checked timeout 1200 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative"; then
+	if ! run_godot_test_checked "$PROJECT_ROOT" "$godot_bin" "$test_relative"; then
 		printf '%s\n' "$test_relative" >> "$failures_file"
 	fi
 }
@@ -146,12 +127,11 @@ run_test_serial() {
 # user-data dir, so tests touching user:// save files cannot collide.
 run_test_isolated() {
 	local test_relative="$1"
-	local expected_marker iso_dir log_file
-	expected_marker="$(python3 "$PROJECT_ROOT/tools/test_success_marker.py" "$PROJECT_ROOT/$test_relative")"
+	local iso_dir log_file
 	iso_dir="$(mktemp -d "${TMPDIR:-/tmp}/pc-test-userdata.XXXXXX")"
 	log_file="$(mktemp "${TMPDIR:-/tmp}/pc-test-log.XXXXXX")"
 	local status=0
-	if POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" XDG_DATA_HOME="$iso_dir" run_godot_checked timeout 1200 "$godot_bin" --path "$PROJECT_ROOT" --headless --script "res://$test_relative" >"$log_file" 2>&1; then
+	if XDG_DATA_HOME="$iso_dir" run_godot_test_checked "$PROJECT_ROOT" "$godot_bin" "$test_relative" >"$log_file" 2>&1; then
 		status=0
 	else
 		status=1
@@ -185,9 +165,11 @@ for test_path in "${tests[@]}"; do
 done
 
 export PROJECT_ROOT godot_bin failures_file
-export -f run_godot_checked run_test_isolated
+export -f run_godot_checked run_godot_test_checked run_test_isolated
 
-gate_parallelism="${PC_GATE_PARALLELISM:-6}"
+# Default 4 (not 6) on an 8-core shared host so the longest serial and parallel
+# tests still have CPU headroom under load; PC_GATE_PARALLELISM overrides.
+gate_parallelism="${PC_GATE_PARALLELISM:-4}"
 if (( ${#parallel_tests[@]} > 0 )); then
 	printf 'Running %d gate tests with parallelism %s...\n' "${#parallel_tests[@]}" "$gate_parallelism"
 	# xargs returns 123 when a worker fails; failures are tracked via

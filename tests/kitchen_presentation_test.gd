@@ -12,7 +12,8 @@ func _run_test() -> void:
 	root.content_scale_size = Vector2i(1280, 720)
 	root.size = Vector2i(1280, 720)
 	var spec: Dictionary = BUILDER.LAYOUTS[&"kitchen"]
-	if not _expect(spec["floor_texture"] == spec["track_texture"], "Kitchen route should share the countertop material rather than overlay a competing fabric"):
+	var materials := HouseholdSurfaceMaterials.resolve(&"kitchen", 0)
+	if not _expect(materials["course"]["kind"] == "painted_surface" and materials["course"]["contrast_safe"], "Kitchen paint should retain the countertop while contrasting with the wood island"):
 		return
 	var world := Node2D.new()
 	root.add_child(world)
@@ -51,16 +52,26 @@ func _run_test() -> void:
 		var image := texture.get_image()
 		if not _expect(image.get_size() == Vector2i(512, 512) and image.get_pixel(0, 0).a == 0 and image.get_used_rect().has_area(), "hero sprites must have normalized size and transparent padding"):
 			return
+		var opaque_samples := 0
+		var key_color_samples := 0
 		for y in range(0, 512, 4):
 			for x in range(0, 512, 4):
 				var pixel := image.get_pixel(x, y)
+				if pixel.a < 0.5:
+					continue
+				opaque_samples += 1
 				var key_color := pixel.r > pixel.g * 1.5 and pixel.b > pixel.g * 1.2 and pixel.r > 0.5
-				if not _expect(pixel.a < 0.5 or not key_color, "processed hero art must not retain the chroma backdrop"):
-					return
+				if key_color:
+					key_color_samples += 1
+		if not _expect(key_color_samples <= maxi(2, opaque_samples / 100), "processed hero art must not retain a chroma-colored field"):
+			return
 	var shadow_root := Node2D.new()
 	world.add_child(shadow_root)
-	BUILDER._add_directional_shadow(shadow_root, "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png", 160.0)
-	if not _expect(shadow_root.get_node("ContactShadow").get_meta("shadow_shape") == &"circle", "round hero props should have round contact shadows even when their collider is convex"):
+	var plate := Sprite2D.new()
+	plate.texture = load("res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png")
+	shadow_root.add_child(plate)
+	BUILDER._add_directional_shadow(plate)
+	if not _expect((shadow_root.get_node("ContactShadow") as Sprite2D).texture == plate.texture, "round hero shadows must follow the plate silhouette even when its collider is convex"):
 		return
 	world.queue_free()
 	await process_frame

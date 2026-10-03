@@ -29,9 +29,11 @@ SOFTWARE.
 ## Procedural 2D
 
 Pocket Circuit includes adapted generator, renderer, and catalog source from
-the first-party Gurisitos Games Procedural 2D project, pinned to revision
-`9fc832c9638471739a61aeac1e84fe44408212f5` and distributed under the MIT
-License.
+the first-party Gurisitos Games Procedural 2D project, distributed under the MIT
+License. Portrait artwork follows the front-facing redraw at revision
+`c341efaccefd9c9e530a24282ed1957494e54b0a`; remaining vendored generator and
+catalog source stays at revision
+`9fc832c9638471739a61aeac1e84fe44408212f5`.
 
 Copyright (c) 2026 Gurisitos Games
 

@@ -4,6 +4,8 @@ extends SceneTree
 const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 const PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
+const WIDTH_PROFILE := preload("res://scripts/race/track_width_profile.gd")
+const CHAMPIONSHIP := preload("res://scripts/progression/championship_circuit_identity.gd")
 const FIXTURE_SEED := 246810
 
 
@@ -19,7 +21,7 @@ func _run_test() -> void:
 		return
 	if not _expect((identity["fingerprints"] as Dictionary).keys().size() == IDENTITIES.DOMAINS.size() + 1, "every domain and the complete circuit should have fingerprints"):
 		return
-	if not _expect(identity["sub_seeds"] == {"route": 246810, "room_composition": 1821677131, "material": 1916693968, "dressing": 493555838, "obstacle": 328509393, "hazard": 1746009985} and String(identity["fingerprint"]) == "b5db6a754498b5d1" and String(identity["display_name"]) == "Clockwork Clamp Circuit" and String(identity["material_id"]) == "workshop_oiled" and String(identity["palette_id"]) == "oiled_espresso", "the v7 fixture identity, fingerprint, and every domain sub-seed should stay regression-pinned"):
+	if not _expect(identity["sub_seeds"] == {"route": 246810, "room_composition": 1821677131, "material": 1916693968, "dressing": 493555838, "obstacle": 328509393, "hazard": 1746009985} and int(identity["generator_version"]) == 12 and String(identity["fingerprint"]) == "7b463a6cf5b3b673" and String(identity["display_name"]) == "Clockwork Clamp Circuit" and String(identity["material_id"]) == "workshop_oiled" and String(identity["palette_id"]) == "oiled_espresso", "the v12 fixture identity, fingerprint, and every domain sub-seed should stay regression-pinned"):
 		return
 	for domain: String in IDENTITIES.DOMAINS:
 		if not _expect(String(identity["fingerprints"][domain]).length() == 16, "%s should have a stable inspectable fingerprint" % domain):
@@ -59,7 +61,7 @@ func _run_test() -> void:
 	var payload_result := IDENTITIES._base32_decode(compact.substr(3))
 	var payload: PackedByteArray = payload_result["bytes"]
 	var body := payload.slice(0, payload.size() - 4)
-	body[0] = 9
+	body[0] = IDENTITIES.GENERATOR_VERSION + 1
 	var unsupported_payload := body.duplicate()
 	unsupported_payload.append_array(IDENTITIES._checksum(body))
 	var generator_code := "PC1" + IDENTITIES._base32_encode(unsupported_payload)
@@ -68,12 +70,17 @@ func _run_test() -> void:
 		return
 
 	var previous_body := payload.slice(0, payload.size() - 4)
-	previous_body[0] = 6
+	previous_body[0] = 10
 	var previous_payload := previous_body.duplicate()
 	previous_payload.append_array(IDENTITIES._checksum(previous_body))
 	var previous_code := "PC1" + IDENTITIES._base32_encode(previous_payload)
 	var previous_result := IDENTITIES.decode_share_code(previous_code)
 	if not _expect(not bool(previous_result.get("ok", false)) and previous_result.get("kind") == "unsupported_generator", "the previous generator version should be rejected honestly as unsupported"):
+		return
+	var previous_identity := identity.duplicate(true)
+	previous_identity["generator_version"] = 10
+	previous_identity["fingerprint"] = "d5c1e98f1fe83f24"
+	if not _expect(IDENTITIES.normalize(previous_identity).is_empty(), "a version-10 identity must not match a revised physical layout"):
 		return
 
 	var bad_tier_body := payload.slice(0, payload.size() - 4)
@@ -94,12 +101,27 @@ func _run_test() -> void:
 		return
 
 	var preview := PREVIEW.prepare(identity)
+	var route := TRACK_BUILDER.prepare_route(&"workshop", &"wide", FIXTURE_SEED, IDENTITIES.generation_options(identity))
 	var prepared := TRACK_BUILDER.prepare_layout(&"workshop", &"wide", FIXTURE_SEED, IDENTITIES.generation_options(identity))
-	if not _expect(not preview.is_empty() and String(preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(identity, prepared), "preview and loaded preparation should resolve to the same fingerprint"):
+	if not _expect(not route.is_empty() and not prepared.is_empty() and not preview.is_empty() and String(preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(identity, prepared) and String(preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(identity, route), "preview and both preparation stages should resolve to the same fingerprint"):
 		return
-	if not _expect(String(prepared["spec"]["story_id"]) == String(identity["story_id"]) and int(prepared["spec"]["material_seed"]) == int(identity["sub_seeds"]["material"]) and int(prepared["spec"]["dressing_seed"]) == int(identity["sub_seeds"]["dressing"]) and int(prepared["spec"]["obstacle_seed"]) == int(identity["sub_seeds"]["obstacle"]) and int(prepared["spec"]["hazard_seed"]) == int(identity["sub_seeds"]["hazard"]), "route preparation should consume every composition seed in its matching domain"):
+	if not _expect(route["centerline"] == prepared["centerline"] and route["edges"] == prepared["edges"] and route["room_polygon"] == prepared["room_polygon"] and route["seed"] == prepared["seed"] and route["racing_line_metrics"] == prepared["racing_line_metrics"], "route and full preparation should share the same geometry, resolved seed, and racing-line metrics"):
 		return
-	if not _expect(bool(preview["hazard_present"]) == bool(identity["danger_profile"]["hazard_present"]) and int(preview["obstacle_count"]) <= int(identity["danger_profile"]["obstacle_count"]), "the summary danger profile should bound the deterministic prepared obstacle plan and match its hazard exactly"):
+	var route_spec: Dictionary = route["spec"]
+	var full_spec: Dictionary = prepared["spec"]
+	for key: String in ["controls", "requested_seed", "generation_attempt", "generation_fallback", "family", "route_program", "route_recipe", "route_sequence", "story_id", "story_kit", "material_seed", "dressing_seed", "obstacle_seed", "obstacle_plan", "material_id", "palette_id"]:
+		if not _expect(route_spec.get(key) == full_spec.get(key), "%s should agree between route and full preparation" % key):
+			return
+	if not _expect(not route_spec.has("environment_plan") and not route_spec.has("environment_assets") and not route_spec.has("surface_identity") and full_spec.has("environment_plan") and full_spec.has("surface_identity"), "route preparation should expose identity and obstacles without requiring a physical environment plan"):
+		return
+	if not _expect(String(preview["story_id"]) == String(route_spec["story_id"]) and int(preview["obstacle_count"]) == (route_spec["obstacle_plan"] as Array).size() and not (preview["points"] as PackedVector2Array).is_empty(), "preview should expose the shared route's story, obstacles, and drawable points"):
+		return
+	var reverse_preview := PREVIEW.prepare(reverse)
+	if not _expect(not reverse_preview.is_empty() and String(reverse_preview["loaded_fingerprint"]) == PREVIEW.fingerprint_for_prepared(reverse, prepared) and reverse_preview["points"] != preview["points"] and reverse_preview["story_id"] == preview["story_id"] and reverse_preview["obstacle_count"] == preview["obstacle_count"], "reverse preview should keep the route composition while reversing its drawn traversal"):
+		return
+	if not _expect(String(prepared["spec"]["story_id"]) == String(identity["story_id"]) and int(prepared["spec"]["material_seed"]) == int(identity["sub_seeds"]["material"]) and int(prepared["spec"]["dressing_seed"]) == int(identity["sub_seeds"]["dressing"]) and int(prepared["spec"]["obstacle_seed"]) == int(identity["sub_seeds"]["obstacle"]), "route preparation should consume every composition seed in its matching domain"):
+		return
+	if not _expect(int(preview["obstacle_count"]) <= int(identity["danger_profile"]["obstacle_count"]), "the summary danger profile should bound the deterministic prepared obstacle plan"):
 		return
 	var inconsistent_room_seed := int(identity["sub_seeds"]["room_composition"]) + 1
 	if not _expect(IDENTITIES.create(&"workshop", &"wide", FIXTURE_SEED, false, 2, "", "", {"room_composition": inconsistent_room_seed}).is_empty(), "room-composition overrides must be rejected when their selected room disagrees with the encoded room"):
@@ -150,6 +172,45 @@ func _run_test() -> void:
 	missing_tier.erase("length_tier")
 	missing_tier.erase("fingerprint")
 	if not _expect(String(IDENTITIES.normalize(missing_tier)["length_tier"]) == "standard", "a current-version identity missing a length profile should default to standard"):
+		return
+
+	var missing_road := identity.duplicate(true)
+	missing_road.erase("road_width")
+	missing_road.erase("fingerprint")
+	if not _expect(String(IDENTITIES.normalize(missing_road)["road_width"]) == String(WIDTH_PROFILE.MODE_FLAT), "a current-version identity missing road_width should default to flat"):
+		return
+
+	# road-width option through identity and share codes (v12)
+	var flat_id := IDENTITIES.create(&"workshop", &"wide", FIXTURE_SEED, false, 2, "", "", {}, "standard", WIDTH_PROFILE.MODE_FLAT)
+	if not _expect(String(flat_id.get("road_width", "")) == String(WIDTH_PROFILE.MODE_FLAT), "explicit flat should round-trip in identity"):
+		return
+	var seeded_id := IDENTITIES.create(&"workshop", &"wide", FIXTURE_SEED, false, 2, "", "", {}, "standard", WIDTH_PROFILE.MODE_SEEDED)
+	if not _expect(String(seeded_id.get("road_width", "")) == String(WIDTH_PROFILE.MODE_SEEDED) and String(seeded_id["fingerprint"]) != String(flat_id["fingerprint"]), "seeded road width must be stored distinctly and change the circuit fingerprint"):
+		return
+	var seeded_code := IDENTITIES.encode_share_code(seeded_id)
+	if not _expect(bool(seeded_code.get("ok", false)), "seeded identity must encode"):
+		return
+	var decoded_seeded := IDENTITIES.decode_share_code(String(seeded_code["code"]))
+	if not _expect(bool(decoded_seeded.get("ok", false)) and decoded_seeded.get("identity", {}) == seeded_id and String(decoded_seeded["identity"]["road_width"]) == String(WIDTH_PROFILE.MODE_SEEDED), "a v12 code carrying road_width must round-trip the mode exactly"):
+		return
+
+	# version mismatch path still works (old codes rejected on generator)
+	var v11_body := (IDENTITIES._base32_decode(String(seeded_code["code"]).replace("PC1", "").replace("-", ""))["bytes"] as PackedByteArray).slice(0, -4)
+	v11_body[0] = 11
+	var v11_payload := v11_body.duplicate()
+	v11_payload.append_array(IDENTITIES._checksum(v11_body))
+	var v11_code := "PC1" + IDENTITIES._base32_encode(v11_payload)
+	var v11_res := IDENTITIES.decode_share_code(v11_code)
+	if not _expect(not bool(v11_res.get("ok", false)) and v11_res.get("kind") == "unsupported_generator", "a v11 code must still be rejected as unsupported_generator after the v12 bump"):
+		return
+
+	# The championship conversion must carry the width mode and length tier through.
+	var championship := CHAMPIONSHIP.create_championship(FIXTURE_SEED)
+	var event_identity: Dictionary = (championship["events"] as Dictionary)["kitchen_crumb_rush"].duplicate(true)
+	event_identity["road_width"] = WIDTH_PROFILE.MODE_SEEDED
+	event_identity["length_tier"] = "long"
+	var converted := IDENTITIES.from_championship_event({"theme": "kitchen", "room": String(event_identity["room"]), "act": 1}, event_identity)
+	if not _expect(String(converted.get("road_width", "")) == String(WIDTH_PROFILE.MODE_SEEDED) and String(converted.get("length_tier", "")) == "long", "championship conversion must carry road_width and length_tier through"):
 		return
 
 	print("GENERATED_CIRCUIT_IDENTITY_TEST PASS")

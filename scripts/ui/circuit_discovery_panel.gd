@@ -7,10 +7,6 @@ const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const PREVIEW_CONTROL := preload("res://scripts/ui/circuit_preview_control.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
-const AMBER := Color("f4c65a")
-const CORAL := Color("e85a2e")
-const CREAM := Color("fff8e8")
-const MUTED := Color("aeb7c8")
 
 var _app: Node
 var _mode := "browser"
@@ -40,9 +36,8 @@ func show_browser() -> void:
 	_preview.clear()
 	_generation += 1
 	_clear()
-	_add_label("CIRCUIT DISCOVERY", 15, AMBER)
-	_add_label("Share an offline circuit", 34, CREAM)
-	_add_label("Import never changes championship progress, mastery records, or ghosts.", 15, MUTED)
+	_add_kicker("CIRCUIT DISCOVERY")
+	_add_label("Share an offline circuit", 34, SKIN.CREAM, true)
 	var code_edit := LineEdit.new()
 	code_edit.name = "DiscoveryCode"
 	code_edit.placeholder_text = "PC1-…"
@@ -53,7 +48,7 @@ func show_browser() -> void:
 	add_child(code_edit)
 	var import_button := _button("PREVIEW CODE", _import_code.bind(code_edit), true, "DiscoveryImport")
 	code_edit.text_submitted.connect(func(_text: String) -> void: _import_code(code_edit))
-	_status = _add_label("Codes are checked before any circuit is prepared.", 14, MUTED)
+	_status = _add_label("Paste a share code.", 14, SKIN.CREAM_DIM)
 	var library: Dictionary = _app.call("get_circuit_library")
 	_add_library_section("FAVORITES", library.get("favorites", []), 2)
 	_add_library_section("RECENT", library.get("history", []), 2)
@@ -74,9 +69,9 @@ func show_confirmation(identity_value: Dictionary) -> void:
 	_generation += 1
 	var generation := _generation
 	_clear()
-	_add_label("OFFLINE CIRCUIT PREVIEW", 15, AMBER)
-	_add_label(String(_identity.get("display_name", "Generated Circuit")), 32, CREAM)
-	var summary := _add_label(String(_identity.get("summary", "")), 15, MUTED)
+	_add_kicker("OFFLINE CIRCUIT PREVIEW")
+	_add_label(String(_identity.get("display_name", "Generated Circuit")), 32, SKIN.CREAM, true)
+	var summary := _add_label(String(_identity.get("summary", "")), 15, SKIN.CREAM_DIM)
 	summary.custom_minimum_size = Vector2(0.0, 58.0)
 	_size_selector = _add_size_selector()
 	_preview_control = PREVIEW_CONTROL.new() as CircuitPreviewControl
@@ -100,7 +95,7 @@ func show_confirmation(identity_value: Dictionary) -> void:
 			_is_favorite = true
 			break
 	_favorite_button = _button("REMOVE FAVORITE" if _is_favorite else "ADD FAVORITE", _toggle_favorite, false, "DiscoveryFavorite")
-	_favorite_status = _add_label("", 13, MUTED)
+	_favorite_status = _add_label("", 13, SKIN.CREAM_DIM)
 	_favorite_status.name = "DiscoveryFavoriteStatus"
 	if _app.has_method("is_save_read_only") and bool(_app.call("is_save_read_only")):
 		_favorite_button.disabled = true
@@ -202,7 +197,7 @@ func _import_code(code_edit: LineEdit) -> void:
 	var result: Dictionary = _app.call("decode_circuit_share_code", code_edit.text)
 	if not bool(result.get("ok", false)):
 		_status.text = String(result.get("error", "This share code could not be read."))
-		_status.add_theme_color_override("font_color", CORAL)
+		_status.add_theme_color_override("font_color", SKIN.ORANGE)
 		code_edit.grab_focus()
 		return
 	show_confirmation(result["identity"])
@@ -210,9 +205,9 @@ func _import_code(code_edit: LineEdit) -> void:
 
 func _add_library_section(title: String, entries_value: Variant, count: int) -> void:
 	var entries: Array = entries_value if entries_value is Array else []
-	_add_label(title, 14, AMBER)
+	_add_label(title, 14, SKIN.YELLOW, true)
 	if entries.is_empty():
-		_add_label("NONE YET", 13, MUTED)
+		_add_label("NONE YET", 13, SKIN.CREAM_DIM)
 		return
 	for index in mini(count, entries.size()):
 		var identity: Dictionary = entries[index]
@@ -234,9 +229,9 @@ func _show_library(title: String, entries: Array, page: int) -> void:
 	var page_size := 6
 	var page_count := maxi(1, ceili(float(entries.size()) / float(page_size)))
 	var current_page := clampi(page, 0, page_count - 1)
-	_add_label("CIRCUIT DISCOVERY · %s" % title, 15, AMBER)
-	_add_label("Saved circuits", 34, CREAM)
-	_add_label("PAGE %d OF %d" % [current_page + 1, page_count], 14, MUTED)
+	_add_kicker("CIRCUIT DISCOVERY · %s" % title)
+	_add_label("Saved circuits", 34, SKIN.CREAM, true)
+	_add_label("PAGE %d OF %d" % [current_page + 1, page_count], 14, SKIN.CREAM_DIM, true)
 	var focusables: Array[Control] = []
 	var start := current_page * page_size
 	for index in range(start, mini(entries.size(), start + page_size)):
@@ -278,7 +273,7 @@ func _toggle_favorite() -> void:
 
 func _set_favorite_error(message: String) -> void:
 	_favorite_status.text = message
-	_favorite_status.add_theme_color_override("font_color", CORAL)
+	_favorite_status.add_theme_color_override("font_color", SKIN.ORANGE)
 
 
 func _launch() -> void:
@@ -308,14 +303,19 @@ func _button(text: String, callback: Callable, primary: bool, node_name: String)
 	return button
 
 
-func _add_label(text: String, font_size: int, color: Color) -> Label:
+func _add_label(text: String, font_size: int, color: Color, display: bool = false) -> Label:
 	var label := Label.new()
 	label.text = text
-	label.add_theme_font_size_override("font_size", font_size)
-	label.add_theme_color_override("font_color", color)
+	SKIN.style_label(label, font_size, color, display)
 	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	add_child(label)
 	return label
+
+
+func _add_kicker(text: String) -> void:
+	var label := Label.new()
+	label.text = text
+	add_child(SKIN.style_tape(label, SKIN.YELLOW, 15))
 
 
 func _wire_vertical(controls: Array[Control]) -> void:

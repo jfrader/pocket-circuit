@@ -26,7 +26,7 @@ func _run() -> void:
 	var track := (load(scene_path) as PackedScene).instantiate() as Node2D
 	root.add_child(track)
 
-	var ribbon := track.get_node_or_null("TrackRibbon") as Polygon2D
+	var ribbon := track.get_node_or_null("TrackSurface") as Line2D
 	var barrier := track.get_node_or_null("InnerBarrier") as StaticBody2D
 	var finish := track.get_node_or_null("Checkpoint0Finish") as Area2D
 	var white := track.get_node_or_null("StartFinishWhite") as Polygon2D
@@ -55,7 +55,7 @@ func _run() -> void:
 					var marker_node := marker as Node2D
 					if marker_node == null:
 						continue
-					_check(Geometry2D.is_point_in_polygon(marker_node.position, ribbon.polygon), "%s marker %s is inside the painted track" % [container_name, marker.name])
+					_check(_inside_course(marker_node.position, ribbon), "%s marker %s is inside the painted track" % [container_name, marker.name])
 					if barrier != null:
 						_check(not Geometry2D.is_point_in_polygon(marker_node.position, barrier_collision_polygon(barrier)), "%s marker %s stays outside the inner barrier" % [container_name, marker.name])
 					var clearance := _clearance_from_colliders(track, marker_node.position)
@@ -68,27 +68,30 @@ func _run() -> void:
 				continue
 			var corners := _gate_corners(gate)
 			var center := gate.position
-			_check(Geometry2D.is_point_in_polygon(center, ribbon.polygon), "%s sits on the painted track" % gate_name)
-			var span: float = maxf(corners["max_x"] - corners["min_x"], corners["max_y"] - corners["min_y"])
+			_check(_inside_course(center, ribbon), "%s sits on the painted track" % gate_name)
+			var gate_size := ((gate.get_node("CollisionShape2D") as CollisionShape2D).shape as RectangleShape2D).size
+			var span := maxf(gate_size.x, gate_size.y)
 			var min_span := 272.0 if gate_name == "Checkpoint0Finish" else 250.0
 			_check(span >= min_span, "%s spans the corridor (%.0f)" % [gate_name, span])
 
 	var obstacles := _obstacle_bodies(track)
-	_check(obstacles.size() >= 11, "eleven named obstacles present")
+	_check(obstacles.size() >= 11, "at least eleven physical scenery objects present")
 	for first in obstacles.size():
 		for second in range(first + 1, obstacles.size()):
-			var distance := obstacles[first].position.distance_to(obstacles[second].position)
-			var min_gap := _obstacle_radius(obstacles[first]) + _obstacle_radius(obstacles[second]) + 12.0
-			_check(distance >= min_gap, "obstacles %s and %s do not overlap (%.0f < %.0f)" % [obstacles[first].name, obstacles[second].name, distance, min_gap])
+			var a := TrackBuilderBoundary._footprint_polygon(obstacles[first].global_position, obstacles[first].get_meta("physical_dimensions_mm"), obstacles[first].global_rotation)
+			var b := TrackBuilderBoundary._footprint_polygon(obstacles[second].global_position, obstacles[second].get_meta("physical_dimensions_mm"), obstacles[second].global_rotation)
+			_check(Geometry2D.intersect_polygons(a,b).is_empty(), "physical scenery %s and %s must not overlap" % [obstacles[first].name, obstacles[second].name])
 
 	if white != null and finish != null:
-		var gate_corners := _gate_corners(finish)
-		var strip_corners := _polygon_bounds(white.polygon)
-		_check(
-			strip_corners["max_x"] >= gate_corners["max_x"] - 5.0
-			and strip_corners["min_x"] <= gate_corners["min_x"] + 5.0,
-			"checker strip covers the finish gate width"
-		)
+		var minimum := INF
+		var maximum := -INF
+		for cell: Node in track.get_children():
+			if cell is Polygon2D and String(cell.name).begins_with("StartFinish"):
+				for point: Vector2 in cell.polygon:
+					var across := finish.to_local(cell.to_global(point)).y
+					minimum = minf(minimum, across)
+					maximum = maxf(maximum, across)
+		_check(maximum - minimum >= TrackBuilderCore.HALF_WIDTH * 2.0 - 2.0, "checker cells collectively cover the complete corridor")
 
 	# Walls cover the room perimeter
 	for wall_name: String in ["Wall0", "Wall1", "Wall2", "Wall3"]:
@@ -103,6 +106,11 @@ func _run() -> void:
 	for failure: String in _failures:
 		push_error("TRACK_LAYOUT_QA FAIL: " + failure)
 	quit(1)
+
+
+func _inside_course(point: Vector2, surface: Line2D) -> bool:
+	var closest := TrackBuilderCore._closest_point_on_loop(point, surface.points)
+	return point.distance_to(closest["position"]) <= surface.width * 0.5
 
 
 func barrier_collision_polygon(barrier: StaticBody2D) -> PackedVector2Array:
@@ -170,11 +178,9 @@ func _nearest_collider(track: Node2D, point: Vector2) -> String:
 
 func _obstacle_bodies(track: Node2D) -> Array[StaticBody2D]:
 	var bodies: Array[StaticBody2D] = []
-	var names := ["MugA", "MugB", "CerealA", "CerealB", "Sponge", "Fork", "Ruler", "Apple", "Lime", "Cup", "Spoon"]
-	for obstacle_name: String in names:
-		var obstacle := track.get_node_or_null(obstacle_name) as StaticBody2D
-		if obstacle:
-			bodies.append(obstacle)
+	for obstacle: Node in track.find_children("*", "StaticBody2D", true, false):
+		if obstacle.has_meta("environment_asset_id"):
+			bodies.append(obstacle as StaticBody2D)
 	return bodies
 
 
