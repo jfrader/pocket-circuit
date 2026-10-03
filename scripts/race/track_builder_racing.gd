@@ -49,7 +49,7 @@ static func fill_island(root: Node2D, spec: Dictionary, inner_loop: PackedVector
 		if bool(entry.get("decal", false)):
 			var sprite := Sprite2D.new()
 			sprite.name = "VignetteDecal"
-			sprite.texture = load(texture_path) as Texture2D
+			sprite.texture = TrackBuilderCore.asset_texture(texture_path)
 			if sprite.texture == null:
 				sprite.free()
 				continue
@@ -377,7 +377,7 @@ static func add_corner_set_pieces(root: Node2D, spec: Dictionary, room_polygon: 
 		if TrackBuilderCore._distance_to_centerline(candidate, TrackBuilderCore._sample_centerline(spec["controls"])) < 200.0:
 			continue
 		var texture_path := String(giants[placed % giants.size()])
-		var texture := load(texture_path) as Texture2D
+		var texture := TrackBuilderCore.asset_texture(texture_path)
 		if texture == null:
 			continue
 		var prop := StaticBody2D.new()
@@ -443,7 +443,7 @@ static func add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Packe
 			cs.shape = shape
 			clip.add_child(cs)
 			TrackBuilderCore._record_shape_probe_points(clip, Vector2.ZERO, shape.size, &"rect")
-			var texture := load("res://assets/textures/imagine/paperclip.png") as Texture2D
+			var texture := TrackBuilderCore.asset_texture("res://assets/textures/imagine/paperclip.png")
 			if texture:
 				var sprite := Sprite2D.new()
 				sprite.texture = texture
@@ -454,4 +454,3 @@ static func add_paperclip_line(root: Node2D, spec: Dictionary, centerline: Packe
 			placed += 1
 		index = (index + 2) % count
 		attempts += 1
-

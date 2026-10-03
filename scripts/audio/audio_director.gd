@@ -43,6 +43,7 @@ var _engine_voice: EngineSoundPlayer
 ## Continuous tyre scrub for the local car, driven by its slip angle.
 var _local_tyre_player: AudioStreamPlayer
 var _local_tyre_level := 0.0
+var _tyre_state: Dictionary = {}
 ## Positional WAV-loop voices for AI and remote cars. The local car alone keeps
 ## the per-sample generator above.
 var _positional_tyre_emitters: Array[Node] = []
@@ -111,6 +112,19 @@ func _exit_tree() -> void:
 			player.stream = null
 	_local_vehicle = null
 	_engine_loop = null
+	# Godot only retires a stopped playback on a later audio mix, and shutdown
+	# stops the audio driver after this teardown. Wait (bounded) for the mixer to
+	# process the stops above so the engine voice and the other players do not
+	# outlive the audio server (godot#76745).
+	var deadline := Time.get_ticks_msec() + 500
+	var last := AudioServer.get_time_since_last_mix()
+	var mixes := 0
+	while mixes < 2 and Time.get_ticks_msec() < deadline:
+		OS.delay_msec(2)
+		var current := AudioServer.get_time_since_last_mix()
+		if current < last:
+			mixes += 1
+		last = current
 
 func ensure_buses() -> void:
 	_ensure_bus(&"Music")
@@ -194,6 +208,8 @@ func set_local_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 	var vehicle_stats: Variant = vehicle.get("stats")
 	if vehicle_stats is Object:
 		_vehicle_max_speed = maxf(1.0, float((vehicle_stats as Object).get("max_speed")))
+	if _headless:
+		return
 	if vehicle_stats is VehicleStats:
 		_prepare_vehicle_sfx(vehicle_stats, vehicle_id)
 	if not _prepare_engine_voice(vehicle, vehicle_id) and not _headless and not _engine_player.playing:
@@ -366,6 +382,12 @@ func get_live_section() -> String:
 func get_sfx_player_count() -> int:
 	return _sfx_players.size()
 
+## How long a section must play before another may replace it. Exposed so callers
+## and tests can reason about the music's settling time without duplicating it.
+func get_live_section_dwell() -> float:
+	return LiveMusic.SECTION_CHANGE_DWELL
+
+
 func set_live_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result: String = "") -> void:
 	_live.set_race_state(phase, intensity, pressure, final_lap, finish_result)
 
@@ -509,7 +531,7 @@ func _update_drift(_delta: float) -> void:
 		if is_instance_valid(_engine_voice):
 			_engine_voice.set_duck_db(0.0)
 		return
-	var tyre_state: Dictionary = _local_vehicle.call("get_tyre_state")
+	var tyre_state := _read_tyre_state(_local_vehicle)
 	_drive_local_tyre(tyre_state, maxf(0.0, float(_local_vehicle.get("speed"))), _delta)
 	if is_instance_valid(_engine_voice):
 		var duck := ENGINE_SLIDE_DUCK_DB * clampf(_local_tyre_level / TYRE_LEVEL_CEILING, 0.0, 1.0)
@@ -572,7 +594,7 @@ func _update_positional_tyres() -> void:
 		if not is_instance_valid(vehicle) or not vehicle.has_method("get_tyre_state"):
 			emitter.stop()
 			continue
-		var tyre_state: Dictionary = vehicle.call("get_tyre_state")
+		var tyre_state := _read_tyre_state(vehicle)
 		var profile: Dictionary = TyreSurfaceProfilesScript.profile_for(tyre_state["surface"])
 		emitter.set_stream(_tyre_loop_for(profile))
 		var screech := clampf(float(tyre_state["screech"]), 0.0, 1.0)
@@ -582,6 +604,14 @@ func _update_positional_tyres() -> void:
 		var level := _tyre_target_level(tyre_state)
 		var pitch := 0.70 + speed_ratio * 0.08 + screech * 0.06
 		emitter.update_voice(listener_position, level, pitch, not _race_paused)
+
+
+func _read_tyre_state(vehicle: Node) -> Dictionary:
+	# Test doubles retain the snapshot API; real vehicles fill our reusable buffer.
+	if vehicle.has_method("write_tyre_state"):
+		vehicle.call("write_tyre_state", _tyre_state)
+		return _tyre_state
+	return vehicle.call("get_tyre_state")
 
 
 func _tyre_loop_for(profile: Dictionary) -> AudioStreamWAV:
@@ -693,14 +723,14 @@ func warm_vehicle_audio(vehicle_id: String, progress: Callable = Callable()) -> 
 	if stats == null:
 		return false
 	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
-	var warmed := EngineVoiceGenerator.generate_cached(recipe) != null
+	var voice := await EngineVoiceGenerator.prepare_cached(recipe, progress)
 	if progress.is_valid():
 		await progress.call()
 	EngineLoopGeneratorScript.generate_cached(recipe)
 	if progress.is_valid():
 		await progress.call()
 	_prepare_vehicle_sfx(stats, vehicle_id)
-	return warmed
+	return voice != null
 
 
 func get_engine_voice_signature() -> String:

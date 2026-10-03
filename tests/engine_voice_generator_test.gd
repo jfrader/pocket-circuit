@@ -66,9 +66,12 @@ func _check_content(voice: EngineVoice) -> PackedStringArray:
 
 func _check_determinism(recipe: EngineRecipe, first: EngineVoice) -> PackedStringArray:
 	var errors := PackedStringArray()
-	var second := EngineVoiceGenerator.new().generate(recipe)
+	var generator := EngineVoiceGenerator.new()
+	var second := generator.generate(recipe)
 	errors.append_array(_expect(_digest(first) == _digest(second), "same recipe must generate an identical bank"))
 	errors.append_array(_expect(first.signature == second.signature, "same recipe must produce the same signature"))
+	var reused := generator.generate(recipe)
+	errors.append_array(_expect(_digest(second) == _digest(reused), "reusing a generator must reset its band and runner state"))
 	return errors
 
 

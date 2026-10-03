@@ -40,6 +40,9 @@ const TOGGLE_ICONS := {
 
 static var _svg_cache: Dictionary = {}
 static var _flat_cache: Dictionary = {}
+const MAX_SKIN_CACHE_ENTRIES := 384
+static var _svg_order: Array[String] = []
+static var _flat_order: Array[String] = []
 static var _display_font: FontVariation
 static var _lamp_pool: GradientTexture2D
 static var _column_shade: GradientTexture2D
@@ -423,6 +426,7 @@ static func _flat(fill: Color, border: Color, radius: int, border_width: int) ->
 		style.set_corner_radius_all(radius)
 		style.anti_aliasing = true
 		_flat_cache[key] = style
+		_evict_skin_cache(_flat_cache, _flat_order, key)
 	return _flat_cache[key]
 
 
@@ -440,7 +444,15 @@ static func _svg(key: String, svg: String) -> Texture2D:
 			push_error("Workbench skin could not render '%s'." % key)
 			return null
 		_svg_cache[key] = ImageTexture.create_from_image(image)
+		_evict_skin_cache(_svg_cache, _svg_order, key)
 	return _svg_cache[key]
+
+
+static func _evict_skin_cache(cache: Dictionary, order: Array[String], key: String) -> void:
+	order.append(key)
+	while order.size() > MAX_SKIN_CACHE_ENTRIES:
+		cache.erase(order[0])
+		order.remove_at(0)
 
 
 static func _toggle(on: bool, disabled: bool) -> Texture2D:

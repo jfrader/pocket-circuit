@@ -24,6 +24,10 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   pool. Quick Race and championship events build arbitrary seeds live through
   staged `TrackBuilderCore.prepare_layout` / `assemble_runtime` preparation.
   `build_packed` remains the synchronous tooling and fixture API.
+- `TrackBuilderCore.prepare_route` is the shared validated route stage for
+  previews and full layouts: centerline, corridor edges, room, story/material
+  identity, obstacle plan and racing-line metrics. `prepare_layout` adds the
+  physical environment plan and surface art identity before scene assembly.
 - The three authored track scenes remain regression fixtures for their themed
   collision and AI smoke tests. They are not a whitelist for generated play.
 - The builder is runtime-safe and headless-safe. It does not depend on the
@@ -168,8 +172,8 @@ their original unscaled canvases.
   sampling. Flat ground can underlay objects but cannot straddle a solid rim.
 - Gate footprints and sealed bay polygons are reserved before placement. Every
   planned environment object stays inside the room and outside the full 125-unit
-  corridor plus its declared clearance. Solid footprints cannot overlap each other,
-  on-course obstacles or hazard sweeps. The planner reserves an actual vehicle-width
+  corridor plus its declared clearance. Solid footprints cannot overlap each other
+  or on-course obstacles. The planner reserves an actual vehicle-width
   exit into the apron before placing scenery, plus an empty boundary sector.
 - Procedural surface profiles live in `data/household_material_patterns.json`.
   Story families and curated palette identities constrain the independent material
@@ -214,6 +218,18 @@ their original unscaled canvases.
 - Trackside placement must remain clear of checkpoint recovery corridors:
   230 units along the route and 48 units across it, plus the prop radius.
 
+## Calm Stretches
+
+- `TrackCornerMap` marks a centerline sample as corner when the heading turns
+  more than 0.5 rad (~29°) over 5 samples each side, and records each sample's
+  arc distance to the nearest corner sample ahead or behind.
+- Races run both ways, so a spot is calm only when it is at least 250 units
+  from any corner in either direction: a corner exit in one direction is the
+  braking zone in the other.
+- Low-grip surfaces (except the optional shortcut lane) and permanent on-course
+  obstacles must sit entirely on calm stretches. Placement underfills rather
+  than falling back to a corner. `track_surface_placement_test.gd` enforces it.
+
 ## Track Moments
 
 Generated tracks implement the design contract in `game-design-spec.md` section
@@ -221,27 +237,26 @@ Generated tracks implement the design contract in `game-design-spec.md` section
 
 - `environment_focal`: the fitted household anchor; opening index metadata remains
   available independently of the chosen physical placement.
-- `EarlyConflictForward` and `EarlyConflictReverse`: kitchen and workshop roll
-  a hazard across the corridor 12-25% into the lap in either direction. Office
-  parks a coiled cable at that pose. There is no countdown overlay.
-- `TechnicalSurfaceMoment`: a full-width low-grip or low-speed zone on a
-  separated high-turn section.
+- `TechnicalSurfaceMoment`: a full-width low-grip or low-speed zone on a seeded
+  random calm stretch (see Calm Stretches). A lap without one has none.
 - `ShortcutDecision`: a visibly decaled inside lane that is geometrically
   shorter and at least 1.06x faster, but has lower grip. The outer lane remains
   longer and safe for every vehicle build.
-- Four to eight additional `patch` surface definitions add deterministic
-  themed grip and speed changes. They remain inside the corridor and clear of
-  every gate and the two designed surface moments. `TrackVariantPresenter`
+- Up to ten additional `patch` surface definitions (target 0-10) add
+  deterministic themed grip and speed changes on calm stretches only. They
+  vary in footprint and lateral position, remain inside the corridor and stay
+  clear of every gate and the two designed surface moments; a lap short of calm
+  room gets fewer. `TrackVariantPresenter`
   remains the only creator of authoritative runtime `SurfaceZone` nodes.
 - `SpeedSection`: the unobstructed start/finish straight.
 - `DramaticFinish`: clear forward and reverse run-ups ending at the checker.
   Its visible paint stays on the nominal corridor while its invisible ordered
   sensor reaches the real room/island boundaries.
 
-`generated_moment_indices`, `generated_hazard_paths`, and
-`generated_surfaces` expose these contracts for runtime presentation and tests.
-The surface array contains the technical moment, shortcut, and 4-8 grip
-patches. `RacingLine` takes the safe outer lane through the shortcut window,
+`generated_moment_indices` and `generated_surfaces` expose these contracts for
+runtime presentation and tests. The surface array contains the shortcut, the
+technical moment when a calm stretch exists, and up to 10 grip patches.
+`RacingLine` takes the safe outer lane through the shortcut window,
 while `ShortcutRacingLine` exposes the shorter lane to competitive AI when its
 speed and grip metadata are suitable. Sunday Drive always stays on the safe
 line.
@@ -266,9 +281,10 @@ line.
   contour bevel along open stretches. Players may leave the nominal racing
   corridor and drive across the room apron wherever no real visible asset is
   present. Collision belongs only to visible household props, rail sections,
-  hazards, giants, the raised island, gate posts, and room perimeter walls.
-- Every generated world visual declares one `visual_role`: `SOLID`, `FLAT`, or
-  `MOVING_HAZARD`. `SOLID` means the owning `StaticBody2D` is on a
+  on-course obstacles, giants, the raised island, gate posts, and room perimeter
+  walls.
+- Every generated world visual declares one `visual_role`: `SOLID` or `FLAT`.
+  `SOLID` means the owning `StaticBody2D` is on a
   vehicle-visible layer (`2`, `4`, or `16`) and its circle, local rotated
   rectangle, or composed shape covers the
   visible center and ends. Circular colliders reach at least 90% of the visible
@@ -277,10 +293,9 @@ line.
   `FLAT` means presentation only and never owns collision: floor decals, broad
   cloth/paper/cardboard ground sections, corridor material patterns, surface
   tints and grip decals, worn-floor hints, shadows, and checker paint. Solid
-  objects must never use a sprite-only placement path. `MOVING_HAZARD` means a
-  colliding hazard whose visible asset is the object itself: kitchen/workshop
-  pieces roll along a path; the office coiled cable stays put. Hazard art is
-  never reused as island or edge scenery.
+  objects must never use a sprite-only placement path.
+- There is no moving hazard. The circuit identity keeps its `hazard` sub-seed
+  as a reserved slot so the identity and share-code format do not change.
 - The island is one visibly raised solid object. Its closed layer-2
   `ConcavePolygonShape2D` segment chain follows the outer contact edge of a dark
   side-face, theme-colored edge and top lip. Recovery begins at that
@@ -296,6 +311,14 @@ line.
   the outer edge or to a bounded parallel outset, never silently to the island.
   Coverage counts actual rail lengths, excluding the empty gaps between items
   and sets. Physical front/back gaps are checked independently of arc metadata.
+- `TrackOuterCutMap` identifies outside corner chords and folds from the route,
+  including outward lane positions. The planner fits existing colliding props
+  directly across uncovered chords within the same boundary budget. These props
+  must pass the normal room, corridor, reservation and open-sector fit checks;
+  registered engine collision, not the planner's conservative cores, is the
+  acceptance gate.
+  Reserved fit footprints are not collision coverage. Exact pocket boundary
+  polygons and conservative unexpanded prop cores supply coverage separately.
 - Common reusable rails and hardware have explicit repeat budgets in the asset
   contract. The single-focal composition rule does not impose a global one-copy
   limit on a pen that is also used in boundary sets.
@@ -310,12 +333,14 @@ line.
   reserves the existing physical boundaries and posts. An empty run means open
   drivable apron, never hidden collision.
 - Permanent on-course obstacles use the existing AI-safe planner, with target
-  ranges of 1–4, 2–6 and 3–8 by act. Targets may underfill if no safe placement
-  exists; never reduce the 1.6-car viable corridor or either racing-line clearance
+  ranges of 1–4, 2–6 and 3–8 by act, on calm stretches only. Targets may
+  underfill if no safe placement exists; never reduce the 1.6-car viable corridor or either racing-line clearance
   to reach a quota. The obstacle stream remains independent of route geometry.
-- Footprint sweeps reject distant segment AABBs before the unchanged narrow-phase
-  checks. The optimized result is regression-checked against an exhaustive sweep;
-  denser scenery must not trade collision accuracy for placement speed.
+- Footprint sweeps reject distant segment AABBs before checking circular
+  clearance against the actual oriented rectangle edges or circle. The result
+  is regression-checked against registered engine shape queries; square corner
+  inflation must not reject physically clear space. Denser scenery must not
+  trade collision accuracy for placement speed.
 - Every ordered checkpoint `Area2D` is asymmetric: its inner endpoint stops at
   `HALF_WIDTH` or the raised island, while its outer endpoint reaches the room
   wall. Inner grass does not trip the gate, but legal outer-apron lines do. The
@@ -394,6 +419,9 @@ line.
   least one position exchange and deliberate pass attempt, no more than three
   recoveries per racer, and a slowest/fastest finish-time ratio no greater than
   1.80.
+- The 60 Hz race acceptance harness checks legal bounded finishes, recovery and
+  field spread with fixed seed and driver inputs. Historical outcome snapshots
+  are diagnostics, not required winners or lap times after layout changes.
 - `ai_recovery_scenarios_test.gd` pins a sustained giant-contact jam and a
   finished car parked on the racing line. The jammed AI must exercise escape or
   recovery and finish legally; the trailing AI must ignore and pass through the

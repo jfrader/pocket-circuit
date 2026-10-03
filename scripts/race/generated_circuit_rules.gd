@@ -13,7 +13,6 @@ const ACT_OBSTACLE_RANGES := {
 	2: Vector2i(2, 6),
 	3: Vector2i(3, 8),
 }
-const HAZARD_PRESENCE_BY_ACT := {1: 0.35, 2: 0.55, 3: 0.75}
 const LENGTH_TIERS: Array[String] = ["compact", "standard", "long", "endurance", "marathon"]
 const DEFAULT_LENGTH_TIER: String = "standard"
 const LENGTH_PROFILE_BANDS := {
@@ -79,24 +78,8 @@ static func roll_obstacle_count(act: int, rng: RandomNumberGenerator) -> int:
 	return rng.randi_range(count_range.x, count_range.y)
 
 
-static func hazard_chance(act: int) -> float:
-	return float(HAZARD_PRESENCE_BY_ACT[clampi(act, 1, 3)])
-
-
-static func hazard_present(act: int, hazard_seed: int) -> bool:
-	var rng := RandomNumberGenerator.new()
-	rng.seed = hazard_seed
-	return roll_hazard_present(act, rng)
-
-
-static func roll_hazard_present(act: int, rng: RandomNumberGenerator) -> bool:
-	return rng.randf() < hazard_chance(act)
-
-
-static func danger_profile(act: int, obstacle_seed: int, hazard_seed: int) -> Dictionary:
+static func danger_profile(act: int, obstacle_seed: int) -> Dictionary:
 	return {
 		"level": clampi(act, 1, 3),
 		"obstacle_count": obstacle_count(act, obstacle_seed),
-		"hazard_present": hazard_present(act, hazard_seed),
-		"hazard_chance": hazard_chance(act),
 	}

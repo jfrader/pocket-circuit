@@ -267,14 +267,6 @@ static func footprint_projected_extent(footprint_size: Vector2, shape_kind: Stri
 	return absf(normalized_axis.dot(local_x)) * footprint_size.x * 0.5 + absf(normalized_axis.dot(local_y)) * footprint_size.y * 0.5
 
 
-static func crossing_path(centerline: PackedVector2Array, center_index: int, half_width: float) -> PackedVector2Array:
-	var normal := sample_tangent(centerline, center_index).rotated(PI * 0.5)
-	return PackedVector2Array([
-		centerline[center_index] - normal * half_width,
-		centerline[center_index] + normal * half_width,
-	])
-
-
 static func clear_of_points(point: Vector2, points: PackedVector2Array, clearance: float) -> bool:
 	for other: Vector2 in points:
 		if point.distance_to(other) < clearance:
@@ -308,16 +300,21 @@ static func line_sweep_clears_footprint(
 			if point_to_segment_distance(center, line[index], line[(index + 1) % line.size()]) < radius:
 				return false
 		return true
-	var expanded_half_size := size * 0.5 + Vector2.ONE * hull_radius
-	var radius := expanded_half_size.length()
+	var half_size := size * 0.5
+	var radius := half_size.length() + hull_radius
 	var bounds := Rect2(center - Vector2.ONE * radius, Vector2.ONE * radius * 2.0)
+	var corners := rect_points(Vector2.ZERO, size)
 	for index in line.size():
 		if not bounds.intersects(Rect2(line[index], line[(index + 1) % line.size()] - line[index]).abs(), true):
 			continue
 		var local_from := (line[index] - center).rotated(-rotation)
 		var local_to := (line[(index + 1) % line.size()] - center).rotated(-rotation)
-		if segment_intersects_axis_rect(local_from, local_to, expanded_half_size):
+		if segment_intersects_axis_rect(local_from, local_to, half_size):
 			return false
+		for edge in corners.size():
+			var nearest := Geometry2D.get_closest_points_between_segments(local_from, local_to, corners[edge], corners[(edge + 1) % corners.size()])
+			if nearest[0].distance_squared_to(nearest[1]) < hull_radius * hull_radius:
+				return false
 	return true
 
 

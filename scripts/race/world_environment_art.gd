@@ -29,7 +29,7 @@ static func render_prop(parent: Node2D, asset: Dictionary, placement: Dictionary
 		parent.add_child(node)
 		var sprite := Sprite2D.new()
 		sprite.name = "Sprite"
-		sprite.texture = load(path) as Texture2D
+		sprite.texture = TrackBuilderCore.asset_texture(path)
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		sprite.scale = Vector2.ONE * TrackBuilderCore.PROP_SCALE.sprite_scale(sprite.texture, TrackBuilderCore._texture_opaque_rect(sprite.texture), float(asset["length_mm"]))
 		sprite.modulate.a = float(asset.get("opacity", 1.0))
@@ -87,8 +87,8 @@ static func compose(root: Node2D, spec: Dictionary, centerline: PackedVector2Arr
 	boundary.set_meta("empty_run_count", run_modes.count(&"none"))
 	boundary.set_meta("open_exit", plan["diagnostics"].get("open_exit", PackedVector2Array()))
 	var gates := TrackBuilderCore._layout_gate_samples(centerline, spec)
-	var gameplay := TrackBuilderCore._analyze_track_moments(centerline, gates)
-	TrackBuilderStory.build_gameplay_moments(root, moments, spec, gameplay, centerline, 0)
+	var gameplay := TrackBuilderCore._analyze_track_moments(centerline, gates, spec)
+	TrackBuilderStory.build_gameplay_moments(root, gameplay, 0)
 	TrackBuilderCore._build_finish_moments(moments, centerline)
 	TrackBuilderDressing.build_generated_surfaces(root, moments, spec["story_kit"], spec, gameplay, centerline, gates, false)
 	var surfaces: Array = root.get_meta("generated_surfaces", [])
@@ -125,7 +125,7 @@ static func _draw_grip_surface(root: Node2D, name: String, asset: Dictionary, po
 	root.add_child(region)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = TrackBuilderCore._mix_seed(seed_value, name + String(asset["id"]))
-	var texture := load(asset["texture_path"]) as Texture2D
+	var texture := TrackBuilderCore.asset_texture(String(asset["texture_path"]))
 	var used := TrackBuilderCore._texture_opaque_rect(texture)
 	var scale := TrackBuilderCore.PROP_SCALE.sprite_scale(texture, used, float(asset["length_mm"]))
 	var nominal_radius := used.size.length() * scale * 0.5

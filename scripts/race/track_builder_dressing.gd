@@ -1,13 +1,26 @@
 class_name TrackBuilderDressing
 ## Generated dressing: moments, formations, giants, room details, surfaces.
 
+## Loose debris varies per track: how many pieces, how big, and where across the
+## road. A patch never touches the corridor edge, so it stays a thing to drive
+## over rather than a wall.
+const GRIP_PATCH_MIN_HALF_WIDTH := 26.0
+const GRIP_PATCH_MAX_HALF_WIDTH := 64.0
+const GRIP_PATCH_MIN_HALF_SPAN := 2
+const GRIP_PATCH_MAX_HALF_SPAN := 5
+const GRIP_PATCH_EDGE_MARGIN := 12.0
 
-static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array) -> Dictionary:
+
+## Technical surface strip reach, in samples each side of its centre.
+const TECHNICAL_HALF_SPAN := 6
+## Surfaces keep this many samples from the finish line and from each other.
+const SURFACE_START_CLEARANCE := 18
+const SURFACE_SEPARATION := 16
+const SURFACE_GATE_CLEARANCE := 155.0
+
+
+static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: PackedVector2Array, surface_seed: int = 0) -> Dictionary:
 	var count := centerline.size()
-	var arc_positions := centerline_arc_positions(centerline)
-	var total_length := arc_positions[arc_positions.size() - 1] + centerline[centerline.size() - 1].distance_to(centerline[0])
-	var conflict_forward := pick_conflict_candidate(centerline, gate_samples, arc_positions, total_length, 0.14, 0.23)
-	var conflict_reverse := pick_conflict_candidate(centerline, gate_samples, arc_positions, total_length, 0.77, 0.86)
 	var straight_candidates: Array[Dictionary] = []
 	var corner_candidates: Array[Dictionary] = []
 	for index in range(0, count, 2):
@@ -25,8 +38,6 @@ static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: 
 		var index := int(candidate["index"])
 		if TrackBuilderCore._cyclic_index_distance(index, 0, count) < 24:
 			continue
-		if TrackBuilderCore._cyclic_index_distance(index, conflict_forward, count) < 24 or TrackBuilderCore._cyclic_index_distance(index, conflict_reverse, count) < 24:
-			continue
 		var separated := true
 		for chosen: int in corners:
 			if TrackBuilderCore._cyclic_index_distance(index, chosen, count) < 38:
@@ -41,7 +52,7 @@ static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: 
 		if corners.size() >= 2:
 			break
 		var fallback := int(round(float(count) * fallback_fraction)) % count
-		var separated := TrackBuilderCore._cyclic_index_distance(fallback, conflict_forward, count) >= 24 and TrackBuilderCore._cyclic_index_distance(fallback, conflict_reverse, count) >= 24
+		var separated := true
 		for chosen: int in corners:
 			if TrackBuilderCore._cyclic_index_distance(fallback, chosen, count) < 38:
 				separated = false
@@ -58,23 +69,46 @@ static func analyze_track_moments(centerline: PackedVector2Array, gate_samples: 
 		if gain > shortcut_gain:
 			shortcut_gain = gain
 			shortcut = corner
-	var technical := int(corners[0])
-	for corner: int in corners:
-		if corner != shortcut:
-			technical = corner
-			break
+	var clearance := TrackCornerMap.clearances(centerline)
+	var technical := pick_calm_surface_index(centerline, gate_samples, clearance, TECHNICAL_HALF_SPAN, PackedInt32Array([shortcut]), surface_seed)
 	return {
 		"opening": 0,
-		"early_conflict_forward": conflict_forward,
-		"early_conflict_reverse": conflict_reverse,
-		"early_conflict_forward_fraction": arc_positions[conflict_forward] / maxf(total_length, 1.0),
-		"early_conflict_reverse_fraction": 1.0 - arc_positions[conflict_reverse] / maxf(total_length, 1.0),
 		"longest_straight": longest,
 		"second_straight": second,
 		"corners": corners,
 		"shortcut": shortcut,
 		"technical": technical,
+		"corner_clearance": clearance,
 	}
+
+
+## A seeded calm centre index for a surface spanning `half_span` samples, clear
+## of the finish line, gates and `avoid`; -1 when the lap has no such room.
+static func pick_calm_surface_index(
+		centerline: PackedVector2Array,
+		gate_samples: PackedVector2Array,
+		clearance: PackedFloat32Array,
+		half_span: int,
+		avoid: PackedInt32Array,
+		seed: int
+) -> int:
+	var count := centerline.size()
+	var options := PackedInt32Array()
+	for index in TrackCornerMap.calm_indices(clearance, half_span):
+		if TrackBuilderCore._cyclic_index_distance(index, 0, count) < SURFACE_START_CLEARANCE:
+			continue
+		var separated := true
+		for other: int in avoid:
+			if other >= 0 and TrackBuilderCore._cyclic_index_distance(index, other, count) < SURFACE_SEPARATION:
+				separated = false
+				break
+		if separated and TrackBuilderCore._clear_of_points(centerline[index], gate_samples, SURFACE_GATE_CLEARANCE):
+			options.append(index)
+	if options.is_empty():
+		return -1
+	var rng := RandomNumberGenerator.new()
+	rng.seed = seed
+	return options[rng.randi_range(0, options.size() - 1)]
 
 
 static func default_act_for_theme(theme: StringName) -> int:
@@ -94,39 +128,6 @@ static func layout_gate_samples(centerline: PackedVector2Array, spec: Dictionary
 	for gate_index in TrackBuilderCore.GATE_COUNT:
 		samples.append(TrackBuilderCore._sample_at_arc(centerline, arc, total * float(fractions[gate_index])))
 	return samples
-
-
-static func centerline_arc_positions(centerline: PackedVector2Array) -> PackedFloat32Array:
-	var positions := PackedFloat32Array([0.0])
-	for index in range(1, centerline.size()):
-		positions.append(positions[index - 1] + centerline[index - 1].distance_to(centerline[index]))
-	return positions
-
-
-static func pick_conflict_candidate(
-		centerline: PackedVector2Array,
-		gate_samples: PackedVector2Array,
-		arc_positions: PackedFloat32Array,
-		total_length: float,
-		minimum_fraction: float,
-		maximum_fraction: float
-) -> int:
-	var best_index := int(round(float(centerline.size()) * (minimum_fraction + maximum_fraction) * 0.5))
-	var best_score := -INF
-	for index in range(0, centerline.size(), 2):
-		var fraction := arc_positions[index] / maxf(total_length, 1.0)
-		if fraction < minimum_fraction or fraction > maximum_fraction:
-			continue
-		var turn := TrackBuilderCore._turn_strength(centerline, index, 7)
-		var chord := centerline[posmod(index + 10, centerline.size())].distance_to(centerline[posmod(index - 10, centerline.size())])
-		var gate_clearance := INF
-		for gate: Vector2 in gate_samples:
-			gate_clearance = minf(gate_clearance, centerline[index].distance_to(gate))
-		var score := chord - turn * 540.0 + minf(gate_clearance, 180.0) * 0.35
-		if score > best_score or (is_equal_approx(score, best_score) and index < best_index):
-			best_score = score
-			best_index = index
-	return best_index
 
 
 static func build_opening_landmark(
@@ -574,7 +575,7 @@ static func build_edge_and_apron_decor(
 		if candidate.distance_to(centerline[0]) < 300.0:
 			continue
 		var tex_path := String(decor[rng.randi() % decor.size()])
-		var tex := load(tex_path) as Texture2D
+		var tex := TrackBuilderCore.asset_texture(tex_path)
 		if tex == null:
 			continue
 		var sz := TrackBuilderCore.PROP_SCALE.length_for(tex_path, rng.randf_range(22.0, 52.0))
@@ -687,7 +688,7 @@ static func build_giant_landmarks(
 			tex_path = String(giants[(asset_offset + asset_attempt) % giants.size()])
 			if bool(spec.get("distinct_giant_assets", false)) and used_assets.has(tex_path):
 				continue
-			tex = load(tex_path) as Texture2D
+			tex = TrackBuilderCore.asset_texture(tex_path)
 			if tex == null:
 				continue
 			var shape_entry: Dictionary = TrackBuilderCore.PROP_SHAPES.get(tex_path.get_file(), {})
@@ -849,7 +850,7 @@ static func build_room_ground_sections(
 			await stage.call("Laying room materials")
 		var definition: Dictionary = definitions[(asset_offset + section_index) % definitions.size()]
 		var asset_path := String(definition["asset"])
-		var texture := load(asset_path) as Texture2D
+		var texture := TrackBuilderCore.asset_texture(asset_path)
 		if texture == null:
 			continue
 		var visible_bounds := TrackBuilderCore._texture_opaque_rect(texture)
@@ -937,7 +938,7 @@ static func build_room_floor_details(
 		if not TrackBuilderCore._clear_of_points(candidate, positions, 46.0):
 			continue
 		var texture_path := String(decals[rng.randi_range(0, decals.size() - 1)])
-		var texture := load(texture_path) as Texture2D
+		var texture := TrackBuilderCore.asset_texture(texture_path)
 		if texture == null:
 			continue
 		var sprite := Sprite2D.new()
@@ -968,31 +969,34 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 	var shortcut_surface_index := 0 if float((surfaces[0] as Dictionary)["grip"]) <= float((surfaces[1] as Dictionary)["grip"]) else 1
 	var technical_surface_index := 1 - shortcut_surface_index
 	var technical_data: Dictionary = surfaces[technical_surface_index]
+	# The technical surface sits on a calm stretch picked by the moments; a lap
+	# without one skips it rather than putting a slippery strip in a corner.
 	var technical_index := int(moments["technical"])
-	var technical_polygon := surface_strip(centerline, technical_index, 6, 92.0)
-	var technical_definition := {
-		"name": StringName(technical_data["name"]),
-		"role": &"technical",
-		"lane": &"full",
-		"grip": float(technical_data["grip"]),
-		"speed": float(technical_data["speed"]),
-		"points": technical_polygon,
-		"decal": String(technical_data["decal"]),
-		"centerline_index": technical_index,
-	}
-	definitions.append(technical_definition)
-	var technical := Node2D.new()
-	technical.name = "TechnicalSurfaceMoment"
-	technical.set_meta("moment_kind", &"technical")
-	technical.set_meta("surface_name", technical_definition["name"])
-	technical.set_meta("grip", technical_definition["grip"])
-	technical.set_meta("speed", technical_definition["speed"])
-	technical.set_meta("polygon", technical_polygon)
-	technical.set_meta("decal_texture", technical_definition["decal"])
-	technical.set_meta("centerline_index", technical_index)
-	parent.add_child(technical)
-	if emit_decals:
-		add_surface_decals(technical, centerline, technical_index, 6, String(technical_data["decal"]))
+	if technical_index >= 0:
+		var technical_polygon := surface_strip(centerline, technical_index, TECHNICAL_HALF_SPAN, 92.0)
+		var technical_definition := {
+			"name": StringName(technical_data["name"]),
+			"role": &"technical",
+			"lane": &"full",
+			"grip": float(technical_data["grip"]),
+			"speed": float(technical_data["speed"]),
+			"points": technical_polygon,
+			"decal": String(technical_data["decal"]),
+			"centerline_index": technical_index,
+		}
+		definitions.append(technical_definition)
+		var technical := Node2D.new()
+		technical.name = "TechnicalSurfaceMoment"
+		technical.set_meta("moment_kind", &"technical")
+		technical.set_meta("surface_name", technical_definition["name"])
+		technical.set_meta("grip", technical_definition["grip"])
+		technical.set_meta("speed", technical_definition["speed"])
+		technical.set_meta("polygon", technical_polygon)
+		technical.set_meta("decal_texture", technical_definition["decal"])
+		technical.set_meta("centerline_index", technical_index)
+		parent.add_child(technical)
+		if emit_decals:
+			add_surface_decals(technical, centerline, technical_index, TECHNICAL_HALF_SPAN, String(technical_data["decal"]))
 
 	var shortcut_data: Dictionary = surfaces[shortcut_surface_index]
 	var shortcut_index := int(moments["shortcut"])
@@ -1033,10 +1037,12 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 		add_surface_decals(shortcut, centerline, shortcut_index, TrackBuilderCore.SHORTCUT_HALF_SPAN, String(shortcut_data["decal"]), float(shortcut_geometry["inside_sign"]) * TrackBuilderCore.SHORTCUT_LANE_OFFSET)
 
 	# Additional in-corridor grip patches are data for TrackVariantPresenter,
-	# which creates the authoritative SurfaceZone nodes at runtime. Keep them
-	# separated from gates, the grids, and the two designed surface moments.
+	# which creates the authoritative SurfaceZone nodes at runtime. They only go
+	# on calm stretches (see TrackCornerMap), separated from gates, the grids and
+	# the two designed surface moments; a lap short of calm room gets fewer.
 	var extra_patches: Array = spec.get("grip_patches", [])
-	if extra_patches.size() > 0:
+	var calm_patch_centres := TrackCornerMap.calm_indices(moments["corner_clearance"], GRIP_PATCH_MIN_HALF_SPAN)
+	if extra_patches.size() > 0 and not calm_patch_centres.is_empty():
 		var patch_rng := RandomNumberGenerator.new()
 		patch_rng.seed = TrackBuilderCore._mix_seed(int(spec.get("material_seed", spec.get("requested_seed", 0))), "grip_patches:%s" % String(story.get("id", "")))
 		var target_count := patch_rng.randi_range(TrackBuilderCore.GRIP_PATCH_MIN_COUNT, TrackBuilderCore.GRIP_PATCH_MAX_COUNT)
@@ -1045,19 +1051,27 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 		for attempt in 240:
 			if added >= target_count:
 				break
-			var pidx_center := patch_rng.randi_range(0, centerline.size() - 1)
-			if TrackBuilderCore._cyclic_index_distance(pidx_center, 0, centerline.size()) < 18:
+			var pidx_center := calm_patch_centres[patch_rng.randi_range(0, calm_patch_centres.size() - 1)]
+			if TrackBuilderCore._cyclic_index_distance(pidx_center, 0, centerline.size()) < SURFACE_START_CLEARANCE:
 				continue
 			var separated := true
 			for used_index: int in used_indices:
-				if TrackBuilderCore._cyclic_index_distance(pidx_center, used_index, centerline.size()) < 16:
+				if used_index >= 0 and TrackBuilderCore._cyclic_index_distance(pidx_center, used_index, centerline.size()) < SURFACE_SEPARATION:
 					separated = false
 					break
-			if not separated or not TrackBuilderCore._clear_of_points(centerline[pidx_center], gate_samples, 155.0):
+			if not separated or not TrackBuilderCore._clear_of_points(centerline[pidx_center], gate_samples, SURFACE_GATE_CLEARANCE):
+				continue
+			var half_span := patch_rng.randi_range(GRIP_PATCH_MIN_HALF_SPAN, GRIP_PATCH_MAX_HALF_SPAN)
+			if not TrackCornerMap.is_calm(moments["corner_clearance"], pidx_center, half_span):
 				continue
 			var data: Dictionary = extra_patches[added % extra_patches.size()]
-			var halfw := 42.0 + patch_rng.randf_range(0, 12)
-			var poly := surface_strip(centerline, pidx_center, 3, halfw)
+			var halfw := patch_rng.randf_range(GRIP_PATCH_MIN_HALF_WIDTH, GRIP_PATCH_MAX_HALF_WIDTH)
+			# Debris is not a centre stripe: each patch sits somewhere across the
+			# road, either side, and only sometimes near the racing line.
+			var room := maxf(0.0, TrackBuilderCore.HALF_WIDTH - halfw - GRIP_PATCH_EDGE_MARGIN)
+			var lateral := (-1.0 if patch_rng.randi() % 2 == 0 else 1.0) * patch_rng.randf_range(0.15, 1.0) * room
+			var shifted := offset_centerline(centerline, lateral)
+			var poly := surface_strip(shifted, pidx_center, half_span, halfw)
 			var patch_node := Node2D.new()
 			patch_node.name = "ExtraGripPatch%d" % added
 			patch_node.set_meta("moment_kind", &"grip_patch")
@@ -1065,10 +1079,12 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 			patch_node.set_meta("grip", float(data["grip"]))
 			patch_node.set_meta("speed", float(data.get("speed", data["grip"])))
 			patch_node.set_meta("polygon", poly)
+			patch_node.set_meta("lateral_mm", lateral)
+			patch_node.set_meta("half_span", half_span)
 			patch_node.set_meta("decal_texture", String(data["decal"]))
 			parent.add_child(patch_node)
 			if emit_decals:
-				add_surface_decals(patch_node, centerline, pidx_center, 3, String(data["decal"]), 0.0)
+				add_surface_decals(patch_node, centerline, pidx_center, half_span, String(data["decal"]), lateral)
 			var def := {
 				"name": StringName(data["name"]),
 				"role": &"patch",
@@ -1078,12 +1094,26 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 				"points": poly,
 				"decal": String(data["decal"]),
 				"centerline_index": pidx_center,
+				"lateral_mm": lateral,
+				"half_span": half_span,
 			}
 			definitions.append(def)
 			used_indices.append(pidx_center)
 			added += 1
 		parent.set_meta("grip_patch_count", added)
 	root.set_meta("generated_surfaces", definitions)
+
+
+## Every point of the racing line moved sideways, so a strip built from it lies
+## off-centre like real debris instead of tracing the driving line.
+static func offset_centerline(centerline: PackedVector2Array, lateral: float) -> PackedVector2Array:
+	if is_zero_approx(lateral):
+		return centerline
+	var shifted := PackedVector2Array()
+	shifted.resize(centerline.size())
+	for index in centerline.size():
+		shifted[index] = centerline[index] + TrackBuilderCore._sample_tangent(centerline, index).rotated(PI * 0.5) * lateral
+	return shifted
 
 
 static func surface_strip(centerline: PackedVector2Array, center_index: int, half_span: int, half_width: float) -> PackedVector2Array:

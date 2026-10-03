@@ -14,6 +14,7 @@ config/name="Pocket Circuit"
 config/description="Tiny racing. Big stakes. Win the Grand Household Circuit before sunrise in this complete offline arcade championship."
 config/version="1.0.0"
 run/main_scene="res://scenes/boot/boot.tscn"
+run/max_fps=0
 config/features=PackedStringArray("4.7")
 config/icon="res://assets/branding/pocket_circuit_icon.svg"
 
@@ -26,6 +27,7 @@ App="*res://scripts/autoload/app.gd"
 window/size/viewport_width=1280
 window/size/viewport_height=720
 window/stretch/mode="canvas_items"
+window/vsync/vsync_mode=1
 
 [editor_plugins]
 
@@ -96,3 +98,7 @@ pause={
 
 environment/defaults/default_clear_color=Color(0.06666667, 0.0745098, 0.08627451, 1)
 renderer/rendering_method="mobile"
+
+[physics]
+
+common/physics_interpolation=true

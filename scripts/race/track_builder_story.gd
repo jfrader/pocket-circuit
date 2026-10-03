@@ -83,7 +83,7 @@ static func compose_generated_story(
 		"SparseDelimiter",
 		story["delimiter"],
 		&"few",
-		int(moments["early_conflict_forward"]),
+		int(moments["second_straight"]),
 		centerline,
 		outer_loop,
 		room_polygon,
@@ -101,35 +101,15 @@ static func compose_generated_story(
 		await stage.call("Adding surface detail")
 	await TrackBuilderCore._build_edge_and_apron_decor(container, spec, centerline, room_polygon, gate_samples, occupied, stage)
 	if stage.is_valid():
-		await stage.call("Preparing grip zones and hazards")
+		await stage.call("Preparing grip zones")
 	TrackBuilderCore._build_generated_surfaces(root, container, story, spec, moments, centerline, gate_samples)
 	TrackBuilderCore._build_finish_moments(container, centerline)
-	build_gameplay_moments(root, container, spec, moments, centerline, opening_index)
+	build_gameplay_moments(root, moments, opening_index)
 
 
-static func build_gameplay_moments(root: Node2D, container: Node2D, spec: Dictionary, moments: Dictionary, centerline: PackedVector2Array, opening_index: int) -> void:
-	var hazard_paths := {}
-	var planned_hazard: Dictionary = spec.get("hazard_plan", {})
-	var planned_paths: Dictionary = planned_hazard.get("paths", {})
-	for direction: String in ["forward", "reverse"]:
-		var hazard_index := int(moments["early_conflict_%s" % direction])
-		var hazard_path: PackedVector2Array = planned_paths.get(direction, TrackBuilderCore._crossing_path(centerline, hazard_index, 96.0))
-		var conflict := Node2D.new()
-		conflict.name = "EarlyConflict%s" % direction.capitalize()
-		conflict.position = centerline[hazard_index]
-		conflict.set_meta("moment_kind", &"early_conflict")
-		conflict.set_meta("direction", StringName(direction))
-		conflict.set_meta("centerline_index", hazard_index)
-		conflict.set_meta("lap_fraction", float(moments["early_conflict_%s_fraction" % direction]))
-		conflict.set_meta("path", hazard_path)
-		container.add_child(conflict)
-		hazard_paths[direction] = hazard_path
-	root.set_meta("generated_hazard_paths", hazard_paths)
-	root.set_meta("generated_hazard_path", hazard_paths["forward"])
+static func build_gameplay_moments(root: Node2D, moments: Dictionary, opening_index: int) -> void:
 	root.set_meta("generated_moment_indices", {
 		"opening": opening_index,
-		"early_conflict_forward": int(moments["early_conflict_forward"]),
-		"early_conflict_reverse": int(moments["early_conflict_reverse"]),
 		"longest_straight": int(moments["longest_straight"]),
 		"second_straight": int(moments["second_straight"]),
 		"corners": moments["corners"],
@@ -137,9 +117,7 @@ static func build_gameplay_moments(root: Node2D, container: Node2D, spec: Dictio
 		"technical": int(moments["technical"]),
 		"speed": 0,
 		"finish": 0,
-		"hazard": int(moments["early_conflict_forward"]),
 	})
-
 
 
 static func build_island_story(
