@@ -148,9 +148,11 @@ func _prefill_buffer() -> void:
 
 
 func stop() -> void:
-	if _player != null and _player.playing:
-		_player.stop()
 	if _player != null:
+		# Stop unconditionally: a live generator playback can report not playing
+		# while it is still registered with the audio server, and stopping the
+		# player is what asks the server to retire that playback (godot#76745).
+		_player.stop()
 		_player.volume_db = SILENCE_DB
 	# The playback died with the player; writing into it after a later play()
 	# would leave the voice silent while the player still reports playing.
