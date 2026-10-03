@@ -108,6 +108,7 @@ failures_file="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-gate-failures.XXXXXX")"
 # Tests that assert on wall-clock responsiveness stay serial so CPU contention
 # from the parallel workers cannot skew their timings.
 serial_tests=(
+	"tests/ai_seed_sweep_test.gd"
 	"tests/race_start_timing_test.gd"
 	"tests/reset_manager_test.gd"
 	"tests/menu_feedback_test.gd"
@@ -166,7 +167,9 @@ done
 export PROJECT_ROOT godot_bin failures_file
 export -f run_godot_checked run_godot_test_checked run_test_isolated
 
-gate_parallelism="${PC_GATE_PARALLELISM:-6}"
+# Default 4 (not 6) on an 8-core shared host so the longest serial and parallel
+# tests still have CPU headroom under load; PC_GATE_PARALLELISM overrides.
+gate_parallelism="${PC_GATE_PARALLELISM:-4}"
 if (( ${#parallel_tests[@]} > 0 )); then
 	printf 'Running %d gate tests with parallelism %s...\n' "${#parallel_tests[@]}" "$gate_parallelism"
 	# xargs returns 123 when a worker fails; failures are tracked via
