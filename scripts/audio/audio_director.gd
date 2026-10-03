@@ -112,6 +112,19 @@ func _exit_tree() -> void:
 			player.stream = null
 	_local_vehicle = null
 	_engine_loop = null
+	# Godot only retires a stopped playback on a later audio mix, and shutdown
+	# stops the audio driver after this teardown. Wait (bounded) for the mixer to
+	# process the stops above so the engine voice and the other players do not
+	# outlive the audio server (godot#76745).
+	var deadline := Time.get_ticks_msec() + 500
+	var last := AudioServer.get_time_since_last_mix()
+	var mixes := 0
+	while mixes < 2 and Time.get_ticks_msec() < deadline:
+		OS.delay_msec(2)
+		var current := AudioServer.get_time_since_last_mix()
+		if current < last:
+			mixes += 1
+		last = current
 
 func ensure_buses() -> void:
 	_ensure_bus(&"Music")
