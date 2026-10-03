@@ -65,6 +65,39 @@ func _run_test() -> void:
 	if not _expect(settled == "defeat", "the section should change once the dwell has passed, saw %s" % settled):
 		return
 
+	# Exercise set_race_state (real API via director) + cue with explicit time
+	# advances (via _process which drives _section_elapsed). Same-phase via set
+	# never restarts or counts as change; inside cooldown drops (newest dropped);
+	# after window different still switches. Matches cue() semantics.
+	director.call("_process", float(director.call("get_live_section_dwell")) + 1.0)
+	director.call("set_live_race_state", "grid", 0.5, 0.0, false)
+	var set1 := String(director.call("get_live_requested_section"))
+	if not _expect(set1 == "grid", "set_race_state after dwell should switch, saw %s" % set1):
+		return
+
+	# same-phase request via set_race_state is not a change and does not restart
+	director.call("set_live_race_state", "grid", 0.5, 0.0, false)
+	if not _expect(String(director.call("get_live_requested_section")) == "grid", "re-set_race_state same phase must not count as change or restart"):
+		return
+
+	# different phase inside cooldown is dropped (consistent with cue drop choice)
+	director.call("set_live_race_state", "ignition", 0.7, 0.1, false)
+	var set_dropped := String(director.call("get_live_requested_section"))
+	if not _expect(set_dropped == "grid", "set_race_state different inside dwell must drop, saw %s" % set_dropped):
+		return
+
+	# also cue inside drops (mixing the two protected APIs)
+	director.call("cue_live_section", "attack")
+	if not _expect(String(director.call("get_live_requested_section")) == "grid", "cue inside dwell after set must also drop"):
+		return
+
+	# after dwell window, set different phase succeeds
+	director.call("_process", float(director.call("get_live_section_dwell")) + 1.0)
+	director.call("set_live_race_state", "redline", 0.9, 0.4, false)
+	var set2 := String(director.call("get_live_requested_section"))
+	if not _expect(set2 == "redline", "set_race_state after dwell window switches, saw %s" % set2):
+		return
+
 	director.queue_free()
 	print("MUSIC_PHASE_DWELL_TEST PASS")
 	quit(0)
