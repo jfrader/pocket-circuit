@@ -22,6 +22,7 @@ var _room: StringName = &"classic"
 var _seed := -1
 var _direction: StringName = &"both"
 var _difficulty := "club_circuit"
+var _road_width: Variant = TrackWidthProfile.MODE_FLAT
 
 
 func _initialize() -> void:
@@ -40,7 +41,15 @@ func _initialize() -> void:
 	var env_difficulty := OS.get_environment("PC_DIFFICULTY")
 	if MAX_LAP_SECONDS.has(env_difficulty):
 		_difficulty = env_difficulty
+	_road_width = _road_width_option(OS.get_environment("PC_ROAD_WIDTH"))
 	call_deferred("_run_test")
+
+
+## PC_ROAD_WIDTH: empty (flat, today's road), "seeded", or a numeric amplitude.
+static func _road_width_option(value: String) -> Variant:
+	if value.is_valid_float():
+		return float(value)
+	return StringName(value) if not value.is_empty() else TrackWidthProfile.MODE_FLAT
 
 
 func _run_test() -> void:
@@ -59,7 +68,7 @@ func _verify_scene_contract() -> bool:
 	var override := OS.get_environment("PC_TRACK_SCENE")
 	var packed: PackedScene
 	if _seed >= 0:
-		var built: Dictionary = TRACK_BUILDER.build_packed(_theme, _room, _seed)
+		var built: Dictionary = TRACK_BUILDER.build_packed(_theme, _room, _seed, {"road_width": _road_width})
 		packed = built.get("scene") as PackedScene
 	else:
 		var scene_path := override if not override.is_empty() else String(THEME_SCENES[_theme])
@@ -107,7 +116,7 @@ func _run_direction(reverse: bool) -> bool:
 	var prototype := PROTOTYPE_SCENE.instantiate()
 	var event := {"theme": _theme, "reverse": reverse}
 	if _seed >= 0:
-		event.merge({"circuit": "generated", "room": _room, "seed": _seed})
+		event.merge({"circuit": "generated", "room": _room, "seed": _seed, "road_width": _road_width})
 	prototype.set("_session", {"event": event, "difficulty": _difficulty})
 	var manager := prototype.get_node("RaceManager") as RaceManager
 	manager.set_reverse_direction(reverse)

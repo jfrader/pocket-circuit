@@ -111,8 +111,8 @@ static func _plan_generated_obstacles(
 		gate_samples,
 		moments,
 		GENERATED_OBSTACLE_TYPES.get(theme, []),
-		_racing_line_points(centerline, moments, false),
-		_racing_line_points(centerline, moments, true)
+		_racing_line_points(centerline, moments, false, spec.get("half_widths", PackedFloat32Array())),
+		_racing_line_points(centerline, moments, true, spec.get("half_widths", PackedFloat32Array()))
 	)
 
 
@@ -211,6 +211,7 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 			for point: Vector2 in room_polygon:
 				scaled_room.append(point * room_scale)
 			room_polygon = scaled_room
+		var road_width_amplitude := TrackWidthProfile.amplitude_for_option(generation_options.get("road_width", TrackWidthProfile.MODE_FLAT), seed)
 		var room_params := {
 			"margin": 190.0,
 			"min_point_distance": 210.0,
@@ -220,6 +221,7 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 			"room_polygon": room_polygon,
 			"room_shape": room_shape,
 			"length_tier": length_tier,
+			"road_width_amplitude": road_width_amplitude,
 		}
 		match room_shape:
 			&"tall":
@@ -280,16 +282,27 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 		spec["obstacle_seed"] = int(generation_options.get("obstacle_seed", sub_seeds.get("obstacle", _mix_seed(seed, "obstacle_plan"))))
 		spec["act"] = clampi(int(generation_options.get("act", GENERATED_RULES.default_act_for_theme(theme))), 1, 3)
 		spec["obstacles_enabled"] = bool(generation_options.get("obstacles_enabled", true))
+		spec["road_width_amplitude"] = TrackWidthProfile.amplitude_for_option(generation_options.get("road_width", TrackWidthProfile.MODE_FLAT), seed)
 		used_seed = int(gen["seed"])
 	var centerline := _sample_centerline(spec["controls"])
-	var edges := _corridor_edges(centerline)
+	# Empty means the fixed legacy corridor; only generated specs are copies, so
+	# only they may carry a width profile.
+	var half_widths := PackedFloat32Array()
+	if float(spec.get("road_width_amplitude", 0.0)) > 0.0:
+		half_widths = TrackWidthProfile.build(centerline, seed, room_polygon, float(spec["road_width_amplitude"]))
+		spec["half_widths"] = half_widths
+	var edges := _corridor_edges(centerline, half_widths)
 	if spec.get("seed_obstacles", false):
 		var left: PackedVector2Array = edges["left"]
 		var right: PackedVector2Array = edges["right"]
 		var outer := left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right
 		var inner := left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right
-		edges["inner_boundary"] = _simple_inner_boundary_loop(inner, centerline)
-		edges["outer_boundary"] = _simple_boundary_loop(outer, centerline)
+		if half_widths.is_empty():
+			edges["inner_boundary"] = _simple_inner_boundary_loop(inner, centerline)
+			edges["outer_boundary"] = _simple_boundary_loop(outer, centerline)
+		else:
+			edges["inner_boundary"] = TRACK_BUILDER_GEOMETRY.variable_boundary_loop(inner, centerline, false)
+			edges["outer_boundary"] = TRACK_BUILDER_GEOMETRY.variable_boundary_loop(outer, centerline, true)
 		var gate_samples := _layout_gate_samples(centerline, spec)
 		var moments := _analyze_track_moments(centerline, gate_samples, spec)
 		spec["obstacle_plan"] = _plan_generated_obstacles(theme, spec, centerline, gate_samples, moments)
@@ -306,6 +319,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 	var centerline: PackedVector2Array = prepared["centerline"]
 	var edges: Dictionary = prepared["edges"]
 	var room_polygon: PackedVector2Array = prepared["room_polygon"]
+	var half_widths: PackedFloat32Array = spec.get("half_widths", PackedFloat32Array())
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 	var inner: PackedVector2Array = edges["inner_boundary"] if edges.has("inner_boundary") else _simple_inner_boundary_loop(left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right, centerline)
@@ -333,7 +347,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 			for side in [-1, 1]:
 				var path := String(post_assets[posmod(gate_index * 2 + (1 if side > 0 else 0), post_assets.size())])
 				var size := PROP_SCALE.size_for(path, GATE_POST_SIZE)
-				var offset := FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET
+				var offset := (FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET) + TrackWidthProfile.at_point(centerline, half_widths, gate_points[gate_index]) - HALF_WIDTH
 				var position: Vector2 = gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side
 				reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(position, size + Vector2.ONE * 6.0, tangent.angle()))
 				solid_cores.append(Vector3(position.x, position.y, minf(size.x, size.y) * core_ratio))
@@ -348,7 +362,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 	surface_art_exclusions.append(inner)
 	spec["surface_art_exclusions"] = surface_art_exclusions
 	var outer: PackedVector2Array = edges.get("outer_boundary", left if absf(_polygon_area(left)) > absf(_polygon_area(right)) else right)
-	spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"outer_boundary":outer,"corridor_half_width":HALF_WIDTH,"reserved_polygons":reserved,"solid_footprints":obstacle_footprints,"solid_polygons":solid_polygons,"solid_cores":solid_cores}, candidates, {})
+	spec["environment_plan"] = WorldEnvironmentPlan.plan(theme, int(spec.get("dressing_seed", _mix_seed(maxi(seed, 0), "dressing"))), {"room_polygon":room_polygon,"island_polygon":inner,"centerline":centerline,"outer_boundary":outer,"corridor_half_width":HALF_WIDTH,"corridor_half_widths":half_widths,"reserved_polygons":reserved,"solid_footprints":obstacle_footprints,"solid_polygons":solid_polygons,"solid_cores":solid_cores}, candidates, {})
 	spec["surface_identity"] = HouseholdSurfaceMaterials.resolve(theme, int(spec.get("material_seed", _mix_seed(maxi(seed, 0), "material"))), String(spec.get("material_id", "")), String(spec.get("palette_id", "")), spec.get("floor_modulate", Color.WHITE))
 	spec["floor_texture"] = spec["surface_identity"]["floor"]["texture"]
 	spec["track_texture"] = spec["surface_identity"]["course"]["texture"]
@@ -357,6 +371,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 	spec["ambient_props"] = []
 	spec["corridor_patterns"] = []
 	prepared["spec"] = spec
+
 	return prepared
 
 
@@ -367,7 +382,8 @@ static func racing_line_metrics_from_prepared(prepared: Dictionary) -> Dictionar
 	var spec: Dictionary = prepared["spec"]
 	var gate_samples := _layout_gate_samples(centerline, spec)
 	var moments := _analyze_track_moments(centerline, gate_samples, spec)
-	var racing_line := _racing_line_points(centerline, moments, false)
+	var racing_line := _racing_line_points(centerline, moments, false, spec.get("half_widths", PackedFloat32Array()))
+
 	if racing_line.size() < 3:
 		return {}
 	var racing_line_length := 0.0
@@ -416,6 +432,8 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 		root.set_meta("target_length", spec.get("target_length", spec["loop_length"]))
 		root.set_meta("corner_profiles", spec.get("corner_profiles", {}))
 		root.set_meta("motifs", spec.get("motifs", []))
+		root.set_meta("corridor_max_half_width", TrackWidthProfile.widest(spec.get("half_widths", PackedFloat32Array())))
+		root.set_meta("road_width_amplitude", float(spec.get("road_width_amplitude", 0.0)))
 		root.set_meta("theme", prepared["theme"])
 		root.set_meta("room_shape", prepared["room_shape"])
 		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
@@ -445,8 +463,8 @@ static func _sample_centerline(controls: Variant) -> PackedVector2Array:
 	return TRACK_BUILDER_GEOMETRY.sample_centerline(packed)
 
 
-static func _corridor_edges(centerline: PackedVector2Array) -> Dictionary:
-	return TRACK_BUILDER_GEOMETRY.corridor_edges(centerline)
+static func _corridor_edges(centerline: PackedVector2Array, half_widths: PackedFloat32Array = PackedFloat32Array()) -> Dictionary:
+	return TRACK_BUILDER_GEOMETRY.corridor_edges(centerline, half_widths)
 
 static func _build_scene(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), environment_composer: Callable = Callable()) -> void:
 	await TRACK_BUILDER_SCENE.build(root, spec, centerline, edges, room_polygon, theme, stage, environment_composer)
@@ -602,16 +620,16 @@ static func _add_polygon(parent: Node, node_name: String, points: PackedVector2A
 	TRACK_BUILDER_NODES.add_polygon(parent, node_name, points, color, z)
 
 
-static func _add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2) -> void:
-	TRACK_BUILDER_NODES.add_finish_checker(parent, finish, tangent)
+static func _add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2, half_width: float = HALF_WIDTH) -> void:
+	TRACK_BUILDER_NODES.add_finish_checker(parent, finish, tangent, half_width)
 
 
 static func _add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String) -> void:
 	TRACK_BUILDER_NODES.add_wall_segment(parent, node_name, position, length, rotation, edge_texture_path)
 
 
-static func _gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:
-	return TRACK_BUILDER_NODES.gate_span_endpoints(sample, tangent, room_polygon, island_polygon)
+static func _gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array, half_width: float = HALF_WIDTH) -> PackedVector2Array:
+	return TRACK_BUILDER_NODES.gate_span_endpoints(sample, tangent, room_polygon, island_polygon, half_width)
 
 
 static func _corridor_gate_endpoint(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
@@ -622,8 +640,8 @@ static func _nearest_gate_boundary(sample: Vector2, direction: Vector2, room_pol
 	return TRACK_BUILDER_NODES.nearest_gate_boundary(sample, direction, room_polygon, island_polygon)
 
 
-static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int) -> void:
-	TRACK_BUILDER_NODES.add_gate_posts(root, spec, sample, tangent, gate_index)
+static func _add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int, half_width: float = HALF_WIDTH) -> void:
+	TRACK_BUILDER_NODES.add_gate_posts(root, spec, sample, tangent, gate_index, half_width)
 
 
 static func _add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float, span_endpoints: PackedVector2Array = PackedVector2Array()) -> void:
@@ -1062,12 +1080,12 @@ static func _line_boundary_props(root: Node2D, spec: Dictionary, centerline: Pac
 	TRACK_BUILDER_RACING.line_boundary_props(root, spec, centerline, outer_loop, corridor, room_polygon)
 
 
-static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}) -> void:
-	TRACK_BUILDER_RACING.build_racing_line(root, centerline, moments)
+static func _build_racing_line(root: Node2D, centerline: PackedVector2Array, moments: Dictionary = {}, half_widths: PackedFloat32Array = PackedFloat32Array()) -> void:
+	TRACK_BUILDER_RACING.build_racing_line(root, centerline, moments, half_widths)
 
 
-static func _racing_line_points(centerline: PackedVector2Array, moments: Dictionary, use_shortcut: bool) -> PackedVector2Array:
-	return TRACK_BUILDER_RACING.racing_line_points(centerline, moments, use_shortcut)
+static func _racing_line_points(centerline: PackedVector2Array, moments: Dictionary, use_shortcut: bool, half_widths: PackedFloat32Array = PackedFloat32Array()) -> PackedVector2Array:
+	return TRACK_BUILDER_RACING.racing_line_points(centerline, moments, use_shortcut, half_widths)
 
 
 static func _add_hidden_racing_line(parent: Node2D, line_name: String, points: PackedVector2Array) -> Line2D:
@@ -1244,8 +1262,8 @@ static func _expand_loop(points: PackedVector2Array, distance: float) -> PackedV
 	return TRACK_BUILDER_COLLISION.expand_loop(points, distance)
 
 
-static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52, tint: Color = Color.WHITE, edge_feather: float = 0.16) -> void:
-	TRACK_BUILDER_COLLISION.add_centerline_tiles(parent, centerline, texture_path, modulate_value, world_tile_size, opacity, tint, edge_feather)
+static func _add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52, tint: Color = Color.WHITE, edge_feather: float = 0.16, half_widths: PackedFloat32Array = PackedFloat32Array()) -> void:
+	TRACK_BUILDER_COLLISION.add_centerline_tiles(parent, centerline, texture_path, modulate_value, world_tile_size, opacity, tint, edge_feather, half_widths)
 
 
 static func _add_start_banner(parent: Node, start: Vector2, tangent: Vector2, corridor: PackedVector2Array) -> void:
