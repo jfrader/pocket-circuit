@@ -217,11 +217,12 @@ func _test_recovery_notification() -> bool:
 	controller.set("vehicle", racer)
 	controller.set("race_manager", manager)
 	controller.set("_route_progress_accumulator", -970.0)
-	controller.set("_watchdog_target_key", "4:-1")
+	# The watchdog key is an int composite now; any non-zero value must be re-anchored.
+	controller.set("_watchdog_target_key", ((4 + 1) << 8) | ((-1 + 1) & 0xFF))
 	controller.call("_on_external_recovery", racer)
 	if not _expect(float(controller.get("_route_progress_accumulator")) == 0.0, "external recovery should reset the route progress accumulator"):
 		return false
-	if not _expect(str(controller.get("_watchdog_target_key")) == "", "external recovery should re-anchor the watchdog target key"):
+	if not _expect(int(controller.get("_watchdog_target_key")) == 0, "external recovery should re-anchor the watchdog target key"):
 		return false
 	return true
 
