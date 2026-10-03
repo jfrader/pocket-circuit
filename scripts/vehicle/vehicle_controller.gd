@@ -75,6 +75,11 @@ var _contact_elapsed := 0.0
 var _contact_pair_last_seen: Dictionary = {}
 var _last_output_velocity := Vector2.ZERO
 var last_collision_response: Dictionary = {}
+var _contact_sample: Dictionary = {}
+var _contact_result: Dictionary = {}
+var _strongest_contact: Dictionary = {}
+var _seen_pairs: Dictionary = {}
+var _snapshot_result: Dictionary = {}
 var has_static_contact := false
 var static_contact_normal := Vector2.ZERO
 var _racer_tag: Label
@@ -329,8 +334,15 @@ func reset_dynamics_state() -> void:
 	_slide = {}
 
 
-func collision_snapshot() -> Dictionary:
-	return {"mass": mass}
+func collision_snapshot(p_result: Variant = null) -> Dictionary:
+	var result: Dictionary
+	if p_result is Dictionary:
+		result = p_result
+	else:
+		result = {}
+	result.clear()
+	result["mass"] = mass
+	return result
 
 
 # ═══════════════════════════════════════════════════════════════════════
@@ -987,10 +999,12 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 	var delta := state.step
 	_contact_elapsed += delta
 	var intended_forward := Vector2.UP.rotated(state.transform.get_rotation())
-	var strongest_contact: Dictionary = {}
+	_strongest_contact.clear()
+	var strongest_contact: Dictionary = _strongest_contact
 	var strongest_score := -1.0
 	var strongest_static_score := -1.0
-	var seen_pairs: Dictionary = {}
+	_seen_pairs.clear()
+	var seen_pairs: Dictionary = _seen_pairs
 	has_static_contact = false
 	static_contact_normal = Vector2.ZERO
 
@@ -1020,13 +1034,14 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		if score <= strongest_score:
 			continue
 		strongest_score = score
-		strongest_contact = {
-			"collider_id": collider_id,
-			"other_mass": float((collider.call("collision_snapshot") as Dictionary).get("mass", 1.0)),
-			"normal": world_normal,
-			"relative_velocity": relative_velocity,
-			"impulse": impulse,
-		}
+		strongest_contact.clear()
+		strongest_contact["collider_id"] = collider_id
+		_snapshot_result.clear()
+		var snap: Dictionary = collider.call("collision_snapshot", _snapshot_result) as Dictionary
+		strongest_contact["other_mass"] = float(snap.get("mass", 1.0))
+		strongest_contact["normal"] = world_normal
+		strongest_contact["relative_velocity"] = relative_velocity
+		strongest_contact["impulse"] = impulse
 
 	for pair_id: int in _contact_pair_last_seen.keys():
 		if not seen_pairs.has(pair_id) and _contact_elapsed - float(_contact_pair_last_seen[pair_id]) > CONTACT_RELEASE_GRACE:
@@ -1036,19 +1051,20 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		var collider_id := int(strongest_contact["collider_id"])
 		var is_new_contact := not _contact_pair_last_seen.has(collider_id)
 		_contact_pair_last_seen[collider_id] = _contact_elapsed
-		last_collision_response = COLLISION_RESPONSE.resolve_contact({
-			"delta": delta,
-			"intended_forward": intended_forward,
-			"normal": strongest_contact["normal"],
-			"relative_velocity": strongest_contact["relative_velocity"],
-			"impulse": strongest_contact["impulse"],
-			"previous_velocity": _last_output_velocity,
-			"solver_velocity": state.linear_velocity,
-			"solver_angular_velocity": state.angular_velocity,
-			"self_mass": mass,
-			"other_mass": strongest_contact["other_mass"],
-			"is_new_contact": is_new_contact,
-		})
+		_contact_sample.clear()
+		_contact_sample["delta"] = delta
+		_contact_sample["intended_forward"] = intended_forward
+		_contact_sample["normal"] = strongest_contact["normal"]
+		_contact_sample["relative_velocity"] = strongest_contact["relative_velocity"]
+		_contact_sample["impulse"] = strongest_contact["impulse"]
+		_contact_sample["previous_velocity"] = _last_output_velocity
+		_contact_sample["solver_velocity"] = state.linear_velocity
+		_contact_sample["solver_angular_velocity"] = state.angular_velocity
+		_contact_sample["self_mass"] = mass
+		_contact_sample["other_mass"] = strongest_contact["other_mass"]
+		_contact_sample["is_new_contact"] = is_new_contact
+		_contact_result.clear()
+		last_collision_response = COLLISION_RESPONSE.resolve_contact(_contact_sample, _contact_result)
 		state.linear_velocity = last_collision_response["velocity"]
 		state.angular_velocity = float(last_collision_response["angular_velocity"])
 
