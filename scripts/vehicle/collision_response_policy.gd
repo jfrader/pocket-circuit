@@ -7,7 +7,13 @@ const ANGULAR_CONTACT_DAMPING_RATE := 12.0
 const MIN_SEPARATION_SPEED := 36.0
 
 
-static func resolve_contact(sample: Dictionary) -> Dictionary:
+static func resolve_contact(sample: Dictionary, p_result: Variant = null) -> Dictionary:
+	var result: Dictionary
+	if p_result is Dictionary:
+		result = p_result
+	else:
+		result = {}
+	result.clear()
 	var delta := maxf(float(sample.get("delta", 1.0 / 60.0)), 0.0001)
 	var intended_forward := (sample.get("intended_forward", Vector2.UP) as Vector2).normalized()
 	var right := Vector2(-intended_forward.y, intended_forward.x)
@@ -84,16 +90,15 @@ static func resolve_contact(sample: Dictionary) -> Dictionary:
 	else:
 		resolved_angular_velocity *= exp(-ANGULAR_CONTACT_DAMPING_RATE * delta)
 
-	return {
-		"velocity": velocity,
-		"angular_velocity": resolved_angular_velocity,
-		"closing_speed": closing_speed,
-		"impulse_speed": impulse_speed,
-		"mass_share": mass_share,
-		"severity": severity,
-		"loss_ratio": loss_ratio if not rear_contact else 0.0,
-		"nudge_ratio": nudge_ratio,
-		"heading_cap_degrees": heading_cap_degrees,
-		"rear_contact": rear_contact,
-		"is_new_contact": is_new_contact,
-	}
+	result["velocity"] = velocity
+	result["angular_velocity"] = resolved_angular_velocity
+	result["closing_speed"] = closing_speed
+	result["impulse_speed"] = impulse_speed
+	result["mass_share"] = mass_share
+	result["severity"] = severity
+	result["loss_ratio"] = loss_ratio if not rear_contact else 0.0
+	result["nudge_ratio"] = nudge_ratio
+	result["heading_cap_degrees"] = heading_cap_degrees
+	result["rear_contact"] = rear_contact
+	result["is_new_contact"] = is_new_contact
+	return result
