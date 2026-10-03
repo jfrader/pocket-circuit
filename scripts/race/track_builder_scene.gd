@@ -1,6 +1,70 @@
 class_name TrackBuilderScene
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
+const STRIP_WALL_STEP := 4
+const STRIP_PROP_OFFSET := 230.0
+const STRIP_PROP_RADIUS := 26.0
+
+
+static func build_strip(root: Node2D, prepared: Dictionary) -> void:
+	var spec: Dictionary = prepared["spec"]
+	var centerline: PackedVector2Array = prepared["centerline"]
+	var edges: Dictionary = prepared["edges"]
+	var room: PackedVector2Array = prepared["room_polygon"]
+	var bounds := TrackBuilderCore._polygon_bounds_rect(room)
+	TrackBuilderCore._add_polygon(root, "Floor", TrackBuilderCore._rect_points(bounds.get_center(), bounds.size + Vector2.ONE * 1520.0), Color("111316"), -22)
+	TrackBuilderCore._add_textured_polygon(root, "RoomSurface", TrackBuilderCore._expand_loop(room, 26.0), String(spec["floor_texture"]), spec["highlight"], -20, spec.get("floor_tile_world_size", TrackBuilderCore.DEFAULT_FLOOR_TILE_WORLD_SIZE), spec.get("floor_modulate", Color.WHITE))
+	var road_texture := String(spec["track_texture"])
+	var same_material := road_texture == String(spec["floor_texture"])
+	TrackBuilderCore._add_centerline_tiles(root, centerline, road_texture, 1.0 if same_material else float(spec.get("track_tile_modulate", 1.35)), spec.get("track_world_tile_size", Vector2.ZERO), 1.0 if same_material else float(spec.get("track_opacity", 0.52)), Color.WHITE, 0.0 if same_material else 0.16)
+	var surface := root.get_node_or_null("TrackSurface") as Line2D
+	if surface != null:
+		surface.closed = false
+	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
+	for index in room.size():
+		var a: Vector2 = room[index]
+		var b: Vector2 = room[(index + 1) % room.size()]
+		TrackBuilderCore._add_wall_segment(root, "Wall%d" % index, (a + b) * 0.5, a.distance_to(b), (b - a).angle(), edge_texture)
+	for side in ["left", "right"]:
+		var boundary: PackedVector2Array = edges[side]
+		var index := 0
+		while index < boundary.size() - 1:
+			var next := mini(boundary.size() - 1, index + STRIP_WALL_STEP)
+			var a := boundary[index]
+			var b := boundary[next]
+			TrackBuilderCore._add_wall_segment(root, "%sBoundary%d" % [side, index], (a + b) * 0.5, a.distance_to(b), (b - a).angle(), edge_texture)
+			index = next
+	var left: PackedVector2Array = edges["left"]
+	var right: PackedVector2Array = edges["right"]
+	for cap_index in [0, centerline.size() - 1]:
+		var a := left[cap_index]
+		var b := right[cap_index]
+		TrackBuilderCore._add_wall_segment(root, "StartCap" if cap_index == 0 else "FinishCap", (a + b) * 0.5, a.distance_to(b), (b - a).angle(), edge_texture)
+	for gate: Dictionary in prepared["strip_gates"]:
+		var index := int(gate["index"])
+		var tangent := Vector2.UP.rotated(float(gate["rotation"]))
+		var normal := tangent.rotated(PI * 0.5) * float(prepared["strip_half_width"])
+		var position: Vector2 = gate["position"]
+		TrackBuilderCore._add_cp(root, "Checkpoint%dFinish" % index if gate["is_finish_line"] else "Checkpoint%d" % index, position, tangent.angle() + PI, index, bool(gate["is_finish_line"]), float(gate["rotation"]), PackedVector2Array([position - normal, position + normal]))
+		TrackBuilderCore._add_gate_posts(root, spec, position, tangent, index)
+	var last: Dictionary = (prepared["strip_gates"] as Array)[-1]
+	TrackBuilderCore._add_finish_checker(root, last["position"], Vector2.UP.rotated(float(last["rotation"])))
+	var grid: Dictionary = prepared["strip_grid"]
+	TrackBuilderCore._add_grid(root, "GridForward", 0.0, [grid["player"].origin, grid["chaser"].origin], [grid["player"].get_rotation(), grid["chaser"].get_rotation()])
+	TrackBuilderCore._add_hidden_racing_line(root, "RacingLine", prepared["racing_line"])
+	(root.get_node("RacingLine") as Line2D).closed = false
+	var story: Dictionary = spec.get("story_kit", {})
+	var object_line: Dictionary = story.get("object_line", {})
+	var props: Array = object_line.get("assets", spec.get("ambient_props", []))
+	for index in range(10, centerline.size() - 10, maxi(1, centerline.size() / 5)):
+		if props.is_empty():
+			break
+		var tangent := (centerline[index + 1] - centerline[index - 1]).normalized()
+		var side := 1.0 if index % 2 == 0 else -1.0
+		var point := centerline[index] + tangent.rotated(PI * 0.5) * STRIP_PROP_OFFSET * side
+		if Geometry2D.is_point_in_polygon(point, room):
+			TrackBuilderCore._add_prop_with_collision(root, point, STRIP_PROP_RADIUS, String(props[posmod(index, props.size())]))
+
 
 static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), environment_composer: Callable = Callable()) -> void:
 	var left: PackedVector2Array = edges["left"]

@@ -39,7 +39,8 @@ static func create(
 		explicit_material_id: String = "",
 		explicit_palette_id: String = "",
 		sub_seed_overrides: Dictionary = {},
-		length_tier: String = "standard"
+		length_tier: String = "standard",
+		route_shape: String = "circuit"
 ) -> Dictionary:
 	var theme_text := String(theme)
 	var room_text := String(room)
@@ -61,7 +62,7 @@ static func create(
 			seeds[domain] = sub_seed_overrides[domain]
 	if int(seeds.get("route", -1)) != route_seed:
 		return {}
-	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds, length_tier)
+	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds, length_tier, route_shape)
 
 
 static func from_championship_event(event: Dictionary, championship_identity: Dictionary) -> Dictionary:
@@ -108,7 +109,8 @@ static func normalize(value: Variant) -> Dictionary:
 		String(raw.get("material_id", "")),
 		String(raw.get("palette_id", "")),
 		seeds as Dictionary,
-		String(length_tier)
+		String(length_tier),
+		String(raw.get("route_shape", "circuit"))
 	)
 	if canonical.is_empty():
 		return {}
@@ -131,7 +133,7 @@ static func apply_to_event(identity_value: Variant, vehicle_opponents: Array = [
 		"room": String(identity["room"]),
 		"seed": int(seeds["route"]),
 		"circuit": "generated",
-		"race_format": "circuit",
+		"race_format": String(identity["route_shape"]),
 		"reverse": bool(identity["reverse"]),
 		"act": int(identity["danger_level"]),
 		"length_tier": String(identity["length_tier"]),
@@ -159,6 +161,8 @@ static func encode_share_code(identity_value: Variant) -> Dictionary:
 	var identity := normalize(identity_value)
 	if identity.is_empty():
 		return _error("invalid_identity", "This circuit identity is incomplete or incompatible.")
+	if String(identity["route_shape"]) == "strip":
+		return _error("unsupported_shape", "Strip roads do not have share codes yet.")
 	var material_id := String(identity["material_id"])
 	var palette_id := String(identity["palette_id"])
 	var derived := WORLD_MATERIALS.resolve(
@@ -271,17 +275,23 @@ static func generation_options(identity_value: Variant) -> Dictionary:
 	var identity := normalize(identity_value)
 	if identity.is_empty():
 		return {}
-	return {
+	var options := {
 		"act": int(identity["danger_level"]),
 		"length_tier": String(identity["length_tier"]),
 		"sub_seeds": (identity["sub_seeds"] as Dictionary).duplicate(true),
 		"material_id": String(identity["material_id"]),
 		"palette_id": String(identity["palette_id"]),
 	}
+	if String(identity["route_shape"]) == "strip":
+		options["route_shape"] = "strip"
+		options["reverse"] = bool(identity["reverse"])
+	return options
 
 
-static func _canonical_identity(theme: String, room: String, reverse: bool, danger_level: int, material_id: String, palette_id: String, seeds_value: Dictionary, length_tier: String = "standard") -> Dictionary:
+static func _canonical_identity(theme: String, room: String, reverse: bool, danger_level: int, material_id: String, palette_id: String, seeds_value: Dictionary, length_tier: String = "standard", route_shape: String = "circuit") -> Dictionary:
 	if not theme in THEMES or not room in ROOMS or danger_level < 1 or danger_level > 3:
+		return {}
+	if not route_shape in ["circuit", "strip"]:
 		return {}
 	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
 		return {}
@@ -311,6 +321,7 @@ static func _canonical_identity(theme: String, room: String, reverse: bool, dang
 		"theme": theme,
 		"room": room,
 		"reverse": reverse,
+		"route_shape": route_shape,
 		"danger_level": danger_level,
 		"length_tier": length_tier,
 		"material_id": material_id,
@@ -334,7 +345,7 @@ static func _build_display_name(identity: Dictionary) -> String:
 	var nouns: Array = THEME_NOUNS[String(identity["theme"])]
 	var adjective := String(NAME_ADJECTIVES[posmod(seed, NAME_ADJECTIVES.size())])
 	var noun := String(nouns[posmod(seed / NAME_ADJECTIVES.size(), nouns.size())])
-	return "%s %s Circuit" % [adjective, noun]
+	return "%s %s %s" % [adjective, noun, "Strip" if String(identity["route_shape"]) == "strip" else "Circuit"]
 
 
 static func _build_summary(identity: Dictionary) -> String:
@@ -377,6 +388,8 @@ static func _circuit_fingerprint(identity: Dictionary, include_direction: bool) 
 	])
 	if include_direction:
 		parts.append("reverse=%s" % str(identity["reverse"]))
+	if String(identity["route_shape"]) == "strip":
+		parts.append("route_shape=strip")
 	var seeds: Dictionary = identity["sub_seeds"]
 	for domain: String in DOMAINS:
 		parts.append("%s=%d" % [domain, int(seeds[domain])])
