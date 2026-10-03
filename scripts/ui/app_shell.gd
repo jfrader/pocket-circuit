@@ -25,6 +25,7 @@ var _button_focus_chain: Array[Button] = []
 var _screen := "title"
 var _event_id := ""
 var _quick_race := false
+var _quick_strip := false
 var _map_act_number := 1
 var _quick_race_theme := StringName(GENERATED_CIRCUITS.THEMES[0])
 var _quick_race_room: StringName = &"classic"
@@ -38,6 +39,7 @@ var _entrance_generation := 0
 var _save_error_back_action := Callable()
 var _current_vehicle_select_id := ""
 var _quick_race_vehicle_id := ""
+var _quick_strip_vehicle_id := ""
 ## Candidate portrait seed shown on the Driver screen before the player keeps it.
 var _preview_avatar_seed := 0
 ## Where the Driver screen returns to, so it can be opened from more than one screen.
@@ -143,6 +145,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_screen = "quick_race"
 	_event_id = ""
 	_quick_race = true
+	_quick_strip = false
 	_quick_race_reverse = false
 	_roll_quick_race()
 	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
@@ -169,6 +172,45 @@ func show_quick_race(_requested_act: int = 0) -> void:
 		var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
 		seed_controls = _add_quick_race_seed_controls(seed_status)
 	_add_button("CHANGE CAR · %s" % String(CATALOG.get_vehicle(_quick_race_vehicle_id).get("name", "Rustbug")).to_upper(), Callable(self, "show_vehicle_select").bind("", true))
+	_add_button("BACK TO TITLE", Callable(self, "show_title"))
+	_footer.text = "EXHIBITION RESULTS DO NOT SAVE  ·  " + BACK_HINT
+	if not seed_controls.is_empty():
+		_complete_focus_row(seed_controls, play_button)
+	_queue_content_entrance()
+	_grab_button_focus_after_layout(play_button, _entrance_generation)
+
+
+func show_quick_strip(_requested_act: int = 0) -> void:
+	_screen = "quick_strip"
+	_event_id = ""
+	_quick_strip = true
+	_quick_race = false
+	_quick_race_reverse = false
+	_roll_quick_race()
+	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
+	_quick_race_entry_count += 1
+	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
+	var progress: Dictionary = _app.call("get_save_data")
+	if _quick_strip_vehicle_id.is_empty():
+		_quick_strip_vehicle_id = _selected_vehicle(progress)
+	_configure_stage(&"map", _quick_strip_vehicle_id, "rae", String(_quick_race_theme))
+	_add_kicker("QUICK STRIP · RESULTS DO NOT SAVE")
+	var quick_identity: Dictionary = _current_quick_identity()
+	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
+	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
+	_content.add_child(_quick_identity_heading)
+	_quick_identity_summary = _label(String(quick_identity.get("summary", "")), 13, SKIN.CREAM_DIM)
+	_quick_identity_summary.name = "QuickCircuitSummary"
+	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
+	_content.add_child(_quick_identity_summary)
+	_register_button_focus(_add_difficulty_picker())
+	var play_button := _add_big_play_button(Callable(self, "_start_quick_strip"), false)
+	var seed_controls: Array[Control] = []
+	if OS.is_debug_build():
+		var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
+		seed_controls = _add_quick_race_seed_controls(seed_status)
+	_add_button("CHANGE CAR · %s" % String(CATALOG.get_vehicle(_quick_strip_vehicle_id).get("name", "Rustbug")).to_upper(), Callable(self, "show_vehicle_select").bind("", true))
 	_add_button("BACK TO TITLE", Callable(self, "show_title"))
 	_footer.text = "EXHIBITION RESULTS DO NOT SAVE  ·  " + BACK_HINT
 	if not seed_controls.is_empty():
@@ -307,7 +349,9 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	var event := CATALOG.get_event(event_id)
 	var progress: Dictionary = _app.call("get_save_data")
 	var selected_vehicle := _selected_vehicle(progress)
-	if quick_race and not _quick_race_vehicle_id.is_empty():
+	if _quick_strip and not _quick_strip_vehicle_id.is_empty():
+		selected_vehicle = _quick_strip_vehicle_id
+	elif quick_race and not _quick_race_vehicle_id.is_empty():
 		selected_vehicle = _quick_race_vehicle_id
 	_current_vehicle_select_id = selected_vehicle
 	var unlocked_vehicles: Array = progress.get("unlocked_vehicles", ["rustbug"])
@@ -319,7 +363,7 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 		roster = CATALOG.championship_vehicle_ids()
 	_page.hide()
 	_art_menu.set("reduced_motion", _reduced_motion_enabled())
-	var context := "QUICK RACE · YOUR MACHINE" if quick_race else String(event.get("name", "CHAMPIONSHIP")).to_upper()
+	var context := "QUICK STRIP · YOUR MACHINE" if _quick_strip else ("QUICK RACE · YOUR MACHINE" if quick_race else String(event.get("name", "CHAMPIONSHIP")).to_upper())
 	_art_menu.call("show_garage", selected_vehicle, unlocked_vehicles, context, "NEXT: TRACK" if quick_race and event_id.is_empty() else "PLAY", roster)
 
 
@@ -489,7 +533,7 @@ func go_back() -> void:
 	match _screen:
 		"title":
 			return
-		"map", "settings", "credits", "reset_confirmation", "quick_race":
+		"map", "settings", "credits", "reset_confirmation", "quick_race", "quick_strip":
 			show_title()
 		"driver":
 			_leave_driver()
@@ -501,7 +545,9 @@ func go_back() -> void:
 		"briefing":
 			show_map()
 		"vehicle_select":
-			if _quick_race:
+			if _quick_strip:
+				show_quick_strip()
+			elif _quick_race:
 				show_quick_race()
 			else:
 				show_briefing(_event_id)
@@ -632,7 +678,9 @@ func _configure_stage(
 
 func _on_art_vehicle_selected(vehicle_id: String) -> void:
 	_current_vehicle_select_id = vehicle_id
-	if _quick_race:
+	if _quick_strip:
+		_quick_strip_vehicle_id = vehicle_id
+	elif _quick_race:
 		_quick_race_vehicle_id = vehicle_id
 
 
@@ -645,6 +693,8 @@ func _on_art_action(action: StringName) -> void:
 			_app.call("request_new_championship")
 		&"quick_race":
 			_app.call("open_quick_race")
+		&"quick_strip":
+			_app.call("open_quick_strip")
 		&"discovery":
 			_app.call("open_discovery")
 		&"options":
@@ -661,7 +711,9 @@ func _on_art_action(action: StringName) -> void:
 		&"back":
 			go_back()
 		&"play_vehicle":
-			if _quick_race and _event_id.is_empty():
+			if _quick_strip and _event_id.is_empty():
+				show_quick_strip()
+			elif _quick_race and _event_id.is_empty():
 				show_quick_race()
 			else:
 				_start_current_selected_vehicle()
@@ -1028,12 +1080,14 @@ func _show_map_act(act_number: int) -> void:
 
 func _reset_quick_race_state() -> void:
 	_quick_race = false
+	_quick_strip = false
 	_quick_race_theme = StringName(GENERATED_CIRCUITS.THEMES[0])
 	_quick_race_room = &"classic"
 	_quick_race_seed = 875
 	_quick_race_reverse = false
 	_quick_race_length_tier = "standard"
 	_quick_race_vehicle_id = ""
+	_quick_strip_vehicle_id = ""
 	_quick_identity_heading = null
 	_quick_identity_summary = null
 
@@ -1064,7 +1118,15 @@ func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 
 
 func _current_quick_identity() -> Dictionary:
-	return _app.call("generated_circuit_identity", _quick_race_theme, _quick_race_room, _quick_race_seed, _quick_race_reverse, _quick_race_length_tier)
+	return _app.call(
+		"generated_circuit_identity",
+		_quick_race_theme,
+		_quick_race_room,
+		_quick_race_seed,
+		_quick_race_reverse,
+		_quick_race_length_tier,
+		"strip" if _quick_strip else "circuit"
+	)
 
 
 func _refresh_quick_identity_labels() -> void:
@@ -1094,6 +1156,15 @@ func _start_quick_race() -> void:
 	if not vehicle_id in qids:
 		vehicle_id = qids[0] if not qids.is_empty() else "rustbug"
 	_app.call("start_circuit_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id, _quick_race_reverse, _quick_race_length_tier)
+
+
+func _start_quick_strip() -> void:
+	var progress: Dictionary = _app.call("get_save_data")
+	var vehicle_id := _quick_strip_vehicle_id if not _quick_strip_vehicle_id.is_empty() else _selected_vehicle(progress)
+	var qids := CATALOG.quick_race_vehicle_ids()
+	if not vehicle_id in qids:
+		vehicle_id = qids[0] if not qids.is_empty() else "rustbug"
+	_app.call("start_strip_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id, _quick_race_reverse, _quick_race_length_tier)
 
 
 func _start_with_vehicle(vehicle_id: String) -> void:
