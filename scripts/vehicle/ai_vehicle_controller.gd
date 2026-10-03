@@ -200,6 +200,8 @@ var _stuck_target_key := 0
 var _best_checkpoint_distance := INF
 var _smoothed_steer := 0.0
 var _racing_line: PackedVector2Array = PackedVector2Array()
+## Off-route recovery reach: the fixed value widened by the track's widest road.
+var _off_route_distance := OFF_ROUTE_DISTANCE
 var _standard_racing_line: PackedVector2Array = PackedVector2Array()
 var _shortcut_racing_line: PackedVector2Array = PackedVector2Array()
 var _reference_path: PackedVector2Array = PackedVector2Array()
@@ -370,6 +372,8 @@ func _cache_checkpoints() -> void:
 			track = track.get_parent()
 	if track:
 		_allow_room_cuts = bool(track.get_meta("generated_track", false)) and bool(_difficulty_tuning()["room_cuts_allowed"])
+		_off_route_distance = OFF_ROUTE_DISTANCE + maxf(0.0, float(track.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)) - TrackBuilderCore.HALF_WIDTH)
+
 		var racing_line := track.get_node_or_null("RacingLine") as Line2D
 		if racing_line:
 			for point: Vector2 in racing_line.points:
@@ -1788,7 +1792,7 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 		_no_progress_time += delta
 
 	var lateral_distance := float(sample["distance"])
-	if lateral_distance >= OFF_ROUTE_DISTANCE:
+	if lateral_distance >= _off_route_distance:
 		_off_route_time += delta
 	else:
 		_off_route_time = 0.0

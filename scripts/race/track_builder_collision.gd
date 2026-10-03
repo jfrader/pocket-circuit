@@ -666,7 +666,7 @@ static func expand_loop(points: PackedVector2Array, distance: float) -> PackedVe
 	return result
 
 
-static func add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52, tint: Color = Color.WHITE, edge_feather: float = 0.16) -> void:
+static func add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52, tint: Color = Color.WHITE, edge_feather: float = 0.16, half_widths: PackedFloat32Array = PackedFloat32Array()) -> void:
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
@@ -677,6 +677,9 @@ static func add_centerline_tiles(parent: Node, centerline: PackedVector2Array, t
 	surface.points = centerline
 	surface.closed = true
 	surface.width = TrackBuilderCore.HALF_WIDTH * 2.0
+	if half_widths.size() == centerline.size():
+		surface.width = TrackWidthProfile.widest(half_widths) * 2.0
+		surface.width_curve = TrackWidthProfile.line_width_curve(centerline, half_widths)
 	surface.texture = texture
 	surface.texture_mode = Line2D.LINE_TEXTURE_TILE
 	surface.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
@@ -799,8 +802,19 @@ static func pocket_regions(spec: Dictionary, centerline: PackedVector2Array, roo
 	var regions: Array[Dictionary] = []
 	if pockets.is_empty():
 		return regions
-	var clearance := TrackBuilderCore.HALF_WIDTH + TrackBuilderCore.APRON_COLLIDER_CLEARANCE + TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH
-	var contours := Geometry2D.offset_polyline(centerline, clearance, Geometry2D.JOIN_ROUND, Geometry2D.END_JOINED)
+	var apron := TrackBuilderCore.APRON_COLLIDER_CLEARANCE + TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH
+	var half_widths: PackedFloat32Array = spec.get("half_widths", PackedFloat32Array())
+	var contours: Array[PackedVector2Array] = []
+	if half_widths.is_empty():
+		contours = Geometry2D.offset_polyline(centerline, TrackBuilderCore.HALF_WIDTH + apron, Geometry2D.JOIN_ROUND, Geometry2D.END_JOINED)
+	else:
+		# Bays sit outside the loop, so the exclusion is the variable outer road
+		# edge pushed out by the same apron the fixed corridor uses.
+		var edges := TrackBuilderCore._corridor_edges(centerline, half_widths)
+		var left: PackedVector2Array = edges["left"]
+		var right: PackedVector2Array = edges["right"]
+		var outer := left if absf(TrackBuilderCore._polygon_area(left)) > absf(TrackBuilderCore._polygon_area(right)) else right
+		contours = Geometry2D.offset_polygon(TrackBuilderGeometry.variable_boundary_loop(outer, centerline, true), apron, Geometry2D.JOIN_ROUND)
 	var exclusion := PackedVector2Array()
 	for contour: PackedVector2Array in contours:
 		if absf(TrackBuilderCore._polygon_area(contour)) > absf(TrackBuilderCore._polygon_area(exclusion)):
