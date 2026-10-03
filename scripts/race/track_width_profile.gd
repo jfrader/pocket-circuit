@@ -195,6 +195,12 @@ static func _place_events(arc: PackedFloat32Array, caps: PackedFloat32Array, see
 			break
 		if _overlaps(candidate, events, total):
 			continue
+		# The start/finish setup straight keeps today's width: no swells inside the
+		# same clear zone the pinches respect, so the gate, grid and landmarks do
+		# not move with the amplitude.
+		var center := fposmod(float(candidate["start"]) + float(candidate["length"]) * 0.5, total)
+		if minf(center, total - center) < FINISH_CLEAR_ARC + float(candidate["length"]) * 0.5:
+			continue
 		candidate["depth"] = amplitude * lerpf(SWELL_DEPTH_SPREAD, 1.0, _unit(seed, 60 + events.size()))
 		events.append(candidate)
 	var pinch_depth := minf(BASE_HALF_WIDTH - NARROW_HALF_WIDTH, amplitude * PINCH_DEPTH_SHARE)
