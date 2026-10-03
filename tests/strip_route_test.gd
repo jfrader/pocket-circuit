@@ -2,7 +2,7 @@ extends SceneTree
 
 const ROUTE := preload("res://scripts/race/strip_route.gd")
 const CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
-const MIN_STANDARD_LENGTH := 7500.0
+const MAX_HEADING_DEGREES := 45.2
 
 
 func _initialize() -> void:
@@ -13,6 +13,7 @@ func _initialize() -> void:
 		var minimum := INF
 		var maximum := 0.0
 		var sum := 0.0
+		var worst_heading := 0.0
 		for seed in 20:
 			var route := ROUTE.generate(seed, polygon)
 			var repeat := ROUTE.generate(seed, polygon)
@@ -24,9 +25,16 @@ func _initialize() -> void:
 			minimum = minf(minimum, length)
 			maximum = maxf(maximum, length)
 			sum += length
-			if length < MIN_STANDARD_LENGTH:
-				_fail("Short strip %.0f in %s seed %d" % [length, room, seed])
-				return
+			for index in range(1, line.size()):
+				var segment := line[index] - line[index - 1]
+				var heading := rad_to_deg(absf(Vector2.UP.angle_to(segment)))
+				worst_heading = maxf(worst_heading, heading)
+				if segment.y >= 0.0 or heading > MAX_HEADING_DEGREES:
+					_fail("Route reversed or exceeded north cone in %s seed %d: %.1f°" % [room, seed, heading])
+					return
+				if line[0].y - line[index].y <= ROUTE.START_STRAIGHT and absf(line[index].x - line[0].x) > 1.0:
+					_fail("Start bent before straight finished")
+					return
 			if not route["fallback"]:
 				generated_count += 1
 			if line[0].distance_to(line[-1]) < ROUTE.MIN_ENDPOINT_DISTANCE:
@@ -36,10 +44,14 @@ func _initialize() -> void:
 		if fallback.is_empty() or not fallback["fallback"] or not ROUTE.validate(fallback["centerline"], polygon):
 			_fail("Safe fallback failed in " + room)
 			return
+		for index in range(1, (fallback["centerline"] as PackedVector2Array).size()):
+			if (fallback["centerline"] as PackedVector2Array)[index].y >= (fallback["centerline"] as PackedVector2Array)[index - 1].y:
+				_fail("Fallback reversed in " + room)
+				return
 		if generated_count == 0:
 			_fail("No shaped candidates in " + room)
 			return
-		summaries.append("%s %.0f/%.0f/%.0f shaped=%d/20" % [room, minimum, sum / 20.0, maximum, generated_count])
+		summaries.append("%s %.0f/%.0f/%.0f max_heading=%.1f° shaped=%d/20" % [room, minimum, sum / 20.0, maximum, worst_heading, generated_count])
 	print("STRIP_ROUTE_TEST PASS min/avg/max: " + "; ".join(summaries))
 	quit(0)
 

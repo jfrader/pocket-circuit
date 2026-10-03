@@ -3,6 +3,7 @@ extends SceneTree
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const IDENTITY := preload("res://scripts/race/generated_circuit_identity.gd")
 const PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
+const LAYOUT_GATE_SPACING := 900.0
 
 
 func _initialize() -> void:
@@ -27,18 +28,25 @@ func _initialize() -> void:
 	if gates.size() < 3 or gates[0]["index"] != 0 or not gates[-1]["is_finish_line"] or gates[0]["arc"] >= gates[1]["arc"]:
 		_fail("Ordered strip gates")
 		return
-	if float(first["strip_length"]) < 10000.0 or gates.size() < 10:
+	if float(first["strip_length"]) < 700.0 or gates.size() < 4:
 		_fail("Strip length or distributed gates")
 		return
+	for index in range(1, gates.size()):
+		if int(gates[index]["index"]) != index or float(gates[index]["arc"]) <= float(gates[index - 1]["arc"]) or float(gates[index]["arc"]) - float(gates[index - 1]["arc"]) > LAYOUT_GATE_SPACING:
+			_fail("Strip gates must cover the north road in order")
+			return
 	var grid: Dictionary = first["strip_grid"]
 	if (grid["player"] as Transform2D).origin.distance_to((grid["chaser"] as Transform2D).origin) < 90.0:
 		_fail("Unsafe starting grid")
+		return
+	if absf((grid["player"] as Transform2D).get_rotation()) > 0.001 or absf((grid["chaser"] as Transform2D).get_rotation()) > 0.001 or (first["strip_caps"] as Dictionary)["start"].y <= (first["strip_caps"] as Dictionary)["finish"].y:
+		_fail("Strip grid must face north from the south cap")
 		return
 	for traffic: Dictionary in first["traffic_plan"]:
 		if absf(float(traffic["lane"])) > 0.5 or float(traffic["arc"]) >= float(gates[-1]["arc"]) or not traffic["behavior"] in [&"cruiser", &"cutter", &"line"]:
 			_fail("Unsafe traffic plan")
 			return
-	if (first["traffic_plan"] as Array).size() < 4 or (first["traffic_plan"] as Array).size() > 6:
+	if (first["traffic_plan"] as Array).size() < 2 or (first["traffic_plan"] as Array).size() > 6:
 		_fail("Traffic should scale with route length without forming a wall")
 		return
 	var reversed_identity := IDENTITY.create(&"kitchen", &"classic", 123, true, 0, "", "", {}, "standard", "strip")
@@ -70,7 +78,7 @@ func _initialize() -> void:
 			minimum = minf(minimum, length)
 			maximum = maxf(maximum, length)
 			sum += length
-			if length < 7500.0 or length > 26000.0:
+			if length < 700.0 or length > 6000.0:
 				_fail("Length outside drivable sprint budget: %s %.0f" % [tier, length])
 				return
 		lengths.append("%s %.0f/%.0f/%.0f" % [tier, minimum, sum / 3.0, maximum])
