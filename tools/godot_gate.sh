@@ -32,6 +32,9 @@ run_godot_test_checked() (
 	if [[ -n "$fixed_fps" ]]; then
 		clock_args=(--fixed-fps "$fixed_fps")
 	fi
-	POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" run_godot_checked timeout 1200 "$godot_bin" \
+	# PC_TEST_TIMEOUT (default 1800s) gives headroom on loaded/shared hosts;
+	# a real hang is still killed. Serial tests now share this budget.
+	local test_timeout="${PC_TEST_TIMEOUT:-1800}"
+	POCKET_CIRCUIT_EXPECT_OUTPUT="$expected_marker" run_godot_checked timeout "$test_timeout" "$godot_bin" \
 		--path "$project_root" --headless "${clock_args[@]}" --script "res://$test_relative"
 )
