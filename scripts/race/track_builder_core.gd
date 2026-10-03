@@ -208,10 +208,7 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 		var strip_room: PackedVector2Array = ROOM_SHAPES[room_shape]
 		var profile_growth := log(float(strip_profile["room_scale"]))
 		if not is_zero_approx(profile_growth):
-			var bounds := _polygon_bounds_rect(strip_room)
-			var along_scale := 1.0 + profile_growth * STRIP_LAYOUT.AXIS_SCALE_GAIN
-			var across_scale := 1.0 + profile_growth * STRIP_LAYOUT.CROSS_SCALE_GAIN
-			var scale := Vector2(along_scale, across_scale) if bounds.size.x >= bounds.size.y else Vector2(across_scale, along_scale)
+			var scale := Vector2(1.0 + profile_growth * STRIP_LAYOUT.WIDTH_SCALE_GAIN, 1.0 + profile_growth * STRIP_LAYOUT.NORTH_SCALE_GAIN)
 			strip_room = strip_room.duplicate()
 			for index in strip_room.size():
 				strip_room[index] *= scale
