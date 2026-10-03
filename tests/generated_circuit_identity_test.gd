@@ -5,6 +5,7 @@ const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 const PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const WIDTH_PROFILE := preload("res://scripts/race/track_width_profile.gd")
+const CHAMPIONSHIP := preload("res://scripts/progression/championship_circuit_identity.gd")
 const FIXTURE_SEED := 246810
 
 
@@ -201,6 +202,15 @@ func _run_test() -> void:
 	var v11_code := "PC1" + IDENTITIES._base32_encode(v11_payload)
 	var v11_res := IDENTITIES.decode_share_code(v11_code)
 	if not _expect(not bool(v11_res.get("ok", false)) and v11_res.get("kind") == "unsupported_generator", "a v11 code must still be rejected as unsupported_generator after the v12 bump"):
+		return
+
+	# The championship conversion must carry the width mode and length tier through.
+	var championship := CHAMPIONSHIP.create_championship(FIXTURE_SEED)
+	var event_identity: Dictionary = (championship["events"] as Dictionary)["kitchen_crumb_rush"].duplicate(true)
+	event_identity["road_width"] = WIDTH_PROFILE.MODE_SEEDED
+	event_identity["length_tier"] = "long"
+	var converted := IDENTITIES.from_championship_event({"theme": "kitchen", "room": String(event_identity["room"]), "act": 1}, event_identity)
+	if not _expect(String(converted.get("road_width", "")) == String(WIDTH_PROFILE.MODE_SEEDED) and String(converted.get("length_tier", "")) == "long", "championship conversion must carry road_width and length_tier through"):
 		return
 
 	print("GENERATED_CIRCUIT_IDENTITY_TEST PASS")

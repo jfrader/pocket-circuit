@@ -81,7 +81,9 @@ static func from_championship_event(event: Dictionary, championship_identity: Di
 		clampi(int(event.get("act", 1)), 1, 3),
 		String(championship_identity.get("material_id", "")),
 		String(championship_identity.get("palette_id", "")),
-		seeds as Dictionary
+		seeds as Dictionary,
+		String(championship_identity.get("length_tier", "standard")),
+		StringName(championship_identity.get("road_width", DEFAULT_ROAD_WIDTH))
 	)
 
 
