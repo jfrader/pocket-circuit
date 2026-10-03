@@ -3,9 +3,13 @@ extends Node
 var _worker: Thread
 
 
-func run_data_job(job: Callable) -> Dictionary:
+## Runs `job` on a background Thread. Caller must `await` the result.
+## `priority` defaults to LOW to preserve prior behaviour for all existing call sites.
+## Pass PRIORITY_NORMAL (or HIGH) explicitly for CPU-bound work that benefits from
+## better OS scheduling (e.g. first-load circuit generation).
+func run_data_job(job: Callable, priority: int = Thread.PRIORITY_LOW) -> Dictionary:
 	_worker = Thread.new()
-	var error := _worker.start(job, Thread.PRIORITY_LOW)
+	var error := _worker.start(job, priority)
 	if error != OK:
 		_worker = null
 		return {}
