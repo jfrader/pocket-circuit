@@ -46,7 +46,9 @@ const CIRCUIT_PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const PERSONAL_GHOST_SCRIPT := preload("res://scripts/race/personal_ghost.gd")
 const RACE_MUSIC_PLAN := preload("res://scripts/audio/race_music_plan.gd")
+const STARTING_GRID_SYNC_FRAMES := 2
 const COUNTDOWN_STEP_SECONDS := 0.65
+const PAUSE_STRIP_HEIGHT := 12.0
 ## The victory/defeat outro is a four-bar phrase. Hold the menu phase off it for
 ## roughly that long so the finish reads as an outro rather than a cut.
 const RESULTS_OUTRO_SECONDS := 7.0
@@ -273,7 +275,7 @@ func _prepare_race_async() -> void:
 		# The director swaps in this circuit's score directly on Starting Grid.
 		director.call("play_race_music")
 		for entry: Dictionary in _build_field_racers_for_preparation():
-			director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")))
+			await director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")), _loading_step.bind("Preparing race audio"))
 			await _loading_step("Preparing race audio")
 	for frame in 3:
 		await _loading_step("Warming graphics for the starting grid")
@@ -461,6 +463,8 @@ func _configure_vehicle(
 
 
 func _release_starting_grid() -> void:
+	if not is_inside_tree():
+		return
 	# Clear stale contacts while the body accepts its queued spawn transform.
 	# Restore normal collision immediately after the physics server syncs it.
 	for entry: Dictionary in _starting_collision_states:
@@ -468,8 +472,10 @@ func _release_starting_grid() -> void:
 		body.collision_layer = 0
 		body.collision_mask = 0
 		body.freeze = false
-	await get_tree().physics_frame
-	await get_tree().physics_frame
+	for _frame in STARTING_GRID_SYNC_FRAMES:
+		await get_tree().physics_frame
+		if not is_inside_tree():
+			return
 	for entry: Dictionary in _starting_collision_states:
 		var body := entry["body"] as RigidBody2D
 		if is_instance_valid(body):
@@ -537,6 +543,8 @@ func _track_generation_options(event: Dictionary) -> Dictionary:
 	}
 	if int(options["act"]) <= 0:
 		options.erase("act")
+	if event.has("road_width"):
+		options["road_width"] = event["road_width"]
 	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
 	if identity is Dictionary:
 		var identity_record := identity as Dictionary
@@ -581,7 +589,7 @@ func _apply_track_variant(requested_theme: StringName) -> void:
 			reset_manager.set("invalid_polygon", track_root.get_meta("island_invalid_polygon", PackedVector2Array()))
 	_track_variant_presenter = TRACK_VARIANT_SCRIPT.new() as TrackVariantPresenter
 	track_root.add_child(_track_variant_presenter)
-	_track_variant_presenter.configure(track_root, requested_theme, race_manager.is_reverse_direction())
+	_track_variant_presenter.configure(track_root, requested_theme)
 	var discovered_checkpoints: Array[Node] = []
 	for child: Node in track_root.get_children():
 		if child.is_in_group("track_checkpoints"):
@@ -607,7 +615,7 @@ func _configure_route_reference() -> void:
 			for tile: Node in tiles.get_children():
 				if tile is Node2D:
 					route.append((tile as Node2D).global_position)
-	race_manager.configure_route_reference(route)
+	race_manager.configure_route_reference(route, float(track_root.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)))
 
 
 func _abort_failed_race() -> void:
@@ -657,8 +665,7 @@ func _run_countdown() -> void:
 		_play_sfx(&"countdown", 0.82)
 		race_manager.report_countdown_tick(value)
 		# process_in_physics keeps the countdown on the fixed physics step so the
-		# race-start (and the hazard phase it fixes) is deterministic, instead of
-		# drifting with rendered frame rate.
+		# race start is deterministic instead of drifting with rendered frame rate.
 		await get_tree().create_timer(COUNTDOWN_STEP_SECONDS, false, true).timeout
 	_present_countdown("GO!")
 	_play_sfx(&"go", 0.92)
@@ -1114,33 +1121,34 @@ func _create_pause_overlay() -> void:
 	_pause_overlay.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_pause_overlay.visible = false
 	_pause_overlay.cancel_pressed.connect(_on_pause_cancel)
+	_pause_overlay.theme = MENU_SKIN.make_theme()
 	hud.add_child(_pause_overlay)
 
 	var shade := ColorRect.new()
 	shade.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	shade.color = Color(0.03, 0.04, 0.07, 0.82)
+	shade.color = Color(MENU_SKIN.VOID, 0.8)
 	shade.mouse_filter = Control.MOUSE_FILTER_STOP
 	_pause_overlay.add_child(shade)
 
 	_pause_menu_panel = PanelContainer.new()
 	_pause_menu_panel.name = "PauseMenuPanel"
-	_pause_menu_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.94), Color("f4c65a")))
+	_pause_menu_panel.add_theme_stylebox_override("panel", MENU_SKIN.card_style(MENU_SKIN.CREAM, 0.0))
 	_pause_menu_panel.position = Vector2(370.0, 105.0)
 	_pause_menu_panel.size = Vector2(540.0, 510.0)
 	_pause_overlay.add_child(_pause_menu_panel)
 	var menu_margin := MarginContainer.new()
 	menu_margin.add_theme_constant_override("margin_left", 48)
-	menu_margin.add_theme_constant_override("margin_top", 38)
+	menu_margin.add_theme_constant_override("margin_top", 34)
 	menu_margin.add_theme_constant_override("margin_right", 48)
 	menu_margin.add_theme_constant_override("margin_bottom", 38)
 	_pause_menu_panel.add_child(menu_margin)
 	var menu_column := VBoxContainer.new()
 	menu_column.add_theme_constant_override("separation", 18)
 	menu_margin.add_child(menu_column)
-	var menu_heading := Label.new()
+	menu_column.add_child(_pause_checker_strip())
+	var menu_heading := MENU_SKIN.style_label(Label.new(), 34, MENU_SKIN.INK, true)
 	menu_heading.text = "RACE PAUSED"
 	menu_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	menu_heading.add_theme_font_size_override("font_size", 34)
 	menu_column.add_child(menu_heading)
 	_pause_resume_button = _add_pause_button(menu_column, "Resume", _toggle_pause, true)
 	_add_pause_button(menu_column, "Settings", _show_pause_settings)
@@ -1151,30 +1159,25 @@ func _create_pause_overlay() -> void:
 
 	_pause_settings_panel = PanelContainer.new()
 	_pause_settings_panel.name = "PauseSettingsPanel"
-	_pause_settings_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.94), Color("4a8fb8")))
+	_pause_settings_panel.add_theme_stylebox_override("panel", MENU_SKIN.card_style(MENU_SKIN.CREAM, 0.0))
 	_pause_settings_panel.position = Vector2(320.0, 16.0)
 	_pause_settings_panel.size = Vector2(640.0, 688.0)
 	_pause_settings_panel.visible = false
 	_pause_overlay.add_child(_pause_settings_panel)
 	var settings_margin := MarginContainer.new()
 	settings_margin.add_theme_constant_override("margin_left", 44)
-	settings_margin.add_theme_constant_override("margin_top", 30)
+	settings_margin.add_theme_constant_override("margin_top", 26)
 	settings_margin.add_theme_constant_override("margin_right", 44)
 	settings_margin.add_theme_constant_override("margin_bottom", 30)
 	_pause_settings_panel.add_child(settings_margin)
 	var settings_column := VBoxContainer.new()
 	settings_column.add_theme_constant_override("separation", 12)
 	settings_margin.add_child(settings_column)
-	var settings_heading := Label.new()
+	settings_column.add_child(_pause_checker_strip())
+	var settings_heading := MENU_SKIN.style_label(Label.new(), 30, MENU_SKIN.INK, true)
 	settings_heading.text = "RACE SETTINGS"
 	settings_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	settings_heading.add_theme_font_size_override("font_size", 30)
 	settings_column.add_child(settings_heading)
-	var settings_copy := Label.new()
-	settings_copy.text = "Audio and comfort apply immediately. Difficulty and display stay in the main Settings screen."
-	settings_copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	settings_copy.custom_minimum_size = Vector2(0.0, 44.0)
-	settings_column.add_child(settings_copy)
 	var app := get_node_or_null("/root/App")
 	var settings: Dictionary = app.call("get_save_data") if app and app.has_method("get_save_data") else {}
 	_pause_settings_first_control = _add_pause_setting_slider(settings_column, "Master", "master_volume", float(settings.get("master_volume", 1.0)))
@@ -1182,9 +1185,8 @@ func _create_pause_overlay() -> void:
 	_add_pause_setting_slider(settings_column, "SFX", "sfx_volume", float(settings.get("sfx_volume", 0.9)))
 	_add_pause_setting_slider(settings_column, "Engine", "engine_volume", float(settings.get("engine_volume", settings.get("sfx_volume", 0.9))))
 	_add_pause_setting_slider(settings_column, "Tyres", "tyre_volume", float(settings.get("tyre_volume", settings.get("sfx_volume", 0.9))))
-	var comfort_heading := Label.new()
+	var comfort_heading := MENU_SKIN.style_label(Label.new(), 18, MENU_SKIN.INK, true)
 	comfort_heading.text = "COMFORT"
-	comfort_heading.add_theme_font_size_override("font_size", 18)
 	settings_column.add_child(comfort_heading)
 	var shake := CheckButton.new()
 	shake.name = "PauseReducedCameraShake"
@@ -1200,7 +1202,7 @@ func _create_pause_overlay() -> void:
 	motion.button_pressed = bool(settings.get("reduced_motion", false))
 	motion.toggled.connect(func(enabled: bool) -> void: _update_pause_setting("reduced_motion", enabled))
 	settings_column.add_child(motion)
-	_pause_settings_status = Label.new()
+	_pause_settings_status = MENU_SKIN.style_label(Label.new(), 15, MENU_SKIN.INK_SOFT)
 	_pause_settings_status.custom_minimum_size = Vector2(0.0, 42.0)
 	_pause_settings_status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	settings_column.add_child(_pause_settings_status)
@@ -1231,10 +1233,9 @@ func _show_pause_settings() -> void:
 func _add_pause_setting_slider(parent: Control, label_text: String, setting_key: String, value: float) -> HSlider:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
-	var label := Label.new()
+	var label := MENU_SKIN.style_label(Label.new(), 18, MENU_SKIN.INK, true)
 	label.text = label_text
 	label.custom_minimum_size = Vector2(120.0, 0.0)
-	label.add_theme_font_size_override("font_size", 18)
 	row.add_child(label)
 	var slider := HSlider.new()
 	slider.name = "PauseSetting_%s" % setting_key
@@ -1276,9 +1277,17 @@ func _apply_menu_button_art(button: Button, primary: bool = false) -> void:
 	MENU_SKIN.apply_button(button, primary)
 
 
+func _pause_checker_strip() -> Control:
+	var strip := Control.new()
+	strip.custom_minimum_size = Vector2(0.0, PAUSE_STRIP_HEIGHT)
+	strip.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	strip.draw.connect(func() -> void: MENU_SKIN.draw_flag(strip, Rect2(Vector2.ZERO, strip.size), PAUSE_STRIP_HEIGHT * 0.5))
+	return strip
+
+
 func _add_pause_button(parent: Control, text: String, callback: Callable, primary: bool = false) -> Button:
 	var button := MENU_BUTTON_SCRIPT.new() as Button
-	button.text = text
+	button.text = text.to_upper()
 	button.custom_minimum_size = Vector2(400.0, 58.0)
 	button.focus_mode = Control.FOCUS_ALL
 	button.add_theme_font_size_override("font_size", 18)

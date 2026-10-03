@@ -1,31 +1,28 @@
-# Gamestruments v1.0.5-rc1 (release candidate)
+# Gamestruments v1.1.0
 
-The native libraries in this directory are the packaged release-candidate build
-of Gamestruments v1.0.5-rc1 (generator `1.11.0`), built for Gamestruments PR #93
-at commit `8a320a054bef51dec83d31cf1e35dc84dacbe64b` by the release workflow:
+The native libraries in this directory are the packaged release build of
+Gamestruments v1.1.0, built from the `v1.1.0` tag (commit
+`b5e79b2bf3acc3d77648e355a08d024ce021d167`) by the release workflow:
 
-https://github.com/jfrader/gamestruments/actions/runs/36280187796
+https://github.com/jfrader/gamestruments/actions/runs/36916839091
 
-This is a release candidate, not a published or tagged release. It carries the
-re-voiced garage intro and Ignition build, the seed-change and section-cue
-crossfade holds, the state-change supersede fix, and atomic
-`generate(seed, opening_section)` handoffs. Pocket Circuit vendors it so its
-release gate stays credential-free and can load the addon without a Gamestruments
+It adds, over 1.0.5-rc1, the engine's shared `LivePlayer` (the end-of-blend and
+section-loop glitch fix), the Suspense match phases and Trance style, and the
+documented quit-without-leak recipe. Pocket Circuit vendors it so its release
+gate stays credential-free and can load the addon without a Gamestruments
 source checkout.
 
-Vendored binaries, taken from the workflow's native Linux and Windows
-artifacts:
+Vendored binaries, taken from the release's Godot 4 kit archive
+(`gamestruments-1.1.0-godot4.zip`, sha256
+`c4c32368ca99faf49e9b83f5da7f63214564037b545c49e47c5177043ac9b78d`):
 
 - Linux x86_64 `bin/libgamestruments_godot.so` — sha256
-  `6596200dd2342579d44f0540c56adfab3cb9925fdc6a19ca15c50a8c3397de85`
+  `af0ef6c9f8015242466528e4512b995f90ab63989da6b72ce29baa7c41979716`
 - Windows x86_64 `bin/gamestruments_godot.dll` — sha256
-  `7777ea7d808719e3152316848d98a167263774d12d0ab031d0488494d9158a9c`
+  `5c76eb949df8e28b6552f586e916f0d09018242a51074bfd7d4c390d6dac6da8`
 
-The candidate Godot 4 kit archive
-(`gamestruments-1.0.5-rc1-godot4.zip`, sha256
-`62ceb1818577b1e7056fb9ca570d9760d78f0a6a47c6d6077ca150a34f2263de`) supplies the
-`gamestruments.gdextension` and `LICENSE.md` committed beside these libraries;
-both are byte-identical to the previous pin and unchanged.
+The kit's `gamestruments.gdextension` and `LICENSE.md` are byte-identical to
+the previous pin and unchanged.
 
 Replace this vendored copy with a credentialed release fetch when a suitable
 credential exists. Use a fine-grained GitHub PAT with `Contents: read` access

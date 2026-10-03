@@ -4,12 +4,22 @@ set -Eeuo pipefail
 readonly PROJECT_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)"
 readonly SCRIPT_PATH="$(realpath -- "${BASH_SOURCE[0]}")"
 
+# The game generates its music at runtime and ships no music file, so the trailer
+# needs a bed supplied explicitly. Record one from a packaged build to re-capture.
+readonly TRAILER_MUSIC_BED="${TRAILER_MUSIC_BED:-}"
+
 cleanup_session() {
 	if [[ -n "${game_pid:-}" ]]; then
 		kill "$game_pid" 2>/dev/null || true
 		wait "$game_pid" 2>/dev/null || true
 	fi
 }
+
+if [[ -z "$TRAILER_MUSIC_BED" || ! -f "$TRAILER_MUSIC_BED" ]]; then
+	echo "ERROR: set TRAILER_MUSIC_BED to an audio file to use as the trailer bed." >&2
+	echo "The game generates its music at runtime and ships no music file; record one from a packaged build." >&2
+	exit 1
+fi
 
 if [[ "${1:-}" == "--xvfb-session" ]]; then
 	mode="$2"
@@ -199,7 +209,7 @@ ffmpeg -nostdin -y -loglevel error \
 	-i "$temporary_root/workshop-scrapjaw.mp4" \
 	-i "$temporary_root/office-flicker.mp4" \
 	-loop 1 -t 3 -i "$trailer_root/ending_card.png" \
-	-stream_loop -1 -i "$PROJECT_ROOT/assets/audio/race_loop.wav" \
+	-stream_loop -1 -i "$TRAILER_MUSIC_BED" \
 	-filter_complex "[0:v]fps=30,format=yuv420p[v0];[1:v]fps=30,format=yuv420p[v1];[2:v]fps=30,format=yuv420p[v2];[3:v]fps=30,format=yuv420p[v3];[4:v]fps=30,format=yuv420p[v4];[5:v]fps=30,format=yuv420p[v5];[v1][v0][v2][v3][v4][v5]concat=n=6:v=1:a=0[v]" \
 	-map "[v]" -map 6:a:0 -t 25 -c:v libx264 -preset slow -b:v 6M -minrate 6M -maxrate 6M -bufsize 12M \
 	-x264-params "nal-hrd=cbr:force-cfr=1" \

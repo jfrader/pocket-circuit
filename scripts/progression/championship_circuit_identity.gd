@@ -18,6 +18,8 @@ const DOMAINS: Array[String] = [
 	"material",
 	"dressing",
 	"obstacle",
+	# Reserved: kept so the identity format does not change (see
+	# GeneratedCircuitIdentity.DOMAINS).
 	"hazard",
 ]
 

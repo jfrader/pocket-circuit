@@ -3,8 +3,11 @@ extends RefCounted
 
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
+const TRACK_WIDTH_PROFILE := preload("res://scripts/race/track_width_profile.gd")
+const ROAD_WIDTH_MODES: Array[StringName] = [TRACK_WIDTH_PROFILE.MODE_FLAT, TRACK_WIDTH_PROFILE.MODE_SEEDED]
+const DEFAULT_ROAD_WIDTH: StringName = TRACK_WIDTH_PROFILE.MODE_FLAT
 const SCHEMA_VERSION := 1
-const GENERATOR_VERSION := 7
+const GENERATOR_VERSION := 12
 const MAX_SEED := 0x7FFFFFFF
 const SHARE_PREFIX := "PC1"
 const SHARE_ALPHABET := "0123456789ABCDEFGHJKMNPQRSTVWXYZ"
@@ -15,6 +18,8 @@ const DOMAINS: Array[String] = [
 	"material",
 	"dressing",
 	"obstacle",
+	# Reserved: the moving hazard was removed, but its sub-seed stays so the
+	# identity and share-code format do not change.
 	"hazard",
 ]
 const THEMES: Array[String] = ["kitchen", "workshop", "office"]
@@ -37,13 +42,16 @@ static func create(
 		explicit_material_id: String = "",
 		explicit_palette_id: String = "",
 		sub_seed_overrides: Dictionary = {},
-		length_tier: String = "standard"
+		length_tier: String = "standard",
+		road_width: StringName = DEFAULT_ROAD_WIDTH
 ) -> Dictionary:
 	var theme_text := String(theme)
 	var room_text := String(room)
 	if not theme_text in THEMES or not room_text in ROOMS or not _is_seed(route_seed):
 		return {}
 	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
+		return {}
+	if road_width not in ROAD_WIDTH_MODES:
 		return {}
 	var level := clampi(danger_level if danger_level > 0 else GENERATED_RULES.default_act_for_theme(theme), 1, 3)
 	var seeds := {
@@ -59,7 +67,7 @@ static func create(
 			seeds[domain] = sub_seed_overrides[domain]
 	if int(seeds.get("route", -1)) != route_seed:
 		return {}
-	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds, length_tier)
+	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds, length_tier, road_width)
 
 
 static func from_championship_event(event: Dictionary, championship_identity: Dictionary) -> Dictionary:
@@ -73,7 +81,9 @@ static func from_championship_event(event: Dictionary, championship_identity: Di
 		clampi(int(event.get("act", 1)), 1, 3),
 		String(championship_identity.get("material_id", "")),
 		String(championship_identity.get("palette_id", "")),
-		seeds as Dictionary
+		seeds as Dictionary,
+		String(championship_identity.get("length_tier", "standard")),
+		StringName(championship_identity.get("road_width", DEFAULT_ROAD_WIDTH))
 	)
 
 
@@ -98,6 +108,10 @@ static func normalize(value: Variant) -> Dictionary:
 	var length_tier: Variant = raw.get("length_tier", GENERATED_RULES.DEFAULT_LENGTH_TIER)
 	if length_tier is not String or not GENERATED_RULES.LENGTH_TIERS.has(length_tier as String):
 		return {}
+	var road_width_v: Variant = raw.get("road_width", DEFAULT_ROAD_WIDTH)
+	if not (road_width_v is String or road_width_v is StringName) or StringName(road_width_v) not in ROAD_WIDTH_MODES:
+		return {}
+	var road_width := StringName(road_width_v)
 	var canonical := _canonical_identity(
 		String(raw.get("theme", "")),
 		String(raw.get("room", "")),
@@ -106,7 +120,8 @@ static func normalize(value: Variant) -> Dictionary:
 		String(raw.get("material_id", "")),
 		String(raw.get("palette_id", "")),
 		seeds as Dictionary,
-		String(length_tier)
+		String(length_tier),
+		road_width
 	)
 	if canonical.is_empty():
 		return {}
@@ -174,6 +189,7 @@ static func encode_share_code(identity_value: Variant) -> Dictionary:
 		1 if bool(identity["reverse"]) else 0,
 		int(identity["danger_level"]),
 		GENERATED_RULES.LENGTH_TIERS.find(String(identity["length_tier"])),
+		ROAD_WIDTH_MODES.find(StringName(identity.get("road_width", DEFAULT_ROAD_WIDTH))),
 	])
 	var seeds: Dictionary = identity["sub_seeds"]
 	for domain: String in DOMAINS:
@@ -219,13 +235,16 @@ static func decode_share_code(code: String) -> Dictionary:
 	var reverse_byte := int(body[offset + 2])
 	var danger_level := int(body[offset + 3])
 	var tier_index := int(body[offset + 4])
-	offset += 5
+	var road_index := int(body[offset + 5])
+	offset += 6
 	if theme_index < 0 or theme_index >= THEMES.size() or room_index < 0 or room_index >= ROOMS.size():
 		return _error("invalid_fields", "The share code contains an unknown theme or room.")
 	if reverse_byte not in [0, 1] or danger_level < 1 or danger_level > 3:
 		return _error("invalid_fields", "The share code contains an invalid direction or danger profile.")
 	if tier_index < 0 or tier_index >= GENERATED_RULES.LENGTH_TIERS.size():
 		return _error("invalid_fields", "The share code contains an unknown length profile.")
+	if road_index < 0 or road_index >= ROAD_WIDTH_MODES.size():
+		return _error("invalid_fields", "The share code contains an unknown road width mode.")
 	var seeds := {}
 	for domain: String in DOMAINS:
 		if offset + 4 > body.size():
@@ -250,7 +269,8 @@ static func decode_share_code(code: String) -> Dictionary:
 		String(material_result["value"]),
 		String(palette_result["value"]),
 		seeds,
-		GENERATED_RULES.LENGTH_TIERS[tier_index]
+		GENERATED_RULES.LENGTH_TIERS[tier_index],
+		ROAD_WIDTH_MODES[road_index]
 	)
 	if identity.is_empty():
 		return _error("invalid_fields", "The share code decoded, but its circuit identity is invalid.")
@@ -275,13 +295,16 @@ static func generation_options(identity_value: Variant) -> Dictionary:
 		"sub_seeds": (identity["sub_seeds"] as Dictionary).duplicate(true),
 		"material_id": String(identity["material_id"]),
 		"palette_id": String(identity["palette_id"]),
+		"road_width": identity.get("road_width", DEFAULT_ROAD_WIDTH),
 	}
 
 
-static func _canonical_identity(theme: String, room: String, reverse: bool, danger_level: int, material_id: String, palette_id: String, seeds_value: Dictionary, length_tier: String = "standard") -> Dictionary:
+static func _canonical_identity(theme: String, room: String, reverse: bool, danger_level: int, material_id: String, palette_id: String, seeds_value: Dictionary, length_tier: String = "standard", road_width: StringName = DEFAULT_ROAD_WIDTH) -> Dictionary:
 	if not theme in THEMES or not room in ROOMS or danger_level < 1 or danger_level > 3:
 		return {}
 	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
+		return {}
+	if road_width not in ROAD_WIDTH_MODES:
 		return {}
 	if not _valid_explicit_id(material_id) or not _valid_explicit_id(palette_id):
 		return {}
@@ -302,7 +325,7 @@ static func _canonical_identity(theme: String, room: String, reverse: bool, dang
 	palette_id = String(resolved["palette_id"])
 	var material_fallback := "base-%03d" % posmod(int(seeds["material"]), 1000)
 	var palette_fallback := "%s-default-%02d" % [theme, posmod(int(seeds["material"]) / 1000, 32)]
-	var danger := GENERATED_RULES.danger_profile(danger_level, int(seeds["obstacle"]), int(seeds["hazard"]))
+	var danger := GENERATED_RULES.danger_profile(danger_level, int(seeds["obstacle"]))
 	var identity := {
 		"schema_version": SCHEMA_VERSION,
 		"generator_version": GENERATOR_VERSION,
@@ -311,6 +334,7 @@ static func _canonical_identity(theme: String, room: String, reverse: bool, dang
 		"reverse": reverse,
 		"danger_level": danger_level,
 		"length_tier": length_tier,
+		"road_width": road_width,
 		"material_id": material_id,
 		"palette_id": palette_id,
 		"material_fallback_id": material_fallback,
@@ -345,8 +369,7 @@ static func _build_summary(identity: Dictionary) -> String:
 		palette = "fallback %s" % String(identity["palette_fallback_id"])
 	var danger: Dictionary = identity["danger_profile"]
 	var obstacle_count := int(danger["obstacle_count"])
-	var obstacle_text := "no static obstacles" if obstacle_count == 0 else "up to %d static obstacle%s" % [obstacle_count, "" if obstacle_count == 1 else "s"]
-	var danger_text := "%s · %s" % [obstacle_text, "moving hazard" if bool(danger["hazard_present"]) else "no moving hazard"]
+	var obstacle_text := "no obstacles" if obstacle_count == 0 else "up to %d obstacle%s" % [obstacle_count, "" if obstacle_count == 1 else "s"]
 	return "Seed %d · Route %s · %s · %s room / %s · Material %s / palette %s · %s · %s" % [
 		int(seeds["route"]),
 		String(identity["fingerprints"]["route"]).substr(0, 8).to_upper(),
@@ -356,7 +379,7 @@ static func _build_summary(identity: Dictionary) -> String:
 		material,
 		palette,
 		"Reverse" if bool(identity["reverse"]) else "Forward",
-		danger_text,
+		obstacle_text,
 	]
 
 
@@ -371,6 +394,7 @@ static func _circuit_fingerprint(identity: Dictionary, include_direction: bool) 
 		String(identity["room"]),
 		str(identity["danger_level"]),
 		String(identity["length_tier"]),
+		String(identity.get("road_width", DEFAULT_ROAD_WIDTH)),
 		String(identity["material_id"]),
 		String(identity["palette_id"]),
 	])

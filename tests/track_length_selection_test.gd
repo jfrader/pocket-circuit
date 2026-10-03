@@ -4,10 +4,12 @@ const APP_SHELL := preload("res://scripts/ui/app_shell.gd")
 const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
 const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 const RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+var _failed := false
 
 
 class MockApp extends Node:
 	var last_quick_tier := ""
+	var last_quick_theme := ""
 	var quick_draws := 0
 	var last_discovery_identity: Dictionary = {}
 	var favorites: Array = []
@@ -33,8 +35,9 @@ class MockApp extends Node:
 	func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard") -> Dictionary:
 		return IDENTITIES.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
 
-	func start_circuit_race(_theme: StringName, _room: StringName, _seed: int, _vehicle_id: String, _reverse: bool = false, length_tier: String = "standard") -> void:
+	func start_circuit_race(theme: StringName, _room: StringName, _seed: int, _vehicle_id: String, _reverse: bool = false, length_tier: String = "standard") -> void:
 		last_quick_tier = length_tier
+		last_quick_theme = String(theme)
 
 	func get_circuit_library() -> Dictionary:
 		return {"history": [], "favorites": favorites}
@@ -130,6 +133,8 @@ func _run_test() -> void:
 		return
 
 	await _test_ui_selection()
+	if _failed:
+		return
 
 	print("TRACK_LENGTH_SELECTION_TEST PASS")
 	quit(0)
@@ -148,11 +153,11 @@ func _test_ui_selection() -> void:
 		return
 	var first_seed := int(shell.get("_quick_race_seed"))
 	if not _expect(
-			String(shell.get("_quick_race_theme")) == "kitchen"
+			String(shell.get("_quick_race_theme")) in IDENTITIES.THEMES
 			and first_seed != 875
 			and String(shell.get("_quick_race_room")) == String(IDENTITIES.room_for_route_seed(first_seed))
 			and not bool(shell.get("_quick_race_reverse")),
-			"Quick Race should open on a rolled kitchen circuit, not seed 875"
+			"Quick Race should open on a rolled available theme, not seed 875"
 	):
 		return
 	if not _expect(shell.find_child("QuickRaceSize", true, false) == null, "Quick Race should not expose a size selector"):
@@ -170,6 +175,8 @@ func _test_ui_selection() -> void:
 		return
 	shell.call("_start_quick_race")
 	if not _expect(mock.last_quick_tier == second_tier, "starting the second quick race should forward the new profile"):
+		return
+	if not await _test_theme_coverage(shell, mock):
 		return
 		
 	root.remove_child(shell)
@@ -204,6 +211,45 @@ func _test_ui_selection() -> void:
 	mock.free()
 
 
+func _test_theme_coverage(shell: CanvasLayer, mock: MockApp) -> bool:
+	var previous_theme := String(shell.get("_quick_race_theme"))
+	for reroll in [true, false]:
+		var seen := {}
+		for _index in IDENTITIES.THEMES.size() * 2:
+			var previous_seed := int(shell.get("_quick_race_seed"))
+			if reroll:
+				var control: Button
+				for button: Button in shell.find_children("*", "Button", true, false):
+					if button.text == "REROLL":
+						control = button
+						break
+				if not _expect(control != null, "Quick Race must expose its real reroll action in debug"):
+					return false
+				control.pressed.emit()
+			else:
+				shell.call("show_quick_race")
+			await _wait_frames(2)
+			var theme := String(shell.get("_quick_race_theme"))
+			if not _expect(theme in IDENTITIES.THEMES and theme != previous_theme, "entries and rerolls must advance to another available theme"):
+				return false
+			if not _expect(not seen.has(theme), "every available theme must appear before the cycle repeats"):
+				return false
+			seen[theme] = true
+			if seen.size() == IDENTITIES.THEMES.size():
+				seen.clear()
+			var identity: Dictionary = shell.call("_current_quick_identity")
+			var stage := shell.get("_stage") as AppShellStage
+			if not _expect(identity["theme"] == theme and stage.theme_id == theme, "preview identity and artwork must match the chosen theme"):
+				return false
+			if not _expect(int(shell.get("_quick_race_seed")) != previous_seed, "changing theme must also draw a fresh circuit seed"):
+				return false
+			shell.call("_start_quick_race")
+			if not _expect(mock.last_quick_theme == theme, "Play must launch the displayed theme"):
+				return false
+			previous_theme = theme
+	return true
+
+
 func _reset_race_transition(app: Node) -> void:
 	app.set("_loading_cancelled", true)
 	if is_instance_valid(app.get("_loading_screen")):
@@ -221,6 +267,7 @@ func _wait_frames(count: int) -> void:
 func _expect(condition: bool, message: String) -> bool:
 	if condition:
 		return true
+	_failed = true
 	push_error("TRACK_LENGTH_SELECTION_TEST FAIL: " + message)
 	quit(1)
 	return false

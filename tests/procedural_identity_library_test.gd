@@ -16,13 +16,16 @@ const PINNED_AVATAR_PAYLOADS: Dictionary = {
 	"tess": "1f4a41b05957760863a0bc5f4f041f6871427c384507e3f78c1f2a70603d473a",
 	"cass": "5c3c13937a90eba243d0011179b3e0158ae4ea1b675d57bb7ef08ea59c11777e",
 }
+# Repinned for GURI-1302 (Upgrade avatars and generate persistent player and race
+# driver identities): the friendly, front-facing portrait redraw changes pixels
+# only. Payload pins above stay untouched and prove the trait contract held.
 const PINNED_AVATAR_PIXELS: Dictionary = {
-	"rae": "b59d5dd27637d2d4182c320bd241f62a3519474b25eef6f9de34d4f23359b371",
-	"inez": "9dbdcd5edc0bc64eb9d460075abfcb39a4ca76c6e2debde8ea723090e642f3f0",
-	"juniper": "1934a7fef2838f84085bc6460122d9d2f409f52a1d429c0ba3b6d0ac5379d7a0",
-	"milo": "95040d3d6ee5b2bad1b6a5bc312c8810193ed402a7089a838b9bbae128079479",
-	"tess": "77a64877bc83ed2314bdf120e5742ed2507f9b7f6d379d17ce3faa2f804ed9e9",
-	"cass": "1280674140232dcf3984c136fbf35a1c288558915d48872e3fcdfb78692129de",
+	"rae": "8fe7983fd3bd251eb09253ad10b64c4f1043053b11233c24edb511417b1c22de",
+	"inez": "12f40c822091bbe5a193ddcadad2ff08cd1e43380b281552957cc70a2007838e",
+	"juniper": "4d090f9e5457e37243ee226d3a44fe5127e5d7058f353a046416dd9bfcfddcf6",
+	"milo": "f25ada530a1e1d402a84f60ddf49f2bc40f9d1db7cd11a89cd70930e9245adb3",
+	"tess": "d8ae9727b102d2586b49a5e9b4c66aa3fb698b21bfdc720fb3905c23171a3f19",
+	"cass": "b6419be0d91a4785e567b5b5658665b75a84e49d220d6967411401aab5bca62b",
 }
 const PINNED_CAR_PAYLOADS: Dictionary = {
 	"rustbug": "8c0f4560b370a657c9ddfd48bd482649541d556f4d9b686c4bb633b143c4ba5a",
@@ -55,7 +58,7 @@ func _texture_hash(texture: Texture2D) -> String:
 
 
 func _initialize() -> void:
-	if not _expect(IDENTITIES.SOURCE_REVISION == "9fc832c9638471739a61aeac1e84fe44408212f5", "the vendored source revision should stay pinned"):
+	if not _expect(IDENTITIES.SOURCE_REVISION == "c341efaccefd9c9e530a24282ed1957494e54b0a", "the vendored source revision should stay pinned"):
 		return
 	for driver_id: String in DRIVER_IDS:
 		var mapping: Dictionary = CATALOG.get_driver(driver_id).get("avatar_art", {})

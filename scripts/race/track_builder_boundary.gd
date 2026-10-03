@@ -129,7 +129,7 @@ static func build_generated_outer_boundary_visuals(
 		var preferred_index := int(corners[slot])
 		if TrackBuilderCore._cyclic_index_distance(preferred_index, 0, centerline.size()) < 18:
 			continue
-		var accent_scale := Vector2(160.0 / accent_texture.get_width(), 70.0 / accent_texture.get_height())
+		var accent_scale := Vector2.ONE * TrackBuilderCore.PROP_SCALE.sprite_scale(accent_texture, TrackBuilderCore._texture_opaque_rect(accent_texture), 160.0)
 		var accent_footprint := TrackBuilderCore._texture_collision_footprint(accent_texture, &"convex", true)
 		var accent_size: Vector2 = (accent_footprint["size"] as Vector2) * accent_scale + Vector2.ONE * 2.0
 		var preferred_side := &"outer" if (slot + mode_offset) % 3 != 0 else &"inner"
@@ -148,6 +148,8 @@ static func build_generated_outer_boundary_visuals(
 				position = advance_footprint_outside_corridor(position, centerline, away_from_track, accent_size, tangent.angle())
 				position = pull_inside_room(position, centerline, room_polygon)
 				if (
+					_clear_of_sections(container, position, accent_size, tangent.angle())
+					and
 					TrackBuilderCore._oriented_rect_inside_polygon(position, accent_size, tangent.angle(), room_polygon)
 					and TrackBuilderCore._line_sweep_clears_footprint(centerline, position, accent_size, &"rect", tangent.angle(), TrackBuilderCore.HALF_WIDTH + TrackBuilderCore.APRON_COLLIDER_CLEARANCE)
 				):
@@ -173,7 +175,6 @@ static func build_generated_outer_boundary_visuals(
 		TrackBuilderCore._mark_solid_body(accent_body, accent_path, &"boundary_prop")
 		container.add_child(accent_body)
 		var accent_offset := TrackBuilderCore._add_texture_collision(accent_body, accent_texture, accent_scale, &"convex", true, 2.0)
-		TrackBuilderCore._add_directional_shadow(accent_body, accent_path, 160.0, 1.0, accent_size)
 		var accent_sprite := Sprite2D.new()
 		accent_sprite.name = "Sprite"
 		accent_sprite.texture = accent_texture
@@ -182,6 +183,7 @@ static func build_generated_outer_boundary_visuals(
 		accent_sprite.position = -accent_offset
 		TrackBuilderCore._mark_solid_visual(accent_sprite, accent_path, &"boundary_prop")
 		accent_body.add_child(accent_sprite)
+		TrackBuilderCore._add_directional_shadow(accent_sprite)
 		accent_count += 1
 	container.set_meta("section_count", section_count)
 	container.set_meta("outer_section_count", outer_section_count)
@@ -237,13 +239,30 @@ static func add_generated_boundary_section(
 	side: StringName,
 	side_index: int
 ) -> bool:
-	var texture := textures[posmod(run_index + side_index, textures.size())]
+	for attempt in textures.size():
+		var texture := textures[posmod(run_index + side_index + attempt, textures.size())]
+		if _try_boundary_section(container, texture, centerline, boundary, room_polygon, centerline_index, run_index, side, side_index):
+			return true
+	return false
+
+
+static func _try_boundary_section(
+	container: Node2D,
+	texture: Texture2D,
+	centerline: PackedVector2Array,
+	boundary: PackedVector2Array,
+	room_polygon: PackedVector2Array,
+	centerline_index: int,
+	run_index: int,
+	side: StringName,
+	side_index: int
+) -> bool:
 	var boundary_sample := closest_point_on_loop(centerline[centerline_index], boundary)
 	var boundary_index := int(boundary_sample["index"])
 	var boundary_position: Vector2 = boundary_sample["position"]
 	var tangent := (boundary[(boundary_index + 1) % boundary.size()] - boundary[boundary_index]).normalized()
 	var away_from_track := (boundary_position - centerline[centerline_index]).normalized()
-	var sprite_scale := Vector2(156.0 / texture.get_width(), 56.0 / texture.get_height())
+	var sprite_scale := Vector2.ONE * TrackBuilderCore.PROP_SCALE.sprite_scale(texture, TrackBuilderCore._texture_opaque_rect(texture), 156.0)
 	var footprint := TrackBuilderCore._texture_collision_footprint(texture, &"convex", true)
 	var footprint_size: Vector2 = (footprint["size"] as Vector2) * sprite_scale
 	var position := boundary_position + away_from_track * 8.0
@@ -254,7 +273,8 @@ static func add_generated_boundary_section(
 	var nearest_centerline: Vector2 = nearest_centerline_sample["position"]
 	var run_center := int(round((float(run_index) + 0.5) * float(centerline.size()) / 8.0)) % centerline.size()
 	if (
-		position.distance_to(nearest_centerline) < TrackBuilderCore.HALF_WIDTH
+		not _clear_of_sections(container, position, footprint_size, tangent.angle())
+		or position.distance_to(nearest_centerline) < TrackBuilderCore.HALF_WIDTH
 		or not TrackBuilderCore._oriented_rect_inside_polygon(position, footprint_size, tangent.angle(), room_polygon)
 		or not TrackBuilderCore._line_sweep_clears_footprint(centerline, position, footprint_size, &"rect", tangent.angle(), TrackBuilderCore.HALF_WIDTH + TrackBuilderCore.APRON_COLLIDER_CLEARANCE)
 		or TrackBuilderCore._cyclic_index_distance(int(nearest_centerline_sample["index"]), run_center, centerline.size()) >= centerline.size() / 16
@@ -277,7 +297,6 @@ static func add_generated_boundary_section(
 	container.add_child(body)
 	var offset := TrackBuilderCore._add_texture_collision(body, texture, sprite_scale, &"convex", true, 0.0)
 	(body.get_node("AssetCollision") as CollisionShape2D).name = "RailCollision"
-	TrackBuilderCore._add_directional_shadow(body, texture.resource_path, 156.0, 1.0, footprint_size)
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
@@ -286,7 +305,27 @@ static func add_generated_boundary_section(
 	sprite.position = -offset
 	TrackBuilderCore._mark_solid_visual(sprite, texture.resource_path, &"rail")
 	body.add_child(sprite)
+	TrackBuilderCore._add_directional_shadow(sprite)
 	return true
+
+
+static func _clear_of_sections(container: Node2D, position: Vector2, size: Vector2, rotation: float) -> bool:
+	var polygon := _footprint_polygon(position, size, rotation)
+	for child: Node2D in container.get_children():
+		if not child.has_meta("footprint_size"):
+			continue
+		var other_size: Vector2 = child.get_meta("footprint_size")
+		var other := _footprint_polygon(child.position, other_size, child.rotation)
+		if not Geometry2D.intersect_polygons(polygon, other).is_empty():
+			return false
+	return true
+
+
+static func _footprint_polygon(position: Vector2, size: Vector2, rotation: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for corner: Vector2 in [Vector2(-1, -1), Vector2(1, -1), Vector2(1, 1), Vector2(-1, 1)]:
+		points.append(position + (corner * (size * 0.5 + Vector2.ONE * 4.0)).rotated(rotation))
+	return points
 
 
 static func add_generated_boundary_run_fallback(
@@ -411,4 +450,3 @@ static func island_region(room_polygon: PackedVector2Array, ribbon: PackedVector
 			best_score = score
 			best = piece
 	return best
-

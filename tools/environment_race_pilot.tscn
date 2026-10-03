@@ -1,0 +1,11 @@
+[gd_scene format=3 uid="uid://b064dvvufljbq"]
+
+[ext_resource type="PackedScene" uid="uid://cxdjtkaox48xt" path="res://scenes/race/prototype_race.tscn" id="1_j4l5n"]
+[ext_resource type="Script" uid="uid://ca35e6r7t02fo" path="res://tools/environment_race_pilot.gd" id="2_ft1fu"]
+
+[node name="NativeRacePilot" type="Node2D" unique_id=576690686]
+
+[node name="Race" parent="." unique_id=364870414 instance=ExtResource("1_j4l5n")]
+script = ExtResource("2_ft1fu")
+pilot_theme = "kitchen"
+capture_mode = false

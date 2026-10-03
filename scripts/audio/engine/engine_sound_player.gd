@@ -11,9 +11,12 @@ signal fallback_activated(reason: String)
 signal buffer_underrun(count: int)
 
 const SAMPLE_RATE := 22050
-const BUFFER_SECONDS := 0.12
-## Bound one frame's fill so a stalled audio server cannot allocate unbounded.
-const MAX_FRAMES_PER_FILL := 4096
+## How much generated audio the generator can queue ahead of the mixer. A long
+## main-thread stall drains this queue; 0.5 s absorbs a half-second frame without
+## a gap (the previous 0.12 s starved on routine mid-race spikes). This buffer is
+## only the local engine voice on the Engine bus — the score lives on the Music
+## bus — so the extra depth adds no audible latency to the music.
+const BUFFER_SECONDS := 0.5
 ## A buffer with all but this many frames free has run dry: the server drained
 ## everything queued before this frame rendered. Slack absorbs the priming frame.
 const STARVATION_SLACK_FRAMES := 8
@@ -72,7 +75,9 @@ func _process(delta: float) -> void:
 		buffer_underrun.emit(_underruns)
 	if available <= 0:
 		return
-	_fill_buffer(mini(available, MAX_FRAMES_PER_FILL))
+	# `available` is bounded by the generator's own capacity, so filling it can
+	# never allocate unbounded — it just restores the queue after a stall.
+	_fill_buffer(available)
 	if _playback.push_buffer(_buffer):
 		_primed = true
 
@@ -124,13 +129,30 @@ func start() -> void:
 	if _headless or _player == null:
 		return
 	_player.volume_db = _current_volume_db()
-	_bind_playback()
+	if _bind_playback():
+		_prefill_buffer()
+
+
+## Fill the generator to capacity before the first frame, so the queue starts
+## full rather than racing the mixer from empty. A stall in the first moments of
+## driving then has the whole buffer to spend instead of a handful of frames.
+func _prefill_buffer() -> void:
+	if _playback == null:
+		return
+	var available := _playback.get_frames_available()
+	if available <= 0:
+		return
+	_fill_buffer(available)
+	if _playback.push_buffer(_buffer):
+		_primed = true
 
 
 func stop() -> void:
-	if _player != null and _player.playing:
-		_player.stop()
 	if _player != null:
+		# Stop unconditionally: a live generator playback can report not playing
+		# while it is still registered with the audio server, and stopping the
+		# player is what asks the server to retire that playback (godot#76745).
+		_player.stop()
 		_player.volume_db = SILENCE_DB
 	# The playback died with the player; writing into it after a later play()
 	# would leave the voice silent while the player still reports playing.

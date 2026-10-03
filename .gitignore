@@ -19,6 +19,7 @@ addons/godot_mcp/
 # Gamestruments GDExtension binary (sync with tools/sync_gamestruments.sh)
 addons/gamestruments/bin/
 addons/gamestruments/*.gdextension
+addons/gamestruments/*.gdextension.uid
 
 # Editor / OS
 .DS_Store

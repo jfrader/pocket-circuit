@@ -60,6 +60,15 @@ class TestApp extends Node:
 	func get_save_data() -> Dictionary:
 		return save_data
 
+	func get_championship_event(event_id: String) -> Dictionary:
+		return get_tree().root.get_node("App").call("get_championship_event", event_id)
+
+	func update_setting(key: String, value: Variant) -> bool:
+		if key == "difficulty" and value is String:
+			save_data["difficulty"] = value
+			return true
+		return false
+
 	func get_mastery_state(event_id: String, vehicle_id: String = "") -> Dictionary:
 		if mastery_calibrating:
 			return {
@@ -194,6 +203,17 @@ func _run_test() -> void:
 		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should open with PLAY focused for a one-click start")
 		quit(1)
 		return
+	var difficulty_picker := shell.find_child("Difficulty", true, false) as OptionButton
+	if difficulty_picker == null:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race should surface the shared difficulty picker")
+		quit(1)
+		return
+	difficulty_picker.select(2)
+	difficulty_picker.item_selected.emit(2)
+	if app.save_data["difficulty"] != "clockwork":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Quick Race difficulty should persist through update_setting")
+		quit(1)
+		return
 	shell.call("go_back")
 	await process_frame
 	if String(shell.get("_screen")) != "title":
@@ -225,41 +245,26 @@ func _run_test() -> void:
 	shell.call("show_map", {}, 3)
 	await process_frame
 	await process_frame
-	var completed_event := shell.find_child("Event_office_last_light", true, false) as Button
-	if completed_event == null or not completed_event.text.contains("1ST · 10 PTS") or not completed_event.text.contains("MASTERY GOLD"):
+	var completed_event := shell.find_child("Stop_office_last_light", true, false)
+	var completed_text := String(completed_event.get("text")) if completed_event != null else ""
+	if completed_event == null or not completed_text.contains("1ST · 10 PTS") or not completed_text.contains("MASTERY GOLD"):
 		push_error("APP_SHELL_FOCUS_TEST FAIL: completed map events should retain championship finish and points alongside mastery status")
 		quit(1)
 		return
 	for _step in 2:
 		await _tap_action(&"ui_down")
 	focus_owner = root.get_viewport().gui_get_focus_owner()
-	if focus_owner == null or not String(focus_owner.get("text")).begins_with("Last Light Grand Final"):
-		push_error("APP_SHELL_FOCUS_TEST FAIL: act paging should focus the final act's first available event")
+	if focus_owner == null or not String(focus_owner.get("text")).begins_with("Last Light"):
+		push_error("APP_SHELL_FOCUS_TEST FAIL: the road should move focus to the office final")
 		quit(1)
 		return
 	shell.call("show_map", {}, 2)
 	await process_frame
 	await process_frame
-	var previous_button: Button
-	var next_button: Button
-	var return_button: Button
-	for node: Node in shell.find_children("*", "Button", true, false):
-		var button := node as Button
-		if button.text == "← PREVIOUS ACT":
-			previous_button = button
-		elif button.text == "NEXT ACT →":
-			next_button = button
-		elif button.text == "RETURN TO TITLE":
-			return_button = button
-	if (
-		previous_button == null
-		or next_button == null
-		or return_button == null
-		or previous_button.focus_neighbor_right != previous_button.get_path_to(next_button)
-		or previous_button.focus_neighbor_bottom != previous_button.get_path_to(return_button)
-		or next_button.focus_neighbor_bottom != next_button.get_path_to(return_button)
-	):
-		push_error("APP_SHELL_FOCUS_TEST FAIL: act pager should use horizontal focus and share the following vertical action")
+	var return_button := shell.find_child("ReturnToTitle", true, false) as Button
+	var paper := shell.find_child("Stop_office_paper_trail", true, false) as Button
+	if return_button == null or paper == null or paper.focus_neighbor_bottom == NodePath():
+		push_error("APP_SHELL_FOCUS_TEST FAIL: the route menu should keep a return control and a road focus chain")
 		quit(1)
 		return
 	var scroll := shell.get("_scroll") as ScrollContainer

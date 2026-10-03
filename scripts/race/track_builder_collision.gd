@@ -1,6 +1,11 @@
 class_name TrackBuilderCollision
 ## Texture footprints, colliders, shadows, obstacles, and surface tiles.
 
+const CONTACT_SHADER := preload("res://assets/shaders/prop_contact_shadow.gdshader")
+const CONTACT_OFFSET_WIDTH_RATIO := 0.08
+const CONTACT_MAX_OFFSET_MM := 3.0
+const CONTACT_SOFTNESS_MM := 0.8
+static var _contact_material: ShaderMaterial
 
 static func mark_solid_body(body: CollisionObject2D, texture_path: String, solid_class: StringName) -> void:
 	body.set_meta("collision_contract", TrackBuilderCore.COLLISION_SOLID)
@@ -31,7 +36,7 @@ static func texture_opaque_rect(texture: Texture2D) -> Rect2:
 	if TrackBuilderCore._texture_opaque_rect_cache.has(cache_key):
 		return TrackBuilderCore._texture_opaque_rect_cache[cache_key]
 	var result: Rect2 = texture_alpha_outline(texture)["used"]
-	TrackBuilderCore._texture_opaque_rect_cache[cache_key] = result
+	TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_opaque_rect_cache, TrackBuilderCore._texture_opaque_rect_order, cache_key, result)
 	return result
 
 
@@ -41,7 +46,7 @@ static func texture_alpha_outline(texture: Texture2D) -> Dictionary:
 		return TrackBuilderCore._texture_outline_cache[cache_key]
 	TrackBuilderCore.synchronous_outline_builds += 1
 	var result := compute_alpha_outline(texture.get_image(), texture.get_width(), texture.get_height())
-	TrackBuilderCore._texture_outline_cache[cache_key] = result
+	TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_outline_cache, TrackBuilderCore._texture_outline_order, cache_key, result)
 	return result
 
 
@@ -56,7 +61,7 @@ static func has_prepared_outline_path(path: String) -> bool:
 
 static func install_prepared_outline(texture: Texture2D, outline: Dictionary) -> void:
 	var key := texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id())
-	TrackBuilderCore._texture_outline_cache[key] = outline
+	TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_outline_cache, TrackBuilderCore._texture_outline_order, key, outline)
 
 
 static func preparation_texture_paths(value: Variant) -> Array[String]:
@@ -129,6 +134,9 @@ static func compute_alpha_outline(image: Image, width: int, height: int) -> Dict
 static func texture_collision_footprint(texture: Texture2D, shape_kind: StringName, force_axis_aligned: bool = false) -> Dictionary:
 	var override: Dictionary = TrackBuilderCore.ASSET_FOOTPRINT_OVERRIDES.get(texture.resource_path.get_file(), {})
 	var resolved_kind := StringName(override.get("kind", shape_kind))
+	var contract := WorldEnvironmentCatalog.for_path(texture.resource_path)
+	if not contract.is_empty() and contract.get("collision") == "alpha":
+		resolved_kind = &"convex"
 	var no_rotation := force_axis_aligned or bool(override.get("no_rotation", false))
 	var cache_key := "%s:%s:%s" % [texture.resource_path if not texture.resource_path.is_empty() else str(texture.get_instance_id()), resolved_kind, no_rotation]
 	if TrackBuilderCore._texture_footprint_cache.has(cache_key):
@@ -137,18 +145,18 @@ static func texture_collision_footprint(texture: Texture2D, shape_kind: StringNa
 	var fallback := {"center": used.get_center(), "size": used.size, "rotation": 0.0, "kind": resolved_kind}
 	if resolved_kind == &"circle":
 		var circle_result := balanced_circle_texture_footprint(texture, used)
-		TrackBuilderCore._texture_footprint_cache[cache_key] = circle_result
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, circle_result)
 		return circle_result
 	if resolved_kind == &"convex":
-		TrackBuilderCore._texture_footprint_cache[cache_key] = fallback
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, fallback)
 		return fallback
 	if no_rotation:
 		var forced_axis_result := axis_aligned_texture_footprint(used, resolved_kind)
-		TrackBuilderCore._texture_footprint_cache[cache_key] = forced_axis_result
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, forced_axis_result)
 		return forced_axis_result
 	var outline := texture_alpha_outline(texture)
 	if (outline["boundary"] as PackedVector2Array).is_empty():
-		TrackBuilderCore._texture_footprint_cache[cache_key] = fallback
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, fallback)
 		return fallback
 	# Gather the first and last opaque pixel on sampled rows and columns. This
 	# keeps diagonal silhouettes tight without scanning every interior pixel or
@@ -172,7 +180,7 @@ static func texture_collision_footprint(texture: Texture2D, shape_kind: StringNa
 			points.append(Vector2(x + 0.5, first_y + 0.5))
 			points.append(Vector2(x + 0.5, last_y + 0.5))
 	if points.size() < 3:
-		TrackBuilderCore._texture_footprint_cache[cache_key] = fallback
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, fallback)
 		return fallback
 	# Use principal axis (covariance) of border points for robust long-axis
 	# orientation. Finishes the cached alpha-derived oriented footprint so that
@@ -233,7 +241,7 @@ static func texture_collision_footprint(texture: Texture2D, shape_kind: StringNa
 	var anisotropy := maxf(fitted_size.x, fitted_size.y) / maxf(minf(fitted_size.x, fitted_size.y), 0.001)
 	if anisotropy < TrackBuilderCore.ORIENTED_FOOTPRINT_MIN_ANISOTROPY:
 		var low_anisotropy_result := axis_aligned_texture_footprint(used, resolved_kind)
-		TrackBuilderCore._texture_footprint_cache[cache_key] = low_anisotropy_result
+		TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, low_anisotropy_result)
 		return low_anisotropy_result
 	var result := {
 		"center": best_axis_x * center_projection.x + best_axis_y * center_projection.y,
@@ -248,7 +256,7 @@ static func texture_collision_footprint(texture: Texture2D, shape_kind: StringNa
 	if sz.x < sz.y:
 		result["size"] = Vector2(sz.y, sz.x)
 		result["rotation"] = float(result["rotation"]) + PI * 0.5
-	TrackBuilderCore._texture_footprint_cache[cache_key] = result
+	TrackBuilderCore.cache_texture_entry(TrackBuilderCore._texture_footprint_cache, TrackBuilderCore._texture_footprint_order, cache_key, result)
 	return result
 
 
@@ -415,7 +423,6 @@ static func add_boundary_prop(parent: Node, position: Vector2, radius: float, te
 	prop.collision_layer = 16
 	mark_solid_body(prop, texture_path, &"boundary_prop")
 	parent.add_child(prop)
-	add_directional_shadow(prop, texture_path, radius * 2.2)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -429,6 +436,7 @@ static func add_boundary_prop(parent: Node, position: Vector2, radius: float, te
 		sprite.position = -offset
 		mark_solid_visual(sprite, texture_path, &"boundary_prop")
 		prop.add_child(sprite)
+		add_directional_shadow(sprite)
 
 
 static func add_fill_prop(parent: Node, position: Vector2, radius: float, texture_path: String, rotation: float) -> void:
@@ -439,7 +447,6 @@ static func add_fill_prop(parent: Node, position: Vector2, radius: float, textur
 	prop.collision_layer = 16
 	mark_solid_body(prop, texture_path, &"island_prop")
 	parent.add_child(prop)
-	add_directional_shadow(prop, texture_path, radius * 2.2)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -454,45 +461,41 @@ static func add_fill_prop(parent: Node, position: Vector2, radius: float, textur
 		sprite.position = -offset
 		mark_solid_visual(sprite, texture_path, &"island_prop")
 		prop.add_child(sprite)
+		add_directional_shadow(sprite)
 
 
 static func add_directional_shadow(
-		parent: Node2D,
-		texture_path: String,
-		fallback_diameter: float,
-		size_scale: float = 1.0,
-		footprint_override: Vector2 = Vector2.ZERO,
-		add_cast_shadow: bool = false,
-		footprint_rotation: float = 0.0
+		sprite: Sprite2D,
+		add_cast_shadow: bool = false
 ) -> void:
-	var entry: Dictionary = TrackBuilderCore.PROP_SHAPES.get(texture_path.get_file(), {})
-	var override: Dictionary = TrackBuilderCore.ASSET_FOOTPRINT_OVERRIDES.get(texture_path.get_file(), {})
-	var shape_kind := StringName(entry.get("shadow_shape", override.get("kind", entry.get("shape", "circle"))))
-	var footprint: Vector2 = footprint_override
-	if footprint.is_zero_approx():
-		footprint = (entry.get("size", Vector2.ONE * fallback_diameter) as Vector2) * size_scale
-	if footprint.x <= 0.0 or footprint.y <= 0.0:
-		footprint = Vector2.ONE * fallback_diameter
-	var shadow_path := TrackBuilderCore.SHADOW_CIRCLE_TEXTURE if shape_kind == &"circle" else TrackBuilderCore.SHADOW_RECT_TEXTURE
-	var shadow_texture := load(shadow_path) as Texture2D
-	if shadow_texture == null:
-		push_error("TrackBuilderCore: directional shadow asset is missing: %s" % shadow_path)
+	var texture_path := sprite.texture.resource_path
+	var asset := WorldEnvironmentCatalog.for_path(texture_path)
+	if asset.get("shadow", "contact") == "none":
 		return
-	var visual_shadow_kind := &"circle" if shape_kind == &"circle" else &"rect"
+	var parent := sprite.get_parent() as Node2D
+	var footprint := texture_opaque_rect(sprite.texture).size * sprite.scale.abs()
 	var longest := maxf(footprint.x, footprint.y)
-	var local_light_direction := TrackBuilderCore.SHADOW_DIRECTION.rotated(-parent.rotation).normalized()
+	var local_light_direction := TrackBuilderCore.SHADOW_DIRECTION.rotated(-parent.global_rotation).normalized()
+	var offset := minf(minf(footprint.x, footprint.y) * CONTACT_OFFSET_WIDTH_RATIO, CONTACT_MAX_OFFSET_MM)
 	var contact := Sprite2D.new()
 	contact.name = "ContactShadow"
-	contact.texture = shadow_texture
+	contact.texture = sprite.texture
 	contact.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
-	contact.position = local_light_direction * longest * 0.10
-	contact.rotation = footprint_rotation
-	contact.scale = Vector2(footprint.x * 1.08 / shadow_texture.get_width(), footprint.y * 1.08 / shadow_texture.get_height())
+	contact.position = sprite.position + local_light_direction * offset
+	contact.rotation = sprite.rotation
+	contact.scale = sprite.scale
+	contact.flip_h = sprite.flip_h
+	contact.flip_v = sprite.flip_v
+	if _contact_material == null:
+		_contact_material = ShaderMaterial.new()
+		_contact_material.shader = CONTACT_SHADER
+		_contact_material.set_shader_parameter("softness_mm", CONTACT_SOFTNESS_MM)
+	contact.material = _contact_material
 	contact.modulate = TrackBuilderCore.SHADOW_TINT
 	contact.z_index = -2
-	contact.set_meta("shadow_shape", visual_shadow_kind)
+	contact.set_meta("shadow_shape", &"silhouette")
 	contact.set_meta("light_direction", TrackBuilderCore.SHADOW_DIRECTION)
-	mark_flat_visual(contact, shadow_path, &"shadow")
+	mark_flat_visual(contact, texture_path, &"shadow")
 	parent.add_child(contact)
 	if not add_cast_shadow:
 		return
@@ -504,7 +507,7 @@ static func add_directional_shadow(
 	cast.texture = cast_texture
 	cast.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 	cast.position = local_light_direction * longest * 0.34
-	cast.rotation = TrackBuilderCore.SHADOW_DIRECTION.angle() - parent.rotation
+	cast.rotation = TrackBuilderCore.SHADOW_DIRECTION.angle() - parent.global_rotation
 	cast.scale = Vector2(longest * 0.56 / cast_texture.get_width(), minf(footprint.x, footprint.y) * 0.66 / cast_texture.get_height())
 	cast.modulate = TrackBuilderCore.GIANT_CAST_SHADOW_TINT
 	cast.z_index = -3
@@ -547,13 +550,12 @@ static func add_planned_obstacle(parent: Node2D, data: Dictionary) -> void:
 	if texture == null:
 		return
 	var visual_size: Vector2 = data["visual_size"]
-	var sprite_scale := maxf(visual_size.x, visual_size.y) / maxf(texture.get_width(), texture.get_height())
+	var sprite_scale := TrackBuilderCore.PROP_SCALE.sprite_scale(texture, texture_opaque_rect(texture), maxf(visual_size.x, visual_size.y))
 	var shape_kind := StringName(data["footprint_kind"])
 	var offset := add_scaled_texture_collision(obstacle, texture, sprite_scale, shape_kind)
 	obstacle.set_meta("collision_footprint_size", data["footprint_size"])
 	obstacle.set_meta("collision_shape_kind", shape_kind)
 	obstacle.set_meta("collision_footprint_rotation", 0.0)
-	add_directional_shadow(obstacle, asset_path, maxf(visual_size.x, visual_size.y), 1.0, data["footprint_size"])
 	var sprite := Sprite2D.new()
 	sprite.name = "Sprite"
 	sprite.texture = texture
@@ -563,6 +565,7 @@ static func add_planned_obstacle(parent: Node2D, data: Dictionary) -> void:
 	mark_solid_visual(sprite, asset_path, &"permanent_obstacle")
 	sprite.set_meta("visual_bounds", data["visual_bounds"])
 	obstacle.add_child(sprite)
+	add_directional_shadow(sprite)
 
 
 static func add_obstacle(parent: Node, node_name: String, position: Vector2, radius: float, texture_path: String) -> void:
@@ -572,7 +575,6 @@ static func add_obstacle(parent: Node, node_name: String, position: Vector2, rad
 	obstacle.collision_layer = 2
 	mark_solid_body(obstacle, texture_path, &"obstacle")
 	parent.add_child(obstacle)
-	add_directional_shadow(obstacle, texture_path, radius * 2.4)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
@@ -587,6 +589,7 @@ static func add_obstacle(parent: Node, node_name: String, position: Vector2, rad
 		sprite.position = -offset
 		mark_solid_visual(sprite, texture_path, &"obstacle")
 		obstacle.add_child(sprite)
+		add_directional_shadow(sprite)
 
 
 static func add_prop_with_collision(parent: Node, position: Vector2, radius: float, texture_path: String) -> void:
@@ -596,10 +599,10 @@ static func add_prop_with_collision(parent: Node, position: Vector2, radius: flo
 	prop.collision_layer = 2
 	mark_solid_body(prop, texture_path, &"apron_prop")
 	parent.add_child(prop)
-	add_directional_shadow(prop, texture_path, radius * 2.4)
 	var texture := load(texture_path) as Texture2D
 	if texture:
 		var sprite := Sprite2D.new()
+		sprite.name = "Sprite"
 		sprite.texture = texture
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		var longest := maxf(texture.get_width(), texture.get_height())
@@ -610,6 +613,7 @@ static func add_prop_with_collision(parent: Node, position: Vector2, radius: flo
 		sprite.position = -offset
 		mark_solid_visual(sprite, texture_path, &"apron_prop")
 		prop.add_child(sprite)
+		add_directional_shadow(sprite)
 
 
 static func add_textured_polygon(
@@ -662,7 +666,7 @@ static func expand_loop(points: PackedVector2Array, distance: float) -> PackedVe
 	return result
 
 
-static func add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52, tint: Color = Color.WHITE, edge_feather: float = 0.16) -> void:
+static func add_centerline_tiles(parent: Node, centerline: PackedVector2Array, texture_path: String, modulate_value: float = 1.35, world_tile_size: Vector2 = Vector2.ZERO, opacity: float = 0.52, tint: Color = Color.WHITE, edge_feather: float = 0.16, half_widths: PackedFloat32Array = PackedFloat32Array()) -> void:
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		return
@@ -673,6 +677,9 @@ static func add_centerline_tiles(parent: Node, centerline: PackedVector2Array, t
 	surface.points = centerline
 	surface.closed = true
 	surface.width = TrackBuilderCore.HALF_WIDTH * 2.0
+	if half_widths.size() == centerline.size():
+		surface.width = TrackWidthProfile.widest(half_widths) * 2.0
+		surface.width_curve = TrackWidthProfile.line_width_curve(centerline, half_widths)
 	surface.texture = texture
 	surface.texture_mode = Line2D.LINE_TEXTURE_TILE
 	surface.texture_repeat = CanvasItem.TEXTURE_REPEAT_ENABLED
@@ -788,24 +795,33 @@ static func add_boundary_worn_hint(container: Node2D, centerline: PackedVector2A
 
 
 
-static func seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+static func pocket_regions(spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> Array[Dictionary]:
 	# A mouth-only wall leaves the rest of a deep bay cuttable. Fill the bay with
 	# a visible raised pad, subtracting the racing corridor and its full apron.
 	var pockets: Array = spec.get("pockets", [])
+	var regions: Array[Dictionary] = []
 	if pockets.is_empty():
-		return
-	var container := Node2D.new()
-	container.name = "PocketSeals"
-	root.add_child(container)
-	var clearance := TrackBuilderCore.HALF_WIDTH + TrackBuilderCore.APRON_COLLIDER_CLEARANCE + TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH
-	var contours := Geometry2D.offset_polyline(centerline, clearance, Geometry2D.JOIN_ROUND, Geometry2D.END_JOINED)
+		return regions
+	var apron := TrackBuilderCore.APRON_COLLIDER_CLEARANCE + TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH
+	var half_widths: PackedFloat32Array = spec.get("half_widths", PackedFloat32Array())
+	var contours: Array[PackedVector2Array] = []
+	if half_widths.is_empty():
+		contours = Geometry2D.offset_polyline(centerline, TrackBuilderCore.HALF_WIDTH + apron, Geometry2D.JOIN_ROUND, Geometry2D.END_JOINED)
+	else:
+		# Bays sit outside the loop, so the exclusion is the variable outer road
+		# edge pushed out by the same apron the fixed corridor uses.
+		var edges := TrackBuilderCore._corridor_edges(centerline, half_widths)
+		var left: PackedVector2Array = edges["left"]
+		var right: PackedVector2Array = edges["right"]
+		var outer := left if absf(TrackBuilderCore._polygon_area(left)) > absf(TrackBuilderCore._polygon_area(right)) else right
+		contours = Geometry2D.offset_polygon(TrackBuilderGeometry.variable_boundary_loop(outer, centerline, true), apron, Geometry2D.JOIN_ROUND)
 	var exclusion := PackedVector2Array()
 	for contour: PackedVector2Array in contours:
 		if absf(TrackBuilderCore._polygon_area(contour)) > absf(TrackBuilderCore._polygon_area(exclusion)):
 			exclusion = contour
 	if exclusion.is_empty():
 		push_error("TrackBuilderCollision: cannot seal bays without a valid corridor exclusion")
-		return
+		return regions
 	# The corridor exclusion can carry hundreds of collinear round-join vertices;
 	# clip_polygons inherits them, and a stray one can land exactly on a ray that
 	# the pad-intrusion probe casts. Simplify it before clipping (self-union is
@@ -822,28 +838,40 @@ static func seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVecto
 				var region := TrackBuilderCore._simple_island_loop(clipped)
 				if region.size() < 3 or absf(TrackBuilderCore._polygon_area(region)) < 100.0:
 					continue
-				var body := StaticBody2D.new()
-				body.name = "Seal%02d" % pocket_index
-				body.collision_layer = 2
-				body.set_meta("pocket_index", pocket_index)
-				TrackBuilderCore._mark_solid_body(body, "", &"raised_island_rim")
-				container.add_child(body)
-				var collision_region := TrackBuilderCore._outset_polygon(region, TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH * 0.5)
-				var segments := PackedVector2Array()
-				for i in collision_region.size():
-					segments.append(collision_region[i])
-					segments.append(collision_region[(i + 1) % collision_region.size()])
-				var shape := ConcavePolygonShape2D.new()
-				shape.segments = segments
-				var collision := CollisionShape2D.new()
-				collision.shape = shape
-				body.add_child(collision)
-				body.set_meta("collision_boundary_polygon", collision_region)
-				var surface := Polygon2D.new()
-				surface.name = "RaisedPad"
-				surface.polygon = region
-				surface.color = spec["island"]
-				surface.z_index = -9
-				TrackBuilderCore._mark_solid_visual(surface, "", &"raised_island")
-				body.add_child(surface)
-				TrackBuilderIsland.build_raised_island_rim(body, spec, region)
+				regions.append({"index":pocket_index,"region":region,"collision":TrackBuilderCore._outset_polygon(region, TrackBuilderCore.ISLAND_TEXTURED_RIM_WIDTH * 0.5)})
+	return regions
+
+
+static func seal_pockets(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, room_polygon: PackedVector2Array) -> void:
+	var regions: Array = spec["pocket_regions"] if spec.has("pocket_regions") else pocket_regions(spec, centerline, room_polygon)
+	if regions.is_empty():
+		return
+	var container := Node2D.new()
+	container.name = "PocketSeals"
+	root.add_child(container)
+	for definition: Dictionary in regions:
+		var body := StaticBody2D.new()
+		body.name = "Seal%02d" % int(definition["index"])
+		body.collision_layer = 2
+		body.set_meta("pocket_index", definition["index"])
+		TrackBuilderCore._mark_solid_body(body, "", &"raised_island_rim")
+		container.add_child(body)
+		var collision_region: PackedVector2Array = definition["collision"]
+		var segments := PackedVector2Array()
+		for i in collision_region.size():
+			segments.append(collision_region[i])
+			segments.append(collision_region[(i + 1) % collision_region.size()])
+		var shape := ConcavePolygonShape2D.new()
+		shape.segments = segments
+		var collision := CollisionShape2D.new()
+		collision.shape = shape
+		body.add_child(collision)
+		body.set_meta("collision_boundary_polygon", collision_region)
+		var surface := Polygon2D.new()
+		surface.name = "RaisedPad"
+		surface.polygon = definition["region"]
+		surface.color = spec["island"]
+		surface.z_index = -9
+		TrackBuilderCore._mark_solid_visual(surface, "", &"raised_island")
+		body.add_child(surface)
+		TrackBuilderIsland.build_raised_island_rim(body, spec, definition["region"])

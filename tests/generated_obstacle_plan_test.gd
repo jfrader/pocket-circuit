@@ -6,9 +6,9 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const VISUAL_ROLE := preload("res://scripts/race/generated_world_visual_role.gd")
 
 const CASES := [
-	{"theme": &"kitchen", "act": 1, "range": Vector2i(0, 1), "seed": 3},
-	{"theme": &"workshop", "act": 2, "range": Vector2i(1, 2), "seed": 5},
-	{"theme": &"office", "act": 3, "range": Vector2i(2, 3), "seed": 8},
+	{"theme": &"kitchen", "act": 1, "range": Vector2i(1, 4), "seed": 3},
+	{"theme": &"workshop", "act": 2, "range": Vector2i(2, 6), "seed": 5},
+	{"theme": &"office", "act": 3, "range": Vector2i(3, 8), "seed": 8},
 ]
 
 
@@ -18,7 +18,7 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	for case: Dictionary in CASES:
-		var options := {"act": case["act"], "obstacle_seed": 663100 + int(case["act"]), "hazard_seed": 663200}
+		var options := {"act": case["act"], "obstacle_seed": 663100 + int(case["act"])}
 		var prepared := BUILDER.prepare_layout(case["theme"], &"classic", case["seed"], options)
 		var repeated := BUILDER.prepare_layout(case["theme"], &"classic", case["seed"], options)
 		if not _expect(not prepared.is_empty() and prepared["centerline"] == repeated["centerline"], "%s route should remain deterministic" % case["theme"]):
@@ -34,17 +34,16 @@ func _run_test() -> void:
 		var disabled := BUILDER.prepare_layout(case["theme"], &"classic", case["seed"], {
 			"act": case["act"],
 			"obstacle_seed": options["obstacle_seed"],
-			"hazard_seed": options["hazard_seed"],
 			"obstacles_enabled": false,
 		})
 		if not _expect(disabled["centerline"] == prepared["centerline"] and (disabled["spec"]["obstacle_plan"] as Array).is_empty(), "disabling %s obstacles must not perturb route geometry" % case["theme"]):
 			return
 
-	var office := BUILDER.prepare_layout(&"office", &"classic", 8, {"act": 3, "obstacle_seed": 9001, "hazard_seed": 7001})
+	var office := BUILDER.prepare_layout(&"office", &"classic", 8, {"act": 3, "obstacle_seed": 9001})
 	var changed_plan: Array = []
 	var changed_seed := 0
 	var gate_samples := BUILDER._layout_gate_samples(office["centerline"], office["spec"])
-	var moments := BUILDER._analyze_track_moments(office["centerline"], gate_samples)
+	var moments := BUILDER._analyze_track_moments(office["centerline"], gate_samples, office["spec"])
 	for obstacle_seed in range(9002, 9020):
 		var changed_spec: Dictionary = office["spec"].duplicate(true)
 		changed_spec["obstacle_seed"] = obstacle_seed
@@ -52,11 +51,9 @@ func _run_test() -> void:
 		if changed_plan != office["spec"]["obstacle_plan"]:
 			changed_seed = obstacle_seed
 			break
-	if not _expect(changed_seed > 0 and office["centerline"] == BUILDER.prepare_layout(&"office", &"classic", 8, {"act": 3, "obstacle_seed": changed_seed, "hazard_seed": 7001})["centerline"], "an independent obstacle seed should change only the obstacle plan"):
+	if not _expect(changed_seed > 0 and office["centerline"] == BUILDER.prepare_layout(&"office", &"classic", 8, {"act": 3, "obstacle_seed": changed_seed})["centerline"], "an independent obstacle seed should change only the obstacle plan"):
 		return
 
-	if not _check_hazard_progression(office, moments):
-		return
 	if not _check_championship_identity():
 		return
 	if not _check_built_metadata():
@@ -70,7 +67,7 @@ func _check_plan(prepared: Dictionary) -> bool:
 	var plan: Array = prepared["spec"]["obstacle_plan"]
 	var centerline: PackedVector2Array = prepared["centerline"]
 	var gate_samples := BUILDER._layout_gate_samples(centerline, prepared["spec"])
-	var moments := BUILDER._analyze_track_moments(centerline, gate_samples)
+	var moments := BUILDER._analyze_track_moments(centerline, gate_samples, prepared["spec"])
 	var routes := [
 		BUILDER._racing_line_points(centerline, moments, false),
 		BUILDER._racing_line_points(centerline, moments, true),
@@ -107,27 +104,6 @@ func _check_plan(prepared: Dictionary) -> bool:
 	return true
 
 
-func _check_hazard_progression(prepared: Dictionary, moments: Dictionary) -> bool:
-	var counts := {1: 0, 2: 0, 3: 0}
-	var saw_progression_split := false
-	for hazard_seed in 100:
-		var presence := {}
-		for act in [1, 2, 3]:
-			var spec: Dictionary = prepared["spec"].duplicate(true)
-			spec["hazard_seed"] = hazard_seed
-			spec["act"] = act
-			var plan := BUILDER._plan_generated_hazard(&"office", spec, prepared["centerline"], moments)
-			presence[act] = bool(plan["present"])
-			counts[act] += int(plan["present"])
-		if not presence[1] and presence[3]:
-			saw_progression_split = true
-	if not _expect(counts[1] > 0 and counts[3] < 100 and counts[1] < counts[2] and counts[2] < counts[3] and saw_progression_split, "hazards should be deterministic, occasional, and increasingly present by act (%s)" % str(counts)):
-		return false
-	var first := BUILDER._plan_generated_hazard(&"office", prepared["spec"], prepared["centerline"], moments)
-	var second := BUILDER._plan_generated_hazard(&"office", prepared["spec"], prepared["centerline"], moments)
-	return _expect(first == second and first["paths"] is Dictionary and StringName(first.get("motion", &"")) == &"static" and (first["danger_states"] as PackedStringArray) == PackedStringArray(["active"]), "office coiled-cable stream should reproduce a static collision pose")
-
-
 func _check_championship_identity() -> bool:
 	var championship := IDENTITIES.create_championship(663)
 	var event: Dictionary = CATALOG.EVENTS[4]
@@ -138,21 +114,19 @@ func _check_championship_identity() -> bool:
 	var second := BUILDER.prepare_layout(StringName(applied["theme"]), StringName(applied["room"]), int(applied["seed"]), options)
 	return _expect(
 		first["spec"]["obstacle_seed"] == identity["sub_seeds"]["obstacle"]
-		and first["spec"]["hazard_seed"] == identity["sub_seeds"]["hazard"]
-		and first["spec"]["obstacle_plan"] == second["spec"]["obstacle_plan"]
-		and first["spec"]["hazard_plan"] == second["spec"]["hazard_plan"],
-		"same championship identity should reproduce independent obstacle and hazard plans"
+		and first["spec"]["obstacle_plan"] == second["spec"]["obstacle_plan"],
+		"same championship identity should reproduce its obstacle plan"
 	)
 
 
 func _check_built_metadata() -> bool:
-	var built := BUILDER.build_packed(&"office", &"classic", 8, {"act": 3, "obstacle_seed": 9001, "hazard_seed": 7001})
+	var built := BUILDER.build_packed(&"office", &"classic", 8, {"act": 3, "obstacle_seed": 9001})
 	if not _expect(built.get("scene") is PackedScene, "metadata fixture should build"):
 		return false
 	var track := (built["scene"] as PackedScene).instantiate() as Node2D
 	var container := track.get_node_or_null("PermanentObstacles") as Node2D
 	var plan: Array = track.get_meta("generated_obstacle_plan", [])
-	if not _expect(container != null and container.get_child_count() == plan.size() and plan.size() >= 2, "built Office track should realize its 2-3 planned permanent obstacles"):
+	if not _expect(container != null and container.get_child_count() == plan.size() and plan.size() >= 3, "built Office track should realize its planned permanent obstacles"):
 		track.free()
 		return false
 	var plan_by_id := {}
@@ -178,7 +152,7 @@ func _check_built_metadata() -> bool:
 		var footprint_kind := StringName(entry.get("footprint_kind", &""))
 		var has_fitted_shape := collision != null and (
 			(footprint_kind == &"circle" and collision.shape is CircleShape2D)
-			or (footprint_kind == &"rect" and collision.shape is RectangleShape2D)
+			or (footprint_kind == &"rect" and (collision.shape is RectangleShape2D or collision.shape is ConvexPolygonShape2D))
 		)
 		if not _expect(
 			has_fitted_shape
