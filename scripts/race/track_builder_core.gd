@@ -211,6 +211,7 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 			for point: Vector2 in room_polygon:
 				scaled_room.append(point * room_scale)
 			room_polygon = scaled_room
+		var road_width_amplitude := TrackWidthProfile.amplitude_for_option(generation_options.get("road_width", TrackWidthProfile.MODE_FLAT), seed)
 		var room_params := {
 			"margin": 190.0,
 			"min_point_distance": 210.0,
@@ -220,6 +221,7 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 			"room_polygon": room_polygon,
 			"room_shape": room_shape,
 			"length_tier": length_tier,
+			"road_width_amplitude": road_width_amplitude,
 		}
 		match room_shape:
 			&"tall":

@@ -11,6 +11,7 @@ const GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const SAMPLE_COUNT := 260
 const HALF_WIDTH := 125.0
 const CORRIDOR_CLEARANCE := HALF_WIDTH + 10.0
+const BRANCH_GAP := 70.0
 const SPLINE_GUARD := 12.0
 const MAX_VARIANTS := 12
 const WORLD_SCALE := 1.75
@@ -20,6 +21,8 @@ const MIN_SETUP_DISTANCE := 450.0
 # near-pivot turn while preserving the constrained L-room realization.
 const VEHICLE_HULL_RADIUS := 22.0
 const MIN_DRIVE_RADIUS := HALF_WIDTH + VEHICLE_HULL_RADIUS
+# MIN_DRIVE_RADIUS stays base; the fit-time caps in TrackWidthProfile already
+# enforce the local (w_local + hull) bound per sample.
 const FILLET_RADIUS_MARGIN := 24.0
 const STRAIGHT_CONTROL_SPACING := 110.0
 const LITERAL_STRAIGHT_HEADING_TOLERANCE := 0.04
@@ -164,9 +167,15 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 	var room_polygon: PackedVector2Array = params.get("room_polygon", PackedVector2Array())
 	var room_shape := StringName(params.get("room_shape", &""))
 	var source_rect := _generation_rect(room_rect, params, room_polygon)
+	var amplitude := float(params.get("road_width_amplitude", 0.0))
+	# amplitude is the delta (0 for flat, up to MAX_HALF_WIDTH - HALF_WIDTH for full);
+	# derive intended_max by adding the (capped) delta so that amp==0 reduces exactly.
+	var max_delta := TrackWidthProfile.MAX_HALF_WIDTH - HALF_WIDTH
+	var intended_max := HALF_WIDTH + minf(amplitude, max_delta)
+
 	var requested_margin := float(params.get("margin", 150.0))
 	
-	var centerline_margin := maxf(requested_margin, CORRIDOR_CLEARANCE)
+	var centerline_margin := maxf(requested_margin, CORRIDOR_CLEARANCE + (intended_max - HALF_WIDTH))
 	var usable_rect := source_rect.grow(-centerline_margin).grow(-SPLINE_GUARD)
 	if usable_rect.size.x < HALF_WIDTH * 2.0 or usable_rect.size.y < HALF_WIDTH * 2.0:
 		var e = _empty_result(seed, family)
@@ -174,12 +183,13 @@ static func _generate_result(seed: int, room_rect: Rect2, params: Dictionary) ->
 		return e
 
 	var requested_self_distance := maxf(float(params.get("min_self_distance", 250.0)), HALF_WIDTH * 2.0)
+	requested_self_distance = maxf(requested_self_distance, 2.0 * intended_max + BRANCH_GAP)
 	# A narrow room cannot honor an arbitrarily large requested branch gap after
 	# reserving the corridor and wall margin. Keep the full corridor clear while
 	# accepting that physical maximum instead of rejecting every candidate.
 	var physical_self_distance := maxf(HALF_WIDTH * 2.0, minf(usable_rect.size.x, usable_rect.size.y) * 0.55)
 	var min_self_distance := minf(requested_self_distance, physical_self_distance)
-	var room_check_margin := maxf(float(params.get("room_check_margin", 0.0)), CORRIDOR_CLEARANCE)
+	var room_check_margin := maxf(float(params.get("room_check_margin", 0.0)), CORRIDOR_CLEARANCE + (intended_max - HALF_WIDTH))
 	var minimum_length := float(params.get("min_loop_length", 1900.0 * WORLD_SCALE))
 	# Large tiers honor their band floor as a validation minimum so a compact
 	# program cannot slip in below the selected band.
