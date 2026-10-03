@@ -184,7 +184,17 @@ func _prepare_race_async() -> void:
 	app.call("set_loading_section", 1)
 	await _loading_step("Generating a legal circuit")
 	if String(event.get("circuit", "")) == "generated":
-		var prepared: Dictionary = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)))
+		var key := _circuit_cache_key(event)
+		var prepared: Dictionary = {}
+		var used_cached_prepared := false
+		if not key.is_empty():
+			prepared = TRACK_BUILDER.cached_prepared(key)
+			if not prepared.is_empty():
+				used_cached_prepared = true
+		if prepared.is_empty():
+			prepared = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)))
+			if not prepared.is_empty() and not key.is_empty():
+				TRACK_BUILDER.store_prepared(key, prepared)
 		if app.call("is_race_loading_cancelled"):
 			app.call("complete_race_loading")
 			return
@@ -198,8 +208,22 @@ func _prepare_race_async() -> void:
 			var preview_identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
 			var loaded_preview_fingerprint := CIRCUIT_PREVIEW.fingerprint_for_prepared(preview_identity, prepared)
 			if loaded_preview_fingerprint != expected_preview_fingerprint:
-				app.call("fail_race_loading", "The loaded circuit did not match the confirmed preview")
-				return
+				if used_cached_prepared:
+					# Cache hit produced a fingerprint mismatch (stale or wrong
+					# identity). Fall back to full generation instead of failing.
+					prepared = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)))
+					if app.call("is_race_loading_cancelled"):
+						app.call("complete_race_loading")
+						return
+					if prepared.is_empty():
+						app.call("fail_race_loading", "Circuit generation failed")
+						return
+					if not key.is_empty():
+						TRACK_BUILDER.store_prepared(key, prepared)
+					loaded_preview_fingerprint = CIRCUIT_PREVIEW.fingerprint_for_prepared(preview_identity, prepared)
+				else:
+					app.call("fail_race_loading", "The loaded circuit did not match the confirmed preview")
+					return
 			prepared["loaded_preview_fingerprint"] = loaded_preview_fingerprint
 		if app.has_method("record_prepared_mastery_metrics"):
 			app.call("record_prepared_mastery_metrics", event, prepared.get("racing_line_metrics", {}))
@@ -223,12 +247,26 @@ func _prepare_race_async() -> void:
 		var embedded := track_root
 		remove_child(embedded)
 		embedded.free()
-		track_root = TRACK_BUILDER.create_layout_root(prepared)
+		var used_cached_room := false
+		if not key.is_empty():
+			var packed: PackedScene = TRACK_BUILDER.cached_room(key)
+			if packed != null:
+				var candidate := packed.instantiate()
+				if candidate is Node2D and candidate.get_child_count() > 0:
+					track_root = candidate
+					used_cached_room = true
+		if not used_cached_room:
+			track_root = TRACK_BUILDER.create_layout_root(prepared)
 		track_root.name = "Track"
 		add_child(track_root)
 		if prepared.has("loaded_preview_fingerprint"):
 			track_root.set_meta("preview_fingerprint", prepared["loaded_preview_fingerprint"])
-		await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step)
+		if not used_cached_room:
+			await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step)
+			if not key.is_empty():
+				var pscene := PackedScene.new()
+				if pscene.pack(track_root) == OK:
+					TRACK_BUILDER.store_room(key, pscene)
 		_apply_circuit_identity_metadata(event)
 		_apply_track_variant(StringName(event.get("theme", "kitchen")))
 	else:
@@ -554,6 +592,38 @@ func _track_generation_options(event: Dictionary) -> Dictionary:
 		else:
 			options.merge(generated_options, true)
 	return options
+
+
+func _circuit_cache_key(event: Dictionary) -> String:
+	if event.is_empty():
+		return ""
+	# Prefer the circuit identity fingerprint when the event carries one.
+	# This guarantees distinct keys for distinct circuits and for option
+	# changes (road_width, length_tier, material/palette, sub_seeds, etc).
+	var fp := String(event.get("circuit_fingerprint", ""))
+	if not fp.is_empty():
+		return "cfp|" + fp
+	var ident: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
+	if ident is Dictionary:
+		fp = String((ident as Dictionary).get("fingerprint", ""))
+		if not fp.is_empty():
+			return "gid|" + fp
+	fp = String(event.get("preview_fingerprint", ""))
+	if not fp.is_empty():
+		return "pfp|" + fp
+	# Fallback: deterministic serialization of (theme, room, seed, sorted options).
+	# Keeps retries of manually-started generated races fast even without
+	# a full identity record in the event.
+	var theme := String(event.get("theme", "kitchen"))
+	var room := String(event.get("room", "classic"))
+	var seed := int(event.get("seed", 0))
+	var options: Dictionary = _track_generation_options(event)
+	var parts := PackedStringArray(["pc-gen-circuit-cache-v1", theme, room, str(seed)])
+	var opt_keys: Array = options.keys()
+	opt_keys.sort()
+	for k: Variant in opt_keys:
+		parts.append(str(k) + "=" + str(options[k]))
+	return "|".join(parts)
 
 
 func _apply_circuit_identity_metadata(event: Dictionary) -> void:
