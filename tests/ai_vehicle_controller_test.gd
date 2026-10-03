@@ -386,7 +386,7 @@ func _run_test() -> void:
 	vehicle.linear_velocity = Vector2.ZERO
 	controller.set("_guide_checkpoint_index", 3)
 	controller.set("_guide_reached", true)
-	controller.set("_stuck_target_key", "")
+	controller.set("_stuck_target_key", 0)
 	controller.set("_best_checkpoint_distance", INF)
 	controller.set("_stuck_time", 0.0)
 	for _step in 8:
