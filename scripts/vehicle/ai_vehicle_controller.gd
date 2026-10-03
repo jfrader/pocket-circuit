@@ -196,7 +196,7 @@ var _recovering: bool = false
 var _track_center := Vector2.ZERO
 var _guide_checkpoint_index := -1
 var _guide_reached := false
-var _stuck_target_key := ""
+var _stuck_target_key := 0
 var _best_checkpoint_distance := INF
 var _smoothed_steer := 0.0
 var _racing_line: PackedVector2Array = PackedVector2Array()
@@ -223,7 +223,7 @@ var _no_progress_time := 0.0
 var _wrong_way_progress_time := 0.0
 var _spin_time := 0.0
 var _route_progress_accumulator := 0.0
-var _watchdog_target_key := ""
+var _watchdog_target_key := 0
 var _last_route_arc := 0.0
 var _static_contact_time := 0.0
 var _escape_time_remaining := 0.0
@@ -799,7 +799,7 @@ func _physics_process(delta: float) -> void:
 		throttle = 0.0
 		boost = false
 	vehicle.set_external_controls(throttle, brake, _smoothed_steer, false, boost)
-	var stuck_target_key := "%d:%s" % [expected_index, "guide" if targeting_guide else "gate"]
+	var stuck_target_key: int = (expected_index << 1) | (1 if targeting_guide else 0)
 	_update_stuck_recovery(delta, stuck_target_key, distance_to_target)
 
 
@@ -1731,7 +1731,7 @@ func _update_spin_recovery(delta: float) -> bool:
 	return false
 
 
-func _update_stuck_recovery(delta: float, target_key: String, distance_to_target: float) -> void:
+func _update_stuck_recovery(delta: float, target_key: int, distance_to_target: float) -> void:
 	if target_key != _stuck_target_key:
 		_stuck_target_key = target_key
 		_best_checkpoint_distance = distance_to_target
@@ -1754,7 +1754,7 @@ func _update_stuck_recovery(delta: float, target_key: String, distance_to_target
 
 func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool = false) -> Dictionary:
 	var sample := _active_route_sample(expected_index)
-	var target_key := "%d:%d" % [expected_index, _room_cut_checkpoint]
+	var target_key: int = ((expected_index + 1) << 8) | ((_room_cut_checkpoint + 1) & 0xFF)
 	if target_key != _watchdog_target_key:
 		_watchdog_target_key = target_key
 		_last_route_arc = float(sample["arc"])
@@ -1905,7 +1905,7 @@ func _recover_vehicle(reason: StringName = &"unknown") -> void:
 	_stuck_time = 0.0
 	_guide_checkpoint_index = -1
 	_guide_reached = false
-	_stuck_target_key = ""
+	_stuck_target_key = 0
 	_best_checkpoint_distance = INF
 	_smoothed_steer = 0.0
 	_reset_overtake_state()
@@ -1965,7 +1965,7 @@ func _reset_route_watchdog() -> void:
 	_wrong_way_progress_time = 0.0
 	_spin_time = 0.0
 	_route_progress_accumulator = 0.0
-	_watchdog_target_key = ""
+	_watchdog_target_key = 0
 	_last_route_arc = 0.0
 	_static_contact_time = 0.0
 	_escape_time_remaining = 0.0
