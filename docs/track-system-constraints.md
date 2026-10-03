@@ -109,13 +109,18 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
 
 ## Road Width
 
-- Routes are always generated and validated at the fixed 125 half-width. Width
-  is fitted afterwards by `TrackWidthProfile` and never rejects or reshapes a
-  route.
+- Routes are generated with width-aware acceptance margins: the intended
+  amplitude widens the room margin, the branch self-distance and the room check,
+  so wide roads are not accepted only to be clamped away. A `flat` amplitude
+  reduces these margins exactly to today's values (190 room margin, 320 branch
+  self-distance, 135 room check); width is then fitted per sample by
+  `TrackWidthProfile` and never rejects or reshapes the route.
 - The `road_width` generation option selects it: `flat` (default, today's road,
   byte-identical scenes), `seeded` (a per-seed amplitude; about a quarter of
   seeds stay flat), or a numeric amplitude. Race events pass `road_width`
-  through; the AI harness and capture tool read `PC_ROAD_WIDTH`.
+  through, and the mode travels in the circuit identity and share code
+  (`GENERATOR_VERSION` 12; older share codes reject rather than silently
+  flattening). The AI harness and capture tool read `PC_ROAD_WIDTH`.
 - Width changes are sporadic: most of every lap keeps 125. Each lap gets one or
   two swells (700–1400 units, at most 15% of the lap each) and one pinch
   (400–700 units, at most 8%), each a smooth rise and fall, 300 units apart.
@@ -123,8 +128,9 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   and reach `125 + 0.6..1.0 · A`.
 - The pinch narrows by at most `min(25, 0.2 · A)`, never under a 100
   half-width. That floor keeps the shortcut lane (70 + 26), technical strip (92)
-  and grip patches inside the road. No pinch comes within 500 units of the
-  finish line, so the start grid keeps a full-width straight.
+  and grip patches inside the road. Neither a pinch nor a swell comes within 500
+  units of the finish line, so the start/finish setup straight keeps its width
+  and the gate, grid and landmarks do not move with the amplitude.
 - Each widened sample is clamped to what the route affords:
   `min(240, turn radius − 55, (nearest non-local leg − 70) / 2, room wall − 20)`,
   smoothed over 350 units so the road tapers. The 55 inner-edge radius is
@@ -133,9 +139,8 @@ scripts/race/prototype_race.gd   builds the requested circuit at race startup
   keeps at least 60% of its flat area.
 - The prepared spec carries one `half_widths` array; empty means the fixed
   road. Corridor edges, island, outer boundary, `TrackSurface` width curve,
-  gate sensors and posts, finish checker, bay seals, obstacles, hazard crossing,
-  environment props (per-segment sweep) and the racing-line apex envelope all
-  read it. Generated roots record `corridor_max_half_width`; the race manager's
+  gate sensors and posts, finish checker, bay seals, obstacles, environment
+  props (per-segment sweep) and the racing-line apex envelope all read it. Generated roots record `corridor_max_half_width`; the race manager's
   wrong-way reach and the AI off-route distance widen by it.
 - The handmade course shader measures the local width per fragment when the
   surface has a width curve, so edge paint keeps its real size.
