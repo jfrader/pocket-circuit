@@ -192,7 +192,7 @@ func _prepare_race_async() -> void:
 			if not prepared.is_empty():
 				used_cached_prepared = true
 		if prepared.is_empty():
-			prepared = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)))
+			prepared = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)), Thread.PRIORITY_NORMAL)
 			if not prepared.is_empty() and not key.is_empty():
 				TRACK_BUILDER.store_prepared(key, prepared)
 		if app.call("is_race_loading_cancelled"):
@@ -211,7 +211,7 @@ func _prepare_race_async() -> void:
 				if used_cached_prepared:
 					# Cache hit produced a fingerprint mismatch (stale or wrong
 					# identity). Fall back to full generation instead of failing.
-					prepared = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)))
+					prepared = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)), Thread.PRIORITY_NORMAL)
 					if app.call("is_race_loading_cancelled"):
 						app.call("complete_race_loading")
 						return
