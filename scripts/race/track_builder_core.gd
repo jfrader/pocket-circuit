@@ -131,10 +131,16 @@ static var _asset_texture_cache: Dictionary = {}
 ## The cap is several tracks' worth of entries, so a single build never thrashes;
 ## entries are only examined when one is added, never on a hit.
 const MAX_TEXTURE_CACHE_ENTRIES := 384
+const MAX_GENERATED_CACHE_ENTRIES := 4
 static var _texture_opaque_rect_order: Array[String] = []
 static var _texture_outline_order: Array[String] = []
 static var _texture_footprint_order: Array[String] = []
 static var _asset_texture_order: Array[String] = []
+
+static var _generated_prepared_cache: Dictionary = {}
+static var _generated_prepared_order: Array[String] = []
+static var _generated_room_cache: Dictionary = {}
+static var _generated_room_order: Array[String] = []
 
 
 static func asset_texture(path: String) -> Texture2D:
@@ -143,12 +149,14 @@ static func asset_texture(path: String) -> Texture2D:
 	return _asset_texture_cache[path]
 
 
-static func cache_texture_entry(cache: Dictionary, order: Array[String], key: String, value: Variant) -> void:
+static func cache_texture_entry(cache: Dictionary, order: Array[String], key: String, value: Variant, max_entries: int = -1) -> void:
 	if order.has(key):
 		order.erase(key)
 	order.append(key)
 	cache[key] = value
-	while order.size() > MAX_TEXTURE_CACHE_ENTRIES:
+	if max_entries < 0:
+		max_entries = MAX_TEXTURE_CACHE_ENTRIES
+	while order.size() > max_entries:
 		var oldest: String = order[0]
 		order.remove_at(0)
 		cache.erase(oldest)
@@ -1290,3 +1298,50 @@ static func _assign_owners(node: Node, owner: Node) -> void:
 		child.owner = owner
 		if child.scene_file_path.is_empty():
 			_assign_owners(child, owner)
+
+
+## Bounded cache for generated circuits so that retry/replay of an identical
+## race can skip route generation + layout assembly. Keys are circuit
+## fingerprints (preferred) or deterministic (theme, room, seed, options).
+## Eviction is oldest-first (insertion order). Size capped low because the
+## prepared dicts and packed scenes are heavy.
+static func cached_prepared(key: String) -> Dictionary:
+	if key.is_empty() or not _generated_prepared_cache.has(key):
+		return {}
+	var v: Variant = _generated_prepared_cache[key]
+	if v is Dictionary:
+		return (v as Dictionary).duplicate(true)
+	return {}
+
+
+static func store_prepared(key: String, prepared: Dictionary) -> void:
+	if key.is_empty() or prepared.is_empty():
+		return
+	cache_texture_entry(_generated_prepared_cache, _generated_prepared_order, key, prepared.duplicate(true), MAX_GENERATED_CACHE_ENTRIES)
+
+
+static func cached_room(key: String) -> PackedScene:
+	if key.is_empty() or not _generated_room_cache.has(key):
+		return null
+	var v: Variant = _generated_room_cache[key]
+	if v is PackedScene:
+		return v as PackedScene
+	return null
+
+
+static func store_room(key: String, packed: PackedScene) -> void:
+	if key.is_empty() or packed == null:
+		return
+	cache_texture_entry(_generated_room_cache, _generated_room_order, key, packed, MAX_GENERATED_CACHE_ENTRIES)
+
+
+static func clear_generated_cache() -> void:
+	_generated_prepared_cache.clear()
+	_generated_prepared_order.clear()
+	_generated_room_cache.clear()
+	_generated_room_order.clear()
+
+
+## Exposed for tests (and diagnostics). Returns the number of cached circuits.
+static func generated_cache_size() -> int:
+	return _generated_prepared_order.size()
