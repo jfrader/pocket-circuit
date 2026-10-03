@@ -42,6 +42,8 @@ func _run_test() -> void:
 					return
 				if not _check_limits(line, polygon, widths, "%s/%s/%d" % [tier, room, seed]):
 					return
+				if not _check_setup_straight(line, widths, "%s/%s/%d" % [tier, room, seed]):
+					return
 				var base_share := _base_share(widths)
 				if not _expect(base_share >= SPORADIC_BASE_SHARE, "%s/%s/%d only %.0f%% of the lap keeps today's width" % [tier, room, seed, base_share * 100.0]):
 					return
@@ -71,6 +73,22 @@ func _base_share(widths: PackedFloat32Array) -> float:
 	for value: float in widths:
 		base += 1 if absf(value - PROFILE.BASE_HALF_WIDTH) < 0.5 else 0
 	return float(base) / float(widths.size())
+
+
+## The setup straight keeps today's width: nothing may widen within the finish
+## clear zone, so the gate, grid and finish landmarks do not move with the
+## amplitude, while pinches may still narrow it like today's geometry.
+func _check_setup_straight(line: PackedVector2Array, widths: PackedFloat32Array, label: String) -> bool:
+	var arc := PackedFloat32Array([0.0])
+	var total := 0.0
+	for i in line.size():
+		total += line[i].distance_to(line[(i + 1) % line.size()])
+		arc.append(total)
+	for i in line.size():
+		var center := minf(arc[i], total - arc[i])
+		if center < PROFILE.FINISH_CLEAR_ARC and widths[i] > PROFILE.BASE_HALF_WIDTH + 0.5:
+			return _expect(false, "%s widened the setup straight at sample %d (%.1f vs base %.1f)" % [label, i, widths[i], PROFILE.BASE_HALF_WIDTH])
+	return true
 
 
 func _has_pinch(widths: PackedFloat32Array) -> bool:
