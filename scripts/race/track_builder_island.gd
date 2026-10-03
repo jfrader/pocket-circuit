@@ -63,7 +63,7 @@ static func build_island_prop(root: Node2D, spec: Dictionary, region: PackedVect
 	visual.polygon = region
 	var material_texture := String(spec.get("island_material_texture", ""))
 	var prop_texture := material_texture if not material_texture.is_empty() else String(spec.get("prop_texture", ""))
-	var texture := load(prop_texture) as Texture2D if not prop_texture.is_empty() else null
+	var texture := TrackBuilderCore.asset_texture(prop_texture) if not prop_texture.is_empty() else null
 	if texture:
 		# Transparent artwork margins must not make the solid island look hollow.
 		TrackBuilderCore._add_polygon(root, "IslandMaterial", region, spec["island"], -9)
@@ -118,7 +118,7 @@ static func build_raised_island_rim(parent: StaticBody2D, spec: Dictionary, poin
 	textured.antialiased = true
 	textured.z_index = -7
 	var edge_texture_path := String(spec.get("edge_texture", ""))
-	var edge_texture := load(edge_texture_path) as Texture2D if not edge_texture_path.is_empty() else null
+	var edge_texture := TrackBuilderCore.asset_texture(edge_texture_path) if not edge_texture_path.is_empty() else null
 	if edge_texture:
 		textured.texture = edge_texture
 		textured.texture_mode = Line2D.LINE_TEXTURE_TILE

@@ -86,6 +86,9 @@ var _drift_boost_accumulated := 0.0
 var _drift_grace_timer := 0.0
 var _front_slip_angle := 0.0
 var _rear_slip_angle := 0.0
+var _v1_slips: Array[float] = [0.0, 0.0]
+var _v1_brakes: Array[float] = [0.0, 0.0]
+var _v1_brake_loads: Array[float] = [0.0, 0.0, 0.0, 0.0]
 var _last_speed := 0.0
 var _drift_entry_speed := 0.0
 
@@ -224,6 +227,14 @@ func get_throttle_input() -> float:
 ## own the sliding truth; raw slip only shapes intensity after gameplay says the
 ## tyres have broken away.
 func get_tyre_state() -> Dictionary:
+	var state: Dictionary = {}
+	write_tyre_state(state)
+	return state
+
+
+## Fill caller-owned scratch state for per-frame presentation; get_tyre_state()
+## remains a snapshot for callers that retain it.
+func write_tyre_state(state: Dictionary) -> void:
 	var sliding := is_drifting or is_sliding
 	var speed_weight := smoothstep(TYRE_ROLLING_SPEED, TYRE_FULL_SPEED, speed)
 	var steer := maxf(absf(_steer_input) - TYRE_STEER_ONSET, 0.0)
@@ -234,15 +245,13 @@ func get_tyre_state() -> Dictionary:
 	var rear_slip_deg := rad_to_deg(absf(_rear_slip_angle))
 	var span := maxf(SCREECH_FULL_DEG - SCREECH_ONSET_DEG, 1.0)
 	var slip_intensity := pow(clampf((rear_slip_deg - SCREECH_ONSET_DEG) / span, 0.0, 1.0), 1.6)
-	return {
-		"cornering": cornering,
-		"sliding": sliding,
-		"screech": slip_intensity if sliding else 0.0,
-		"drift_state": _drift_state,
-		"surface": current_surface,
-		"grip": get_effective_grip(),
-		"surface_grip": surface_grip_multiplier,
-	}
+	state["cornering"] = cornering
+	state["sliding"] = sliding
+	state["screech"] = slip_intensity if sliding else 0.0
+	state["drift_state"] = _drift_state
+	state["surface"] = current_surface
+	state["grip"] = get_effective_grip()
+	state["surface_grip"] = surface_grip_multiplier
 
 
 ## Compatibility accessors for probes and presentation callers.
@@ -279,14 +288,14 @@ func get_safe_corner_speed(radius: float, surface_grip: float = -1.0) -> float:
 	return DYNAMICS.get_safe_corner_speed(radius, lat_accel)
 
 
-func get_braking_distance(v_now: float, v_target: float, surface_grip: float = -1.0) -> float:
+func get_braking_distance(v_now: float, v_target: float, surface_grip: float = -1.0, scratch: Array[float] = [], loads: Array[float] = []) -> float:
 	## AI/public query: braking distance from v_now to v_target.
 	var grip := surface_grip if surface_grip >= 0.0 else surface_grip_multiplier
 	if stats.physics_model_version == 0:
 		var brake_accel := stats.get_legacy_brake_force() / maxf(stats.get_legacy_mass(), 0.001)
 		return DYNAMICS.get_braking_distance(v_now, v_target, brake_accel)
 	return DYNAMICS.predict_braking_distance(
-		v_now, v_target, stats, grip, surface_speed_multiplier,
+		v_now, v_target, stats, grip, surface_speed_multiplier, scratch, loads,
 	)
 
 
@@ -531,12 +540,12 @@ func _v1_physics_step(delta: float) -> void:
 	)
 
 	# ── Slip angles ──
-	var slips := DYNAMICS.calculate_slip_angles(
+	DYNAMICS.calculate_slip_angles_into(
 		fwd_speed, lat_speed, yaw_rate,
-		stats.wheelbase, stats.front_weight_ratio, _rack_angle,
+		stats.wheelbase, stats.front_weight_ratio, _rack_angle, _v1_slips,
 	)
-	_front_slip_angle = float(slips["front"])
-	_rear_slip_angle = float(slips["rear"])
+	_front_slip_angle = _v1_slips[0]
+	_rear_slip_angle = _v1_slips[1]
 
 	var front_normal := DYNAMICS.calculate_axle_normal_load(
 		stats.mass, stats.front_weight_ratio, true,
@@ -723,13 +732,13 @@ func _v1_apply_braking(forward: Vector2, fwd_speed: float, front_pos: Vector2, r
 			linear_velocity *= 0.9
 		return
 
-	var brakes := DYNAMICS.calculate_brake_forces(
+	DYNAMICS.calculate_brake_forces_into(
 		_brake_input, fwd_speed, stats, surface_grip_multiplier,
-		_front_lateral_force, _rear_lateral_force,
+		_front_lateral_force, _rear_lateral_force, _v1_brakes, _v1_brake_loads,
 	)
 	var front_forward := forward.rotated(_rack_angle)
-	apply_force(-front_forward * float(brakes["front_brake"]), front_pos)
-	apply_force(-forward * float(brakes["rear_brake"]), rear_pos)
+	apply_force(-front_forward * _v1_brakes[0], front_pos)
+	apply_force(-forward * _v1_brakes[1], rear_pos)
 
 
 func _v1_apply_boost(delta: float, forward: Vector2, _fwd_speed: float) -> void:

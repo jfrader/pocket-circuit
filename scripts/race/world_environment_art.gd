@@ -29,7 +29,7 @@ static func render_prop(parent: Node2D, asset: Dictionary, placement: Dictionary
 		parent.add_child(node)
 		var sprite := Sprite2D.new()
 		sprite.name = "Sprite"
-		sprite.texture = load(path) as Texture2D
+		sprite.texture = TrackBuilderCore.asset_texture(path)
 		sprite.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR
 		sprite.scale = Vector2.ONE * TrackBuilderCore.PROP_SCALE.sprite_scale(sprite.texture, TrackBuilderCore._texture_opaque_rect(sprite.texture), float(asset["length_mm"]))
 		sprite.modulate.a = float(asset.get("opacity", 1.0))
@@ -125,7 +125,7 @@ static func _draw_grip_surface(root: Node2D, name: String, asset: Dictionary, po
 	root.add_child(region)
 	var rng := RandomNumberGenerator.new()
 	rng.seed = TrackBuilderCore._mix_seed(seed_value, name + String(asset["id"]))
-	var texture := load(asset["texture_path"]) as Texture2D
+	var texture := TrackBuilderCore.asset_texture(String(asset["texture_path"]))
 	var used := TrackBuilderCore._texture_opaque_rect(texture)
 	var scale := TrackBuilderCore.PROP_SCALE.sprite_scale(texture, used, float(asset["length_mm"]))
 	var nominal_radius := used.size.length() * scale * 0.5

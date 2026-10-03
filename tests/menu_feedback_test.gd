@@ -132,8 +132,31 @@ func _run_test() -> void:
 	shell.queue_free()
 	app.queue_free()
 	await process_frame
+	if not _check_skin_cache_bounds():
+		return
 	print("MENU_FEEDBACK_TEST PASS borders_hover_press_focus_disabled_reduced_motion_hud_bounds")
 	quit(0)
+
+
+func _check_skin_cache_bounds() -> bool:
+	SKIN._flat_cache.clear()
+	SKIN._flat_order.clear()
+	SKIN._svg_cache.clear()
+	SKIN._svg_order.clear()
+	var svg := "<svg xmlns='http://www.w3.org/2000/svg' width='2' height='2'><rect width='2' height='2' fill='#ffffff'/></svg>"
+	var first_flat: StyleBoxFlat = SKIN._flat(Color(0, 0, 0), Color.WHITE, 0, 1)
+	var first_flat_key: String = SKIN._flat_order[0]
+	var first_svg: Texture2D = SKIN._svg("cache_0", svg)
+	for index in range(1, SKIN.MAX_SKIN_CACHE_ENTRIES + 1):
+		SKIN._flat(Color.BLACK, Color.WHITE, index, 1)
+		SKIN._svg("cache_%d" % index, svg)
+	if not _expect(SKIN._flat_cache.size() == SKIN.MAX_SKIN_CACHE_ENTRIES and SKIN._svg_cache.size() == SKIN.MAX_SKIN_CACHE_ENTRIES, "skin caches must stay bounded"):
+		return false
+	if not _expect(not SKIN._flat_cache.has(first_flat_key) and not SKIN._svg_cache.has("cache_0"), "oldest cached skin entries must be evicted"):
+		return false
+	if not _expect(SKIN._flat(Color(0, 0, 0), Color.WHITE, 0, 1) != first_flat and SKIN._svg("cache_0", svg) != first_svg, "oldest cached skin entries must be evicted"):
+		return false
+	return true
 
 
 func _button(parent: Node, rect: Rect2, text: String, primary: bool = false) -> Button:

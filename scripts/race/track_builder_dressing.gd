@@ -575,7 +575,7 @@ static func build_edge_and_apron_decor(
 		if candidate.distance_to(centerline[0]) < 300.0:
 			continue
 		var tex_path := String(decor[rng.randi() % decor.size()])
-		var tex := load(tex_path) as Texture2D
+		var tex := TrackBuilderCore.asset_texture(tex_path)
 		if tex == null:
 			continue
 		var sz := TrackBuilderCore.PROP_SCALE.length_for(tex_path, rng.randf_range(22.0, 52.0))
@@ -688,7 +688,7 @@ static func build_giant_landmarks(
 			tex_path = String(giants[(asset_offset + asset_attempt) % giants.size()])
 			if bool(spec.get("distinct_giant_assets", false)) and used_assets.has(tex_path):
 				continue
-			tex = load(tex_path) as Texture2D
+			tex = TrackBuilderCore.asset_texture(tex_path)
 			if tex == null:
 				continue
 			var shape_entry: Dictionary = TrackBuilderCore.PROP_SHAPES.get(tex_path.get_file(), {})
@@ -850,7 +850,7 @@ static func build_room_ground_sections(
 			await stage.call("Laying room materials")
 		var definition: Dictionary = definitions[(asset_offset + section_index) % definitions.size()]
 		var asset_path := String(definition["asset"])
-		var texture := load(asset_path) as Texture2D
+		var texture := TrackBuilderCore.asset_texture(asset_path)
 		if texture == null:
 			continue
 		var visible_bounds := TrackBuilderCore._texture_opaque_rect(texture)
@@ -938,7 +938,7 @@ static func build_room_floor_details(
 		if not TrackBuilderCore._clear_of_points(candidate, positions, 46.0):
 			continue
 		var texture_path := String(decals[rng.randi_range(0, decals.size() - 1)])
-		var texture := load(texture_path) as Texture2D
+		var texture := TrackBuilderCore.asset_texture(texture_path)
 		if texture == null:
 			continue
 		var sprite := Sprite2D.new()
