@@ -77,7 +77,7 @@ static func add_wall_segment(parent: Node, node_name: String, position: Vector2,
 	side_face.color = Color("262e3a")
 	TrackBuilderCore._mark_solid_visual(side_face, "", &"room_wall")
 	wall.add_child(side_face)
-	var edge_texture_side := load(edge_texture_path) as Texture2D
+	var edge_texture_side := TrackBuilderCore.asset_texture(edge_texture_path)
 	if edge_texture_side:
 		var side_strip := Sprite2D.new()
 		side_strip.name = "SideStrip"
@@ -99,7 +99,7 @@ static func add_wall_segment(parent: Node, node_name: String, position: Vector2,
 	top_lip.color = Color("e8d9b8", 0.85)
 	TrackBuilderCore._mark_solid_visual(top_lip, "", &"room_wall")
 	wall.add_child(top_lip)
-	var edge_texture := load(edge_texture_path) as Texture2D
+	var edge_texture := TrackBuilderCore.asset_texture(edge_texture_path)
 	if edge_texture:
 		var tile_count := maxi(1, int(ceil((length + 60.0) / TrackBuilderCore.ROOM_EDGE_TILE_WORLD_LENGTH)))
 		for tile in tile_count:
@@ -166,7 +166,7 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 	var normal := tangent.rotated(PI * 0.5).normalized()
 	for side in [-1, 1]:
 		var asset_path := String(asset_paths[posmod(gate_index * 2 + (1 if side > 0 else 0), asset_paths.size())])
-		var texture := load(asset_path) as Texture2D
+		var texture := TrackBuilderCore.asset_texture(asset_path)
 		if texture == null:
 			continue
 		var post := StaticBody2D.new()
@@ -295,7 +295,7 @@ static func scatter_decals(root: Node2D, spec: Dictionary, room_polygon: PackedV
 		var texture_path := String(decals[rng.randi_range(0, decals.size() - 1)])
 		var sprite := Sprite2D.new()
 		sprite.name = "Decal"
-		sprite.texture = load(texture_path) as Texture2D
+		sprite.texture = TrackBuilderCore.asset_texture(texture_path)
 		if sprite.texture == null:
 			sprite.free()
 			continue

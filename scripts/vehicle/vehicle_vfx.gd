@@ -10,6 +10,7 @@ const IMPACT_DURATION := 0.18
 const IMPACT_AUDIO_COOLDOWN := 0.14
 
 var _vehicle: RigidBody2D
+var _tyre_state: Dictionary = {}
 var _visual_root: Node2D
 var _visual_base_scale := Vector2.ONE
 var _dust_left: Sprite2D
@@ -43,8 +44,8 @@ func _physics_process(delta: float) -> void:
 	_animation_time += delta
 	_skid_cooldown = maxf(0.0, _skid_cooldown - delta)
 	_impact_audio_cooldown = maxf(0.0, _impact_audio_cooldown - delta)
-	var tyre_state: Dictionary = _vehicle.call("get_tyre_state")
-	var drifting := bool(tyre_state["sliding"])
+	_vehicle.call("write_tyre_state", _tyre_state)
+	var drifting := bool(_tyre_state["sliding"])
 	var boosting := bool(_vehicle.call("is_boost_active"))
 	# Boost is an event, so it fires once here. Drift is a sustained state and is
 	# voiced continuously by AudioDirector from the same tyre state used here.

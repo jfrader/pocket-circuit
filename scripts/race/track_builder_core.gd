@@ -122,6 +122,7 @@ static var _texture_footprint_cache: Dictionary = {}
 static var _texture_hull_cache: Dictionary = {}
 static var _texture_opaque_rect_cache: Dictionary = {}
 static var _texture_outline_cache: Dictionary = {}
+static var _asset_texture_cache: Dictionary = {}
 
 ## Textures built while generating a track have no resource path, so the cache key
 ## falls back to the texture instance id, and those ids never repeat between races.
@@ -133,6 +134,13 @@ const MAX_TEXTURE_CACHE_ENTRIES := 384
 static var _texture_opaque_rect_order: Array[String] = []
 static var _texture_outline_order: Array[String] = []
 static var _texture_footprint_order: Array[String] = []
+static var _asset_texture_order: Array[String] = []
+
+
+static func asset_texture(path: String) -> Texture2D:
+	if not _asset_texture_cache.has(path):
+		cache_texture_entry(_asset_texture_cache, _asset_texture_order, path, load(path) as Texture2D)
+	return _asset_texture_cache[path]
 
 
 static func cache_texture_entry(cache: Dictionary, order: Array[String], key: String, value: Variant) -> void:

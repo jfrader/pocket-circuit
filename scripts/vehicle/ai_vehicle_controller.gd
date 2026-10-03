@@ -210,6 +210,9 @@ var _room_cut_checkpoint := -1
 var _room_cut_start := Vector2.ZERO
 var _room_cut_end := Vector2.ZERO
 var _room_cut_shape: CapsuleShape2D
+var _room_cut_query: PhysicsShapeQueryParameters2D
+var _ray_query: PhysicsRayQueryParameters2D
+var _ray_excludes: Array[RID] = []
 var _overtake_offset := 0.0
 var _overtake_hold_remaining := 0.0
 var _overtake_cooldown_remaining := 0.0
@@ -264,6 +267,27 @@ var _reference_cumulative := PackedFloat32Array()
 var _reference_total := 0.0
 var _racing_line_nearest_index := -1
 var _reference_nearest_index := -1
+# Scratch results are owned by this controller. Callers must consume them before
+# calling the same helper again; none may be retained across physics ticks.
+var _reference_goal_result := {"goal": Vector2.ZERO, "lookahead": 0.0}
+var _traffic_result := {"target_position": Vector2.ZERO, "speed_scale": 1.0, "speed_limit": INF, "passing": false, "drafting": false}
+var _leader_result: Dictionary = {}
+var _surface_result := {"weight": 0.0, "speed_scale": 1.0, "grip_scale": 1.0, "risk": 0.0, "avoid_direction": Vector2.ZERO}
+var _surface_model_result := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
+var _obstacle_result := {"weight": 0.0, "speed_scale": 1.0, "speed_limit": INF, "avoid_direction": Vector2.ZERO, "static_contact": false, "escape_steer": 0.0}
+# Tick-local results: callers consume these before calling the same helper again.
+var _segment_result := {"index": 0, "fraction": 0.0, "distance_squared": INF}
+var _route_sample_result := {"arc": 0.0, "length": 1.0, "distance": 0.0, "closed": false}
+var _watchdog_result := {"made_progress": false}
+var _hazard_result := {"radius": 0.0, "distance": INF, "speed_limit": INF}
+# A wide probe needs all three results alive until the nearest is selected.
+var _ray_results := [
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+	{"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO},
+]
+var _brake_prediction: Array[float] = [0.0, 0.0]
+var _brake_prediction_loads: Array[float] = [0.0, 0.0, 0.0, 0.0]
 
 
 func configure(
@@ -277,6 +301,8 @@ func configure(
 	if vehicle != controlled_vehicle or _unassisted_stats == null:
 		_unassisted_stats = controlled_vehicle.stats
 	vehicle = controlled_vehicle
+	if _room_cut_query != null:
+		_room_cut_query.exclude = [vehicle.get_rid()]
 	if vehicle.stats != _unassisted_stats:
 		vehicle.apply_stats(_unassisted_stats)
 	race_manager = manager
@@ -454,7 +480,10 @@ func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_
 				best_dsq = dsq
 				best_index = index
 				best_fraction = fraction
-		return {"index": best_index, "fraction": best_fraction, "distance_squared": best_dsq}
+		_segment_result["index"] = best_index
+		_segment_result["fraction"] = best_fraction
+		_segment_result["distance_squared"] = best_dsq
+		return _segment_result
 	var best_index := 0
 	var best_fraction := 0.0
 	var best_dsq := INF
@@ -472,7 +501,10 @@ func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_
 			best_dsq = dsq
 			best_index = index
 			best_fraction = fraction
-	return {"index": best_index, "fraction": best_fraction, "distance_squared": best_dsq}
+	_segment_result["index"] = best_index
+	_segment_result["fraction"] = best_fraction
+	_segment_result["distance_squared"] = best_dsq
+	return _segment_result
 
 
 func _physics_process(delta: float) -> void:
@@ -531,7 +563,7 @@ func _physics_process(delta: float) -> void:
 		var correction := clampf(maxf(route_error / 70.0, absf(vehicle.slip_angle) / 20.0), 0.0, 1.0)
 		_tracking_grip_utilization = lerpf(CORNER_GRIP_UTILIZATION, CORRECTION_GRIP_UTILIZATION, correction)
 	var line_radius := _racing_line_radius(vehicle.global_position)
-	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version != 0 else {}
+	var curvature_hazard := _v1_curvature_hazard(expected_index) if vehicle.stats.physics_model_version != 0 else _hazard_result
 	var pursuit_lookahead := _lookahead_distance()
 	if line_radius > 0.0:
 		# Steering follows local curvature. A future hairpin may constrain
@@ -677,7 +709,7 @@ func _physics_process(delta: float) -> void:
 		var surface_grip := _planned_surface_grip(surface_plan)
 		var reaction_seconds := float(tuning["reaction_seconds"])
 		var reaction_margin := vehicle.speed * reaction_seconds
-		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, surface_grip) + reaction_margin
+		braking_distance = vehicle.get_braking_distance(vehicle.speed, target_speed, surface_grip, _brake_prediction, _brake_prediction_loads) + reaction_margin
 		braking_distance *= float(personality["brake_timing"])
 	else:
 		braking_distance = lerpf(
@@ -785,7 +817,7 @@ static func calculate_catch_up_power(tuning: Dictionary, position: int, progress
 func _corner_mistake(delta: float, tuning: Dictionary, checkpoint_index: int, radius: float) -> float:
 	if float(tuning["mistake_rate"]) <= 0.0:
 		return 0.0
-	var lap := int(race_manager.get_racer_state(vehicle).get("lap", 0))
+	var lap := int(race_manager.get_racer_state_ref(vehicle).get("lap", 0))
 	var key := "%d:%d" % [lap, checkpoint_index]
 	if key != _mistake_key:
 		_mistake_key = key
@@ -842,11 +874,14 @@ func _update_room_cut(expected_index: int, forward: Vector2) -> void:
 		_room_cut_shape = CapsuleShape2D.new()
 		_room_cut_shape.radius = 22.0
 		_room_cut_shape.height = 56.0
-	var query := PhysicsShapeQueryParameters2D.new()
+	if _room_cut_query == null:
+		_room_cut_query = PhysicsShapeQueryParameters2D.new()
+		_room_cut_query.exclude = [vehicle.get_rid()]
+	var query := _room_cut_query
 	query.shape = _room_cut_shape
 	query.transform = Transform2D(direction.angle() + PI * 0.5, vehicle.global_position)
 	query.collision_mask = STATIC_OBSTACLE_MASK
-	query.exclude = [vehicle.get_rid()]
+	query.motion = Vector2.ZERO
 	var space := vehicle.get_world_2d().direct_space_state
 	if not space.intersect_shape(query, 1).is_empty():
 		_room_cut_checkpoint = -1
@@ -1033,15 +1068,18 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 	## Classic pure-pursuit goal: project the vehicle onto the reference loop,
 	## advance by `lookahead` along the race direction, and return that point
 	## plus the look-ahead distance actually used (the pursuit radius).
+	_reference_goal_result["lookahead"] = lookahead
 	if _reference_path.size() < 2:
-		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
+		_reference_goal_result["goal"] = vehicle.global_position + forward * lookahead
+		return _reference_goal_result
 	_ensure_arc_tables_current()
 	var count := _reference_path.size()
 	var segment_lengths := _reference_segment_lengths
 	var cumulative := _reference_cumulative
 	var total := _reference_total
 	if total < 0.001:
-		return {"goal": vehicle.global_position + forward * lookahead, "lookahead": lookahead}
+		_reference_goal_result["goal"] = vehicle.global_position + forward * lookahead
+		return _reference_goal_result
 
 	var nearest := _nearest_segment_local(_reference_path, vehicle.global_position, _reference_nearest_index)
 	_reference_nearest_index = int(nearest["index"])
@@ -1063,7 +1101,8 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 		1.0
 	)
 	var goal := _reference_path[target_index].lerp(_reference_path[(target_index + 1) % count], target_fraction)
-	return {"goal": goal, "lookahead": lookahead}
+	_reference_goal_result["goal"] = goal
+	return _reference_goal_result
 
 
 func _leader_progress_deficit() -> float:
@@ -1091,13 +1130,12 @@ func _traffic_plan(
 			_overtake_cooldown_remaining,
 			OVERTAKE_COOLDOWN / float(personality["overtake_aggression"])
 		)
-	var plan := {
-		"target_position": line_target,
-		"speed_scale": 1.0,
-		"speed_limit": INF,
-		"passing": false,
-		"drafting": false,
-	}
+	var plan := _traffic_result
+	plan["target_position"] = line_target
+	plan["speed_scale"] = 1.0
+	plan["speed_limit"] = INF
+	plan["passing"] = false
+	plan["drafting"] = false
 	if not vehicle.is_inside_tree() or forward.length_squared() < 0.001:
 		return plan
 
@@ -1174,12 +1212,12 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 			nearest_distance = distance_ahead
 			nearest_lateral = lateral_distance
 	if nearest == null:
-		return {}
-	return {
-		"vehicle": nearest,
-		"distance": nearest_distance,
-		"lateral_distance": nearest_lateral,
-	}
+		_leader_result.clear()
+		return _leader_result
+	_leader_result["vehicle"] = nearest
+	_leader_result["distance"] = nearest_distance
+	_leader_result["lateral_distance"] = nearest_lateral
+	return _leader_result
 
 
 func _select_overtake_side(forward: Vector2, leader: VehicleController) -> float:
@@ -1401,13 +1439,12 @@ func _planned_surface_grip(surface_plan: Dictionary) -> float:
 
 
 func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
-	var plan := {
-		"weight": 0.0,
-		"speed_scale": 1.0,
-		"grip_scale": 1.0,
-		"risk": 0.0,
-		"avoid_direction": desired_direction,
-	}
+	var plan := _surface_result
+	plan["weight"] = 0.0
+	plan["speed_scale"] = 1.0
+	plan["grip_scale"] = 1.0
+	plan["risk"] = 0.0
+	plan["avoid_direction"] = desired_direction
 	if not vehicle.is_inside_tree():
 		return plan
 	var shortcut_zone := _upcoming_shortcut_zone(desired_direction)
@@ -1461,7 +1498,10 @@ func _surface_driving_speed_scale(speed_scale: float, grip_scale: float, directi
 
 
 func _surface_model(direction: Vector2) -> Dictionary:
-	var model := {"risk": 0.0, "grip": 1.0, "speed": 1.0}
+	var model := _surface_model_result
+	model["risk"] = 0.0
+	model["grip"] = 1.0
+	model["speed"] = 1.0
 	var model_risk := 0.0
 	var origin := vehicle.global_position
 	for record: Dictionary in _surface_zone_records_for_tick():
@@ -1474,7 +1514,9 @@ func _surface_model(direction: Vector2) -> Dictionary:
 			var risk := float(record["risk"])
 			if risk >= model_risk:
 				model_risk = risk
-				model = {"risk": risk, "grip": float(record["grip"]), "speed": float(record["speed"])}
+				model["risk"] = risk
+				model["grip"] = float(record["grip"])
+				model["speed"] = float(record["speed"])
 			break
 	return model
 
@@ -1542,14 +1584,13 @@ func _surface_zone_risk(zone: SurfaceZone) -> float:
 
 
 func _obstacle_avoidance(forward: Vector2, desired_direction: Vector2) -> Dictionary:
-	var plan := {
-		"weight": 0.0,
-		"speed_scale": 1.0,
-		"speed_limit": INF,
-		"avoid_direction": desired_direction,
-		"static_contact": false,
-		"escape_steer": 0.0,
-	}
+	var plan := _obstacle_result
+	plan["weight"] = 0.0
+	plan["speed_scale"] = 1.0
+	plan["speed_limit"] = INF
+	plan["avoid_direction"] = desired_direction
+	plan["static_contact"] = false
+	plan["escape_steer"] = 0.0
 	if not vehicle.is_inside_tree():
 		return plan
 	var origin := vehicle.global_position + forward * OBSTACLE_FRONT_OFFSET
@@ -1623,11 +1664,15 @@ func _ray_probe_from(
 		excluded_rids: Array[RID] = []
 ) -> Dictionary:
 	if feeler_length <= 0.001:
-		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
+		var empty: Dictionary = _ray_results[0]
+		empty["clearance"] = 1.0
+		empty["is_vehicle"] = false
+		empty["normal"] = Vector2.ZERO
+		return empty
 	var side_offset := direction.orthogonal() * OBSTACLE_FEELER_HALF_WIDTH
-	var center := _single_ray_probe(origin, direction, feeler_length, mask, excluded_rids)
-	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask, excluded_rids)
-	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask, excluded_rids)
+	var center := _single_ray_probe(origin, direction, feeler_length, mask, excluded_rids, 0)
+	var left := _single_ray_probe(origin + side_offset, direction, feeler_length, mask, excluded_rids, 1)
+	var right := _single_ray_probe(origin - side_offset, direction, feeler_length, mask, excluded_rids, 2)
 	var closest := center
 	if float(left["clearance"]) < float(closest["clearance"]):
 		closest = left
@@ -1641,27 +1686,33 @@ func _single_ray_probe(
 		direction: Vector2,
 		feeler_length: float,
 		mask: int,
-		excluded_rids: Array[RID] = []
+		excluded_rids: Array[RID] = [],
+		slot: int = 0
 ) -> Dictionary:
-	var query_excludes: Array[RID] = [vehicle.get_rid()]
-	query_excludes.append_array(excluded_rids)
-	var query := PhysicsRayQueryParameters2D.create(
-		origin,
-		origin + direction * feeler_length,
-		mask,
-		query_excludes
-	)
+	var result: Dictionary = _ray_results[slot]
+	if _ray_query == null:
+		_ray_query = PhysicsRayQueryParameters2D.new()
+	_ray_excludes.clear()
+	_ray_excludes.append(vehicle.get_rid())
+	_ray_excludes.append_array(excluded_rids)
+	var query := _ray_query
+	query.from = origin
+	query.to = origin + direction * feeler_length
+	query.collision_mask = mask
+	query.exclude = _ray_excludes
 	var hit := vehicle.get_world_2d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
-		return {"clearance": 1.0, "is_vehicle": false, "normal": Vector2.ZERO}
+		result["clearance"] = 1.0
+		result["is_vehicle"] = false
+		result["normal"] = Vector2.ZERO
+		return result
 	var collider: Variant = hit.get("collider")
 	var is_vehicle := collider is Node and (collider as Node).is_in_group("race_vehicle")
 	var hit_normal := (hit.get("normal", Vector2.ZERO) as Vector2).normalized()
-	return {
-		"clearance": origin.distance_to(hit["position"]) / feeler_length,
-		"is_vehicle": is_vehicle,
-		"normal": hit_normal,
-	}
+	result["clearance"] = origin.distance_to(hit["position"]) / feeler_length
+	result["is_vehicle"] = is_vehicle
+	result["normal"] = hit_normal
+	return result
 
 
 func _update_spin_recovery(delta: float) -> bool:
@@ -1711,7 +1762,8 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 		_off_route_time = 0.0
 		_no_progress_time = 0.0
 		_wrong_way_progress_time = 0.0
-		return {"made_progress": true}
+		_watchdog_result["made_progress"] = true
+		return _watchdog_result
 
 	var route_length := maxf(float(sample["length"]), 0.001)
 	var route_delta := float(sample["arc"]) - _last_route_arc
@@ -1762,7 +1814,8 @@ func _update_route_watchdog(delta: float, expected_index: int, turn_around: bool
 	):
 		if not _recovery_cooldown_active():
 			_recover_vehicle(&"wrong_way" if _wrong_way_progress_time >= WRONG_WAY_PROGRESS_TIMEOUT else &"no_progress")
-	return {"made_progress": made_progress}
+	_watchdog_result["made_progress"] = made_progress
+	return _watchdog_result
 
 
 func _active_route_sample(expected_index: int) -> Dictionary:
@@ -1770,7 +1823,11 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var segment := _room_cut_end - _room_cut_start
 		var fraction := clampf((vehicle.global_position - _room_cut_start).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
 		var nearest := _room_cut_start + segment * fraction
-		return {"arc": segment.length() * fraction, "length": segment.length(), "distance": vehicle.global_position.distance_to(nearest), "closed": false}
+		_route_sample_result["arc"] = segment.length() * fraction
+		_route_sample_result["length"] = segment.length()
+		_route_sample_result["distance"] = vehicle.global_position.distance_to(nearest)
+		_route_sample_result["closed"] = false
+		return _route_sample_result
 	if _racing_line.size() >= 2:
 		_ensure_arc_tables_current()
 		var count := _racing_line.size()
@@ -1782,17 +1839,20 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var total := _racing_line_total
 		var best_arc := _racing_line_cumulative[best_index] + _racing_line_segment_lengths[best_index] * best_fraction
 		var directional_arc := fposmod(total - best_arc, total) if race_manager.is_reverse_direction() else best_arc
-		return {
-			"arc": directional_arc,
-			"length": total,
-			"distance": sqrt(best_distance_squared),
-			"closed": true,
-		}
+		_route_sample_result["arc"] = directional_arc
+		_route_sample_result["length"] = total
+		_route_sample_result["distance"] = sqrt(best_distance_squared)
+		_route_sample_result["closed"] = true
+		return _route_sample_result
 
 	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
 	var previous := race_manager.get_checkpoint_before(expected_index) as Node2D
 	if checkpoint == null or previous == null:
-		return {"arc": 0.0, "length": 1.0, "distance": 0.0, "closed": false}
+		_route_sample_result["arc"] = 0.0
+		_route_sample_result["length"] = 1.0
+		_route_sample_result["distance"] = 0.0
+		_route_sample_result["closed"] = false
+		return _route_sample_result
 	var segment := checkpoint.global_position - previous.global_position
 	var fraction := clampf(
 		(vehicle.global_position - previous.global_position).dot(segment) / maxf(segment.length_squared(), 0.001),
@@ -1800,12 +1860,11 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		1.0
 	)
 	var nearest := previous.global_position + segment * fraction
-	return {
-		"arc": segment.length() * fraction,
-		"length": segment.length(),
-		"distance": vehicle.global_position.distance_to(nearest),
-		"closed": false,
-	}
+	_route_sample_result["arc"] = segment.length() * fraction
+	_route_sample_result["length"] = segment.length()
+	_route_sample_result["distance"] = vehicle.global_position.distance_to(nearest)
+	_route_sample_result["closed"] = false
+	return _route_sample_result
 
 
 func _update_static_escape(delta: float, obstacle_plan: Dictionary, made_progress: bool) -> bool:
@@ -2050,7 +2109,10 @@ func _racing_line_curvature_hazard() -> Dictionary:
 		var next := (index + direction + count) % count
 		walked += _racing_line[index].distance_to(_racing_line[next])
 		index = next
-	return {"radius": hazard_radius, "distance": hazard_distance, "speed_limit": speed_limit}
+	_hazard_result["radius"] = hazard_radius
+	_hazard_result["distance"] = hazard_distance
+	_hazard_result["speed_limit"] = speed_limit
+	return _hazard_result
 
 
 func _v1_speed_envelope(radius: float, distance: float) -> float:
@@ -2072,20 +2134,26 @@ func _v1_speed_envelope(radius: float, distance: float) -> float:
 	corner *= minf(1.0, radius / minimum_radius)
 	var reaction_seconds := float(tuning["reaction_seconds"])
 	var braking_distance := maxf(0.0, distance - vehicle.speed * reaction_seconds * float(personality["brake_timing"]))
-	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip)
+	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip, _brake_prediction, _brake_prediction_loads)
 	return minf(maximum, sqrt(corner * corner + 2.0 * braking_accel * braking_distance))
 
 
 func _checkpoint_curvature_hazard(expected_index: int) -> Dictionary:
 	var radius := _checkpoint_derived_radius(expected_index)
 	if radius >= MAX_RACING_LINE_RADIUS:
-		return {"radius": radius, "distance": INF}
+		_hazard_result["radius"] = radius
+		_hazard_result["distance"] = INF
+		_hazard_result.erase("speed_limit")
+		return _hazard_result
 	# The corner apex is at the checkpoint itself (direction-independent); the
 	# entry guide is forward-biased and would mis-measure the brake distance in
 	# reverse. Braking to reach corner speed at the apex is correct either way.
 	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
 	var corner_point: Vector2 = checkpoint.global_position if checkpoint != null else vehicle.global_position
-	return {"radius": radius, "distance": vehicle.global_position.distance_to(corner_point)}
+	_hazard_result["radius"] = radius
+	_hazard_result["distance"] = vehicle.global_position.distance_to(corner_point)
+	_hazard_result.erase("speed_limit")
+	return _hazard_result
 
 
 func _checkpoint_derived_radius(checkpoint_index: int) -> float:
