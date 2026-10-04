@@ -238,6 +238,25 @@ static func resolve_field_visual_keys(racers: Array[Dictionary]) -> Dictionary:
 	return result
 
 
+static func possible_field_visual_keys() -> Array[String]:
+	# The complete pool of (vehicle, driver) looks that can appear in a race field.
+	# - Plain vehicle keys: generated opponents always resolve to the vehicle's default livery.
+	# - Rae variants: the player is always "rae" (with its livery) on whatever vehicle_id is chosen.
+	# Quick-race rosters are re-rolled after circuit preview, so we prewarm the superset here.
+	# Championship rosters are known at event focus time.
+	var keys: Array[String] = []
+	var vids: Array[String] = CATALOG.vehicle_ids()
+	for vid: String in vids:
+		var k := resolve_visual_key(vid)
+		if not keys.has(k):
+			keys.append(k)
+	for vid: String in vids:
+		var k := resolve_visual_key(vid, "rae")
+		if not keys.has(k):
+			keys.append(k)
+	return keys
+
+
 static func _register_visual_key(vehicle_id: String, cosmetic: Dictionary) -> String:
 	var key := vehicle_id
 	if not cosmetic.is_empty():
