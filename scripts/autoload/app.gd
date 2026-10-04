@@ -170,6 +170,10 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	# The prewarm builds the room off-tree; free it if the app is torn down mid-build.
+	if _prewarm_room_root != null and is_instance_valid(_prewarm_room_root):
+		_prewarm_room_root.free()
+	_prewarm_room_root = null
 	if _test_mode and _save_store:
 		_save_store.remove_save()
 
@@ -564,6 +568,11 @@ func generated_circuit_identity(theme: StringName, room: StringName, seed: int, 
 
 
 
+## Off-tree room being built by the prewarm; freed on app teardown if a quit
+## happens mid-build.
+var _prewarm_room_root: Node = null
+
+
 ## Fire-and-forget pre-generation for a generated circuit event while the player
 ## is on a preview or results screen that has idle time. The prepared layout
 ## is computed on a NORMAL data job; the continuation then also warms scenery
@@ -644,15 +653,23 @@ func _warm_scenery_outlines(preparation: Node, prepared: Dictionary) -> void:
 func _warm_room_if_missing(key: String, prepared: Dictionary) -> void:
 	if key.is_empty() or prepared.is_empty() or TRACK_BUILDER.cached_room(key) != null:
 		return
+	if not is_inside_tree():
+		return
 	var root := TRACK_BUILDER.create_layout_root(prepared)
 	root.name = "Track"
+	_prewarm_room_root = root
 	# Yielding stage spreads the assembly (~0.3s) across frames; Callable()
 	# would block one frame.
 	await TRACK_BUILDER.assemble_runtime(root, prepared, _prewarm_yield_stage)
-	var pscene := PackedScene.new()
-	if pscene.pack(root) == OK:
-		TRACK_BUILDER.store_room(key, pscene)
+	if not is_instance_valid(root):
+		_prewarm_room_root = null
+		return
+	if is_inside_tree():
+		var pscene := PackedScene.new()
+		if pscene.pack(root) == OK:
+			TRACK_BUILDER.store_room(key, pscene)
 	root.free()
+	_prewarm_room_root = null
 	if get_tree():
 		await get_tree().process_frame
 
