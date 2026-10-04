@@ -563,11 +563,14 @@ func generated_circuit_identity(theme: StringName, room: StringName, seed: int, 
 	return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
 
 
+
 ## Fire-and-forget pre-generation for a generated circuit event while the player
-## is on a preview or results screen that has idle time. Only the prepared
-## layout (the expensive part) is computed on a NORMAL priority data job and
-## stored in the cache if the race path has not already populated it.
-## Failures are ignored; the race path will still generate on demand.
+## is on a preview or results screen that has idle time. The prepared layout
+## is computed on a NORMAL data job; the continuation then also warms scenery
+## outlines (on data jobs), the assembled room (off-tree via assemble_runtime
+## + pack), and per-vehicle motion plans (where reproducible from the event).
+## All steps yield cooperatively. Failures are ignored; the race path will
+## still do any missing work on demand.
 func prewarm_generated_circuit(event: Dictionary) -> void:
 	if String(event.get("circuit", "")) != "generated":
 		return
@@ -592,7 +595,11 @@ func _execute_prewarm_job(preparation: Node, theme: StringName, room: StringName
 	)
 	if not prepared.is_empty() and not key.is_empty():
 		TRACK_BUILDER.store_prepared(key, prepared)
-	preparation.queue_free()
+		await _warm_scenery_outlines(preparation, prepared)
+		await _warm_room_if_missing(key, prepared)
+		# Motions intentionally not prewarmed here (see _warm_motions comment).
+	if preparation:
+		preparation.queue_free()
 
 
 func prewarm_championship_event(event_id: String) -> void:
@@ -604,6 +611,70 @@ func prewarm_championship_event(event_id: String) -> void:
 	var event := get_championship_event(event_id)
 	event = CIRCUIT_IDENTITIES.apply_to_event(event, identity)
 	prewarm_generated_circuit(event)
+
+
+## Safe, no-tree work: mirror the race path's outline prep exactly, on data jobs,
+## with yields between textures.
+func _warm_scenery_outlines(preparation: Node, prepared: Dictionary) -> void:
+	if prepared.is_empty():
+		return
+	var spec: Dictionary = prepared.get("spec", {})
+	for texture_path: String in TRACK_BUILDER.preparation_texture_paths(spec):
+		if TRACK_BUILDER.has_prepared_outline_path(texture_path):
+			continue
+		if not ResourceLoader.exists(texture_path):
+			continue
+		var texture := load(texture_path) as Texture2D
+		if texture != null and not TRACK_BUILDER.has_prepared_outline(texture):
+			var outline: Dictionary = await preparation.run_data_job(
+				TRACK_BUILDER.compute_alpha_outline.bind(texture.get_image(), texture.get_width(), texture.get_height())
+			)
+			if not outline.is_empty():
+				TRACK_BUILDER.install_prepared_outline(texture, outline)
+		if preparation.get_tree():
+			await preparation.get_tree().process_frame
+
+
+## Room prewarm: create_layout_root + assemble_runtime can run with root not
+## added to any scene tree (confirmed by build_packed usage, absence of
+## get_tree/get_viewport/ready assumptions in builders beyond _ready which
+## is deferred until add in race, and pack after free in build_packed).
+## We set name="Track" to match the race path's override, use a yielding stage
+## to spread the work, then pack+store exactly as race does. Never force-add.
+func _warm_room_if_missing(key: String, prepared: Dictionary) -> void:
+	if key.is_empty() or prepared.is_empty() or TRACK_BUILDER.cached_room(key) != null:
+		return
+	var root := TRACK_BUILDER.create_layout_root(prepared)
+	root.name = "Track"
+	# Yielding stage spreads the assembly (~0.3s) across frames; Callable()
+	# would block one frame.
+	await TRACK_BUILDER.assemble_runtime(root, prepared, _prewarm_yield_stage)
+	var pscene := PackedScene.new()
+	if pscene.pack(root) == OK:
+		TRACK_BUILDER.store_room(key, pscene)
+	root.free()
+	if get_tree():
+		await get_tree().process_frame
+
+
+func _prewarm_yield_stage(_phase: String) -> void:
+	await get_tree().process_frame
+
+
+## Motion plans skipped in prewarm continuation:
+## _build_field_racers_for_preparation (and thus resolve_field_visual_keys)
+## reads player vehicle_id from the race instance's _session and opponents
+## (plus count) from _session["event"]. For quick races the prewarm call site
+## uses GENERATED_CIRCUITS.apply_to_event(quick_identity) (hardcoded defaults
+## ["juniper","milo","tess"], no vehicle_id) while actual start_circuit_race
+## does _roll_quick_roster() + _event_with_roster which installs a fresh roster.
+## Championship events match better but the prewarm_generated_circuit path is
+## shared. We cannot reproduce the exact set of visual_keys the eventual race
+## will request without race state or guessing rosters/choices; therefore
+## motions left to the race path (which will compute any missing).
+## Prewarming a superset of wrong keys would be pointless.
+func _warm_motions_if_reproducible(_preparation: Node, _event: Dictionary) -> void:
+	pass
 
 
 func circuit_share_code(identity: Dictionary) -> Dictionary:
