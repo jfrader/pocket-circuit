@@ -187,6 +187,19 @@ func _initialize() -> void:
 		return
 	if not _expect(_texture_hash(dup_texture_a) != _texture_hash(dup_texture_b), "duplicate field entries must render distinct cars, not just distinct keys"):
 		return
+
+	# Motion installs must stay inside the bounded car cache: a session meeting
+	# new rosters every race would otherwise accumulate textures forever.
+	for index in IDENTITIES.MAX_CAR_ENTRIES + 20:
+		var motion_key := "synthetic-motion-%d" % index
+		var image := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+		if not _expect(IDENTITIES.install_motion_image_for_key(motion_key, Vector2i(0, 2), image), "motion install %d should succeed" % index):
+			return
+	if not _expect(IDENTITIES._car_spin_cache.size() <= IDENTITIES.MAX_CAR_ENTRIES, "motion installs must stay within the bounded car cache"):
+		return
+	if not _expect(IDENTITIES._car_entry_order.size() <= IDENTITIES.MAX_CAR_ENTRIES, "the car eviction order must stay bounded"):
+		return
+
 	print("PROCEDURAL_IDENTITY_LIBRARY_TEST PASS")
 	quit(0)
 

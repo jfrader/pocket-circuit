@@ -62,6 +62,7 @@ static func _note_avatar_entry(driver_id: String) -> void:
 ## A new livery key ages out that key's payload, textures, spin poses and resolved
 ## cosmetics as one unit.
 static func _note_car_entry(visual_key: String) -> void:
+	_car_entry_order.erase(visual_key)
 	_car_entry_order.append(visual_key)
 	while _car_entry_order.size() > MAX_CAR_ENTRIES:
 		var oldest: String = _car_entry_order[0]
@@ -70,6 +71,13 @@ static func _note_car_entry(visual_key: String) -> void:
 		_car_texture_cache.erase(oldest)
 		_car_spin_cache.erase(oldest)
 		_visual_resolutions.erase(oldest)
+
+
+static func _ensure_spin_entry(visual_key: String) -> Dictionary:
+	if not _car_spin_cache.has(visual_key):
+		_note_car_entry(visual_key)
+		_car_spin_cache[visual_key] = {}
+	return _car_spin_cache[visual_key]
 
 
 static func avatar_payload(driver_id: String) -> Dictionary:
@@ -148,9 +156,7 @@ static func car_motion_texture(vehicle_id: String, travel: float, steer: float) 
 
 
 static func _texture_for_spin_pose(key: String, spin: int, pose: int) -> Texture2D:
-	if not _car_spin_cache.has(key):
-		_car_spin_cache[key] = {}
-	var per_spin: Dictionary = _car_spin_cache[key]
+	var per_spin: Dictionary = _ensure_spin_entry(key)
 	if not per_spin.has(spin):
 		var empty: Array = []
 		empty.resize(5)
@@ -190,9 +196,7 @@ static func install_motion_image_for_key(visual_key: String, frame: Vector2i, im
 	if image == null:
 		return false
 	var texture := ImageTexture.create_from_image(image)
-	if not _car_spin_cache.has(visual_key):
-		_car_spin_cache[visual_key] = {}
-	var per_spin: Dictionary = _car_spin_cache[visual_key]
+	var per_spin: Dictionary = _ensure_spin_entry(visual_key)
 	if not per_spin.has(frame.x):
 		var frames: Array = []
 		frames.resize(5)
@@ -232,6 +236,25 @@ static func resolve_field_visual_keys(racers: Array[Dictionary]) -> Dictionary:
 		used_looks[look] = true
 		result[i] = _register_visual_key(vid, cosmetic)
 	return result
+
+
+static func possible_field_visual_keys() -> Array[String]:
+	# The complete pool of (vehicle, driver) looks that can appear in a race field.
+	# - Plain vehicle keys: generated opponents always resolve to the vehicle's default livery.
+	# - Rae variants: the player is always "rae" (with its livery) on whatever vehicle_id is chosen.
+	# Quick-race rosters are re-rolled after circuit preview, so we prewarm the superset here.
+	# Championship rosters are known at event focus time.
+	var keys: Array[String] = []
+	var vids: Array[String] = CATALOG.vehicle_ids()
+	for vid: String in vids:
+		var k := resolve_visual_key(vid)
+		if not keys.has(k):
+			keys.append(k)
+	for vid: String in vids:
+		var k := resolve_visual_key(vid, "rae")
+		if not keys.has(k):
+			keys.append(k)
+	return keys
 
 
 static func _register_visual_key(vehicle_id: String, cosmetic: Dictionary) -> String:
@@ -290,9 +313,7 @@ static func car_motion_texture_for_key(visual_key: String, travel: float, steer:
 
 
 static func motion_preparation_plan_for_key(visual_key: String) -> Dictionary:
-	if not _car_spin_cache.has(visual_key):
-		_car_spin_cache[visual_key] = {}
-	var per_spin: Dictionary = _car_spin_cache[visual_key]
+	var per_spin: Dictionary = _ensure_spin_entry(visual_key)
 	var jobs: Array[Vector2i] = []
 	for spin in CAR_SPRITES.WHEEL_FRAME_COUNT:
 		if not per_spin.has(spin):
