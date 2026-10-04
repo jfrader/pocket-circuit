@@ -8,6 +8,7 @@ const CIRCUIT_IDENTITIES := preload("res://scripts/progression/championship_circ
 const MASTERY := preload("res://scripts/progression/mastery_run.gd")
 const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
 const RACE_PREPARATION := preload("res://scripts/race/race_preparation.gd")
+const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
@@ -560,6 +561,49 @@ func _random_seed(maximum: int) -> int:
 
 func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard") -> Dictionary:
 	return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
+
+
+## Fire-and-forget pre-generation for a generated circuit event while the player
+## is on a preview or results screen that has idle time. Only the prepared
+## layout (the expensive part) is computed on a NORMAL priority data job and
+## stored in the cache if the race path has not already populated it.
+## Failures are ignored; the race path will still generate on demand.
+func prewarm_generated_circuit(event: Dictionary) -> void:
+	if String(event.get("circuit", "")) != "generated":
+		return
+	var key := TRACK_BUILDER.generated_circuit_cache_key(event)
+	if not key.is_empty():
+		var prepared: Dictionary = TRACK_BUILDER.cached_prepared(key)
+		if not prepared.is_empty():
+			return
+	var theme := StringName(event.get("theme", "kitchen"))
+	var room := StringName(event.get("room", "classic"))
+	var seed := int(event.get("seed", 0))
+	var options: Dictionary = TRACK_BUILDER.generated_circuit_options(event)
+	var preparation := RACE_PREPARATION.new()
+	add_child(preparation)
+	call_deferred("_execute_prewarm_job", preparation, theme, room, seed, options, key)
+
+
+func _execute_prewarm_job(preparation: Node, theme: StringName, room: StringName, seed: int, options: Dictionary, key: String) -> void:
+	var prepared: Dictionary = await preparation.run_data_job(
+		TRACK_BUILDER.prepare_layout.bind(theme, room, seed, options),
+		Thread.PRIORITY_NORMAL
+	)
+	if not prepared.is_empty() and not key.is_empty():
+		TRACK_BUILDER.store_prepared(key, prepared)
+	preparation.queue_free()
+
+
+func prewarm_championship_event(event_id: String) -> void:
+	if event_id.is_empty():
+		return
+	var identity := get_championship_circuit_identity(event_id)
+	if identity.is_empty():
+		return
+	var event := get_championship_event(event_id)
+	event = CIRCUIT_IDENTITIES.apply_to_event(event, identity)
+	prewarm_generated_circuit(event)
 
 
 func circuit_share_code(identity: Dictionary) -> Dictionary:

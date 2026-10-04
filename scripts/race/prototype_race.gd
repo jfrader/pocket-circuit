@@ -574,56 +574,11 @@ func _configure_track_variant() -> bool:
 
 
 func _track_generation_options(event: Dictionary) -> Dictionary:
-	var options := {
-		"act": int(event.get("act", 0)),
-		"obstacles_enabled": bool(event.get("obstacles_enabled", true)),
-		"length_tier": StringName(event.get("length_tier", &"standard")),
-	}
-	if int(options["act"]) <= 0:
-		options.erase("act")
-	if event.has("road_width"):
-		options["road_width"] = event["road_width"]
-	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
-	if identity is Dictionary:
-		var identity_record := identity as Dictionary
-		var generated_options := GENERATED_CIRCUITS.generation_options(identity_record)
-		if generated_options.is_empty():
-			options["sub_seeds"] = (identity_record.get("sub_seeds", {}) as Dictionary).duplicate(true)
-		else:
-			options.merge(generated_options, true)
-	return options
+	return TRACK_BUILDER.generated_circuit_options(event)
 
 
 func _circuit_cache_key(event: Dictionary) -> String:
-	if event.is_empty():
-		return ""
-	# Prefer the circuit identity fingerprint when the event carries one.
-	# This guarantees distinct keys for distinct circuits and for option
-	# changes (road_width, length_tier, material/palette, sub_seeds, etc).
-	var fp := String(event.get("circuit_fingerprint", ""))
-	if not fp.is_empty():
-		return "cfp|" + fp
-	var ident: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
-	if ident is Dictionary:
-		fp = String((ident as Dictionary).get("fingerprint", ""))
-		if not fp.is_empty():
-			return "gid|" + fp
-	fp = String(event.get("preview_fingerprint", ""))
-	if not fp.is_empty():
-		return "pfp|" + fp
-	# Fallback: deterministic serialization of (theme, room, seed, sorted options).
-	# Keeps retries of manually-started generated races fast even without
-	# a full identity record in the event.
-	var theme := String(event.get("theme", "kitchen"))
-	var room := String(event.get("room", "classic"))
-	var seed := int(event.get("seed", 0))
-	var options: Dictionary = _track_generation_options(event)
-	var parts := PackedStringArray(["pc-gen-circuit-cache-v1", theme, room, str(seed)])
-	var opt_keys: Array = options.keys()
-	opt_keys.sort()
-	for k: Variant in opt_keys:
-		parts.append(str(k) + "=" + str(options[k]))
-	return "|".join(parts)
+	return TRACK_BUILDER.generated_circuit_cache_key(event)
 
 
 func _apply_circuit_identity_metadata(event: Dictionary) -> void:
