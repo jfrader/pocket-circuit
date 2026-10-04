@@ -3,7 +3,7 @@
 ## [Unreleased]
 
 ### Added
-- Quick Strip: a one-off strip battle from the title screen. A generated point-to-point road with slow traffic, one rival chasing from behind, and a capture arc when the gap closes. Reach the finish to win; get caught or run past the time limit and the attempt ends. Results do not save.
+- Quick Strip: a one-off strip battle from the title screen. Sweepers and chicanes run north along a printed fabric runner, with civilian toy cars, delivery trucks, and one rival chasing from behind. Traffic holds its lane, yields before merging, and recovers after bumps. A capture arc fills when the rival closes in. Reach the finish to win; get caught or run past the time limit and the attempt ends. Results do not save.
 
 ### Changed
 - Loose debris varies in number, size and position across generated circuits, including tracks with none. Patches remain on calm stretches. This debris and outer-corner layout update advances the generator version; older circuit codes and lap/ghost records no longer match.

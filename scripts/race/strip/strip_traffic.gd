@@ -12,6 +12,7 @@ var _cars: Array = []
 
 
 func configure(route: PackedVector2Array, half_width: float, plan: Array, race_manager: RaceManager) -> void:
+	_disconnect_manager()
 	_half_width = half_width
 	_plan = plan.duplicate(true)
 	_manager = race_manager
@@ -32,6 +33,8 @@ func configure(route: PackedVector2Array, half_width: float, plan: Array, race_m
 		add_child(car)
 		car.add_to_group(&"track_traffic")
 		_cars.append(car)
+	for car in _cars:
+		car.neighbors = _cars
 	_set_active(false)
 	if _manager and is_instance_valid(_manager):
 		if not _manager.race_started.is_connected(_on_race_started):
@@ -42,6 +45,8 @@ func configure(route: PackedVector2Array, half_width: float, plan: Array, race_m
 
 func _set_active(active: bool) -> void:
 	for car in _cars:
+		if not is_instance_valid(car):
+			continue
 		if active:
 			car.start()
 		else:
@@ -59,9 +64,20 @@ func _on_race_finished(_total_time: float = 0.0) -> void:
 func _clear_cars() -> void:
 	for car in _cars:
 		if is_instance_valid(car):
+			car.stop()
 			car.queue_free()
 	_cars.clear()
 
 
 func _exit_tree() -> void:
+	_disconnect_manager()
 	_clear_cars()
+
+
+func _disconnect_manager() -> void:
+	if not is_instance_valid(_manager):
+		return
+	if _manager.race_started.is_connected(_on_race_started):
+		_manager.race_started.disconnect(_on_race_started)
+	if _manager.race_finished.is_connected(_on_race_finished):
+		_manager.race_finished.disconnect(_on_race_finished)

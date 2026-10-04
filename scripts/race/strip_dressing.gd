@@ -62,7 +62,11 @@ static func plan(spec: Dictionary, theme: StringName, line: PackedVector2Array, 
 			var point := line[index] + normal * offset * side
 			if not PLACEMENT.trackside_placement_is_safe(point, radius, room, line, gate_points, occupied):
 				continue
-			placements.append({"asset_id": asset["id"], "role": role, "position": point, "rotation": rng.randf_range(-0.4, 0.4), "zone": "apron"})
+			var rotation := rng.randf_range(-0.4, 0.4)
+			if role == "boundary":
+				var dimensions: Vector2 = asset["dimensions_mm"]
+				rotation = normal.angle() - PI * 0.5 + (0.0 if dimensions.x >= dimensions.y else PI * 0.5)
+			placements.append({"asset_id": asset["id"], "role": role, "position": point, "rotation": rotation, "zone": "apron"})
 			occupied.append({"position": point, "radius": radius})
 	var obstacles: Array[Dictionary] = []
 	var roster: Array = OBSTACLES.GENERATED_OBSTACLE_TYPES.get(theme, [])

@@ -1,14 +1,13 @@
 class_name TrackBuilderScene
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
-const STRIP_WALL_STEP := 8
 const STRIP_DRESSING := preload("res://scripts/race/strip_dressing.gd")
+const STRIP_ROAD_ART := preload("res://scripts/race/strip_road_art.gd")
 
 
 static func build_strip(root: Node2D, prepared: Dictionary) -> void:
 	var spec: Dictionary = prepared["spec"]
 	var centerline: PackedVector2Array = prepared["centerline"]
-	var edges: Dictionary = prepared["edges"]
 	var room: PackedVector2Array = prepared["room_polygon"]
 	var bounds := TrackBuilderCore._polygon_bounds_rect(room)
 	TrackBuilderCore._add_polygon(root, "Floor", TrackBuilderCore._rect_points(bounds.get_center(), bounds.size + Vector2.ONE * 1520.0), Color("111316"), -22)
@@ -24,21 +23,6 @@ static func build_strip(root: Node2D, prepared: Dictionary) -> void:
 		var a: Vector2 = room[index]
 		var b: Vector2 = room[(index + 1) % room.size()]
 		TrackBuilderCore._add_wall_segment(root, "Wall%d" % index, (a + b) * 0.5, a.distance_to(b), (b - a).angle(), edge_texture)
-	for side in ["left", "right"]:
-		var boundary: PackedVector2Array = edges[side]
-		var index := 0
-		while index < boundary.size() - 1:
-			var next := mini(boundary.size() - 1, index + STRIP_WALL_STEP)
-			var a := boundary[index]
-			var b := boundary[next]
-			TrackBuilderCore._add_wall_segment(root, "%sBoundary%d" % [side, index], (a + b) * 0.5, a.distance_to(b), (b - a).angle(), edge_texture)
-			index = next
-	var left: PackedVector2Array = edges["left"]
-	var right: PackedVector2Array = edges["right"]
-	for cap_index in [0, centerline.size() - 1]:
-		var a := left[cap_index]
-		var b := right[cap_index]
-		TrackBuilderCore._add_wall_segment(root, "StartCap" if cap_index == 0 else "FinishCap", (a + b) * 0.5, a.distance_to(b), (b - a).angle(), edge_texture)
 	for gate: Dictionary in prepared["strip_gates"]:
 		var index := int(gate["index"])
 		var tangent := Vector2.UP.rotated(float(gate["rotation"]))
@@ -53,6 +37,7 @@ static func build_strip(root: Node2D, prepared: Dictionary) -> void:
 	TrackBuilderCore._add_hidden_racing_line(root, "RacingLine", prepared["racing_line"])
 	(root.get_node("RacingLine") as Line2D).closed = false
 	STRIP_DRESSING.compose(root, prepared)
+	STRIP_ROAD_ART.build(root, prepared)
 
 
 static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), environment_composer: Callable = Callable()) -> void:

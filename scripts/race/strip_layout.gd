@@ -31,7 +31,7 @@ const RUNNER_HEIGHT := {
 	"standard": 49000.0,
 	"long": 57000.0,
 	"endurance": 69000.0,
-	"marathon": 81000.0,
+	"marathon": 78000.0,
 }
 
 
@@ -76,6 +76,7 @@ static func prepare(theme: StringName, room_shape: StringName, seed: int, option
 	spec["generation_fallback"] = route["fallback"]
 	spec["generation_attempt"] = route["attempt"]
 	spec["controls"] = route["controls"]
+	spec["strip_sections"] = route["sections"]
 	spec["length_tier"] = String(options.get("length_tier", "standard"))
 	var sub_seeds: Dictionary = options.get("sub_seeds", {})
 	spec["material_seed"] = int(sub_seeds.get("material", seed))
