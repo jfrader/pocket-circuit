@@ -2,8 +2,7 @@ class_name TrackBuilderScene
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
 const STRIP_WALL_STEP := 4
-const STRIP_PROP_OFFSET := 230.0
-const STRIP_PROP_RADIUS := 26.0
+const STRIP_DRESSING := preload("res://scripts/race/strip_dressing.gd")
 
 
 static func build_strip(root: Node2D, prepared: Dictionary) -> void:
@@ -53,17 +52,7 @@ static func build_strip(root: Node2D, prepared: Dictionary) -> void:
 	TrackBuilderCore._add_grid(root, "GridForward", 0.0, [grid["player"].origin, grid["chaser"].origin], [grid["player"].get_rotation(), grid["chaser"].get_rotation()])
 	TrackBuilderCore._add_hidden_racing_line(root, "RacingLine", prepared["racing_line"])
 	(root.get_node("RacingLine") as Line2D).closed = false
-	var story: Dictionary = spec.get("story_kit", {})
-	var object_line: Dictionary = story.get("object_line", {})
-	var props: Array = object_line.get("assets", spec.get("ambient_props", []))
-	for index in range(10, centerline.size() - 10, maxi(1, centerline.size() / 5)):
-		if props.is_empty():
-			break
-		var tangent := (centerline[index + 1] - centerline[index - 1]).normalized()
-		var side := 1.0 if index % 2 == 0 else -1.0
-		var point := centerline[index] + tangent.rotated(PI * 0.5) * STRIP_PROP_OFFSET * side
-		if Geometry2D.is_point_in_polygon(point, room):
-			TrackBuilderCore._add_prop_with_collision(root, point, STRIP_PROP_RADIUS, String(props[posmod(index, props.size())]))
+	STRIP_DRESSING.compose(root, prepared)
 
 
 static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), environment_composer: Callable = Callable()) -> void:
