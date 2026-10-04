@@ -1301,6 +1301,17 @@ static func _assign_owners(node: Node, owner: Node) -> void:
 			_assign_owners(child, owner)
 
 
+static func mark_packed_scene_owners(root: Node) -> void:
+	## Ensures a generated track root and all its assembled descendants are
+	## owned by the root before packing. Required for PackedScene to capture
+	## the full tree (children, collisions, props, grids, surfaces, etc).
+	## The build_packed path marks; the prewarm + race assemble+store paths
+	## must mark explicitly or cached rooms will instantiate empty (child_count==0).
+	if root == null:
+		return
+	_mark_owned(root)
+
+
 ## Bounded cache for generated circuits so that retry/replay of an identical
 ## race can skip route generation + layout assembly. Keys are circuit
 ## fingerprints (preferred) or deterministic (theme, room, seed, options).
