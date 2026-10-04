@@ -429,6 +429,19 @@ func _cache_checkpoints() -> void:
 	_build_arc_tables()
 
 
+func prepare_strip_start() -> void:
+	if not _open_route:
+		return
+	# The complete field (including civilian traffic) now exists. Build the
+	# final route/group caches under loading, not again on the GO signal.
+	_cache_checkpoints()
+	_refresh_tree_cache()
+	_reference_nearest_index = int(_nearest_open_segment(_reference_path, vehicle.global_position, -1)["index"])
+	_racing_line_nearest_index = int(_nearest_open_segment(_racing_line, vehicle.global_position, -1)["index"])
+	if race_manager.race_started.is_connected(_cache_checkpoints):
+		race_manager.race_started.disconnect(_cache_checkpoints)
+
+
 func _build_arc_tables() -> void:
 	var racing_line_tables := _arc_tables_for(_racing_line)
 	_racing_line_segment_lengths = racing_line_tables["lengths"]
@@ -1234,6 +1247,9 @@ func _traffic_plan(
 	plan["drafting"] = false
 	if not vehicle.is_inside_tree() or forward.length_squared() < 0.001:
 		return plan
+	if _open_route and _avoid_oncoming(forward, line_target, plan):
+		_cancel_overtake()
+		return plan
 
 	var pursuit_info := _pursuit_distance_and_ahead(forward)
 	var pursuit_dist := float(pursuit_info["distance"])
@@ -1352,6 +1368,8 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 		if not is_instance_valid(node):
 			continue
 		var is_traffic := node.is_in_group(&"track_traffic")
+		if is_traffic and int(node.get_meta("strip_direction", 1)) < 0:
+			continue
 		var candidate := node as Node2D
 		if candidate == null or candidate == vehicle:
 			continue
@@ -1379,6 +1397,37 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 	_leader_result["distance"] = nearest_distance
 	_leader_result["lateral_distance"] = nearest_lateral
 	return _leader_result
+
+
+func _avoid_oncoming(forward: Vector2, line_target: Vector2, plan: Dictionary) -> bool:
+	# Oncoming traffic is a closing obstacle, never a drafting/following leader.
+	# The reference path is the middle of the northbound carriageway, so either
+	# evasive offset remains on that carriageway rather than crossing the divider.
+	var nearest := INF
+	var hazard_lateral := 0.0
+	var right := forward.rotated(PI * 0.5)
+	for node: Node in _group_nodes(&"track_traffic"):
+		if not is_instance_valid(node) or int(node.get_meta("strip_direction", 1)) >= 0:
+			continue
+		var body := node as RigidBody2D
+		if body == null:
+			continue
+		var separation := body.global_position - vehicle.global_position
+		var ahead := separation.dot(forward)
+		var closing := maxf(0.0, (vehicle.linear_velocity - body.linear_velocity).dot(forward))
+		var lateral := separation.dot(right)
+		if ahead <= 0.0 or ahead > maxf(OVERTAKE_REACH, closing * FOLLOWING_TIME) or absf(lateral) > OVERTAKE_LINE_OFFSET:
+			continue
+		if ahead < nearest:
+			nearest = ahead
+			hazard_lateral = lateral
+	if nearest == INF:
+		return false
+	var side := -1.0 if hazard_lateral > 0.0 else 1.0
+	plan["target_position"] = line_target + right * side * OVERTAKE_LINE_OFFSET
+	plan["passing"] = true
+	plan["speed_limit"] = maxf(0.0, nearest - FOLLOWING_DISTANCE) / FOLLOWING_TIME
+	return true
 
 
 func _select_overtake_side(forward: Vector2, leader: Node2D) -> float:
@@ -1479,8 +1528,16 @@ func _refresh_tree_cache() -> void:
 	_surface_zone_nodes = _scan_group(&"surface_zone")
 	_race_vehicle_nodes = _scan_group(&"race_vehicle")
 	_track_traffic_nodes = _scan_group(&"track_traffic")
+	for traffic: Node in _track_traffic_nodes:
+		var on_exit := _on_traffic_exiting.bind(traffic)
+		if not traffic.tree_exiting.is_connected(on_exit):
+			traffic.tree_exiting.connect(on_exit, CONNECT_ONE_SHOT)
 	_rebuild_surface_zone_records()
 	_tree_cache_dirty = false
+
+
+func _on_traffic_exiting(traffic: Node) -> void:
+	_track_traffic_nodes.erase(traffic)
 
 
 func _rebuild_surface_zone_records() -> void:

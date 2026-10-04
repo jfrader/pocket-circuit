@@ -3,6 +3,7 @@ extends RefCounted
 const SURFACES := preload("res://scripts/race/household_surface_materials.gd")
 const COURSE := preload("res://scripts/race/handmade_course_materials.gd")
 const SAMPLER := preload("res://scripts/race/strip/strip_route_sampler.gd")
+const ROAD := preload("res://scripts/race/strip/strip_road_rules.gd")
 const CLOTH_TEXTURE := "res://assets/textures/imagine/track_cloth.png"
 const SELVEDGE := 10.0
 const BINDING_WIDTH := 5.0
@@ -12,6 +13,11 @@ const DASH_SPACING := 135.0
 const STITCH_LENGTH := 6.0
 const STITCH_SPACING := 22.0
 const MARK_WIDTH := 2.5
+const CENTER_WIDTH := 4.0
+const CENTER_GAP := 10.0
+const THRESHOLD_WIDTH := 16.0
+const ARROW_SPACING := 1800.0
+const ARROW_SIZE := Vector2(22.0, 42.0)
 
 
 static func build(root: Node2D, prepared: Dictionary) -> void:
@@ -45,14 +51,31 @@ static func build(root: Node2D, prepared: Dictionary) -> void:
 		var points := PackedVector2Array()
 		for index in line.size():
 			var tangent := (line[mini(line.size() - 1, index + 1)] - line[maxi(0, index - 1)]).normalized()
-			points.append(line[index] + tangent.orthogonal() * side * (half_width + SELVEDGE - BINDING_WIDTH * 0.5))
+			points.append(line[index] + tangent.rotated(PI * 0.5) * side * (half_width + SELVEDGE - BINDING_WIDTH * 0.5))
 		var binding_color := (profile["seam_color"] as Color).lerp(course["edge_color"], rng.randf_range(0.10, 0.30))
 		_line(root, "RunnerBindingLeft" if side < 0 else "RunnerBindingRight", points, BINDING_WIDTH, binding_color, -10)
 		_dashes(root, sampler, "RunnerStitchLeft" if side < 0 else "RunnerStitchRight", side * (half_width + SELVEDGE * 0.5), STITCH_LENGTH, STITCH_SPACING, 1.0, Color(binding_color, 0.6))
-	_dashes(root, sampler, "PrintedCenterDashes", 0.0, DASH_LENGTH, DASH_SPACING, MARK_WIDTH, Color(course["edge_color"], 0.52))
-	for endpoint in [0, line.size() - 1]:
+	for side in [-1.0, 1.0]:
+		var divider := PackedVector2Array()
+		for index in line.size():
+			var tangent := (line[mini(line.size() - 1, index + 1)] - line[maxi(0, index - 1)]).normalized()
+			divider.append(line[index] + tangent.rotated(PI * 0.5) * side * CENTER_GAP * 0.5)
+		_line(root, "CenterDividerLeft" if side < 0 else "CenterDividerRight", divider, CENTER_WIDTH, Color(course["edge_color"], 0.88), -8)
+		_dashes(root, sampler, "SouthboundLaneDashes" if side < 0 else "NorthboundLaneDashes", side * ROAD.LANE_WIDTH, DASH_LENGTH, DASH_SPACING, MARK_WIDTH, Color(course["edge_color"], 0.65))
+	_arrows(root, sampler, Color(course["edge_color"], 0.55))
+
+
+static func build_landmarks(root: Node2D, prepared: Dictionary) -> void:
+	var sampler := SAMPLER.new()
+	sampler.configure(prepared["centerline"])
+	var half_width := float(prepared["strip_half_width"])
+	for endpoint in 2:
+		var region := root.get_node("StripRoom%d" % endpoint)
+		var cloth: ShaderMaterial = region.get_node("WovenRunner").material
+		var color: Color = region.get_node("RunnerBindingLeft").default_color
 		var sample: Dictionary = sampler.sample(0.0 if endpoint == 0 else sampler.length())
-		_hem(root, "StartCap" if endpoint == 0 else "FinishCap", sample, half_width + SELVEDGE, cloth, profile["seam_color"])
+		_hem(root, "StartCap" if endpoint == 0 else "FinishCap", sample, half_width + SELVEDGE, cloth, color)
+	var course: Dictionary = prepared["strip_regions"][0]["spec"]["surface_identity"]["course"]
 	var grid: Dictionary = prepared["strip_grid"]
 	for key: String in grid:
 		var transform: Transform2D = grid[key]
@@ -62,7 +85,14 @@ static func build(root: Node2D, prepared: Dictionary) -> void:
 	for transform: Transform2D in grid.values():
 		start_arc = maxf(start_arc, float(sampler.project(transform.origin)["arc"]))
 	var start: Dictionary = sampler.sample(start_arc + DASH_SPACING)
-	TrackBuilderCore._add_finish_checker(root, start["pos"], start["dir"])
+	TrackBuilderCore._add_finish_checker(root, start["pos"], start["dir"], half_width)
+	var seam: Dictionary = prepared["strip_theme_switch"]
+	var across := Vector2.RIGHT.rotated(float(seam["rotation"])) * (half_width + SELVEDGE)
+	var position: Vector2 = seam["position"]
+	var threshold := _line(root, "RoomThreshold", PackedVector2Array([position - across, position + across]), THRESHOLD_WIDTH, Color(course["edge_color"], 0.85), -7)
+	threshold.set_meta("theme_a", prepared["theme"])
+	threshold.set_meta("theme_b", prepared["theme_b"])
+	threshold.set_meta("arc", seam["arc"])
 
 
 static func _line(parent: Node, node_name: String, points: PackedVector2Array, width: float, color: Color, z: int) -> Line2D:
@@ -91,12 +121,33 @@ static func _dashes(parent: Node, sampler: RefCounted, node_name: String, offset
 		for point in [a - normal, a + normal, b + normal, a - normal, b + normal, b - normal]:
 			vertices.append(point)
 			colors.append(color)
+	_paint_mesh(parent, node_name, vertices, colors)
+
+
+static func _arrows(parent: Node, sampler: RefCounted, color: Color) -> void:
+	var outline := PackedVector2Array([Vector2(0.0, -0.5), Vector2(0.5, -0.1), Vector2(0.16, -0.1), Vector2(0.16, 0.5), Vector2(-0.16, 0.5), Vector2(-0.16, -0.1), Vector2(-0.5, -0.1)])
+	var triangles := Geometry2D.triangulate_polygon(outline)
+	var vertices := PackedVector2Array()
+	var colors := PackedColorArray()
+	for slot in floori(sampler.length() / ARROW_SPACING):
+		var sample: Dictionary = sampler.sample((slot + 0.5) * ARROW_SPACING)
+		for lane: int in ROAD.LANES:
+			var angle := ((sample["dir"] as Vector2) * ROAD.direction(lane)).angle() + PI * 0.5
+			var center: Vector2 = sample["pos"] + sample["perp"] * ROAD.fraction(lane) * ROAD.HALF_WIDTH
+			for index in triangles:
+				vertices.append(center + (outline[index] * ARROW_SIZE).rotated(angle))
+				colors.append(color)
+	_paint_mesh(parent, "PrintedDirectionArrows", vertices, colors)
+
+
+static func _paint_mesh(parent: Node, node_name: String, vertices: PackedVector2Array, colors: PackedColorArray) -> void:
 	var arrays := []
 	arrays.resize(Mesh.ARRAY_MAX)
 	arrays[Mesh.ARRAY_VERTEX] = vertices
 	arrays[Mesh.ARRAY_COLOR] = colors
 	var mesh := ArrayMesh.new()
-	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	if not vertices.is_empty():
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
 	var instance := MeshInstance2D.new()
 	instance.name = node_name
 	instance.mesh = mesh

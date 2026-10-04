@@ -49,6 +49,7 @@ const RACE_MUSIC_PLAN := preload("res://scripts/audio/race_music_plan.gd")
 const STRIP_CONTROLLER := preload("res://scripts/race/strip_controller.gd")
 const STRIP_MARKER := preload("res://scripts/presentation/strip_destination_marker.gd")
 const STRIP_TRAFFIC := preload("res://scripts/race/strip/strip_traffic.gd")
+const STRIP_START_WARMUP := preload("res://scripts/race/strip/strip_start_warmup.gd")
 const STARTING_GRID_SYNC_FRAMES := 2
 const COUNTDOWN_STEP_SECONDS := 0.65
 const PAUSE_STRIP_HEIGHT := 12.0
@@ -273,12 +274,26 @@ func _prepare_race_async() -> void:
 		if app.call("is_race_loading_cancelled"):
 			app.call("complete_race_loading")
 			return
-	preparation.queue_free()
 	app.call("set_loading_section", 3)
 	await _loading_step("Setting the starting grid")
 	_complete_race_setup(false)
 	if String(_session.get("mode", "")) == "strip" and _strip_controller == null:
+		preparation.queue_free()
 		return
+	if String(_session.get("mode", "")) == "strip":
+		var traffic := get_node("StripTraffic") as StripTraffic
+		if not await traffic.prepare_visuals(preparation, _loading_step.bind("Preparing traffic animation"), Callable(app, "is_race_loading_cancelled")):
+			preparation.queue_free()
+			if app.call("is_race_loading_cancelled"):
+				app.call("complete_race_loading")
+			else:
+				app.call("fail_race_loading", "Traffic graphics could not be prepared")
+			return
+		for racer: Node2D in race_manager.get_rankings():
+			for child: Node in racer.get_children():
+				if child is AIVehicleController:
+					(child as AIVehicleController).prepare_strip_start()
+	preparation.queue_free()
 	camera.global_position = _player_vehicle.global_position
 	camera.reset_smoothing()
 	camera.force_update_scroll()
@@ -290,6 +305,9 @@ func _prepare_race_async() -> void:
 		for entry: Dictionary in _build_field_racers_for_preparation():
 			await director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")), _loading_step.bind("Preparing race audio"))
 			await _loading_step("Preparing race audio")
+	if String(_session.get("mode", "")) == "strip":
+		var warmed: Dictionary = await STRIP_START_WARMUP.draw_runner(camera, _strip_prepared["room_polygon"], get_node("StripTraffic"), _loading_step.bind("Warming strip graphics"), Callable(app, "is_race_loading_cancelled"))
+		set_meta("strip_start_warmup", warmed)
 	for frame in 3:
 		await _loading_step("Warming graphics for the starting grid")
 	if not app.call("complete_race_loading"):

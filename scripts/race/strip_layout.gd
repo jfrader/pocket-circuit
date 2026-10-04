@@ -1,11 +1,10 @@
 extends RefCounted
 
 const ROUTE := preload("res://scripts/race/strip_route.gd")
-const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
-const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
-const SURFACES := preload("res://scripts/race/household_surface_materials.gd")
 const VEHICLES := preload("res://data/championship/catalog.gd")
 const DRESSING := preload("res://scripts/race/strip_dressing.gd")
+const ROAD := preload("res://scripts/race/strip/strip_road_rules.gd")
+const THEMES := preload("res://scripts/race/strip_themes.gd")
 const GRID_ARC := 210.0
 const CHASER_GAP := 120.0
 const FINISH_INSET := 145.0
@@ -15,15 +14,20 @@ const MAX_GATE_COUNT := 64
 const TRAFFIC_MIN_ARC := 460.0
 const TRAFFIC_FINISH_CLEARANCE := 340.0
 const TRAFFIC_SPACING := 1450.0
-const MAX_TRAFFIC := 30
+const MAX_NORTHBOUND := 30
+const MAX_ONCOMING := 12
+const MAX_TRAFFIC := MAX_NORTHBOUND + MAX_ONCOMING
+const ONCOMING_SPACING := 4400.0
+const ONCOMING_START_CLEARANCE := 2600.0
+const ONCOMING_SPEED := Vector2(115.0, 140.0)
 const TRAFFIC_FIRST_PACK := 420.0
 const TRAFFIC_PACK_SEPARATION := 170.0
 const SPECIAL_PACK_INTERVAL := 4
 const MIN_TIME_LIMIT := 75.0
 const CLEAN_SPEED_ESTIMATE := 600.0
 const TIME_LIMIT_FACTOR := 1.8
-const MIN_RUNNER_WIDTH := 2200.0
-const MAX_RUNNER_WIDTH := 2800.0
+const MIN_RUNNER_WIDTH := 2600.0
+const MAX_RUNNER_WIDTH := 3000.0
 const CORNER_RADIUS := 170.0
 const CORNER_STEPS := 5
 const RUNNER_HEIGHT := {
@@ -60,12 +64,17 @@ static func runner_room(base_room: PackedVector2Array, length_tier: String) -> P
 
 
 static func prepare(theme: StringName, room_shape: StringName, seed: int, options: Dictionary, base_spec: Dictionary, room_polygon: PackedVector2Array, kits: Array) -> Dictionary:
+	# Only civilian traffic may travel south. A reverse strip would invert the
+	# fixed camera grammar and the meaning of every signed lane.
+	if bool(options.get("reverse", false)):
+		return {}
+	var theme_b := THEMES.second_theme(theme, String(options.get("theme_b", "")))
+	if theme_b == &"":
+		return {}
 	var route := ROUTE.generate(seed, room_polygon)
 	if route.is_empty():
 		return {}
 	var centerline: PackedVector2Array = (route["centerline"] as PackedVector2Array).duplicate()
-	if bool(options.get("reverse", false)):
-		centerline.reverse()
 	var arcs := _arc_lengths(centerline)
 	var total := arcs[-1]
 	var spec := base_spec.duplicate(true)
@@ -84,18 +93,8 @@ static func prepare(theme: StringName, room_shape: StringName, seed: int, option
 	spec["obstacle_seed"] = int(sub_seeds.get("obstacle", seed))
 	spec["material_id"] = String(options.get("material_id", ""))
 	spec["palette_id"] = String(options.get("palette_id", ""))
-	spec["story_id"] = GENERATED_RULES.story_id(theme, spec["dressing_seed"])
-	var kit_index := GENERATED_RULES.story_index(theme, spec["dressing_seed"])
-	var kit: Dictionary = kits[kit_index]
-	spec["story_kit"] = kit.duplicate(true)
-	spec["story_kit"]["id"] = spec["story_id"]
-	WORLD_MATERIALS.apply_to_spec(spec, WORLD_MATERIALS.resolve(theme, spec["story_id"], spec["material_seed"], spec["material_id"], spec["palette_id"]))
-	var surface: Dictionary = SURFACES.resolve(theme, spec["material_seed"], spec["material_id"], spec["palette_id"], spec.get("floor_modulate", Color.WHITE))
-	spec["surface_identity"] = surface
-	spec["floor_texture"] = surface["floor"]["texture"]
-	spec["track_texture"] = surface["course"]["texture"]
-	spec["floor_modulate"] = Color.WHITE
-	spec["obstacle_plan"] = []
+	spec["half_width"] = ROAD.HALF_WIDTH
+	var specs := [THEMES.spec_for(theme, spec, base_spec, kits, true), THEMES.spec_for(theme_b, spec, TrackBuilderCore.LAYOUTS[theme_b], TrackBuilderCore.ROOM_COMPOSITIONS[theme_b], false)]
 	var left := PackedVector2Array()
 	var right := PackedVector2Array()
 	for index in centerline.size():
@@ -110,10 +109,50 @@ static func prepare(theme: StringName, room_shape: StringName, seed: int, option
 		var transform := sample_at_arc(centerline, arcs, distance)
 		gates.append({"index": index, "arc": distance, "position": transform.origin, "rotation": transform.get_rotation(), "is_finish_line": index == gate_count - 1})
 	var grid := {"player": sample_at_arc(centerline, arcs, GRID_ARC), "chaser": sample_at_arc(centerline, arcs, GRID_ARC - CHASER_GAP)}
-	var environment := DRESSING.plan(spec, theme, centerline, room_polygon, gates)
-	spec["environment_plan"] = {"placements": environment["placements"], "diagnostics": environment["diagnostics"]}
-	spec["obstacle_plan"] = environment["obstacles"]
-	return {"spec": spec, "centerline": centerline, "edges": {"left": left, "right": right}, "room_polygon": room_polygon, "theme": theme, "room_shape": room_shape, "seed": seed, "route_shape": "strip", "strip_length": total, "strip_time_limit": maxf(MIN_TIME_LIMIT, ceilf(total / CLEAN_SPEED_ESTIMATE * TIME_LIMIT_FACTOR)), "strip_gates": gates, "strip_grid": grid, "strip_half_width": ROUTE.HALF_WIDTH, "strip_caps": {"start": centerline[0], "finish": centerline[-1]}, "racing_line": centerline.duplicate(), "traffic_plan": _traffic(seed, total)}
+	for key in grid:
+		var transform: Transform2D = grid[key]
+		transform.origin += Vector2.RIGHT.rotated(transform.get_rotation()) * ROAD.LANE_WIDTH * 0.5
+		grid[key] = transform
+	var racing_line := PackedVector2Array()
+	for index in centerline.size():
+		racing_line.append(centerline[index] + _tangent(centerline, index).rotated(PI * 0.5) * ROAD.NORTH_RACING_OFFSET)
+	var switch_arc := THEMES.switch_arc(route["sections"], total)
+	var seam := sample_at_arc(centerline, arcs, switch_arc)
+	var regions: Array[Dictionary] = []
+	var placements: Array[Dictionary] = []
+	var obstacles: Array[Dictionary] = []
+	for index in 2:
+		var from := 0.0 if index == 0 else switch_arc
+		var to := switch_arc if index == 0 else total
+		var region_line := _route_slice(centerline, arcs, from, to)
+		var north := index == 1
+		var region_room := THEMES.room_half(room_polygon, seam.origin.y, north)
+		var region_theme: StringName = theme if index == 0 else theme_b
+		var region_spec: Dictionary = specs[index]
+		var environment := DRESSING.plan(region_spec, region_theme, region_line, region_room, gates)
+		for entry: Dictionary in environment["placements"]:
+			entry["theme"] = region_theme
+		for obstacle: Dictionary in environment["obstacles"]:
+			obstacle["instance_id"] = "region%d_%s" % [index, obstacle["instance_id"]]
+			obstacle["theme"] = region_theme
+		region_spec["environment_plan"] = {"placements": environment["placements"], "diagnostics": environment["diagnostics"]}
+		region_spec["obstacle_plan"] = environment["obstacles"]
+		placements.append_array(environment["placements"])
+		obstacles.append_array(environment["obstacles"])
+		regions.append({"theme": region_theme, "spec": region_spec, "centerline": region_line, "room_polygon": region_room, "strip_gates": gates, "strip_half_width": ROAD.HALF_WIDTH, "start_arc": from, "end_arc": to})
+	spec = specs[0].duplicate(true)
+	spec["environment_plan"] = {"placements": placements, "diagnostics": {"total_placed": placements.size()}}
+	spec["obstacle_plan"] = obstacles
+	return {"spec": spec, "centerline": centerline, "edges": {"left": left, "right": right}, "room_polygon": room_polygon, "theme": theme, "theme_b": theme_b, "strip_theme_switch": {"arc": switch_arc, "position": seam.origin, "rotation": seam.get_rotation()}, "strip_regions": regions, "room_shape": room_shape, "seed": seed, "route_shape": "strip", "strip_length": total, "strip_time_limit": maxf(MIN_TIME_LIMIT, ceilf(total / CLEAN_SPEED_ESTIMATE * TIME_LIMIT_FACTOR)), "strip_gates": gates, "strip_grid": grid, "strip_half_width": ROAD.HALF_WIDTH, "strip_caps": {"start": centerline[0], "finish": centerline[-1]}, "racing_line": racing_line, "traffic_plan": _traffic(seed, total)}
+
+
+static func _route_slice(line: PackedVector2Array, arcs: PackedFloat32Array, from: float, to: float) -> PackedVector2Array:
+	var result := PackedVector2Array([sample_at_arc(line, arcs, from).origin])
+	for index in line.size():
+		if arcs[index] > from and arcs[index] < to:
+			result.append(line[index])
+	result.append(sample_at_arc(line, arcs, to).origin)
+	return result
 
 
 static func _traffic(seed: int, total: float) -> Array[Dictionary]:
@@ -124,7 +163,7 @@ static func _traffic(seed: int, total: float) -> Array[Dictionary]:
 	var available := total - TRAFFIC_MIN_ARC - TRAFFIC_FINISH_CLEARANCE
 	if available <= 0.0:
 		return result
-	var count := clampi(floori(available / TRAFFIC_SPACING), 2, MAX_TRAFFIC)
+	var count := clampi(floori(available / TRAFFIC_SPACING), 2, MAX_NORTHBOUND)
 	var pack_sizes: Array[int] = []
 	var remaining := count
 	while remaining > 0:
@@ -135,9 +174,14 @@ static func _traffic(seed: int, total: float) -> Array[Dictionary]:
 	var special_offset := rng.randi_range(0, special_behaviors.size() - 1)
 	for pack_index in pack_sizes.size():
 		var pack_arc := TRAFFIC_MIN_ARC + TRAFFIC_FIRST_PACK + (available - TRAFFIC_FIRST_PACK - TRAFFIC_FINISH_CLEARANCE) * float(pack_index) / pack_sizes.size()
-		var side := -1.0 if rng.randi() % 2 == 0 else 1.0
+		var lane: int = ROAD.NORTHBOUND[rng.randi_range(0, ROAD.NORTHBOUND.size() - 1)]
 		for member in pack_sizes[pack_index]:
-			result.append({"arc": pack_arc + member * TRAFFIC_PACK_SEPARATION, "lane": side * rng.randf_range(0.18, 0.4), "speed": rng.randf_range(210.0, 225.0), "behavior": special_behaviors[(pack_index / SPECIAL_PACK_INTERVAL + special_offset) % special_behaviors.size()] if pack_sizes[pack_index] == 1 else &"cruiser", "vehicle_id": vehicle_ids[rng.randi_range(0, vehicle_ids.size() - 1)]})
+			result.append({"arc": pack_arc + member * TRAFFIC_PACK_SEPARATION, "lane": lane, "speed": rng.randf_range(210.0, 225.0), "behavior": special_behaviors[(pack_index / SPECIAL_PACK_INTERVAL + special_offset) % special_behaviors.size()] if pack_sizes[pack_index] == 1 else &"cruiser", "vehicle_id": vehicle_ids[rng.randi_range(0, vehicle_ids.size() - 1)]})
+	var oncoming_count := mini(MAX_ONCOMING, floori(available / ONCOMING_SPACING))
+	for index in oncoming_count:
+		var arc := lerpf(ONCOMING_START_CLEARANCE, total - TRAFFIC_FINISH_CLEARANCE, float(index) / maxf(1.0, oncoming_count))
+		result.append({"arc": arc, "lane": ROAD.SOUTHBOUND[rng.randi_range(0, ROAD.SOUTHBOUND.size() - 1)], "speed": rng.randf_range(ONCOMING_SPEED.x, ONCOMING_SPEED.y), "behavior": &"truck" if index % SPECIAL_PACK_INTERVAL == special_offset else &"cruiser", "vehicle_id": vehicle_ids[rng.randi_range(0, vehicle_ids.size() - 1)]})
+	result.sort_custom(func(a: Dictionary, b: Dictionary) -> bool: return float(a["arc"]) < float(b["arc"]))
 	return result
 
 

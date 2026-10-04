@@ -2,6 +2,7 @@ class_name TrafficCar
 extends RigidBody2D
 
 const VISUALS := preload("res://scripts/race/strip/traffic_visuals.gd")
+const ROAD := preload("res://scripts/race/strip/strip_road_rules.gd")
 const SCENERY_MASK := 2 | 4 | 16
 const ACCELERATION := 180.0
 const BRAKING := 480.0
@@ -10,7 +11,6 @@ const LATERAL_ACCELERATION := 300.0
 const LOOKAHEAD_TIME := 0.55
 const MIN_LOOKAHEAD := 130.0
 const LANE_RATE := 0.28
-const MAX_LANE := 0.55
 const FOLLOW_GAP := 42.0
 const HEADWAY := 0.65
 const MERGE_CLEARANCE := 155.0
@@ -19,9 +19,10 @@ const SWERVE_DISTANCE := 1800.0
 const END_CLEARANCE := 100.0
 const RECOVERY_LOOKAHEAD := 15.0
 const RECOVERY_SPEED := 85.0
+const PROBE_SKIN := 2.0
 
 var _sampler: RefCounted
-var _half_width := 125.0
+var _half_width := ROAD.HALF_WIDTH
 var _arc := 0.0
 var _spawn_arc := 0.0
 var _base_lane := 0.0
@@ -39,6 +40,7 @@ var _avoid_lane := 0.0
 var _visual: Node2D
 var _probe: CapsuleShape2D
 var neighbors: Array = []
+var travel_direction := 1
 
 
 func configure(arc: float, lane: float, speed: float, behavior: StringName, vehicle_id: String, sampler: RefCounted, half_width: float) -> void:
@@ -46,15 +48,19 @@ func configure(arc: float, lane: float, speed: float, behavior: StringName, vehi
 	_half_width = half_width
 	_arc = arc
 	_spawn_arc = arc
-	_base_lane = clampf(lane, -MAX_LANE, MAX_LANE)
+	travel_direction = ROAD.direction(lane)
+	set_meta("strip_direction", travel_direction)
+	_base_lane = ROAD.fraction(lane)
 	_lane = _base_lane
+	_avoid_until_arc = arc
+	_avoid_lane = _base_lane
 	_behavior = behavior
 	_cut_requested = false
 	_is_truck = behavior == &"truck"
 	_speed = speed * (0.78 if _is_truck else 1.0)
 	var sample: Dictionary = _sampler.sample(_arc)
 	position = sample["pos"] + sample["perp"] * (_lane * _half_width)
-	rotation = (sample["dir"] as Vector2).angle() + PI * 0.5
+	rotation = ((sample["dir"] as Vector2) * travel_direction).angle() + PI * 0.5
 	collision_layer = 1
 	collision_mask = 1 | SCENERY_MASK
 	gravity_scale = 0.0
@@ -69,7 +75,7 @@ func configure(arc: float, lane: float, speed: float, behavior: StringName, vehi
 	physics_material_override.friction = 0.15
 	physics_material_override.bounce = 0.0
 	_visual = VISUALS.new()
-	_visual.configure(vehicle_id, int(arc), _is_truck)
+	_visual.configure(vehicle_id, int(arc), _is_truck, travel_direction < 0)
 	add_child(_visual)
 	var size: Vector2 = _visual.body_size
 	_body_width = size.x
@@ -81,6 +87,11 @@ func configure(arc: float, lane: float, speed: float, behavior: StringName, vehi
 	collision.name = "BodyCollision"
 	collision.shape = _probe
 	add_child(collision)
+	# Keep a contact skin inside the authoritative body. cast_motion ignores
+	# initially overlapping shapes; a nose resting on a prop must still see it.
+	_probe = _probe.duplicate() as CapsuleShape2D
+	_probe.radius -= PROBE_SKIN
+	_probe.height -= PROBE_SKIN * 2.0
 	stop()
 
 
@@ -106,29 +117,29 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 		return
 	var point := state.transform.origin
 	_arc = float(_sampler.project(point, _arc)["arc"])
-	if _arc >= _sampler.length() - END_CLEARANCE:
+	if (travel_direction > 0 and _arc >= _sampler.length() - END_CLEARANCE) or (travel_direction < 0 and _arc <= END_CLEARANCE):
 		_active = false
 		queue_free()
 		return
 	var sample: Dictionary = _sampler.sample(_arc)
-	var tangent: Vector2 = sample["dir"]
+	var tangent: Vector2 = sample["dir"] * travel_direction
 	var normal: Vector2 = sample["perp"]
 	var lateral := (point - (sample["pos"] as Vector2)).dot(normal)
 	var speed := maxf(0.0, state.linear_velocity.dot(tangent))
 	var requested_lane := _behavior_lane()
-	if _arc < _avoid_until_arc:
+	if (_avoid_until_arc - _arc) * travel_direction > 0.0:
 		requested_lane = _avoid_lane
 	if _merge_clear(requested_lane, lateral):
 		_lane = move_toward(_lane, requested_lane, LANE_RATE * state.step)
 	var lookahead := MIN_LOOKAHEAD + speed * LOOKAHEAD_TIME
-	var future: Dictionary = _sampler.sample(_arc + lookahead)
+	var future: Dictionary = _sampler.sample(_arc + lookahead * travel_direction)
 	var goal: Vector2 = future["pos"] + future["perp"] * (_lane * _half_width)
 	var target_speed := _following_speed(lateral, speed)
 	# Capsule casts include the full vehicle, not just its centre ray. Try a
 	# clear passing line around household props; otherwise brake, never phase.
 	var clear := _clear_fraction(state, point, goal)
 	if clear < 1.0:
-		for passing_lane in [0.0, -MAX_LANE, MAX_LANE]:
+		for passing_lane in ROAD.lane_fractions(travel_direction):
 			if not _merge_clear(passing_lane, lateral):
 				continue
 			var passing_goal: Vector2 = future["pos"] + future["perp"] * (passing_lane * _half_width)
@@ -137,12 +148,12 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 				clear = passing_clear
 				goal = passing_goal
 				_avoid_lane = passing_lane
-				_avoid_until_arc = _arc + lookahead + _body_length
+				_avoid_until_arc = _arc + (lookahead + _body_length) * travel_direction
 		# A bump can leave the nose against a prop, where every forward chord
 		# intersects it. Steer out locally before resuming the forward line.
 		if clear < 1.0:
-			var recovery: Dictionary = _sampler.sample(_arc + RECOVERY_LOOKAHEAD)
-			for passing_lane in [-MAX_LANE, MAX_LANE]:
+			var recovery: Dictionary = _sampler.sample(_arc + RECOVERY_LOOKAHEAD * travel_direction)
+			for passing_lane in ROAD.lane_fractions(travel_direction):
 				if absf(passing_lane * _half_width - lateral) < _body_width or not _merge_clear(passing_lane, lateral):
 					continue
 				var recovery_goal: Vector2 = recovery["pos"] + recovery["perp"] * (passing_lane * _half_width)
@@ -151,7 +162,7 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 					clear = 1.0
 					target_speed = minf(target_speed, RECOVERY_SPEED)
 					_avoid_lane = passing_lane
-					_avoid_until_arc = _arc + lookahead + _body_length
+					_avoid_until_arc = _arc + (lookahead + _body_length) * travel_direction
 					break
 		if clear < 1.0:
 			target_speed = minf(target_speed, sqrt(2.0 * BRAKING * maxf(0.0, point.distance_to(goal) * clear - FOLLOW_GAP)))
@@ -169,12 +180,13 @@ func _integrate_forces(state: PhysicsDirectBodyState2D) -> void:
 
 
 func _behavior_lane() -> float:
-	var travel := maxf(0.0, _arc - _spawn_arc)
+	var travel := maxf(0.0, (_arc - _spawn_arc) * travel_direction)
+	var alternate := travel_direction * (1.0 - absf(_base_lane))
 	if _behavior == &"cutter":
 		_cut_requested = _cut_requested or travel >= CUT_DISTANCE
-		return -_base_lane if _cut_requested else _base_lane
+		return alternate if _cut_requested else _base_lane
 	if _behavior == &"swerve" or _behavior == &"line":
-		return _base_lane * cos(TAU * travel / SWERVE_DISTANCE)
+		return lerpf(_base_lane, alternate, (1.0 - cos(TAU * travel / SWERVE_DISTANCE)) * 0.5)
 	return _base_lane
 
 
@@ -186,9 +198,13 @@ func _merge_clear(lane: float, lateral: float) -> bool:
 		var other := candidate as TrafficCar
 		if not is_instance_valid(other) or other == self or not other._active:
 			continue
-		if absf(other._arc - _arc) > MERGE_CLEARANCE + maxf(0.0, _speed - other._speed):
-			continue
 		var sample: Dictionary = _sampler.sample(other._arc)
+		var gap := (other._arc - _arc) * travel_direction
+		var tangent: Vector2 = sample["dir"] * travel_direction
+		var closing := maxf(0.0, (linear_velocity - other.linear_velocity).dot(tangent) * signf(gap))
+		var required_gap := (_body_length + other._body_length) * 0.5 + FOLLOW_GAP * 0.5 + closing * HEADWAY
+		if absf(gap) > required_gap:
+			continue
 		var other_lateral := (other.global_position - (sample["pos"] as Vector2)).dot(sample["perp"])
 		var margin := (_body_width + other._body_width) * 0.5 + 12.0
 		if other_lateral > minf(lateral, destination) - margin and other_lateral < maxf(lateral, destination) + margin:
@@ -204,7 +220,9 @@ func _following_speed(lateral: float, speed: float) -> float:
 		var other := candidate as TrafficCar
 		if not is_instance_valid(other) or other == self or not other._active:
 			continue
-		var gap := other._arc - _arc
+		if other.travel_direction != travel_direction:
+			continue
+		var gap := (other._arc - _arc) * travel_direction
 		if gap <= 0.0 or gap > MERGE_CLEARANCE + speed * 2.0:
 			continue
 		var sample: Dictionary = _sampler.sample(other._arc)
@@ -212,7 +230,7 @@ func _following_speed(lateral: float, speed: float) -> float:
 		if absf(other_lateral - lateral) > (_body_width + other._body_width) * 0.5 + 14.0:
 			continue
 		var free_gap := gap - (_body_length + other._body_length) * 0.5 - FOLLOW_GAP
-		var leader_speed := maxf(0.0, other.linear_velocity.dot(sample["dir"]))
+		var leader_speed := maxf(0.0, other.linear_velocity.dot((sample["dir"] as Vector2) * travel_direction))
 		result = minf(result, maxf(0.0, leader_speed + (free_gap - speed * HEADWAY) * 1.5))
 	return result
 
@@ -220,14 +238,14 @@ func _following_speed(lateral: float, speed: float) -> float:
 func _clear_fraction(state: PhysicsDirectBodyState2D, from: Vector2, to: Vector2) -> float:
 	var query := PhysicsShapeQueryParameters2D.new()
 	query.shape = _probe
-	query.transform = Transform2D((to - from).angle() + PI * 0.5, from)
+	query.transform = Transform2D(state.transform.get_rotation(), from)
 	query.motion = to - from
 	query.collision_mask = collision_mask
 	var excluded: Array[RID] = [get_rid()]
 	# Platoon headway handles civilians. Cast against racers as well as scenery
 	# so a stopped player is not treated as something to continuously push.
 	for other in neighbors:
-		if is_instance_valid(other) and other != self:
+		if is_instance_valid(other) and other != self and other.travel_direction == travel_direction:
 			excluded.append(other.get_rid())
 	query.exclude = excluded
 	var fractions := state.get_space_state().cast_motion(query)

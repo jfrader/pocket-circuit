@@ -1,9 +1,10 @@
 extends RefCounted
 
 const SAMPLER := preload("res://scripts/race/track_curve_sampling.gd")
-const HALF_WIDTH := 125.0
-const CLEARANCE := HALF_WIDTH + 65.0
-const MIN_RADIUS := 350.0
+const ROAD := preload("res://scripts/race/strip/strip_road_rules.gd")
+const HALF_WIDTH := ROAD.HALF_WIDTH
+const CLEARANCE := HALF_WIDTH + 85.0
+const MIN_RADIUS := 600.0
 const START_STRAIGHT := 1000.0
 const MIN_ENDPOINT_DISTANCE := 500.0
 const ATTEMPTS := 12
@@ -17,7 +18,7 @@ const CHICANE_RAMP := 650.0
 const CHICANE_HOLD := 350.0
 const SWEEP_HEADING := Vector2(28.0, 42.0)
 const STRAIGHT_LENGTH := Vector2(1600.0, 2800.0)
-const LATERAL_USE := 0.30
+const LATERAL_USE := 0.28
 
 
 static func generate(seed: int, room_polygon: PackedVector2Array, force_fallback: bool = false) -> Dictionary:

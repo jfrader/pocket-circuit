@@ -1,5 +1,7 @@
 extends RefCounted
 
+const ROAD := preload("res://scripts/race/strip/strip_road_rules.gd")
+
 const CATALOG := preload("res://scripts/race/world_environment_catalog.gd")
 const ART := preload("res://scripts/race/world_environment_art.gd")
 const DRESSING := preload("res://scripts/race/track_builder_dressing.gd")
@@ -8,7 +10,6 @@ const OBSTACLES := preload("res://scripts/race/track_builder_catalog.gd")
 const SURFACES := preload("res://scripts/race/household_surface_materials.gd")
 const SCENERY_SPACING := 750.0
 const SCENERY_CLUSTER_GAP := 190.0
-const FORMATION_HALF_SPAN := 75
 const GIANT_SLOT_INTERVAL := 14
 const EDGE_SPACING := 145.0
 const EDGE_SIDE_OFFSET := 16.0
@@ -57,10 +58,12 @@ static func plan(spec: Dictionary, theme: StringName, line: PackedVector2Array, 
 			var normal := (line[mini(index + 1, line.size() - 1)] - line[maxi(index - 1, 0)]).normalized().rotated(PI * 0.5)
 			var asset: Dictionary = pool[rng.randi_range(0, pool.size() - 1)]
 			var radius := maxf(24.0, PLACEMENT.asset_radius(String(asset["texture_path"]), (asset["dimensions_mm"] as Vector2).length() * 0.5))
-			var offset := 125.0 + radius + MIN_SIDE_CLEARANCE + rng.randf_range(0.0, 140.0)
+			var offset := ROAD.HALF_WIDTH + radius + MIN_SIDE_CLEARANCE + rng.randf_range(0.0, 140.0)
 			var side := -1.0 if slot % 2 == 0 else 1.0
 			var point := line[index] + normal * offset * side
 			if not PLACEMENT.trackside_placement_is_safe(point, radius, room, line, gate_points, occupied):
+				continue
+			if TrackBuilderCore._distance_to_centerline(point, line) < ROAD.HALF_WIDTH + radius + MIN_SIDE_CLEARANCE:
 				continue
 			var rotation := rng.randf_range(-0.4, 0.4)
 			if role == "boundary":
@@ -85,8 +88,8 @@ static func plan(spec: Dictionary, theme: StringName, line: PackedVector2Array, 
 				var definition: Dictionary = (roster[(asset_start + asset_attempt) % roster.size()] as Dictionary).duplicate(true)
 				var size := TrackBuilderCore.PROP_SCALE.size_for(String(definition["asset"]), Vector2(40.0, 40.0))
 				var radius := size.length() * 0.5
-				var offset := 125.0 - ROAD_OBSTACLE_INSET - radius
-				if offset <= radius or 125.0 + offset - radius < MIN_OPEN_LANE:
+				var offset := ROAD.HALF_WIDTH - ROAD_OBSTACLE_INSET - radius
+				if offset <= radius or ROAD.HALF_WIDTH + offset - radius < MIN_OPEN_LANE:
 					continue
 				for side in [side_choice, -side_choice]:
 					var position: Vector2 = line[index] + tangent.rotated(PI * 0.5) * offset * side
@@ -94,9 +97,9 @@ static func plan(spec: Dictionary, theme: StringName, line: PackedVector2Array, 
 						continue
 					if not TrackBuilderCore._clear_of_occupied(position, radius + 80.0, occupied):
 						continue
-					if not TrackBuilderCore._line_sweep_clears_footprint(line, position, size, &"rect", tangent.angle(), float(definition["clearance"])):
+					if not _traffic_paths_clear(line, position, size, tangent.angle(), float(definition["clearance"])):
 						continue
-					definition.merge({"instance_id": "strip_%d" % slot, "position": position, "rotation": tangent.angle(), "centerline_index": index, "side": side, "footprint_kind": &"rect", "footprint_size": size, "visual_size": size, "visual_bounds": Rect2(-size * 0.5, size), "lateral_footprint_extent": radius, "lateral_center_offset": offset, "viable_corridor_width": 125.0 + offset - radius, "validated_ai_routes": PackedStringArray(["RacingLine"])})
+					definition.merge({"instance_id": "strip_%d" % slot, "position": position, "rotation": tangent.angle(), "centerline_index": index, "side": side, "footprint_kind": &"rect", "footprint_size": size, "visual_size": size, "visual_bounds": Rect2(-size * 0.5, size), "lateral_footprint_extent": radius, "lateral_center_offset": offset, "viable_corridor_width": ROAD.HALF_WIDTH + offset - radius, "validated_ai_routes": PackedStringArray(["RacingLine", "Southbound"])})
 					obstacles.append(definition)
 					occupied.append({"position": position, "radius": radius})
 					placed = true
@@ -106,7 +109,7 @@ static func plan(spec: Dictionary, theme: StringName, line: PackedVector2Array, 
 	var edge_assets: Array[Dictionary] = []
 	for path: String in spec.get("edge_decor", []):
 		var asset := CATALOG.for_path(path)
-		if not asset.is_empty():
+		if not asset.is_empty() and String(theme) in asset["themes"]:
 			edge_assets.append(asset)
 	if not edge_assets.is_empty():
 		var edge_slots := maxi(1, floori(total / EDGE_SPACING))
@@ -116,7 +119,7 @@ static func plan(spec: Dictionary, theme: StringName, line: PackedVector2Array, 
 			for side in [-1.0, 1.0]:
 				var asset: Dictionary = edge_assets[rng.randi_range(0, edge_assets.size() - 1)]
 				var radius := maxf(18.0, PLACEMENT.asset_radius(String(asset["texture_path"]), float(asset["length_mm"]) * 0.5))
-				var point: Vector2 = line[index] + normal * side * (125.0 + radius + MIN_SIDE_CLEARANCE + EDGE_SIDE_OFFSET)
+				var point: Vector2 = line[index] + normal * side * (ROAD.HALF_WIDTH + radius + MIN_SIDE_CLEARANCE + EDGE_SIDE_OFFSET)
 				if not _edge_is_safe(point, radius, room, line, gate_points, occupied):
 					continue
 				placements.append({"asset_id": asset["id"], "role": "micro" if String(asset.get("collision", "flat")) == "flat" else "boundary", "position": point, "rotation": rng.randf_range(-0.45, 0.45), "zone": "apron", "edge_detail": true})
@@ -172,27 +175,19 @@ static func compose(root: Node2D, prepared: Dictionary) -> void:
 				sector_line.append(point)
 		DRESSING.build_room_ground_sections(sector, story, spec, sector_line, PackedVector2Array(), sector_room, Callable(), ceili((bottom - top) / GROUND_SECTION_SPACING))
 		DRESSING.build_room_floor_details(sector, spec, sector_line, sector_room, occupied, rng, ceili((bottom - top) / FLOOR_DETAIL_SPACING))
-	var outer: PackedVector2Array = prepared["edges"]["left"]
-	_build_local_formation(moments, "OpeningLandmark", {"asset": story["landmarks"][0], "count": 1}, &"unique", maxi(32, line.size() / 20), line, outer, room, gate_points, occupied)
-	var formation: Dictionary = story["object_line"]
-	_build_local_formation(moments, "StraightFormation", formation, &"few", line.size() / 2, line, outer, room, gate_points, occupied)
-	_build_local_formation(moments, "CornerFormation", formation, &"few", line.size() * 3 / 4, line, outer, room, gate_points, occupied)
 	DRESSING.build_open_generated_surfaces(root, moments, story, spec, line, gate_points, SURFACE_SPACING)
 	SURFACES.apply(root, spec["surface_identity"])
 
 
-static func _build_local_formation(parent: Node2D, name: String, data: Dictionary, quantity: StringName, preferred: int, line: PackedVector2Array, outer: PackedVector2Array, room: PackedVector2Array, gates: PackedVector2Array, occupied: Array[Dictionary]) -> void:
-	var first := maxi(0, preferred - FORMATION_HALF_SPAN)
-	var last := mini(line.size() - 1, preferred + FORMATION_HALF_SPAN)
-	var local_line := PackedVector2Array()
-	var local_outer := PackedVector2Array()
-	for index in range(first, last + 1):
-		local_line.append(line[index])
-		local_outer.append(outer[index])
-	DRESSING.build_track_formation(parent, name, data, quantity, preferred - first, local_line, local_outer, room, gates, occupied)
-	var formation := parent.get_node_or_null(name)
-	if formation != null:
-		formation.set_meta("centerline_index", preferred)
+static func _traffic_paths_clear(line: PackedVector2Array, position: Vector2, size: Vector2, rotation: float, clearance: float) -> bool:
+	for side in [-1.0, 1.0]:
+		var path := PackedVector2Array()
+		for index in line.size():
+			var tangent := (line[mini(line.size() - 1, index + 1)] - line[maxi(0, index - 1)]).normalized()
+			path.append(line[index] + tangent.rotated(PI * 0.5) * ROAD.NORTH_RACING_OFFSET * side)
+		if not TrackBuilderCore._line_sweep_clears_footprint(path, position, size, &"rect", rotation, clearance):
+			return false
+	return true
 
 
 static func _gate_points(gates: Array) -> PackedVector2Array:
@@ -206,7 +201,7 @@ static func _edge_is_safe(point: Vector2, radius: float, room: PackedVector2Arra
 	# Edge pieces sit beyond the corridor plus the apron clearance. This also
 	# clears the narrower centreline recovery lanes on both sides.
 	return PLACEMENT.inside_polygon_with_radius(point, radius, room) \
-		and TrackBuilderCore._distance_to_centerline(point, line) >= TrackBuilderCore.HALF_WIDTH + radius + TrackBuilderCore.APRON_COLLIDER_CLEARANCE \
+		and TrackBuilderCore._distance_to_centerline(point, line) >= ROAD.HALF_WIDTH + radius + TrackBuilderCore.APRON_COLLIDER_CLEARANCE \
 		and TrackBuilderCore._clear_of_points(point, gates, radius + 24.0) \
 		and TrackBuilderCore._clear_of_occupied(point, radius, occupied)
 

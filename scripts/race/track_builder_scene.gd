@@ -6,38 +6,61 @@ const STRIP_ROAD_ART := preload("res://scripts/race/strip_road_art.gd")
 
 
 static func build_strip(root: Node2D, prepared: Dictionary) -> void:
-	var spec: Dictionary = prepared["spec"]
 	var centerline: PackedVector2Array = prepared["centerline"]
 	var room: PackedVector2Array = prepared["room_polygon"]
 	var bounds := TrackBuilderCore._polygon_bounds_rect(room)
 	TrackBuilderCore._add_polygon(root, "Floor", TrackBuilderCore._rect_points(bounds.get_center(), bounds.size + Vector2.ONE * 1520.0), Color("111316"), -22)
-	TrackBuilderCore._add_textured_polygon(root, "RoomSurface", TrackBuilderCore._expand_loop(room, 26.0), String(spec["floor_texture"]), spec["highlight"], -20, spec.get("floor_tile_world_size", TrackBuilderCore.DEFAULT_FLOOR_TILE_WORLD_SIZE), spec.get("floor_modulate", Color.WHITE))
-	var road_texture := String(spec["track_texture"])
-	var same_material := road_texture == String(spec["floor_texture"])
-	TrackBuilderCore._add_centerline_tiles(root, centerline, road_texture, 1.0 if same_material else float(spec.get("track_tile_modulate", 1.35)), spec.get("track_world_tile_size", Vector2.ZERO), 1.0 if same_material else float(spec.get("track_opacity", 0.52)), Color.WHITE, 0.0 if same_material else 0.16)
-	var surface := root.get_node_or_null("TrackSurface") as Line2D
-	if surface != null:
+	var regions: Array = prepared["strip_regions"]
+	var surfaces: Array = []
+	for index in regions.size():
+		var region: Dictionary = regions[index]
+		var spec: Dictionary = region["spec"]
+		var container := Node2D.new()
+		container.name = "StripRoom%d" % index
+		container.set_meta("theme", region["theme"])
+		container.set_meta("start_arc", region["start_arc"])
+		container.set_meta("end_arc", region["end_arc"])
+		root.add_child(container)
+		TrackBuilderCore._add_textured_polygon(container, "RoomSurface", region["room_polygon"], String(spec["floor_texture"]), spec["highlight"], -20, spec.get("floor_tile_world_size", TrackBuilderCore.DEFAULT_FLOOR_TILE_WORLD_SIZE), Color.WHITE)
+		TrackBuilderCore._add_centerline_tiles(container, region["centerline"], String(spec["track_texture"]))
+		var surface := container.get_node("TrackSurface") as Line2D
 		surface.closed = false
-	var edge_texture := String(spec.get("edge_texture", "res://assets/textures/kitchen/counter_edge.png"))
+		surface.width = float(prepared["strip_half_width"]) * 2.0
+		STRIP_DRESSING.compose(container, region)
+		STRIP_ROAD_ART.build(container, region)
+		surfaces.append_array(container.get_meta("generated_surfaces", []))
+	root.set_meta("generated_surfaces", surfaces)
+	root.set_meta("environment_placements", prepared["spec"]["environment_plan"]["placements"])
+	root.set_meta("strip_theme_switch", prepared["strip_theme_switch"])
+	root.set_meta("theme_b", prepared["theme_b"])
+	var seam_y := float(prepared["strip_theme_switch"]["position"].y)
 	for index in room.size():
 		var a: Vector2 = room[index]
 		var b: Vector2 = room[(index + 1) % room.size()]
-		TrackBuilderCore._add_wall_segment(root, "Wall%d" % index, (a + b) * 0.5, a.distance_to(b), (b - a).angle(), edge_texture)
+		var points := PackedVector2Array([a])
+		if (a.y - seam_y) * (b.y - seam_y) < 0.0:
+			points.append(a.lerp(b, (seam_y - a.y) / (b.y - a.y)))
+		points.append(b)
+		for part in range(points.size() - 1):
+			var midpoint := (points[part] + points[part + 1]) * 0.5
+			var region_index := 0 if (midpoint.y > seam_y) == (centerline[0].y > seam_y) else 1
+			var edge_texture := String(regions[region_index]["spec"]["edge_texture"])
+			TrackBuilderCore._add_wall_segment(root, "Wall%dPart%d" % [index, part], midpoint, points[part].distance_to(points[part + 1]), (points[part + 1] - points[part]).angle(), edge_texture)
 	for gate: Dictionary in prepared["strip_gates"]:
 		var index := int(gate["index"])
 		var tangent := Vector2.UP.rotated(float(gate["rotation"]))
 		var normal := tangent.rotated(PI * 0.5) * float(prepared["strip_half_width"])
 		var position: Vector2 = gate["position"]
 		TrackBuilderCore._add_cp(root, "Checkpoint%dFinish" % index if gate["is_finish_line"] else "Checkpoint%d" % index, position, tangent.angle() + PI, index, bool(gate["is_finish_line"]), float(gate["rotation"]), PackedVector2Array([position - normal, position + normal]))
+		var spec: Dictionary = regions[0 if float(gate["arc"]) < float(prepared["strip_theme_switch"]["arc"]) else 1]["spec"]
 		TrackBuilderCore._add_gate_posts(root, spec, position, tangent, index)
 	var last: Dictionary = (prepared["strip_gates"] as Array)[-1]
-	TrackBuilderCore._add_finish_checker(root, last["position"], Vector2.UP.rotated(float(last["rotation"])))
+	TrackBuilderCore._add_finish_checker(root, last["position"], Vector2.UP.rotated(float(last["rotation"])), float(prepared["strip_half_width"]))
 	var grid: Dictionary = prepared["strip_grid"]
 	TrackBuilderCore._add_grid(root, "GridForward", 0.0, [grid["player"].origin, grid["chaser"].origin], [grid["player"].get_rotation(), grid["chaser"].get_rotation()])
 	TrackBuilderCore._add_hidden_racing_line(root, "RacingLine", prepared["racing_line"])
 	(root.get_node("RacingLine") as Line2D).closed = false
-	STRIP_DRESSING.compose(root, prepared)
-	STRIP_ROAD_ART.build(root, prepared)
+	STRIP_ROAD_ART.build_landmarks(root, prepared)
 
 
 static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array, edges: Dictionary, room_polygon: PackedVector2Array, theme: StringName, stage: Callable = Callable(), environment_composer: Callable = Callable()) -> void:

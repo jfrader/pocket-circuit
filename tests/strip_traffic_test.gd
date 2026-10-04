@@ -8,6 +8,7 @@ const LAYOUT := preload("res://scripts/race/strip_layout.gd")
 const CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const SAMPLER := preload("res://scripts/race/strip/strip_route_sampler.gd")
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
+const ROAD := preload("res://scripts/race/strip/strip_road_rules.gd")
 const FIXED_FPS := 60
 
 func _initialize() -> void:
@@ -103,30 +104,56 @@ func _pathing_test() -> void:
 	var traffic := STRIP_TRAFFIC.new()
 	root.add_child(traffic)
 	var plan: Array = [
-		{"arc": 100.0, "lane": -0.35, "speed": 225.0, "behavior": &"cruiser"},
-		{"arc": 270.0, "lane": -0.35, "speed": 210.0, "behavior": &"truck"},
-		{"arc": 600.0, "lane": 0.35, "speed": 220.0, "behavior": &"cutter"},
-		{"arc": 850.0, "lane": -0.35, "speed": 220.0, "behavior": &"swerve"},
-		{"arc": 1150.0, "lane": 0.25, "speed": 225.0, "behavior": &"line"},
-		{"arc": 1600.0, "lane": -0.40, "speed": 225.0, "behavior": &"cutter"},
-		{"arc": 1600.0, "lane": 0.40, "speed": 225.0, "behavior": &"cutter"},
+		{"arc": 100.0, "lane": 1, "speed": 225.0, "behavior": &"cruiser"},
+		{"arc": 270.0, "lane": 1, "speed": 210.0, "behavior": &"truck"},
+		{"arc": 600.0, "lane": 2, "speed": 220.0, "behavior": &"cutter"},
+		{"arc": 850.0, "lane": 1, "speed": 220.0, "behavior": &"swerve"},
+		{"arc": 1150.0, "lane": 1, "speed": 225.0, "behavior": &"line"},
+		{"arc": 1600.0, "lane": 1, "speed": 225.0, "behavior": &"cutter"},
+		{"arc": 1600.0, "lane": 2, "speed": 225.0, "behavior": &"cutter"},
+		{"arc": 5800.0, "lane": -1, "speed": 140.0, "behavior": &"cutter"},
+		{"arc": 5400.0, "lane": -2, "speed": 140.0, "behavior": &"truck"},
 	]
-	traffic.configure(route, 125.0, plan, manager)
+	traffic.configure(route, ROAD.HALF_WIDTH, plan, manager)
 	var cars := traffic.get_children()
+	for index in cars.size():
+		var car := cars[index] as TrafficCar
+		var sample: Dictionary = sampler.sample(car._arc)
+		var facing := Vector2.UP.rotated(car.rotation)
+		var lane := int(plan[index]["lane"])
+		var expected := -1 if lane < 0 else 1
+		if car.travel_direction != expected or facing.dot((sample["dir"] as Vector2) * expected) < 0.99:
+			_fail("Lane direction or facing does not match signed lane ID")
+			return
+		var lateral := (car.position - (sample["pos"] as Vector2)).dot(sample["perp"])
+		var expected_lateral := expected * (absf(lane) - 0.5) * ROAD.LANE_WIDTH
+		if absf(lateral - expected_lateral) > 0.1:
+			_fail("Right-hand traffic spawned on the wrong carriageway")
+			return
+		if (car._visual.get_node_or_null("OncomingLampLeft") != null) != (expected < 0) or (car._visual.get_node_or_null("RoofMarkerLeft") != null) != (expected < 0 and car._is_truck):
+			_fail("Oncoming visual cues must match travel direction and body type")
+			return
+	if ROAD.lane_id(0.0) != 1 or ROAD.lane_id(123.0) != 1 or ROAD.lane_id(-0.5) != 1:
+		_fail("Unknown lanes must default safely to northbound +1")
+		return
 	var obstacle_sample: Dictionary = sampler.sample(2200.0)
 	var obstacle := StaticBody2D.new()
 	obstacle.collision_layer = 16
-	obstacle.position = obstacle_sample["pos"] + obstacle_sample["perp"] * -45.0
+	obstacle.position = obstacle_sample["pos"] + obstacle_sample["perp"] * ROAD.LANE_WIDTH * 0.5
 	var shape := CircleShape2D.new()
 	shape.radius = 24.0
 	var collision := CollisionShape2D.new()
 	collision.shape = shape
 	obstacle.add_child(collision)
 	root.add_child(obstacle)
+	var south_obstacle := obstacle.duplicate() as StaticBody2D
+	var south_sample: Dictionary = sampler.sample(3400.0)
+	south_obstacle.position = south_sample["pos"] - south_sample["perp"] * ROAD.LANE_WIDTH * 1.5
+	root.add_child(south_obstacle)
 	var parked_sample: Dictionary = sampler.sample(4500.0)
 	var parked_racer := StaticBody2D.new()
 	parked_racer.collision_layer = 1
-	parked_racer.position = parked_sample["pos"]
+	parked_racer.position = parked_sample["pos"] + parked_sample["perp"] * ROAD.LANE_WIDTH * 1.5
 	parked_racer.rotation = (parked_sample["dir"] as Vector2).angle() + PI * 0.5
 	var parked_shape := CapsuleShape2D.new()
 	parked_shape.radius = 18.0
@@ -139,6 +166,7 @@ func _pathing_test() -> void:
 	var minimum_gap := INF
 	var maximum_lane_error := 0.0
 	var recovered_error := INF
+	var south_recovered_error := INF
 	var stuck_ticks := 0
 	for tick in FIXED_FPS * 65:
 		await physics_frame
@@ -146,6 +174,9 @@ func _pathing_test() -> void:
 			var bumped := cars[2] as TrafficCar
 			var sample: Dictionary = sampler.sample(bumped._arc)
 			bumped.apply_central_impulse((sample["perp"] as Vector2) * 300.0)
+			var south_bumped := cars[7] as TrafficCar
+			var south_pose: Dictionary = sampler.sample(south_bumped._arc)
+			south_bumped.apply_central_impulse(-(south_pose["perp"] as Vector2) * 300.0)
 		for candidate in cars:
 			if not is_instance_valid(candidate):
 				continue
@@ -156,14 +187,19 @@ func _pathing_test() -> void:
 				return
 			var sample: Dictionary = sampler.sample(car._arc)
 			var lateral := (car.global_position - (sample["pos"] as Vector2)).dot(sample["perp"])
-			var error := absf(lateral - car._lane * 125.0)
+			var error := absf(lateral - car._lane * ROAD.HALF_WIDTH)
+			if tick > FIXED_FPS * 3 and (car._arc - car._spawn_arc) * car.travel_direction < 50.0:
+				_fail("Traffic did not advance in its declared direction")
+				return
 			if tick > FIXED_FPS * 9 and car == cars[2]:
 				recovered_error = minf(recovered_error, error)
+			if tick > FIXED_FPS * 9 and car == cars[7]:
+				south_recovered_error = minf(south_recovered_error, error)
 			if tick > FIXED_FPS * 10:
 				maximum_lane_error = maxf(maximum_lane_error, absf(lateral))
 			if tick > FIXED_FPS * 3 and car.linear_velocity.length() < 8.0:
 				stuck_ticks += 1
-			if car.global_position.distance_to(obstacle.position) < 24.0 + car._body_width * 0.5 - 3.0:
+			if minf(car.global_position.distance_to(obstacle.position), car.global_position.distance_to(south_obstacle.position)) < 24.0 + car._body_width * 0.5 - 3.0:
 				_fail("Traffic penetrated solid scenery")
 				return
 		for first in cars.size():
@@ -182,18 +218,19 @@ func _pathing_test() -> void:
 				if gap < -3.0:
 					_fail("Traffic stacked/overlapped: %.2f wu" % gap)
 					return
-	if recovered_error > 12.0 or maximum_lane_error > 108.0 or stuck_ticks > FIXED_FPS * 3 or traffic.get_child_count() != 0:
-		for car in traffic.get_children():
+	if recovered_error > 12.0 or south_recovered_error > 12.0 or maximum_lane_error > ROAD.HALF_WIDTH - 16.0 or stuck_ticks > FIXED_FPS * 3 or traffic.get_child_count() != 0:
+		for car: TrafficCar in traffic.get_children():
 			print("TRAFFIC_SURVIVOR behavior=%s arc=%.1f lane=%.2f speed=%.1f position=%s" % [car._behavior, car._arc, car._lane, car.linear_velocity.length(), car.position])
 		_fail("Pathing/recovery/end failed: recovery=%.1f lateral=%.1f stuck=%d remaining=%d" % [recovered_error, maximum_lane_error, stuck_ticks, traffic.get_child_count()])
 		return
 	traffic.free()
 	manager.free()
 	obstacle.free()
+	south_obstacle.free()
 	parked_racer.free()
 	if not await _world_traffic_test():
 		return
-	print("STRIP_TRAFFIC_TEST PASS physical_65s min_gap=%.2f recovered_lane_error=%.2f max_lateral=%.2f stuck_ticks=%d remaining=0" % [minimum_gap, recovered_error, maximum_lane_error, stuck_ticks])
+	print("STRIP_TRAFFIC_TEST PASS physical_65s min_gap=%.2f recovered_lane_error=%.2f south_recovered_lane_error=%.2f max_lateral=%.2f stuck_ticks=%d remaining=0" % [minimum_gap, recovered_error, south_recovered_error, maximum_lane_error, stuck_ticks])
 	quit(0)
 
 
@@ -219,8 +256,8 @@ func _world_traffic_test() -> bool:
 				worst_stall = maxi(worst_stall, int(stalled[id]))
 		var minimum_progress := INF
 		for car: TrafficCar in traffic.get_children():
-			minimum_progress = minf(minimum_progress, car._arc - car._spawn_arc)
-		if minimum_progress < 3500.0 or worst_stall > FIXED_FPS * 3:
+			minimum_progress = minf(minimum_progress, (car._arc - car._spawn_arc) * car.travel_direction)
+		if minimum_progress < 2400.0 or worst_stall > FIXED_FPS * 3:
 			_fail("World traffic stalled in %s: min_progress=%.1f worst_stall=%d" % [theme, minimum_progress, worst_stall])
 			return false
 		print("STRIP_TRAFFIC_WORLD %s seed=42 30s min_progress=%.1f worst_stall_ticks=%d" % [theme, minimum_progress, worst_stall])

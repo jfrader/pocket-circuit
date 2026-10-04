@@ -7,15 +7,24 @@ const TYPES := ["compact", "coupe", "muscle"]
 const PIXEL_SCALE := 2
 const SPRITE_SCALE := 0.5
 const TRUCK_STRETCH := Vector2(1.12, 1.35)
+const HEADLIGHT_SIZE := Vector2(5.0, 3.0)
+const ROOF_MARKER_SIZE := Vector2(4.0, 2.0)
+const ROOF_MARKER_COLOR := Color("f4c65a")
+const STEER_POSE_COUNT := 5
+const MOTION_POSE_COUNT := SPRITES.WHEEL_FRAME_COUNT * STEER_POSE_COUNT
+
+static var motion_image_generations := 0
+static var motion_image_generation_usec := 0
 
 var body_size := Vector2.ZERO
 var _payload: Dictionary
 var _sprite: Sprite2D
 var _travel := 0.0
 var _frames := {}
+var _warmup_texture: Texture2D
 
 
-func configure(vehicle_id: String, seed_value: int, truck: bool) -> void:
+func configure(vehicle_id: String, seed_value: int, truck: bool, oncoming: bool = false) -> void:
 	var seed := (vehicle_id + ":" + str(seed_value)).hash() & 0x7fffffff
 	var type: String = "muscle" if truck else TYPES[seed % TYPES.size()]
 	_payload = GENERATOR.generate(seed, type, {"palette_id": PALETTES[seed % PALETTES.size()], "livery": "solid", "spoiler": "none", "bumpers": "utility"})
@@ -30,16 +39,67 @@ func configure(vehicle_id: String, seed_value: int, truck: bool) -> void:
 	animate(0.0, 0.0, 0.0)
 	if truck:
 		_build_cargo_box(stretch)
+	if oncoming:
+		for side in [-1.0, 1.0]:
+			var position := Vector2(body_size.x * side * 0.30, -body_size.y * 0.46)
+			_add_panel("OncomingLampLeft" if side < 0 else "OncomingLampRight", Rect2(position - HEADLIGHT_SIZE * 0.5, HEADLIGHT_SIZE), Color(_payload["palette"]["headlight"]))
+			if truck:
+				var roof := Vector2(body_size.x * side * 0.30, -body_size.y * 0.17)
+				_add_panel("RoofMarkerLeft" if side < 0 else "RoofMarkerRight", Rect2(roof - ROOF_MARKER_SIZE * 0.5, ROOF_MARKER_SIZE), ROOF_MARKER_COLOR)
 
 
 func animate(speed: float, steering: float, delta: float) -> void:
 	_travel += speed * delta
 	var spin := SPRITES.wheel_frame_index(1.0, _travel)
 	var steer := SPRITES.steer_pose_index(steering)
-	var key := spin * 5 + steer
+	var key := spin * STEER_POSE_COUNT + steer
 	if not _frames.has(key):
+		var started := Time.get_ticks_usec()
 		_frames[key] = ImageTexture.create_from_image(SPRITES.car_pose_image(_payload, spin, steer, PIXEL_SCALE))
+		motion_image_generations += 1
+		motion_image_generation_usec += Time.get_ticks_usec() - started
 	_sprite.texture = _frames[key]
+
+
+func motion_preparation_plan() -> Dictionary:
+	var poses: Array[int] = []
+	for pose in MOTION_POSE_COUNT:
+		if not _frames.has(pose):
+			poses.append(pose)
+	return {"payload": _payload.duplicate(true), "poses": poses}
+
+
+static func render_motion_plan(plan: Dictionary) -> Dictionary:
+	var started := Time.get_ticks_usec()
+	var images: Array[Image] = []
+	for pose: int in plan["poses"]:
+		images.append(SPRITES.car_pose_image(plan["payload"], pose / STEER_POSE_COUNT, pose % STEER_POSE_COUNT, PIXEL_SCALE))
+	return {"poses": plan["poses"], "images": images, "usec": Time.get_ticks_usec() - started}
+
+
+func install_motion_images(rendered: Dictionary) -> bool:
+	if rendered.is_empty() or rendered["poses"].size() != rendered["images"].size():
+		return false
+	for index in rendered["poses"].size():
+		if rendered["images"][index] == null:
+			return false
+		_frames[rendered["poses"][index]] = ImageTexture.create_from_image(rendered["images"][index])
+	motion_image_generations += rendered["poses"].size()
+	motion_image_generation_usec += int(rendered["usec"])
+	return _frames.size() == MOTION_POSE_COUNT
+
+
+func show_warmup_pose(pose: int) -> void:
+	# Loading-only presentation: leave rolling distance and steering untouched.
+	if _warmup_texture == null:
+		_warmup_texture = _sprite.texture
+	_sprite.texture = _frames[pose]
+
+
+func restore_warmup_pose() -> void:
+	if _warmup_texture != null:
+		_sprite.texture = _warmup_texture
+		_warmup_texture = null
 
 
 func _build_cargo_box(stretch: Vector2) -> void:
