@@ -51,6 +51,22 @@ func _run_test() -> void:
 	if not _expect((TRACK_BUILDER.cached_prepared(key).get("spec", {}) as Dictionary).has("half_widths") or not TRACK_BUILDER.cached_prepared(key).is_empty(), "the cached circuit must be the real prepared layout"):
 		return
 
+	# The prewarm continuation also warms the packed room and the scenery outlines.
+	var room_deadline := Time.get_ticks_msec() + 60000
+	while Time.get_ticks_msec() < room_deadline and TRACK_BUILDER.cached_room(key) == null:
+		await process_frame
+	if not _expect(TRACK_BUILDER.cached_room(key) != null, "a completed prewarm must also pack the room"):
+		return
+
+	var spec: Dictionary = TRACK_BUILDER.cached_prepared(key).get("spec", {})
+	for texture_path: String in TRACK_BUILDER.preparation_texture_paths(spec):
+		if not ResourceLoader.exists(texture_path):
+			continue
+		var texture := load(texture_path) as Texture2D
+		var ready_for_race := TRACK_BUILDER.has_prepared_outline_path(texture_path) or (texture != null and TRACK_BUILDER.has_prepared_outline(texture))
+		if not _expect(ready_for_race, "a completed prewarm must prepare the outline for %s" % texture_path):
+			return
+
 	TRACK_BUILDER.clear_generated_cache()
 	print("PREWARM_GENERATED_CIRCUIT_TEST PASS")
 	quit(0)
