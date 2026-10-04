@@ -7,6 +7,7 @@ class_name TrackBuilderCore
 const CHECKPOINT_SCRIPT := preload("res://scripts/race/checkpoint.gd")
 const VISUAL_ROLE_CONTRACT := preload("res://scripts/race/generated_world_visual_role.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
 const PROP_SCALE := preload("res://scripts/race/world_prop_scale.gd")
 const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
@@ -1345,3 +1346,60 @@ static func clear_generated_cache() -> void:
 ## Exposed for tests (and diagnostics). Returns the number of cached circuits.
 static func generated_cache_size() -> int:
 	return _generated_prepared_order.size()
+
+## Shared cache key logic for generated circuits. Matches the behaviour previously
+## private in prototype_race so that preview/results screens can pre-warm the
+## exact key the race path will look up.
+static func generated_circuit_cache_key(event: Dictionary) -> String:
+	if event.is_empty():
+		return ""
+	# Prefer the circuit identity fingerprint when the event carries one.
+	# This guarantees distinct keys for distinct circuits and for option
+	# changes (road_width, length_tier, material/palette, sub_seeds, etc).
+	var fp := String(event.get("circuit_fingerprint", ""))
+	if not fp.is_empty():
+		return "cfp|" + fp
+	var ident: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
+	if ident is Dictionary:
+		fp = String((ident as Dictionary).get("fingerprint", ""))
+		if not fp.is_empty():
+			return "gid|" + fp
+	fp = String(event.get("preview_fingerprint", ""))
+	if not fp.is_empty():
+		return "pfp|" + fp
+	# Fallback: deterministic serialization of (theme, room, seed, sorted options).
+	# Keeps retries of manually-started generated races fast even without
+	# a full identity record in the event.
+	var theme := String(event.get("theme", "kitchen"))
+	var room := String(event.get("room", "classic"))
+	var seed := int(event.get("seed", 0))
+	var options: Dictionary = generated_circuit_options(event)
+	var parts := PackedStringArray(["pc-gen-circuit-cache-v1", theme, room, str(seed)])
+	var opt_keys: Array = options.keys()
+	opt_keys.sort()
+	for k: Variant in opt_keys:
+		parts.append(str(k) + "=" + str(options[k]))
+	return "|".join(parts)
+
+
+## Replicates the option assembly that prototype_race used when building the
+## cache key or calling prepare_layout, so pre-warm and race use identical inputs.
+static func generated_circuit_options(event: Dictionary) -> Dictionary:
+	var options := {
+		"act": int(event.get("act", 0)),
+		"obstacles_enabled": bool(event.get("obstacles_enabled", true)),
+		"length_tier": StringName(event.get("length_tier", &"standard")),
+	}
+	if int(options["act"]) <= 0:
+		options.erase("act")
+	if event.has("road_width"):
+		options["road_width"] = event["road_width"]
+	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
+	if identity is Dictionary:
+		var identity_record := identity as Dictionary
+		var generated_options := GENERATED_CIRCUITS.generation_options(identity_record)
+		if generated_options.is_empty():
+			options["sub_seeds"] = (identity_record.get("sub_seeds", {}) as Dictionary).duplicate(true)
+		else:
+			options.merge(generated_options, true)
+	return options
