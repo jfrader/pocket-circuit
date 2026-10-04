@@ -39,6 +39,11 @@ const FOLLOWING_DISTANCE := 70.0
 const FOLLOWING_TIME := 0.5
 const OVERTAKE_STRAIGHT_RADIUS := 1050.0
 const PURSUIT_CLOSING_DISTANCE := 340.0
+const PURSUIT_FOLLOW_DISTANCE := 110.0
+const PURSUIT_FOLLOW_TIME := 1.2
+const PURSUIT_PACE_FRACTION := 0.93
+const PURSUIT_START_GRACE := 3.0
+const PURSUIT_START_PACE := 0.93
 const DRAFT_MIN_DISTANCE := 54.0
 const DRAFT_MAX_DISTANCE := 185.0
 const DRAFT_LATERAL_WIDTH := 34.0
@@ -187,6 +192,7 @@ var difficulty: String = "club_circuit"
 var personality_id := "baseline"
 var pursuit_target: Node2D = null
 var _open_route := false
+var _pursuit_returning := false
 var personality: Dictionary = DEFAULT_PERSONALITY.duplicate()
 var recovery_count := 0
 var recovery_reasons: Dictionary = {}
@@ -314,6 +320,7 @@ func configure(
 	lane_offset = preferred_lane_offset
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
 	self.pursuit_target = pursuit_target
+	_pursuit_returning = false
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
 	var assist := tuning["assist"] as Dictionary
@@ -582,8 +589,14 @@ func _physics_process(delta: float) -> void:
 
 	var forward := Vector2.UP.rotated(vehicle.rotation)
 	_update_room_cut(expected_index, forward)
+	var is_pursuit_return := _is_pursuit_active() and _pursuit_returning
 	var heading_to_checkpoint := absf(forward.angle_to(vehicle.global_position.direction_to(checkpoint_position)))
-	var watchdog := _update_route_watchdog(delta, expected_index, heading_to_checkpoint > TURN_AROUND_HEADING)
+	var turn_around := heading_to_checkpoint > TURN_AROUND_HEADING and not is_pursuit_return
+	var watchdog := _update_route_watchdog(delta, expected_index, turn_around)
+	if is_pursuit_return:
+		_stuck_time = 0.0
+		_no_progress_time = 0.0
+		_wrong_way_progress_time = 0.0
 	if _recovering:
 		return
 	if _update_spin_recovery(delta):
@@ -608,6 +621,20 @@ func _physics_process(delta: float) -> void:
 		line_radius = 0.0
 	var traffic_plan := _traffic_plan(delta, forward, target_position, line_radius)
 	target_position = traffic_plan["target_position"] as Vector2
+	if _is_pursuit_active():
+		var pinfo := _pursuit_distance_and_ahead(forward)
+		var pahead := float(pinfo["ahead"])
+		if pahead < 0:
+			_pursuit_returning = true
+		else:
+			_pursuit_returning = false
+	is_pursuit_return = _is_pursuit_active() and _pursuit_returning
+	if is_pursuit_return and _is_pursuit_active():
+		var pinfo := _pursuit_distance_and_ahead(forward)
+		var pahead := float(pinfo["ahead"])
+		if pahead < -100:
+			# drive back along the route (approx opposite forward to return to target without prediction or off-path ambush)
+			target_position = vehicle.global_position - forward * 800.0
 	var goal_chord := vehicle.global_position.distance_to(target_position)
 	var desired_direction := vehicle.global_position.direction_to(target_position)
 	var surface_plan := _surface_anticipation(desired_direction)
@@ -724,10 +751,21 @@ func _physics_process(delta: float) -> void:
 		target_speed = minf(target_speed, float(traffic_plan["speed_limit"]))
 	else:
 		target_speed *= float(traffic_plan["speed_scale"])
+	if _is_pursuit_active() and not is_pursuit_return and race_manager.race_time < PURSUIT_START_GRACE:
+		target_speed *= PURSUIT_START_PACE
+	if is_pursuit_return and _is_pursuit_active():
+		var pinfo := _pursuit_distance_and_ahead(forward)
+		var pa := float(pinfo["ahead"])
+		var ch_lead := -pa
+		if ch_lead > 250:
+			target_speed = minf(target_speed, 250.0)
+		elif ch_lead > 0:
+			target_speed = minf(target_speed, 150.0)
 	var heading_error := absf(steering_angle)
 	if heading_error > 1.05:
 		target_speed = minf(target_speed, effective_max_speed * float(tuning["heading_cap"]))
-	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
+	var wrong_way := race_manager.is_racer_wrong_way(vehicle) and not is_pursuit_return
+	if heading_error > 1.45 or wrong_way:
 		target_speed = minf(target_speed, effective_max_speed * float(tuning["wrong_way_cap"]))
 	if heading_error > TURN_AROUND_HEADING:
 		# A near-180 heading change cannot be made at pace without a wide arc;
@@ -757,14 +795,16 @@ func _physics_process(delta: float) -> void:
 		# gated by proximity to a checkpoint.
 		if (
 			heading_error > 1.45
-			or race_manager.is_racer_wrong_way(vehicle)
+			or (race_manager.is_racer_wrong_way(vehicle) and not is_pursuit_return)
 			or float(obstacle_plan["speed_scale"]) < 0.95
 			or float(surface_plan["speed_scale"]) < 0.95
 		):
 			should_brake = vehicle.speed > target_speed
 	var throttle := 0.0 if should_brake else 1.0
-	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
+	if heading_error > 1.45 or (race_manager.is_racer_wrong_way(vehicle) and not is_pursuit_return):
 		throttle = 0.42 if not should_brake else 0.0
+	if is_pursuit_return and not should_brake:
+		throttle = 1.0
 	var brake := clampf(
 		(vehicle.speed - target_speed) / float(tuning["brake_response"]),
 		0.0,
@@ -1213,6 +1253,22 @@ func _traffic_plan(
 		else:
 			leader_vel = leader.get("linear_velocity") if "linear_velocity" in leader else Vector2.ZERO
 			leader_speed = leader_vel.length()
+	# In pursuit, always consider the pursuit_target for speed/closing logic (even if beyond normal overtake reach or traffic in between) so chaser closes by overtaking traffic to reach player.
+	if _is_pursuit_active():
+		var pinfo := _pursuit_distance_and_ahead(forward)
+		var pdist := float(pinfo["distance"])
+		var pahead := float(pinfo["ahead"])
+		if pahead > 28.0 and pdist < 2000.0 and (leader == null or pdist < float(leader_info.get("distance", INF))):
+			leader = pinfo.get("vehicle") as Node2D
+			if leader:
+				if leader is VehicleController:
+					var vc2 := leader as VehicleController
+					leader_speed = vc2.speed
+					leader_vel = vc2.linear_velocity
+				else:
+					leader_vel = Vector2.ZERO
+					leader_speed = 0.0
+			leader_info = {"vehicle": leader, "distance": pdist, "lateral_distance": float(pinfo.get("lateral", 0.0))}
 	var is_straight := line_radius <= 0.0 or line_radius >= OVERTAKE_STRAIGHT_RADIUS
 	if in_pursuit_follow and leader == pursuit_vehicle:
 		# suppress lateral overtake offset while following pursuit target inside closing range
@@ -1275,7 +1331,12 @@ func _traffic_plan(
 		plan["speed_limit"] = INF
 	else:
 		plan["speed_scale"] = 0.84
-		plan["speed_limit"] = maxf(0.0, leader_vel.dot(forward)) + maxf(0.0, distance - FOLLOWING_DISTANCE) / FOLLOWING_TIME
+		var fdist := FOLLOWING_DISTANCE
+		var ftime := FOLLOWING_TIME
+		if in_pursuit_follow and leader == pursuit_vehicle:
+			fdist = PURSUIT_FOLLOW_DISTANCE
+			ftime = PURSUIT_FOLLOW_TIME
+		plan["speed_limit"] = maxf(0.0, leader_vel.dot(forward)) + maxf(0.0, distance - fdist) / ftime
 	return plan
 
 

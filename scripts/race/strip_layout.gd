@@ -14,8 +14,11 @@ const MIN_GATE_COUNT := 4
 const MAX_GATE_COUNT := 64
 const TRAFFIC_MIN_ARC := 460.0
 const TRAFFIC_FINISH_CLEARANCE := 340.0
-const TRAFFIC_SPACING := 1750.0
-const MAX_TRAFFIC := 12
+const TRAFFIC_SPACING := 1450.0
+const MAX_TRAFFIC := 30
+const TRAFFIC_FIRST_PACK := 420.0
+const TRAFFIC_PACK_SEPARATION := 170.0
+const SPECIAL_PACK_INTERVAL := 4
 const MIN_TIME_LIMIT := 75.0
 const CLEAN_SPEED_ESTIMATE := 600.0
 const TIME_LIMIT_FACTOR := 1.8
@@ -121,10 +124,19 @@ static func _traffic(seed: int, total: float) -> Array[Dictionary]:
 	if available <= 0.0:
 		return result
 	var count := clampi(floori(available / TRAFFIC_SPACING), 2, MAX_TRAFFIC)
-	var behaviors := [&"cruiser", &"cutter", &"line"]
-	var behavior_offset := rng.randi_range(0, behaviors.size() - 1)
-	for index in count:
-		result.append({"arc": TRAFFIC_MIN_ARC + available * (index + 1.0) / (count + 1.0), "lane": rng.randf_range(-0.45, 0.45), "speed": rng.randf_range(210.0, 225.0), "behavior": behaviors[(index + behavior_offset) % behaviors.size()], "vehicle_id": vehicle_ids[rng.randi_range(0, vehicle_ids.size() - 1)]})
+	var pack_sizes: Array[int] = []
+	var remaining := count
+	while remaining > 0:
+		var pack_size := 1 if pack_sizes.size() % SPECIAL_PACK_INTERVAL == SPECIAL_PACK_INTERVAL - 1 else mini(remaining, 2 + int(pack_sizes.size() % 3 == 2))
+		pack_sizes.append(pack_size)
+		remaining -= pack_size
+	var special_behaviors := [&"cutter", &"swerve", &"truck"]
+	var special_offset := rng.randi_range(0, special_behaviors.size() - 1)
+	for pack_index in pack_sizes.size():
+		var pack_arc := TRAFFIC_MIN_ARC + TRAFFIC_FIRST_PACK + (available - TRAFFIC_FIRST_PACK - TRAFFIC_FINISH_CLEARANCE) * float(pack_index) / pack_sizes.size()
+		var side := -1.0 if rng.randi() % 2 == 0 else 1.0
+		for member in pack_sizes[pack_index]:
+			result.append({"arc": pack_arc + member * TRAFFIC_PACK_SEPARATION, "lane": side * rng.randf_range(0.18, 0.4), "speed": rng.randf_range(210.0, 225.0), "behavior": special_behaviors[(pack_index / SPECIAL_PACK_INTERVAL + special_offset) % special_behaviors.size()] if pack_sizes[pack_index] == 1 else &"cruiser", "vehicle_id": vehicle_ids[rng.randi_range(0, vehicle_ids.size() - 1)]})
 	return result
 
 

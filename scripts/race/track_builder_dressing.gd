@@ -827,7 +827,8 @@ static func build_room_ground_sections(
 		centerline: PackedVector2Array,
 		outer_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
-		stage: Callable = Callable()
+		stage: Callable = Callable(),
+		target_override: int = -1
 ) -> int:
 	var definitions: Array = spec.get("ground_sections", [])
 	if definitions.is_empty():
@@ -839,7 +840,7 @@ static func build_room_ground_sections(
 	var rng := RandomNumberGenerator.new()
 	rng.seed = TrackBuilderCore._mix_seed(int(spec.get("material_seed", spec["requested_seed"])), "ground_sections:%s" % String(story["id"]))
 	var room_area := absf(TrackBuilderCore._polygon_area(room_polygon))
-	var target_count := mini(clampi(int(round(room_area / 750000.0)), 2, 4), definitions.size())
+	var target_count := target_override if target_override >= 0 else mini(clampi(int(round(room_area / 750000.0)), 2, 4), definitions.size())
 	sections.set_meta("requested_count", target_count)
 	var bounds := polygon_bounds_rect(room_polygon)
 	var placements: Array[Dictionary] = []
@@ -915,7 +916,8 @@ static func build_room_floor_details(
 		centerline: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		occupied: Array[Dictionary],
-		rng: RandomNumberGenerator
+		rng: RandomNumberGenerator,
+		target_override: int = -1
 ) -> int:
 	var decals: Array = spec.get("decals", [])
 	if decals.is_empty():
@@ -924,7 +926,7 @@ static func build_room_floor_details(
 	details.name = "FloorDetails"
 	parent.add_child(details)
 	var bounds := polygon_bounds_rect(room_polygon)
-	var target_count := clampi(int(round(absf(TrackBuilderCore._polygon_area(room_polygon)) / 90000.0)), 18, 30)
+	var target_count := target_override if target_override >= 0 else clampi(int(round(absf(TrackBuilderCore._polygon_area(room_polygon)) / 90000.0)), 18, 30)
 	var positions := PackedVector2Array()
 	for attempt in 820:
 		var candidate := Vector2(
