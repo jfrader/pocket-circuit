@@ -1,7 +1,7 @@
 class_name TrackBuilderScene
 ## Assembles the visible track from a prepared layout. Helpers stay on TrackBuilderCore.
 
-const STRIP_WALL_STEP := 4
+const STRIP_WALL_STEP := 8
 const STRIP_DRESSING := preload("res://scripts/race/strip_dressing.gd")
 
 

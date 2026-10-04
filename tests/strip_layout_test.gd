@@ -44,7 +44,7 @@ func _initialize() -> void:
 		_fail("Strip grid must face north from the south cap")
 		return
 	for traffic: Dictionary in first["traffic_plan"]:
-		if absf(float(traffic["lane"])) > 0.5 or float(traffic["arc"]) >= float(gates[-1]["arc"]) or not traffic["behavior"] in [&"cruiser", &"cutter", &"line"]:
+		if absf(float(traffic["lane"])) > 0.5 or float(traffic["arc"]) >= float(gates[-1]["arc"]) or not traffic["behavior"] in [&"cruiser", &"cutter", &"line", &"swerve", &"truck"]:
 			_fail("Unsafe traffic plan")
 			return
 	if (first["traffic_plan"] as Array).size() < 2 or (first["traffic_plan"] as Array).size() > LAYOUT.MAX_TRAFFIC:
@@ -127,14 +127,20 @@ func _initialize() -> void:
 				return
 			var behaviors := {}
 			var previous_arc := 0.0
+			var cruisers := 0
+			var packed_pairs := 0
 			for car: Dictionary in traffic_plan:
 				behaviors[car["behavior"]] = true
-				if float(car["speed"]) < 210.0 or float(car["speed"]) > 225.0 or absf(float(car["lane"])) > 0.45 or float(car["arc"]) - previous_arc < 500.0:
-					_fail("Traffic speed or lane leaves the drivable gap")
+				if car["behavior"] == &"cruiser":
+					cruisers += 1
+				if float(car["arc"]) - previous_arc <= LAYOUT.TRAFFIC_PACK_SEPARATION + 0.1:
+					packed_pairs += 1
+				if float(car["speed"]) < 210.0 or float(car["speed"]) > 225.0 or absf(float(car["lane"])) > 0.45 or float(car["arc"]) - previous_arc < LAYOUT.TRAFFIC_PACK_SEPARATION - 0.1 or float(car["arc"]) - previous_arc > length / 10.0 or float(car["arc"]) >= length - LAYOUT.TRAFFIC_FINISH_CLEARANCE:
+					_fail("Traffic speed, spacing or lane on %s: arc=%.1f gap=%.1f" % [tier, float(car["arc"]), float(car["arc"]) - previous_arc])
 					return
 				previous_arc = float(car["arc"])
-			if behaviors.size() != 3:
-				_fail("Traffic needs cruiser, cutter and line cars")
+			if previous_arc < length * 0.82 or cruisers < traffic_plan.size() / 2 or packed_pairs < traffic_plan.size() / 3 or not behaviors.has(&"cutter") or not behaviors.has(&"swerve") or not behaviors.has(&"truck"):
+				_fail("Traffic must fill the runner with cruiser packs and lone cutter, swerve, truck")
 				return
 		lengths.append("%s %.0f/%.0f/%.0f limit=%.0fs" % [tier, minimum, sum / 3.0, maximum, ceilf(sum / 3.0 / LAYOUT.CLEAN_SPEED_ESTIMATE * LAYOUT.TIME_LIMIT_FACTOR)])
 	print("STRIP_LAYOUT_TEST PASS gates=%d traffic=%d tier min/avg/max (wu): %s" % [gates.size(), (first["traffic_plan"] as Array).size(), "; ".join(lengths)])

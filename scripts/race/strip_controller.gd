@@ -9,6 +9,9 @@ const ARC_RADIUS := 43.0
 const ARC_WIDTH := 8.0
 const SCENERY_COLLISION_MASK := 2 | 4 | 16
 const RECOVERY_GHOST_SECONDS := 1.5
+## A failed launch should cost time, not the run: capture cannot resolve in the
+## first moments after GO.
+const LAUNCH_GRACE_SECONDS := 2.5
 
 var manager: RaceManager
 var player: VehicleController
@@ -58,7 +61,7 @@ func _sample_capture(delta: float) -> void:
 	if _last_tick == tick:
 		return
 	_last_tick = tick
-	var suspended := manager.race_time < _ghost_until or player.freeze or chaser.freeze
+	var suspended := manager.race_time < LAUNCH_GRACE_SECONDS or manager.race_time < _ghost_until or player.freeze or chaser.freeze
 	var same_section := manager.get_expected_checkpoint(player) == manager.get_expected_checkpoint(chaser)
 	var clear_sight := false
 	if not suspended and same_section and player.global_position.distance_to(chaser.global_position) <= CAPTURE.CAPTURE_RANGE:
