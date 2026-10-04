@@ -45,7 +45,7 @@ func sample(arc: float) -> Dictionary:
 	return {
 		"pos": _points[low].lerp(_points[low + 1], fraction),
 		"dir": direction,
-		"perp": direction.orthogonal(),
+		"perp": direction.rotated(PI * 0.5),
 	}
 
 

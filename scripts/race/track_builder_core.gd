@@ -626,8 +626,8 @@ static func _add_polygon(parent: Node, node_name: String, points: PackedVector2A
 	TRACK_BUILDER_NODES.add_polygon(parent, node_name, points, color, z)
 
 
-static func _add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2) -> void:
-	TRACK_BUILDER_NODES.add_finish_checker(parent, finish, tangent)
+static func _add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2, half_width: float = HALF_WIDTH) -> void:
+	TRACK_BUILDER_NODES.add_finish_checker(parent, finish, tangent, half_width)
 
 
 static func _add_wall_segment(parent: Node, node_name: String, position: Vector2, length: float, rotation: float, edge_texture_path: String) -> void:

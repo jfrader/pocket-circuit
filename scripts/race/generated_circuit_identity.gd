@@ -3,6 +3,7 @@ extends RefCounted
 
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const WORLD_MATERIALS := preload("res://scripts/race/generated_world_materials.gd")
+const STRIP_THEMES := preload("res://scripts/race/strip_themes.gd")
 const SCHEMA_VERSION := 1
 const GENERATOR_VERSION := 11
 const MAX_SEED := 0x7FFFFFFF
@@ -40,7 +41,8 @@ static func create(
 		explicit_palette_id: String = "",
 		sub_seed_overrides: Dictionary = {},
 		length_tier: String = "standard",
-		route_shape: String = "circuit"
+		route_shape: String = "circuit",
+		theme_b: StringName = &""
 ) -> Dictionary:
 	var theme_text := String(theme)
 	var room_text := String(room)
@@ -62,7 +64,7 @@ static func create(
 			seeds[domain] = sub_seed_overrides[domain]
 	if int(seeds.get("route", -1)) != route_seed:
 		return {}
-	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds, length_tier, route_shape)
+	return _canonical_identity(theme_text, room_text, reverse, level, explicit_material_id, explicit_palette_id, seeds, length_tier, route_shape, String(theme_b))
 
 
 static func from_championship_event(event: Dictionary, championship_identity: Dictionary) -> Dictionary:
@@ -110,7 +112,8 @@ static func normalize(value: Variant) -> Dictionary:
 		String(raw.get("palette_id", "")),
 		seeds as Dictionary,
 		String(length_tier),
-		String(raw.get("route_shape", "circuit"))
+		String(raw.get("route_shape", "circuit")),
+		String(raw.get("theme_b", ""))
 	)
 	if canonical.is_empty():
 		return {}
@@ -124,7 +127,7 @@ static func apply_to_event(identity_value: Variant, vehicle_opponents: Array = [
 	if identity.is_empty():
 		return {}
 	var seeds: Dictionary = identity["sub_seeds"]
-	return {
+	var event := {
 		"id": "discovery_%s" % String(identity["fingerprint"]),
 		"name": String(identity["display_name"]),
 		"circuit_display_name": String(identity["display_name"]),
@@ -145,6 +148,9 @@ static func apply_to_event(identity_value: Variant, vehicle_opponents: Array = [
 		"circuit_identity": identity.duplicate(true),
 		"generated_circuit_identity": identity.duplicate(true),
 	}
+	if String(identity["route_shape"]) == "strip":
+		event["theme_b"] = identity["theme_b"]
+	return event
 
 
 static func display_name(identity_value: Variant) -> String:
@@ -285,13 +291,16 @@ static func generation_options(identity_value: Variant) -> Dictionary:
 	if String(identity["route_shape"]) == "strip":
 		options["route_shape"] = "strip"
 		options["reverse"] = bool(identity["reverse"])
+		options["theme_b"] = identity["theme_b"]
 	return options
 
 
-static func _canonical_identity(theme: String, room: String, reverse: bool, danger_level: int, material_id: String, palette_id: String, seeds_value: Dictionary, length_tier: String = "standard", route_shape: String = "circuit") -> Dictionary:
+static func _canonical_identity(theme: String, room: String, reverse: bool, danger_level: int, material_id: String, palette_id: String, seeds_value: Dictionary, length_tier: String = "standard", route_shape: String = "circuit", theme_b: String = "") -> Dictionary:
 	if not theme in THEMES or not room in ROOMS or danger_level < 1 or danger_level > 3:
 		return {}
 	if not route_shape in ["circuit", "strip"]:
+		return {}
+	if route_shape == "strip" and reverse:
 		return {}
 	if not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
 		return {}
@@ -333,6 +342,11 @@ static func _canonical_identity(theme: String, room: String, reverse: bool, dang
 		"sub_seeds": seeds,
 		"fingerprints": fingerprints,
 	}
+	if route_shape == "strip":
+		var second := STRIP_THEMES.second_theme(StringName(theme), theme_b)
+		if second == &"":
+			return {}
+		identity["theme_b"] = String(second)
 	fingerprints["circuit"] = _circuit_fingerprint(identity, false)
 	identity["fingerprint"] = _circuit_fingerprint(identity, true)
 	identity["display_name"] = _build_display_name(identity)
@@ -359,10 +373,13 @@ static func _build_summary(identity: Dictionary) -> String:
 	var danger: Dictionary = identity["danger_profile"]
 	var obstacle_count := int(danger["obstacle_count"])
 	var obstacle_text := "no obstacles" if obstacle_count == 0 else "up to %d obstacle%s" % [obstacle_count, "" if obstacle_count == 1 else "s"]
+	var theme_label := String(identity["theme"]).capitalize()
+	if String(identity["route_shape"]) == "strip":
+		theme_label += " → " + String(identity["theme_b"]).capitalize()
 	return "Seed %d · Route %s · %s · %s room / %s · Material %s / palette %s · %s · %s" % [
 		int(seeds["route"]),
 		String(identity["fingerprints"]["route"]).substr(0, 8).to_upper(),
-		String(identity["theme"]).capitalize(),
+		theme_label,
 		String(identity["room"]).capitalize(),
 		String(identity["story_id"]).replace("_", " ").capitalize(),
 		material,
@@ -390,6 +407,7 @@ static func _circuit_fingerprint(identity: Dictionary, include_direction: bool) 
 		parts.append("reverse=%s" % str(identity["reverse"]))
 	if String(identity["route_shape"]) == "strip":
 		parts.append("route_shape=strip")
+		parts.append("theme_b=" + String(identity["theme_b"]))
 	var seeds: Dictionary = identity["sub_seeds"]
 	for domain: String in DOMAINS:
 		parts.append("%s=%d" % [domain, int(seeds[domain])])

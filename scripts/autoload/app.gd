@@ -661,10 +661,10 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 	return _start_generated_identity_race(identity, vehicle_id, "quick")
 
 
-func start_strip_race(theme: StringName, room: StringName, seed: int, vehicle_id: String, reverse: bool = false, length_tier: String = "standard") -> bool:
+func start_strip_race(theme: StringName, room: StringName, seed: int, vehicle_id: String, reverse: bool = false, length_tier: String = "standard", theme_b: StringName = &"") -> bool:
 	if _transitioning_to_race or not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
 		return false
-	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier, "strip")
+	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier, "strip", theme_b)
 	if identity.is_empty():
 		return false
 	return _start_generated_identity_race(identity, vehicle_id, "strip")

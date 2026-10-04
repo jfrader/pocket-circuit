@@ -7,6 +7,9 @@ const AI_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const TRAFFIC_SCRIPT := preload("res://scripts/race/strip/strip_traffic.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const SAMPLE_FRAMES := 1200
+const FIXED_FPS := 60
+const ROAD := preload("res://scripts/race/strip/strip_road_rules.gd")
+const CLEAN_SPEED := 690.0
 
 
 func _initialize() -> void:
@@ -34,7 +37,7 @@ func _run() -> void:
 	var player_arc := minf(float(prepared["strip_length"]) - 500.0, 9000.0)
 	var player := VEHICLE_SCENE.instantiate() as VehicleController
 	get_root().add_child(player)
-	player.place_on_grid(LAYOUT.sample_at_arc(prepared["centerline"], arcs, player_arc))
+	player.place_on_grid(_northbound_pose(prepared, arcs, player_arc))
 	player.freeze = true
 	player.collision_layer = 0
 	player.collision_mask = 0
@@ -53,6 +56,24 @@ func _run() -> void:
 	var traffic := TRAFFIC_SCRIPT.new() as StripTraffic
 	track.add_child(traffic)
 	traffic.configure(prepared["centerline"], float(prepared["strip_half_width"]), prepared["traffic_plan"], manager)
+	var oncoming := RigidBody2D.new()
+	oncoming.freeze = true
+	oncoming.position = chaser.position + Vector2.UP * 240.0
+	oncoming.set_meta("strip_direction", -1)
+	root.add_child(oncoming)
+	oncoming.add_to_group(&"track_traffic")
+	ai.set("_tree_cache_dirty", true)
+	var leader: Dictionary = ai.call("_nearest_vehicle_ahead", Vector2.UP)
+	if leader.get("vehicle") == oncoming:
+		push_error("Oncoming car was selected as a following leader")
+		quit(1)
+		return
+	var avoidance := {"target_position": chaser.position + Vector2.UP * 300.0, "passing": false, "drafting": false, "speed_limit": INF}
+	if not ai.call("_avoid_oncoming", Vector2.UP, avoidance["target_position"], avoidance) or avoidance["drafting"] or not avoidance["passing"] or not is_finite(float(avoidance["speed_limit"])):
+		push_error("Chaser did not evade/brake for an oncoming obstacle")
+		quit(1)
+		return
+	oncoming.free()
 	manager.prepare_race()
 	manager.start_race()
 	var start := chaser.global_position
@@ -90,9 +111,13 @@ func _run() -> void:
 		return
 
 	# === clean full-speed player for ~20s: chaser should not sustain close ===
-	player.freeze = false
+	manager.stop_race()
+	player.place_on_grid(prepared["strip_grid"]["player"])
+	player.freeze = true
 	chaser.place_on_grid(prepared["strip_grid"]["chaser"])
-	ai.set("_reference_nearest_index", -1)
+	ai.configure(chaser, manager, 0.0, "club_circuit", "juniper", {}, player)
+	manager.prepare_race()
+	manager.start_race()
 	ai.recovery_count = 0
 	ai.recovery_reasons.clear()
 	var clean_min := 9999.0
@@ -100,9 +125,10 @@ func _run() -> void:
 	var consec := 0
 	for frame in 1200:
 		await physics_frame
-		# simulate clean full speed drive (no input, direct vel for test harness)
-		var pforward := Vector2.UP.rotated(player.rotation)
-		player.linear_velocity = pforward * 210.0
+		# Deterministic clean driver follows the actual northbound lane, not an
+		# infinite tangent that leaves a real bend. The production chaser drives normally.
+		player.global_transform = _northbound_pose(prepared, arcs, LAYOUT.GRID_ARC + CLEAN_SPEED * float(frame + 1) / FIXED_FPS)
+		player.linear_velocity = Vector2.UP.rotated(player.rotation) * CLEAN_SPEED
 		var dd := chaser.global_position.distance_to(player.global_position)
 		if dd < clean_min:
 			clean_min = dd
@@ -123,23 +149,26 @@ func _run() -> void:
 		return
 
 	# === player lifts after ~8s: chaser catches ===
+	manager.stop_race()
 	chaser.place_on_grid(prepared["strip_grid"]["chaser"])
-	ai.set("_reference_nearest_index", -1)
+	ai.configure(chaser, manager, 0.0, "club_circuit", "juniper", {}, player)
 	ai.recovery_count = 0
 	ai.recovery_reasons.clear()
 	# reset player to a catchable position ahead (mid strip)
-	var lift_player_arc := minf(float(prepared["strip_length"]) - 2500.0, 6500.0)
-	player.place_on_grid(LAYOUT.sample_at_arc(prepared["centerline"], arcs, lift_player_arc))
-	player.linear_velocity = Vector2.UP.rotated(player.rotation) * 210.0
+	var lift_player_arc := LAYOUT.GRID_ARC
+	player.place_on_grid(_northbound_pose(prepared, arcs, lift_player_arc))
+	manager.prepare_race()
+	manager.start_race()
 	var lift_min := 9999.0
 	var caught := false
 	for frame in 1200:
 		await physics_frame
-		var pforward := Vector2.UP.rotated(player.rotation)
 		if frame < 480:  # ~8s full speed
-			player.linear_velocity = pforward * 210.0
+			lift_player_arc += CLEAN_SPEED / FIXED_FPS
 		else:
-			player.linear_velocity = pforward * 20.0  # lift / slow
+			lift_player_arc += 20.0 / FIXED_FPS
+		player.global_transform = _northbound_pose(prepared, arcs, lift_player_arc)
+		player.linear_velocity = Vector2.UP.rotated(player.rotation) * (CLEAN_SPEED if frame < 480 else 20.0)
 		var dd := chaser.global_position.distance_to(player.global_position)
 		if dd < lift_min:
 			lift_min = dd
@@ -147,9 +176,15 @@ func _run() -> void:
 			caught = true
 	print("STRIP_CHASER lift after 8s: min_dist=%.1f caught=%s (target true)" % [lift_min, caught])
 	if lift_min > 90.0:
-		push_error("STRIP_CHASER lift: never caught after lift (min=%.1f)" % lift_min)
+		push_error("STRIP_CHASER lift: never caught after lift (min=%.1f final_gap=%.1f player=%s chaser=%s speed=%.1f recoveries=%d)" % [lift_min, player.position.distance_to(chaser.position), player.position, chaser.position, chaser.linear_velocity.length(), ai.recovery_count])
 		quit(1)
 		return
 
 	print("STRIP_CHASER_TEST PASS all cases")
 	quit(0)
+
+
+func _northbound_pose(prepared: Dictionary, arcs: PackedFloat32Array, arc: float) -> Transform2D:
+	var pose := LAYOUT.sample_at_arc(prepared["centerline"], arcs, arc)
+	pose.origin += Vector2.RIGHT.rotated(pose.get_rotation()) * ROAD.LANE_WIDTH * 0.5
+	return pose

@@ -3,9 +3,11 @@ extends Node
 
 const TRAFFIC_CAR := preload("res://scripts/race/strip/traffic_car.gd")
 const ROUTE_SAMPLER := preload("res://scripts/race/strip/strip_route_sampler.gd")
+const ROAD := preload("res://scripts/race/strip/strip_road_rules.gd")
+const VISUALS := preload("res://scripts/race/strip/traffic_visuals.gd")
 
 var _sampler := ROUTE_SAMPLER.new()
-var _half_width := 80.0
+var _half_width := ROAD.HALF_WIDTH
 var _plan: Array = []
 var _manager: RaceManager
 var _cars: Array = []
@@ -51,6 +53,30 @@ func _set_active(active: bool) -> void:
 			car.start()
 		else:
 			car.stop()
+
+
+func prepare_visuals(preparation: Node, progress: Callable, cancelled: Callable) -> bool:
+	for car: TrafficCar in _cars:
+		if cancelled.call():
+			return false
+		var plan: Dictionary = car._visual.motion_preparation_plan()
+		if plan["poses"].is_empty():
+			continue
+		await progress.call()
+		var rendered: Dictionary = await preparation.run_data_job(VISUALS.render_motion_plan.bind(plan))
+		if not car._visual.install_motion_images(rendered):
+			return false
+	return true
+
+
+func show_warmup_pose(pose: int) -> void:
+	for car: TrafficCar in _cars:
+		car._visual.show_warmup_pose(pose)
+
+
+func restore_warmup_pose() -> void:
+	for car: TrafficCar in _cars:
+		car._visual.restore_warmup_pose()
 
 
 func _on_race_started() -> void:

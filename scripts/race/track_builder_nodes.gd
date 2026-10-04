@@ -11,12 +11,12 @@ static func add_polygon(parent: Node, node_name: String, points: PackedVector2Ar
 	parent.add_child(polygon)
 
 
-static func add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2) -> void:
+static func add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2, half_width: float = TrackBuilderCore.HALF_WIDTH) -> void:
 	var along := tangent.normalized()
 	var across := along.rotated(PI * 0.5)
 	var columns := 6
 	var rows := 2
-	var cell_width := TrackBuilderCore.HALF_WIDTH * 2.0 / float(columns)
+	var cell_width := half_width * 2.0 / float(columns)
 	var cell_depth := 36.0
 	var color_counts := {&"White": 0, &"Black": 0}
 	for row in rows:
@@ -47,7 +47,7 @@ static func add_finish_checker(parent: Node2D, finish: Vector2, tangent: Vector2
 	for color_key: StringName in color_counts:
 		var first := parent.get_node("StartFinish%s" % String(color_key))
 		first.set_meta("checker_cell_count", int(color_counts[color_key]))
-		first.set_meta("corridor_span", TrackBuilderCore.HALF_WIDTH * 2.0)
+		first.set_meta("corridor_span", half_width * 2.0)
 		first.set_meta("bidirectional", true)
 
 
@@ -172,6 +172,7 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 		var post := StaticBody2D.new()
 		post.name = "Gate%02d%s" % [gate_index, "Right" if side > 0 else "Left"]
 		var post_offset := TrackBuilderCore.FINISH_LANDMARK_OFFSET if gate_index == 0 else TrackBuilderCore.GATE_POST_OFFSET
+		post_offset += float(spec.get("half_width", TrackBuilderCore.HALF_WIDTH)) - TrackBuilderCore.HALF_WIDTH
 		post.position = sample + normal * post_offset * float(side)
 		post.rotation = tangent.angle()
 		post.collision_layer = 16
