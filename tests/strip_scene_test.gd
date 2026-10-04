@@ -8,6 +8,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
+	await process_frame
 	var started := Time.get_ticks_msec()
 	var prepared := BUILDER.prepare_layout(&"kitchen", &"classic", 42, {"route_shape": "strip"})
 	if prepared.is_empty():
@@ -20,6 +21,8 @@ func _run() -> void:
 	var assembled_ms := Time.get_ticks_msec() - started - prepared_ms
 	var line := root.get_node_or_null("RacingLine") as Line2D
 	var road := root.get_node_or_null("TrackSurface") as Line2D
+	if not _check_runner(root, road):
+		return
 	var start_cap := root.get_node_or_null("StartCap") as StaticBody2D
 	var finish_cap := root.get_node_or_null("FinishCap") as StaticBody2D
 	var caps := start_cap != null and finish_cap != null and start_cap.get_children().any(func(child: Node) -> bool: return child is CollisionShape2D) and finish_cap.get_children().any(func(child: Node) -> bool: return child is CollisionShape2D)
@@ -76,6 +79,8 @@ func _run() -> void:
 			_fail("Strip room could not be packed for " + String(theme))
 			return
 		var room := scene.instantiate()
+		if not _check_runner(room, room.get_node("TrackSurface") as Line2D):
+			return
 		var themed_moments := room.get_node_or_null("GeneratedMoments")
 		if themed_moments == null or room.get_node_or_null("PermanentObstacles") == null or (room.get_meta("generated_surfaces", []) as Array).is_empty():
 			room.free()
@@ -108,3 +113,38 @@ func _run() -> void:
 func _fail(message: String) -> void:
 	push_error(message)
 	quit(1)
+
+
+func _check_runner(track: Node, road: Line2D) -> bool:
+	var runner := track.get_node_or_null("WovenRunner") as Line2D
+	var left := track.get_node_or_null("RunnerBindingLeft") as Line2D
+	var right := track.get_node_or_null("RunnerBindingRight") as Line2D
+	if runner == null or left == null or right == null or left.width > 6.0 or right.width > 6.0 or left.default_color == right.default_color:
+		_fail("Runner needs thin independently seeded fabric bindings")
+		return false
+	if runner.width != road.width + 20.0 or runner.closed or left.closed or right.closed:
+		_fail("Runner selvedge must follow the open painted road")
+		return false
+	if runner.get_meta("material_profile", "") != "strip_woven_runner" or road.get_meta("substrate_profile", "") != runner.get_meta("material_profile") or runner.material == null or road.material == null:
+		_fail("Road paint and runner must share their woven substrate")
+		return false
+	if (runner.material as ShaderMaterial).get_shader_parameter("pattern") != 4 or (road.material as ShaderMaterial).get_shader_parameter("pattern") != 4:
+		_fail("Runner weave was lost when applying the paint shader")
+		return false
+	for name in ["PrintedCenterDashes", "RunnerStitchLeft", "RunnerStitchRight", "PrintedGridPlayer", "PrintedGridChaser"]:
+		if track.get_node_or_null(name) == null:
+			_fail("Missing runner marking " + name)
+			return false
+	if not track.find_children("*Boundary*", "StaticBody2D", false, false).is_empty():
+		_fail("Flat binding must not conceal a continuous wall")
+		return false
+	for name in ["StartCap", "FinishCap"]:
+		var cap := track.get_node(name) as StaticBody2D
+		var visual := cap.get_node("FoldedFabric") as Polygon2D
+		var collision := cap.get_child(0) as CollisionShape2D
+		var shape := collision.shape as RectangleShape2D
+		var bounds := BUILDER._polygon_bounds_rect(visual.polygon)
+		if shape.size.y != 8.0 or bounds.size != shape.size or bounds.get_center() != collision.position:
+			_fail("Raised fabric hem collision must exactly match its visible footprint")
+			return false
+	return true

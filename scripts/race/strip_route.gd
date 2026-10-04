@@ -3,17 +3,21 @@ extends RefCounted
 const SAMPLER := preload("res://scripts/race/track_curve_sampling.gd")
 const HALF_WIDTH := 125.0
 const CLEARANCE := HALF_WIDTH + 65.0
-const MIN_RADIUS := 95.0
-const START_STRAIGHT := 310.0
+const MIN_RADIUS := 350.0
+const START_STRAIGHT := 1000.0
 const MIN_ENDPOINT_DISTANCE := 500.0
 const ATTEMPTS := 12
 const POINT_SPACING := 30.0
 const END_INSET := CLEARANCE + 25.0
 const MAX_HEADING := PI * 0.25
 const HEADING_TOLERANCE := 0.002
-const MAX_SLOPE := 0.7
-const WAVE_VARIATIONS := 3
-const WAVE_LENGTH := 6000.0
+const FINISH_STRAIGHT := 1200.0
+const SWEEP_RAMP := 750.0
+const CHICANE_RAMP := 650.0
+const CHICANE_HOLD := 350.0
+const SWEEP_HEADING := Vector2(28.0, 42.0)
+const STRAIGHT_LENGTH := Vector2(1600.0, 2800.0)
+const LATERAL_USE := 0.30
 
 
 static func generate(seed: int, room_polygon: PackedVector2Array, force_fallback: bool = false) -> Dictionary:
@@ -29,13 +33,11 @@ static func generate(seed: int, room_polygon: PackedVector2Array, force_fallback
 		for attempt in ATTEMPTS:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = (seed * 1103515245 + attempt * 2654435761) & 0x7FFFFFFFFFFFFFFF
-			var waves := maxi(1, floori(height / WAVE_LENGTH)) + rng.randi_range(0, WAVE_VARIATIONS - 1)
-			var center_x := bounds.get_center().x + rng.randf_range(-0.10, 0.10) * bounds.size.x
-			var amplitude := minf(bounds.size.x * 0.12, (height - START_STRAIGHT) * MAX_SLOPE / (TAU * waves + PI * 2.0))
-			amplitude *= rng.randf_range(0.55, 0.9)
-			var line := _north_line(center_x, amplitude, waves, south, north)
+			var candidate := _section_route(bounds, south, north, rng)
+			var line: PackedVector2Array = candidate["centerline"]
 			if validate(line, room_polygon):
-				return {"controls": line.duplicate(), "centerline": line, "fallback": false, "attempt": attempt}
+				candidate.merge({"controls": line.duplicate(), "fallback": false, "attempt": attempt})
+				return candidate
 	# The longest clearance-valid north lane; no loop or reversal on fallback.
 	var best := PackedVector2Array()
 	for row in [-0.35, -0.2, 0.0, 0.2, 0.35]:
@@ -45,19 +47,66 @@ static func generate(seed: int, room_polygon: PackedVector2Array, force_fallback
 	if best.size() != 2:
 		return {}
 	var centerline := SAMPLER.sample_open(best, POINT_SPACING)
-	return {"controls": best, "centerline": centerline, "fallback": true, "attempt": ATTEMPTS} if validate(centerline, room_polygon) else {}
+	return {"controls": best, "centerline": centerline, "sections": [], "fallback": true, "attempt": ATTEMPTS} if validate(centerline, room_polygon) else {}
 
 
-static func _north_line(center_x: float, amplitude: float, waves: int, south: float, north: float) -> PackedVector2Array:
-	var height := south - north
-	var count := maxi(2, ceili(height / POINT_SPACING))
-	var line := PackedVector2Array()
-	for index in count + 1:
-		var distance := height * float(index) / count
-		var u := clampf((distance - START_STRAIGHT) / maxf(height - START_STRAIGHT, 0.001), 0.0, 1.0)
-		var envelope := pow(sin(PI * u), 2.0)
-		line.append(Vector2(center_x + amplitude * sin(TAU * waves * u) * envelope, south - distance))
-	return line
+static func _section_route(bounds: Rect2, south: float, north: float, rng: RandomNumberGenerator) -> Dictionary:
+	var extent := minf(bounds.size.x * LATERAL_USE, bounds.size.x * 0.5 - CLEARANCE - POINT_SPACING)
+	var side := -1.0 if rng.randi() % 2 == 0 else 1.0
+	var line := PackedVector2Array([Vector2(bounds.get_center().x + extent * side, south)])
+	var sections: Array[Dictionary] = []
+	_append_section(line, sections, "start", START_STRAIGHT, 0.0, 0.0)
+	var cycle := 0
+	while line[-1].y - north > FINISH_STRAIGHT:
+		var slope := tan(deg_to_rad(rng.randf_range(SWEEP_HEADING.x, SWEEP_HEADING.y)))
+		var span := extent * 2.0 / slope + SWEEP_RAMP
+		if line[-1].y - north < span + FINISH_STRAIGHT:
+			break
+		_append_section(line, sections, "sweeper", span, -side * slope, SWEEP_RAMP)
+		side = -side
+		cycle += 1
+		# A short in/out pair interrupts the long held bends without ever turning south.
+		var chicane_span := CHICANE_RAMP * 2.0 + CHICANE_HOLD
+		if cycle % 3 == 2 and line[-1].y - north > chicane_span * 2.0 + FINISH_STRAIGHT:
+			var chicane_slope := tan(deg_to_rad(rng.randf_range(25.0, 29.0)))
+			_append_section(line, sections, "chicane", chicane_span, -side * chicane_slope, CHICANE_RAMP)
+			_append_section(line, sections, "chicane", chicane_span, side * chicane_slope, CHICANE_RAMP)
+		var straight := minf(rng.randf_range(STRAIGHT_LENGTH.x, STRAIGHT_LENGTH.y), line[-1].y - north - FINISH_STRAIGHT)
+		if straight > POINT_SPACING:
+			_append_section(line, sections, "straight", straight, 0.0, 0.0)
+	_append_section(line, sections, "finish", line[-1].y - north, 0.0, 0.0)
+	return {"centerline": line, "sections": sections}
+
+
+static func _append_section(line: PackedVector2Array, sections: Array[Dictionary], kind: String, span: float, slope: float, ramp: float) -> void:
+	var origin := line[-1]
+	var first := line.size() - 1
+	var count := maxi(1, ceili(span / POINT_SPACING))
+	var length := 0.0
+	var heading := 0.0
+	for index in range(1, count + 1):
+		var y := span * float(index) / count
+		# Integral of a cosine-eased slope: zero curvature at both joins, constant
+		# heading through the middle. End displacement is exactly slope*(span-ramp).
+		var x := 0.0
+		if ramp > 0.0:
+			if y < ramp:
+				x = _ramp_integral(y, ramp)
+			elif y <= span - ramp:
+				x = y - ramp * 0.5
+			else:
+				x = span - ramp - _ramp_integral(span - y, ramp)
+		var point := origin + Vector2(slope * x, -y)
+		var segment := point - line[-1]
+		length += segment.length()
+		heading = maxf(heading, rad_to_deg(absf(Vector2.UP.angle_to(segment))))
+		line.append(point)
+	var start_arc := 0.0 if sections.is_empty() else float(sections[-1]["end_arc"])
+	sections.append({"kind": kind, "first_index": first, "last_index": line.size() - 1, "start_arc": start_arc, "end_arc": start_arc + length, "length": length, "heading_degrees": heading * signf(slope), "max_heading_degrees": heading, "hold_length": maxf(0.0, span - ramp * 2.0) * sqrt(1.0 + slope * slope) if ramp > 0.0 else length})
+
+
+static func _ramp_integral(distance: float, ramp: float) -> float:
+	return distance * 0.5 - ramp * sin(PI * distance / ramp) / (2.0 * PI)
 
 
 static func _safe_line(bounds: Rect2, polygon: PackedVector2Array, row: float) -> PackedVector2Array:
