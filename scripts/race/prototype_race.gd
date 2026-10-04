@@ -264,6 +264,9 @@ func _prepare_race_async() -> void:
 		if not used_cached_room:
 			await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step)
 			if not key.is_empty():
+				# PackedScene only captures owned descendants; without this the
+				# cached room instantiates empty and every race re-assembles.
+				TRACK_BUILDER.mark_packed_scene_owners(track_root)
 				var pscene := PackedScene.new()
 				if pscene.pack(track_root) == OK:
 					TRACK_BUILDER.store_room(key, pscene)
