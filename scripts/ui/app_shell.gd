@@ -107,6 +107,8 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 			if int(event["act"]) == _map_act_number and CATALOG.is_event_unlocked(String(event["id"]), progress):
 				focus_id = String(event["id"])
 				break
+	if not focus_id.is_empty():
+		_app.call("prewarm_championship_event", focus_id)
 	var stops: Array[Dictionary] = []
 	var seen_acts: Dictionary = {}
 	for event: Dictionary in CATALOG.EVENTS:
@@ -155,6 +157,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_configure_stage(&"map", _quick_race_vehicle_id, "rae", String(_quick_race_theme))
 	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
+	_app.call("prewarm_generated_circuit", GENERATED_CIRCUITS.apply_to_event(quick_identity))
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
 	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
 	_content.add_child(_quick_identity_heading)
