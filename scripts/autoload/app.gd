@@ -641,16 +641,21 @@ func prewarm_championship_event(event_id: String) -> void:
 
 ## The field is only known once the player commits, so warm its looks now: the
 ## renders overlap the loading screen and land as cache hits in section 2.
-func _prewarm_roster_motions(vehicle_id: String, mode: String) -> void:
+## Mirrors PrototypeRace._build_field_racers_for_preparation so the keys (and
+## any cosmetic collision shifts) match exactly.
+func _prewarm_roster_motions(vehicle_id: String, event: Dictionary) -> void:
 	if not is_instance_valid(_race_asset_preloader) or not _race_asset_preloader.has_method("prewarm_roster"):
 		return
-	var roster := _quick_roster if mode == "quick" else _championship_roster()
-	var looks: Array = [IDENTITIES.resolve_visual_key(vehicle_id, CATALOG.player_driver_id())]
-	for o: Variant in roster.get("opponents", []):
-		if o is Dictionary:
-			var record := o as Dictionary
-			var vid := String(record.get("vehicle_id", vehicle_id))
-			looks.append(IDENTITIES.resolve_visual_key(vid, String(record.get("id", ""))))
+	var racers: Array[Dictionary] = [{"vehicle_id": vehicle_id, "driver_id": "rae", "slot": 0}]
+	var opponents: Array = event.get("opponents", [])
+	var count := clampi(int(event.get("opponent_count", opponents.size())), 0, 3)
+	for i in mini(opponents.size(), count):
+		var did := String(opponents[i])
+		var record := CATALOG.get_driver(did)
+		racers.append({"vehicle_id": String(record.get("vehicle_id", "rustbug")), "driver_id": did, "slot": i + 1})
+	var looks: Array = []
+	for k: Variant in IDENTITIES.resolve_field_visual_keys(racers).values():
+		looks.append(String(k))
 	_race_asset_preloader.call("prewarm_roster", looks)
 
 
@@ -697,6 +702,7 @@ func _warm_room_if_missing(key: String, prepared: Dictionary) -> void:
 		_prewarm_room_root = null
 		return
 	if is_inside_tree():
+		TRACK_BUILDER.mark_packed_scene_owners(root)
 		var pscene := PackedScene.new()
 		if pscene.pack(root) == OK:
 			TRACK_BUILDER.store_room(key, pscene)
@@ -850,7 +856,7 @@ func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: Stri
 			_save_data = candidate
 	if not preview_fingerprint.is_empty():
 		event["preview_fingerprint"] = preview_fingerprint
-	_prewarm_roster_motions(vehicle_id, mode)
+	_prewarm_roster_motions(vehicle_id, event)
 	current_race_session = {
 		"mode": mode,
 		"event_id": event["id"],
