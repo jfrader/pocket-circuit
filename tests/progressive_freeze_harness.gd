@@ -50,7 +50,7 @@ func _run_test() -> void:
 	var last: Dictionary = _race_results[_race_results.size() - 1]["after"]
 	if not _expect(int(last["avatar_payloads"]) <= IDENTITIES.MAX_AVATAR_ENTRIES and int(last["avatar_textures"]) <= IDENTITIES.MAX_AVATAR_ENTRIES, "avatar caches must stay bounded across %d races, saw payloads=%d textures=%d (cap %d)" % [NUM_RACES, int(last["avatar_payloads"]), int(last["avatar_textures"]), IDENTITIES.MAX_AVATAR_ENTRIES]):
 		return
-	if not _expect(int(last["car_payloads"]) <= IDENTITIES.MAX_CAR_ENTRIES and int(last["car_textures"]) <= IDENTITIES.MAX_CAR_ENTRIES, "car caches must stay bounded across %d races, saw payloads=%d textures=%d (cap %d)" % [NUM_RACES, int(last["car_payloads"]), int(last["car_textures"]), IDENTITIES.MAX_CAR_ENTRIES]):
+	if not _expect(int(last["car_payloads"]) <= IDENTITIES.MAX_CAR_ENTRIES and int(last["car_textures"]) <= IDENTITIES.MAX_CAR_ENTRIES and int(last["car_spins"]) <= IDENTITIES.MAX_CAR_ENTRIES and int(last["visual_resolutions"]) <= IDENTITIES.MAX_CAR_ENTRIES, "car caches must stay bounded across %d races, saw payloads=%d textures=%d spins=%d resolutions=%d (cap %d)" % [NUM_RACES, int(last["car_payloads"]), int(last["car_textures"]), int(last["car_spins"]), int(last["visual_resolutions"]), IDENTITIES.MAX_CAR_ENTRIES]):
 		return
 	# Nodes and orphans must not drift either: the growth above was pure cache state.
 	var nodes := int(last["node_count"])
