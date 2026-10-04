@@ -2,16 +2,10 @@ class_name RaceAssetPreloader
 extends Node
 ## Menu-time background warm-up for the per-session race assets.
 ##
-## The first race after boot pays for two big, deterministic per-session costs
-## on its loading screen: the alpha outlines behind every collision footprint
-## (`TrackBuilderCollision.compute_alpha_outline`) and the procedural wheel-spin
-## motion sprites (`ProceduralCarSprites`). Both are already cached per process
-## (TrackBuilderCore's static outline cache and ProceduralIdentityLibrary's
-## static motion cache) — that cache is why a second race in the same session
-## starts warm. This node runs the same work during the menu so the *first*
-## race starts warm, reusing those exact caches instead of building a parallel
-## one. It also compiles the race scene's scripts on a worker so the loading
-## screen no longer pays first-load GDScript compilation.
+## Prewarms scenery outlines + the pool of vehicle visual keys (plain + rae-liveried
+## variants via possible_field_visual_keys) so that any rolled quick-race or championship
+## roster's motion sprites are already installed before prototype_race section 2.
+## The first race after boot pays for two big... (rest unchanged).
 
 signal completed
 
@@ -38,7 +32,7 @@ func start(app: Node) -> void:
 		return
 	_active = true
 	_texture_paths = _collect_texture_paths()
-	_vehicle_ids = CATALOG.vehicle_ids()
+	_vehicle_ids = IDENTITIES.possible_field_visual_keys()
 	call_deferred("_run")
 
 
@@ -51,6 +45,8 @@ func debug_metrics() -> Dictionary:
 		"active": _active,
 		"finished": _finished,
 		"textures_remaining": maxi(0, _texture_paths.size() - _texture_index),
+		"visual_keys_remaining": maxi(0, _vehicle_ids.size() - _vehicle_index),
+		# "vehicles_remaining" kept for back-compat with any external prints
 		"vehicles_remaining": maxi(0, _vehicle_ids.size() - _vehicle_index),
 	}
 
@@ -145,14 +141,90 @@ func _precompute_outlines() -> void:
 
 
 func _precompute_vehicles() -> void:
+	await _precompute_motions_for(_vehicle_ids, true)
+
+
+## Called from App.prewarm_championship_event (and potentially other hooks) to
+## ensure the exact roster + selected vehicle looks are motion-warmed even if
+## the full-pool precompute has not finished or for emphasis on known set.
+## Idempotent: plan_for_key returns no jobs for already-installed keys.
+## Work only proceeds while menu is visible; one key at a time on data worker.
+func prewarm_additional(keys: Array) -> void:
+	if keys.is_empty():
+		return
+	call_deferred("_warm_additional_deferred", keys)
+
+
+func _warm_additional_deferred(raw_keys: Array) -> void:
+	if not is_inside_tree():
+		return
+	var keys: Array[String] = []
+	for k in raw_keys:
+		var sk := String(k)
+		if not sk.is_empty() and not keys.has(sk):
+			keys.append(sk)
+	if keys.is_empty():
+		return
+	if not await _wait_until_menu():
+		return
+	await _precompute_motions_for(keys, false)
+
+
+## Race-start warm-up: the rolled roster is only known when the player commits,
+## so its missing looks are rendered immediately on a dedicated worker while the
+## loading screen runs. Not menu-gated; the race path still renders anything the
+## pass does not reach, and both installs are idempotent.
+var _roster_worker: Node
+var _roster_keys: Array[String] = []
+
+
+func prewarm_roster(keys: Array) -> void:
+	if keys.is_empty():
+		return
+	for raw_key: Variant in keys:
+		var visual_key := String(raw_key)
+		if not visual_key.is_empty() and not _roster_keys.has(visual_key):
+			_roster_keys.append(visual_key)
+	if _roster_worker == null and is_inside_tree():
+		_run_roster_pass()
+
+
+func _run_roster_pass() -> void:
+	_roster_worker = RACE_PREPARATION.new()
+	_roster_worker.name = "RaceRosterMotionWorker"
+	add_child(_roster_worker)
+	while not _roster_keys.is_empty():
+		var visual_key: String = _roster_keys.pop_front()
+		var plan := IDENTITIES.motion_preparation_plan_for_key(visual_key)
+		if (plan["jobs"] as Array).is_empty():
+			continue
+		var rendered: Dictionary = await _roster_worker.run_data_job(IDENTITIES.render_motion_plan.bind(plan))
+		if rendered.is_empty():
+			continue
+		var jobs: Array = rendered["jobs"]
+		var images: Array = rendered["images"]
+		for index in jobs.size():
+			IDENTITIES.install_motion_image_for_key(visual_key, jobs[index], images[index])
+	if _roster_worker != null:
+		_roster_worker.queue_free()
+	_roster_worker = null
+
+
+## Shared implementation. count_toward_index only for the boot full-pool pass.
+## One pass at a time: the boot pool already covers every field look, so a
+## concurrent emphasis request is skipped rather than racing the same worker.
+func _precompute_motions_for(keys: Array[String], count_toward_index: bool = true) -> void:
+	if _worker != null:
+		return
 	_worker = RACE_PREPARATION.new()
 	_worker.name = "RaceAssetMotionWorker"
 	add_child(_worker)
-	for vehicle_id: String in _vehicle_ids:
+	for visual_key: String in keys:
 		if not await _wait_until_menu():
-			return
-		_vehicle_index += 1
-		var plan := IDENTITIES.motion_preparation_plan(vehicle_id)
+			break
+		if count_toward_index:
+			_vehicle_index += 1
+		var plan := IDENTITIES.motion_preparation_plan_for_key(visual_key)
 		if (plan["jobs"] as Array).is_empty():
 			continue
 		var rendered: Dictionary = await _worker.run_data_job(IDENTITIES.render_motion_plan.bind(plan))
@@ -161,6 +233,6 @@ func _precompute_vehicles() -> void:
 		var jobs: Array = rendered["jobs"]
 		var images: Array = rendered["images"]
 		for index in jobs.size():
-			IDENTITIES.install_motion_image(vehicle_id, jobs[index], images[index])
+			IDENTITIES.install_motion_image_for_key(visual_key, jobs[index], images[index])
 	_worker.queue_free()
 	_worker = null
