@@ -6,7 +6,6 @@ const VEHICLE_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
 const AI_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const TRAFFIC_SCRIPT := preload("res://scripts/race/strip/strip_traffic.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
-const TRACK_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const SAMPLE_FRAMES := 600
 
 
@@ -15,10 +14,7 @@ func _initialize() -> void:
 
 
 func _run() -> void:
-	var test_room: PackedVector2Array = TRACK_CATALOG.ROOM_SHAPES[&"classic"].duplicate()
-	for index in test_room.size():
-		test_room[index].y *= 4.0
-	var prepared := LAYOUT.prepare(&"kitchen", &"classic", 42, {"route_shape": "strip"}, TRACK_CATALOG.LAYOUTS[&"kitchen"], test_room, TRACK_CATALOG.ROOM_COMPOSITIONS[&"kitchen"])
+	var prepared := BUILDER.prepare_layout(&"kitchen", &"classic", 42, {"route_shape": "strip"})
 	var manager := RaceManager.new()
 	manager.add_to_group("race_manager")
 	get_root().add_child(manager)

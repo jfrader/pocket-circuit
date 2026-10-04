@@ -2,13 +2,14 @@ extends SceneTree
 
 const ROUTE := preload("res://scripts/race/strip_route.gd")
 const CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
+const LAYOUT := preload("res://scripts/race/strip_layout.gd")
 const MAX_HEADING_DEGREES := 45.2
 
 
 func _initialize() -> void:
 	var summaries: Array[String] = []
 	for room: String in ["classic", "wide", "tall", "el", "long", "square"]:
-		var polygon: PackedVector2Array = CATALOG.ROOM_SHAPES[StringName(room)]
+		var polygon := LAYOUT.runner_room(CATALOG.ROOM_SHAPES[StringName(room)], "standard")
 		var generated_count := 0
 		var minimum := INF
 		var maximum := 0.0
@@ -52,6 +53,21 @@ func _initialize() -> void:
 			_fail("No shaped candidates in " + room)
 			return
 		summaries.append("%s %.0f/%.0f/%.0f max_heading=%.1f° shaped=%d/20" % [room, minimum, sum / 20.0, maximum, worst_heading, generated_count])
+	for tier in LAYOUT.RUNNER_HEIGHT:
+		var polygon := LAYOUT.runner_room(CATALOG.ROOM_SHAPES[&"classic"], tier)
+		var sum := 0.0
+		var minimum := INF
+		var maximum := 0.0
+		for seed in 3:
+			var route := ROUTE.generate(seed, polygon)
+			if route.is_empty() or not ROUTE.validate(route["centerline"], polygon):
+				_fail("Invalid north strip at %s seed %d" % [tier, seed])
+				return
+			var length := _length(route["centerline"])
+			minimum = minf(minimum, length)
+			maximum = maxf(maximum, length)
+			sum += length
+		summaries.append("%s %.0f/%.0f/%.0f" % [tier, minimum, sum / 3.0, maximum])
 	print("STRIP_ROUTE_TEST PASS min/avg/max: " + "; ".join(summaries))
 	quit(0)
 

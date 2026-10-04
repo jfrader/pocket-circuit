@@ -470,14 +470,14 @@ func _setup_strip() -> bool:
 	_strip_controller = STRIP_CONTROLLER.new() as Node2D
 	_strip_controller.name = "StripController"
 	add_child(_strip_controller)
-	_strip_controller.configure(race_manager, _player_vehicle, chaser)
+	_strip_controller.configure(race_manager, _player_vehicle, chaser, float(_strip_prepared["strip_time_limit"]))
 	_strip_controller.outcome_resolved.connect(_on_strip_outcome)
 	race_manager.configure_strip_route(1, int(gates[-1]["index"]), Callable(_strip_controller, "may_finish"))
 	_setup_strip_traffic()
 	var marker := STRIP_MARKER.new() as Control
 	marker.name = "StripDestination"
 	$HUD.add_child(marker)
-	marker.configure(gates[-1]["position"], camera, race_manager)
+	marker.configure(gates[-1]["position"], camera, race_manager, float(_strip_prepared["strip_time_limit"]))
 	return true
 
 

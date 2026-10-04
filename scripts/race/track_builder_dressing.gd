@@ -1104,6 +1104,36 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 	root.set_meta("generated_surfaces", definitions)
 
 
+static func build_open_generated_surfaces(root: Node2D, parent: Node2D, story: Dictionary, spec: Dictionary, centerline: PackedVector2Array, gate_samples: PackedVector2Array, spacing: float) -> void:
+	var surfaces: Array = story.get("surfaces", [])
+	var definitions: Array[Dictionary] = []
+	if surfaces.is_empty() or centerline.size() < TECHNICAL_HALF_SPAN * 2 + 2:
+		return
+	var total := open_path_length(centerline)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = TrackBuilderCore._mix_seed(int(spec["material_seed"]), "strip_surfaces")
+	var count := maxi(2, floori(total / spacing))
+	for slot in count:
+		var fraction := (slot + 1.0) / (count + 1.0)
+		var index := clampi(roundi(fraction * centerline.size()), TECHNICAL_HALF_SPAN + 1, centerline.size() - TECHNICAL_HALF_SPAN - 2)
+		if not TrackBuilderCore._clear_of_points(centerline[index], gate_samples, SURFACE_GATE_CLEARANCE):
+			index = mini(index + TECHNICAL_HALF_SPAN * 2, centerline.size() - TECHNICAL_HALF_SPAN - 2)
+		if not TrackBuilderCore._clear_of_points(centerline[index], gate_samples, SURFACE_GATE_CLEARANCE):
+			continue
+		var data: Dictionary = surfaces[(slot + rng.randi_range(0, surfaces.size() - 1)) % surfaces.size()]
+		var half_width := rng.randf_range(GRIP_PATCH_MIN_HALF_WIDTH, GRIP_PATCH_MAX_HALF_WIDTH)
+		var lateral := (-1.0 if slot % 2 == 0 else 1.0) * rng.randf_range(12.0, TrackBuilderCore.HALF_WIDTH - half_width - GRIP_PATCH_EDGE_MARGIN)
+		var polygon := surface_strip(offset_centerline(centerline, lateral), index, TECHNICAL_HALF_SPAN, half_width)
+		var node := Node2D.new()
+		node.name = "OpenGripPatch%d" % slot
+		node.set_meta("polygon", polygon)
+		node.set_meta("moment_kind", &"grip_patch")
+		parent.add_child(node)
+		add_surface_decals(node, centerline, index, TECHNICAL_HALF_SPAN, String(data["decal"]), lateral)
+		definitions.append({"name": StringName(data["name"]), "role": &"patch", "lane": &"mixed", "grip": float(data["grip"]), "speed": float(data["speed"]), "points": polygon, "decal": String(data["decal"]), "centerline_index": index, "lateral_mm": lateral})
+	root.set_meta("generated_surfaces", definitions)
+
+
 ## Every point of the racing line moved sideways, so a strip built from it lies
 ## off-centre like real debris instead of tracing the driving line.
 static func offset_centerline(centerline: PackedVector2Array, lateral: float) -> PackedVector2Array:

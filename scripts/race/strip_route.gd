@@ -12,7 +12,8 @@ const END_INSET := CLEARANCE + 25.0
 const MAX_HEADING := PI * 0.25
 const HEADING_TOLERANCE := 0.002
 const MAX_SLOPE := 0.7
-const MAX_WAVES := 3
+const WAVE_VARIATIONS := 3
+const WAVE_LENGTH := 6000.0
 
 
 static func generate(seed: int, room_polygon: PackedVector2Array, force_fallback: bool = false) -> Dictionary:
@@ -28,7 +29,7 @@ static func generate(seed: int, room_polygon: PackedVector2Array, force_fallback
 		for attempt in ATTEMPTS:
 			var rng := RandomNumberGenerator.new()
 			rng.seed = (seed * 1103515245 + attempt * 2654435761) & 0x7FFFFFFFFFFFFFFF
-			var waves := rng.randi_range(1, MAX_WAVES)
+			var waves := maxi(1, floori(height / WAVE_LENGTH)) + rng.randi_range(0, WAVE_VARIATIONS - 1)
 			var center_x := bounds.get_center().x + rng.randf_range(-0.10, 0.10) * bounds.size.x
 			var amplitude := minf(bounds.size.x * 0.12, (height - START_STRAIGHT) * MAX_SLOPE / (TAU * waves + PI * 2.0))
 			amplitude *= rng.randf_range(0.55, 0.9)

@@ -1,7 +1,8 @@
 class_name TrafficCar
 extends RigidBody2D
 
-const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const CAR_GEN := preload("res://scripts/vendor/procedural_2d/procedural_car_generator.gd")
+const CAR_SPR := preload("res://scripts/vendor/procedural_2d/procedural_car_sprites.gd")
 
 var _sampler: RefCounted
 var _half_width := 80.0
@@ -15,6 +16,8 @@ var _active := false
 var _cut_done := false
 var _cut_arc := 0.0
 var _osc_t := 0.0
+var _swerve_phase := 0.0
+var _is_truck := false
 
 func configure(arc: float, lane: float, speed: float, behavior: StringName, vehicle_id: String, sampler: RefCounted, half_width: float) -> void:
 	_sampler = sampler
@@ -22,15 +25,24 @@ func configure(arc: float, lane: float, speed: float, behavior: StringName, vehi
 	_arc = arc
 	_base_lane = lane
 	_lane = lane
-	_behavior = behavior
+	_behavior = behavior if behavior in [&"cruiser", &"cutter", &"line", &"swerve", &"truck"] else &"cruiser"
 	_vehicle_id = vehicle_id if vehicle_id else "rustbug"
-	# small deterministic speed variation from own arc only
-	var var_seed := int(arc * 17.0) % 5 - 2
-	_speed = speed * (1.0 + float(var_seed) * 0.015)
+	_is_truck = _behavior == &"truck"
+	# deterministic from entry
+	var seed := _stable_seed(_vehicle_id + ":" + str(int(arc)) + ":" + str(int(lane * 100)))
+	# small var + behavior adjust
+	var var_f := 1.0 + float(seed % 5 - 2) * 0.012
+	_speed = speed * var_f
+	if _is_truck:
+		_speed *= 0.55
 	_cut_done = false
 	_osc_t = 0.0
+	_swerve_phase = 0.0
 	if _behavior == &"cutter":
 		_cut_arc = _arc + maxf((_sampler.length() - _arc) * 0.35, 120.0)
+	elif _behavior == &"swerve":
+		# out and back later
+		_swerve_phase = 0.0
 	# spawn at initial
 	var s: Dictionary = _sampler.sample(_arc)
 	global_position = (s.pos as Vector2) + (s.perp as Vector2) * (_lane * _half_width)
@@ -45,23 +57,52 @@ func _setup_body() -> void:
 	collision_mask = 1 | 2
 	gravity_scale = 0.0
 	can_sleep = false
-	mass = 8.0
+	mass = 8.0 if not _is_truck else 18.0
 	linear_damp = 0.8
-	# capsule approx car
+	# size by behavior
+	var r := 15.0
+	var h := 42.0
+	var vscale := 0.48
+	if _is_truck:
+		r = 19.0
+		h = 58.0
+		vscale = 0.62
 	var cap := CapsuleShape2D.new()
-	cap.radius = 15.0
-	cap.height = 42.0
+	cap.radius = r
+	cap.height = h
 	var cs := CollisionShape2D.new()
 	cs.shape = cap
 	add_child(cs)
-	# visual via procedural, dulled for non-racer traffic
+	# visual: procedural civilian car, deterministic from entry, distinct palette/livery from racers
 	var sprite := Sprite2D.new()
-	var tex := IDENTITIES.car_texture(_vehicle_id)
+	var payload := _make_civilian_payload()
+	var tex := CAR_SPR.car_texture(payload, 2)
 	if tex:
 		sprite.texture = tex
-		sprite.scale = Vector2(0.48, 0.48)
-	sprite.modulate = Color(0.52, 0.55, 0.60, 1.0)  # duller, non-racer palette
+		sprite.scale = Vector2(vscale, vscale)
 	add_child(sprite)
+
+func _make_civilian_payload() -> Dictionary:
+	var seed_val := _stable_seed(_vehicle_id + str(int(_arc)) + str(int(_lane*100)))
+	var types := CAR_GEN.available_types()
+	var ctype := types[seed_val % types.size()]
+	# civilian muted palettes + simple livery, distinct from racer flash
+	var pals: Array[String] = ["desert_sage", "midnight_teal", "plum_soda"]
+	var pal: String = pals[seed_val % pals.size()]
+	var opts := {
+		"palette_id": pal,
+		"livery": "solid"
+	}
+	# slight parts civilian
+	if seed_val % 3 == 0:
+		opts["bumpers"] = "utility"
+	return CAR_GEN.generate(seed_val, ctype, opts)
+
+func _stable_seed(text: String) -> int:
+	var h := 2166136261
+	for b in text.to_utf8_buffer():
+		h = ((h ^ int(b)) * 16777619) & 0xffffffff
+	return maxi(1, h)
 
 func start() -> void:
 	_active = true
@@ -92,6 +133,18 @@ func _physics_process(delta: float) -> void:
 		_osc_t += delta * 1.8
 		var osc := sin(_osc_t) * 0.22
 		target_lane = _base_lane + osc
+	elif _behavior == &"swerve":
+		_swerve_phase = fposmod(_swerve_phase + delta * 0.8, 3.0)
+		var p := _swerve_phase / 3.0
+		if p < 0.25:
+			target_lane = _base_lane
+		elif p < 0.75:
+			target_lane = -_base_lane * 0.9
+		else:
+			target_lane = _base_lane
+	elif _is_truck:
+		# slow, heavy, holds lane longer
+		target_lane = _base_lane
 	_lane = target_lane
 	var target_pos: Vector2 = (s["pos"] as Vector2) + (s["perp"] as Vector2) * (_lane * _half_width)
 	var to: Vector2 = target_pos - global_position

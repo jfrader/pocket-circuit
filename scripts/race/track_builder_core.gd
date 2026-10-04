@@ -202,16 +202,9 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 	if not LAYOUTS.has(theme) or not ROOM_SHAPES.has(room_shape):
 		return {}
 	if String(generation_options.get("route_shape", "circuit")) == "strip":
-		var strip_profile := GENERATED_RULES.length_profile(String(generation_options.get("length_tier", "standard")))
-		if strip_profile.is_empty():
+		var strip_room := STRIP_LAYOUT.runner_room(ROOM_SHAPES[room_shape], String(generation_options.get("length_tier", "standard")))
+		if strip_room.is_empty():
 			return {}
-		var strip_room: PackedVector2Array = ROOM_SHAPES[room_shape]
-		var profile_growth := log(float(strip_profile["room_scale"]))
-		if not is_zero_approx(profile_growth):
-			var scale := Vector2(1.0 + profile_growth * STRIP_LAYOUT.WIDTH_SCALE_GAIN, 1.0 + profile_growth * STRIP_LAYOUT.NORTH_SCALE_GAIN)
-			strip_room = strip_room.duplicate()
-			for index in strip_room.size():
-				strip_room[index] *= scale
 		return STRIP_LAYOUT.prepare(theme, room_shape, seed, generation_options, LAYOUTS[theme], strip_room, ROOM_COMPOSITIONS.get(theme, ROOM_COMPOSITIONS[&"kitchen"]))
 	var spec: Dictionary = LAYOUTS[theme]
 	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape] if seed >= 0 else BASE_ROOM_SHAPES[room_shape]
