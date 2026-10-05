@@ -2,6 +2,7 @@ extends SceneTree
 
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const PRESENTER := preload("res://scripts/presentation/track_variant_presenter.gd")
+const DRESSING := preload("res://scripts/race/track_builder_dressing.gd")
 
 const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 const ROOMS: Array[StringName] = [&"classic", &"wide", &"tall", &"square"]
@@ -174,12 +175,13 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 
 	var centerline := (track.get_node("TrackSurface") as Line2D).points
 	var definitions: Variant = track.get_meta("generated_surfaces", null)
-	# Slippery surfaces only go on calm stretches, so a lap may carry fewer
-	# patches, or no technical surface, rather than one in a corner.
-	if not _expect(definitions is Array and (definitions as Array).size() >= 1 and (definitions as Array).size() <= 2 + BUILDER.GRIP_PATCH_MAX_COUNT, "%s should define a shortcut, an optional technical surface and up to %d grip patches" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
+	# Calm patches may underfill; corner water/debris adds up to two more
+	# surfaces on top of the shortcut, the technical moment and the patch budget.
+	if not _expect(definitions is Array and (definitions as Array).size() >= 1 and (definitions as Array).size() <= 4 + BUILDER.GRIP_PATCH_MAX_COUNT, "%s should define a shortcut, an optional technical surface, up to %d grip patches and up to 2 corner debris" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
 		return false
 	var definitions_by_role := {}
 	var patch_definitions: Array[Dictionary] = []
+	var debris_definitions: Array[Dictionary] = []
 	for definition: Dictionary in definitions:
 		var polygon: PackedVector2Array = definition.get("points", PackedVector2Array())
 		if not _expect(polygon.size() >= 3 and absf(_polygon_area(polygon)) > 1.0, "%s generated surface polygon should follow a non-empty track section" % theme):
@@ -187,6 +189,8 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 		definitions_by_role[StringName(definition.get("role", &""))] = definition
 		if StringName(definition.get("role", &"")) == &"patch":
 			patch_definitions.append(definition)
+		elif StringName(definition.get("role", &"")) == &"debris":
+			debris_definitions.append(definition)
 	if not _expect(definitions_by_role.has(&"shortcut"), "%s should expose the shortcut surface role" % theme):
 		return false
 	if not _expect(patch_definitions.size() >= BUILDER.GRIP_PATCH_MIN_COUNT and patch_definitions.size() <= BUILDER.GRIP_PATCH_MAX_COUNT, "%s should expose 0-%d deterministic grip-patch definitions" % [theme, BUILDER.GRIP_PATCH_MAX_COUNT]):
@@ -203,6 +207,19 @@ func _check_generated_track(track: Node2D, theme: StringName, seed: int, seen_st
 			return false
 		for point: Vector2 in patch_polygon:
 			if not _expect(_minimum_point_distance(point, centerline) <= BUILDER.HALF_WIDTH, "%s grip patches should remain inside the drivable corridor" % theme):
+				return false
+	for debris_definition: Dictionary in debris_definitions:
+		var debris_index := int(debris_definition.get("centerline_index", -1))
+		var debris_polygon: PackedVector2Array = debris_definition.get("points", PackedVector2Array())
+		if not _expect(debris_index >= 0 and _minimum_point_distance(centerline[debris_index], gate_positions) >= 155.0, "%s corner water/debris should stay clear of start, finish, and checkpoint gates" % theme):
+			return false
+		if not _expect(debris_definition.has("half_width") and debris_definition.has("lateral_mm"), "%s corner water/debris must declare its footprint" % theme):
+			return false
+		var debris_driveable := BUILDER.HALF_WIDTH - (absf(float(debris_definition["lateral_mm"])) + float(debris_definition["half_width"]))
+		if not _expect(debris_driveable >= DRESSING.GRIP_PATCH_EDGE_MARGIN - 0.1, "%s corner water/debris must leave a driveable line (%.1f wide)" % [theme, debris_driveable]):
+			return false
+		for point: Vector2 in debris_polygon:
+			if not _expect(_minimum_point_distance(point, centerline) <= BUILDER.HALF_WIDTH, "%s corner water/debris should remain inside the drivable corridor" % theme):
 				return false
 	var technical_surface := track.get_node_or_null("GeneratedMoments/TechnicalSurfaceMoment")
 	var shortcut := track.get_node_or_null("GeneratedMoments/ShortcutDecision")

@@ -20,7 +20,8 @@ static func prepare(identity_value: Variant) -> Dictionary:
 	)
 	if prepared.is_empty():
 		return {}
-	var points := _preview_points(prepared["centerline"], bool(identity["reverse"]))
+	var strip := String(identity["route_shape"]) == "strip"
+	var points := _preview_points(prepared["centerline"], bool(identity["reverse"]) and not strip, strip)
 	if points.is_empty():
 		return {}
 	var fingerprint := fingerprint_for_prepared(identity, prepared)
@@ -55,7 +56,7 @@ static func fingerprint_for_prepared(identity_value: Variant, prepared: Dictiona
 	return "|".join(parts).sha256_text().substr(0, 16)
 
 
-static func _preview_points(centerline: PackedVector2Array, reverse: bool) -> PackedVector2Array:
+static func _preview_points(centerline: PackedVector2Array, reverse: bool, open_route: bool = false) -> PackedVector2Array:
 	if centerline.is_empty():
 		return PackedVector2Array()
 	var bounds := Rect2(centerline[0], Vector2.ZERO)
@@ -72,4 +73,6 @@ static func _preview_points(centerline: PackedVector2Array, reverse: bool) -> Pa
 	var indices := range(centerline.size() - 1, -1, -4) if reverse else range(0, centerline.size(), 4)
 	for index: int in indices:
 		output.append(centerline[index] * scale + offset)
+	if open_route and (output.is_empty() or output[-1] != centerline[0 if reverse else centerline.size() - 1] * scale + offset):
+		output.append(centerline[0 if reverse else centerline.size() - 1] * scale + offset)
 	return output

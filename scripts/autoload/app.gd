@@ -68,7 +68,8 @@ func _install_roster_for(mode: String) -> void:
 
 
 func _install_active_roster() -> void:
-	_install_roster_for(String(current_race_session.get("mode", "")))
+	var mode := String(current_race_session.get("mode", ""))
+	_install_roster_for("quick" if mode == "strip" else mode)
 
 
 ## Points the event at its roster slots and names the rival in the story. Slots
@@ -349,6 +350,10 @@ func open_quick_race() -> void:
 	_shell.call("show_quick_race")
 
 
+func open_quick_strip() -> void:
+	_shell.call("show_quick_strip")
+
+
 func open_discovery() -> void:
 	_shell.call("show_discovery")
 
@@ -563,8 +568,8 @@ func _random_seed(maximum: int) -> int:
 	return random.randi_range(0, maximum)
 
 
-func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard") -> Dictionary:
-	return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier)
+func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard", route_shape: String = "circuit") -> Dictionary:
+	return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier, GENERATED_CIRCUITS.DEFAULT_ROAD_WIDTH, route_shape)
 
 
 
@@ -751,7 +756,10 @@ func retier_circuit_identity(identity_value: Dictionary, length_tier: String) ->
 		String(identity["material_id"]),
 		String(identity["palette_id"]),
 		overrides,
-		length_tier
+		length_tier,
+		StringName(identity.get("road_width", GENERATED_CIRCUITS.DEFAULT_ROAD_WIDTH)),
+		String(identity.get("route_shape", "circuit")),
+		String(identity.get("theme_b", ""))
 	)
 
 
@@ -817,6 +825,15 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 	return _start_generated_identity_race(identity, vehicle_id, "quick")
 
 
+func start_strip_race(theme: StringName, room: StringName, seed: int, vehicle_id: String, reverse: bool = false, length_tier: String = "standard", theme_b: StringName = &"") -> bool:
+	if _transitioning_to_race or not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
+		return false
+	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier, GENERATED_CIRCUITS.DEFAULT_ROAD_WIDTH, "strip", theme_b)
+	if identity.is_empty():
+		return false
+	return _start_generated_identity_race(identity, vehicle_id, "strip")
+
+
 func start_discovery_race(identity_value: Dictionary, vehicle_id: String, preview_fingerprint: String = "") -> bool:
 	if _transitioning_to_race or preview_fingerprint.length() != 16:
 		return false
@@ -825,21 +842,32 @@ func start_discovery_race(identity_value: Dictionary, vehicle_id: String, previe
 
 func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: String, mode: String, preview_fingerprint: String = "") -> bool:
 	var identity := GENERATED_CIRCUITS.normalize(identity_value)
-	if identity.is_empty() or not mode in ["quick", "discovery"]:
+	if identity.is_empty() or not mode in ["quick", "discovery", "strip"]:
 		return false
-	if mode == "quick":
+	if mode in ["quick", "strip"]:
 		_roll_quick_roster()
-	_install_roster_for(mode)
+	_install_roster_for("quick" if mode == "strip" else mode)
 	var event := _event_with_roster(
-		GENERATED_CIRCUITS.apply_to_event(identity, _roster_ids(_quick_roster if mode == "quick" else _championship_roster())),
-		_quick_roster if mode == "quick" else _championship_roster()
+		GENERATED_CIRCUITS.apply_to_event(identity, _roster_ids(_quick_roster if mode in ["quick", "strip"] else _championship_roster())),
+		_quick_roster if mode in ["quick", "strip"] else _championship_roster()
 	)
 	if event.is_empty():
 		return false
-	if mode == "quick":
+	if mode in ["quick", "strip"]:
 		event["id"] = "circuit_%s_%s_%d" % [String(identity["theme"]), String(identity["room"]), int(identity["sub_seeds"]["route"])]
+	if mode == "strip":
+		event["race_format"] = "strip"
+		event["opponent_count"] = 1
+		for rival: Dictionary in _quick_roster.get("opponents", []):
+			if String(rival.get("vehicle_id", "")) != vehicle_id:
+				event["opponents"] = [String(rival["id"])]
+				break
+		if (event.get("opponents", []) as Array).size() != 1:
+			event["opponents"] = [_roster_ids(_quick_roster)[0]]
 	var candidate := _save_data.duplicate(true)
 	candidate["circuit_history"] = CIRCUIT_LIBRARY.add_recent(candidate.get("circuit_history"), identity)
+	if mode == "strip":
+		candidate["selected_vehicle"] = vehicle_id
 	if candidate != _save_data:
 		if is_save_read_only():
 			candidate = _save_data
@@ -1180,6 +1208,12 @@ func _result_save_candidate_with_session_metrics(event: Dictionary) -> Dictionar
 
 
 func continue_after_race(transition_scene: bool = true) -> void:
+	if String(current_race_session.get("mode", "")) == "strip":
+		current_race_session.clear()
+		_destination = "title"
+		if transition_scene:
+			get_tree().change_scene_to_file(BOOT_SCENE)
+		return
 	if current_race_session.is_empty() or not current_race_session.has("result"):
 		return
 	if String(current_race_session["mode"]) in ["quick", "discovery"]:
@@ -1264,7 +1298,7 @@ func abandon_race() -> void:
 	if current_race_session.is_empty() or current_race_session.has("result"):
 		return
 	var mode := String(current_race_session.get("mode", "quick"))
-	_destination = "discovery" if mode == "discovery" else ("title" if mode == "quick" else "map")
+	_destination = "discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map")
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
 

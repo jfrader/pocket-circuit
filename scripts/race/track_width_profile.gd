@@ -116,9 +116,9 @@ static func line_width_curve(centerline: PackedVector2Array, widths: PackedFloat
 
 
 ## Half-width of the sample nearest to `point`; BASE_HALF_WIDTH for flat roads.
-static func at_point(centerline: PackedVector2Array, widths: PackedFloat32Array, point: Vector2) -> float:
+static func at_point(centerline: PackedVector2Array, widths: PackedFloat32Array, point: Vector2, fallback: float = BASE_HALF_WIDTH) -> float:
 	if widths.size() != centerline.size() or widths.is_empty():
-		return BASE_HALF_WIDTH
+		return fallback
 	var best := 0
 	var best_distance := INF
 	for index in centerline.size():
