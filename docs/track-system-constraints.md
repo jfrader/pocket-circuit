@@ -231,9 +231,11 @@ their original unscaled canvases.
 - Races run both ways, so a spot is calm only when it is at least 250 units
   from any corner in either direction: a corner exit in one direction is the
   braking zone in the other.
-- Low-grip surfaces (except the optional shortcut lane) and permanent on-course
-  obstacles must sit entirely on calm stretches. Placement underfills rather
-  than falling back to a corner. `track_surface_placement_test.gd` enforces it.
+- Permanent on-course obstacles must sit entirely on calm stretches. Low-grip
+  corner water/debris is allowed: it is seeded, bounded, never covers the full
+  corridor width (a driveable line always remains), keeps clear of gates, grids
+  and the checker, and its visible decal matches the authoritative zone.
+  `track_surface_placement_test.gd` enforces it.
 
 ## Track Moments
 
@@ -246,13 +248,18 @@ Generated tracks implement the design contract in `game-design-spec.md` section
   random calm stretch (see Calm Stretches). A lap without one has none.
 - `ShortcutDecision`: a visibly decaled inside lane that is geometrically
   shorter and at least 1.06x faster, but has lower grip. The outer lane remains
-  longer and safe for every vehicle build.
+  longer, but it is no longer guaranteed free of water/debris.
 - Up to ten additional `patch` surface definitions (target 0-10) add
-  deterministic themed grip and speed changes on calm stretches only. They
+  deterministic themed grip and speed changes on calm stretches and at seeded
+  corner debris positions. They
   vary in footprint and lateral position, remain inside the corridor and stay
   clear of every gate and the two designed surface moments; a lap short of calm
   room gets fewer. `TrackVariantPresenter`
   remains the only creator of authoritative runtime `SurfaceZone` nodes.
+- Corner water/debris (role `debris`, target 0-2) rides the same patch pipeline
+  on corner samples with a seeded lateral position anywhere across the corridor,
+  including outside the racing line. Footprints stay bounded so a driveable line
+  always remains, and they clear gates, grids, the start/finish and the checker.
 - `SpeedSection`: the unobstructed start/finish straight.
 - `DramaticFinish`: clear forward and reverse run-ups ending at the checker.
   Its visible paint stays on the nominal corridor while its invisible ordered
