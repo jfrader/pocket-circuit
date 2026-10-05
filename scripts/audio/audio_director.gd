@@ -12,6 +12,7 @@ const VehicleLoopEmitterScript := preload("res://scripts/audio/vehicle_loop_emit
 const CrashVoiceGeneratorScript := preload("res://scripts/audio/sfx/crash_voice_generator.gd")
 const BoostVoiceGeneratorScript := preload("res://scripts/audio/sfx/boost_voice_generator.gd")
 const UiVoiceGeneratorScript := preload("res://scripts/audio/sfx/ui_voice_generator.gd")
+const PursuitVoiceGeneratorScript := preload("res://scripts/audio/sfx/pursuit_voice_generator.gd")
 const ChampionshipCatalogScript := preload("res://data/championship/catalog.gd")
 ## The engine ducks while the tyres slide. A broadband scrub at the same level as
 ## the tonal engine is masked by it, and ducking reads better than raising the
@@ -221,6 +222,10 @@ func _build_interface_sfx() -> void:
 	var generator = UiVoiceGeneratorScript.new()
 	for sound_name in generator.names():
 		_register_voice(StringName(sound_name), generator.generate(String(sound_name)))
+	var pgen := PursuitVoiceGeneratorScript.new()
+	_register_voice(&"pursuit", pgen.generate("pursuit"))
+	_register_voice(&"strip_captured", pgen.generate_stinger("strip_captured"))
+	_register_voice(&"strip_won", pgen.generate_stinger("strip_won"))
 
 
 func _register_voice(sound_name: StringName, voice: OneShotVoice) -> void:

@@ -2,6 +2,9 @@
 
 ## [Unreleased]
 
+### Added
+- Quick Strip: a one-off strip battle from the title screen. Sweepers and chicanes run north along a four-lane printed fabric runner between two household rooms. Civilian toy cars share the northbound lanes; sparser oncoming cars and delivery trucks approach on the left, with headlights and amber truck markers. Traffic yields before merging and recovers after bumps. One rival chases from behind, with a capture arc when it closes in. Reach the finish to win; get caught or run past the time limit and the attempt ends. Results do not save.
+
 ### Changed
 - Loose debris varies in number, size and position across generated circuits, including tracks with none. Patches remain on calm stretches. This debris and outer-corner layout update advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Every new championship fields its own generated rivals, and each Quick Race brings a new lineup driving different cars. Rival names follow the roster into briefings, the route board and the race.
@@ -27,6 +30,7 @@
 - The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
+- Quick Strip prepares civilian wheel animations, both rooms' graphics and the chaser's route caches during loading instead of hitching as traffic starts moving.
 - Quitting the game no longer prints Godot's audio playback leak warning (updated Gamestruments addon).
 - Changing volume, difficulty or comfort settings no longer exits fullscreen or shrinks a maximized window.
 - Bare outside bends receive colliding household props where an apron shortcut would skip the corner. The reserved apron exit stays open.

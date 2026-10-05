@@ -46,6 +46,10 @@ const CIRCUIT_PREVIEW := preload("res://scripts/race/circuit_route_preview.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const PERSONAL_GHOST_SCRIPT := preload("res://scripts/race/personal_ghost.gd")
 const RACE_MUSIC_PLAN := preload("res://scripts/audio/race_music_plan.gd")
+const STRIP_CONTROLLER := preload("res://scripts/race/strip_controller.gd")
+const STRIP_MARKER := preload("res://scripts/presentation/strip_destination_marker.gd")
+const STRIP_TRAFFIC := preload("res://scripts/race/strip/strip_traffic.gd")
+const STRIP_START_WARMUP := preload("res://scripts/race/strip/strip_start_warmup.gd")
 const STARTING_GRID_SYNC_FRAMES := 2
 const COUNTDOWN_STEP_SECONDS := 0.65
 const PAUSE_STRIP_HEIGHT := 12.0
@@ -123,6 +127,9 @@ var _previous_ghost_capture_transform := Transform2D.IDENTITY
 var _mastery_capture_finished := false
 var _last_lap_elapsed := 0.0
 var _best_lap := INF
+var _strip_spawns: Dictionary = {}
+var _strip_prepared: Dictionary = {}
+var _strip_controller: Node2D
 
 
 func _ready() -> void:
@@ -147,6 +154,9 @@ func _complete_race_setup(start_countdown: bool = true) -> void:
 	_create_pause_overlay()
 	_pause_overlay.enabled = start_countdown
 	_configure_racers()
+	if String(_session.get("mode", "")) == "strip" and not _setup_strip():
+		call_deferred("_abort_failed_race")
+		return
 	_configure_personal_ghost()
 	for racer: Node2D in race_manager.get_rankings():
 		if racer is RigidBody2D:
@@ -201,6 +211,8 @@ func _prepare_race_async() -> void:
 		if prepared.is_empty():
 			app.call("fail_race_loading", "Circuit generation failed")
 			return
+		if String(_session.get("mode", "")) == "strip":
+			_strip_prepared = prepared
 		if app.has_method("record_prepared_mastery_metrics"):
 			app.call("record_prepared_mastery_metrics", event, prepared.get("racing_line_metrics", {}))
 		var expected_preview_fingerprint := String(event.get("preview_fingerprint", ""))
@@ -303,10 +315,26 @@ func _prepare_race_async() -> void:
 		if app.call("is_race_loading_cancelled"):
 			app.call("complete_race_loading")
 			return
-	preparation.queue_free()
 	app.call("set_loading_section", 3)
 	await _loading_step("Setting the starting grid")
 	_complete_race_setup(false)
+	if String(_session.get("mode", "")) == "strip" and _strip_controller == null:
+		preparation.queue_free()
+		return
+	if String(_session.get("mode", "")) == "strip":
+		var traffic := get_node("StripTraffic") as StripTraffic
+		if not await traffic.prepare_visuals(preparation, _loading_step.bind("Preparing traffic animation"), Callable(app, "is_race_loading_cancelled")):
+			preparation.queue_free()
+			if app.call("is_race_loading_cancelled"):
+				app.call("complete_race_loading")
+			else:
+				app.call("fail_race_loading", "Traffic graphics could not be prepared")
+			return
+		for racer: Node2D in race_manager.get_rankings():
+			for child: Node in racer.get_children():
+				if child is AIVehicleController:
+					(child as AIVehicleController).prepare_strip_start()
+	preparation.queue_free()
 	camera.global_position = _player_vehicle.global_position
 	camera.reset_smoothing()
 	camera.force_update_scroll()
@@ -318,6 +346,9 @@ func _prepare_race_async() -> void:
 		for entry: Dictionary in _build_field_racers_for_preparation():
 			await director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")), _loading_step.bind("Preparing race audio"))
 			await _loading_step("Preparing race audio")
+	if String(_session.get("mode", "")) == "strip":
+		var warmed: Dictionary = await STRIP_START_WARMUP.draw_runner(camera, _strip_prepared["room_polygon"], get_node("StripTraffic"), _loading_step.bind("Warming strip graphics"), Callable(app, "is_race_loading_cancelled"))
+		set_meta("strip_start_warmup", warmed)
 	for frame in 3:
 		await _loading_step("Warming graphics for the starting grid")
 	if not app.call("complete_race_loading"):
@@ -441,6 +472,11 @@ func _configure_racers() -> void:
 	var opponent_count := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
 	var difficulty := String(_session.get("difficulty", "club_circuit"))
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
+	if String(_session.get("mode", "")) == "strip":
+		_strip_spawns = _strip_prepared.get("strip_grid", {})
+		if not _strip_spawns.is_empty():
+			grid = grid.duplicate()
+			grid[1] = _strip_spawns["chaser"]
 	var positional_vehicles: Array[Node] = []
 	for ai_index in mini(opponent_ids.size(), opponent_count):
 		var driver_id := String(opponent_ids[ai_index])
@@ -465,15 +501,69 @@ func _configure_racers() -> void:
 		ai_controller.configure(
 			ai_vehicle,
 			race_manager,
-			AI_LANE_OFFSETS[ai_index],
+			0.0 if String(_session.get("mode", "")) == "strip" else AI_LANE_OFFSETS[ai_index],
 			difficulty,
 			driver_id,
-			driver.get("ai_style", {}) as Dictionary
+			driver.get("ai_style", {}) as Dictionary,
+			_player_vehicle if String(_session.get("mode", "")) == "strip" else null
 		)
 		positional_vehicles.append(ai_vehicle)
 	var director := _audio_director()
 	if director and director.has_method("set_positional_vehicles"):
 		director.call("set_positional_vehicles", positional_vehicles)
+
+
+func _setup_strip() -> bool:
+	var gates: Array = _strip_prepared.get("strip_gates", [])
+	if _strip_spawns.is_empty() or gates.size() < 2:
+		push_error("No legal strip spawn on the generated route")
+		return false
+	_player_vehicle.place_on_grid(_strip_spawns["player"])
+	var chaser: VehicleController = null
+	for racer: Node2D in race_manager.get_rankings():
+		if racer != _player_vehicle:
+			chaser = racer as VehicleController
+			break
+	if chaser == null:
+		return false
+	_strip_controller = STRIP_CONTROLLER.new() as Node2D
+	_strip_controller.name = "StripController"
+	add_child(_strip_controller)
+	_strip_controller.configure(race_manager, _player_vehicle, chaser, float(_strip_prepared["strip_time_limit"]))
+	_strip_controller.outcome_resolved.connect(_on_strip_outcome)
+	race_manager.configure_strip_route(1, int(gates[-1]["index"]), Callable(_strip_controller, "may_finish"))
+	_setup_strip_traffic()
+	var marker := STRIP_MARKER.new() as Control
+	marker.name = "StripDestination"
+	$HUD.add_child(marker)
+	marker.configure(gates[-1]["position"], camera, race_manager, float(_strip_prepared["strip_time_limit"]))
+	return true
+
+
+func _setup_strip_traffic() -> void:
+	var traffic := STRIP_TRAFFIC.new() as Node
+	traffic.name = "StripTraffic"
+	add_child(traffic)
+	traffic.configure(
+		_strip_prepared.get("centerline", PackedVector2Array()),
+		float(_strip_prepared.get("strip_half_width", 125.0)),
+		_strip_prepared.get("traffic_plan", []),
+		race_manager
+	)
+
+
+func _on_strip_outcome(headline: String, elapsed: float) -> void:
+	_finished = true
+	_results_finalized = true
+	_race_hud.visible = false
+	_pause_overlay.enabled = false
+	_results_panel.visible = true
+	_results_label.text = "%s\n\n%s\n\nCONTINUE · RETRY TO RUN IT AGAIN" % [headline, _format_time(elapsed) if headline == "STRIP WON" else ""]
+	_retry_button.text = "RETRY"
+	_retry_button.disabled = false
+	_continue_button.disabled = false
+	_mastery_button.visible = false
+	_retry_button.grab_focus()
 
 
 func _configure_vehicle(
@@ -485,6 +575,9 @@ func _configure_vehicle(
 		visual_key: String = ""
 ) -> void:
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
+	if String(_session.get("mode", "")) == "strip" and not _strip_spawns.is_empty():
+		grid = grid.duplicate()
+		grid[racer_index] = _strip_spawns["player" if is_player else "chaser"]
 	vehicle.freeze = true
 	vehicle.place_on_grid(grid[racer_index])
 	vehicle.collision_layer |= 1
@@ -534,8 +627,10 @@ func _configure_session() -> void:
 	var event: Dictionary = _session.get("event", {})
 	if not event.is_empty():
 		race_manager.laps_to_finish = clampi(int(event.get("laps", 3)), 1, 99)
-		race_manager.set_reverse_direction(bool(event.get("reverse", false)))
+		race_manager.set_reverse_direction(bool(event.get("reverse", false)) and String(_session.get("mode", "")) != "strip")
 		if is_instance_valid(_race_hud):
+			if String(_session.get("mode", "")) == "strip":
+				_race_hud.set_strip_mode(true)
 			var vehicle := CATALOG.get_vehicle(String(_session.get("vehicle_id", "rustbug")))
 			_race_hud.set_context(String(event.get("name", "Household Circuit")), String(vehicle.get("name", "Rustbug")))
 
@@ -549,6 +644,8 @@ func _configure_track_variant() -> bool:
 		var circuit_room := StringName(event.get("room", "classic"))
 		var circuit_seed := int(event.get("seed", 0))
 		var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed, _track_generation_options(event))
+		if String(_session.get("mode", "")) == "strip":
+			_strip_prepared = built.get("strip_prepared", {})
 		packed = built.get("scene") as PackedScene
 		var app := get_node_or_null("/root/App")
 		if app and app.has_method("record_prepared_mastery_metrics"):
@@ -577,7 +674,10 @@ func _configure_track_variant() -> bool:
 
 
 func _track_generation_options(event: Dictionary) -> Dictionary:
-	return TRACK_BUILDER.generated_circuit_options(event)
+	var options := TRACK_BUILDER.generated_circuit_options(event)
+	if String(event.get("race_format", "")) == "strip":
+		options["route_shape"] = "strip"
+	return options
 
 
 func _circuit_cache_key(event: Dictionary) -> String:
@@ -643,7 +743,7 @@ func _configure_route_reference() -> void:
 			for tile: Node in tiles.get_children():
 				if tile is Node2D:
 					route.append((tile as Node2D).global_position)
-	race_manager.configure_route_reference(route, float(track_root.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)))
+	race_manager.configure_route_reference(route, float(track_root.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)), String(_session.get("mode", "")) == "strip")
 
 
 func _abort_failed_race() -> void:
@@ -725,11 +825,18 @@ func _update_race_hud() -> void:
 	var progress := PackedFloat32Array()
 	var total_gates := maxf(1.0, race_manager.laps_to_finish * race_manager.get_checkpoint_count())
 	for racer: Node2D in racers:
-		progress.append(race_manager.get_racer_progress(racer) / total_gates)
+		if String(_session.get("mode", "")) == "strip":
+			var gates: Array = _strip_prepared.get("strip_gates", [])
+			progress.append(clampf(race_manager.get_racer_progress(racer) / maxf(1.0, float(gates.size() - 1)), 0.0, 1.0))
+		else:
+			progress.append(race_manager.get_racer_progress(racer) / total_gates)
 	_race_hud.set_route_progress(progress, racers.find(_player_vehicle), race_manager.get_expected_checkpoint(_player_vehicle))
 
 
 func _on_race_finished(_total_time: float) -> void:
+	if String(_session.get("mode", "")) == "strip":
+		_strip_controller.call("win", _total_time)
+		return
 	_finished = true
 	_race_hud.visible = false
 	_race_won = is_instance_valid(_player_vehicle) and race_manager.get_racer_position(_player_vehicle) == 1
@@ -759,6 +866,8 @@ func _queue_menu_phase() -> void:
 
 
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:
+	if String(_session.get("mode", "")) == "strip":
+		return
 	if racer != _player_vehicle:
 		return
 	_update_race_hud()
@@ -835,6 +944,8 @@ func _on_racer_finished(racer: Node2D, _position: int, total_time: float) -> voi
 
 
 func _on_results_ready(results: Array) -> void:
+	if String(_session.get("mode", "")) == "strip":
+		return
 	_set_paused(false)
 	if _results_finalized:
 		return
@@ -1376,6 +1487,8 @@ func _layout_result_actions(mastery_available: bool) -> void:
 
 
 func _report_result_to_app(results: Array) -> bool:
+	if String(_session.get("mode", "")) == "strip":
+		return true
 	_save_error = ""
 	var app := get_node_or_null("/root/App")
 	if app == null or _session.is_empty() or not app.has_method("report_race_result"):

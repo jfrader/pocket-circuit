@@ -38,6 +38,12 @@ const OVERTAKE_COOLDOWN := 0.8
 const FOLLOWING_DISTANCE := 70.0
 const FOLLOWING_TIME := 0.5
 const OVERTAKE_STRAIGHT_RADIUS := 1050.0
+const PURSUIT_CLOSING_DISTANCE := 340.0
+const PURSUIT_FOLLOW_DISTANCE := 110.0
+const PURSUIT_FOLLOW_TIME := 1.2
+const PURSUIT_PACE_FRACTION := 0.93
+const PURSUIT_START_GRACE := 3.0
+const PURSUIT_START_PACE := 0.93
 const DRAFT_MIN_DISTANCE := 54.0
 const DRAFT_MAX_DISTANCE := 185.0
 const DRAFT_LATERAL_WIDTH := 34.0
@@ -184,6 +190,9 @@ var race_manager: RaceManager
 var lane_offset: float = 0.0
 var difficulty: String = "club_circuit"
 var personality_id := "baseline"
+var pursuit_target: Node2D = null
+var _open_route := false
+var _pursuit_returning := false
 var personality: Dictionary = DEFAULT_PERSONALITY.duplicate()
 var recovery_count := 0
 var recovery_reasons: Dictionary = {}
@@ -251,6 +260,7 @@ static var surface_zone_probe_count := 0   # SurfaceZone.contains_global_point(.
 # them once and invalidate when the field is (re)spawned.
 var _surface_zone_nodes: Array[Node] = []
 var _race_vehicle_nodes: Array[Node] = []
+var _track_traffic_nodes: Array[Node] = []
 var _tree_cache_dirty := true
 # Per-race surface-zone records: the raw node plus a global-space bounding circle
 # and the derived risk/lane/role flags, built once per race so the per-tick
@@ -298,7 +308,8 @@ func configure(
 		preferred_lane_offset: float,
 		difficulty_id: String = "club_circuit",
 		driver_id: String = "baseline",
-		driver_style: Dictionary = {}
+		driver_style: Dictionary = {},
+		pursuit_target: Node2D = null
 ) -> void:
 	if vehicle != controlled_vehicle or _unassisted_stats == null:
 		_unassisted_stats = controlled_vehicle.stats
@@ -310,6 +321,8 @@ func configure(
 	race_manager = manager
 	lane_offset = preferred_lane_offset
 	difficulty = difficulty_id if DIFFICULTY_TUNING.has(difficulty_id) else "club_circuit"
+	self.pursuit_target = pursuit_target
+	_pursuit_returning = false
 	_configure_personality(driver_id, driver_style)
 	var tuning := _difficulty_tuning()
 	var assist := tuning["assist"] as Dictionary
@@ -360,6 +373,7 @@ func _cache_checkpoints() -> void:
 	if not _checkpoints_by_index.is_empty():
 		_track_center /= float(_checkpoints_by_index.size())
 	_racing_line = PackedVector2Array()
+	_open_route = false
 	_standard_racing_line = PackedVector2Array()
 	_shortcut_racing_line = PackedVector2Array()
 	uses_shortcut_line = false
@@ -376,6 +390,7 @@ func _cache_checkpoints() -> void:
 
 		var racing_line := track.get_node_or_null("RacingLine") as Line2D
 		if racing_line:
+			_open_route = not racing_line.closed
 			for point: Vector2 in racing_line.points:
 				_standard_racing_line.append(racing_line.to_global(point))
 		elif vehicle.stats.physics_model_version != VehicleStats.LEGACY_MODEL_VERSION:
@@ -418,6 +433,19 @@ func _cache_checkpoints() -> void:
 	_build_arc_tables()
 
 
+func prepare_strip_start() -> void:
+	if not _open_route:
+		return
+	# The complete field (including civilian traffic) now exists. Build the
+	# final route/group caches under loading, not again on the GO signal.
+	_cache_checkpoints()
+	_refresh_tree_cache()
+	_reference_nearest_index = int(_nearest_open_segment(_reference_path, vehicle.global_position, -1)["index"])
+	_racing_line_nearest_index = int(_nearest_open_segment(_racing_line, vehicle.global_position, -1)["index"])
+	if race_manager.race_started.is_connected(_cache_checkpoints):
+		race_manager.race_started.disconnect(_cache_checkpoints)
+
+
 func _build_arc_tables() -> void:
 	var racing_line_tables := _arc_tables_for(_racing_line)
 	_racing_line_segment_lengths = racing_line_tables["lengths"]
@@ -441,7 +469,7 @@ func _arc_tables_for(path: PackedVector2Array) -> Dictionary:
 	cumulative.resize(count)
 	var total := 0.0
 	for index in count:
-		lengths[index] = path[index].distance_to(path[(index + 1) % count])
+		lengths[index] = 0.0 if _open_route and index == count - 1 else path[index].distance_to(path[(index + 1) % count])
 		cumulative[index] = total
 		total += lengths[index]
 	return {"lengths": lengths, "cumulative": cumulative, "total": total}
@@ -465,6 +493,8 @@ func _ensure_arc_tables_current() -> void:
 ## distance so every caller can skip re-projecting.
 func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_index: int) -> Dictionary:
 	var count := path.size()
+	if _open_route:
+		return _nearest_open_segment(path, position, cached_index)
 	if cached_index >= 0 and cached_index < count:
 		var best_index := cached_index
 		var best_fraction := 0.0
@@ -508,6 +538,26 @@ func _nearest_segment_local(path: PackedVector2Array, position: Vector2, cached_
 	_segment_result["index"] = best_index
 	_segment_result["fraction"] = best_fraction
 	_segment_result["distance_squared"] = best_dsq
+	return _segment_result
+
+
+func _nearest_open_segment(path: PackedVector2Array, position: Vector2, cached_index: int) -> Dictionary:
+	var best_index := -1
+	var best_fraction := 0.0
+	var best_distance := INF
+	var start := maxi(0, cached_index - 32) if cached_index >= 0 and cached_index < path.size() - 1 else 0
+	var end := mini(path.size() - 1, cached_index + 33) if cached_index >= 0 and cached_index < path.size() - 1 else path.size() - 1
+	for index in range(start, end):
+		var segment := path[index + 1] - path[index]
+		var fraction := clampf((position - path[index]).dot(segment) / maxf(segment.length_squared(), 0.001), 0.0, 1.0)
+		var distance := position.distance_squared_to(path[index] + segment * fraction)
+		if distance < best_distance:
+			best_index = index
+			best_fraction = fraction
+			best_distance = distance
+	_segment_result["index"] = best_index
+	_segment_result["fraction"] = best_fraction
+	_segment_result["distance_squared"] = best_distance
 	return _segment_result
 
 
@@ -556,8 +606,14 @@ func _physics_process(delta: float) -> void:
 
 	var forward := Vector2.UP.rotated(vehicle.rotation)
 	_update_room_cut(expected_index, forward)
+	var is_pursuit_return := _is_pursuit_active() and _pursuit_returning
 	var heading_to_checkpoint := absf(forward.angle_to(vehicle.global_position.direction_to(checkpoint_position)))
-	var watchdog := _update_route_watchdog(delta, expected_index, heading_to_checkpoint > TURN_AROUND_HEADING)
+	var turn_around := heading_to_checkpoint > TURN_AROUND_HEADING and not is_pursuit_return
+	var watchdog := _update_route_watchdog(delta, expected_index, turn_around)
+	if is_pursuit_return:
+		_stuck_time = 0.0
+		_no_progress_time = 0.0
+		_wrong_way_progress_time = 0.0
 	if _recovering:
 		return
 	if _update_spin_recovery(delta):
@@ -582,6 +638,20 @@ func _physics_process(delta: float) -> void:
 		line_radius = 0.0
 	var traffic_plan := _traffic_plan(delta, forward, target_position, line_radius)
 	target_position = traffic_plan["target_position"] as Vector2
+	if _is_pursuit_active():
+		var pinfo := _pursuit_distance_and_ahead(forward)
+		var pahead := float(pinfo["ahead"])
+		if pahead < 0:
+			_pursuit_returning = true
+		else:
+			_pursuit_returning = false
+	is_pursuit_return = _is_pursuit_active() and _pursuit_returning
+	if is_pursuit_return and _is_pursuit_active():
+		var pinfo := _pursuit_distance_and_ahead(forward)
+		var pahead := float(pinfo["ahead"])
+		if pahead < -100:
+			# drive back along the route (approx opposite forward to return to target without prediction or off-path ambush)
+			target_position = vehicle.global_position - forward * 800.0
 	var goal_chord := vehicle.global_position.distance_to(target_position)
 	var desired_direction := vehicle.global_position.direction_to(target_position)
 	var surface_plan := _surface_anticipation(desired_direction)
@@ -698,10 +768,21 @@ func _physics_process(delta: float) -> void:
 		target_speed = minf(target_speed, float(traffic_plan["speed_limit"]))
 	else:
 		target_speed *= float(traffic_plan["speed_scale"])
+	if _is_pursuit_active() and not is_pursuit_return and race_manager.race_time < PURSUIT_START_GRACE:
+		target_speed *= PURSUIT_START_PACE
+	if is_pursuit_return and _is_pursuit_active():
+		var pinfo := _pursuit_distance_and_ahead(forward)
+		var pa := float(pinfo["ahead"])
+		var ch_lead := -pa
+		if ch_lead > 250:
+			target_speed = minf(target_speed, 250.0)
+		elif ch_lead > 0:
+			target_speed = minf(target_speed, 150.0)
 	var heading_error := absf(steering_angle)
 	if heading_error > 1.05:
 		target_speed = minf(target_speed, effective_max_speed * float(tuning["heading_cap"]))
-	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
+	var wrong_way := race_manager.is_racer_wrong_way(vehicle) and not is_pursuit_return
+	if heading_error > 1.45 or wrong_way:
 		target_speed = minf(target_speed, effective_max_speed * float(tuning["wrong_way_cap"]))
 	if heading_error > TURN_AROUND_HEADING:
 		# A near-180 heading change cannot be made at pace without a wide arc;
@@ -731,14 +812,16 @@ func _physics_process(delta: float) -> void:
 		# gated by proximity to a checkpoint.
 		if (
 			heading_error > 1.45
-			or race_manager.is_racer_wrong_way(vehicle)
+			or (race_manager.is_racer_wrong_way(vehicle) and not is_pursuit_return)
 			or float(obstacle_plan["speed_scale"]) < 0.95
 			or float(surface_plan["speed_scale"]) < 0.95
 		):
 			should_brake = vehicle.speed > target_speed
 	var throttle := 0.0 if should_brake else 1.0
-	if heading_error > 1.45 or race_manager.is_racer_wrong_way(vehicle):
+	if heading_error > 1.45 or (race_manager.is_racer_wrong_way(vehicle) and not is_pursuit_return):
 		throttle = 0.42 if not should_brake else 0.0
+	if is_pursuit_return and not should_brake:
+		throttle = 1.0
 	var brake := clampf(
 		(vehicle.speed - target_speed) / float(tuning["brake_response"]),
 		0.0,
@@ -749,7 +832,7 @@ func _physics_process(delta: float) -> void:
 	var catch_up := tuning["catch_up"] as Dictionary
 	var catch_up_max := float(catch_up["max_power"])
 	var catch_up_power := 0.0
-	if catch_up_max > 0.0:
+	if catch_up_max > 0.0 and not _is_pursuit_active():
 		for racer: Node in _group_nodes(&"race_vehicle"):
 			if is_instance_valid(racer) and racer.is_in_group("player_vehicle"):
 				var progress := race_manager.get_racer_progress(vehicle)
@@ -843,6 +926,9 @@ func _corner_mistake(delta: float, tuning: Dictionary, checkpoint_index: int, ra
 
 
 func _update_room_cut(expected_index: int, forward: Vector2) -> void:
+	if _open_route:
+		_room_cut_checkpoint = -1
+		return
 	if _room_cut_checkpoint != expected_index:
 		_room_cut_checkpoint = -1
 	if not _allow_room_cuts or vehicle.has_static_contact:
@@ -936,6 +1022,8 @@ func _has_passed_guide(guide_position: Vector2, checkpoint_position: Vector2) ->
 
 
 func _checkpoint_entry_guide_position(checkpoint_index: int) -> Variant:
+	if _open_route:
+		return null
 	var checkpoint := _checkpoints_by_index.get(checkpoint_index) as Node2D
 	var previous := race_manager.get_checkpoint_before(checkpoint_index) as Node2D
 	if checkpoint == null or previous == null:
@@ -1092,7 +1180,7 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 
 	var arc := cumulative[best_index] + segment_lengths[best_index] * best_fraction
 	var direction := -1.0 if race_manager.is_reverse_direction() else 1.0
-	var target_arc := fposmod(arc + direction * lookahead, total)
+	var target_arc := clampf(arc + direction * lookahead, 0.0, total) if _open_route else fposmod(arc + direction * lookahead, total)
 	var target_index := count - 1
 	for i in count:
 		if cumulative[i] <= target_arc:
@@ -1104,7 +1192,7 @@ func _reference_goal(forward: Vector2, lookahead: float) -> Dictionary:
 		0.0,
 		1.0
 	)
-	var goal := _reference_path[target_index].lerp(_reference_path[(target_index + 1) % count], target_fraction)
+	var goal := _reference_path[target_index].lerp(_reference_path[mini(target_index + 1, count - 1)] if _open_route else _reference_path[(target_index + 1) % count], target_fraction)
 	_reference_goal_result["goal"] = goal
 	return _reference_goal_result
 
@@ -1117,6 +1205,27 @@ func _leader_progress_deficit() -> float:
 			continue
 		best = maxf(best, race_manager.get_racer_progress(racer as Node2D))
 	return maxf(0.0, best - mine)
+
+
+func _is_pursuit_active() -> bool:
+	if not is_instance_valid(pursuit_target) or not is_instance_valid(race_manager) or not race_manager.is_running:
+		return false
+	if race_manager.has_method("is_racer_finished") and race_manager.is_racer_finished(pursuit_target):
+		return false
+	return true
+
+
+func _pursuit_distance_and_ahead(forward: Vector2) -> Dictionary:
+	var result := {"distance": INF, "ahead": 0.0, "lateral": 0.0, "vehicle": null}
+	if not _is_pursuit_active():
+		return result
+	var sep: Vector2 = pursuit_target.global_position - vehicle.global_position
+	result["distance"] = sep.length()
+	result["ahead"] = sep.dot(forward)
+	result["lateral"] = sep.dot(forward.orthogonal())
+	if pursuit_target is VehicleController:
+		result["vehicle"] = pursuit_target
+	return result
 
 
 func _traffic_plan(
@@ -1142,16 +1251,58 @@ func _traffic_plan(
 	plan["drafting"] = false
 	if not vehicle.is_inside_tree() or forward.length_squared() < 0.001:
 		return plan
+	if _open_route and _avoid_oncoming(forward, line_target, plan):
+		_cancel_overtake()
+		return plan
+
+	var pursuit_info := _pursuit_distance_and_ahead(forward)
+	var pursuit_dist := float(pursuit_info["distance"])
+	var pursuit_ahead := float(pursuit_info["ahead"])
+	var pursuit_vehicle := pursuit_info.get("vehicle") as VehicleController
+	var in_pursuit_follow := _is_pursuit_active() and pursuit_dist < PURSUIT_CLOSING_DISTANCE and pursuit_ahead > 28.0
 
 	var leader_info := _nearest_vehicle_ahead(forward)
-	var leader := leader_info.get("vehicle") as VehicleController
+	var leader := leader_info.get("vehicle") as Node2D
+	var leader_speed := 0.0
+	var leader_vel := Vector2.ZERO
+	if leader:
+		if leader is VehicleController:
+			var vc := leader as VehicleController
+			leader_speed = vc.speed
+			leader_vel = vc.linear_velocity
+		else:
+			leader_vel = leader.get("linear_velocity") if "linear_velocity" in leader else Vector2.ZERO
+			leader_speed = leader_vel.length()
+	# In pursuit, always consider the pursuit_target for speed/closing logic (even if beyond normal overtake reach or traffic in between) so chaser closes by overtaking traffic to reach player.
+	if _is_pursuit_active():
+		var pinfo := _pursuit_distance_and_ahead(forward)
+		var pdist := float(pinfo["distance"])
+		var pahead := float(pinfo["ahead"])
+		if pahead > 28.0 and pdist < 2000.0 and (leader == null or pdist < float(leader_info.get("distance", INF))):
+			leader = pinfo.get("vehicle") as Node2D
+			if leader:
+				if leader is VehicleController:
+					var vc2 := leader as VehicleController
+					leader_speed = vc2.speed
+					leader_vel = vc2.linear_velocity
+				else:
+					leader_vel = Vector2.ZERO
+					leader_speed = 0.0
+			leader_info = {"vehicle": leader, "distance": pdist, "lateral_distance": float(pinfo.get("lateral", 0.0))}
 	var is_straight := line_radius <= 0.0 or line_radius >= OVERTAKE_STRAIGHT_RADIUS
+	if in_pursuit_follow and leader == pursuit_vehicle:
+		# suppress lateral overtake offset while following pursuit target inside closing range
+		if _overtake_target_id != 0 and _overtake_target_id == (pursuit_vehicle.get_instance_id() if pursuit_vehicle else 0):
+			_cancel_overtake()
 	if _overtake_hold_remaining > 0.0 and _overtake_target_id != 0 and is_straight:
 		var side := signf(_overtake_offset)
 		if _overtake_side_clear(forward, side, leader):
-			plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
-			plan["passing"] = true
-			return plan
+			if in_pursuit_follow and leader == pursuit_vehicle:
+				_cancel_overtake()
+			else:
+				plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
+				plan["passing"] = true
+				return plan
 		_cancel_overtake()
 	if _overtake_cooldown_remaining > 0.0 and not is_zero_approx(_overtake_offset):
 		plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
@@ -1163,47 +1314,75 @@ func _traffic_plan(
 
 	var distance := float(leader_info["distance"])
 	var lateral_distance := absf(float(leader_info["lateral_distance"]))
+	var is_traffic_leader := leader != null and leader.is_in_group(&"track_traffic")
 	plan["drafting"] = (
 		is_straight
 		and distance >= DRAFT_MIN_DISTANCE
 		and distance <= DRAFT_MAX_DISTANCE
 		and lateral_distance <= DRAFT_LATERAL_WIDTH
+		and not is_traffic_leader
 	)
 	var aggression := float(personality["overtake_aggression"])
-	var leader_is_slower := leader.speed + 22.0 / aggression < vehicle.speed or leader.speed < vehicle.get_effective_max_speed() * (0.75 + (aggression - 1.0) * 0.08)
+	var leader_is_slower := leader_speed + 22.0 / aggression < vehicle.speed or leader_speed < vehicle.get_effective_max_speed() * (0.75 + (aggression - 1.0) * 0.08)
 	# only commit overtake when gap/room truly clear (corridor/apron checks inside side_score)
 	var launch_complete := race_manager.race_time >= 1.0
-	var pass_speed_ready := vehicle.speed >= 160.0 or leader.speed < 20.0
+	var pass_speed_ready := vehicle.speed >= 160.0 or leader_speed < 20.0
 	if is_straight and leader_is_slower and launch_complete and pass_speed_ready and _overtake_cooldown_remaining <= 0.0 and distance > 55.0:
-		var selected_side := _select_overtake_side(forward, leader)
-		if not is_zero_approx(selected_side):
-			_overtake_offset = selected_side * OVERTAKE_LINE_OFFSET
-			_overtake_hold_remaining = OVERTAKE_HOLD_TIME * aggression
-			_overtake_target_id = leader.get_instance_id()
-			overtake_attempt_count += 1
-			plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
-			plan["passing"] = true
-			return plan
+		if in_pursuit_follow and leader == pursuit_vehicle:
+			# inside closing range (~340 units): suppress passing behavior on the pursuit target.
+			# never fly far ahead; speed limit below settles at following gap just inside capture band.
+			# far behind (>340): normal overtake logic (including this) remains available to close.
+			pass
+		else:
+			var selected_side := _select_overtake_side(forward, leader)
+			if not is_zero_approx(selected_side):
+				_overtake_offset = selected_side * OVERTAKE_LINE_OFFSET
+				_overtake_hold_remaining = OVERTAKE_HOLD_TIME * aggression
+				_overtake_target_id = leader.get_instance_id()
+				overtake_attempt_count += 1
+				plan["target_position"] = line_target + forward.orthogonal() * _overtake_offset
+				plan["passing"] = true
+				return plan
 
 	# A blocked pass remains a controlled tow rather than the former heavy brake.
-	plan["speed_scale"] = 0.84
-	plan["speed_limit"] = maxf(0.0, leader.linear_velocity.dot(forward)) + maxf(0.0, distance - FOLLOWING_DISTANCE) / FOLLOWING_TIME
+	# For track_traffic: treat as things to pass (overtake logic above), do not follow/slow or draft.
+	if is_traffic_leader:
+		plan["speed_scale"] = 1.0
+		plan["speed_limit"] = INF
+	else:
+		plan["speed_scale"] = 0.84
+		var fdist := FOLLOWING_DISTANCE
+		var ftime := FOLLOWING_TIME
+		if in_pursuit_follow and leader == pursuit_vehicle:
+			fdist = PURSUIT_FOLLOW_DISTANCE
+			ftime = PURSUIT_FOLLOW_TIME
+		plan["speed_limit"] = maxf(0.0, leader_vel.dot(forward)) + maxf(0.0, distance - fdist) / ftime
 	return plan
 
 
 func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
-	var nearest: VehicleController
+	var nearest: Node2D
 	var nearest_distance := INF
 	var nearest_lateral := 0.0
 	var lateral_axis := forward.orthogonal()
-	for node: Node in _group_nodes(&"race_vehicle"):
+	var ahead_nodes: Array[Node] = []
+	ahead_nodes.append_array(_group_nodes(&"race_vehicle"))
+	ahead_nodes.append_array(_group_nodes(&"track_traffic"))
+	for node: Node in ahead_nodes:
 		if not is_instance_valid(node):
 			continue
-		var candidate := node as VehicleController
+		var is_traffic := node.is_in_group(&"track_traffic")
+		if is_traffic and int(node.get_meta("strip_direction", 1)) < 0:
+			continue
+		var candidate := node as Node2D
 		if candidate == null or candidate == vehicle:
 			continue
-		if race_manager.is_racer_finished(candidate) or bool(race_manager.get_racer_state_ref(candidate).get("dnf", false)):
-			continue
+		if not is_traffic:
+			var as_racer := node as VehicleController
+			if as_racer == null:
+				continue
+			if race_manager.is_racer_finished(as_racer) or bool(race_manager.get_racer_state_ref(as_racer).get("dnf", false)):
+				continue
 		var separation := candidate.global_position - vehicle.global_position
 		var distance_ahead := separation.dot(forward)
 		var lateral_distance := separation.dot(lateral_axis)
@@ -1224,7 +1403,38 @@ func _nearest_vehicle_ahead(forward: Vector2) -> Dictionary:
 	return _leader_result
 
 
-func _select_overtake_side(forward: Vector2, leader: VehicleController) -> float:
+func _avoid_oncoming(forward: Vector2, line_target: Vector2, plan: Dictionary) -> bool:
+	# Oncoming traffic is a closing obstacle, never a drafting/following leader.
+	# The reference path is the middle of the northbound carriageway, so either
+	# evasive offset remains on that carriageway rather than crossing the divider.
+	var nearest := INF
+	var hazard_lateral := 0.0
+	var right := forward.rotated(PI * 0.5)
+	for node: Node in _group_nodes(&"track_traffic"):
+		if not is_instance_valid(node) or int(node.get_meta("strip_direction", 1)) >= 0:
+			continue
+		var body := node as RigidBody2D
+		if body == null:
+			continue
+		var separation := body.global_position - vehicle.global_position
+		var ahead := separation.dot(forward)
+		var closing := maxf(0.0, (vehicle.linear_velocity - body.linear_velocity).dot(forward))
+		var lateral := separation.dot(right)
+		if ahead <= 0.0 or ahead > maxf(OVERTAKE_REACH, closing * FOLLOWING_TIME) or absf(lateral) > OVERTAKE_LINE_OFFSET:
+			continue
+		if ahead < nearest:
+			nearest = ahead
+			hazard_lateral = lateral
+	if nearest == INF:
+		return false
+	var side := -1.0 if hazard_lateral > 0.0 else 1.0
+	plan["target_position"] = line_target + right * side * OVERTAKE_LINE_OFFSET
+	plan["passing"] = true
+	plan["speed_limit"] = maxf(0.0, nearest - FOLLOWING_DISTANCE) / FOLLOWING_TIME
+	return true
+
+
+func _select_overtake_side(forward: Vector2, leader: Node2D) -> float:
 	var best_side := 0.0
 	var best_score := -INF
 	for side: float in [-1.0, 1.0]:
@@ -1235,11 +1445,11 @@ func _select_overtake_side(forward: Vector2, leader: VehicleController) -> float
 	return best_side if best_score >= 0.90 else 0.0
 
 
-func _overtake_side_clear(forward: Vector2, side: float, leader: VehicleController) -> bool:
+func _overtake_side_clear(forward: Vector2, side: float, leader: Node2D) -> bool:
 	return _overtake_side_score(forward, side, leader) >= 0.86
 
 
-func _overtake_side_score(forward: Vector2, side: float, leader: VehicleController) -> float:
+func _overtake_side_score(forward: Vector2, side: float, leader: Node2D) -> float:
 	if is_zero_approx(side):
 		return -INF
 	var origin := vehicle.global_position + forward * OBSTACLE_FRONT_OFFSET
@@ -1311,6 +1521,8 @@ func _group_nodes(group_name: StringName) -> Array[Node]:
 			return _surface_zone_nodes
 		&"race_vehicle":
 			return _race_vehicle_nodes
+		&"track_traffic":
+			return _track_traffic_nodes
 	return _scan_group(group_name)
 
 
@@ -1319,8 +1531,17 @@ func _refresh_tree_cache() -> void:
 		return
 	_surface_zone_nodes = _scan_group(&"surface_zone")
 	_race_vehicle_nodes = _scan_group(&"race_vehicle")
+	_track_traffic_nodes = _scan_group(&"track_traffic")
+	for traffic: Node in _track_traffic_nodes:
+		var on_exit := _on_traffic_exiting.bind(traffic)
+		if not traffic.tree_exiting.is_connected(on_exit):
+			traffic.tree_exiting.connect(on_exit, CONNECT_ONE_SHOT)
 	_rebuild_surface_zone_records()
 	_tree_cache_dirty = false
+
+
+func _on_traffic_exiting(traffic: Node) -> void:
+	_track_traffic_nodes.erase(traffic)
 
 
 func _rebuild_surface_zone_records() -> void:
@@ -1711,7 +1932,7 @@ func _single_ray_probe(
 		result["normal"] = Vector2.ZERO
 		return result
 	var collider: Variant = hit.get("collider")
-	var is_vehicle := collider is Node and (collider as Node).is_in_group("race_vehicle")
+	var is_vehicle := collider is Node and ((collider as Node).is_in_group("race_vehicle") or (collider as Node).is_in_group("track_traffic"))
 	var hit_normal := (hit.get("normal", Vector2.ZERO) as Vector2).normalized()
 	result["clearance"] = origin.distance_to(hit["position"]) / feeler_length
 	result["is_vehicle"] = is_vehicle
@@ -1842,11 +2063,11 @@ func _active_route_sample(expected_index: int) -> Dictionary:
 		var best_distance_squared := float(nearest["distance_squared"])
 		var total := _racing_line_total
 		var best_arc := _racing_line_cumulative[best_index] + _racing_line_segment_lengths[best_index] * best_fraction
-		var directional_arc := fposmod(total - best_arc, total) if race_manager.is_reverse_direction() else best_arc
+		var directional_arc := fposmod(total - best_arc, total) if race_manager.is_reverse_direction() and not _open_route else best_arc
 		_route_sample_result["arc"] = directional_arc
 		_route_sample_result["length"] = total
 		_route_sample_result["distance"] = sqrt(best_distance_squared)
-		_route_sample_result["closed"] = true
+		_route_sample_result["closed"] = not _open_route
 		return _route_sample_result
 
 	var checkpoint := _checkpoints_by_index.get(expected_index) as Node2D
@@ -2018,7 +2239,7 @@ func _nearest_line_index(position: Vector2) -> int:
 		var best := _racing_line_nearest_index
 		var best_distance := _racing_line[best].distance_squared_to(position)
 		for delta in 65:
-			var index := posmod(_racing_line_nearest_index - 32 + delta, count)
+			var index := clampi(_racing_line_nearest_index - 32 + delta, 0, count - 1) if _open_route else posmod(_racing_line_nearest_index - 32 + delta, count)
 			var distance := _racing_line[index].distance_squared_to(position)
 			if distance < best_distance:
 				best_distance = distance
@@ -2045,6 +2266,8 @@ func _racing_line_target(forward: Vector2) -> Vector2:
 	var lookahead := (70.0 + vehicle.speed * 0.4) / float(personality["line_commitment"])
 	var walked := 0.0
 	for step in count:
+		if _open_route and (index + direction < 0 or index + direction >= count):
+			return _racing_line[index]
 		var next := (index + direction + count) % count
 		var segment := _racing_line[index].distance_to(_racing_line[next])
 		if walked + segment >= lookahead and segment > 0.001:
@@ -2064,8 +2287,8 @@ func _radius_at_line_index(index: int) -> float:
 	var count := _racing_line.size()
 	var direction := -1 if race_manager.is_reverse_direction() else 1
 	var a := _racing_line[index]
-	var b := _racing_line[(index + 9 * direction + count) % count]
-	var c := _racing_line[(index + 18 * direction + count) % count]
+	var b := _racing_line[clampi(index + 9 * direction, 0, count - 1)] if _open_route else _racing_line[(index + 9 * direction + count) % count]
+	var c := _racing_line[clampi(index + 18 * direction, 0, count - 1)] if _open_route else _racing_line[(index + 18 * direction + count) % count]
 	var ab := a.distance_to(b)
 	var bc := b.distance_to(c)
 	var ac := a.distance_to(c)
@@ -2110,6 +2333,8 @@ func _racing_line_curvature_hazard() -> Dictionary:
 				speed_limit = allowed
 				hazard_distance = walked
 				hazard_radius = radius
+		if _open_route and (index + direction < 0 or index + direction >= count):
+			break
 		var next := (index + direction + count) % count
 		walked += _racing_line[index].distance_to(_racing_line[next])
 		index = next

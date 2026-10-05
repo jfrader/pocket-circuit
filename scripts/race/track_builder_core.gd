@@ -14,6 +14,7 @@ const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog
 const TRACK_BUILDER_GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const TRACK_BUILDER_PLANNER := preload("res://scripts/race/track_builder_planner.gd")
 const TRACK_BUILDER_SCENE := preload("res://scripts/race/track_builder_scene.gd")
+const STRIP_LAYOUT := preload("res://scripts/race/strip_layout.gd")
 const TRACK_BUILDER_ISLAND := preload("res://scripts/race/track_builder_island.gd")
 const TRACK_BUILDER_STORY := preload("res://scripts/race/track_builder_story.gd")
 const TRACK_BUILDER_DRESSING := preload("res://scripts/race/track_builder_dressing.gd")
@@ -192,17 +193,28 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int, g
 	if prepared.is_empty():
 		return {"scene": null, "seed": seed}
 	var root := create_layout_root(prepared)
-	_build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], theme)
+	if String(prepared.get("route_shape", "circuit")) == "strip":
+		TRACK_BUILDER_SCENE.build_strip(root, prepared)
+	else:
+		_build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], theme)
 	_mark_owned(root)
 	var packed := PackedScene.new()
 	packed.pack(root)
 	root.free()
-	return {"scene": packed, "seed": prepared["seed"], "racing_line_metrics": (prepared.get("racing_line_metrics", {}) as Dictionary).duplicate(true)}
+	var result := {"scene": packed, "seed": prepared["seed"], "racing_line_metrics": (prepared.get("racing_line_metrics", {}) as Dictionary).duplicate(true)}
+	if String(prepared.get("route_shape", "circuit")) == "strip":
+		result["strip_prepared"] = prepared
+	return result
 
 
 static func prepare_route(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
 	if not LAYOUTS.has(theme) or not ROOM_SHAPES.has(room_shape):
 		return {}
+	if String(generation_options.get("route_shape", "circuit")) == "strip":
+		var strip_room := STRIP_LAYOUT.runner_room(ROOM_SHAPES[room_shape], String(generation_options.get("length_tier", "standard")))
+		if strip_room.is_empty():
+			return {}
+		return STRIP_LAYOUT.prepare(theme, room_shape, seed, generation_options, LAYOUTS[theme], strip_room, ROOM_COMPOSITIONS.get(theme, ROOM_COMPOSITIONS[&"kitchen"]))
 	var spec: Dictionary = LAYOUTS[theme]
 	var room_polygon: PackedVector2Array = ROOM_SHAPES[room_shape] if seed >= 0 else BASE_ROOM_SHAPES[room_shape]
 	var used_seed := seed
@@ -324,6 +336,8 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 	var prepared := prepare_route(theme, room_shape, seed, generation_options)
 	if prepared.is_empty():
 		return {}
+	if String(prepared.get("route_shape", "circuit")) == "strip":
+		return prepared
 	var spec: Dictionary = prepared["spec"]
 	var centerline: PackedVector2Array = prepared["centerline"]
 	var edges: Dictionary = prepared["edges"]
@@ -356,7 +370,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 			for side in [-1, 1]:
 				var path := String(post_assets[posmod(gate_index * 2 + (1 if side > 0 else 0), post_assets.size())])
 				var size := PROP_SCALE.size_for(path, GATE_POST_SIZE)
-				var offset := (FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET) + TrackWidthProfile.at_point(centerline, half_widths, gate_points[gate_index]) - HALF_WIDTH
+				var offset := (FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET) + TrackWidthProfile.at_point(centerline, half_widths, gate_points[gate_index], float(spec.get("half_width", HALF_WIDTH))) - HALF_WIDTH
 				var position: Vector2 = gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side
 				reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(position, size + Vector2.ONE * 6.0, tangent.angle()))
 				solid_cores.append(Vector3(position.x, position.y, minf(size.x, size.y) * core_ratio))
@@ -425,6 +439,13 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 	var root := Node2D.new()
 	root.name = String(spec["root_name"])
 	root.add_to_group("track", true)
+	if String(prepared.get("route_shape", "circuit")) == "strip":
+		root.set_meta("generated_track", true)
+		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
+		root.set_meta("room_polygon", room_polygon)
+		root.set_meta("theme", prepared["theme"])
+		root.set_meta("room_shape", prepared["room_shape"])
+		root.set_meta("generation_fallback", bool(spec.get("generation_fallback", false)))
 	if spec.get("seed_obstacles", false):
 		root.set_meta("generated_track", true)
 		root.set_meta("requested_seed", int(spec["requested_seed"]))
@@ -459,6 +480,9 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 
 
 static func assemble_runtime(root: Node2D, prepared: Dictionary, stage: Callable, environment_composer: Callable = Callable()) -> void:
+	if String(prepared.get("route_shape", "circuit")) == "strip":
+		TRACK_BUILDER_SCENE.build_strip(root, prepared)
+		return
 	await _build_scene(root, prepared["spec"], prepared["centerline"], prepared["edges"], prepared["room_polygon"], prepared["theme"], stage, environment_composer)
 
 
