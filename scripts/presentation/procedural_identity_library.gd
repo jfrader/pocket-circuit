@@ -239,19 +239,28 @@ static func resolve_field_visual_keys(racers: Array[Dictionary]) -> Dictionary:
 
 
 static func possible_field_visual_keys() -> Array[String]:
-	# The looks a normal race field realises without cosmetic collisions:
+	# The looks a normal race field realises:
 	# - generated opponents have no car_livery, so they resolve through
 	#   _effective_livery_for to the vehicle's catalog default cosmetics
 	#   (a bare vehicle id is NOT the key the race uses);
-	# - the player is always "rae" (with its livery) on whatever vehicle_id is chosen.
+	# - the player is always "rae" (with its livery, or the vehicle default
+	#   when rae has none) on whatever vehicle_id is chosen;
+	# - when the player and an opponent share a vehicle, resolve_field_visual_keys
+	#   shifts the opponent's cosmetics (slot 1..3), so the shifted variants
+	#   must be warm too or that car re-renders at race start.
 	# Quick-race rosters are re-rolled after circuit preview, so we prewarm the
 	# superset here. Championship rosters are known at event focus time.
 	var keys: Array[String] = []
 	var vids: Array[String] = CATALOG.vehicle_ids()
 	for vid: String in vids:
-		var k := _register_visual_key(vid, _effective_livery_for(vid, ""))
-		if not keys.has(k):
-			keys.append(k)
+		var base := _effective_livery_for(vid, "")
+		var cosmetics: Array[Dictionary] = [base]
+		for shift in [1, 2, 3]:
+			cosmetics.append(_shift_cosmetic(base, shift))
+		for cosmetic: Dictionary in cosmetics:
+			var k := _register_visual_key(vid, cosmetic)
+			if not keys.has(k):
+				keys.append(k)
 	for vid: String in vids:
 		var k := resolve_visual_key(vid, "rae")
 		if not keys.has(k):
