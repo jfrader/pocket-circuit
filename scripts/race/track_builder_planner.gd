@@ -8,6 +8,9 @@ const VEHICLE_WIDTH := 44.0
 const MIN_VIABLE_CORRIDOR_WIDTH := VEHICLE_WIDTH * 1.6
 const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
 const OBSTACLE_EDGE_INSET := 8.0
+## Hazard crossing reach from the centerline on a 125 half-width road; scaled by
+## the local half-width on wider roads.
+const HAZARD_CROSSING_HALF_SPAN := 96.0
 
 
 static func plan_obstacles(
@@ -33,11 +36,13 @@ static func plan_obstacles(
 		int(moments.get("technical", 0)),
 	])
 	var occupied: Array[Dictionary] = []
+	var half_widths: PackedFloat32Array = spec.get("half_widths", PackedFloat32Array())
 	# Obstacles stay out of corners and out of the braking zone before any corner
 	# in either race direction.
 	var corner_clearance: PackedFloat32Array = moments.get("corner_clearance", PackedFloat32Array())
 	if corner_clearance.size() != centerline.size():
 		corner_clearance = TrackCornerMap.clearances(centerline)
+
 	for slot in target_count:
 		var definition: Dictionary = (roster[posmod(rng.randi(), roster.size())] as Dictionary).duplicate(true)
 		var footprint_size := TrackBuilderCore.PROP_SCALE.size_for(String(definition["asset"]), Vector2(40.0, 40.0))
@@ -65,9 +70,10 @@ static func plan_obstacles(
 			var lateral_extent := GEOM.footprint_projected_extent(footprint_size, shape_kind, rotation, normal)
 			var route_offset := (standard_route[index] - centerline[index]).dot(normal)
 			var side := -signf(route_offset) if not is_zero_approx(route_offset) else preferred_side
-			var lateral_offset := HALF_WIDTH - OBSTACLE_EDGE_INSET - lateral_extent
+			var local_half := half_widths[index] if half_widths.size() == centerline.size() else HALF_WIDTH
+			var lateral_offset := local_half - OBSTACLE_EDGE_INSET - lateral_extent
 			var candidate := centerline[index] + normal * side * lateral_offset
-			var viable_width := HALF_WIDTH + absf(lateral_offset) - lateral_extent
+			var viable_width := local_half + absf(lateral_offset) - lateral_extent
 			if viable_width + 0.001 < MIN_VIABLE_CORRIDOR_WIDTH:
 				continue
 			if not GEOM.clear_of_points(candidate, gate_samples, maxf(90.0, footprint_size.length())):
@@ -96,3 +102,4 @@ static func plan_obstacles(
 		if not placed:
 			push_warning("TrackBuilderPlanner: skipped an obstacle that had no AI-safe placement")
 	return plan
+

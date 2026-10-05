@@ -115,7 +115,7 @@ static func add_wall_segment(parent: Node, node_name: String, position: Vector2,
 			wall.add_child(strip)
 
 
-static func gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> PackedVector2Array:
+static func gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array, half_width: float = TrackBuilderCore.HALF_WIDTH) -> PackedVector2Array:
 	var normal := tangent.rotated(PI * 0.5).normalized()
 	var positive_island := nearest_gate_boundary(sample, normal, PackedVector2Array(), island_polygon)
 	var negative_island := nearest_gate_boundary(sample, -normal, PackedVector2Array(), island_polygon)
@@ -124,15 +124,15 @@ static func gate_span_endpoints(sample: Vector2, tangent: Vector2, room_polygon:
 	var inner_direction := normal if positive_distance <= negative_distance else -normal
 	var outer_direction := -inner_direction
 	return PackedVector2Array([
-		corridor_gate_endpoint(sample, inner_direction, room_polygon, island_polygon),
+		corridor_gate_endpoint(sample, inner_direction, room_polygon, island_polygon, half_width),
 		nearest_gate_boundary(sample, outer_direction, room_polygon, island_polygon),
 	])
 
 
-static func corridor_gate_endpoint(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
+static func corridor_gate_endpoint(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array, half_width: float = TrackBuilderCore.HALF_WIDTH) -> Vector2:
 	var boundary := nearest_gate_boundary(sample, direction, room_polygon, island_polygon)
 	var projected := (boundary - sample).dot(direction.normalized())
-	return sample + direction.normalized() * minf(projected, TrackBuilderCore.HALF_WIDTH)
+	return sample + direction.normalized() * minf(projected, half_width)
 
 
 static func nearest_gate_boundary(sample: Vector2, direction: Vector2, room_polygon: PackedVector2Array, island_polygon: PackedVector2Array) -> Vector2:
@@ -152,7 +152,7 @@ static func nearest_gate_boundary(sample: Vector2, direction: Vector2, room_poly
 	return nearest
 
 
-static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int) -> void:
+static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tangent: Vector2, gate_index: int, half_width: float = TrackBuilderCore.HALF_WIDTH) -> void:
 	var container := root.get_node_or_null("GatePosts") as Node2D
 	if container == null:
 		container = Node2D.new()
@@ -171,8 +171,7 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 			continue
 		var post := StaticBody2D.new()
 		post.name = "Gate%02d%s" % [gate_index, "Right" if side > 0 else "Left"]
-		var post_offset := TrackBuilderCore.FINISH_LANDMARK_OFFSET if gate_index == 0 else TrackBuilderCore.GATE_POST_OFFSET
-		post_offset += float(spec.get("half_width", TrackBuilderCore.HALF_WIDTH)) - TrackBuilderCore.HALF_WIDTH
+		var post_offset := (TrackBuilderCore.FINISH_LANDMARK_OFFSET if gate_index == 0 else TrackBuilderCore.GATE_POST_OFFSET) + half_width - TrackBuilderCore.HALF_WIDTH
 		post.position = sample + normal * post_offset * float(side)
 		post.rotation = tangent.angle()
 		post.collision_layer = 16
@@ -201,7 +200,7 @@ static func add_gate_posts(root: Node2D, spec: Dictionary, sample: Vector2, tang
 		container.set_meta("placed_count", int(container.get_meta("placed_count", 0)) + 1)
 	if gate_index == 0:
 		container.set_meta("finish_landmark_paths", [NodePath("Gate00Left"), NodePath("Gate00Right")])
-		container.set_meta("finish_landmark_offset", TrackBuilderCore.FINISH_LANDMARK_OFFSET)
+		container.set_meta("finish_landmark_offset", TrackBuilderCore.FINISH_LANDMARK_OFFSET + half_width - TrackBuilderCore.HALF_WIDTH)
 
 
 static func add_cp(parent: Node, node_name: String, position: Vector2, rotation: float, index: int, is_finish: bool, recovery_rotation: float, span_endpoints: PackedVector2Array = PackedVector2Array()) -> void:

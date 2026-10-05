@@ -194,7 +194,17 @@ func _prepare_race_async() -> void:
 	app.call("set_loading_section", 1)
 	await _loading_step("Generating a legal circuit")
 	if String(event.get("circuit", "")) == "generated":
-		var prepared: Dictionary = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)))
+		var key := _circuit_cache_key(event)
+		var prepared: Dictionary = {}
+		var used_cached_prepared := false
+		if not key.is_empty():
+			prepared = TRACK_BUILDER.cached_prepared(key)
+			if not prepared.is_empty():
+				used_cached_prepared = true
+		if prepared.is_empty():
+			prepared = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)), Thread.PRIORITY_NORMAL)
+			if not prepared.is_empty() and not key.is_empty():
+				TRACK_BUILDER.store_prepared(key, prepared)
 		if app.call("is_race_loading_cancelled"):
 			app.call("complete_race_loading")
 			return
@@ -210,8 +220,22 @@ func _prepare_race_async() -> void:
 			var preview_identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
 			var loaded_preview_fingerprint := CIRCUIT_PREVIEW.fingerprint_for_prepared(preview_identity, prepared)
 			if loaded_preview_fingerprint != expected_preview_fingerprint:
-				app.call("fail_race_loading", "The loaded circuit did not match the confirmed preview")
-				return
+				if used_cached_prepared:
+					# Cache hit produced a fingerprint mismatch (stale or wrong
+					# identity). Fall back to full generation instead of failing.
+					prepared = await preparation.run_data_job(TRACK_BUILDER.prepare_layout.bind(StringName(event.get("theme", "kitchen")), StringName(event.get("room", "classic")), int(event.get("seed", 0)), _track_generation_options(event)), Thread.PRIORITY_NORMAL)
+					if app.call("is_race_loading_cancelled"):
+						app.call("complete_race_loading")
+						return
+					if prepared.is_empty():
+						app.call("fail_race_loading", "Circuit generation failed")
+						return
+					if not key.is_empty():
+						TRACK_BUILDER.store_prepared(key, prepared)
+					loaded_preview_fingerprint = CIRCUIT_PREVIEW.fingerprint_for_prepared(preview_identity, prepared)
+				else:
+					app.call("fail_race_loading", "The loaded circuit did not match the confirmed preview")
+					return
 			prepared["loaded_preview_fingerprint"] = loaded_preview_fingerprint
 		if app.has_method("record_prepared_mastery_metrics"):
 			app.call("record_prepared_mastery_metrics", event, prepared.get("racing_line_metrics", {}))
@@ -235,12 +259,29 @@ func _prepare_race_async() -> void:
 		var embedded := track_root
 		remove_child(embedded)
 		embedded.free()
-		track_root = TRACK_BUILDER.create_layout_root(prepared)
+		var used_cached_room := false
+		if not key.is_empty():
+			var packed: PackedScene = TRACK_BUILDER.cached_room(key)
+			if packed != null:
+				var candidate := packed.instantiate()
+				if candidate is Node2D and candidate.get_child_count() > 0:
+					track_root = candidate
+					used_cached_room = true
+		if not used_cached_room:
+			track_root = TRACK_BUILDER.create_layout_root(prepared)
 		track_root.name = "Track"
 		add_child(track_root)
 		if prepared.has("loaded_preview_fingerprint"):
 			track_root.set_meta("preview_fingerprint", prepared["loaded_preview_fingerprint"])
-		await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step)
+		if not used_cached_room:
+			await TRACK_BUILDER.assemble_runtime(track_root, prepared, _loading_step)
+			if not key.is_empty():
+				# PackedScene only captures owned descendants; without this the
+				# cached room instantiates empty and every race re-assembles.
+				TRACK_BUILDER.mark_packed_scene_owners(track_root)
+				var pscene := PackedScene.new()
+				if pscene.pack(track_root) == OK:
+					TRACK_BUILDER.store_room(key, pscene)
 		_apply_circuit_identity_metadata(event)
 		_apply_track_variant(StringName(event.get("theme", "kitchen")))
 	else:
@@ -633,24 +674,14 @@ func _configure_track_variant() -> bool:
 
 
 func _track_generation_options(event: Dictionary) -> Dictionary:
-	var options := {
-		"act": int(event.get("act", 0)),
-		"obstacles_enabled": bool(event.get("obstacles_enabled", true)),
-		"length_tier": StringName(event.get("length_tier", &"standard")),
-	}
+	var options := TRACK_BUILDER.generated_circuit_options(event)
 	if String(event.get("race_format", "")) == "strip":
 		options["route_shape"] = "strip"
-	if int(options["act"]) <= 0:
-		options.erase("act")
-	var identity: Variant = event.get("generated_circuit_identity", event.get("circuit_identity"))
-	if identity is Dictionary:
-		var identity_record := identity as Dictionary
-		var generated_options := GENERATED_CIRCUITS.generation_options(identity_record)
-		if generated_options.is_empty():
-			options["sub_seeds"] = (identity_record.get("sub_seeds", {}) as Dictionary).duplicate(true)
-		else:
-			options.merge(generated_options, true)
 	return options
+
+
+func _circuit_cache_key(event: Dictionary) -> String:
+	return TRACK_BUILDER.generated_circuit_cache_key(event)
 
 
 func _apply_circuit_identity_metadata(event: Dictionary) -> void:
@@ -712,7 +743,7 @@ func _configure_route_reference() -> void:
 			for tile: Node in tiles.get_children():
 				if tile is Node2D:
 					route.append((tile as Node2D).global_position)
-	race_manager.configure_route_reference(route, String(_session.get("mode", "")) == "strip")
+	race_manager.configure_route_reference(route, float(track_root.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)), String(_session.get("mode", "")) == "strip")
 
 
 func _abort_failed_race() -> void:

@@ -102,7 +102,8 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 			spec.get("track_world_tile_size", Vector2.ZERO),
 			1.0 if same_material else float(spec.get("track_opacity", 0.52)),
 			tint,
-			0.0 if same_material else 0.16
+			0.0 if same_material else 0.16,
+			spec.get("half_widths", PackedFloat32Array())
 		)
 
 	if spec.get("seed_obstacles", false):
@@ -149,6 +150,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	# Checkpoints along the arc, aligned to the tangent. The last lap gate sits
 	# slightly past the corner rejoin so its recovery point stays on a straight.
 	var gate_fractions: Array = spec.get("gate_fractions", [0.0, 0.125, 0.25, 0.375, 0.5, 0.625, 0.75, 0.84])
+	var half_widths: PackedFloat32Array = spec.get("half_widths", PackedFloat32Array())
 	var arc := TrackBuilderCore._arc_lengths(centerline)
 	var total := arc[arc.size() - 1]
 	var start := centerline[0]
@@ -165,15 +167,16 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		var is_finish := gate_index == 0
 		var name := "Checkpoint0Finish" if is_finish else "Checkpoint%d" % gate_index
 		var span_endpoints := PackedVector2Array()
+		var local_half := TrackWidthProfile.at_point(centerline, half_widths, sample)
 		if spec.get("seed_obstacles", false):
-			span_endpoints = TrackBuilderCore._gate_span_endpoints(sample, tangent, room_polygon, island_region)
+			span_endpoints = TrackBuilderCore._gate_span_endpoints(sample, tangent, room_polygon, island_region, local_half)
 		TrackBuilderCore._add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y), span_endpoints)
 		if spec.get("seed_obstacles", false):
-			TrackBuilderCore._add_gate_posts(root, spec, sample, tangent, gate_index)
+			TrackBuilderCore._add_gate_posts(root, spec, sample, tangent, gate_index, local_half)
 
-	# The checker spans the complete nominal corridor. Each color cell is its own
+	# The checker spans the complete local corridor. Each color cell is its own
 	# simple polygon so disconnected checks never become a self-crossing polygon.
-	TrackBuilderCore._add_finish_checker(root, start, start_tangent)
+	TrackBuilderCore._add_finish_checker(root, start, start_tangent, TrackWidthProfile.at_point(centerline, half_widths, start))
 
 	# Follow the centerline arc rather than extending one start tangent through a
 	# nearby corner. This keeps every grid slot inside the drivable corridor on
@@ -208,7 +211,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 
 	# Racing line the AI follows (curvature-offset ideal path, stored invisibly).
 	# Generated AI stays on the safe side of the optional risk shortcut.
-	TrackBuilderCore._build_racing_line(root, centerline, generated_moments)
+	TrackBuilderCore._build_racing_line(root, centerline, generated_moments, half_widths)
 	if stage.is_valid():
 		await stage.call("Building trackside scenery")
 

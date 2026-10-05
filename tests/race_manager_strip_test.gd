@@ -1,5 +1,7 @@
 extends SceneTree
 
+const TRACK_BUILDER_CORE := preload("res://scripts/race/track_builder_core.gd")
+
 const MANAGER := preload("res://scripts/race/race_manager.gd")
 
 class Gate extends Area2D:
@@ -23,7 +25,7 @@ func _initialize() -> void:
 	if int(manager.get_ordered_checkpoints()[0].get("checkpoint_index")) != 0:
 		_fail("Strip checkpoints must be sorted from start to finish")
 		return
-	manager.configure_route_reference(PackedVector2Array([Vector2(0, 0), Vector2(300, 0), Vector2(600, 0), Vector2(600, 300)]), true)
+	manager.configure_route_reference(PackedVector2Array([Vector2(0, 0), Vector2(300, 0), Vector2(600, 0), Vector2(600, 300)]), TRACK_BUILDER_CORE.HALF_WIDTH, true)
 	if absf(float(manager.get("_route_length")) - 900.0) > 0.01:
 		_fail("Open reference must not close the endpoints")
 		return

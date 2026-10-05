@@ -2,6 +2,8 @@ extends SceneTree
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
+const DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
 
 const DRIVER_IDS: Array[String] = ["rae", "inez", "juniper", "milo", "tess", "cass"]
 const VEHICLE_IDS: Array[String] = ["rustbug", "pinbolt", "scrapjaw", "flicker", "thimble", "spindle", "anvil", "dustmite"]
@@ -187,6 +189,43 @@ func _initialize() -> void:
 		return
 	if not _expect(_texture_hash(dup_texture_a) != _texture_hash(dup_texture_b), "duplicate field entries must render distinct cars, not just distinct keys"):
 		return
+
+	# Motion installs must stay inside the bounded car cache: a session meeting
+	# new rosters every race would otherwise accumulate textures forever.
+	for index in IDENTITIES.MAX_CAR_ENTRIES + 20:
+		var motion_key := "synthetic-motion-%d" % index
+		var image := Image.create(4, 4, false, Image.FORMAT_RGBA8)
+		if not _expect(IDENTITIES.install_motion_image_for_key(motion_key, Vector2i(0, 2), image), "motion install %d should succeed" % index):
+			return
+	if not _expect(IDENTITIES._car_spin_cache.size() <= IDENTITIES.MAX_CAR_ENTRIES, "motion installs must stay within the bounded car cache"):
+		return
+	if not _expect(IDENTITIES._car_entry_order.size() <= IDENTITIES.MAX_CAR_ENTRIES, "the car eviction order must stay bounded"):
+		return
+
+	# The pool the boot preloader warms must contain exactly the looks a
+	# generated race field resolves to (vehicle default cosmetics, not bare ids).
+	var roster: Dictionary = DRIVER_ROSTER.create(424242, CATALOG.quick_race_vehicle_ids(), 3)
+	DIRECTORY.install_opponents(roster.get("opponents", []))
+	if not _expect(not roster.is_empty(), "a generated roster must build for the pool guard"):
+		DIRECTORY.clear()
+		return
+	var pool: Array[String] = IDENTITIES.possible_field_visual_keys()
+	for opponent: Variant in roster.get("opponents", []):
+		var record := opponent as Dictionary
+		var key := IDENTITIES.resolve_visual_key(String(record.get("vehicle_id", "rustbug")), String(record.get("id", "")))
+		if not _expect(pool.has(key), "generated opponent look %s must be in the prewarmed pool" % key):
+			DIRECTORY.clear()
+			return
+	var opponents: Array = roster.get("opponents", [])
+	var shared_vehicle := String((opponents[0] as Dictionary).get("vehicle_id", "rustbug"))
+	var base := IDENTITIES._effective_livery_for(shared_vehicle, "")
+	for shift in [1, 2, 3]:
+		var shifted := String(IDENTITIES._register_visual_key(shared_vehicle, IDENTITIES._shift_cosmetic(base, shift)))
+		if not _expect(pool.has(shifted), "collision-shifted look %s must be in the prewarmed pool" % shifted):
+			DIRECTORY.clear()
+			return
+	DIRECTORY.clear()
+
 	print("PROCEDURAL_IDENTITY_LIBRARY_TEST PASS")
 	quit(0)
 

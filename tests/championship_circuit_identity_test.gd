@@ -14,9 +14,9 @@ func _run_test() -> void:
 	var championship := IDENTITIES.create_championship(FIXTURE_SEED)
 	if not _expect(championship == IDENTITIES.create_championship(FIXTURE_SEED), "the same championship seed should reproduce every event identity exactly"):
 		return
-	if not _expect(int(championship["schema_version"]) == 1 and int(championship["generator_version"]) == 11, "championship identity should carry schema and generator versions"):
+	if not _expect(int(championship["schema_version"]) == 1 and int(championship["generator_version"]) == 12, "championship identity should carry schema and generator versions"):
 		return
-	if not _expect(String(championship["fingerprint"]) == "75cd1bc71e79e3e3", "the deterministic championship fingerprint must stay regression-pinned"):
+	if not _expect(String(championship["fingerprint"]) == "3814f66108efb1ed", "the deterministic championship fingerprint must stay regression-pinned"):
 		return
 	var events: Dictionary = championship["events"]
 	if not _expect(events.size() == CATALOG.EVENTS.size(), "every catalog event should receive one stable identity"):
@@ -28,7 +28,7 @@ func _run_test() -> void:
 		var identity: Dictionary = events[event_id]
 		var sub_seeds: Dictionary = identity["sub_seeds"]
 		var fingerprints: Dictionary = identity["fingerprints"]
-		if not _expect(int(identity["schema_version"]) == 1 and int(identity["generator_version"]) == 11, "%s should carry record versions" % event_id):
+		if not _expect(int(identity["schema_version"]) == 1 and int(identity["generator_version"]) == 12, "%s should carry record versions" % event_id):
 			return
 		if not _expect(sub_seeds.keys().size() == IDENTITIES.DOMAINS.size(), "%s should expose every domain-separated sub-seed" % event_id):
 			return
@@ -54,7 +54,7 @@ func _run_test() -> void:
 				"obstacle": 308711,
 				"hazard": 806213,
 			}
-			and String(crumb_rush["fingerprints"]["circuit"]) == "64b580c5eda27188",
+			and String(crumb_rush["fingerprints"]["circuit"]) == "048cbf5b8ad19dd9",
 			"a representative event should keep its pinned route, room, future-system seeds, and fingerprint"
 	):
 		return
@@ -97,7 +97,7 @@ func _run_test() -> void:
 		"fingerprint": "ba391b90f4c3f2b5",
 	}
 	var migrated := IDENTITIES.normalize_championship(legacy)
-	if not _expect(int(migrated["seed"]) == FIXTURE_SEED and int(migrated["generator_version"]) == 11 and String(migrated["fingerprint"]) != "ba391b90f4c3f2b5", "normalizing an older championship should preserve the master seed while advancing the generator version and fingerprints"):
+	if not _expect(int(migrated["seed"]) == FIXTURE_SEED and int(migrated["generator_version"]) == 12 and String(migrated["fingerprint"]) != "ba391b90f4c3f2b5", "normalizing an older championship should preserve the master seed while advancing the generator version and fingerprints"):
 		return
 	var previous := championship.duplicate(true)
 	previous["generator_version"] = 10
@@ -120,7 +120,7 @@ func _run_test() -> void:
 			and session_event.get("circuit_identity", {}) == crumb_rush
 			and int(session_event.get("seed", -1)) == 721039
 			and String(session_event.get("room", "")) == "tall"
-			and String(session_event.get("circuit_fingerprint", "")) == "64b580c5eda27188",
+			and String(session_event.get("circuit_fingerprint", "")) == "048cbf5b8ad19dd9",
 			"starting a championship race should resolve the persisted identity instead of drawing a new circuit"
 	):
 		return

@@ -29,6 +29,9 @@ static func candidates(
 	if expanded.size() < 3:
 		return found
 
+	var island_rect := Rect2()
+	if island.size() >= 3:
+		island_rect = CORE._polygon_bounds_rect(island)
 	var fractions: Array = settings["lane_fractions"]
 	var edge_margin := float(settings["vehicle_radius_mm"])
 	var lane_reach := maxf(0.0, half_width - edge_margin)
@@ -46,7 +49,7 @@ static func candidates(
 		if CORE._turn_strength(line, start, 6) < CORE.CUT_TURN_THRESHOLD:
 			continue
 		for span in range(CORE.CUT_MIN_LOOKAHEAD, CORE.CUT_MAX_LOOKAHEAD + 1):
-			_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, start, (start + span) % count, seen, found)
+			_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, start, (start + span) % count, seen, found, island_rect)
 
 	# Nearby non-local folds need not be sharp at either endpoint.
 	var buckets := {}
@@ -68,9 +71,9 @@ static func candidates(
 					if mini(forward, count - forward) < int(CORE.CUT_FOLD_MIN_LAP_FRACTION * count):
 						continue
 					if forward <= count - forward:
-						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, index, other, seen, found)
+						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, index, other, seen, found, island_rect)
 					else:
-						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, other, index, seen, found)
+						_consider(line, normals, prefix, total, expanded, island, fractions, lane_reach, open_sector, other, index, seen, found, island_rect)
 	found.sort_custom(func(left: Dictionary, right: Dictionary) -> bool: return float(left["saved_mm"]) > float(right["saved_mm"]))
 	return found
 
@@ -79,7 +82,7 @@ static func _consider(
 		line: PackedVector2Array, normals: PackedVector2Array, prefix: PackedFloat64Array,
 		total: float, expanded: PackedVector2Array, island: PackedVector2Array,
 		fractions: Array, lane_reach: float, open_sector: int, start: int, finish: int,
-		seen: Dictionary, found: Array[Dictionary]
+		seen: Dictionary, found: Array[Dictionary], island_rect: Rect2
 ) -> void:
 	var count := line.size()
 	var key := mini(start, finish) * count + maxi(start, finish)
@@ -100,8 +103,10 @@ static func _consider(
 			if arc - chord < CORE.CUT_MIN_SAVED_MM or arc < chord * CORE.CUT_MIN_ARC_RATIO:
 				continue
 			var segment := PackedVector2Array([a, b])
-			if island.size() >= 3 and not Geometry2D.intersect_polyline_with_polygon(segment, island).is_empty():
-				continue
+			if island.size() >= 3:
+				var seg_rect := Rect2(a, b - a).abs()
+				if island_rect.intersects(seg_rect, true) and not Geometry2D.intersect_polyline_with_polygon(segment, island).is_empty():
+					continue
 			if Geometry2D.clip_polyline_with_polygon(segment, expanded).is_empty():
 				continue
 			var deep := PackedVector2Array()

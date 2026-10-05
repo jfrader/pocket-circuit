@@ -32,7 +32,7 @@ func _run() -> void:
 	manager.configure_checkpoints(gates)
 	var gate_count := (prepared["strip_gates"] as Array).size()
 	manager.configure_strip_route(1, gate_count - 1)
-	manager.configure_route_reference(prepared["centerline"], true)
+	manager.configure_route_reference(prepared["centerline"], BUILDER.HALF_WIDTH, true)
 	var arcs := LAYOUT._arc_lengths(prepared["centerline"])
 	var player_arc := minf(float(prepared["strip_length"]) - 500.0, 9000.0)
 	var player := VEHICLE_SCENE.instantiate() as VehicleController

@@ -52,6 +52,9 @@ var _rankings_dirty := true
 # real route tangent instead of the checkpoint chord, which lies on long curved
 # sections and reverses on hairpins.
 var _route_points: PackedVector2Array = PackedVector2Array()
+## Wrong-way tangent reach: the fixed-corridor value widened by the track's
+## widest road beyond 125.
+var _route_tangent_max_distance := ROUTE_TANGENT_MAX_DISTANCE
 var _route_cumulative: PackedFloat32Array = PackedFloat32Array()
 var _route_length := 0.0
 var _route_open := false
@@ -454,7 +457,8 @@ func get_ordered_checkpoints() -> Array[Node]:
 	return checkpoints.duplicate()
 
 
-func configure_route_reference(points: PackedVector2Array, open_route: bool = false) -> void:
+func configure_route_reference(points: PackedVector2Array, corridor_half_width: float = TrackBuilderCore.HALF_WIDTH, open_route: bool = false) -> void:
+	_route_tangent_max_distance = ROUTE_TANGENT_MAX_DISTANCE + maxf(0.0, corridor_half_width - TrackBuilderCore.HALF_WIDTH)
 	## Route-reference seam. The race scene supplies the actual drivable route
 	## (generated/authored racing line in global coords, forward order) once.
 	## Wrong-way detection then follows the real route tangent within the active
@@ -522,7 +526,7 @@ func get_route_forward_direction(position: Vector2, previous_checkpoint_index: i
 	var nearest := _nearest_route_segment(position, lo, hi)
 	if int(nearest["index"]) < 0:
 		return Vector2.ZERO
-	if float(nearest["distance_squared"]) > ROUTE_TANGENT_MAX_DISTANCE * ROUTE_TANGENT_MAX_DISTANCE:
+	if float(nearest["distance_squared"]) > _route_tangent_max_distance * _route_tangent_max_distance:
 		# Off the corridor the nearest in-window segment may belong to a folded
 		# return leg running the other way. Leave the judgement to the caller's
 		# checkpoint chord rather than report a backwards tangent.
