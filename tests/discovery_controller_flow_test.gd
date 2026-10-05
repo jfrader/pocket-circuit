@@ -10,6 +10,7 @@ class TestApp extends Node:
 	var save_read_only := false
 	var discovery_opened := false
 	var launched: Dictionary = {}
+	var prewarm_events: Array = []
 
 	func is_save_read_only() -> bool:
 		return save_read_only
@@ -58,6 +59,9 @@ class TestApp extends Node:
 		launched = {"identity": value.duplicate(true), "vehicle_id": vehicle_id, "preview_fingerprint": preview_fingerprint}
 		return true
 
+	func prewarm_generated_circuit(event: Dictionary) -> void:
+		prewarm_events.append(event.duplicate(true))
+
 	func play_sfx(_sound: StringName, _volume: float = 1.0) -> bool:
 		return true
 
@@ -95,6 +99,8 @@ func _run_test() -> void:
 	await _wait_frames(2)
 	var favorite := shell.find_child("DiscoveryFavorite", true, false) as Button
 	if not _expect(String(panel.get("_mode")) == "confirmation" and favorite != null and root.get_viewport().gui_get_focus_owner() == favorite, "a valid import should open confirmation without moving focus while its preview prepares"):
+		return
+	if not _expect(app.prewarm_events.size() == 1 and String((app.prewarm_events[0] as Dictionary).get("circuit_fingerprint", "")) == String(app.identity["fingerprint"]), "the confirmation screen must prewarm exactly the circuit it shows"):
 		return
 	await _wait_frames(5)
 	var launch := shell.find_child("DiscoveryLaunch", true, false) as Button
