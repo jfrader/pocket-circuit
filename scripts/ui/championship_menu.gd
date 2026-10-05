@@ -68,7 +68,7 @@ func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustb
 	_label(status, Rect2(COLUMN_X + 4, 290, COLUMN_WIDTH, 30), 18, SKIN.CREAM_DIM)
 	var play := _button("PLAY", Rect2(COLUMN_X, 336, COLUMN_WIDTH, 82), &"championship", true)
 	play.disabled = read_only and not has_progress
-	var second_actions := [&"new_run", &"quick_race"] if has_progress else [&"quick_race"]
+	var second_actions := [&"new_run", &"quick_race", &"quick_strip"] if has_progress else [&"quick_race", &"quick_strip"]
 	var second_row := _button_row(second_actions, Rect2(COLUMN_X, 436, COLUMN_WIDTH, 54), 20)
 	if has_progress:
 		second_row[0].disabled = read_only

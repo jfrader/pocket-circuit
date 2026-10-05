@@ -1,9 +1,9 @@
 class_name TrackBuilderDressing
 ## Generated dressing: moments, formations, giants, room details, surfaces.
 
-## Loose debris varies per track: how many pieces, how big, and where across the
-## road. A patch never touches the corridor edge, so it stays a thing to drive
-## over rather than a wall.
+## Loose debris (grip patches on calm + corner water/debris) varies per track.
+## Patches and corner debris use full lateral range (0.15-1.0 * room), never touch
+## the corridor edge (edge margin + far-side clearance >= ~vehicle).
 const GRIP_PATCH_MIN_HALF_WIDTH := 26.0
 const GRIP_PATCH_MAX_HALF_WIDTH := 64.0
 const GRIP_PATCH_MIN_HALF_SPAN := 2
@@ -827,7 +827,8 @@ static func build_room_ground_sections(
 		centerline: PackedVector2Array,
 		outer_loop: PackedVector2Array,
 		room_polygon: PackedVector2Array,
-		stage: Callable = Callable()
+		stage: Callable = Callable(),
+		target_override: int = -1
 ) -> int:
 	var definitions: Array = spec.get("ground_sections", [])
 	if definitions.is_empty():
@@ -839,7 +840,7 @@ static func build_room_ground_sections(
 	var rng := RandomNumberGenerator.new()
 	rng.seed = TrackBuilderCore._mix_seed(int(spec.get("material_seed", spec["requested_seed"])), "ground_sections:%s" % String(story["id"]))
 	var room_area := absf(TrackBuilderCore._polygon_area(room_polygon))
-	var target_count := mini(clampi(int(round(room_area / 750000.0)), 2, 4), definitions.size())
+	var target_count := target_override if target_override >= 0 else mini(clampi(int(round(room_area / 750000.0)), 2, 4), definitions.size())
 	sections.set_meta("requested_count", target_count)
 	var bounds := polygon_bounds_rect(room_polygon)
 	var placements: Array[Dictionary] = []
@@ -915,7 +916,8 @@ static func build_room_floor_details(
 		centerline: PackedVector2Array,
 		room_polygon: PackedVector2Array,
 		occupied: Array[Dictionary],
-		rng: RandomNumberGenerator
+		rng: RandomNumberGenerator,
+		target_override: int = -1
 ) -> int:
 	var decals: Array = spec.get("decals", [])
 	if decals.is_empty():
@@ -924,7 +926,7 @@ static func build_room_floor_details(
 	details.name = "FloorDetails"
 	parent.add_child(details)
 	var bounds := polygon_bounds_rect(room_polygon)
-	var target_count := clampi(int(round(absf(TrackBuilderCore._polygon_area(room_polygon)) / 90000.0)), 18, 30)
+	var target_count := target_override if target_override >= 0 else clampi(int(round(absf(TrackBuilderCore._polygon_area(room_polygon)) / 90000.0)), 18, 30)
 	var positions := PackedVector2Array()
 	for attempt in 820:
 		var candidate := Vector2(
@@ -1036,17 +1038,39 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 	if emit_decals:
 		add_surface_decals(shortcut, centerline, shortcut_index, TrackBuilderCore.SHORTCUT_HALF_SPAN, String(shortcut_data["decal"]), float(shortcut_geometry["inside_sign"]) * TrackBuilderCore.SHORTCUT_LANE_OFFSET)
 
-	# Additional in-corridor grip patches are data for TrackVariantPresenter,
-	# which creates the authoritative SurfaceZone nodes at runtime. They only go
-	# on calm stretches (see TrackCornerMap), separated from gates, the grids and
-	# the two designed surface moments; a lap short of calm room gets fewer.
+	# Corner debris pass (0-2 per lap). Reuses the grip_patches catalog (water/debris
+	# spills, dust, smears, filings) at seeded lateral positions on corners.
+	# Full ±(0.15..1.0)*room range (both signs occur across seeds). Keeps
+	# GRIP_PATCH_* bounds; never covers full corridor (driveable line remains on
+	# far side); clear of gates, start, grids, shortcut, technical, other surfaces.
+	# Uses dedicated seeded RNG. Decal via add_surface_decals matches the def.
+	# (Calm grip patches below remain calm-only.)
+	var corner_debris_centres := PackedInt32Array()
+	var corner_clearance: PackedFloat32Array = moments.get("corner_clearance", PackedFloat32Array())
+	var corner_list: PackedInt32Array = moments.get("corners", PackedInt32Array())
+	for c: int in corner_list:
+		for d in range(-12, 13):
+			var ii := posmod(c + d, centerline.size())
+			if TrackBuilderCore._cyclic_index_distance(ii, 0, centerline.size()) >= SURFACE_START_CLEARANCE:
+				corner_debris_centres.append(ii)
+	if corner_debris_centres.size() > 0:
+		var seen := {}
+		var uniq := PackedInt32Array()
+		for ii in corner_debris_centres:
+			if not seen.has(ii):
+				seen[ii] = true
+				uniq.append(ii)
+		corner_debris_centres = uniq
+
+	# Additional in-corridor grip patches (calm only) ...
 	var extra_patches: Array = spec.get("grip_patches", [])
 	var calm_patch_centres := TrackCornerMap.calm_indices(moments["corner_clearance"], GRIP_PATCH_MIN_HALF_SPAN)
+	var used_indices := PackedInt32Array([technical_index, shortcut_index])
+	var grip_patch_added := 0
 	if extra_patches.size() > 0 and not calm_patch_centres.is_empty():
 		var patch_rng := RandomNumberGenerator.new()
 		patch_rng.seed = TrackBuilderCore._mix_seed(int(spec.get("material_seed", spec.get("requested_seed", 0))), "grip_patches:%s" % String(story.get("id", "")))
 		var target_count := patch_rng.randi_range(TrackBuilderCore.GRIP_PATCH_MIN_COUNT, TrackBuilderCore.GRIP_PATCH_MAX_COUNT)
-		var used_indices := PackedInt32Array([technical_index, shortcut_index])
 		var added := 0
 		for attempt in 240:
 			if added >= target_count:
@@ -1096,11 +1120,107 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 				"centerline_index": pidx_center,
 				"lateral_mm": lateral,
 				"half_span": half_span,
+				"half_width": halfw,
 			}
 			definitions.append(def)
 			used_indices.append(pidx_center)
 			added += 1
-		parent.set_meta("grip_patch_count", added)
+			grip_patch_added = added
+		parent.set_meta("grip_patch_count", grip_patch_added)
+
+	# Corner debris pass (reuse patch pipeline for simplicity, dedicated RNG and
+	# centres). 0-2, on corners, full lateral, bounded, seeded.
+	if extra_patches.size() > 0 and corner_debris_centres.size() > 0:
+		var debris_rng := RandomNumberGenerator.new()
+		debris_rng.seed = TrackBuilderCore._mix_seed(int(spec.get("material_seed", spec.get("requested_seed", 0))), "corner_debris:%s" % String(story.get("id", "")))
+		var target_debris := debris_rng.randi_range(0, 2)
+		var added_debris := 0
+		for attempt in 120:
+			if added_debris >= target_debris:
+				break
+			var pidx_center := corner_debris_centres[debris_rng.randi_range(0, corner_debris_centres.size() - 1)]
+			if TrackBuilderCore._cyclic_index_distance(pidx_center, 0, centerline.size()) < SURFACE_START_CLEARANCE:
+				continue
+			var separated := true
+			for used_index: int in used_indices:
+				if used_index >= 0 and TrackBuilderCore._cyclic_index_distance(pidx_center, used_index, centerline.size()) < SURFACE_SEPARATION:
+					separated = false
+					break
+			if not separated or not TrackBuilderCore._clear_of_points(centerline[pidx_center], gate_samples, SURFACE_GATE_CLEARANCE):
+				continue
+			var half_span := debris_rng.randi_range(GRIP_PATCH_MIN_HALF_SPAN, GRIP_PATCH_MAX_HALF_SPAN)
+			if TrackCornerMap.is_calm(moments["corner_clearance"], pidx_center, half_span):
+				continue  # must be corner placement
+			var data: Dictionary = extra_patches[(grip_patch_added + added_debris) % extra_patches.size()]
+			var halfw := debris_rng.randf_range(GRIP_PATCH_MIN_HALF_WIDTH, GRIP_PATCH_MAX_HALF_WIDTH)
+			var room := maxf(0.0, TrackBuilderCore.HALF_WIDTH - halfw - GRIP_PATCH_EDGE_MARGIN)
+			var lateral := (-1.0 if debris_rng.randi() % 2 == 0 else 1.0) * debris_rng.randf_range(0.15, 1.0) * room
+			# enforce driveable line: near margin >= edge, far margin >= ~1 vehicle
+			var near_m := TrackBuilderCore.HALF_WIDTH - (absf(lateral) + halfw)
+			var far_m := TrackBuilderCore.HALF_WIDTH + absf(lateral) - halfw
+			if near_m < GRIP_PATCH_EDGE_MARGIN - 0.1 or far_m < 40.0:
+				continue
+			var shifted := offset_centerline(centerline, lateral)
+			var poly := surface_strip(shifted, pidx_center, half_span, halfw)
+			var patch_node := Node2D.new()
+			patch_node.name = "CornerDebris%d" % added_debris
+			patch_node.set_meta("moment_kind", &"debris")
+			patch_node.set_meta("surface_name", StringName(data["name"]))
+			patch_node.set_meta("grip", float(data["grip"]))
+			patch_node.set_meta("speed", float(data.get("speed", data["grip"])))
+			patch_node.set_meta("polygon", poly)
+			patch_node.set_meta("lateral_mm", lateral)
+			patch_node.set_meta("half_span", half_span)
+			patch_node.set_meta("decal_texture", String(data["decal"]))
+			parent.add_child(patch_node)
+			if emit_decals:
+				add_surface_decals(patch_node, centerline, pidx_center, half_span, String(data["decal"]), lateral)
+			var def := {
+				"name": StringName(data["name"]),
+				"role": &"debris",
+				"lane": &"mixed",
+				"grip": float(data["grip"]),
+				"speed": float(data.get("speed", data["grip"])),
+				"points": poly,
+				"decal": String(data["decal"]),
+				"centerline_index": pidx_center,
+				"lateral_mm": lateral,
+				"half_span": half_span,
+				"half_width": halfw,
+			}
+			definitions.append(def)
+			used_indices.append(pidx_center)
+			added_debris += 1
+	root.set_meta("generated_surfaces", definitions)
+
+
+static func build_open_generated_surfaces(root: Node2D, parent: Node2D, story: Dictionary, spec: Dictionary, centerline: PackedVector2Array, gate_samples: PackedVector2Array, spacing: float) -> void:
+	var surfaces: Array = story.get("surfaces", [])
+	var definitions: Array[Dictionary] = []
+	if surfaces.is_empty() or centerline.size() < TECHNICAL_HALF_SPAN * 2 + 2:
+		return
+	var total := open_path_length(centerline)
+	var rng := RandomNumberGenerator.new()
+	rng.seed = TrackBuilderCore._mix_seed(int(spec["material_seed"]), "strip_surfaces")
+	var count := maxi(2, floori(total / spacing))
+	for slot in count:
+		var fraction := (slot + 1.0) / (count + 1.0)
+		var index := clampi(roundi(fraction * centerline.size()), TECHNICAL_HALF_SPAN + 1, centerline.size() - TECHNICAL_HALF_SPAN - 2)
+		if not TrackBuilderCore._clear_of_points(centerline[index], gate_samples, SURFACE_GATE_CLEARANCE):
+			index = mini(index + TECHNICAL_HALF_SPAN * 2, centerline.size() - TECHNICAL_HALF_SPAN - 2)
+		if not TrackBuilderCore._clear_of_points(centerline[index], gate_samples, SURFACE_GATE_CLEARANCE):
+			continue
+		var data: Dictionary = surfaces[(slot + rng.randi_range(0, surfaces.size() - 1)) % surfaces.size()]
+		var half_width := rng.randf_range(GRIP_PATCH_MIN_HALF_WIDTH, GRIP_PATCH_MAX_HALF_WIDTH)
+		var lateral := (-1.0 if slot % 2 == 0 else 1.0) * rng.randf_range(12.0, TrackBuilderCore.HALF_WIDTH - half_width - GRIP_PATCH_EDGE_MARGIN)
+		var polygon := surface_strip(offset_centerline(centerline, lateral), index, TECHNICAL_HALF_SPAN, half_width)
+		var node := Node2D.new()
+		node.name = "OpenGripPatch%d" % slot
+		node.set_meta("polygon", polygon)
+		node.set_meta("moment_kind", &"grip_patch")
+		parent.add_child(node)
+		add_surface_decals(node, centerline, index, TECHNICAL_HALF_SPAN, String(data["decal"]), lateral)
+		definitions.append({"name": StringName(data["name"]), "role": &"patch", "lane": &"mixed", "grip": float(data["grip"]), "speed": float(data["speed"]), "points": polygon, "decal": String(data["decal"]), "centerline_index": index, "lateral_mm": lateral})
 	root.set_meta("generated_surfaces", definitions)
 
 

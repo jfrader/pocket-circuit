@@ -24,6 +24,12 @@ var wrong_way := false
 var route_progress := PackedFloat32Array()
 var player_progress_index := 0
 var next_checkpoint := 0
+var strip_mode := false
+
+
+func set_strip_mode(enabled: bool) -> void:
+	strip_mode = enabled
+	queue_redraw()
 
 
 func _ready() -> void:
@@ -66,8 +72,9 @@ func _draw() -> void:
 	if size.x < 640.0 or size.y < 360.0:
 		return
 	var layout := get_layout_rects()
-	_draw_position(layout["position"])
-	_draw_lap(layout["lap"])
+	if not strip_mode:
+		_draw_position(layout["position"])
+		_draw_lap(layout["lap"])
 	_draw_clock(layout["clock"])
 	_draw_speed(layout["speed"])
 	_draw_route_progress(layout["progress"])
