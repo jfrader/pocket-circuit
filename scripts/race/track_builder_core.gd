@@ -370,7 +370,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 			for side in [-1, 1]:
 				var path := String(post_assets[posmod(gate_index * 2 + (1 if side > 0 else 0), post_assets.size())])
 				var size := PROP_SCALE.size_for(path, GATE_POST_SIZE)
-				var offset := (FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET) + TrackWidthProfile.at_point(centerline, half_widths, gate_points[gate_index]) - HALF_WIDTH
+				var offset := (FINISH_LANDMARK_OFFSET if gate_index == 0 else GATE_POST_OFFSET) + TrackWidthProfile.at_point(centerline, half_widths, gate_points[gate_index], float(spec.get("half_width", HALF_WIDTH))) - HALF_WIDTH
 				var position: Vector2 = gate_points[gate_index] + tangent.rotated(PI * 0.5) * offset * side
 				reserved.append(TRACK_BUILDER_BOUNDARY._footprint_polygon(position, size + Vector2.ONE * 6.0, tangent.angle()))
 				solid_cores.append(Vector3(position.x, position.y, minf(size.x, size.y) * core_ratio))
