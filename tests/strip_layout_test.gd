@@ -10,7 +10,7 @@ const LAYOUT_GATE_SPACING := 1850.0
 
 
 func _initialize() -> void:
-	var identity := IDENTITY.create(&"kitchen", &"classic", 123, false, 0, "", "", {}, "standard", "strip")
+	var identity := IDENTITY.create(&"kitchen", &"classic", 123, false, 0, "", "", {}, "standard", IDENTITY.DEFAULT_ROAD_WIDTH, "strip")
 	if identity.is_empty() or String(identity["route_shape"]) != "strip" or bool(IDENTITY.encode_share_code(identity).get("ok", false)):
 		_fail("Strip identity or share-code rejection")
 		return
@@ -52,7 +52,7 @@ func _initialize() -> void:
 	if (first["traffic_plan"] as Array).size() < 2 or (first["traffic_plan"] as Array).size() > LAYOUT.MAX_TRAFFIC:
 		_fail("Traffic should scale with route length without forming a wall")
 		return
-	var reversed_identity := IDENTITY.create(&"kitchen", &"classic", 123, true, 0, "", "", {}, "standard", "strip")
+	var reversed_identity := IDENTITY.create(&"kitchen", &"classic", 123, true, 0, "", "", {}, "standard", IDENTITY.DEFAULT_ROAD_WIDTH, "strip")
 	var reversed := BUILDER.prepare_layout(&"kitchen", &"classic", 123, {"route_shape": "strip", "reverse": true})
 	if not reversed_identity.is_empty() or not reversed.is_empty():
 		_fail("Only traffic may travel south; reverse strip APIs must reject reversal")
@@ -62,7 +62,7 @@ func _initialize() -> void:
 	if preview.is_empty() or not reverse_preview.is_empty() or (preview["points"] as PackedVector2Array).size() < 2 or (preview["points"] as PackedVector2Array)[0] == (preview["points"] as PackedVector2Array)[-1]:
 		_fail("Open preview lost an endpoint or accepted a southbound strip")
 		return
-	var long_identity := IDENTITY.create(&"kitchen", &"classic", 123, false, 0, "", "", {}, "long", "strip")
+	var long_identity := IDENTITY.create(&"kitchen", &"classic", 123, false, 0, "", "", {}, "long", IDENTITY.DEFAULT_ROAD_WIDTH, "strip")
 	var long_layout := BUILDER.prepare_layout(&"kitchen", &"classic", 123, IDENTITY.generation_options(long_identity))
 	if long_layout.is_empty() or float(long_layout["strip_length"]) <= float(first["strip_length"]):
 		_fail("Strip length tier does not scale the room")
@@ -157,11 +157,11 @@ func _initialize() -> void:
 				_fail("Traffic must fill the runner with cruiser packs and lone cutter, swerve, truck")
 				return
 		lengths.append("%s %.0f/%.0f/%.0f limit=%.0fs" % [tier, minimum, sum / 3.0, maximum, ceilf(sum / 3.0 / LAYOUT.CLEAN_SPEED_ESTIMATE * LAYOUT.TIME_LIMIT_FACTOR)])
-	var explicit := IDENTITY.create(&"kitchen", &"classic", 123, false, 0, "", "", {}, "standard", "strip", &"office")
+	var explicit := IDENTITY.create(&"kitchen", &"classic", 123, false, 0, "", "", {}, "standard", IDENTITY.DEFAULT_ROAD_WIDTH, "strip", &"office")
 	if explicit.is_empty() or explicit["theme_b"] != "office" or not "Kitchen → Office" in explicit["summary"] or IDENTITY.generation_options(explicit).get("theme_b") != "office" or IDENTITY.apply_to_event(explicit).get("theme_b") != "office":
 		_fail("Explicit destination theme lost across identity/event/options")
 		return
-	var same := IDENTITY.create(&"kitchen", &"classic", 123, false, 0, "", "", {}, "standard", "strip", &"kitchen")
+	var same := IDENTITY.create(&"kitchen", &"classic", 123, false, 0, "", "", {}, "standard", IDENTITY.DEFAULT_ROAD_WIDTH, "strip", &"kitchen")
 	var explicit_layout := BUILDER.prepare_layout(&"kitchen", &"classic", 123, IDENTITY.generation_options(explicit))
 	if explicit_layout.get("theme_b") != &"office" or not _check_themes(explicit_layout):
 		_fail("Explicit destination theme lost during layout preparation")

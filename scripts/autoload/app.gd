@@ -8,6 +8,7 @@ const CIRCUIT_IDENTITIES := preload("res://scripts/progression/championship_circ
 const MASTERY := preload("res://scripts/progression/mastery_run.gd")
 const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
 const RACE_PREPARATION := preload("res://scripts/race/race_preparation.gd")
+const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
@@ -170,6 +171,10 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	# The prewarm builds the room off-tree; free it if the app is torn down mid-build.
+	if _prewarm_room_root != null and is_instance_valid(_prewarm_room_root):
+		_prewarm_room_root.free()
+	_prewarm_room_root = null
 	if _test_mode and _save_store:
 		_save_store.remove_save()
 
@@ -564,7 +569,164 @@ func _random_seed(maximum: int) -> int:
 
 
 func generated_circuit_identity(theme: StringName, room: StringName, seed: int, reverse: bool = false, length_tier: String = "standard", route_shape: String = "circuit") -> Dictionary:
-	return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier, route_shape)
+	return GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier, GENERATED_CIRCUITS.DEFAULT_ROAD_WIDTH, route_shape)
+
+
+
+## Off-tree room being built by the prewarm; freed on app teardown if a quit
+## happens mid-build.
+var _prewarm_room_root: Node = null
+
+
+## Fire-and-forget pre-generation for a generated circuit event while the player
+## is on a preview or results screen that has idle time. The prepared layout
+## is computed on a NORMAL data job; the continuation then also warms scenery
+## outlines (on data jobs), the assembled room (off-tree via assemble_runtime
+## + pack), and per-vehicle motion plans (where reproducible from the event).
+## All steps yield cooperatively. Failures are ignored; the race path will
+## still do any missing work on demand.
+func prewarm_generated_circuit(event: Dictionary) -> void:
+	if String(event.get("circuit", "")) != "generated":
+		return
+	var key := TRACK_BUILDER.generated_circuit_cache_key(event)
+	if not key.is_empty():
+		var prepared: Dictionary = TRACK_BUILDER.cached_prepared(key)
+		if not prepared.is_empty():
+			return
+	var theme := StringName(event.get("theme", "kitchen"))
+	var room := StringName(event.get("room", "classic"))
+	var seed := int(event.get("seed", 0))
+	var options: Dictionary = TRACK_BUILDER.generated_circuit_options(event)
+	var preparation := RACE_PREPARATION.new()
+	add_child(preparation)
+	call_deferred("_execute_prewarm_job", preparation, theme, room, seed, options, key)
+
+
+func _execute_prewarm_job(preparation: Node, theme: StringName, room: StringName, seed: int, options: Dictionary, key: String) -> void:
+	var prepared: Dictionary = await preparation.run_data_job(
+		TRACK_BUILDER.prepare_layout.bind(theme, room, seed, options),
+		Thread.PRIORITY_NORMAL
+	)
+	if not prepared.is_empty() and not key.is_empty():
+		TRACK_BUILDER.store_prepared(key, prepared)
+		await _warm_scenery_outlines(preparation, prepared)
+		await _warm_room_if_missing(key, prepared)
+		# Motions warmed via separate RaceAssetPreloader pool + roster hooks (see prewarm_championship_event).
+	if preparation:
+		preparation.queue_free()
+
+
+func prewarm_championship_event(event_id: String) -> void:
+	if event_id.is_empty():
+		return
+	var identity := get_championship_circuit_identity(event_id)
+	if identity.is_empty():
+		return
+	var event := get_championship_event(event_id)
+	event = CIRCUIT_IDENTITIES.apply_to_event(event, identity)
+	prewarm_generated_circuit(event)
+	# Prewarm the exact roster's car motion looks too (opponents resolve to plain vehicle keys;
+	# we also include the currently-selected vehicle + rae livery so the race the player
+	# actually enters is warm). Uses the background preloader so work is low-pri data job,
+	# yields in menu idle time, idempotent if already cached from the full pool.
+	var roster := _championship_roster()
+	var looks: Array = []
+	for o: Variant in roster.get("opponents", []):
+		if o is Dictionary:
+			var did := String((o as Dictionary).get("id", ""))
+			var vid := String((o as Dictionary).get("vehicle_id", "rustbug"))
+			var k := IDENTITIES.resolve_visual_key(vid, did)
+			looks.append(k)
+	var sel := String(_save_data.get("selected_vehicle", "rustbug"))
+	var pk := IDENTITIES.resolve_visual_key(sel, "rae")
+	looks.append(pk)
+	if is_instance_valid(_race_asset_preloader) and _race_asset_preloader.has_method("prewarm_additional"):
+		_race_asset_preloader.call("prewarm_additional", looks)
+
+
+## The field is only known once the player commits, so warm its looks now: the
+## renders overlap the loading screen and land as cache hits in section 2.
+## Mirrors PrototypeRace._build_field_racers_for_preparation so the keys (and
+## any cosmetic collision shifts) match exactly.
+func _prewarm_roster_motions(vehicle_id: String, event: Dictionary) -> void:
+	if not is_instance_valid(_race_asset_preloader) or not _race_asset_preloader.has_method("prewarm_roster"):
+		return
+	var racers: Array[Dictionary] = [{"vehicle_id": vehicle_id, "driver_id": "rae", "slot": 0}]
+	var opponents: Array = event.get("opponents", [])
+	var count := clampi(int(event.get("opponent_count", opponents.size())), 0, 3)
+	for i in mini(opponents.size(), count):
+		var did := String(opponents[i])
+		var record := CATALOG.get_driver(did)
+		racers.append({"vehicle_id": String(record.get("vehicle_id", "rustbug")), "driver_id": did, "slot": i + 1})
+	var looks: Array = []
+	for k: Variant in IDENTITIES.resolve_field_visual_keys(racers).values():
+		looks.append(String(k))
+	_race_asset_preloader.call("prewarm_roster", looks)
+
+
+## Safe, no-tree work: mirror the race path's outline prep exactly, on data jobs,
+## with yields between textures.
+func _warm_scenery_outlines(preparation: Node, prepared: Dictionary) -> void:
+	if prepared.is_empty():
+		return
+	var spec: Dictionary = prepared.get("spec", {})
+	for texture_path: String in TRACK_BUILDER.preparation_texture_paths(spec):
+		if TRACK_BUILDER.has_prepared_outline_path(texture_path):
+			continue
+		if not ResourceLoader.exists(texture_path):
+			continue
+		var texture := load(texture_path) as Texture2D
+		if texture != null and not TRACK_BUILDER.has_prepared_outline(texture):
+			var outline: Dictionary = await preparation.run_data_job(
+				TRACK_BUILDER.compute_alpha_outline.bind(texture.get_image(), texture.get_width(), texture.get_height())
+			)
+			if not outline.is_empty():
+				TRACK_BUILDER.install_prepared_outline(texture, outline)
+		if preparation.get_tree():
+			await preparation.get_tree().process_frame
+
+
+## Room prewarm: create_layout_root + assemble_runtime can run with root not
+## added to any scene tree (confirmed by build_packed usage, absence of
+## get_tree/get_viewport/ready assumptions in builders beyond _ready which
+## is deferred until add in race, and pack after free in build_packed).
+## We set name="Track" to match the race path's override, use a yielding stage
+## to spread the work, then pack+store exactly as race does. Never force-add.
+func _warm_room_if_missing(key: String, prepared: Dictionary) -> void:
+	if key.is_empty() or prepared.is_empty() or TRACK_BUILDER.cached_room(key) != null:
+		return
+	if not is_inside_tree():
+		return
+	var root := TRACK_BUILDER.create_layout_root(prepared)
+	root.name = "Track"
+	_prewarm_room_root = root
+	# Yielding stage spreads the assembly (~0.3s) across frames; Callable()
+	# would block one frame.
+	await TRACK_BUILDER.assemble_runtime(root, prepared, _prewarm_yield_stage)
+	if not is_instance_valid(root):
+		_prewarm_room_root = null
+		return
+	if is_inside_tree():
+		TRACK_BUILDER.mark_packed_scene_owners(root)
+		var pscene := PackedScene.new()
+		if pscene.pack(root) == OK:
+			TRACK_BUILDER.store_room(key, pscene)
+	root.free()
+	_prewarm_room_root = null
+	if get_tree():
+		await get_tree().process_frame
+
+
+func _prewarm_yield_stage(_phase: String) -> void:
+	await get_tree().process_frame
+
+
+## Motions are now prewarmed by the full-pool background warmer in RaceAssetPreloader
+## (using possible_field_visual_keys) plus explicit roster looks from prewarm_championship_event.
+## This covers both the late _roll_quick_roster() case and exact championship rosters.
+## The race path still renders anything missing (no change to loading logic).
+func _warm_motions_if_reproducible(_preparation: Node, _event: Dictionary) -> void:
+	pass
 
 
 func circuit_share_code(identity: Dictionary) -> Dictionary:
@@ -595,7 +757,9 @@ func retier_circuit_identity(identity_value: Dictionary, length_tier: String) ->
 		String(identity["palette_id"]),
 		overrides,
 		length_tier,
-		String(identity["route_shape"])
+		StringName(identity.get("road_width", GENERATED_CIRCUITS.DEFAULT_ROAD_WIDTH)),
+		String(identity.get("route_shape", "circuit")),
+		String(identity.get("theme_b", ""))
 	)
 
 
@@ -664,7 +828,7 @@ func start_circuit_race(theme: StringName, room: StringName, seed: int, vehicle_
 func start_strip_race(theme: StringName, room: StringName, seed: int, vehicle_id: String, reverse: bool = false, length_tier: String = "standard", theme_b: StringName = &"") -> bool:
 	if _transitioning_to_race or not GENERATED_RULES.LENGTH_TIERS.has(length_tier):
 		return false
-	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier, "strip", theme_b)
+	var identity := GENERATED_CIRCUITS.create(theme, room, seed, reverse, 0, "", "", {}, length_tier, GENERATED_CIRCUITS.DEFAULT_ROAD_WIDTH, "strip", theme_b)
 	if identity.is_empty():
 		return false
 	return _start_generated_identity_race(identity, vehicle_id, "strip")
@@ -720,6 +884,7 @@ func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: Stri
 			_save_data = candidate
 	if not preview_fingerprint.is_empty():
 		event["preview_fingerprint"] = preview_fingerprint
+	_prewarm_roster_motions(vehicle_id, event)
 	current_race_session = {
 		"mode": mode,
 		"event_id": event["id"],
