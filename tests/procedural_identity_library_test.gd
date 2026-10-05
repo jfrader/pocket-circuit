@@ -216,6 +216,14 @@ func _initialize() -> void:
 		if not _expect(pool.has(key), "generated opponent look %s must be in the prewarmed pool" % key):
 			DIRECTORY.clear()
 			return
+	var opponents: Array = roster.get("opponents", [])
+	var shared_vehicle := String((opponents[0] as Dictionary).get("vehicle_id", "rustbug"))
+	var base := IDENTITIES._effective_livery_for(shared_vehicle, "")
+	for shift in [1, 2, 3]:
+		var shifted := String(IDENTITIES._register_visual_key(shared_vehicle, IDENTITIES._shift_cosmetic(base, shift)))
+		if not _expect(pool.has(shifted), "collision-shifted look %s must be in the prewarmed pool" % shifted):
+			DIRECTORY.clear()
+			return
 	DIRECTORY.clear()
 
 	print("PROCEDURAL_IDENTITY_LIBRARY_TEST PASS")

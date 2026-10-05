@@ -7,6 +7,7 @@ const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const PREVIEW_CONTROL := preload("res://scripts/ui/circuit_preview_control.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd")
+const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
 
 var _app: Node
 var _mode := "browser"
@@ -64,6 +65,10 @@ func show_browser() -> void:
 
 func show_confirmation(identity_value: Dictionary) -> void:
 	_identity = identity_value.duplicate(true)
+	# The launch builds the whole circuit layout; start that now so a player who
+	# reads the confirmation before pressing Race starts it warm.
+	if _app.has_method("prewarm_generated_circuit"):
+		_app.call("prewarm_generated_circuit", GENERATED_CIRCUITS.apply_to_event(_identity))
 	_preview.clear()
 	_mode = "confirmation"
 	_generation += 1
@@ -159,6 +164,8 @@ func _on_size_selected(index: int) -> void:
 			_size_selector.select(current_index)
 		return
 	_identity = regenerated.duplicate(true)
+	if _app.has_method("prewarm_generated_circuit"):
+		_app.call("prewarm_generated_circuit", GENERATED_CIRCUITS.apply_to_event(_identity))
 	_preview.clear()
 	_generation += 1
 	var generation := _generation
