@@ -1126,14 +1126,25 @@ func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 
 
 func _current_quick_identity() -> Dictionary:
+	# route_shape only when the Quick Strip toggle is on: mock apps implement the
+	# five-argument form, and the circuit path is the long-standing contract.
+	if _quick_strip:
+		return _app.call(
+			"generated_circuit_identity",
+			_quick_race_theme,
+			_quick_race_room,
+			_quick_race_seed,
+			_quick_race_reverse,
+			_quick_race_length_tier,
+			"strip"
+		)
 	return _app.call(
 		"generated_circuit_identity",
 		_quick_race_theme,
 		_quick_race_room,
 		_quick_race_seed,
 		_quick_race_reverse,
-		_quick_race_length_tier,
-		"strip" if _quick_strip else "circuit"
+		_quick_race_length_tier
 	)
 
 
