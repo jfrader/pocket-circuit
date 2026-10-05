@@ -57,6 +57,13 @@ func _run_test() -> void:
 		await process_frame
 	if not _expect(TRACK_BUILDER.cached_room(key) != null, "a completed prewarm must also pack the room"):
 		return
+	var packed_room: PackedScene = TRACK_BUILDER.cached_room(key)
+	var room_instance: Node = packed_room.instantiate()
+	var room_children := room_instance.get_child_count() if room_instance != null else -1
+	if room_instance != null:
+		room_instance.free()
+	if not _expect(room_children > 0, "the packed room must contain its assembled children, saw %d" % room_children):
+		return
 
 	var spec: Dictionary = TRACK_BUILDER.cached_prepared(key).get("spec", {})
 	for texture_path: String in TRACK_BUILDER.preparation_texture_paths(spec):

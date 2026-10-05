@@ -606,7 +606,7 @@ func _execute_prewarm_job(preparation: Node, theme: StringName, room: StringName
 		TRACK_BUILDER.store_prepared(key, prepared)
 		await _warm_scenery_outlines(preparation, prepared)
 		await _warm_room_if_missing(key, prepared)
-		# Motions intentionally not prewarmed here (see _warm_motions comment).
+		# Motions warmed via separate RaceAssetPreloader pool + roster hooks (see prewarm_championship_event).
 	if preparation:
 		preparation.queue_free()
 
@@ -620,6 +620,43 @@ func prewarm_championship_event(event_id: String) -> void:
 	var event := get_championship_event(event_id)
 	event = CIRCUIT_IDENTITIES.apply_to_event(event, identity)
 	prewarm_generated_circuit(event)
+	# Prewarm the exact roster's car motion looks too (opponents resolve to plain vehicle keys;
+	# we also include the currently-selected vehicle + rae livery so the race the player
+	# actually enters is warm). Uses the background preloader so work is low-pri data job,
+	# yields in menu idle time, idempotent if already cached from the full pool.
+	var roster := _championship_roster()
+	var looks: Array = []
+	for o: Variant in roster.get("opponents", []):
+		if o is Dictionary:
+			var did := String((o as Dictionary).get("id", ""))
+			var vid := String((o as Dictionary).get("vehicle_id", "rustbug"))
+			var k := IDENTITIES.resolve_visual_key(vid, did)
+			looks.append(k)
+	var sel := String(_save_data.get("selected_vehicle", "rustbug"))
+	var pk := IDENTITIES.resolve_visual_key(sel, "rae")
+	looks.append(pk)
+	if is_instance_valid(_race_asset_preloader) and _race_asset_preloader.has_method("prewarm_additional"):
+		_race_asset_preloader.call("prewarm_additional", looks)
+
+
+## The field is only known once the player commits, so warm its looks now: the
+## renders overlap the loading screen and land as cache hits in section 2.
+## Mirrors PrototypeRace._build_field_racers_for_preparation so the keys (and
+## any cosmetic collision shifts) match exactly.
+func _prewarm_roster_motions(vehicle_id: String, event: Dictionary) -> void:
+	if not is_instance_valid(_race_asset_preloader) or not _race_asset_preloader.has_method("prewarm_roster"):
+		return
+	var racers: Array[Dictionary] = [{"vehicle_id": vehicle_id, "driver_id": "rae", "slot": 0}]
+	var opponents: Array = event.get("opponents", [])
+	var count := clampi(int(event.get("opponent_count", opponents.size())), 0, 3)
+	for i in mini(opponents.size(), count):
+		var did := String(opponents[i])
+		var record := CATALOG.get_driver(did)
+		racers.append({"vehicle_id": String(record.get("vehicle_id", "rustbug")), "driver_id": did, "slot": i + 1})
+	var looks: Array = []
+	for k: Variant in IDENTITIES.resolve_field_visual_keys(racers).values():
+		looks.append(String(k))
+	_race_asset_preloader.call("prewarm_roster", looks)
 
 
 ## Safe, no-tree work: mirror the race path's outline prep exactly, on data jobs,
@@ -665,6 +702,7 @@ func _warm_room_if_missing(key: String, prepared: Dictionary) -> void:
 		_prewarm_room_root = null
 		return
 	if is_inside_tree():
+		TRACK_BUILDER.mark_packed_scene_owners(root)
 		var pscene := PackedScene.new()
 		if pscene.pack(root) == OK:
 			TRACK_BUILDER.store_room(key, pscene)
@@ -678,18 +716,10 @@ func _prewarm_yield_stage(_phase: String) -> void:
 	await get_tree().process_frame
 
 
-## Motion plans skipped in prewarm continuation:
-## _build_field_racers_for_preparation (and thus resolve_field_visual_keys)
-## reads player vehicle_id from the race instance's _session and opponents
-## (plus count) from _session["event"]. For quick races the prewarm call site
-## uses GENERATED_CIRCUITS.apply_to_event(quick_identity) (hardcoded defaults
-## ["juniper","milo","tess"], no vehicle_id) while actual start_circuit_race
-## does _roll_quick_roster() + _event_with_roster which installs a fresh roster.
-## Championship events match better but the prewarm_generated_circuit path is
-## shared. We cannot reproduce the exact set of visual_keys the eventual race
-## will request without race state or guessing rosters/choices; therefore
-## motions left to the race path (which will compute any missing).
-## Prewarming a superset of wrong keys would be pointless.
+## Motions are now prewarmed by the full-pool background warmer in RaceAssetPreloader
+## (using possible_field_visual_keys) plus explicit roster looks from prewarm_championship_event.
+## This covers both the late _roll_quick_roster() case and exact championship rosters.
+## The race path still renders anything missing (no change to loading logic).
 func _warm_motions_if_reproducible(_preparation: Node, _event: Dictionary) -> void:
 	pass
 
@@ -826,6 +856,7 @@ func _start_generated_identity_race(identity_value: Dictionary, vehicle_id: Stri
 			_save_data = candidate
 	if not preview_fingerprint.is_empty():
 		event["preview_fingerprint"] = preview_fingerprint
+	_prewarm_roster_motions(vehicle_id, event)
 	current_race_session = {
 		"mode": mode,
 		"event_id": event["id"],
