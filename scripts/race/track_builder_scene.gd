@@ -53,7 +53,7 @@ static func build_strip(root: Node2D, prepared: Dictionary) -> void:
 		var position: Vector2 = gate["position"]
 		TrackBuilderCore._add_cp(root, "Checkpoint%dFinish" % index if gate["is_finish_line"] else "Checkpoint%d" % index, position, tangent.angle() + PI, index, bool(gate["is_finish_line"]), float(gate["rotation"]), PackedVector2Array([position - normal, position + normal]))
 		var spec: Dictionary = regions[0 if float(gate["arc"]) < float(prepared["strip_theme_switch"]["arc"]) else 1]["spec"]
-		TrackBuilderCore._add_gate_posts(root, spec, position, tangent, index)
+		TrackBuilderCore._add_gate_posts(root, spec, position, tangent, index, float(prepared["strip_half_width"]))
 	var last: Dictionary = (prepared["strip_gates"] as Array)[-1]
 	TrackBuilderCore._add_finish_checker(root, last["position"], Vector2.UP.rotated(float(last["rotation"])), float(prepared["strip_half_width"]))
 	var grid: Dictionary = prepared["strip_grid"]
@@ -167,7 +167,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 		var is_finish := gate_index == 0
 		var name := "Checkpoint0Finish" if is_finish else "Checkpoint%d" % gate_index
 		var span_endpoints := PackedVector2Array()
-		var local_half := TrackWidthProfile.at_point(centerline, half_widths, sample)
+		var local_half := TrackWidthProfile.at_point(centerline, half_widths, sample, float(spec.get("half_width", TrackBuilderCore.HALF_WIDTH)))
 		if spec.get("seed_obstacles", false):
 			span_endpoints = TrackBuilderCore._gate_span_endpoints(sample, tangent, room_polygon, island_region, local_half)
 		TrackBuilderCore._add_cp(root, name, sample, rotation, gate_index, is_finish, atan2(tangent.x, -tangent.y), span_endpoints)
@@ -176,7 +176,7 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 
 	# The checker spans the complete local corridor. Each color cell is its own
 	# simple polygon so disconnected checks never become a self-crossing polygon.
-	TrackBuilderCore._add_finish_checker(root, start, start_tangent, TrackWidthProfile.at_point(centerline, half_widths, start))
+	TrackBuilderCore._add_finish_checker(root, start, start_tangent, TrackWidthProfile.at_point(centerline, half_widths, start, float(spec.get("half_width", TrackBuilderCore.HALF_WIDTH))))
 
 	# Follow the centerline arc rather than extending one start tangent through a
 	# nearby corner. This keeps every grid slot inside the drivable corridor on
