@@ -204,6 +204,10 @@ func show_briefing(event_id: String) -> void:
 		return
 	_screen = "briefing"
 	_event_id = event_id
+	# Mastery runs use this event's championship circuit, so warm it while the
+	# briefing is on screen (the map prewarms its focus, the briefing did not).
+	if _app.has_method("prewarm_championship_event"):
+		_app.call("prewarm_championship_event", event_id)
 	_reset_quick_race_state()
 	_clear_content()
 	var opponent_ids: Array = event.get("opponents", [])
