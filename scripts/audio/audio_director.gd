@@ -1,6 +1,5 @@
 extends Node
 
-const ENGINE_LOOP := preload("res://assets/audio/engine_loop.ogg")
 const RaceMusicPlan := preload("res://scripts/audio/race_music_plan.gd")
 const EngineSoundPlayerScript := preload("res://scripts/audio/engine/engine_sound_player.gd")
 const EngineRecipeLibraryScript := preload("res://scripts/audio/engine/engine_recipe_library.gd")
@@ -68,7 +67,9 @@ var _music_context: StringName = &""
 var _local_vehicle: Node
 var _vehicle_max_speed := 680.0
 var _race_paused := false
-var _engine_loop: AudioStream
+## Recipe of the local car, kept so the generated loop fallback can be built
+## when the real-time engine voice is unavailable. No recorded audio ships.
+var _engine_fallback_recipe: EngineRecipe = null
 var _engine_rpm := 0.08
 var _headless := false
 ## Live music: score generation, section cues, and the phase rotation.
@@ -80,7 +81,6 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_headless = DisplayServer.get_name().to_lower() == "headless"
 	ensure_buses()
-	_engine_loop = _make_runtime_loop(ENGINE_LOOP)
 	_build_players()
 	_build_interface_sfx()
 	_live = LiveMusic.new(self)
@@ -112,7 +112,7 @@ func _exit_tree() -> void:
 			player.stop()
 			player.stream = null
 	_local_vehicle = null
-	_engine_loop = null
+	_engine_fallback_recipe = null
 	# Godot only retires a stopped playback on a later audio mix, and shutdown
 	# stops the audio driver after this teardown. Wait (bounded) for the mixer to
 	# process the stops above so the engine voice and the other players do not
@@ -213,8 +213,20 @@ func set_local_vehicle(vehicle: Node, vehicle_id: String = "") -> void:
 		return
 	if vehicle_stats is VehicleStats:
 		_prepare_vehicle_sfx(vehicle_stats, vehicle_id)
-	if not _prepare_engine_voice(vehicle, vehicle_id) and not _headless and not _engine_player.playing:
-		_engine_player.play()
+	var voice_ready := _prepare_engine_voice(vehicle, vehicle_id)
+	if not voice_ready and not _headless:
+		_ensure_generated_fallback_loop()
+		if not _engine_player.playing:
+			_engine_player.play()
+
+
+## First-party stand-in for the local engine tone: the same generated looping WAV
+## the opponents use, built from the local car's recipe and cached by signature.
+func _ensure_generated_fallback_loop() -> void:
+	if not is_instance_valid(_engine_player) or _engine_fallback_recipe == null:
+		return
+	if _engine_player.stream == null:
+		_engine_player.stream = EngineLoopGeneratorScript.generate_cached(_engine_fallback_recipe)
 
 
 ## Interface and race blips are global and fixed, so they are built once at boot.
@@ -280,6 +292,7 @@ func _prepare_engine_voice(vehicle: Node, vehicle_id: String) -> bool:
 	if resolved_id.is_empty():
 		resolved_id = EngineRecipeLibraryScript.UNIDENTIFIED_VEHICLE_ID
 	var recipe := EngineRecipeLibraryScript.resolve(resolved_id, stats)
+	_engine_fallback_recipe = recipe
 	if not _engine_voice.prepare(recipe, resolved_id):
 		return false
 	_engine_voice.start()
@@ -415,7 +428,6 @@ func _build_players() -> void:
 	_engine_player = AudioStreamPlayer.new()
 	_engine_player.name = "EnginePlayer"
 	_engine_player.bus = &"Engine"
-	_engine_player.stream = _engine_loop
 	_engine_player.volume_db = SILENCE_DB
 	add_child(_engine_player)
 
@@ -459,8 +471,10 @@ func _update_engine(delta: float = 1.0 / 60.0) -> void:
 	if is_instance_valid(_engine_voice) and not _engine_voice.is_using_fallback():
 		_drive_engine_voice(delta)
 		return
-	if not _headless and not _engine_player.playing:
-		_engine_player.play()
+	if not _headless:
+		_ensure_generated_fallback_loop()
+		if not _engine_player.playing:
+			_engine_player.play()
 	var speed := maxf(0.0, float(_local_vehicle.get("speed")))
 	var speed_ratio := clampf(speed / _vehicle_max_speed, 0.0, 1.2)
 	var engine_load := 0.0
@@ -752,16 +766,3 @@ func _ensure_bus(bus_name: StringName) -> int:
 		AudioServer.set_bus_name(bus_index, bus_name)
 	AudioServer.set_bus_send(bus_index, &"Master")
 	return bus_index
-
-func _make_runtime_loop(source: AudioStream) -> AudioStream:
-	var looped := source.duplicate() as AudioStream
-	if looped is AudioStreamWAV:
-		var wav := looped as AudioStreamWAV
-		wav.loop_mode = AudioStreamWAV.LOOP_FORWARD
-		wav.loop_begin = 0
-		wav.loop_end = maxi(0, roundi(wav.get_length() * float(wav.mix_rate)) - 1)
-	elif looped is AudioStreamOggVorbis:
-		var ogg := looped as AudioStreamOggVorbis
-		ogg.loop = true
-		ogg.loop_offset = 0.0
-	return looped
