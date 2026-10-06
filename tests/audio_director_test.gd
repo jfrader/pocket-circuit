@@ -1,6 +1,8 @@
 extends SceneTree
 
 const AUDIO_DIRECTOR_SCRIPT := preload("res://scripts/audio/audio_director.gd")
+const RECIPE_LIBRARY := preload("res://scripts/audio/engine/engine_recipe_library.gd")
+const CATALOG := preload("res://data/championship/catalog.gd")
 
 
 class FakeVehicle extends Node:
@@ -86,8 +88,16 @@ func _run_test() -> void:
 	if not _expect(not String(director.call("get_live_seed")).is_empty(), "play_menu_music should load a live score with a seed"):
 		return
 	var menu_seed := String(director.call("get_live_seed"))
-	var engine_stream: AudioStream = (director.get_node("EnginePlayer") as AudioStreamPlayer).stream
-	if not _expect(_loop_spans_stream(engine_stream), "engine loop should span decoded samples"):
+	var fallback_player := director.get_node("EnginePlayer") as AudioStreamPlayer
+	if not _expect(fallback_player != null and fallback_player.stream == null, "the engine player must not ship a recorded loop; the fallback is generated on demand"):
+		return
+	# The fallback only exists when the real-time voice is unavailable, so seed a
+	# recipe and build it the way the director does at runtime.
+	var recipe := RECIPE_LIBRARY.resolve("rustbug", CATALOG.create_vehicle_stats("rustbug"))
+	director.set("_engine_fallback_recipe", recipe)
+	director.call("_ensure_generated_fallback_loop")
+	var engine_stream: AudioStream = fallback_player.stream
+	if not _expect(_loop_spans_stream(engine_stream), "the generated engine fallback should span decoded samples"):
 		return
 	director.play_race_music()
 	director.play_race_music()
