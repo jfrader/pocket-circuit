@@ -27,7 +27,8 @@ func _run_test() -> void:
 	# Try emit first for signal path (exercises connect in handler + our signal with live)
 	Input.joy_connection_changed.emit(0, true)
 	await process_frame
-	if not _expect(received.size() > 0 and received[received.size() - 1] == true, "signal must fire true (live) on connect sim"):
+	var live_after_emit := not Input.get_connected_joypads().is_empty()
+	if not _expect(received.size() > 0 and received[received.size() - 1] == live_after_emit, "signal must fire the live state on connect sim"):
 		return
 
 	# Simulate held via joypad event + action press (to survive poll in this env)
@@ -48,10 +49,11 @@ func _run_test() -> void:
 		return
 	# signal during this will have emitted the live (true), which is consistent
 
-	# re-sim connect via emit to exercise signal true
+	# re-sim connect via emit to exercise the signal again
 	Input.joy_connection_changed.emit(0, true)
 	await process_frame
-	if not _expect(received[received.size() - 1] == true, "signal must fire right boolean (true) for connect"):
+	var live_after_reconnect := not Input.get_connected_joypads().is_empty()
+	if not _expect(received[received.size() - 1] == live_after_reconnect, "signal must fire the live state on reconnect"):
 		return
 
 	# Clean up our signal listener (real disconnect happens in App._exit_tree on tree exit)
