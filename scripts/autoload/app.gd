@@ -21,6 +21,8 @@ const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd
 const ROSTER_SIZE := 3
 const LOADING_FRAME_BUDGET_USEC := 50_000
 
+signal joypad_connection_changed(connected: bool)
+
 var current_race_session: Dictionary = {}
 var _quick_roster: Dictionary = {}
 
@@ -132,6 +134,12 @@ func _enter_tree() -> void:
 	_ensure_key(&"pause", KEY_ESCAPE)
 	_ensure_joypad_button(&"pause", JOY_BUTTON_START)
 
+	Input.joy_connection_changed.connect(_on_joy_connection_changed)
+	# Emit initial state once at startup if a pad is already present (Godot does not
+	# emit joy_connection_changed for pads that were connected before the game launched).
+	if not Input.get_connected_joypads().is_empty():
+		joypad_connection_changed.emit(true)
+
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -171,6 +179,8 @@ func _ready() -> void:
 
 
 func _exit_tree() -> void:
+	if Input.joy_connection_changed.is_connected(_on_joy_connection_changed):
+		Input.joy_connection_changed.disconnect(_on_joy_connection_changed)
 	# The prewarm builds the room off-tree; free it if the app is torn down mid-build.
 	if _prewarm_room_root != null and is_instance_valid(_prewarm_room_root):
 		_prewarm_room_root.free()
@@ -213,6 +223,11 @@ func get_save_data() -> Dictionary:
 
 func get_championship_event(event_id: String) -> Dictionary:
 	return _event_with_roster(CATALOG.get_event(event_id), _championship_roster())
+
+
+func has_joypad() -> bool:
+	# Returns true if at least one joypad is currently connected.
+	return not Input.get_connected_joypads().is_empty()
 
 
 ## The player drives one cast slot; only its portrait seed is customizable.
@@ -1465,6 +1480,29 @@ func _ensure_key(action: StringName, keycode: Key) -> void:
 	var event := InputEventKey.new()
 	event.keycode = keycode
 	InputMap.action_add_event(action, event)
+
+
+func _on_joy_connection_changed(device: int, connected: bool) -> void:
+	if not connected:
+		_release_joypad_actions()
+	# Emit live state on every change (connect or disconnect). Callers can react to
+	# presence without polling.
+	joypad_connection_changed.emit(not Input.get_connected_joypads().is_empty())
+
+
+func _release_joypad_actions() -> void:
+	# Release every action that has a joypad event bound and is currently held.
+	# This prevents a disconnected pad from leaving throttle/steer/pause/ui_* stuck.
+	for action: StringName in InputMap.get_actions():
+		if not Input.is_action_pressed(action):
+			continue
+		var has_joypad_event := false
+		for event: InputEvent in InputMap.action_get_events(action):
+			if event is InputEventJoypadButton or event is InputEventJoypadMotion:
+				has_joypad_event = true
+				break
+		if has_joypad_event:
+			Input.action_release(action)
 
 
 func _save() -> bool:
