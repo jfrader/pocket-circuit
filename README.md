@@ -15,6 +15,11 @@ spec (§7) describes a 3D camera — the project renders as **2D**; where spec
 and 2D conflict, 2D wins and the spec's *feel* (readable at speed, follow
 camera, miniature scale) is the guide.
 
+## Download
+
+Windows tester builds are published on the [Releases](../../releases) page.
+Unpack the zip and run `pocket-circuit.exe`.
+
 ## Design spec
 
 Full 135-section pre-production spec: [`docs/game-design-spec.md`](docs/game-design-spec.md)
@@ -88,3 +93,9 @@ engine version without a decision in Linear and matching export templates.
 
 - [Pocket Circuit project (Linear)](https://linear.app/gurisitosgames/project/pocket-circuit-78cd5b0a6db2)
 - Gurisitos Games studio: [gurisitos.games](https://gurisitos.games)
+
+## License
+
+MIT — see [`LICENSE`](LICENSE). Third-party components and asset provenance are
+recorded in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) and
+[`ASSET_PROVENANCE.md`](ASSET_PROVENANCE.md).
