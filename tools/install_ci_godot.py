@@ -1,9 +1,12 @@
 #!/usr/bin/env python3
 """Install checksum-pinned official Godot build inputs without root or Docker."""
 
+from __future__ import annotations
+
 import hashlib
 import json
 from pathlib import Path
+from typing import Callable
 import shutil
 import sys
 import time
@@ -30,7 +33,7 @@ def _ensure_archive(
     url: str,
     expected_sha: str,
     filename: str,
-    fetch: callable,
+    fetch: Callable,
 ) -> None:
     """Ensure the archive file exists at `archive` with matching sha256.
 
@@ -108,7 +111,7 @@ def _ensure_archive(
     raise last_exc
 
 
-def install(destination: Path, *, fetch: callable | None = None) -> dict[str, str]:
+def install(destination: Path, *, fetch: Callable | None = None) -> dict[str, str]:
     if fetch is None:
         fetch = _fetch
     manifest = json.loads(Path(__file__).with_name("godot_release.json").read_text())

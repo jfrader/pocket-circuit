@@ -5,6 +5,8 @@ Exercises: success, transient-fail-then-success, permanent-bad-checksum (clear d
 Run with: python3 tools/test_install_ci_godot.py
 Exits non-zero on any failure.
 """
+from __future__ import annotations
+
 
 import hashlib
 import importlib.util
