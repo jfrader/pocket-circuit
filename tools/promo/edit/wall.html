@@ -1,0 +1,92 @@
+<title>Pocket Circuit circuit wall</title>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@800&display=block" rel="stylesheet">
+<style>
+:root{--ink:#1a1f23;--cream:#f5f0e3;--yellow:#f4c65a;--orange:#e85a2e;--asphalt:#2a2f33}
+html,body{margin:0;width:1920px;height:1080px;overflow:hidden;background:#2a1d17;font-family:"Open Sans",sans-serif;font-weight:800}
+#bg{position:absolute;inset:0;background:repeating-linear-gradient(90deg,rgba(92,70,56,.55) 0 3px,transparent 3px 140px),linear-gradient(180deg,#3f2a22,#2a1d17)}
+#cam{position:absolute;inset:0;transform-origin:0 0}
+.tile{position:absolute;opacity:0}
+#plate{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);opacity:0;text-align:center}
+#plate .box{background:var(--cream);border:7px solid var(--ink);border-radius:20px;padding:18px 54px 24px;box-shadow:12px 12px 0 rgba(26,31,35,.7);font-size:124px;line-height:1.02;white-space:nowrap}
+#plate .hl{color:var(--orange)}
+#plate .tape{position:absolute;left:-30px;top:-40px;background:rgba(244,198,90,.95);padding:9px 30px;font-size:34px;letter-spacing:4px;transform:rotate(-4deg);white-space:nowrap}
+</style>
+<div id="bg"></div><div id="cam"></div>
+<div id="plate"><div class="tape" id="ptape">NEW SEED, NEW CIRCUIT</div><div class="box" id="pbox">A NEW CIRCUIT<br><span class="hl">EVERY RACE</span></div></div>
+<script>
+let COLS=12, ROWS=9;
+const M=56, GAP=14, W=1920, H=1080;
+let TW, TH;
+function layout(c,r){COLS=c;ROWS=r;TW=(W-2*M-(COLS-1)*GAP)/COLS;TH=(H-2*M-(ROWS-1)*GAP)/ROWS;}
+layout(12,9);
+let BEAT=0.5, EIGHTH=BEAT/2;
+const FULL_STEP=7;
+function setBeat(b){BEAT=b;EIGHTH=b/2;}
+function setCopy(tape,html){document.getElementById("ptape").textContent=tape;document.getElementById("pbox").innerHTML=html;}
+let tiles=[], order=[], focus;
+function tileSVG(r){
+  const pts=r.points; let x0=1e9,y0=1e9,x1=-1e9,y1=-1e9;
+  for(const [x,y] of pts){x0=Math.min(x0,x);y0=Math.min(y0,y);x1=Math.max(x1,x);y1=Math.max(y1,y);}
+  const pad=10, s=Math.min((TW-2*pad)/(x1-x0),(TH-2*pad)/(y1-y0));
+  const ox=(TW-(x1-x0)*s)/2-x0*s, oy=(TH-(y1-y0)*s)/2-y0*s;
+  const seq=r.reverse?[...pts].reverse():pts;
+  const d='M'+seq.map(([x,y])=>`${(x*s+ox).toFixed(2)},${(y*s+oy).toFixed(2)}`).join('L')+'Z';
+  const [sx,sy]=[seq[0][0]*s+ox,seq[0][1]*s+oy];
+  let grid='';for(let gx=8;gx<TW;gx+=8)grid+=`<line x1="${gx}" y1="0" x2="${gx}" y2="${TH}"/>`;for(let gy=8;gy<TH;gy+=8)grid+=`<line x1="0" y1="${gy}" x2="${TW}" y2="${gy}"/>`;
+  const f=2.4;
+  return `<svg width="${TW}" height="${TH}" viewBox="0 0 ${TW} ${TH}" style="overflow:visible">
+   <rect x="0" y="0" width="${TW}" height="${TH}" rx="7" fill="#1a1f23" transform="translate(3,3)" opacity=".55"/>
+   <rect x="0" y="0" width="${TW}" height="${TH}" rx="7" fill="#f5f0e3" stroke="#1a1f23" stroke-width="2.5"/>
+   <g stroke="#1a1f23" stroke-opacity=".08" stroke-width=".6">${grid}</g>
+   <path d="${d}" fill="none" stroke="#1a1f23" stroke-width="6.2" stroke-linejoin="round"/>
+   <path d="${d}" fill="none" stroke="#2a2f33" stroke-width="4.2" stroke-linejoin="round"/>
+   <path d="${d}" fill="none" stroke="#f5f0e3" stroke-opacity=".55" stroke-width=".5" stroke-linejoin="round"/>
+   <g transform="translate(${sx-f*2},${sy-f*2})"><rect width="${f*4}" height="${f*4}" fill="#f5f0e3" stroke="#1a1f23" stroke-width=".8"/>
+   <rect width="${f}" height="${f}"/><rect x="${f*2}" width="${f}" height="${f}"/><rect x="${f}" y="${f}" width="${f}" height="${f}"/><rect x="${f*3}" y="${f}" width="${f}" height="${f}"/>
+   <rect y="${f*2}" width="${f}" height="${f}"/><rect x="${f*2}" y="${f*2}" width="${f}" height="${f}"/><rect x="${f}" y="${f*3}" width="${f}" height="${f}"/><rect x="${f*3}" y="${f*3}" width="${f}" height="${f}"/></g></svg>`;
+}
+function carSVG(src){
+  return `<svg width="${TW}" height="${TH}" viewBox="0 0 ${TW} ${TH}" style="overflow:visible">
+   <rect x="0" y="0" width="${TW}" height="${TH}" rx="7" fill="#1a1f23" transform="translate(3,3)" opacity=".55"/>
+   <rect x="0" y="0" width="${TW}" height="${TH}" rx="7" fill="#f5f0e3" stroke="#1a1f23" stroke-width="2.5"/></svg>
+   <img src="${src}" style="position:absolute;left:${(TW-TH*0.9*0.75)/2}px;top:${TH*0.05}px;height:${TH*0.9}px;image-rendering:pixelated">`;
+}
+function buildCars(srcs){ build(srcs.map(s=>({car:s}))); }
+function build(routes){
+  const cam=document.getElementById('cam');
+  for(let i=0;i<COLS*ROWS;i++){
+    const c=i%COLS, r=Math.floor(i/COLS), el=document.createElement('div');
+    el.className='tile'; el.style.left=(M+c*(TW+GAP))+'px'; el.style.top=(M+r*(TH+GAP))+'px';
+    el.innerHTML=routes[i].car?carSVG(routes[i].car):tileSVG(routes[i]); cam.appendChild(el); tiles.push({el,c,r});
+  }
+  const fc=5, fr=4; focus=tiles[fr*COLS+fc];
+  // rings outward from the focus tile, with a small seeded jitter so it does not read as a wipe
+  let seed=7; const rnd=()=>((seed=(seed*16807)%2147483647)/2147483647);
+  order=tiles.map((t,i)=>({i,k:Math.hypot((t.c-fc)*TW,(t.r-fr)*TH)+rnd()*120})).sort((a,b)=>a.k-b.k).map(o=>o.i);
+}
+const ease=x=>1-Math.pow(1-x,3);
+function at(t){
+  const step=Math.floor(t/EIGHTH);
+  const count=Math.min(COLS*ROWS,Math.pow(2,Math.min(step,FULL_STEP)));
+  order.forEach((ti,rank)=>{
+    const el=tiles[ti].el;
+    if(rank<count){
+      const born=rank===0?0:Math.floor(Math.log2(rank))+1;  // step this tile appeared on
+      const age=Math.max(0,t-born*EIGHTH), k=Math.min(1,age/0.12);
+      el.style.opacity=1; el.style.transform=`scale(${0.55+0.45*ease(k)})`;
+    } else el.style.opacity=0;
+  });
+  // camera: start with the focus tile filling the screen, pull back to the full wall by FULL_STEP, then a slow push
+  const fx=M+focus.c*(TW+GAP)+TW/2, fy=M+focus.r*(TH+GAP)+TH/2;
+  const pull=Math.min(1,t/(FULL_STEP*EIGHTH)), S0=W*0.62/TW;
+  let s=Math.exp(Math.log(S0)*(1-ease(pull)));
+  const cx=fx+(W/2-fx)*ease(pull), cy=fy+(H/2-fy)*ease(pull);
+  s*=1+0.035*Math.max(0,t-FULL_STEP*EIGHTH);
+  document.getElementById('cam').style.transform=`translate(${W/2-cx*s}px,${H/2-cy*s}px) scale(${s})`;
+  // plate slams on the bar
+  const p=document.getElementById('plate'), pt=t-4*BEAT;
+  if(pt<0){p.style.opacity=0}else{const k=Math.min(1,pt/0.16);p.style.opacity=1;
+    const sc=pt<0.16?2.4-1.46*ease(k):(pt<0.26?0.94+0.06*((pt-0.16)/0.1):1);
+    p.style.transform=`translate(-50%,-50%) rotate(-2deg) scale(${sc})`;}
+}
+</script>
