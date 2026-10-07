@@ -37,22 +37,14 @@ func _run_test() -> void:
 
 	# frozen before start
 	if traffic.get_child_count() != 3:
-		push_error("STRIP_TRAFFIC_TEST FAIL: expected 3 cars spawned")
-		quit(1)
-		return
+		if not _fail("expected 3 cars spawned"): return
 	for c in traffic.get_children():
 		if not (c is TRAFFIC_CAR):
-			push_error("STRIP_TRAFFIC_TEST FAIL: child not TrafficCar")
-			quit(1)
-			return
+			if not _fail("child not TrafficCar"): return
 		if (c as TRAFFIC_CAR).linear_velocity.length() > 0.1:
-			push_error("STRIP_TRAFFIC_TEST FAIL: cars should be frozen before race start")
-			quit(1)
-			return
+			if not _fail("cars should be frozen before race start"): return
 		if Vector2.UP.rotated(c.rotation).dot(Vector2.RIGHT) < 0.95:
-			push_error("STRIP_TRAFFIC_TEST FAIL: civilian sprite must face its travel direction")
-			quit(1)
-			return
+			if not _fail("civilian sprite must face its travel direction"): return
 
 	# start
 	mgr.race_started.emit()
@@ -67,9 +59,7 @@ func _run_test() -> void:
 		if tc.global_position.x > 30.0:
 			any_moved = true
 	if not any_moved:
-		push_error("STRIP_TRAFFIC_TEST FAIL: cars did not advance after start")
-		quit(1)
-		return
+		if not _fail("cars did not advance after start"): return
 	# cutter lane change is internal deterministic; rely on no crash + count for MVP test
 
 
@@ -78,9 +68,7 @@ func _run_test() -> void:
 	await process_frame
 	for c in traffic.get_children():
 		if (c as TRAFFIC_CAR).linear_velocity.length() > 0.5:
-			push_error("STRIP_TRAFFIC_TEST FAIL: cars should stop on race finish")
-			quit(1)
-			return
+			if not _fail("cars should stop on race finish"): return
 
 	traffic.free()
 	mgr.free()
@@ -123,19 +111,15 @@ func _pathing_test() -> void:
 		var lane := int(plan[index]["lane"])
 		var expected := -1 if lane < 0 else 1
 		if car.travel_direction != expected or facing.dot((sample["dir"] as Vector2) * expected) < 0.99:
-			_fail("Lane direction or facing does not match signed lane ID")
-			return
+			if not _fail("Lane direction or facing does not match signed lane ID"): return
 		var lateral := (car.position - (sample["pos"] as Vector2)).dot(sample["perp"])
 		var expected_lateral := expected * (absf(lane) - 0.5) * ROAD.LANE_WIDTH
 		if absf(lateral - expected_lateral) > 0.1:
-			_fail("Right-hand traffic spawned on the wrong carriageway")
-			return
+			if not _fail("Right-hand traffic spawned on the wrong carriageway"): return
 		if (car._visual.get_node_or_null("OncomingLampLeft") != null) != (expected < 0) or (car._visual.get_node_or_null("RoofMarkerLeft") != null) != (expected < 0 and car._is_truck):
-			_fail("Oncoming visual cues must match travel direction and body type")
-			return
+			if not _fail("Oncoming visual cues must match travel direction and body type"): return
 	if ROAD.lane_id(0.0) != 1 or ROAD.lane_id(123.0) != 1 or ROAD.lane_id(-0.5) != 1:
-		_fail("Unknown lanes must default safely to northbound +1")
-		return
+		if not _fail("Unknown lanes must default safely to northbound +1"): return
 	var obstacle_sample: Dictionary = sampler.sample(2200.0)
 	var obstacle := StaticBody2D.new()
 	obstacle.collision_layer = 16
@@ -183,14 +167,12 @@ func _pathing_test() -> void:
 			var car := candidate as TrafficCar
 			var projected: Dictionary = sampler.project(car.global_position)
 			if absf(float(projected["arc"]) - car._arc) > 15.0:
-				_fail("Traffic progress ran ahead of its physical body")
-				return
+				if not _fail("Traffic progress ran ahead of its physical body"): return
 			var sample: Dictionary = sampler.sample(car._arc)
 			var lateral := (car.global_position - (sample["pos"] as Vector2)).dot(sample["perp"])
 			var error := absf(lateral - car._lane * ROAD.HALF_WIDTH)
 			if tick > FIXED_FPS * 3 and (car._arc - car._spawn_arc) * car.travel_direction < 50.0:
-				_fail("Traffic did not advance in its declared direction")
-				return
+				if not _fail("Traffic did not advance in its declared direction"): return
 			if tick > FIXED_FPS * 9 and car == cars[2]:
 				recovered_error = minf(recovered_error, error)
 			if tick > FIXED_FPS * 9 and car == cars[7]:
@@ -200,8 +182,7 @@ func _pathing_test() -> void:
 			if tick > FIXED_FPS * 3 and car.linear_velocity.length() < 8.0:
 				stuck_ticks += 1
 			if minf(car.global_position.distance_to(obstacle.position), car.global_position.distance_to(south_obstacle.position)) < 24.0 + car._body_width * 0.5 - 3.0:
-				_fail("Traffic penetrated solid scenery")
-				return
+				if not _fail("Traffic penetrated solid scenery"): return
 		for first in cars.size():
 			if not is_instance_valid(cars[first]):
 				continue
@@ -216,19 +197,19 @@ func _pathing_test() -> void:
 				var gap := closest[0].distance_to(closest[1]) - (a._body_width + b._body_width) * 0.5
 				minimum_gap = minf(minimum_gap, gap)
 				if gap < -3.0:
-					_fail("Traffic stacked/overlapped: %.2f wu" % gap)
-					return
+					if not _fail("Traffic stacked/overlapped: %.2f wu" % gap): return
 	if recovered_error > 12.0 or south_recovered_error > 12.0 or maximum_lane_error > ROAD.HALF_WIDTH - 16.0 or stuck_ticks > FIXED_FPS * 3 or traffic.get_child_count() != 0:
 		for car: TrafficCar in traffic.get_children():
 			print("TRAFFIC_SURVIVOR behavior=%s arc=%.1f lane=%.2f speed=%.1f position=%s" % [car._behavior, car._arc, car._lane, car.linear_velocity.length(), car.position])
-		_fail("Pathing/recovery/end failed: recovery=%.1f lateral=%.1f stuck=%d remaining=%d" % [recovered_error, maximum_lane_error, stuck_ticks, traffic.get_child_count()])
-		return
+		if not _fail("Pathing/recovery/end failed: recovery=%.1f lateral=%.1f stuck=%d remaining=%d" % [recovered_error, maximum_lane_error, stuck_ticks, traffic.get_child_count()]): return
 	traffic.free()
 	manager.free()
 	obstacle.free()
 	south_obstacle.free()
 	parked_racer.free()
 	if not await _world_traffic_test():
+		return
+	if _failed:
 		return
 	print("STRIP_TRAFFIC_TEST PASS physical_65s min_gap=%.2f recovered_lane_error=%.2f south_recovered_lane_error=%.2f max_lateral=%.2f stuck_ticks=%d remaining=0" % [minimum_gap, recovered_error, south_recovered_error, maximum_lane_error, stuck_ticks])
 	quit(0)
@@ -258,14 +239,17 @@ func _world_traffic_test() -> bool:
 		for car: TrafficCar in traffic.get_children():
 			minimum_progress = minf(minimum_progress, (car._arc - car._spawn_arc) * car.travel_direction)
 		if minimum_progress < 2400.0 or worst_stall > FIXED_FPS * 3:
-			_fail("World traffic stalled in %s: min_progress=%.1f worst_stall=%d" % [theme, minimum_progress, worst_stall])
-			return false
+			if not _fail("World traffic stalled in %s: min_progress=%.1f worst_stall=%d" % [theme, minimum_progress, worst_stall]): return false
 		print("STRIP_TRAFFIC_WORLD %s seed=42 30s min_progress=%.1f worst_stall_ticks=%d" % [theme, minimum_progress, worst_stall])
 		track.free()
 		manager.free()
 	return true
 
 
-func _fail(message: String) -> void:
+var _failed := false
+
+func _fail(message: String) -> bool:
+	_failed = true
 	push_error("STRIP_TRAFFIC_TEST FAIL: " + message)
 	quit(1)
+	return false
