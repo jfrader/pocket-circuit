@@ -54,6 +54,7 @@ func default_data() -> Dictionary:
 		"reduced_camera_shake": false,
 		"reduced_motion": false,
 		"first_run": true,
+		"current_run": {},
 	}
 
 
