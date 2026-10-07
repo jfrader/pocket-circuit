@@ -51,7 +51,7 @@ extends RefCounted
 
 const SCHEMA_VERSION := 1
 
-const AXES: Array[String] = ["speed", "accel", "grip", "drift", "boost", "tough"]
+const AXES: Array[String] = CarProfile.AXES
 const WEAR_LEVELS: Array[String] = ["clean", "dusty", "rusty", "dented"]
 
 const TIER_ENVELOPES := {
