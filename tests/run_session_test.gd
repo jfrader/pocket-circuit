@@ -45,9 +45,17 @@ func _run_test() -> void:
 		var avail: Array[Dictionary] = sess.available_nodes()
 		if avail.is_empty():
 			break
-		# always leftmost for determinism; adjust index if needed to hit coverage
-		var pick_idx: int = (avail.size() - 1) if avail.size() > 1 else 0
-		var next_id: String = String((avail[pick_idx] as Dictionary).get("id", ""))
+		# prefer path to unseen critical types for coverage+transit (deterministic by priority)
+		var priority: Dictionary = {"act_rival": 10, "lockup": 8, "rival": 6, "errand": 4, "parts_van": 3, "bench": 2, "race": 1}
+		var best_idx: int = 0
+		var best_score: int = -1
+		for ii: int in range(avail.size()):
+			var nt: String = String((avail[ii] as Dictionary).get("type", ""))
+			var sc: int = int(priority.get(nt, 0))
+			if sc > best_score:
+				best_score = sc
+				best_idx = ii
+		var next_id: String = String((avail[best_idx] as Dictionary).get("id", ""))
 		if not sess.enter_node(next_id):
 			break
 		var after_enter: Dictionary = sess.current_node()
