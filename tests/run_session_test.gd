@@ -101,6 +101,8 @@ func _run_test() -> void:
 				return
 		elif etype == "parts_van":
 			var did_spend: bool = sess.spend(5)
+			if not did_spend:
+				print("DEBUG parts_van FAIL: budget=", sess.run_budget, " current_node=", sess.current_node_id, " resolved_nodes=", sess.resolved_nodes)
 			if not _expect(did_spend, "parts_van spend ok when funded"):
 				return
 		elif etype == "lockup":
@@ -152,12 +154,43 @@ func _run_test() -> void:
 		lose_steps += 1
 		var av: Array[Dictionary] = lose_sess.available_nodes()
 		if av.is_empty(): break
-		var nid: String = String((av[0] as Dictionary).get("id", ""))
+		
+		# Find which child leads to act_rival
+		var best_nid := ""
+		for a in av:
+			var anid = String((a as Dictionary).get("id", ""))
+			if lose_sess.current_map.nodes[anid].get("type") == "act_rival":
+				best_nid = anid
+				break
+		if best_nid == "":
+			for a in av:
+				var anid = String((a as Dictionary).get("id", ""))
+				var reaches_boss = false
+				# Breadth first search in children
+				var q = [anid]
+				var vis = {}
+				while q.size() > 0:
+					var curr = q.pop_front()
+					if lose_sess.current_map.nodes[curr].get("type") == "act_rival":
+						reaches_boss = true
+						break
+					for c in lose_sess.current_map.children.get(curr, []):
+						if not vis.has(c):
+							vis[c] = true
+							q.push_back(c)
+				if reaches_boss:
+					best_nid = anid
+					break
+		if best_nid == "":
+			best_nid = String((av[0] as Dictionary).get("id", ""))
+		
+		var nid: String = best_nid
 		if not lose_sess.enter_node(nid): break
 		var cn: Dictionary = lose_sess.current_node()
 		var ct: String = String(cn.get("type", ""))
 		if ct == "act_rival":
 			var lout: Dictionary = lose_sess.resolve_race(String(cn.get("id", "")), 2, 2)
+			print("DEBUG act_rival resolve: ", lout)
 			if bool(lout.get("run_failed", false)):
 				lost_act = true
 			break
