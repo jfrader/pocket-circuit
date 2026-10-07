@@ -1379,6 +1379,7 @@ func enter_run_node(node_id: String) -> bool:
 	if ok:
 		persist_current_run()
 	return ok
+	return ok
 
 func update_setting(key: String, value: Variant) -> bool:
 	var candidate := _save_data.duplicate(true)
