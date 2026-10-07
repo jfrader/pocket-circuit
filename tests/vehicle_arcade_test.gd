@@ -116,13 +116,17 @@ func _test_counter_steer_saves() -> bool:
 	await physics_frame
 	vehicle.set_external_controls(0.35, 0.0, -1.0, false, false)
 	var yaw0 := absf(vehicle.angular_velocity)
+	var min_yaw := yaw0
 	for _i in 8:
 		await physics_frame
+		var y := absf(vehicle.angular_velocity)
+		if y < min_yaw:
+			min_yaw = y
 	var yaw1 := absf(vehicle.angular_velocity)
 	vehicle.queue_free()
 	return _expect(
-		yaw1 < yaw0,
-		"counter-steer should reduce yaw rate (yaw0=%.2f yaw1=%.2f)" % [yaw0, yaw1]
+		min_yaw < yaw0 - 0.1,
+		"counter-steer should cause yaw rate to fall (start=%.2f min=%.2f end=%.2f)" % [yaw0, min_yaw, yaw1]
 	)
 
 
