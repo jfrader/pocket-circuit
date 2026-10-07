@@ -2,6 +2,7 @@ extends CanvasLayer
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
+const LINES_SCRIPT := preload("res://scripts/ui/run_board_lines.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
 const ROUTE_SCRIPT := preload("res://scripts/ui/championship_route_menu.gd")
 const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
@@ -260,7 +261,7 @@ func show_run_board() -> void:
 		_focus_first()
 		return
 	var car_id: String = sess.current_car_id
-	_configure_stage(&"map", car_id, "rae", "workshop")
+	_configure_stage(&"title")
 	_add_kicker("RUN · ACT %d" % sess.current_map.act)
 	_add_heading("BOARD")
 	_add_section("POINTS", "%d" % sess.run_points)
@@ -272,14 +273,13 @@ func show_run_board() -> void:
 	var owned_count: int = sess.owned_cars.size()
 	_add_section("OWNED", "%d" % owned_count)
 	_add_spacer(6)
-	# Board with positioned node buttons. y decreases with growing row (higher rows toward top of board).
+	# Board: a compact chip grid — seven columns, one short type word per chip,
+	# rows growing upward (row 0 at the bottom). Sizes are set explicitly so the
+	# chips cannot overlap however long the labels are.
 	var board := Control.new()
 	board.name = "RunBoard"
-	board.custom_minimum_size = Vector2(520.0, 240.0)
+	board.custom_minimum_size = Vector2(850.0, 348.0)
 	_content.add_child(board)
-	var col_step: float = 68.0
-	var row_step: float = 38.0
-	var base_y: float = 200.0
 	var avail: Array[Dictionary] = sess.available_nodes()
 	var avail_ids: Array[String] = []
 	for a: Dictionary in avail:
@@ -290,6 +290,32 @@ func show_run_board() -> void:
 		var row_list: Array[Dictionary] = sess.current_map.get_nodes_in_row(r)
 		for n: Dictionary in row_list:
 			node_list.append(n)
+	var rows_n: int = sess.current_map.num_rows
+	var col_step: float = 118.0
+	var row_step: float = 34.0
+	var chip_size := Vector2(112.0, 30.0)
+	var x0: float = maxf(8.0, (850.0 - 7.0 * col_step) * 0.5)
+	var pos_of: Dictionary = {}
+	for n: Dictionary in node_list:
+		var nc: int = int(n.get("col", 0))
+		var nr: int = int(n.get("row", 0))
+		pos_of[String(n.get("id", ""))] = Vector2(x0 + float(nc) * col_step, float(rows_n - 1 - nr) * row_step)
+	# Edges first so the chips draw on top of them.
+	var lines := LINES_SCRIPT.new()
+	lines.name = "RunBoardLines"
+	lines.position = Vector2.ZERO
+	lines.size = board.custom_minimum_size
+	lines.set("segments", _board_segments(sess.current_map, pos_of, chip_size))
+	board.add_child(lines)
+	var chip_labels: Dictionary = {
+		"race": "race",
+		"rival": "rival",
+		"act_rival": "BOSS",
+		"bench": "bench",
+		"parts_van": "van",
+		"lockup": "lockup",
+		"errand": "errand",
+	}
 	for n: Dictionary in node_list:
 		var nid: String = String(n.get("id", ""))
 		var nr: int = int(n.get("row", 0))
@@ -297,16 +323,20 @@ func show_run_board() -> void:
 		var is_curr: bool = (nid == curr_id)
 		var is_avail: bool = nid in avail_ids
 		var t: String = String(n.get("type", "race"))
-		var txt: String = ("> " if is_curr else "") + nid + "\n" + t
+		var txt: String = String(chip_labels.get(t, t))
 		var cb: Callable = Callable(self, "_on_run_node_pressed").bind(nid) if is_avail else Callable()
 		var btn: Button = _make_button(txt, cb, false, not is_avail, "Node_" + nid.replace("_", "-"))
-		btn.custom_minimum_size = Vector2(62.0, 34.0)
-		btn.position = Vector2(20.0 + float(nc) * col_step, base_y - float(nr) * row_step)
+		btn.add_theme_font_size_override("font_size", 13)
+		btn.custom_minimum_size = chip_size
+		btn.clip_text = true
+		btn.size = chip_size
+		btn.position = pos_of.get(nid, Vector2.ZERO) as Vector2
 		if is_curr:
 			btn.modulate = Color(1.0, 0.95, 0.4)
 		board.add_child(btn)
 		if is_avail:
 			_register_button_focus(btn)
+	_add_copy("AT %s · %s" % [curr_id, String(chip_labels.get(String(sess.current_node().get("type", "")), ""))], SKIN.CREAM_DIM)
 	_add_spacer(8)
 	_add_button("NEW RUN", Callable(self, "_on_new_run_pressed"), false, false, "ActionNewRun")
 	_add_button("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
@@ -315,8 +345,11 @@ func show_run_board() -> void:
 	_focus_first()
 
 
-func _run_context(sess: RunSession) -> void:
+func _run_act_kicker(sess: RunSession) -> void:
 	_add_kicker("RUN · ACT %d" % sess.current_map.act)
+
+
+func _run_stats(sess: RunSession) -> void:
 	_add_section("POINTS", "%d" % sess.run_points)
 	_add_section("BUDGET", "%d" % sess.run_budget)
 	var car_id: String = sess.current_car_id
@@ -337,9 +370,10 @@ func show_run_bench() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
+	_configure_stage(&"title")
+	_run_act_kicker(sess)
 	_add_heading("BENCH")
-	_run_context(sess)
+	_run_stats(sess)
 	_add_spacer(8)
 	_add_button("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, false, "BenchRepair")
 	_add_button("FIT SPARE", Callable(self, "_on_bench_fit_pressed"), false, false, "BenchFit")
@@ -361,9 +395,10 @@ func show_run_parts_van() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
+	_configure_stage(&"title")
+	_run_act_kicker(sess)
 	_add_heading("PARTS VAN")
-	_run_context(sess)
+	_run_stats(sess)
 	_add_spacer(8)
 	_add_button("TYRE SET · 15", Callable(self, "_on_van_buy_pressed").bind(15), true, sess.run_budget < 15, "VanBuy15")
 	_add_button("TOOL KIT · 8", Callable(self, "_on_van_buy_pressed").bind(8), false, sess.run_budget < 8, "VanBuy8")
@@ -384,9 +419,10 @@ func show_run_lockup() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
+	_configure_stage(&"title")
+	_run_act_kicker(sess)
 	_add_heading("LOCKUP")
-	_run_context(sess)
+	_run_stats(sess)
 	_add_copy("One free car per act.", SKIN.CREAM_DIM)
 	_add_spacer(8)
 	_add_button("OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
@@ -406,9 +442,10 @@ func show_run_errand() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
+	_configure_stage(&"title")
+	_run_act_kicker(sess)
 	_add_heading("ERRAND")
-	_run_context(sess)
+	_run_stats(sess)
 	_add_copy("Pick one favour.", SKIN.CREAM_DIM)
 	_add_spacer(8)
 	_add_button("TAKE THE CASH", Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandCash")
@@ -455,6 +492,19 @@ func _on_errand_choice_pressed(choice: int) -> void:
 	_play_ui_confirm()
 	_app.call("run_resolve_errand", choice)
 	show_run_board()
+
+
+func _board_segments(map: RunMap, pos_of: Dictionary, chip_size: Vector2) -> Array[PackedVector2Array]:
+	var out: Array[PackedVector2Array] = []
+	for nid: String in map.nodes:
+		if not pos_of.has(nid):
+			continue
+		var from: Vector2 = (pos_of[nid] as Vector2) + chip_size * 0.5
+		for child: Dictionary in map.get_children(nid):
+			var cid: String = String(child.get("id", ""))
+			if pos_of.has(cid):
+				out.append(PackedVector2Array([from, (pos_of[cid] as Vector2) + chip_size * 0.5]))
+	return out
 
 
 func show_briefing(event_id: String) -> void:
