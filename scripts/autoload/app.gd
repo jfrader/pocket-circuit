@@ -1523,13 +1523,22 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 	if _transitioning_to_race:
 		last_run_error = "transitioning to race"
 		return false
+	if _current_run_session == null:
+		last_run_error = "no active run"
+		return false
+	# Draw the circuit before entering the stop, so a failed draw never leaves
+	# the run standing on a stop it cannot race.
+	var target_id := node_id if not node_id.is_empty() else _current_run_session.current_node_id
+	var circuit := _run_circuit(target_id)
+	if circuit.is_empty():
+		last_run_error = "circuit could not be drawn"
+		return false
 	if not _advance_or_check_node(node_id, allowed_types):
 		return false
 	if not _current_run_session.is_race_pending():
 		last_run_error = "already raced"
 		return false
 	var node: Dictionary = _current_run_session.current_node()
-	var target_id := String(node.get("id", ""))
 	var node_type := String(node.get("type", ""))
 	var duel := node_type == "rival"
 	var vehicle_id: String = _current_run_session.current_car_id
@@ -1539,7 +1548,7 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 	if duel:
 		opponents = opponents.slice(0, 1)
 	var event_id: String = "run_%s" % target_id
-	var event := _event_with_generated_identity({"opponents": opponents}, _run_circuit(target_id))
+	var event := _event_with_generated_identity({"opponents": opponents}, circuit)
 	if event.is_empty():
 		last_run_error = "circuit could not be drawn"
 		return false
@@ -1572,7 +1581,7 @@ func _run_circuit(stop_id: String) -> Dictionary:
 		StringName(CATALOG.get_act(act)["id"]),
 		GENERATED_CIRCUITS.room_for_route_seed(seed),
 		seed,
-		seed % 2 == 1,
+		_current_run_session.circuit_reversed(stop_id),
 		act
 	)
 
