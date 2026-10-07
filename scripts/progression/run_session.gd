@@ -31,7 +31,7 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##   current_node() -> Dictionary
 ##   enter_node(id: String) -> bool
 ##   On enter bench: reset per-visit action flag.
-##   On enter final node (last row) of act==3: completed=true
+##   On resolving the final bench (last row of act==3): completed=true
 ##
 ## Per-type resolution (game layer calls with real outcomes after node "play"):
 ##   All require node_id matches current and type matches, else refuse (return error or false).
@@ -80,7 +80,7 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##   is_failed() -> bool  (also true if current wear is worn_out)
 ##
 ## Run end:
-##   is_complete() -> bool  (entered last node of act 3's map without having failed)
+##   is_complete() -> bool  (resolved the final bench of act 3 without having failed)
 ##   serialize() / deserialize() roundtrips full session (map+state+position+budgets+owned+flags)
 ##
 ## Ownership:
@@ -158,8 +158,6 @@ func enter_node(node_id: String) -> bool:
 	if ntype == "bench":
 		last_bench_visited = node_id
 		bench_action_done = false
-	if current_map.act == 3 and current_map.is_last_row(r):
-		completed = true
 	return true
 
 func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dictionary:
@@ -247,14 +245,18 @@ func _rival_type_for_act(a: int) -> String:
 	return "suv"
 
 func bench_repair(car_key: String) -> bool:
-	if not _can_do_bench_action(car_key):
+	var can: bool = _can_do_bench_action(car_key)
+	if not can:
 		return false
-	if not owned_cars.has(car_key) and car_key != current_car_id:
+	var hask: bool = owned_cars.has(car_key)
+	var iscurk: bool = (car_key == current_car_id)
+	if not hask and not iscurk:
 		return false
 	var cur_w: String = run_state.get_car_wear(car_key)
 	var restored: String = RUN_STATE.restore_at_bench(cur_w)
 	run_state.set_car_wear(car_key, restored)
 	bench_action_done = true
+	_maybe_complete_on_final_bench()
 	return true
 
 func bench_fit(car_key: String, part: String) -> bool:
@@ -266,7 +268,14 @@ func bench_fit(car_key: String, part: String) -> bool:
 		return false
 	installed_parts[car_key] = part
 	bench_action_done = true
+	_maybe_complete_on_final_bench()
 	return true
+
+## The run is won by resolving the final bench of act 3 (the forced last node).
+func _maybe_complete_on_final_bench() -> void:
+	if current_map != null and current_map.act == 3 and current_map.is_last_row(int(run_state.row)):
+		completed = true
+
 
 func _can_do_bench_action(_car_key: String) -> bool:
 	if failed or completed:

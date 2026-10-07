@@ -93,9 +93,7 @@ func _run_test() -> void:
 			var is_b: bool = sess._is_current_node_type("bench") if sess.has_method("_is_current_node_type") else false
 			var lastb: String = sess.last_bench_visited
 			var doneb: bool = sess.bench_action_done
-			print("DEBUG bench: cur=", ccar, " owned=", has_own, " iscur=", is_cur, " is_bench_node=", is_b, " last=", lastb, " done=", doneb, " current_node=", sess.current_node_id)
 			var did_repair: bool = sess.bench_repair(ccar)
-			print("DEBUG bench_repair returned=", did_repair)
 			if not _expect(did_repair, "bench repair succeeds first"):
 				return
 			var did_fit: bool = sess.bench_fit(ccar, "test_spoiler")
@@ -128,7 +126,6 @@ func _run_test() -> void:
 	for t: String in all_types:
 		if not seen_types.has(t):
 			missed.append(t)
-	print("DEBUG seen_types=", seen_types.keys(), " missed=", missed, " transits=", act_transits, " final_act=", (sess.current_map.act if sess.current_map else 0), " row=", sess.run_state.row, " complete=", sess.is_complete(), " steps=", steps)
 	# require complete + transit; tolerate missing rare quota on the reached path for this slice
 	if not _expect(sess.is_complete() and not sess.is_failed(), "main run reaches complete without fail"):
 		return
@@ -200,8 +197,11 @@ func _run_test() -> void:
 		return
 	if not _expect(btest.spend(9999) == false, "overspend refused"):
 		return
-	if not _expect(btest.run_budget < 60, "some spends happened or not"):
-		pass
+	var budget_before: int = btest.run_budget
+	if not _expect(btest.spend(10), "a valid spend inside the budget succeeds"):
+		return
+	if not _expect(btest.run_budget == budget_before - 10, "the budget reflects the spend exactly"):
+		return
 
 	# --- Determinism: same seed + ops produce same state
 	var s1 = RUN_SESSION.create(55555)
@@ -234,11 +234,17 @@ func _run_test() -> void:
 	if not _expect(snap2.hash() == snap.hash() or _maps_equal(snap, snap2), "double roundtrip stable"):
 		pass  # hash may differ on dict order but content ok
 
+	if _failed:
+		return
 	print("RUN_SESSION_TEST PASS")
 	quit(0)
 
+var _failed := false
+
+
 func _expect(condition: bool, message: String) -> bool:
 	if not condition:
+		_failed = true
 		print("FAIL: ", message)
 		quit(1)
 		return false
