@@ -22,7 +22,10 @@ func _run_test() -> void:
 		if node is RaceManager:
 			(node as RaceManager).finish_grace_seconds = 8.0
 	)
+	var theme_only := String(OS.get_environment("PC_THEME_ONLY"))
 	for case: Array in [[&"kitchen", &"classic", 0], [&"workshop", &"wide", 1], [&"office", &"el", 7], [&"kitchen", &"long", 24469], [&"workshop", &"square", 51940], [&"office", &"tall", 42]]:
+		if not theme_only.is_empty() and case[0] != StringName(theme_only):
+			continue
 		if not await _run_theme(case[0], case[1], case[2]):
 			return
 	Engine.time_scale = 1.0
