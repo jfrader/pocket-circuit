@@ -1406,6 +1406,7 @@ func enter_run_node(node_id: String) -> bool:
 	if ok:
 		persist_current_run()
 	return ok
+	return ok
 
 func start_run_race(node_id: String = "") -> bool:
 	if _current_run_session == null or _transitioning_to_race:
