@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="VehicleStats" format=3 uid="uid://shqjm13785wk"]
+[gd_resource type="Resource" script_class="VehicleStats" load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_stats"]
 
@@ -17,7 +17,7 @@ max_speed = 672.0
 reverse_speed = 238.0
 rolling_resistance = 16.0
 aero_drag_coefficient = 0.00048
-front_grip = 1.1
+front_grip = 1.10
 rear_grip = 1.12
 front_cornering_stiffness = 3950.0
 rear_cornering_stiffness = 3850.0

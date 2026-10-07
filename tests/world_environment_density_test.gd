@@ -31,7 +31,7 @@ func _run() -> void:
 			var identity := CIRCUITS.create(StringName(theme), room, seed_value)
 			var options := CIRCUITS.generation_options(identity)
 			var prepared := CORE.prepare_layout(StringName(theme), room, seed_value, options)
-			assert(not prepared.is_empty())
+			if not _expect(not prepared.is_empty(), "the layout must prepare"): return
 			var spec: Dictionary = prepared["spec"]
 			var plan: Dictionary = spec["environment_plan"]
 			var count := int(plan["diagnostics"]["boundary_count"])

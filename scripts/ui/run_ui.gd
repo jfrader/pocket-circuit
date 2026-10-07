@@ -159,6 +159,14 @@ static func marker(kind: String, current: bool, available: bool) -> Button:
 	return button
 
 
+static func key_row(entries: Array[String]) -> HBoxContainer:
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 36)
+	for entry: String in entries:
+		row.add_child(label(entry, 10, MUTED, true))
+	return row
+
+
 static func legend(map: RunMap) -> HBoxContainer:
 	var row := HBoxContainer.new()
 	row.name = "RunLegend"

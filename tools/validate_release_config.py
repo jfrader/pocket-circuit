@@ -98,25 +98,38 @@ def unquote(value: str) -> str:
     return value
 
 
-def missing_uid_sidecars(paths: list[str]) -> list[str]:
-    """Return tracked Godot resource paths that lack a tracked sibling .uid.
+# Godot 4.4+ writes .uid sidecars only for formats with no header to hold a UID:
+# scripts, shaders and shader includes. Scenes and resources keep their UID in the file header.
+UID_SIDECAR_SUFFIXES = (".gd", ".gdshader", ".gdshaderinc")
 
-    Pure function: takes list of paths (e.g. from "git ls-files -z".split("\0")),
-    returns the base resource paths missing their .uid. Only the four Godot
-    resource suffixes are considered; ignored files never appear in input.
-    """
-    resource_suffixes = (".gd", ".tscn", ".tres", ".gdshader")
+# A test that cannot stop the run is a defect: assert() is stripped outside
+# debug builds and never stops a headless script. A SaveStore built without an
+# explicit path writes the player's real save.
+TEST_SOURCE_BANS = (
+    (re.compile(r"^\s*assert\(", re.MULTILINE), "uses assert(); use a failing _expect"),
+    (re.compile(r"\b(SAVE_STORE|SaveStore|SAVE_STORE_SCRIPT)\.new\(\s*\)"), "builds a SaveStore on the player's save path"),
+)
+
+
+def missing_uid_sidecars(paths: list[str]) -> list[str]:
+    """Return tracked scripts and shaders that lack a tracked sibling .uid."""
     tracked = {p for p in paths if p}
-    resources = [
-        p
-        for p in tracked
-        if any(p.endswith(suf) for suf in resource_suffixes)
+    return [p for p in tracked if p.endswith(UID_SIDECAR_SUFFIXES) and f"{p}.uid" not in tracked]
+
+
+def stray_uid_sidecars(paths: list[str]) -> list[str]:
+    """Return tracked .uid files Godot never writes (for scenes and resources)."""
+    return [p for p in paths if p.endswith(".uid") and not p[: -len(".uid")].endswith(UID_SIDECAR_SUFFIXES)]
+
+
+def test_source_violations(sources: dict[str, str]) -> list[str]:
+    """Return "path: reason" for every test source that breaks a ban."""
+    return [
+        f"{path}: {reason}"
+        for path, text in sorted(sources.items())
+        for pattern, reason in TEST_SOURCE_BANS
+        if pattern.search(text)
     ]
-    missing = []
-    for res in resources:
-        if f"{res}.uid" not in tracked:
-            missing.append(res)
-    return missing
 
 
 def validate_upload_wrapper(upload_wrapper: Path, errors: list[str]) -> None:
@@ -564,9 +577,18 @@ def main() -> int:
             shown = sorted(missing_uid)[:5]
             capped = ", ".join(shown) + ("..." if len(missing_uid) > 5 else "")
             errors.append(
-                f"tracked Godot resources without .uid sidecars: {capped} "
-                "(commit the missing .uid sidecars — Godot regenerates them on import)"
+                f"tracked scripts or shaders without .uid sidecars: {capped} "
+                "(commit the .uid Godot writes beside them on import)"
             )
+        stray_uid = stray_uid_sidecars(tracked_output)
+        if stray_uid:
+            errors.append(f".uid sidecars for formats that keep their UID in the header: {', '.join(sorted(stray_uid)[:5])}")
+        test_sources = {
+            path: (ROOT / path).read_text(encoding="utf-8")
+            for path in tracked_output
+            if path.startswith("tests/") and path.endswith(".gd")
+        }
+        errors.extend(f"test source {violation}" for violation in test_source_violations(test_sources))
 
     if errors:
         for error in errors:
