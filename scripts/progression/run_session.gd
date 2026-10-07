@@ -114,6 +114,10 @@ func start_race(node_id: String, field_size: int) -> bool:
 	race_in_flight = {"node": node_id, "field": field_size}
 	return true
 
+## The seed of the circuit a stop races on, from the run, the act and the stop.
+func circuit_seed(stop_id: String) -> int:
+	return ("pocket-circuit|run-circuit|%d|act%d|%s" % [run_seed, current_map.act, stop_id]).hash() & 0x7FFFFFFF
+
 ## A race-type node has to be raced before the run moves past it.
 func is_race_pending() -> bool:
 	return String(current_node().get("type", "")) in RACE_NODE_TYPES and not resolved_nodes.has(current_node_id)
