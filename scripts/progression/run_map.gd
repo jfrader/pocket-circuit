@@ -366,10 +366,25 @@ static func _assign_types(base_nodes: Dictionary, prnts: Dictionary, chlds: Dict
 			if pu < 0.55 and cands.size() > 1 and defic.get(cands[0] if cands.size()>0 else "race", 0.0) > 0.0: idx = 0
 			idx = clampi(idx, 0, cands.size() - 1)
 			var chosen: String = String(cands[idx])
+			var is_sole: bool = false
+			for pid: String in pars:
+				if chlds.has(pid) and (chlds[pid] as Array).size() == 1:
+					is_sole = true
+					break
+
 			if chosen == "rival" and int(cur_count.get("act_rival", 0)) < int(target.get("act_rival", 0)):
 				var au: float = _roll(map_seed, r, "ar_c%d" % c, ACT_RIVAL_SALT)
 				if au < 0.45 or r >= int(float(n_rows) * 0.55):
-					chosen = "act_rival"
+					if not is_sole:
+						chosen = "act_rival"
+
+			if chosen == "act_rival" and is_sole:
+				chosen = "race"
+				for cand in cands:
+					if cand != "act_rival":
+						chosen = cand
+						break
+
 			typed[nid]["type"] = chosen
 			cur_count[chosen] = int(cur_count.get(chosen, 0)) + 1
 			for pid: String in pars:
@@ -384,6 +399,15 @@ static func generate(run_seed: int, act: int) -> RunMap:
 		var mseed: int = _derive_map_seed(rs, a, j)
 		var built: Dictionary = _try_build(mseed, rs, a)
 		if not built.is_empty():
+			var has_boss = false
+			var nodes_dict: Dictionary = built.get("nodes", {})
+			for nid: String in nodes_dict:
+				if String((nodes_dict[nid] as Dictionary).get("type", "")) == "act_rival":
+					has_boss = true
+					break
+			if not has_boss and j < 255:
+				continue
+			
 			var rm := new()
 			rm.run_seed = rs
 			rm.act = a
@@ -409,36 +433,8 @@ static func generate(run_seed: int, act: int) -> RunMap:
 						lst.append((rm.nodes[idd] as Dictionary).duplicate(true))
 				rm.row_nodes.append(lst)
 			return rm
-	# fallback path=1
-	var spec: Dictionary = get_act_spec(a)
-	var nr: int = int(spec["rows"])
-	var rmf := new()
-	rmf.run_seed = rs
-	rmf.act = a
-	rmf.num_rows = nr
-	rmf.num_paths = 1
-	rmf.path_count = 1
-	rmf.nodes = {}
-	rmf.parents = {}
-	rmf.children = {}
-	rmf.row_nodes = []
-	var center: int = NUM_COLUMNS / 2
-	for rr: int in range(nr):
-		var lst: Array[Dictionary] = []
-		var c: int = center
-		var idd: String = "%d_%d" % [rr, c]
-		var t: String = "race" if rr < nr-1 else "bench"
-		if rr == 0: t = "race"
-		var n: Dictionary = {"id": idd, "row": rr, "col": c, "type": t}
-		rmf.nodes[idd] = n
-		lst.append(n.duplicate(true))
-		rmf.row_nodes.append(lst)
-		if rr < nr-1:
-			var pid: String = idd
-			var cid: String = "%d_%d" % [rr+1, center]
-			rmf.children[pid] = [cid]
-			rmf.parents[cid] = [pid]
-	return rmf
+	# fallback: exhaust jitter budget; return null so the caller fails loudly
+	return null
 
 func get_node(node_id: String) -> Dictionary:
 	if nodes.has(node_id):
@@ -532,6 +528,8 @@ static func deserialize(data: Dictionary) -> RunMap:
 					lst.append(n.duplicate(true))
 			lst.sort_custom(func(x: Dictionary, y: Dictionary) -> bool: return int(x.get("col", 0)) < int(y.get("col", 0)))
 			rm.row_nodes.append(lst)
+	else:
+		return null
 	return rm
 
 static func _maps_structurally_equal(a: RunMap, b: RunMap) -> bool:

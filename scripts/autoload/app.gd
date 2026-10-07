@@ -27,6 +27,7 @@ signal joypad_connection_changed(connected: bool)
 var current_race_session: Dictionary = {}
 ## Active roguelike run, restored from the save on boot (null when there is none).
 var _current_run_session: RunSession = null
+var last_run_error: String = ""
 var _quick_roster: Dictionary = {}
 
 
@@ -1379,14 +1380,17 @@ func start_run(run_seed: int) -> RunSession:
 
 ## Persists the active run. The flow layer calls this after every resolved node.
 func persist_current_run() -> void:
+	last_run_error = ""
 	_finish_run_if_over()
 	var candidate := _save_data.duplicate(true)
 	candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
 	if candidate == _save_data:
 		return
 	if is_save_read_only():
+		last_run_error = "save is read-only"
 		return
 	if not _save_candidate(candidate):
+		last_run_error = "save failed"
 		return
 	_save_data = candidate
 
@@ -1442,37 +1446,58 @@ func enter_run_node(node_id: String) -> bool:
 	var ok: bool = _current_run_session.enter_node(node_id)
 	if ok:
 		persist_current_run()
-	return ok
+	else:
+		last_run_error = "refused"
 	return ok
 
-func start_run_race(node_id: String = "") -> bool:
-	if _current_run_session == null or _transitioning_to_race:
+func _advance_or_check_node(node_id: String, allowed_types: Array) -> bool:
+	if _current_run_session == null:
+		last_run_error = "no active run"
 		return false
-	var target_id: String = node_id
+	var target_id := node_id
 	if target_id.is_empty():
 		target_id = String(_current_run_session.current_node().get("id", ""))
+	if target_id == String(_current_run_session.current_node().get("id", "")):
+		var ntype := String(_current_run_session.current_node().get("type", ""))
+		if not allowed_types.has(ntype):
+			last_run_error = "wrong node type"
+			return false
+		return true
 	var allowed := false
 	for entry: Dictionary in _current_run_session.available_nodes():
 		if String(entry.get("id", "")) == target_id:
 			allowed = true
 			break
 	if not allowed:
+		last_run_error = "node not an available child"
 		return false
-	var node: Dictionary = (_current_run_session.current_map.get_node(target_id) as Dictionary) if _current_run_session.current_map != null else {}
+	var node: Dictionary = _current_run_session.current_map.get_node(target_id) if _current_run_session.current_map != null else {}
 	var ntype: String = String(node.get("type", ""))
-	if ntype != "race" and ntype != "act_rival":
+	if not allowed_types.has(ntype):
+		last_run_error = "wrong node type"
 		return false
 	if not _current_run_session.enter_node(target_id):
+		last_run_error = "failed to enter node"
 		return false
-	node_id = target_id
 	persist_current_run()
+	if last_run_error != "":
+		return false
+	return true
+
+func start_run_race(node_id: String = "") -> bool:
+	if _transitioning_to_race:
+		last_run_error = "transitioning to race"
+		return false
+	if not _advance_or_check_node(node_id, ["race", "act_rival"]):
+		return false
+	var target_id := node_id if not node_id.is_empty() else String(_current_run_session.current_node().get("id", ""))
 	var vehicle_id: String = _current_run_session.current_car_id
 	_roll_quick_roster()
 	_install_roster_for("quick")
-	var event_id: String = "run_%s" % node_id
+	var event_id: String = "run_%s" % target_id
 	var event: Dictionary = {
 		"id": event_id,
-		"name": "Run Race " + node_id,
+		"name": "Run Race " + target_id,
 		"theme": "kitchen",
 		"room": "classic",
 		"seed": _current_run_session.run_seed,
@@ -1489,44 +1514,30 @@ func start_run_race(node_id: String = "") -> bool:
 		"vehicle_id": vehicle_id,
 		"difficulty": String(_save_data.get("difficulty", "club_circuit")),
 		"result_committed": false,
-		"run_node_id": node_id,
+		"run_node_id": target_id,
 	}
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
 	return true
 
 func start_run_rival(node_id: String = "") -> bool:
-	if _current_run_session == null or _transitioning_to_race:
+	if _transitioning_to_race:
+		last_run_error = "transitioning to race"
 		return false
-	var target_id: String = node_id
-	if target_id.is_empty():
-		target_id = String(_current_run_session.current_node().get("id", ""))
-	var allowed: bool = false
-	for entry: Dictionary in _current_run_session.available_nodes():
-		if String(entry.get("id", "")) == target_id:
-			allowed = true
-			break
-	if not allowed:
+	if not _advance_or_check_node(node_id, ["rival"]):
 		return false
-	var node: Dictionary = (_current_run_session.current_map.get_node(target_id) as Dictionary) if _current_run_session.current_map != null else {}
-	var ntype: String = String(node.get("type", ""))
-	if ntype != "rival":
-		return false
-	if not _current_run_session.enter_node(target_id):
-		return false
-	node_id = target_id
-	persist_current_run()
+	var target_id := node_id if not node_id.is_empty() else String(_current_run_session.current_node().get("id", ""))
 	var vehicle_id: String = _current_run_session.current_car_id
 	_roll_quick_roster()
 	_install_roster_for("quick")
-	var event_id: String = "run_%s" % node_id
+	var event_id: String = "run_%s" % target_id
 	var roster_ids: Array = _roster_ids(_quick_roster)
 	var opp: Array = []
 	if roster_ids.size() > 0:
 		opp = [String(roster_ids[0])]
 	var event: Dictionary = {
 		"id": event_id,
-		"name": "Run Rival " + node_id,
+		"name": "Run Rival " + target_id,
 		"theme": "kitchen",
 		"room": "classic",
 		"seed": _current_run_session.run_seed,
@@ -1543,7 +1554,7 @@ func start_run_rival(node_id: String = "") -> bool:
 		"vehicle_id": vehicle_id,
 		"difficulty": String(_save_data.get("difficulty", "club_circuit")),
 		"result_committed": false,
-		"run_node_id": node_id,
+		"run_node_id": target_id,
 	}
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
@@ -1556,73 +1567,67 @@ func start_run_rival(node_id: String = "") -> bool:
 ## Run node outcome seams (non-race). Validate current node type matches, delegate to session,
 ## persist on success. Return bool success. For data-returning session calls (lockup, errand)
 ## we return bool (action performed) and caller inspects session state after; keeps seam shape uniform.
-func run_bench_repair(car_key: String) -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "bench":
+func run_bench_repair(car_key: String, node_id: String = "") -> bool:
+	if not _advance_or_check_node(node_id, ["bench"]):
 		return false
 	var ok: bool = _current_run_session.bench_repair(car_key)
 	if ok:
 		persist_current_run()
+	else:
+		last_run_error = "refused"
 	return ok
 
-func run_bench_fit(part: String) -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "bench":
+func run_bench_fit(part: String, node_id: String = "") -> bool:
+	if not _advance_or_check_node(node_id, ["bench"]):
 		return false
 	var car_key: String = _current_run_session.current_car_id
 	var ok: bool = _current_run_session.bench_fit(car_key, part)
 	if ok:
 		persist_current_run()
+	else:
+		last_run_error = "refused"
 	return ok
 
-func run_bench_continue() -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "bench":
+func run_bench_continue(node_id: String = "") -> bool:
+	if not _advance_or_check_node(node_id, ["bench"]):
 		return false
 	var ok: bool = _current_run_session.bench_continue()
 	if ok:
 		persist_current_run()
+	else:
+		last_run_error = "refused"
 	return ok
 
-func run_spend(cost: int) -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "parts_van":
+func run_spend(cost: int, node_id: String = "") -> bool:
+	if not _advance_or_check_node(node_id, ["parts_van"]):
 		return false
 	var ok: bool = _current_run_session.spend(cost)
 	if ok:
 		persist_current_run()
+	else:
+		last_run_error = "refused"
 	return ok
 
-func run_open_lockup() -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "lockup":
+func run_open_lockup(node_id: String = "") -> bool:
+	if not _advance_or_check_node(node_id, ["lockup"]):
 		return false
 	var res: Dictionary = _current_run_session.open_lockup()
 	var ok: bool = res.size() > 0
 	if ok:
 		persist_current_run()
+	else:
+		last_run_error = "refused"
 	return ok
 
-func run_resolve_errand(choice: int) -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "errand":
+func run_resolve_errand(choice: int, node_id: String = "") -> bool:
+	if not _advance_or_check_node(node_id, ["errand"]):
 		return false
 	var res: Dictionary = _current_run_session.resolve_errand(choice)
 	var ok: bool = not res.has("error")
 	if ok:
 		persist_current_run()
+	else:
+		last_run_error = "refused"
 	return ok
 
 
