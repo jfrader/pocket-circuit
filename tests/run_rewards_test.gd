@@ -31,6 +31,10 @@ func _run_test() -> void:
 	var pre_owned_win: Dictionary = sess.owned_cars.duplicate(true)
 	if not _walk_to_act3_final_bench_and_resolve(app, sess):
 		return
+	# resolve final bench action to trigger is_complete (see RunSession._maybe_complete_on_final_bench)
+	var ckey: String = sess.current_car_id
+	if not _expect(sess.bench_repair(ckey), "final bench repair must succeed and mark completed"):
+		return
 	app.call("persist_current_run")
 	if not _expect(app.call("current_run_session") == null, "win must clear current_run_session"):
 		return
