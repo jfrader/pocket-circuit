@@ -162,7 +162,7 @@ static func max_abs_deviation(roll: Dictionary) -> float:
 		m = maxf(m, absf(float(roll.get(axis, 0.0))))
 	return m
 
-## Pure wear transition. severity in [0,1+] ; higher values advance more steps.
+## Pure wear transition. severity in [0,1+] ; higher values advance multiple steps (can jump clean to dented in one hit).
 ## Always monotonic; caps at "dented".
 static func advance_wear(current: String, severity: float) -> String:
 	var idx := WEAR_LEVELS.find(current)
@@ -253,6 +253,8 @@ static func deserialize(data: Dictionary) -> RunState:
 			var w := String(wears_in[vid])
 			if w in WEAR_LEVELS:
 				rs.car_wear[vid] = w
+	else:
+		return null
 	return rs
 
 func _to_string() -> String:
