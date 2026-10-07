@@ -88,7 +88,14 @@ func _run_test() -> void:
 				return
 		elif etype == "bench":
 			var ccar: String = sess.current_car_id
+			var has_own: bool = sess.owned_cars.has(ccar)
+			var is_cur: bool = (ccar == sess.current_car_id)
+			var is_b: bool = sess._is_current_node_type("bench") if sess.has_method("_is_current_node_type") else false
+			var lastb: String = sess.last_bench_visited
+			var doneb: bool = sess.bench_action_done
+			print("DEBUG bench: cur=", ccar, " owned=", has_own, " iscur=", is_cur, " is_bench_node=", is_b, " last=", lastb, " done=", doneb, " current_node=", sess.current_node_id)
 			var did_repair: bool = sess.bench_repair(ccar)
+			print("DEBUG bench_repair returned=", did_repair)
 			if not _expect(did_repair, "bench repair succeeds first"):
 				return
 			var did_fit: bool = sess.bench_fit(ccar, "test_spoiler")
