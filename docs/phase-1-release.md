@@ -219,6 +219,12 @@ servers, MMO persistence, live economy, premium currency, and seasonal systems
 are outside Phase 1. Their future architecture must adapt to the shipped race
 rules rather than holding this release open.
 
+Screen King (spec §15.3: continuous racing where a screen/distance advantage
+scores a point, the field resets, first to the target score wins) is **deferred**
+to the competitive/online phase. Phase 1 ships the `circuit` and `rival_duel`
+formats in the championship catalog; no Screen King mode, HUD or reset logic is
+implemented for this release.
+
 ## Exact Release Commands
 
 Run the full gate locally for development closeout, following `AGENTS.md`'s
