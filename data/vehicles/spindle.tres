@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="VehicleStats" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="VehicleStats" format=3 uid="uid://d2u8xeolsjphw"]
 
 [ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_stats"]
 
