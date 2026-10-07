@@ -41,16 +41,29 @@ func _run_test() -> void:
 		var avail: Array[Dictionary] = sess.available_nodes()
 		if avail.is_empty():
 			break
-		# prefer path to unseen critical types for coverage+transit (deterministic by priority)
-		var priority: Dictionary = {"act_rival": 10, "lockup": 8, "rival": 6, "errand": 4, "parts_van": 3, "bench": 2, "race": 1}
 		var best_idx: int = 0
-		var best_score: int = -1
-		for ii: int in range(avail.size()):
-			var nt: String = String((avail[ii] as Dictionary).get("type", ""))
-			var sc: int = int(priority.get(nt, 0))
-			if sc > best_score:
-				best_score = sc
-				best_idx = ii
+		# steer toward act_rival col to guarantee transit for test (converge lanes)
+		var ar_id: String = _find_first_act_rival(sess.current_map)
+		if not ar_id.is_empty() and sess.current_map.act < 3:
+			var arn: Dictionary = sess.current_map.get_node(ar_id)
+			var tcol: int = int(arn.get("col", 3))
+			var bd: int = 999
+			for ii: int in range(avail.size()):
+				var cc: int = int((avail[ii] as Dictionary).get("col", 0))
+				var dd: int = absi(cc - tcol)
+				if dd < bd:
+					bd = dd
+					best_idx = ii
+		else:
+			# priority for other specials when no act_rival steer
+			var priority: Dictionary = {"lockup": 8, "rival": 6, "errand": 4, "parts_van": 3, "bench": 2, "race": 1}
+			var bs: int = -1
+			for ii: int in range(avail.size()):
+				var nt: String = String((avail[ii] as Dictionary).get("type", ""))
+				var sc: int = int(priority.get(nt, 0))
+				if sc > bs:
+					bs = sc
+					best_idx = ii
 		var next_id: String = String((avail[best_idx] as Dictionary).get("id", ""))
 		if not sess.enter_node(next_id):
 			break
@@ -236,3 +249,11 @@ func _maps_equal(a: Dictionary, b: Dictionary) -> bool:
 			if (va as Array).size() != (vb as Array).size(): return false
 		elif va != vb: return false
 	return true
+
+func _find_first_act_rival(m: RunMap) -> String:
+	if m == null: return ""
+	for nid: String in m.nodes:
+		var n: Dictionary = m.get_node(nid)
+		if String(n.get("type", "")) == "act_rival":
+			return nid
+	return ""
