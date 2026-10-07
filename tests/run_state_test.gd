@@ -14,7 +14,7 @@ func _initialize() -> void:
 func _run_test() -> void:
 	# --- Determinism and basic creation
 	var seed_a := 424242
-	var rs := RUN_STATE.create(seed_a)
+	var rs: RunState = RUN_STATE.create(seed_a)
 	if not _expect(rs.run_seed == seed_a, "create should retain the run seed"):
 		return
 	if not _expect(rs.act == null and rs.row == null, "act/row start nullable"):
@@ -23,74 +23,71 @@ func _run_test() -> void:
 		return
 
 	# --- Roll generation basics (use catalog vehicles for real types)
-	var rustbug := CATALOG.get_vehicle("rustbug")
-	var pinbolt := CATALOG.get_vehicle("pinbolt")
-	var scrapjaw := CATALOG.get_vehicle("scrapjaw")
-	var dustmite := CATALOG.get_vehicle("dustmite")
+	var rustbug: Dictionary = CATALOG.get_vehicle("rustbug")
+	var pinbolt: Dictionary = CATALOG.get_vehicle("pinbolt")
+	var scrapjaw: Dictionary = CATALOG.get_vehicle("scrapjaw")
+	var dustmite: Dictionary = CATALOG.get_vehicle("dustmite")
 	if not _expect(not rustbug.is_empty() and not pinbolt.is_empty(), "catalog vehicles available"):
 		return
 
-	var type_compact := String(rustbug["car_art"]["type"])
-	var type_coupe := String(pinbolt["car_art"]["type"])
-	var type_muscle := String(scrapjaw["car_art"]["type"])
-	var type_buggy := String(dustmite["car_art"]["type"])
+	var type_compact: String = String(rustbug["car_art"]["type"])
+	var type_coupe: String = String(pinbolt["car_art"]["type"])
+	var type_muscle: String = String(scrapjaw["car_art"]["type"])
+	var type_buggy: String = String(dustmite["car_art"]["type"])
 	if not _expect(type_compact == "compact" and type_coupe == "coupe" and type_muscle == "muscle" and type_buggy == "buggy", "car types from catalog"):
 		return
 
-	var tier_starter := RUN_STATE.get_tier_for_type(type_compact)
-	var tier_side := RUN_STATE.get_tier_for_type(type_coupe)
+	var tier_starter: String = RUN_STATE.get_tier_for_type(type_compact)
+	var tier_side: String = RUN_STATE.get_tier_for_type(type_coupe)
 	if not _expect(tier_starter == "starter" and tier_side == "sidegrade", "tier mapping"):
 		return
 	if not _expect(is_equal_approx(RUN_STATE.get_envelope_for_type(type_compact), 0.09) and is_equal_approx(RUN_STATE.get_envelope_for_type(type_coupe), 0.18), "envelopes per tier"):
 		return
 
-	var roll1 := rs.get_or_create_car_roll("rustbug", type_compact)
-	if not _expect(roll1.keys().size() == 6 and RUN_STATE.AXES.all(func(a): return roll1.has(a)), "roll has all six axes"):
+	var roll1: Dictionary = rs.get_or_create_car_roll("rustbug", type_compact)
+	if not _expect(roll1.keys().size() == 6 and RUN_STATE.AXES.all(func(a: String) -> bool: return roll1.has(a)), "roll has all six axes"):
 		return
 	if not _expect(is_zero(RUN_STATE.sum_of_axes(roll1), ZERO_MEAN_TOL), "zero-mean sum"):
 		return
-	var env_st := RUN_STATE.get_envelope_for_type(type_compact)
+	var env_st: float = RUN_STATE.get_envelope_for_type(type_compact)
 	if not _expect(RUN_STATE.max_abs_deviation(roll1) <= env_st + ENVELOPE_TOL, "within starter envelope"):
 		return
 
 	# Reproduce exactly
-	var roll1_again := rs.get_or_create_car_roll("rustbug", type_compact)
+	var roll1_again: Dictionary = rs.get_or_create_car_roll("rustbug", type_compact)
 	if not _expect(roll1 == roll1_again, "get_or_create is stable"):
 		return
-	var roll1_fresh := RUN_STATE.generate_car_roll(seed_a, tier_starter, type_compact, "rustbug")
+	var roll1_fresh: Dictionary = RUN_STATE.generate_car_roll(seed_a, tier_starter, type_compact, "rustbug")
 	if not _expect(roll1 == roll1_fresh, "generate deterministic for same inputs"):
 		return
 
 	# Different vehicle -> different roll (same tier)
-	var roll_rust := rs.get_or_create_car_roll("rustbug", type_compact)
-	var roll_dust := rs.get_or_create_car_roll("dustmite", type_buggy)
+	var roll_rust: Dictionary = rs.get_or_create_car_roll("rustbug", type_compact)
+	var roll_dust: Dictionary = rs.get_or_create_car_roll("dustmite", type_buggy)
 	if not _expect(roll_rust != roll_dust, "different vehicles produce different rolls even same tier"):
 		return
 	if not _expect(is_zero(RUN_STATE.sum_of_axes(roll_dust), ZERO_MEAN_TOL) and RUN_STATE.max_abs_deviation(roll_dust) <= 0.09 + ENVELOPE_TOL, "buggy also starter zero-mean in envelope"):
 		return
 
 	# Sidegrade larger envelope
-	var roll_pin := rs.get_or_create_car_roll("pinbolt", type_coupe)
+	var roll_pin: Dictionary = rs.get_or_create_car_roll("pinbolt", type_coupe)
 	if not _expect(RUN_STATE.max_abs_deviation(roll_pin) <= 0.18 + ENVELOPE_TOL, "coupe sidegrade envelope"):
 		return
 	if not _expect(not is_equal_approx(RUN_STATE.max_abs_deviation(roll_pin), RUN_STATE.max_abs_deviation(roll_rust)), "different magnitudes across tiers"):
 		return
 
 	# --- Corpus validation over many rolls
-	var starters: Array = []
-	var sidegrades: Array = []
-	var all_rolls := []
-	var axis_sums := {"speed": 0.0, "accel": 0.0, "grip": 0.0, "drift": 0.0, "boost": 0.0, "tough": 0.0}
-	var max_seen_starter := 0.0
-	var max_seen_side := 0.0
-	for i in CORPUS_SIZE:
-		var s := 100000 + i * 37
-		var r_st := RUN_STATE.generate_car_roll(s, "starter", "compact", "corpus_c%d" % i)
-		var r_si := RUN_STATE.generate_car_roll(s, "sidegrade", "coupe", "corpus_s%d" % i)
+	var starters: Array[Dictionary] = []
+	var sidegrades: Array[Dictionary] = []
+	var axis_sums: Dictionary = {"speed": 0.0, "accel": 0.0, "grip": 0.0, "drift": 0.0, "boost": 0.0, "tough": 0.0}
+	var max_seen_starter: float = 0.0
+	var max_seen_side: float = 0.0
+	for i: int in CORPUS_SIZE:
+		var s: int = 100000 + i * 37
+		var r_st: Dictionary = RUN_STATE.generate_car_roll(s, "starter", "compact", "corpus_c%d" % i)
+		var r_si: Dictionary = RUN_STATE.generate_car_roll(s, "sidegrade", "coupe", "corpus_s%d" % i)
 		starters.append(r_st)
 		sidegrades.append(r_si)
-		all_rolls.append(r_st)
-		all_rolls.append(r_si)
 		for a: String in RUN_STATE.AXES:
 			axis_sums[a] += float(r_st.get(a, 0.0))
 			axis_sums[a] += float(r_si.get(a, 0.0))
@@ -99,7 +96,7 @@ func _run_test() -> void:
 
 	# Means near zero
 	for a: String in RUN_STATE.AXES:
-		var mean := axis_sums[a] / (CORPUS_SIZE * 2.0)
+		var mean: float = axis_sums[a] / (CORPUS_SIZE * 2.0)
 		if not _expect(absf(mean) < MEAN_TOL, "axis %s mean deviation near zero over corpus (got %s)" % [a, mean]):
 			return
 
@@ -112,8 +109,8 @@ func _run_test() -> void:
 		return
 
 	# Reproducibility across corpus
-	var r0 := RUN_STATE.generate_car_roll(424242, "starter", "compact", "repro")
-	var r0b := RUN_STATE.generate_car_roll(424242, "starter", "compact", "repro")
+	var r0: Dictionary = RUN_STATE.generate_car_roll(424242, "starter", "compact", "repro")
+	var r0b: Dictionary = RUN_STATE.generate_car_roll(424242, "starter", "compact", "repro")
 	if not _expect(r0 == r0b, "identical seed+type+id reproduces exactly"):
 		return
 
@@ -146,37 +143,37 @@ func _run_test() -> void:
 		return
 
 	# --- Serialization round-trip
-	var rs2 := RUN_STATE.create(987654)
+	var rs2: RunState = RUN_STATE.create(987654)
 	rs2.get_or_create_car_roll("rustbug", "compact")
 	rs2.get_or_create_car_roll("pinbolt", "coupe")
 	rs2.set_car_wear("rustbug", "dusty")
 	rs2.set_car_wear("pinbolt", "clean")
 	rs2.act = 1
 	rs2.row = 3
-	var snap := RUN_STATE.serialize(rs2)
+	var snap: Dictionary = RUN_STATE.serialize(rs2)
 	if not _expect(int(snap["schema_version"]) == 1 and int(snap["run_seed"]) == 987654 and snap["act"] == 1 and snap["row"] == 3, "serialize captures identity and position"):
 		return
 	if not _expect((snap["car_rolls"] as Dictionary).has("rustbug") and (snap["car_wear"] as Dictionary)["rustbug"] == "dusty", "serialize includes rolls and wear"):
 		return
 
-	var rs3 := RUN_STATE.deserialize(snap)
+	var rs3: RunState = RUN_STATE.deserialize(snap)
 	if not _expect(rs3.run_seed == 987654 and rs3.act == 1 and rs3.row == 3, "deserialize restores scalars"):
 		return
-	var restored_roll := rs3.get_or_create_car_roll("rustbug", "compact")
+	var restored_roll: Dictionary = rs3.get_or_create_car_roll("rustbug", "compact")
 	if not _expect(restored_roll == rs2.get_or_create_car_roll("rustbug", "compact"), "rolls round-trip exactly"):
 		return
 	if not _expect(rs3.get_car_wear("rustbug") == "dusty" and rs3.get_car_wear("pinbolt") == "clean", "wear round-trips"):
 		return
 
 	# Deserialize tolerates bad wear
-	var bad := snap.duplicate(true)
+	var bad: Dictionary = snap.duplicate(true)
 	(bad["car_wear"] as Dictionary)["rustbug"] = "broken"
-	var rs_bad := RUN_STATE.deserialize(bad)
+	var rs_bad: RunState = RUN_STATE.deserialize(bad)
 	if not _expect(rs_bad.get_car_wear("rustbug") == "clean", "bad wear falls back safely"):
 		return
 
 	# Empty deserialize works
-	var empty := RUN_STATE.deserialize({})
+	var empty: RunState = RUN_STATE.deserialize({})
 	if not _expect(empty.run_seed == 0 and empty.car_rolls.is_empty(), "empty data yields default run state"):
 		return
 
