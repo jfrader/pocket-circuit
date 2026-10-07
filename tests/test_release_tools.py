@@ -13,7 +13,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from test_success_marker import fixed_fps_for, marker_for
-from validate_release_config import missing_uid_sidecars, validate_gamestruments_readme
+from validate_release_config import missing_uid_sidecars, stray_uid_sidecars, test_source_violations, validate_gamestruments_readme
 
 
 class CompletionMarkerTests(unittest.TestCase):
@@ -340,50 +340,26 @@ print("MAPPED_READER PASS", flush=True)
 
 
 class UidSidecarTests(unittest.TestCase):
-    def test_all_uid_present_returns_empty(self):
-        paths = [
-            "scripts/foo.gd",
-            "scripts/foo.gd.uid",
-            "scenes/bar.tscn",
-            "scenes/bar.tscn.uid",
-            "data/baz.tres",
-            "data/baz.tres.uid",
-            "assets/shaders/quux.gdshader",
-            "assets/shaders/quux.gdshader.uid",
-        ]
-        self.assertEqual(missing_uid_sidecars(paths), [])
+    def test_scripts_and_shaders_need_a_sidecar(self):
+        paths = ["a.gd", "a.gd.uid", "b.gd", "c.gdshader", "d.tscn", "e.tres", "f.txt"]
+        self.assertEqual(sorted(missing_uid_sidecars(paths)), ["b.gd", "c.gdshader"])
 
-    def test_one_missing_sidecar_is_reported(self):
-        paths = [
-            "scripts/foo.gd",
-            "scripts/foo.gd.uid",
-            "scenes/bar.tscn",
-            # bar.tscn.uid deliberately absent
-        ]
-        self.assertEqual(missing_uid_sidecars(paths), ["scenes/bar.tscn"])
+    def test_scene_and_resource_sidecars_are_stray(self):
+        paths = ["a.gd", "a.gd.uid", "b.gdshader.uid", "c.tscn", "c.tscn.uid", "d.tres.uid"]
+        self.assertEqual(sorted(stray_uid_sidecars(paths)), ["c.tscn.uid", "d.tres.uid"])
 
-    def test_suffixes_covered_are_exactly_the_four(self):
-        paths = [
-            "a.gd",  # present
-            "a.gd.uid",
-            "b.tscn",  # missing
-            "c.tres",  # missing
-            "d.gdshader",  # missing
-            "e.txt",  # not a resource
-            "e.txt.uid",
-            "ignored/addon.gd",  # reported when handed in; a real git ls-files never yields ignored paths
-        ]
-        missing = missing_uid_sidecars(paths)
-        self.assertEqual(sorted(missing), ["b.tscn", "c.tres", "d.gdshader", "ignored/addon.gd"])
 
-    def test_ignored_directories_never_reach_the_check(self):
-        # git ls-files only yields tracked files; ignored paths (e.g. under addons/godot_mcp)
-        # are never present in the input list passed to the pure function.
-        # This test exercises that the pure function itself does not special-case
-        # directories; the exclusion is by construction of the tracked list.
-        paths_with_only_tracked = ["scripts/real.gd", "scripts/real.gd.uid"]
-        self.assertEqual(missing_uid_sidecars(paths_with_only_tracked), [])
-        # If an ignored path were erroneously passed it would be treated, but
-        # the git step in main() and build gate prevents that.
-        paths_simulating_mistake = ["addons/godot_mcp/foo.gd"]
-        self.assertEqual(missing_uid_sidecars(paths_simulating_mistake), ["addons/godot_mcp/foo.gd"])
+class TestSourceBanTests(unittest.TestCase):
+    def test_assert_is_reported(self):
+        self.assertEqual(
+            test_source_violations({"tests/a_test.gd": "func _run():\n\tassert(x)\n"}),
+            ["tests/a_test.gd: uses assert(); use a failing _expect"],
+        )
+
+    def test_unpathed_save_store_is_reported(self):
+        violations = test_source_violations({"tests/b_test.gd": "var store = SAVE_STORE.new()\n"})
+        self.assertEqual(violations, ["tests/b_test.gd: builds a SaveStore on the player's save path"])
+
+    def test_pathed_store_and_expect_pass(self):
+        source = 'var store = SAVE_STORE.new("user://tests/x.json")\nif not _expect(x, "x"): return\n'
+        self.assertEqual(test_source_violations({"tests/c_test.gd": source}), [])

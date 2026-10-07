@@ -298,7 +298,7 @@ func show_run_board() -> void:
 	RUN_UI.spacer(_content, 10)
 	RUN_UI.divider(_content)
 	_content.add_child(RUN_UI.legend(sess.current_map))
-	_content.add_child(RUN_UI.label("RING · CURRENT STOP     COLOUR · AVAILABLE     DIM · LOCKED", 10, RUN_UI.MUTED, true))
+	_content.add_child(RUN_UI.key_row(["RING · CURRENT STOP", "COLOUR · AVAILABLE", "DIM · LOCKED"]))
 	_focus_first()
 
 

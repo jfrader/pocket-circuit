@@ -13,7 +13,7 @@ func _run() -> void:
 	await process_frame
 	for theme: StringName in [&"kitchen", &"workshop", &"office"]:
 		var built := CORE.build_packed(theme, &"classic", 0, {"length_tier":"compact"})
-		assert(built["scene"] != null)
+		if not _expect(built["scene"] != null, "the packed course must build"): return
 		var track := (built["scene"] as PackedScene).instantiate() as Node2D
 		root.add_child(track)
 		var surface := track.get_node("TrackSurface") as Line2D

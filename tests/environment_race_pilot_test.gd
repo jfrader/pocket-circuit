@@ -3,7 +3,6 @@ extends SceneTree
 const SCENE := preload("res://tools/environment_race_pilot.tscn")
 const CORE := preload("res://scripts/race/track_builder_core.gd")
 const ART := preload("res://tools/environment_pilot_props.gd")
-var failures: Array[String] = []
 
 
 func _initialize() -> void:
@@ -24,9 +23,6 @@ func _run() -> void:
 		while not bool(race.get("pilot_ready")) and Time.get_ticks_msec() < deadline:
 			await process_frame
 		if not _expect(bool(race.get("pilot_ready")), theme + ": native race failed to become ready"): return
-		if not bool(race.get("pilot_ready")):
-			fixture.free()
-			break
 		var track := race.get_node("Track") as Node2D
 		var manager := race.get_node("RaceManager")
 		if not _expect(manager.call("get_rankings").size() == 4, theme + ": actual four-racer field is missing"): return
@@ -80,15 +76,12 @@ func _run() -> void:
 	await process_frame
 	app.free()
 	await create_timer(0.2).timeout
-	for failure: String in failures:
-		push_error("ENVIRONMENT_RACE_PILOT_TEST FAIL " + failure)
-	if failures.is_empty():
-		print("ENVIRONMENT_RACE_PILOT_TEST PASS native_race_hud_field_geometry_fresh_art_scale_hierarchy_surfaces")
-	quit(0 if failures.is_empty() else 1)
+	print("ENVIRONMENT_RACE_PILOT_TEST PASS native_race_hud_field_geometry_fresh_art_scale_hierarchy_surfaces")
+	quit(0)
 
 
 func _expect(condition: bool, message: String) -> bool:
 	if not condition:
-		failures.append(message)
-		return false
-	return true
+		push_error("ENVIRONMENT_RACE_PILOT_TEST FAIL " + message)
+		quit(1)
+	return condition

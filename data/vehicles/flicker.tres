@@ -1,9 +1,10 @@
-[gd_resource type="Resource" script_class="VehicleStats" format=3 uid="uid://cfg05axu6xl7l"]
+[gd_resource type="Resource" script_class="VehicleStats" load_steps=2 format=3]
 
 [ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_stats"]
 
 [resource]
 script = ExtResource("1_stats")
+physics_model_version = 2
 mass = 0.68
 wheelbase = 36.0
 front_weight_ratio = 0.48
@@ -11,7 +12,7 @@ engine_force = 695.0
 launch_torque_multiplier = 1.06
 torque_peak_ratio = 0.33
 torque_at_max_speed = 0.38
-torque_falloff_exponent = 2.1
+torque_falloff_exponent = 2.10
 max_speed = 742.0
 reverse_speed = 250.0
 rolling_resistance = 14.0
@@ -24,13 +25,16 @@ post_peak_grip_ratio = 0.56
 slip_falloff_rate = 0.48
 max_steer_angle_deg = 35.0
 steering_response = 9.5
+high_speed_steer_ratio = 0.48
+arcade_high_speed_steer_ratio = 0.82
+arcade_throttle_oversteer = 0.32
 steer_fade_start_ratio = 0.28
 yaw_stability_rate = 6.0
 brake_force = 820.0
 handbrake_force = 200.0
 drift_min_speed = 115.0
 drift_entry_steer = 0.28
-drift_rear_grip_ratio = 0.3
+drift_rear_grip_ratio = 0.30
 drift_yaw_assist = 3.2
 drift_grip_recovery_rate = 6.5
 drift_optimal_slip_deg = 32.0
