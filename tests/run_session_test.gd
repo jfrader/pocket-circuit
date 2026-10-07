@@ -101,6 +101,9 @@ func _check_bench_and_van() -> void:
 	var van = RUN_SESSION.create(22222)
 	if not _expect(_walk_to(van, "parts_van"), "a route reaches a parts van"):
 		return
+	var cheapest: int = RUN_SESSION.VAN_PART_COSTS.values().min()
+	if not _expect(cheapest <= int(RUN_SESSION.RUN_POINTS_BY_FINISH[1]), "one race win buys the cheapest part"):
+		return
 	van.run_points = 20
 	if not _expect(not van.spend(9999) and van.run_points == 20, "overspending is refused"):
 		return

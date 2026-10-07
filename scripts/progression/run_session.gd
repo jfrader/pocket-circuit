@@ -12,6 +12,7 @@ const RUN_STATE := preload("res://scripts/progression/run_state.gd")
 const INITIAL_POINTS := 0
 const RIVAL_LOSS_POINTS_COST := 10
 const ERRAND_PAY_POINTS := 6
+const VAN_PART_COSTS := {"tool_kit": 5, "tyre_set": 10, "spare_shell": 15}
 const RIVAL_LOSS_SEVERITY := 0.6
 const LOCKUP_CAR_TYPE := "compact"
 
