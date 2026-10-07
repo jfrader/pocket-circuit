@@ -114,6 +114,21 @@ func start_race(node_id: String, field_size: int) -> bool:
 	race_in_flight = {"node": node_id, "field": field_size}
 	return true
 
+## The seed of the circuit a stop races on, from the run, the act and the stop.
+func circuit_seed(stop_id: String) -> int:
+	return _circuit_roll("route", stop_id)
+
+## Whether a stop's circuit runs reversed: its own stream, mixed through the
+## engine's PCG generator because String.hash's low bit follows the route
+## seed's and would tie the direction to the room.
+func circuit_reversed(stop_id: String) -> bool:
+	var mix := RandomNumberGenerator.new()
+	mix.seed = _circuit_roll("reverse", stop_id)
+	return mix.randi() % 2 == 1
+
+func _circuit_roll(stream: String, stop_id: String) -> int:
+	return ("pocket-circuit|run-circuit|%s|%d|act%d|%s" % [stream, run_seed, current_map.act, stop_id]).hash() & 0x7FFFFFFF
+
 ## A race-type node has to be raced before the run moves past it.
 func is_race_pending() -> bool:
 	return String(current_node().get("type", "")) in RACE_NODE_TYPES and not resolved_nodes.has(current_node_id)
