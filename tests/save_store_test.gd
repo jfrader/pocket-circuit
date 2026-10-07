@@ -18,7 +18,7 @@ func _run_test() -> void:
 	var data := store.default_data()
 	if not _expect(not bool(data["championship_started"]), "new saves should not start a championship implicitly"):
 		return
-	if not _expect(int(data["version"]) == int(SAVE_STORE.CURRENT_VERSION) and int(data["championship_circuit"]["seed"]) == 665001 and data["championship_circuit"]["events"].size() == CATALOG.EVENTS.size() and (data["mastery_circuit_metrics"] as Dictionary).is_empty() and data["circuit_history"].is_empty() and data["favorite_circuits"].is_empty(), "new saves should carry complete circuit identity and empty mastery/discovery collections"):
+	if not _expect(int(data["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(data["championship_circuit"]["seed"]) == 665001 and data["championship_circuit"]["events"].size() == CATALOG.EVENTS.size() and (data["mastery_circuit_metrics"] as Dictionary).is_empty() and data["circuit_history"].is_empty() and data["favorite_circuits"].is_empty(), "new saves should carry complete circuit identity and empty mastery/discovery collections"):
 		return
 	if not _expect(not bool(data["reduced_motion"]), "reduced motion should default off"):
 		return
@@ -153,14 +153,14 @@ func _run_test() -> void:
 	if not _expect(is_equal_approx(float(loaded["engine_volume"]), float(loaded["sfx_volume"])) and is_equal_approx(float(loaded["tyre_volume"]), float(loaded["sfx_volume"])), "saves without engine or tyre volume should start from the saved SFX level"):
 		return
 	var migrated_identity: Dictionary = loaded["championship_circuit"]
-	if not _expect(int(loaded["version"]) == int(SAVE_STORE.CURRENT_VERSION) and int(migrated_identity["seed"]) == 665001 and migrated_identity["events"].size() == CATALOG.EVENTS.size() and loaded["mastery_records"].is_empty() and loaded["personal_ghosts"].is_empty() and loaded["circuit_history"].is_empty() and loaded["favorite_circuits"].is_empty(), "version 1 saves should receive deterministic identity and empty mastery/discovery archives in memory"):
+	if not _expect(int(loaded["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(migrated_identity["seed"]) == 665001 and migrated_identity["events"].size() == CATALOG.EVENTS.size() and loaded["mastery_records"].is_empty() and loaded["personal_ghosts"].is_empty() and loaded["circuit_history"].is_empty() and loaded["favorite_circuits"].is_empty(), "version 1 saves should receive deterministic identity and empty mastery/discovery archives in memory"):
 		return
 	if not _expect(int(_read_json(TEST_PATH)["version"]) == 1, "loading a legacy save should not rewrite it before a validated save action"):
 		return
 	if not _expect(store.save_data(loaded), "a migrated save should persist safely: %s" % store.last_save_error):
 		return
 	var migrated_on_disk := _read_json(TEST_PATH)
-	if not _expect(int(migrated_on_disk["version"]) == int(SAVE_STORE.CURRENT_VERSION) and int(migrated_on_disk["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "persisting migration should upgrade the schema without changing player progress"):
+	if not _expect(int(migrated_on_disk["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(migrated_on_disk["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "persisting migration should upgrade the schema without changing player progress"):
 		return
 	if not _expect(store.load_data()["championship_circuit"] == migrated_identity, "reloading a persisted migration should retain the exact generated identity"):
 		return
@@ -280,7 +280,7 @@ func _test_current_run_migration(store: SaveStore) -> bool:
 	if not _expect(store.save_data(v5_with_run), "save v5 with current_run data"):
 		return false
 	loaded = store.load_data()
-	if not _expect(int(loaded["version"]) == int(SAVE_STORE.CURRENT_VERSION) and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_budget",0)) == 33, "v5 current_run data roundtrips via normalize"):
+	if not _expect(int(loaded["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_budget",0)) == 33, "v5 current_run data roundtrips via normalize"):
 		return false
 
 	# future v6 crafted save -> read only, defaults (current_run={}), disk untouched
