@@ -968,7 +968,8 @@ func _update_results(results: Array) -> void:
 			status,
 		])
 	lines.append("")
-	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if String(_session.get("mode", "quick")) in ["quick", "discovery"] else "RESULT SAVED · CONTINUE OR RETRY"
+	var mode := String(_session.get("mode", "quick"))
+	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if mode in ["quick", "discovery"] else ("RESULT SAVED · CONTINUE" if mode == "run" else "RESULT SAVED · CONTINUE OR RETRY")
 	var app := get_node_or_null("/root/App")
 	var live_session: Dictionary = app.call("get_current_race_session") if app and app.has_method("get_current_race_session") else {}
 	var summary: Dictionary = live_session.get("result_summary", {})
@@ -1439,6 +1440,8 @@ func _add_pause_button(parent: Control, text: String, callback: Callable, primar
 
 
 func _on_retry_pressed() -> void:
+	if not _retry_button.visible:
+		return
 	if _save_error.is_empty():
 		restart_race()
 	else:
@@ -1456,16 +1459,17 @@ func _on_mastery_pressed() -> void:
 func _attempt_result_commit(results: Array) -> void:
 	var committed := _report_result_to_app(results)
 	var mastery_mode := String(_session.get("mode", "")) == "mastery"
-	_retry_button.disabled = false
+	var app := get_node_or_null("/root/App")
+	_retry_button.visible = not committed or app == null or not app.has_method("can_retry_race") or bool(app.call("can_retry_race"))
+	_retry_button.disabled = not _retry_button.visible
 	_continue_button.disabled = not committed and not mastery_mode
 	_retry_button.text = "RETRY" if committed else "RETRY SAVE"
-	var app := get_node_or_null("/root/App")
 	var mastery_available := committed and app and app.has_method("can_start_mastery_rematch") and bool(app.call("can_start_mastery_rematch"))
 	_mastery_button.visible = mastery_available
 	_mastery_button.disabled = not mastery_available
 	_layout_result_actions(mastery_available)
 	_retry_button.focus_neighbor_right = _retry_button.get_path_to(_mastery_button if mastery_available else _continue_button)
-	_continue_button.focus_neighbor_left = _continue_button.get_path_to(_mastery_button if mastery_available else _retry_button)
+	_continue_button.focus_neighbor_left = _continue_button.get_path_to(_mastery_button if mastery_available else (_retry_button if _retry_button.visible else _continue_button))
 	if mastery_available:
 		_mastery_button.focus_neighbor_left = _mastery_button.get_path_to(_retry_button)
 		_mastery_button.focus_neighbor_right = _mastery_button.get_path_to(_continue_button)
@@ -1481,6 +1485,8 @@ func _layout_result_actions(mastery_available: bool) -> void:
 		_retry_button.position.x = 26.0
 		_mastery_button.position.x = 225.0
 		_continue_button.position.x = 424.0
+	elif not _retry_button.visible:
+		_continue_button.position.x = 225.0
 	else:
 		_retry_button.position.x = 126.0
 		_continue_button.position.x = 324.0
