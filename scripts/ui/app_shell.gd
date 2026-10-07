@@ -637,6 +637,8 @@ func go_back() -> void:
 				show_briefing(_event_id)
 		"run_board":
 			show_title()
+		"run_bench", "run_parts_van", "run_lockup", "run_errand":
+			show_run_board()
 		"ending":
 			_app.call("finish_ending", "map")
 
