@@ -560,6 +560,8 @@ func go_back() -> void:
 				show_quick_race()
 			else:
 				show_briefing(_event_id)
+		"run_board":
+			show_title()
 		"ending":
 			_app.call("finish_ending", "map")
 
