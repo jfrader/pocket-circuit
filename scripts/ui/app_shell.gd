@@ -73,7 +73,7 @@ func show_title() -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	_page.hide()
 	_art_menu.set("reduced_motion", _reduced_motion_enabled())
-	_art_menu.call("show_title", has_progress, save_read_only, _selected_vehicle(progress), progress.get("unlocked_vehicles", ["rustbug"]), recovery_message)
+	_art_menu.call("show_title", has_progress, save_read_only, _selected_vehicle(progress), progress.get("unlocked_vehicles", ["rustbug"]), recovery_message, _app.call("current_run_session") != null)
 	_app.call("prepare_circuit_preview", _current_quick_identity())
 
 
@@ -292,6 +292,11 @@ func show_run_board() -> void:
 	RUN_UI.stats(detail, sess)
 	RUN_UI.spacer(detail, 8)
 	_run_actions = detail
+	var unsaved := String(_app.get("run_save_error"))
+	if not unsaved.is_empty():
+		detail.add_child(RUN_UI.label("NOT SAVED · " + unsaved.to_upper(), 12, RUN_UI.AMBER, true))
+		if not bool(_app.call("is_save_read_only")):
+			_run_action("SAVE AGAIN", Callable(self, "_on_save_run_again"), true, false, "ActionSaveAgain")
 	_run_action("NEW RUN", Callable(self, "_on_new_run_pressed"), false, false, "ActionNewRun")
 	_run_action("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
 	_run_action("BACK", Callable(self, "show_title"), false, false, "ActionBack")
@@ -937,6 +942,8 @@ func _on_art_action(action: StringName) -> void:
 		&"new_run":
 			_app.call("start_new_run")
 			show_run_board()
+		&"continue_run":
+			show_run_board()
 		&"quick_race":
 			_app.call("open_quick_race")
 		&"quick_strip":
@@ -1489,6 +1496,15 @@ func _on_run_node_pressed(node_id: String) -> void:
 func _on_new_run_pressed() -> void:
 	_app.call("start_new_run")
 	show_run_board()
+
+
+func _on_save_run_again() -> void:
+	_play_ui_confirm()
+	_app.call("persist_current_run")
+	if _app.call("current_run_session") == null:
+		show_title()
+	else:
+		show_run_board()
 
 
 func _on_abandon_run() -> void:

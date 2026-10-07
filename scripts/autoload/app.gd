@@ -33,6 +33,8 @@ var current_race_session: Dictionary = {}
 ## Active roguelike run, restored from the save on boot (null when there is none).
 var _current_run_session: RunSession = null
 var last_run_error: String = ""
+## Why the run is not on disk yet ("" once a run save lands); the board shows it.
+var run_save_error := ""
 var _quick_roster: Dictionary = {}
 
 
@@ -1139,9 +1141,6 @@ func _leave_race_loading() -> void:
 	_transitioning_to_race = false
 	_loading_failed = false
 	var mode := String(current_race_session.get("mode", "quick"))
-	if mode == "run" and _current_run_session != null:
-		_current_run_session.cancel_race()
-		persist_current_run()
 	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode == "quick" else "map"))
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
@@ -1380,6 +1379,9 @@ func current_run_session() -> RunSession:
 func start_run(run_seed: int) -> RunSession:
 	if _current_run_session != null:
 		abandon_run()
+		if _current_run_session != null:
+			# The old night could not be saved; it stays until it can.
+			return null
 	_current_run_session = RUN_SESSION.create(run_seed)
 	persist_current_run()
 	return _current_run_session
@@ -1404,6 +1406,7 @@ func persist_current_run() -> void:
 			last_run_error = "save failed"
 		else:
 			_save_data = candidate
+	run_save_error = last_run_error
 	if ended and last_run_error.is_empty():
 		_current_run_session = null
 	_install_held_vehicles()
@@ -1521,6 +1524,9 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 		return false
 	if not _advance_or_check_node(node_id, allowed_types):
 		return false
+	if not _current_run_session.is_race_pending():
+		last_run_error = "already raced"
+		return false
 	var node: Dictionary = _current_run_session.current_node()
 	var target_id := String(node.get("id", ""))
 	var node_type := String(node.get("type", ""))
@@ -1553,24 +1559,33 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 		"result_committed": false,
 		"run_node_id": target_id,
 	}
-	if not _current_run_session.start_race(target_id, _field_size(event)):
-		current_race_session.clear()
-		last_run_error = "already raced"
-		return false
-	persist_current_run()
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
 	return true
 
 
+## The race scene calls this when its countdown begins: from here a run race
+## counts, so it is marked (and saved) as running until its result lands.
+## A race that never got this far (cancelled or failed loading) costs nothing.
+func race_started() -> void:
+	if String(current_race_session.get("mode", "")) != "run" or _current_run_session == null:
+		return
+	if _current_run_session.start_race(String(current_race_session.get("run_node_id", "")), _field_size(current_race_session.get("event", {}))):
+		persist_current_run()
+
+
 ## A run race that started and was never reported (quit, abandoned, or the game
-## closed mid-race) ends as a did-not-finish in last place.
+## closed mid-race) ends as a did-not-finish in last place. A mark that no longer
+## matches the run is dropped rather than retried on every boot.
 func _settle_race_in_flight() -> void:
 	if _current_run_session == null or _current_run_session.race_in_flight.is_empty():
 		return
 	var flight: Dictionary = _current_run_session.race_in_flight
 	var field := int(flight.get("field", 1))
 	_commit_run_result(String(flight.get("node", "")), field, true, field)
+	if _current_run_session != null and not _current_run_session.race_in_flight.is_empty():
+		_current_run_session.race_in_flight = {}
+		persist_current_run()
 
 
 ## Applies a run race outcome exactly once: rivals through resolve_rival (which

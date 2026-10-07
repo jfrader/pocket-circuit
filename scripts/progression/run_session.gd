@@ -109,14 +109,10 @@ func available_nodes() -> Array[Dictionary]:
 ## Marks the current unraced race-type stop as racing. Whatever ends that race
 ## (a result, a quit, a closed game) has to resolve it; it is never re-raced.
 func start_race(node_id: String, field_size: int) -> bool:
-	if node_id != current_node_id or not is_race_pending():
+	if node_id != current_node_id or not is_race_pending() or not race_in_flight.is_empty():
 		return false
 	race_in_flight = {"node": node_id, "field": field_size}
 	return true
-
-## A race that never got past its loading screen did not happen.
-func cancel_race() -> void:
-	race_in_flight = {}
 
 ## A race-type node has to be raced before the run moves past it.
 func is_race_pending() -> bool:

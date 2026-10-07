@@ -74,7 +74,11 @@ func _run_test() -> void:
 
 	# NEW RUN over a night that won a car ends that night first: the car is kept.
 	var swapped := _run_to_rival(app)
+	if not _expect(swapped != null, "a second rival is reachable"):
+		return
 	RUN_WALK.settle(app, swapped)
+	if not _expect(not swapped.won_cars().is_empty(), "the second duel wins a car"):
+		return
 	var swapped_car := String(swapped.won_cars()[0]["id"])
 	app.call("start_new_run")
 	if not _expect(swapped_car in (app.call("garage_car_ids") as Array), "starting a new run keeps the cars the old one won"):
@@ -82,7 +86,11 @@ func _run_test() -> void:
 
 	# A night that ends while the save cannot be written keeps its cars until it can.
 	var blocked := _run_to_rival(app)
+	if not _expect(blocked != null, "a third rival is reachable"):
+		return
 	RUN_WALK.settle(app, blocked)
+	if not _expect(not blocked.won_cars().is_empty(), "the third duel wins a car"):
+		return
 	var blocked_car := String(blocked.won_cars()[0]["id"])
 	var store: Object = app.get("_save_store")
 	store.set("is_read_only", true)
@@ -91,15 +99,28 @@ func _run_test() -> void:
 		return
 	if not _expect(not blocked_car in (SAVE_STORE.new(path).load_data()["garage_cars"] as Array).map(func(car: Dictionary) -> String: return String(car["id"])), "nothing reaches disk while the save is blocked"):
 		return
+	if not _expect(app.call("start_new_run") == null and app.call("current_run_session") == blocked, "a new run never replaces a night that is not saved yet"):
+		return
+	var shell := app.get("_shell") as CanvasLayer
 	store.set("is_read_only", false)
-	app.call("persist_current_run")
-	if not _expect(app.call("current_run_session") == null and blocked_car in (app.call("garage_car_ids") as Array), "the held night lands with its car once the save works"):
+	shell.call("show_run_board")
+	await process_frame
+	var save_again := shell.find_child("ActionSaveAgain", true, false) as Button
+	if not _expect(save_again != null, "the board offers to save an unsaved night"):
+		return
+	save_again.pressed.emit()
+	await process_frame
+	if not _expect(app.call("current_run_session") == null and blocked_car in (app.call("garage_car_ids") as Array), "saving again lands the held night with its car"):
 		return
 
 	# A new championship resets the championship, not the garage.
 	var before: Array = app.call("garage_car_ids")
+	var running: RunSession = app.call("start_run", 4040) as RunSession
 	app.call("confirm_new_championship")
 	if not _expect(app.call("garage_car_ids") == before, "a new championship keeps every won car"):
+		return
+	var kept_run: Dictionary = SAVE_STORE.new(path).load_data()["current_run"]
+	if not _expect(int(kept_run.get("run_seed", 0)) == running.run_seed, "a new championship keeps the run in progress"):
 		return
 
 	app.call("abandon_run")

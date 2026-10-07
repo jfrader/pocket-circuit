@@ -70,7 +70,7 @@ func clear() -> void:
 	visible = false
 
 
-func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustbug", unlocked: Array = ["rustbug"], recovery_message: String = "") -> void:
+func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustbug", unlocked: Array = ["rustbug"], recovery_message: String = "", has_run: bool = false) -> void:
 	_begin()
 	_add_stage(TITLE_STAGE).configure(&"title", vehicle_id, "rae", "kitchen", TITLE_RIVAL, unlocked)
 	_label("POCKET", Rect2(COLUMN_X - 4, 40, 560, 104), 88, SKIN.CREAM)
@@ -86,7 +86,7 @@ func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustb
 	play.disabled = read_only and not has_progress
 	# The run (roguelike) is a mode from the start: it seeds its own starter car,
 	# so it must not wait for championship progress.
-	var second_actions := [&"new_run", &"quick_race", &"quick_strip"]
+	var second_actions := [&"continue_run" if has_run else &"new_run", &"quick_race", &"quick_strip"]
 	var second_row := _button_row(second_actions, Rect2(COLUMN_X, 436, COLUMN_WIDTH, 54), 20)
 	if has_progress:
 		second_row[0].disabled = read_only

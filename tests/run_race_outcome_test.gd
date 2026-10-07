@@ -85,8 +85,16 @@ func _run_test() -> void:
 	# and quitting it is a did-not-finish that resolves the stop for good.
 	var quit_run: RunSession = app.call("start_run", 52525) as RunSession
 	var opening := quit_run.current_node_id
+	# Leaving before the countdown (a cancelled or failed loading screen) costs nothing.
+	app.call("start_run_race", opening)
+	app.call("abandon_race")
+	for frame in 3:
+		await process_frame
+	if not _expect(quit_run.is_race_pending() and quit_run.race_in_flight.is_empty(), "a race left before its countdown is still there to race"):
+		return
 	if not _expect(bool(app.call("start_run_race", opening)), "the opening race starts"):
 		return
+	app.call("race_started")
 	var on_disk: Dictionary = SAVE_STORE.new(path).load_data().get("current_run", {}) as Dictionary
 	if not _expect(String((on_disk.get("race_in_flight", {}) as Dictionary).get("node", "")) == opening, "a started race is in the save before it is driven"):
 		return
@@ -108,6 +116,7 @@ func _run_test() -> void:
 	# A race left running when the game closed resolves the same way on boot.
 	var closed: RunSession = app.call("start_run", 63636) as RunSession
 	app.call("start_run_race", closed.current_node_id)
+	app.call("race_started")
 	var reloaded := RunSession.deserialize(SAVE_STORE.new(path).load_data().get("current_run", {}) as Dictionary)
 	app.set("_current_run_session", reloaded)
 	app.call("_settle_race_in_flight")
