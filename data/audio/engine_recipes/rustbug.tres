@@ -1,22 +1,18 @@
-[gd_resource type="Resource" script_class="EngineRecipe" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="EngineRecipe" format=3 uid="uid://bcqyol38tlpp1"]
 
 [ext_resource type="Script" path="res://scripts/audio/engine/engine_recipe.gd" id="1_recipe"]
 
 [resource]
 script = ExtResource("1_recipe")
 recipe_id = "rustbug"
-generator_version = 1
 identity_seed = "pc:rustbug:engine-v1"
-cylinder_count = 3
 firing_order = PackedInt32Array(0, 2, 1)
 displacement_l = 0.78
 cam = 0.58
 exhaust_primary_m = 0.46
 exhaust_body = 0.44
-aspiration = "turbo"
 turbo = 0.28
 idle_rpm = 1050.0
 redline_rpm = 7600.0
 gear_ratios = PackedFloat32Array(3.15, 2.05, 1.48, 1.13)
 final_drive = 4.1
-output_trim_db = 0.0
