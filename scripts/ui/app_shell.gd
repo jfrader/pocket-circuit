@@ -313,10 +313,6 @@ func show_run_board() -> void:
 	_focus_first()
 
 
-	_discovery_panel.configure(_app)
-	_footer.text = BACK_HINT
-
-
 func show_briefing(event_id: String) -> void:
 	var event: Dictionary = _app.call("get_championship_event", event_id)
 	if event.is_empty():
