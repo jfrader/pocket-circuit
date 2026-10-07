@@ -23,12 +23,11 @@ func _run_test() -> void:
 	for frame in 3:
 		await process_frame
 
-	# --- Win case (separate session) ---
-	var win_sess: RunSession = app.call("start_run", 1740010) as RunSession
-	if not _expect(win_sess != null, "start_run must create a session for win"):
-		return
-	var rival_id: String = _find_rival_before_enter(app, win_sess, 80)
-	if not _expect(not rival_id.is_empty(), "a rival node must become available within the walk (retries seeds)"):
+	# --- Win case (separate session, retry seeds for ~12% rival density) ---
+	var find_win: Dictionary = _find_rival_before_enter(app, 30, 80)
+	var win_sess: RunSession = find_win.get("sess") as RunSession
+	var rival_id: String = String(find_win.get("rival_id", ""))
+	if not _expect(win_sess != null and not rival_id.is_empty(), "a rival node must be found within bounded seed retries and walk"):
 		return
 
 	var owned_before: int = win_sess.owned_cars.size()
@@ -67,12 +66,11 @@ func _run_test() -> void:
 	if not _expect(saved_owned.size() == win_sess.owned_cars.size(), "the save must carry the granted rival car"):
 		return
 
-	# --- Loss case (separate session, fresh run) ---
-	var loss_sess: RunSession = app.call("start_run", 1740020) as RunSession
-	if not _expect(loss_sess != null, "start_run must create a session for loss"):
-		return
-	rival_id = _find_rival_before_enter(app, loss_sess, 80)
-	if not _expect(not rival_id.is_empty(), "a rival node must become available within the walk for loss"):
+	# --- Loss case (separate session, fresh run, retry seeds) ---
+	var find_loss: Dictionary = _find_rival_before_enter(app, 30, 80)
+	var loss_sess: RunSession = find_loss.get("sess") as RunSession
+	rival_id = String(find_loss.get("rival_id", ""))
+	if not _expect(loss_sess != null and not rival_id.is_empty(), "a rival node must be found for loss within bounded retries"):
 		return
 
 	var budget_before: int = loss_sess.run_budget
@@ -107,27 +105,33 @@ func _run_test() -> void:
 	quit(0)
 
 
-## Walks position-only (using enter seam) until a "rival" is *available* but does not enter it.
-## Retries with different seeds because rival nodes are ~12%. Returns id or "".
-func _find_rival_before_enter(app: Object, session: RunSession, max_steps: int) -> String:
-	var steps: int = 0
-	while steps < max_steps:
-		steps += 1
-		var options: Array[Dictionary] = session.available_nodes()
-		if options.is_empty():
-			return ""
-		for entry: Dictionary in options:
-			var nid: String = String(entry.get("id", ""))
-			var node: Dictionary = session.current_map.get_node(nid) as Dictionary
-			if String(node.get("type", "")) == "rival":
-				return nid
-		# advance on a non-rival using the app seam (matches race_outcome_test)
-		var first_id: String = ""
-		if options.size() > 0:
-			first_id = String(options[0].get("id", ""))
-		if first_id.is_empty() or not bool(app.call("enter_run_node", first_id)):
-			return ""
-	return ""
+## Tries up to max_seeds fresh start_run(seed) + bounded position-only walk until a rival
+## is seen in available_nodes() but does not enter it (start_run_rival will). Returns {"sess": RunSession, "rival_id": String} or empty.
+## Rivals ~12%, bounded retries per spec.
+func _find_rival_before_enter(app: Object, max_seeds: int, walk_budget: int) -> Dictionary:
+	for attempt in max_seeds:
+		var seed: int = 1740010 + attempt * 17
+		var sess: RunSession = app.call("start_run", seed) as RunSession
+		if sess == null:
+			continue
+		var steps: int = 0
+		while steps < walk_budget:
+			steps += 1
+			var options: Array[Dictionary] = sess.available_nodes()
+			if options.is_empty():
+				break
+			for entry: Dictionary in options:
+				var nid: String = String(entry.get("id", ""))
+				var node: Dictionary = sess.current_map.get_node(nid) as Dictionary
+				if String(node.get("type", "")) == "rival":
+					return {"sess": sess, "rival_id": nid}
+			# advance using app seam to keep position-only like other tests
+			var first_id: String = ""
+			if options.size() > 0:
+				first_id = String(options[0].get("id", ""))
+			if first_id.is_empty() or not bool(app.call("enter_run_node", first_id)):
+				break
+	return {"sess": null, "rival_id": ""}
 
 
 func _expect(condition: bool, message: String) -> bool:
