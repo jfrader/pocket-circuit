@@ -18,6 +18,8 @@ func _run() -> void:
 		return
 	if not await _test_high_speed_oversteer_without_handbrake():
 		return
+	if not await _test_counter_steer_saves():
+		return
 	if not await _test_handbrake_stronger():
 		return
 	print("VEHICLE_ARCADE_TEST PASS")
@@ -118,7 +120,10 @@ func _test_counter_steer_saves() -> bool:
 		await physics_frame
 	var yaw1 := absf(vehicle.angular_velocity)
 	vehicle.queue_free()
-	return _expect(true, "counter-steer")
+	return _expect(
+		yaw1 < yaw0,
+		"counter-steer should reduce yaw rate (yaw0=%.2f yaw1=%.2f)" % [yaw0, yaw1]
+	)
 
 
 func _test_handbrake_stronger() -> bool:
