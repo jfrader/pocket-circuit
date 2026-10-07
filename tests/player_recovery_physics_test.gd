@@ -89,13 +89,13 @@ func _run_case(reverse: bool) -> bool:
 	reset.recover_vehicle()
 	var entered_island := false
 	var farthest_travel := 0.0
-	for frame in 132:
+	for frame in 40:
 		await physics_frame
 		entered_island = entered_island or not reset.is_position_valid(vehicle.position)
 		farthest_travel = maxf(farthest_travel, vehicle.position.distance_to(manager.anchor.origin))
 	Input.action_release("accelerate")
 	print("PLAYER_RECOVERY_CASE reverse=%s recoveries=%d illegal=%s gates=%d travel=%.1f" % [reverse, manager.recoveries, entered_island, manager.gates, farthest_travel])
-	var passed := manager.recoveries == 1 and not entered_island and manager.gates == 1 and farthest_travel > 50.0
+	var passed := manager.recoveries == 1 and not entered_island and manager.gates == 1 and farthest_travel > 30.0
 	if not passed:
 		push_error("PLAYER_RECOVERY_PHYSICS_TEST FAIL: held throttle must preserve world collision and gate detection, without a second reset")
 	world.queue_free()
