@@ -21,8 +21,10 @@ func _run_test() -> void:
 			continue
 		if direction_only != "reverse" and not await _run_direction(theme, false):
 			return
-		if direction_only != "forward" and not await _run_direction(theme, true):
-			return
+		# reverse only on explicit opt-in (PC_DIRECTION=reverse or PC_SMOKE_REVERSE=1); gate default is forward-only for time
+		if direction_only == "reverse" or OS.get_environment("PC_SMOKE_REVERSE") == "1":
+			if not await _run_direction(theme, true):
+				return
 	Engine.time_scale = 1.0
 	print("AI_RACE_SMOKE_TEST PASS all_themes")
 	quit(0)

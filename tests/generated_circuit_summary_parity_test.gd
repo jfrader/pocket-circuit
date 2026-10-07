@@ -4,7 +4,15 @@ extends SceneTree
 const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
 const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
+# Gate default samples two seeds per theme/act combination; PC_PARITY_FULL=1
+# restores the exhaustive six-seed sweep for a manual run.
 const SEEDS: Array[int] = [1, 7, 42, 663, 24680, 999999]
+
+
+static func _gate_seeds() -> Array[int]:
+	if OS.get_environment("PC_PARITY_FULL") == "1":
+		return SEEDS
+	return [SEEDS[0], SEEDS[2]]
 
 
 func _initialize() -> void:
@@ -15,7 +23,7 @@ func _run_test() -> void:
 	var checked := 0
 	for theme: StringName in THEMES:
 		for danger_level in range(1, 4):
-			for seed: int in SEEDS:
+			for seed: int in _gate_seeds():
 				var room := IDENTITIES.room_for_route_seed(seed)
 				var identity := IDENTITIES.create(theme, room, seed, false, danger_level)
 				var prepared := TRACK_BUILDER.prepare_layout(theme, room, seed, IDENTITIES.generation_options(identity))

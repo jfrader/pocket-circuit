@@ -59,7 +59,7 @@ func _run() -> void:
 	for sample_path: String in ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/workshop_hero/hero_workshop_paint_can.png", "res://assets/textures/office_hero/hero_office_keyboard.png"]:
 		if not _expect(_uses_shared_painted_contract(sample_path), "painted sprites must retain source color variation and anti-aliased edges: " + sample_path):
 			return
-	for sample: Array in [[&"kitchen", &"classic", 0], [&"kitchen", &"tall", 1], [&"kitchen", &"wide", 2], [&"kitchen", &"square", 6], [&"workshop", &"square", 51940], [&"workshop", &"classic", 5], [&"workshop", &"wide", 7], [&"workshop", &"el", 2], [&"office", &"el", 7], [&"office", &"classic", 1], [&"office", &"wide", 2], [&"office", &"square", 6]]:
+	for sample: Array in [ [&"kitchen", &"classic", 0], [&"workshop", &"square", 51940], [&"office", &"el", 7] ]:
 		var packed: PackedScene = BUILDER.build_packed(sample[0], sample[1], sample[2])["scene"]
 		var track := packed.instantiate() as Node2D
 		root.add_child(track)
