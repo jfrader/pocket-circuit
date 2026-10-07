@@ -277,10 +277,29 @@ func bench_fit(car_key: String, part: String) -> bool:
 	_maybe_complete_on_final_bench()
 	return true
 
-## The run is won by resolving the final bench of act 3 (the forced last node).
+func bench_continue() -> bool:
+	if failed or completed:
+		return false
+	if not _is_current_node_type("bench"):
+		return false
+	# explicit continue path so final bench can advance act without repair/fit being possible or wanted.
+	# repair XOR fit per visit remains enforced by _can_do + bench_action_done.
+	_maybe_complete_on_final_bench()
+	return true
+
+## Resolving the forced final bench (last row, always bench type) ends the current act:
+## - act < 3: _advance_to_act (regens map from same seed, resets to start of next act, lockup_used=false)
+## - act == 3: set completed=true
+## Invoked after bench action or via bench_continue.
 func _maybe_complete_on_final_bench() -> void:
-	if current_map != null and current_map.act == 3 and current_map.is_last_row(int(run_state.row)):
+	if current_map == null:
+		return
+	if not current_map.is_last_row(int(run_state.row)):
+		return
+	if current_map.act == 3:
 		completed = true
+	else:
+		_advance_to_act(current_map.act + 1)
 
 
 func _can_do_bench_action(_car_key: String) -> bool:
