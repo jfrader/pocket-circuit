@@ -7,6 +7,7 @@ extends SceneTree
 ## Screens: title, board, bench, van, lockup, errand, discovery.
 ## Optional PC_SHOT_CROP="x,y,w,h" crops the capture for close review.
 
+const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const WALK := {"bench": "bench", "van": "parts_van", "lockup": "lockup", "errand": "errand"}
 
 func _initialize() -> void:
@@ -38,22 +39,7 @@ func _run() -> void:
 		var found := false
 		for attempt in 6:
 			var sess: RunSession = app.call("start_run", 900100 + attempt) as RunSession
-			if sess == null:
-				continue
-			var steps := 0
-			while steps < 70 and not found:
-				steps += 1
-				var options: Array[Dictionary] = sess.available_nodes()
-				for entry: Dictionary in options:
-					var nid := String(entry.get("id", ""))
-					var node: Dictionary = sess.current_map.get_node(nid) as Dictionary
-					if String(node.get("type", "")) == target:
-						found = bool(app.call("enter_run_node", nid))
-						break
-				if found or options.is_empty():
-					break
-				if not bool(app.call("enter_run_node", String(options[0].get("id", "")))):
-					break
+			found = RUN_WALK.walk_to(app, sess, target)
 			if found:
 				break
 		if not found:
