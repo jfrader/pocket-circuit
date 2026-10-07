@@ -132,6 +132,19 @@ class GodotGateTests(unittest.TestCase):
         result = self.run_worker('print("FIXTURE PASS"); print("SCRIPT ERROR: broken fixture")')
         self.assertNotEqual(result.returncode, 0)
 
+    def test_failed_assertion_with_success_marker_and_zero_exit_fails(self):
+        for failure in ("FAIL: deliberate", "  \tFAIL: deliberate", "Assertion failed", "at fixture: Assertion failed: deliberate"):
+            for stream in ("sys.stdout", "sys.stderr"):
+                with self.subTest(failure=failure, stream=stream):
+                    result = self.run_worker(f'import sys; print({failure!r}, file={stream}); print("FIXTURE PASS")')
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("failed assertion", result.stderr)
+                    self.assertIn(failure, result.stdout)
+
+    def test_failure_scan_does_not_reject_ordinary_output(self):
+        result = self.run_worker('print("EXPECTED_FAIL: negative case checked"); print("FIXTURE PASS")')
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_missing_completion_marker_fails(self):
         result = self.run_worker('print("still preparing")')
         self.assertNotEqual(result.returncode, 0)

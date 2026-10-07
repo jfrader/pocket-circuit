@@ -199,7 +199,8 @@ func _capture(filename: String) -> void:
 		return
 	await _frame()
 	var error := root.get_texture().get_image().save_png(_captures.path_join(filename))
-	_expect(error == OK, "visual evidence must be written successfully")
+	if not _expect(error == OK, "visual evidence must be written successfully"):
+		return
 
 
 var _failed := false
