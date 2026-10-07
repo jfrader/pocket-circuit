@@ -1378,7 +1378,48 @@ func enter_run_node(node_id: String) -> bool:
 	var ok: bool = _current_run_session.enter_node(node_id)
 	if ok:
 		persist_current_run()
-	return ok
+
+func start_run_race() -> bool:
+	if _current_run_session == null or _transitioning_to_race:
+		return false
+	var curr_node: Dictionary = _current_run_session.current_node()
+	var ntype: String = String(curr_node.get("type", ""))
+	if ntype != "race" and ntype != "act_rival":
+		return false
+	var node_id: String = String(curr_node.get("id", ""))
+	var entered: bool = _current_run_session.enter_node(node_id)
+	if not entered:
+		return false
+	persist_current_run()
+	var vehicle_id: String = _current_run_session.current_car_id
+	_roll_quick_roster()
+	_install_roster_for("quick")
+	var event_id: String = "run_%s" % node_id
+	var event: Dictionary = {
+		"id": event_id,
+		"name": "Run Race " + node_id,
+		"theme": "kitchen",
+		"room": "classic",
+		"seed": _current_run_session.run_seed,
+		"circuit": "generated",
+		"race_format": "circuit",
+		"reverse": false,
+		"opponent_count": ROSTER_SIZE,
+		"opponents": _roster_ids(_quick_roster),
+	}
+	current_race_session = {
+		"mode": "run",
+		"event_id": event_id,
+		"event": event,
+		"vehicle_id": vehicle_id,
+		"difficulty": String(_save_data.get("difficulty", "club_circuit")),
+		"result_committed": false,
+		"run_node_id": node_id,
+	}
+	if not _test_mode:
+		_begin_race_transition(vehicle_id)
+	return true
+
 
 func update_setting(key: String, value: Variant) -> bool:
 	var candidate := _save_data.duplicate(true)
