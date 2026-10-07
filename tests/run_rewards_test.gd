@@ -9,6 +9,15 @@ const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 
+## A store whose every write fails, for the nights that cannot be saved.
+class FailingSaveStore extends SaveStore:
+	func _init(path: String) -> void:
+		super(path)
+
+	func save_data(_data: Dictionary) -> bool:
+		last_save_error = "Injected run save failure"
+		return false
+
 var _failed := false
 
 
@@ -93,7 +102,7 @@ func _run_test() -> void:
 		return
 	var blocked_car := String(blocked.won_cars()[0]["id"])
 	var store: Object = app.get("_save_store")
-	store.set("is_read_only", true)
+	app.set("_save_store", FailingSaveStore.new(path))
 	app.call("abandon_run")
 	if not _expect(app.call("current_run_session") == blocked and not String(app.get("last_run_error")).is_empty(), "an ended night that failed to save is held, and says so"):
 		return
@@ -102,12 +111,12 @@ func _run_test() -> void:
 	if not _expect(app.call("start_new_run") == null and app.call("current_run_session") == blocked, "a new run never replaces a night that is not saved yet"):
 		return
 	var shell := app.get("_shell") as CanvasLayer
-	store.set("is_read_only", false)
 	shell.call("show_run_board")
 	await process_frame
 	var save_again := shell.find_child("ActionSaveAgain", true, false) as Button
-	if not _expect(save_again != null, "the board offers to save an unsaved night"):
+	if not _expect(save_again != null and _has_label(shell, "NIGHT OVER"), "the board says the night is over and offers to save it"):
 		return
+	app.set("_save_store", store)
 	save_again.pressed.emit()
 	await process_frame
 	if not _expect(app.call("current_run_session") == null and blocked_car in (app.call("garage_car_ids") as Array), "saving again lands the held night with its car"):
@@ -141,6 +150,15 @@ func _run_to_rival(app: Object) -> RunSession:
 		if RUN_WALK.walk_to(app, sess, "rival"):
 			return sess
 	return null
+
+
+func _has_label(node: Node, text: String) -> bool:
+	if node is Label and (node as Label).text == text:
+		return true
+	for child in node.get_children():
+		if _has_label(child, text):
+			return true
+	return false
 
 
 func _expect(condition: bool, message: String) -> bool:
