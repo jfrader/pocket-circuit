@@ -42,6 +42,9 @@ func configure(session: RunSession, on_pressed: Callable) -> Array[Button]:
 			if kind == "act_rival":
 				_boss_label = UI.label("ACT RIVAL", 10, UI.AMBER, true)
 				_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+				var plate := StyleBoxFlat.new()
+				plate.bg_color = UI.PANEL
+				_boss_label.add_theme_stylebox_override("normal", plate)
 				add_child(_boss_label)
 	resized.connect(_layout)
 	_layout()
@@ -72,7 +75,7 @@ func _layout() -> void:
 
 func _draw() -> void:
 	draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL)
-	draw_rect(Rect2(Vector2.ZERO, size), UI.LINE, false, 1.0)
+	draw_rect(Rect2(Vector2.ONE * 0.5, size - Vector2.ONE), UI.LINE, false, 1.0)
 	if _map == null:
 		return
 	for id: String in _centres:
