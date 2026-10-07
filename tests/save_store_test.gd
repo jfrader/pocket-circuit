@@ -94,6 +94,8 @@ func _run_test() -> void:
 		return
 	if not _expect(store.last_load_error.contains("backup"), "backup recovery should expose a diagnostic"):
 		return
+	if not _expect(store.recovery_message == "Save recovered from backup", "backup recovery should set clean recovery message for title"):
+		return
 
 	_write_raw(TEST_PATH, "{ definitely not json")
 	loaded = store.load_data()
@@ -125,6 +127,8 @@ func _run_test() -> void:
 	if not _expect(int(_read_json(TEST_PATH)["version"]) == 99, "loading a future save must leave it unchanged"):
 		return
 	if not _expect(store.is_read_only, "a future save should make the store read-only for this process"):
+		return
+	if not _expect(store.recovery_message == "Save is from a newer version (v99) — running read-only", "future version should set clean recovery message for title"):
 		return
 	if not _expect(not store.save_data(store.default_data()), "read-only mode must reject every replacement save"):
 		return

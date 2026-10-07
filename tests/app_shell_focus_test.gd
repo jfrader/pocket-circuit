@@ -54,6 +54,9 @@ class TestApp extends Node:
 	func is_save_read_only() -> bool:
 		return save_read_only
 
+	func get_save_recovery_message() -> String:
+		return ""
+
 	func has_championship_progress() -> bool:
 		return true
 

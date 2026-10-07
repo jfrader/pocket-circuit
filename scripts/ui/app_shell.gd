@@ -63,11 +63,12 @@ func show_title() -> void:
 	_reset_quick_race_state()
 	_clear_content()
 	var save_read_only := bool(_app.call("is_save_read_only"))
+	var recovery_message := String(_app.call("get_save_recovery_message"))
 	var has_progress := bool(_app.call("has_championship_progress"))
 	var progress: Dictionary = _app.call("get_save_data")
 	_page.hide()
 	_art_menu.set("reduced_motion", _reduced_motion_enabled())
-	_art_menu.call("show_title", has_progress, save_read_only, _selected_vehicle(progress), progress.get("unlocked_vehicles", ["rustbug"]))
+	_art_menu.call("show_title", has_progress, save_read_only, _selected_vehicle(progress), progress.get("unlocked_vehicles", ["rustbug"]), recovery_message)
 	_app.call("prepare_circuit_preview", _current_quick_identity())
 
 
