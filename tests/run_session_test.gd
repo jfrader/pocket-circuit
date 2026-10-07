@@ -46,7 +46,7 @@ func _run_test() -> void:
 		if avail.is_empty():
 			break
 		# always leftmost for determinism; adjust index if needed to hit coverage
-		var pick_idx: int = 0
+		var pick_idx: int = (avail.size() - 1) if avail.size() > 1 else 0
 		var next_id: String = String((avail[pick_idx] as Dictionary).get("id", ""))
 		if not sess.enter_node(next_id):
 			break
