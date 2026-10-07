@@ -387,9 +387,9 @@ func show_run_parts_van() -> void:
 		return
 	_run_node_intro(sess, "parts_van")
 	_run_actions.add_child(RUN_UI.label("SPEND POINTS", 11, RUN_UI.AMBER, true))
-	for part: Array in RUN_UI.VAN_PARTS:
-		var cost := int(part[1])
-		_run_action("%s · %d" % [String(part[0]), cost], Callable(self, "_on_van_buy_pressed").bind(cost), false, sess.run_points < cost, "VanBuy%d" % cost)
+	for part: String in RunSession.VAN_PART_COSTS:
+		var cost := int(RunSession.VAN_PART_COSTS[part])
+		_run_action("%s · %d" % [String(RUN_UI.VAN_PART_NAMES[part]), cost], Callable(self, "_on_van_buy_pressed").bind(cost), false, sess.run_points < cost, "VanBuy%d" % cost)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	_focus_first()
 

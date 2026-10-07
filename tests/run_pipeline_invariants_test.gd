@@ -5,6 +5,7 @@ const RUN_MAP := preload("res://scripts/progression/run_map.gd")
 const RUN_STATE := preload("res://scripts/progression/run_state.gd")
 const APP := preload("res://scripts/autoload/app.gd")
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const TEST_SAVE_PATH := "user://tests/run_pipeline_invariants_save.json"
 
 var _failed := false
 func _expect(cond: bool, msg: String) -> bool:
@@ -32,45 +33,40 @@ func _run_test() -> void:
 	print("RUN_PIPELINE_INVARIANTS_TEST PASS")
 	quit(0)
 
+## Every stop of every act leads to the act rival: no dead ends, no way around it.
 func _test_map_invariants() -> void:
-	var boss_count := 0
-	var total := 0
 	for act in range(1, 4):
 		for seed_idx in range(200):
-			total += 1
 			var rm = RUN_MAP.generate(seed_idx, act)
-			if not _expect(rm != null, "map generated successfully (no silent fallback return)"):
+			if not _expect(rm != null, "map generated (seed %d, act %d)" % [seed_idx, act]):
 				return
-			var has_boss := false
-			for nid: String in rm.nodes:
-				var node: Dictionary = rm.nodes[nid]
-				if String(node.get("type", "")) == "act_rival":
-					has_boss = true
-					# Check it is NOT a sole child
-					var parents = rm.parents.get(nid, [])
-					var is_sole := false
-					for p in parents:
-						if rm.children.get(p, []).size() == 1:
-							is_sole = true
-							break
-					if not _expect(not is_sole, "act_rival %s must not be a sole child (seed %d, act %d)" % [nid, seed_idx, act]):
+			var boss_id := String(rm.get_end_node().get("id", ""))
+			if not _expect(String(rm.get_end_node().get("type", "")) == "act_rival", "the act ends on the act rival (seed %d, act %d)" % [seed_idx, act]):
+				return
+			var reaches: Dictionary = {boss_id: true}
+			for row in range(rm.num_rows - 2, -1, -1):
+				for node: Dictionary in rm.get_nodes_in_row(row):
+					var nid := String(node["id"])
+					var kids: Array = rm.children.get(nid, [])
+					var ok := not kids.is_empty()
+					for kid: String in kids:
+						ok = ok and reaches.has(kid)
+					if not _expect(ok, "stop %s must lead only to stops that reach the act rival (seed %d, act %d)" % [nid, seed_idx, act]):
 						return
-			if has_boss:
-				boss_count += 1
-	print("Boss-present rate: %d / %d (%.1f%%)" % [boss_count, total, 100.0 * boss_count / float(maxi(1, total))])
+					reaches[nid] = true
 
 func _test_double_resolutions() -> void:
 	# Test spend
 	var sess1 = RUN_SESSION.create(100)
 	sess1.current_node_id = "test_node"
-	sess1.run_budget = 60
+	sess1.run_points = 60
 	sess1.current_map.nodes["test_node"] = {"id": "test_node", "type": "parts_van"}
 	var s1 = sess1.spend(10)
 	if not _expect(s1, "first spend ok"): return
-	if not _expect(sess1.run_budget == 50, "budget reduced"): return
+	if not _expect(sess1.run_points == 50, "points reduced"): return
 	var s2 = sess1.spend(10)
 	if not _expect(not s2, "second spend refused"): return
-	if not _expect(sess1.run_budget == 50, "budget not reduced again"): return
+	if not _expect(sess1.run_points == 50, "points not reduced again"): return
 	
 	var sess_saved = RUN_SESSION.deserialize(RUN_SESSION.serialize(sess1))
 	var s3 = sess_saved.spend(10)
@@ -89,9 +85,10 @@ func _test_double_resolutions() -> void:
 
 func _test_save_failures() -> void:
 	var app = APP.new()
-	var store = SAVE_STORE.new()
+	var store = SAVE_STORE.new(TEST_SAVE_PATH)
 	app._save_store = store
 	app._current_run_session = RUN_SESSION.create(200)
+	app._current_run_session.run_points = 60
 	
 	# Test refused node (wrong type)
 	var ok = app.run_spend(10, "")
@@ -107,7 +104,7 @@ func _test_save_failures() -> void:
 	store.is_read_only = true
 	app._current_run_session.resolved_nodes.clear()
 	app._current_run_session.current_map.nodes[app._current_run_session.current_node_id]["type"] = "parts_van"
-	ok = app.run_spend(10, "") # budget is enough
+	ok = app.run_spend(10, "")
 	if not _expect(ok, "seam accepted logically"): return
 	if not _expect(app.last_run_error != "", "last_run_error is non-empty on read-only save: " + app.last_run_error): return
 	

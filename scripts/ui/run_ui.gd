@@ -19,7 +19,7 @@ const TYPES := {
 	"errand": {"name": "Errand", "cost": "varies", "copy": "A choice, no race. The cast wants something; it has a price.", "icon": preload("res://assets/ui/run_map/node_errand.svg")},
 	"act_rival": {"name": "Act rival", "cost": "the run", "copy": "A generated driver carrying the act's hardest AI profile. One race decides the act.", "icon": preload("res://assets/ui/run_map/node_boss.svg")},
 }
-const VAN_PARTS := [["TOOL KIT", 8], ["TYRE SET", 15], ["SPARE SHELL", 25]]
+const VAN_PART_NAMES := {"tool_kit": "TOOL KIT", "tyre_set": "TYRE SET", "spare_shell": "SPARE SHELL"}
 const CURRENT_RING := preload("res://assets/ui/run_map/ring_current.svg")
 
 static var _mono: FontVariation

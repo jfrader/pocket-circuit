@@ -4,6 +4,8 @@ extends SceneTree
 ## the available nodes, and entering a node moves + persists the session.
 
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const RUN_UI := preload("res://scripts/ui/run_ui.gd")
+const RUN_WALK := preload("res://tests/support/run_walk.gd")
 
 var _failed := false
 
@@ -49,14 +51,18 @@ func _run_test() -> void:
 	if not _expect(str(enabled) == str(available), "the enabled nodes must equal available_nodes (got %s want %s)" % [str(enabled), str(available)]):
 		return
 
-	# The header carries the session values.
-	if not _expect(_has_label(board.get_parent(), str(sess.run_budget)), "the header must show the run budget"):
+	if not _expect(available.size() == 1 and available[0] == sess.current_node_id, "a fresh run offers only its opening race"):
 		return
-	if not _expect(_has_label(board.get_parent(), str(sess.run_points)), "the header must show the run points"):
+
+	# The detail column carries the session values.
+	var detail := shell.find_child("RunDetail", true, false) as Control
+	if not _expect(detail != null, "the board must have its detail column"):
 		return
-	if not _expect(_has_label(board.get_parent(), str(sess.owned_cars.size())), "the header must show owned cars"):
+	if not _expect(_has_label(detail, str(sess.run_points)), "the detail must show the run points"):
 		return
-	if not _expect(_has_label(board.get_parent(), "%s · %s" % [sess.current_car_id, sess.run_state.get_car_wear(sess.current_car_id)]), "the header must show car and wear"):
+	if not _expect(_has_label(detail, str(sess.owned_cars.size())), "the detail must show owned cars"):
+		return
+	if not _expect(_has_label(detail, "%s · %s" % [sess.current_car_id, sess.run_state.get_car_wear(sess.current_car_id)]), "the detail must show car and wear"):
 		return
 	var legend := shell.find_child("RunLegend", true, false) as Control
 	if not _expect(legend != null and legend.get_global_rect().end.y <= root.get_visible_rect().end.y, "the map legend must fit inside the logical viewport"):
@@ -75,12 +81,24 @@ func _run_test() -> void:
 					if not _expect(marker.position.y < (other as Button).position.y, "the act rival must be above ordinary nodes"):
 						return
 
-	# Press one available node: the session moves and the save follows.
-	if not _expect(available.size() > 0, "the run must have an available node"):
+	# Pressing the opening race starts it; once raced, its children open.
+	var opening := board.get_node_or_null("Node_" + sess.current_node_id.replace("_", "-")) as Button
+	opening.pressed.emit()
+	await process_frame
+	var race_session: Dictionary = app.get("current_race_session")
+	if not _expect(String(race_session.get("run_node_id", "")) == sess.current_node_id, "pressing the opening race must start it"):
 		return
-	var target_id: String = available[0]
+	app.call("report_race_result", RUN_WALK.WIN, 1.0, [], false, {})
+	shell.call("show_run_board")
+	await process_frame
+	await process_frame
+	board = shell.find_child("RunBoard", true, false) as Control
+	var children: Array[Dictionary] = sess.available_nodes()
+	if not _expect(not children.is_empty() and String(children[0]["id"]) != sess.current_node_id, "a raced opening offers its children"):
+		return
+	var target_id := String(children[0]["id"])
 	var button := board.get_node_or_null("Node_" + target_id.replace("_", "-")) as Button
-	if not _expect(button != null, "the node button must exist for %s" % target_id):
+	if not _expect(button != null and not button.disabled, "the child marker must be pressable for %s" % target_id):
 		return
 	button.pressed.emit()
 	await process_frame
@@ -96,10 +114,10 @@ func _run_test() -> void:
 
 	# Node screens must retain their action and description without clipping the legend.
 	var screens := [
-		["show_run_bench", "BenchRepair", "No race. Repair the car, or fit one part. Never both."],
-		["show_run_parts_van", "VanBuy15", "No race. Spend points on parts, with a downside on each."],
-		["show_run_lockup", "LockupOpen", "No race. A free car, no fight. Rare, and fought over."],
-		["show_run_errand", "ErrandCash", "A choice, no race. The cast wants something; it has a price."],
+		["show_run_bench", "BenchRepair", String(RUN_UI.TYPES["bench"]["copy"])],
+		["show_run_parts_van", "VanBuy15", String(RUN_UI.TYPES["parts_van"]["copy"])],
+		["show_run_lockup", "LockupOpen", String(RUN_UI.TYPES["lockup"]["copy"])],
+		["show_run_errand", "ErrandPay", String(RUN_UI.TYPES["errand"]["copy"])],
 	]
 	for screen: Array in screens:
 		shell.call(String(screen[0]))

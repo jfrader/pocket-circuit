@@ -172,9 +172,8 @@ func _run_test() -> void:
 	if not _expect(rs_bad.get_car_wear("rustbug") == "clean", "bad wear falls back safely"):
 		return
 
-	# Empty deserialize works
-	var empty := RUN_STATE.deserialize({})
-	if not _expect(empty.run_seed == 0 and empty.car_rolls.is_empty(), "empty data yields default run state"):
+	# Data without a matching schema is rejected, never half-restored
+	if not _expect(RUN_STATE.deserialize({}) == null, "empty data deserializes to null"):
 		return
 
 	print("RUN_STATE_TEST PASS")
