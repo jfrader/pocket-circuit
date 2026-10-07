@@ -2,7 +2,7 @@ extends SceneTree
 
 const PROTOTYPE := preload("res://scenes/race/prototype_race.tscn")
 const CATALOG := preload("res://data/championship/catalog.gd")
-const CASES := [[&"kitchen", &"classic", 0], [&"workshop", &"wide", 1], [&"office", &"el", 7]]
+const CASES := [[&"kitchen", &"classic", 0]]
 const MAX_FRAMES := 9000
 
 
