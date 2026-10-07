@@ -73,8 +73,8 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d"):
 		return false
 	if app.get("_loading_failed"):
-		_expect(false, "loading must not fail")
-		return false
+		if not _expect(false, "loading must not fail"):
+			return false
 
 	# Race scene is now current; ensure visuals and roster installed
 	var race := current_scene

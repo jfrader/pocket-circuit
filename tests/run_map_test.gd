@@ -77,26 +77,22 @@ func _run_test() -> void:
 				return
 			# no crossing check (monotonic connections)
 			if not _check_no_cross(m, target_rows):
-				_expect(false, "no crossing edges act %d seed %d" % [a, s])
-				return
+				if not _expect(false, "no crossing edges act %d seed %d" % [a, s]):
+					return
 			# hard rules on types + early/late
 			for nid: String in m.nodes:
 				var n: Dictionary = m.get_node(nid)
 				var t: String = String(n.get("type", ""))
 				var rr: int = int(n.get("row", -1))
 				if t in ["rival", "bench", "lockup", "act_rival"] and rr < min_spec_row:
-					_expect(false, "banned special %s below 1/3 row %d act %d" % [t, rr, a])
-					return
+					if not _expect(false, "banned special %s below 1/3 row %d act %d" % [t, rr, a]): return
 				if t == "bench" and rr == target_rows - 2:
-					_expect(false, "bench banned on pre-last row")
-					return
+					if not _expect(false, "bench banned on pre-last row"): return
 				if t == "race" and rr == target_rows - 1:
-					_expect(false, "last not race")
-					return
+					if not _expect(false, "last not race"): return
 			# parent-child no same for restricted; siblings unique
 			if not _check_edge_rules(m):
-				_expect(false, "edge/sibling type rules violated act %d seed %d" % [a, s])
-				return
+				if not _expect(false, "edge/sibling type rules violated act %d seed %d" % [a, s]): return
 			# quota accumulation
 			for nid: String in m.nodes:
 				var t: String = String(m.get_node(nid).get("type", "race"))
@@ -112,8 +108,7 @@ func _run_test() -> void:
 			var snap: Dictionary = RUN_MAP.serialize(m)
 			var m3 = RUN_MAP.deserialize(snap)
 			if not RUN_MAP._maps_structurally_equal(m, m3):
-				_expect(false, "ser roundtrip failed act %d seed %d" % [a, s])
-				return
+				if not _expect(false, "ser roundtrip failed act %d seed %d" % [a, s]): return
 		# corpus quota check (within tol)
 		for t: String in ["errand", "bench", "rival", "parts_van", "lockup"]:
 			var obs: float = float(qcounts.get(t, 0)) / float(maxi(1, total_nodes_seen))
@@ -125,8 +120,7 @@ func _run_test() -> void:
 		if not _expect(absf(riv_total - 0.12) <= QUOTA_TOL + 0.02, "rival+act_rival ~0.12 act %d" % a):
 			return
 		if det_fail > 0:
-			_expect(false, "determinism fails %d/%d act %d" % [det_fail, CORPUS_SIZE, a])
-			return
+			if not _expect(false, "determinism fails %d/%d act %d" % [det_fail, CORPUS_SIZE, a]): return
 		# also quick check forced always even in fallback path
 		var mfall = RUN_MAP.generate(999999, a)
 		var fs: Dictionary = mfall.get_start_node()
@@ -139,8 +133,7 @@ func _run_test() -> void:
 	var m1a = RUN_MAP.generate(s0, 1)
 	var m1b = RUN_MAP.generate(s0, 1)
 	if not RUN_MAP._maps_structurally_equal(m1a, m1b):
-		_expect(false, "same seed act1 det")
-		return
+		if not _expect(false, "same seed act1 det"): return
 
 	print("RUN_MAP_TEST PASS")
 	quit(0)

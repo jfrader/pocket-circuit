@@ -257,13 +257,14 @@ func _test_current_run_migration(store: SaveStore) -> bool:
 	var loaded := store.load_data()
 	if not _expect(loaded.get("current_run") == {} and loaded["completed_events"] == ["kitchen_crumb_rush"], "old v4 normalises current_run to {} and leaves progress/records untouched"):
 		return false
+	# intentional old-fixture assertion: version 4 load leaves disk at version 4
 	if not _expect(int(_read_json(TEST_PATH)["version"]) == 4, "v4 load leaves disk at old version"):
 		return false
-	# persist migrates version to 5 and keeps current_run
+	# persist migrates version to current and keeps current_run
 	if not _expect(store.save_data(loaded), "save of migrated v4+current_run"):
 		return false
 	var on_disk := _read_json(TEST_PATH)
-	if not _expect(int(on_disk["version"]) == 5 and on_disk.get("current_run") == {}, "save after v4 load writes v5 and current_run:{} "):
+	if not _expect(int(on_disk["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and on_disk.get("current_run") == {}, "save after v4 load writes current version and current_run:{} "):
 		return false
 
 	# hand v5 with mid-run data persists and reloads
