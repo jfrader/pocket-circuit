@@ -47,9 +47,22 @@ var _rotating := false
 const SECTION_CHANGE_DWELL := 6.0
 var _section_elapsed := 0.0
 
+## Test seam only. When true, LiveMusic and AudioDirector pretend the
+## Gamestruments GDExtension is absent even if ClassDB sees the class.
+static var _test_force_unavailable := false
+
+
+static func is_gamestruments_available() -> bool:
+	if _test_force_unavailable:
+		return false
+	return ClassDB.class_exists("GamestrumentsPlayer")
+
 
 func _init(host: Node) -> void:
 	_host = host
+	if not LiveMusic.is_gamestruments_available():
+		_player = null
+		return
 	_player = ClassDB.instantiate("GamestrumentsPlayer")
 	_player.name = "GamestrumentsPlayer"
 	_player.set("project_secret", PROJECT_SECRET)
@@ -66,6 +79,8 @@ func _init(host: Node) -> void:
 ## section so a seed handoff does not stack a second section transition. Hold its
 ## tour form so the game drives every later phase.
 func play(seed: String, profile: Dictionary, opening: String) -> void:
+	if _player == null:
+		return
 	if _seed != seed:
 		_apply_profile(profile)
 		if not bool(_player.call("generate", seed, opening)):
@@ -105,7 +120,7 @@ func current_section() -> String:
 ## Cue a known section. `hold_seconds` keeps the rotation off it for at least
 ## that long, so a sting or reprise is not stepped on immediately.
 func cue(section: String, hold_seconds := 0.0) -> bool:
-	if not has_score() or not _player.has_method("cue_section"):
+	if _player == null or not has_score() or not _player.has_method("cue_section"):
 		return false
 	# The first cue of a score is never held back, and asking again for the section
 	# already playing is not a change.
@@ -130,7 +145,7 @@ func cue(section: String, hold_seconds := 0.0) -> bool:
 
 
 func set_race_state(phase: String, intensity: float, pressure: float, final_lap: bool, finish_result := "") -> bool:
-	if not has_score() or not _player.has_method("set_race_state"):
+	if _player == null or not has_score() or not _player.has_method("set_race_state"):
 		return false
 	# Phase requests (from set_race_state) are protected by the same dwell/drop
 	# as cue(): newest request dropped (not held) while inside SECTION_CHANGE_DWELL.
