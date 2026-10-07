@@ -21,6 +21,9 @@ class MockApp extends Node:
 	func is_save_read_only() -> bool:
 		return save_read_only
 
+	func get_save_recovery_message() -> String:
+		return ""
+
 	func get_last_save_error() -> String:
 		return ""
 

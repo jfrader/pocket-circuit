@@ -213,6 +213,10 @@ func is_save_read_only() -> bool:
 	return _save_store != null and _save_store.is_read_only
 
 
+func get_save_recovery_message() -> String:
+	return _save_store.recovery_message if _save_store != null else ""
+
+
 func get_last_save_error() -> String:
 	return _last_save_error
 

@@ -18,6 +18,7 @@ var save_path: String
 var last_load_error: String = ""
 var last_save_error: String = ""
 var is_read_only := false
+var recovery_message: String = ""
 
 
 func _init(injected_path: String = DEFAULT_PATH) -> void:
@@ -59,18 +60,22 @@ func default_data() -> Dictionary:
 func load_data() -> Dictionary:
 	last_load_error = ""
 	is_read_only = false
+	recovery_message = ""
 	var primary := _read_candidate(save_path)
 	if String(primary["status"]) == "ok":
 		return primary["data"] as Dictionary
 	if String(primary["status"]) == "future":
+		recovery_message = "Save is from a newer version (v%d) — running read-only" % int(primary["version"])
 		return _future_version_defaults(int(primary["version"]), "primary")
 
 	var backup_path := save_path + ".bak"
 	var backup := _read_candidate(backup_path)
 	if String(backup["status"]) == "ok":
 		last_load_error = "%s; recovered validated backup" % String(primary["diagnostic"])
+		recovery_message = "Save recovered from backup"
 		return backup["data"] as Dictionary
 	if String(backup["status"]) == "future":
+		recovery_message = "Save is from a newer version (v%d) — running read-only" % int(backup["version"])
 		return _future_version_defaults(int(backup["version"]), "backup")
 	if String(primary["status"]) != "missing":
 		last_load_error = "%s; no valid backup was available" % String(primary["diagnostic"])
@@ -158,6 +163,7 @@ func remove_save() -> void:
 	_remove_if_present(save_path + ".bak")
 	_remove_if_present(save_path + ".bak.tmp")
 	is_read_only = false
+	recovery_message = ""
 
 
 func _canonicalize_for_disk(raw: Dictionary) -> Dictionary:
