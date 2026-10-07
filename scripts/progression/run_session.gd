@@ -383,7 +383,7 @@ static func serialize(sess: RunSession) -> Dictionary:
 static func deserialize(data: Dictionary) -> RunSession:
 	var sess: RunSession = new()
 	var ver: Variant = data.get("schema_version", 0)
-	if ver is int and int(ver) == SCHEMA_VERSION:
+	if (ver is int or ver is float) and int(ver) == SCHEMA_VERSION:
 		sess.run_seed = int(data.get("run_seed", 0))
 		var st_d: Dictionary = data.get("run_state", {}) as Dictionary
 		sess.run_state = RUN_STATE.deserialize(st_d)

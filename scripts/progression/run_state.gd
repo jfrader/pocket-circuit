@@ -235,12 +235,12 @@ static func serialize(rs: RunState) -> Dictionary:
 static func deserialize(data: Dictionary) -> RunState:
 	var rs := new()
 	var ver: Variant = data.get("schema_version", 0)
-	if ver is int and int(ver) == SCHEMA_VERSION:
+	if (ver is int or ver is float) and int(ver) == SCHEMA_VERSION:
 		rs.run_seed = int(data.get("run_seed", 0))
 		var act_val: Variant = data.get("act")
-		rs.act = act_val if (act_val == null or act_val is int) else null
+		rs.act = int(act_val) if (act_val is int or act_val is float) else null
 		var r: Variant = data.get("row")
-		rs.row = r if (r == null or r is int) else null
+		rs.row = int(r) if (r is int or r is float) else null
 		var rolls_in: Dictionary = data.get("car_rolls", {}) as Dictionary
 		for vid: String in rolls_in:
 			var rdict: Dictionary = rolls_in[vid] as Dictionary
