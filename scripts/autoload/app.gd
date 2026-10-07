@@ -21,6 +21,7 @@ const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 ## Every race fields the player plus three opponents.
 const ROSTER_SIZE := 3
 const RUN_ACT_RIVAL_DIFFICULTY := "clockwork"
+const RUN_SEED_MAX := 0x7FFFFFFF
 ## A run race finished this far down the field (or not at all) costs wear.
 const RUN_CRASH_FINISH_POSITION := 3
 const RUN_CRASH_SEVERITY := 0.6
@@ -175,7 +176,10 @@ func _ready() -> void:
 	var stored_run: Variant = _save_data.get("current_run", {})
 	if stored_run is Dictionary and not (stored_run as Dictionary).is_empty():
 		_current_run_session = RUN_SESSION.deserialize(stored_run as Dictionary)
+		if _current_run_session == null:
+			_save_data["current_run"] = {}
 	_install_held_vehicles()
+	_settle_race_in_flight()
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
 	_apply_settings()
@@ -325,6 +329,8 @@ func confirm_new_championship() -> bool:
 		"personal_ghosts": _save_data.get("personal_ghosts", []).duplicate(true),
 		"circuit_history": _save_data.get("circuit_history", []).duplicate(true),
 		"favorite_circuits": _save_data.get("favorite_circuits", []).duplicate(true),
+		"garage_cars": _save_data.get("garage_cars", []).duplicate(true),
+		"current_run": _save_data.get("current_run", {}).duplicate(true),
 	}
 	var candidate := _save_store.default_data()
 	for key: String in preserved_settings:
@@ -1133,6 +1139,9 @@ func _leave_race_loading() -> void:
 	_transitioning_to_race = false
 	_loading_failed = false
 	var mode := String(current_race_session.get("mode", "quick"))
+	if mode == "run" and _current_run_session != null:
+		_current_run_session.cancel_race()
+		persist_current_run()
 	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode == "quick" else "map"))
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
@@ -1144,10 +1153,7 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 	if bool(current_race_session.get("result_committed", false)):
 		return true
 	var event: Dictionary = current_race_session.get("event", {})
-	# The declared field size is authoritative: a session may carry its opponents
-	# from a saved roster, but the event always states how many cars it fields.
-	var declared := maxi((event.get("opponents", []) as Array).size(), int(event.get("opponent_count", 0)))
-	var racer_count := clampi(declared + 1, 1, 4)
+	var racer_count := _field_size(event)
 	current_race_session["result"] = {
 		"position": clampi(player_position, 1, racer_count),
 		"time": maxf(0.0, total_time),
@@ -1283,9 +1289,16 @@ func continue_after_race(transition_scene: bool = true) -> void:
 		get_tree().change_scene_to_file(BOOT_SCENE)
 
 
-## A run node is raced once: its committed result is final.
+## The declared field size is authoritative: a session may carry its opponents
+## from a saved roster, but the event always states how many cars it fields.
+static func _field_size(event: Dictionary) -> int:
+	var declared := maxi((event.get("opponents", []) as Array).size(), int(event.get("opponent_count", 0)))
+	return clampi(declared + 1, 1, 4)
+
+
+## A run race is raced once: no restart mid-race and no retry after it.
 func can_retry_race() -> bool:
-	return String(current_race_session.get("mode", "")) != "run" or not bool(current_race_session.get("result_committed", false))
+	return String(current_race_session.get("mode", "")) != "run"
 
 
 func retry_race(reload_scene: bool = true) -> void:
@@ -1351,8 +1364,7 @@ func abandon_race() -> void:
 		return
 	var mode := String(current_race_session.get("mode", "quick"))
 	if mode == "run":
-		var field_size := int((current_race_session.get("event", {}) as Dictionary).get("opponent_count", 0)) + 1
-		_commit_run_result(String(current_race_session.get("run_node_id", "")), field_size, true, field_size)
+		_settle_race_in_flight()
 	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map"))
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
@@ -1366,27 +1378,35 @@ func current_run_session() -> RunSession:
 
 ## Starts a fresh run for the seed and persists its opening state.
 func start_run(run_seed: int) -> RunSession:
+	if _current_run_session != null:
+		abandon_run()
 	_current_run_session = RUN_SESSION.create(run_seed)
 	persist_current_run()
 	return _current_run_session
 
 
-## Persists the active run. The flow layer calls this after every resolved node.
+## Persists the active run. A run that has ended (won or lost) is written out
+## in the same save as the cars it won joining the garage (one-way); the run is
+## only dropped once that save lands, so a failed write loses nothing.
 func persist_current_run() -> void:
 	last_run_error = ""
-	_finish_run_if_over()
-	_install_held_vehicles()
+	var ended := _current_run_session != null and (_current_run_session.is_complete() or _current_run_session.is_failed())
 	var candidate := _save_data.duplicate(true)
-	candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
-	if candidate == _save_data:
-		return
-	if is_save_read_only():
-		last_run_error = "save is read-only"
-		return
-	if not _save_candidate(candidate):
-		last_run_error = "save failed"
-		return
-	_save_data = candidate
+	if ended:
+		candidate["garage_cars"] = _garage_with(_current_run_session.won_cars())
+		candidate["current_run"] = {}
+	else:
+		candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
+	if candidate != _save_data:
+		if is_save_read_only():
+			last_run_error = "save is read-only"
+		elif not _save_candidate(candidate):
+			last_run_error = "save failed"
+		else:
+			_save_data = candidate
+	if ended and last_run_error.is_empty():
+		_current_run_session = null
+	_install_held_vehicles()
 
 
 ## Abandoning is losing the night: the run ends like any failed run, so the
@@ -1397,23 +1417,16 @@ func abandon_run() -> void:
 	persist_current_run()
 
 
-## One-way: when a run ends (complete or failed) every car it won joins the
-## garage (append only, no duplicates) and the run is cleared. Called at the top
-## of persist_current_run so every resolution path ends the run the same way.
-func _finish_run_if_over() -> void:
-	if _current_run_session == null:
-		return
-	if not (_current_run_session.is_complete() or _current_run_session.is_failed()):
-		return
+## Every car in the garage plus the ones this night won (append only, no duplicates).
+func _garage_with(won: Array[Dictionary]) -> Array:
 	var garage: Array = (_save_data.get("garage_cars", []) as Array).duplicate(true)
 	var held := {}
 	for car: Dictionary in garage:
 		held[String(car["id"])] = true
-	for car: Dictionary in _current_run_session.won_cars():
+	for car: Dictionary in won:
 		if not held.has(String(car["id"])):
 			garage.append(car)
-	_current_run_session = null
-	_save_data["garage_cars"] = garage
+	return garage
 
 
 ## Installs every generated car the player holds (the garage and the active run)
@@ -1440,9 +1453,10 @@ func garage_car_ids() -> Array[String]:
 	return ids
 
 
+## Starts a new run on a random seed (every NEW RUN is a different night).
+## Tests and reproducible cases use start_run(fixed_seed) directly.
 func start_new_run() -> RunSession:
-	var seed: int = int(Time.get_unix_time_from_system())
-	return start_run(seed)
+	return start_run(_random_seed(RUN_SEED_MAX))
 
 
 ## Delegates to the session to move to a child node (if allowed), then persists
@@ -1509,9 +1523,6 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 		return false
 	var node: Dictionary = _current_run_session.current_node()
 	var target_id := String(node.get("id", ""))
-	if _current_run_session.resolved_nodes.has(target_id):
-		last_run_error = "already resolved"
-		return false
 	var node_type := String(node.get("type", ""))
 	var duel := node_type == "rival"
 	var vehicle_id: String = _current_run_session.current_car_id
@@ -1542,9 +1553,24 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 		"result_committed": false,
 		"run_node_id": target_id,
 	}
+	if not _current_run_session.start_race(target_id, _field_size(event)):
+		current_race_session.clear()
+		last_run_error = "already raced"
+		return false
+	persist_current_run()
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
 	return true
+
+
+## A run race that started and was never reported (quit, abandoned, or the game
+## closed mid-race) ends as a did-not-finish in last place.
+func _settle_race_in_flight() -> void:
+	if _current_run_session == null or _current_run_session.race_in_flight.is_empty():
+		return
+	var flight: Dictionary = _current_run_session.race_in_flight
+	var field := int(flight.get("field", 1))
+	_commit_run_result(String(flight.get("node", "")), field, true, field)
 
 
 ## Applies a run race outcome exactly once: rivals through resolve_rival (which
@@ -1576,8 +1602,8 @@ func run_bench_fit(part: String, node_id: String = "") -> bool:
 	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_fit(_current_run_session.current_car_id, part))
 
 
-func run_spend(cost: int, node_id: String = "") -> bool:
-	return _run_seam(node_id, "parts_van", func() -> bool: return _current_run_session.spend(cost))
+func run_buy_part(part_id: String, node_id: String = "") -> bool:
+	return _run_seam(node_id, "parts_van", func() -> bool: return _current_run_session.buy_part(part_id))
 
 
 func run_open_lockup(node_id: String = "") -> bool:

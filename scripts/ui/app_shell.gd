@@ -389,7 +389,7 @@ func show_run_parts_van() -> void:
 	_run_actions.add_child(RUN_UI.label("SPEND POINTS", 11, RUN_UI.AMBER, true))
 	for part: String in RunSession.VAN_PART_COSTS:
 		var cost := int(RunSession.VAN_PART_COSTS[part])
-		_run_action("%s · %d" % [String(RUN_UI.VAN_PART_NAMES[part]), cost], Callable(self, "_on_van_buy_pressed").bind(cost), false, sess.run_points < cost, "VanBuy%d" % cost)
+		_run_action("%s · %d" % [String(RUN_UI.VAN_PART_NAMES[part]), cost], Callable(self, "_on_van_buy_pressed").bind(part), false, sess.run_points < cost, "VanBuy_" + part)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	_focus_first()
 
@@ -445,9 +445,9 @@ func _on_bench_fit_pressed() -> void:
 	show_run_board()
 
 
-func _on_van_buy_pressed(cost: int) -> void:
+func _on_van_buy_pressed(part_id: String) -> void:
 	_play_ui_confirm()
-	_app.call("run_spend", cost)
+	_app.call("run_buy_part", part_id)
 	show_run_board()
 
 

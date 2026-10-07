@@ -32,6 +32,7 @@ class RacePauseOverlay extends Control:
 			get_viewport().set_input_as_handled()
 
 
+const PAUSE_RETURN_LABELS := {"discovery": "Return to Discovery", "quick": "Return to Title", "strip": "Return to Title", "run": "Return to the Board"}
 const RUSTBUG_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
@@ -1292,9 +1293,11 @@ func _create_pause_overlay() -> void:
 	menu_column.add_child(menu_heading)
 	_pause_resume_button = _add_pause_button(menu_column, "Resume", _toggle_pause, true)
 	_add_pause_button(menu_column, "Settings", _show_pause_settings)
-	_add_pause_button(menu_column, "Restart", restart_race)
+	var app := get_node_or_null("/root/App")
+	if app == null or not app.has_method("can_retry_race") or bool(app.call("can_retry_race")):
+		_add_pause_button(menu_column, "Restart", restart_race)
 	var mode := String(_session.get("mode", "quick"))
-	var return_label := "Return to Discovery" if mode == "discovery" else ("Return to Title" if mode == "quick" else "Return to Championship")
+	var return_label: String = PAUSE_RETURN_LABELS.get(mode, "Return to Championship")
 	_add_pause_button(menu_column, return_label, request_abandon)
 
 	_pause_settings_panel = PanelContainer.new()
@@ -1318,7 +1321,6 @@ func _create_pause_overlay() -> void:
 	settings_heading.text = "RACE SETTINGS"
 	settings_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_column.add_child(settings_heading)
-	var app := get_node_or_null("/root/App")
 	var settings: Dictionary = app.call("get_save_data") if app and app.has_method("get_save_data") else {}
 	_pause_settings_first_control = _add_pause_setting_slider(settings_column, "Master", "master_volume", float(settings.get("master_volume", 1.0)))
 	_add_pause_setting_slider(settings_column, "Music", "music_volume", float(settings.get("music_volume", 0.8)))

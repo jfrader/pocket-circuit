@@ -20,6 +20,11 @@ func _run_test() -> void:
 	var app := root.get_node_or_null("App")
 	if not _expect(app != null, "App autoload must exist"):
 		return
+	var boot := (preload("res://scenes/boot/boot.tscn") as PackedScene).instantiate()
+	root.add_child(boot)
+	current_scene = boot
+	for frame in 3:
+		await process_frame
 	var path := String((app.get("_save_store") as Object).get("save_path"))
 
 	var sess := _run_to_rival(app)
@@ -67,6 +72,36 @@ func _run_test() -> void:
 	if not _expect(car_id in (app.call("quick_race_roster") as Array), "the garage outlives the next night"):
 		return
 
+	# NEW RUN over a night that won a car ends that night first: the car is kept.
+	var swapped := _run_to_rival(app)
+	RUN_WALK.settle(app, swapped)
+	var swapped_car := String(swapped.won_cars()[0]["id"])
+	app.call("start_new_run")
+	if not _expect(swapped_car in (app.call("garage_car_ids") as Array), "starting a new run keeps the cars the old one won"):
+		return
+
+	# A night that ends while the save cannot be written keeps its cars until it can.
+	var blocked := _run_to_rival(app)
+	RUN_WALK.settle(app, blocked)
+	var blocked_car := String(blocked.won_cars()[0]["id"])
+	var store: Object = app.get("_save_store")
+	store.set("is_read_only", true)
+	app.call("abandon_run")
+	if not _expect(app.call("current_run_session") == blocked and not String(app.get("last_run_error")).is_empty(), "an ended night that failed to save is held, and says so"):
+		return
+	if not _expect(not blocked_car in (SAVE_STORE.new(path).load_data()["garage_cars"] as Array).map(func(car: Dictionary) -> String: return String(car["id"])), "nothing reaches disk while the save is blocked"):
+		return
+	store.set("is_read_only", false)
+	app.call("persist_current_run")
+	if not _expect(app.call("current_run_session") == null and blocked_car in (app.call("garage_car_ids") as Array), "the held night lands with its car once the save works"):
+		return
+
+	# A new championship resets the championship, not the garage.
+	var before: Array = app.call("garage_car_ids")
+	app.call("confirm_new_championship")
+	if not _expect(app.call("garage_car_ids") == before, "a new championship keeps every won car"):
+		return
+
 	app.call("abandon_run")
 	if _failed:
 		return
@@ -74,9 +109,14 @@ func _run_test() -> void:
 	quit(0)
 
 
+## Each call walks fresh seeds, so every car it wins has its own id.
+var _next_seed := 1741000
+
+
 func _run_to_rival(app: Object) -> RunSession:
 	for attempt in 12:
-		var sess: RunSession = app.call("start_run", 1741000 + attempt * 31) as RunSession
+		_next_seed += 31
+		var sess: RunSession = app.call("start_run", _next_seed) as RunSession
 		if RUN_WALK.walk_to(app, sess, "rival"):
 			return sess
 	return null
