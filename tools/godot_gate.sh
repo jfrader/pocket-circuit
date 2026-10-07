@@ -9,8 +9,8 @@ run_godot_checked() (
 		rm -f -- "$command_log"
 		return 1
 	fi
-	if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR):' "$command_log"; then
-		printf 'Godot reported an error despite returning success.\n' >&2
+	if grep -Eq '(^|[[:space:]])(SCRIPT ERROR|ERROR|FAIL):|Assertion failed' "$command_log"; then
+		printf 'Godot reported an error/failure despite returning success.\n' >&2
 		rm -f -- "$command_log"
 		return 1
 	fi
