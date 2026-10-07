@@ -109,6 +109,7 @@ var completed: bool = false
 var installed_parts: Dictionary = {}
 var last_bench_visited: String = ""
 var bench_action_done: bool = false
+var resolved_nodes: Dictionary = {}
 
 static func create(p_run_seed: int) -> RunSession:
 	var sess: RunSession = new()
@@ -169,6 +170,9 @@ func enter_node(node_id: String) -> bool:
 func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dictionary:
 	if not _is_current_node_type_for_race(node_id):
 		return {"error": "not current race or act_rival node"}
+	if resolved_nodes.has(node_id):
+		return {"error": "already resolved"}
+	resolved_nodes[node_id] = true
 	var n: Dictionary = current_node()
 	var ntype: String = String(n.get("type", ""))
 	var pos: int = clampi(finish_position, 1, maxi(field_size, 1))
@@ -210,12 +214,16 @@ func _advance_to_act(new_act: int) -> void:
 	lockup_used = false
 	bench_action_done = false
 	last_bench_visited = ""
+	resolved_nodes.clear()
 	run_state.act = new_act
 	run_state.row = 0
 
 func resolve_rival(node_id: String, won: bool) -> Dictionary:
 	if not (current_node_id == node_id and _is_current_node_type("rival")):
 		return {"error": "not current rival node"}
+	if resolved_nodes.has(node_id):
+		return {"error": "already resolved"}
+	resolved_nodes[node_id] = true
 	var outcome: Dictionary = {"won": won}
 	if won:
 		var vid: String = "rival_" + node_id
@@ -314,14 +322,20 @@ func _can_do_bench_action(_car_key: String) -> bool:
 func spend(cost: int) -> bool:
 	if failed or completed or cost <= 0:
 		return false
+	if resolved_nodes.has(current_node_id):
+		return false
 	if run_budget >= cost:
 		run_budget -= cost
+		resolved_nodes[current_node_id] = true
 		return true
 	return false
 
 func open_lockup() -> Dictionary:
 	if failed or completed or lockup_used:
 		return {}
+	if resolved_nodes.has(current_node_id):
+		return {}
+	resolved_nodes[current_node_id] = true
 	var vid: String = "lockup_act%d" % current_map.act
 	var ctype: String = LOCKUP_CAR_TYPE
 	owned_cars[vid] = ctype
@@ -336,6 +350,9 @@ func open_lockup() -> Dictionary:
 func resolve_errand(choice: int) -> Dictionary:
 	if not _is_current_node_type("errand"):
 		return {"error": "not current errand node"}
+	if resolved_nodes.has(current_node_id):
+		return {"error": "already resolved"}
+	resolved_nodes[current_node_id] = true
 	var eff: String = ""
 	var amt: int = 0
 	if choice == 0:
@@ -403,6 +420,7 @@ static func serialize(sess: RunSession) -> Dictionary:
 		"installed_parts": inst,
 		"last_bench_visited": sess.last_bench_visited,
 		"bench_action_done": sess.bench_action_done,
+		"resolved_nodes": sess.resolved_nodes.duplicate(true),
 	}
 
 static func deserialize(data: Dictionary) -> RunSession:
@@ -425,8 +443,9 @@ static func deserialize(data: Dictionary) -> RunSession:
 		sess.installed_parts = (data.get("installed_parts", {}) as Dictionary).duplicate(true)
 		sess.last_bench_visited = String(data.get("last_bench_visited", ""))
 		sess.bench_action_done = bool(data.get("bench_action_done", false))
+		sess.resolved_nodes = (data.get("resolved_nodes", {}) as Dictionary).duplicate(true)
 	else:
-		sess = create(0)
+		return null
 	return sess
 
 func _to_string() -> String:
