@@ -190,7 +190,7 @@ func get_or_create_car_roll(vehicle_id: String, car_type: String) -> Dictionary:
 	if car_rolls.has(vehicle_id):
 		return (car_rolls[vehicle_id] as Dictionary).duplicate(true)
 	var tier := get_tier_for_type(car_type)
-	var roll := RunState.generate_car_roll(run_seed, tier, car_type, vehicle_id)
+	var roll := generate_car_roll(run_seed, tier, car_type, vehicle_id)
 	car_rolls[vehicle_id] = roll.duplicate(true)
 	return roll.duplicate(true)
 
@@ -205,7 +205,7 @@ func set_car_wear(vehicle_id: String, wear: String) -> void:
 
 ## Create a fresh run state holder. Rolls and wear populated on demand or explicitly.
 static func create(run_seed: int) -> RunState:
-	var rs := RunState.new()
+	var rs := new()
 	rs.run_seed = posmod(run_seed, 0x7FFFFFFF)
 	rs.act = null
 	rs.row = null
@@ -219,8 +219,8 @@ static func serialize(rs: RunState) -> Dictionary:
 	for vid: String in rs.car_rolls:
 		var r: Dictionary = rs.car_rolls[vid]
 		var clean := {}
-		for a: String in AXES:
-			clean[a] = float(r.get(a, 0.0))
+		for axis: String in AXES:
+			clean[axis] = float(r.get(axis, 0.0))
 		rolls[vid] = clean
 	var wears := rs.car_wear.duplicate(true)
 	return {
@@ -233,20 +233,20 @@ static func serialize(rs: RunState) -> Dictionary:
 	}
 
 static func deserialize(data: Dictionary) -> RunState:
-	var rs := RunState.new()
+	var rs := new()
 	var ver: Variant = data.get("schema_version", 0)
 	if ver is int and int(ver) == SCHEMA_VERSION:
 		rs.run_seed = int(data.get("run_seed", 0))
-		var a: Variant = data.get("act")
-		rs.act = a if (a == null or a is int) else null
+		var act_val: Variant = data.get("act")
+		rs.act = act_val if (act_val == null or act_val is int) else null
 		var r: Variant = data.get("row")
 		rs.row = r if (r == null or r is int) else null
 		var rolls_in: Dictionary = data.get("car_rolls", {}) as Dictionary
 		for vid: String in rolls_in:
 			var rdict: Dictionary = rolls_in[vid] as Dictionary
 			var clean := {}
-			for a: String in AXES:
-				clean[a] = float(rdict.get(a, 0.0))
+			for axis: String in AXES:
+				clean[axis] = float(rdict.get(axis, 0.0))
 			rs.car_rolls[vid] = clean
 		var wears_in: Dictionary = data.get("car_wear", {}) as Dictionary
 		for vid: String in wears_in:
