@@ -31,7 +31,8 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##   current_node() -> Dictionary
 ##   enter_node(id: String) -> bool
 ##   On enter bench: reset per-visit action flag.
-##   On resolving the final bench (last row of act==3): completed=true
+##   On resolving the final bench (last row): act<3 advances to next act via map regen, act==3 sets completed.
+##   Use bench_continue() to advance final bench without requiring a repair/fit action this visit.
 ##
 ## Per-type resolution (game layer calls with real outcomes after node "play"):
 ##   All require node_id matches current and type matches, else refuse (return error or false).
@@ -57,6 +58,11 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##     repair: if car_key owned or current, run_state.set wear = restore_at_bench (clean)
 ##     fit: installed_parts[car_key] = part (effect out of scope for this layer)
 ##     Documented rule: bench is mutually exclusive repair-OR-fit; layer makes calling both impossible.
+##
+##   bench_continue() -> bool
+##     Allowed on any current bench node (final or not). Does not count against the repair/fit action.
+##     If the bench is the final row of act<3: performs the act advance (regens map, resets flags).
+##     If final of act 3: sets completed.
 ##
 ##   spend(cost: int) -> bool   # for parts_van node
 ##     deducts from run_budget if affordable, else false. No negative budget.
@@ -271,10 +277,29 @@ func bench_fit(car_key: String, part: String) -> bool:
 	_maybe_complete_on_final_bench()
 	return true
 
-## The run is won by resolving the final bench of act 3 (the forced last node).
+func bench_continue() -> bool:
+	if failed or completed:
+		return false
+	if not _is_current_node_type("bench"):
+		return false
+	# explicit continue path so final bench can advance act without repair/fit being possible or wanted.
+	# repair XOR fit per visit remains enforced by _can_do + bench_action_done.
+	_maybe_complete_on_final_bench()
+	return true
+
+## Resolving the forced final bench (last row, always bench type) ends the current act:
+## - act < 3: _advance_to_act (regens map from same seed, resets to start of next act, lockup_used=false)
+## - act == 3: set completed=true
+## Invoked after bench action or via bench_continue.
 func _maybe_complete_on_final_bench() -> void:
-	if current_map != null and current_map.act == 3 and current_map.is_last_row(int(run_state.row)):
+	if current_map == null:
+		return
+	if not current_map.is_last_row(int(run_state.row)):
+		return
+	if current_map.act == 3:
 		completed = true
+	else:
+		_advance_to_act(current_map.act + 1)
 
 
 func _can_do_bench_action(_car_key: String) -> bool:

@@ -1487,6 +1487,79 @@ func start_run_race(node_id: String = "") -> bool:
 	return true
 
 
+## Run node outcome seams (non-race). Validate current node type matches, delegate to session,
+## persist on success. Return bool success. For data-returning session calls (lockup, errand)
+## we return bool (action performed) and caller inspects session state after; keeps seam shape uniform.
+func run_bench_repair(car_key: String) -> bool:
+	if _current_run_session == null:
+		return false
+	var n: Dictionary = _current_run_session.current_node()
+	if String(n.get("type", "")) != "bench":
+		return false
+	var ok: bool = _current_run_session.bench_repair(car_key)
+	if ok:
+		persist_current_run()
+	return ok
+
+func run_bench_fit(part: String) -> bool:
+	if _current_run_session == null:
+		return false
+	var n: Dictionary = _current_run_session.current_node()
+	if String(n.get("type", "")) != "bench":
+		return false
+	var car_key: String = _current_run_session.current_car_id
+	var ok: bool = _current_run_session.bench_fit(car_key, part)
+	if ok:
+		persist_current_run()
+	return ok
+
+func run_bench_continue() -> bool:
+	if _current_run_session == null:
+		return false
+	var n: Dictionary = _current_run_session.current_node()
+	if String(n.get("type", "")) != "bench":
+		return false
+	var ok: bool = _current_run_session.bench_continue()
+	if ok:
+		persist_current_run()
+	return ok
+
+func run_spend(cost: int) -> bool:
+	if _current_run_session == null:
+		return false
+	var n: Dictionary = _current_run_session.current_node()
+	if String(n.get("type", "")) != "parts_van":
+		return false
+	var ok: bool = _current_run_session.spend(cost)
+	if ok:
+		persist_current_run()
+	return ok
+
+func run_open_lockup() -> bool:
+	if _current_run_session == null:
+		return false
+	var n: Dictionary = _current_run_session.current_node()
+	if String(n.get("type", "")) != "lockup":
+		return false
+	var res: Dictionary = _current_run_session.open_lockup()
+	var ok: bool = res.size() > 0
+	if ok:
+		persist_current_run()
+	return ok
+
+func run_resolve_errand(choice: int) -> bool:
+	if _current_run_session == null:
+		return false
+	var n: Dictionary = _current_run_session.current_node()
+	if String(n.get("type", "")) != "errand":
+		return false
+	var res: Dictionary = _current_run_session.resolve_errand(choice)
+	var ok: bool = not res.has("error")
+	if ok:
+		persist_current_run()
+	return ok
+
+
 func update_setting(key: String, value: Variant) -> bool:
 	var candidate := _save_data.duplicate(true)
 	match key:
