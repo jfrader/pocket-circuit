@@ -125,7 +125,7 @@ func _count_audio_players(n: Node) -> int:
 	var count := 0
 	var stack: Array[Node] = [n]
 	while stack.size() > 0:
-		var cur := stack.pop_back()
+		var cur: Node = stack.pop_back() as Node
 		if cur is AudioStreamPlayer or cur is AudioStreamPlayer2D:
 			count += 1
 		for c in cur.get_children():
@@ -138,7 +138,7 @@ func _count_emitter_like(n: Node) -> int:
 	var count := 0
 	var stack: Array[Node] = [n]
 	while stack.size() > 0:
-		var cur := stack.pop_back()
+		var cur: Node = stack.pop_back() as Node
 		var nm := String(cur.name)
 		if nm.find("Emitter") != -1 or nm.find("Voice") != -1 or nm.find("TyreVoice") != -1 or nm.find("EnginePlayer") != -1:
 			count += 1
