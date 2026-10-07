@@ -237,6 +237,8 @@ func show_discovery() -> void:
 	_discovery_panel.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	_discovery_panel.back_requested.connect(show_title)
 	_content.add_child(_discovery_panel)
+	_discovery_panel.configure(_app)
+	_footer.text = BACK_HINT
 
 func show_run_board() -> void:
 	_screen = "run_board"
