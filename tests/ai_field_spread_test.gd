@@ -3,20 +3,11 @@ extends SceneTree
 const PROTOTYPE_SCENE := preload("res://scenes/race/prototype_race.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
-const THEMES: Array[StringName] = [&"kitchen", &"workshop", &"office"]
 const LAPS := 3
 const CHECKPOINTS_PER_LAP := 8
 const MAX_PHYSICS_FRAMES := 7200
 const MAX_RECOVERIES := 3
 const MAX_FINISH_GAP_RATIO := 1.80
-## Verified-green deterministic seeds per theme/room. Random seeds stay the
-## domain of the per-lap theme_ai_harness; this race-quality gate must be
-## reproducible run to run.
-const SEED_MATRIX: Dictionary = {
-	&"kitchen": {"room": &"classic", "seed": 0},
-	&"workshop": {"room": &"wide", "seed": 1},
-	&"office": {"room": &"el", "seed": 7},
-}
 
 
 func _initialize() -> void:
@@ -25,19 +16,20 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	Engine.time_scale = 1.0
+	# Use production grace (8 s) instead of the harness's long inspection grace.
+	# Hook before any add_child so the RaceManager instances pick it up.
+	node_added.connect(func(node: Node) -> void:
+		if node is RaceManager:
+			(node as RaceManager).finish_grace_seconds = 8.0
+	)
 	var theme_only := String(OS.get_environment("PC_THEME_ONLY"))
-	var seed_override := int(OS.get_environment("PC_SEED"))
-	for theme: StringName in THEMES:
-		if not theme_only.is_empty() and theme != StringName(theme_only):
+	for case: Array in [[&"kitchen", &"classic", 0], [&"workshop", &"wide", 1], [&"office", &"el", 7], [&"kitchen", &"long", 24469], [&"workshop", &"square", 51940], [&"office", &"tall", 42]]:
+		if not theme_only.is_empty() and case[0] != StringName(theme_only):
 			continue
-		var room: StringName = SEED_MATRIX[theme]["room"]
-		var seed := int(SEED_MATRIX[theme]["seed"])
-		if not OS.get_environment("PC_SEED").is_empty():
-			seed = seed_override
-		if not await _run_theme(theme, room, seed):
+		if not await _run_theme(case[0], case[1], case[2]):
 			return
 	Engine.time_scale = 1.0
-	print("AI_FIELD_SPREAD_TEST PASS all_themes")
+	print("AI_FIELD_SPREAD_TEST PASS six_routes_production_grace")
 	quit(0)
 
 
@@ -57,7 +49,6 @@ func _run_theme(theme: StringName, room: StringName, seed: int) -> bool:
 		"difficulty": "club_circuit",
 	})
 	var manager := prototype.get_node("RaceManager") as RaceManager
-	manager.finish_grace_seconds = 45.0
 	root.add_child(prototype)
 	current_scene = prototype
 
