@@ -9,6 +9,7 @@ const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
 const RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
+const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 
 const PAGE_MARGIN := 48
 const PAGE_TOP := 28
