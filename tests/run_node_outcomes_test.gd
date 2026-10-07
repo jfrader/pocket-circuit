@@ -42,11 +42,11 @@ func _run_test() -> void:
 	if not _expect(van_run != null and RUN_WALK.walk_to(app, van_run, "parts_van"), "a parts van must be reachable"):
 		return
 	van_run.run_points = 12
-	if not _expect(not bool(app.call("run_spend", 13)), "a purchase above the points must be refused"):
+	if not _expect(not bool(app.call("run_buy_part", "spare_shell")), "a part above the points must be refused"):
 		return
-	if not _expect(bool(app.call("run_spend", 8)), "a purchase inside the points must succeed"):
+	if not _expect(bool(app.call("run_buy_part", "tyre_set")), "a part inside the points must sell"):
 		return
-	if not _expect(van_run.run_points == 4, "the purchase must debit exactly its cost"):
+	if not _expect(van_run.run_points == 12 - int(RunSession.VAN_PART_COSTS["tyre_set"]), "the purchase must debit exactly its listed price"):
 		return
 	var live_store: Object = app.get("_save_store")
 	var saved: Dictionary = SAVE_STORE.new(String(live_store.get("save_path"))).load_data()

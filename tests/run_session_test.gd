@@ -105,11 +105,14 @@ func _check_bench_and_van() -> void:
 	if not _expect(cheapest <= int(RUN_SESSION.RUN_POINTS_BY_FINISH[1]), "one race win buys the cheapest part"):
 		return
 	van.run_points = 20
-	if not _expect(not van.spend(9999) and van.run_points == 20, "overspending is refused"):
+	if not _expect(not van.buy_part("rocket") and van.run_points == 20, "the van sells only its listed parts"):
 		return
-	if not _expect(van.spend(15) and van.run_points == 5, "a purchase spends exactly its points"):
+	van.run_points = 14
+	if not _expect(not van.buy_part("spare_shell") and van.run_points == 14, "a part above the points is refused"):
 		return
-	if not _expect(not van.spend(1), "the van sells once per visit"):
+	if not _expect(van.buy_part("tyre_set") and van.run_points == 14 - int(RUN_SESSION.VAN_PART_COSTS["tyre_set"]), "a purchase spends exactly its listed price"):
+		return
+	if not _expect(not van.buy_part("tool_kit"), "the van sells once per visit"):
 		return
 
 
@@ -196,7 +199,7 @@ func _resolve_current(sess, win: bool) -> void:
 		"bench":
 			sess.bench_repair(sess.current_car_id)
 		"parts_van":
-			sess.spend(RUN_SESSION.RIVAL_LOSS_POINTS_COST)
+			sess.buy_part("tool_kit")
 		"lockup":
 			sess.open_lockup()
 		"errand":

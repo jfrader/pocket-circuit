@@ -61,15 +61,15 @@ func _test_double_resolutions() -> void:
 	sess1.current_node_id = "test_node"
 	sess1.run_points = 60
 	sess1.current_map.nodes["test_node"] = {"id": "test_node", "type": "parts_van"}
-	var s1 = sess1.spend(10)
+	var s1 = sess1.buy_part("tool_kit")
 	if not _expect(s1, "first spend ok"): return
-	if not _expect(sess1.run_points == 50, "points reduced"): return
-	var s2 = sess1.spend(10)
+	if not _expect(sess1.run_points == 60 - int(RUN_SESSION.VAN_PART_COSTS["tool_kit"]), "points reduced"): return
+	var s2 = sess1.buy_part("tool_kit")
 	if not _expect(not s2, "second spend refused"): return
-	if not _expect(sess1.run_points == 50, "points not reduced again"): return
+	if not _expect(sess1.run_points == 60 - int(RUN_SESSION.VAN_PART_COSTS["tool_kit"]), "points not reduced again"): return
 	
 	var sess_saved = RUN_SESSION.deserialize(RUN_SESSION.serialize(sess1))
-	var s3 = sess_saved.spend(10)
+	var s3 = sess_saved.buy_part("tool_kit")
 	if not _expect(not s3, "spend still refused after save/load roundtrip"): return
 	
 	# Test resolve_race
@@ -91,12 +91,12 @@ func _test_save_failures() -> void:
 	app._current_run_session.run_points = 60
 	
 	# Test refused node (wrong type)
-	var ok = app.run_spend(10, "")
+	var ok = app.run_buy_part("tool_kit", "")
 	if not _expect(not ok, "seam refused due to wrong type"): return
 	if not _expect(app.last_run_error != "", "last_run_error is non-empty on refusal: " + app.last_run_error): return
 	
 	app._current_run_session.current_map.nodes[app._current_run_session.current_node_id]["type"] = "parts_van"
-	ok = app.run_spend(10, "")
+	ok = app.run_buy_part("tool_kit", "")
 	if not _expect(ok, "seam accepted"): return
 	if not _expect(app.last_run_error == "", "last_run_error cleared on success"): return
 	
@@ -104,7 +104,7 @@ func _test_save_failures() -> void:
 	store.is_read_only = true
 	app._current_run_session.resolved_nodes.clear()
 	app._current_run_session.current_map.nodes[app._current_run_session.current_node_id]["type"] = "parts_van"
-	ok = app.run_spend(10, "")
+	ok = app.run_buy_part("tool_kit", "")
 	if not _expect(ok, "seam accepted logically"): return
 	if not _expect(app.last_run_error != "", "last_run_error is non-empty on read-only save: " + app.last_run_error): return
 	

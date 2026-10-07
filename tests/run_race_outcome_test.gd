@@ -81,6 +81,39 @@ func _run_test() -> void:
 	if not _expect(int(saved_run.get("run_points", -1)) == sess.run_points, "the save must carry the awarded points"):
 		return
 
+	# A started run race is marked in the save, cannot be restarted or retried,
+	# and quitting it is a did-not-finish that resolves the stop for good.
+	var quit_run: RunSession = app.call("start_run", 52525) as RunSession
+	var opening := quit_run.current_node_id
+	if not _expect(bool(app.call("start_run_race", opening)), "the opening race starts"):
+		return
+	var on_disk: Dictionary = SAVE_STORE.new(path).load_data().get("current_run", {}) as Dictionary
+	if not _expect(String((on_disk.get("race_in_flight", {}) as Dictionary).get("node", "")) == opening, "a started race is in the save before it is driven"):
+		return
+	if not _expect(not bool(app.call("can_retry_race")), "a run race offers no restart or retry"):
+		return
+	app.call("retry_race", false)
+	if not _expect(quit_run.race_in_flight.get("node", "") == opening and not quit_run.resolved_nodes.has(opening), "retry does nothing in a run"):
+		return
+	app.call("abandon_race")
+	for frame in 3:
+		await process_frame
+	if not _expect(quit_run.resolved_nodes.has(opening) and quit_run.race_in_flight.is_empty(), "quitting a run race resolves it"):
+		return
+	if not _expect(quit_run.run_points == 0 and quit_run.run_state.get_car_wear(quit_run.current_car_id) != "clean", "a quit race scores nothing and wears the car"):
+		return
+	if not _expect(not bool(app.call("start_run_race", opening)), "a quit race cannot be started again"):
+		return
+
+	# A race left running when the game closed resolves the same way on boot.
+	var closed: RunSession = app.call("start_run", 63636) as RunSession
+	app.call("start_run_race", closed.current_node_id)
+	var reloaded := RunSession.deserialize(SAVE_STORE.new(path).load_data().get("current_run", {}) as Dictionary)
+	app.set("_current_run_session", reloaded)
+	app.call("_settle_race_in_flight")
+	if not _expect(reloaded.resolved_nodes.has(reloaded.current_node_id) and reloaded.race_in_flight.is_empty(), "a race interrupted by a closed game resolves on boot"):
+		return
+
 	app.call("abandon_run")
 	if _failed:
 		return

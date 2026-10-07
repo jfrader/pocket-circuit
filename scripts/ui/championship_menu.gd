@@ -42,8 +42,7 @@ var _vehicle_buttons: Dictionary = {}
 var _unlocked: Array = []
 var _generation := 0
 var _entrance: Tween
-var _garage_primary: Button
-var _garage_back: Button
+var _garage_actions: Array[Button] = []
 var _origin: Label
 var _holding_id := ""
 var _shapes: Dictionary = {}
@@ -59,13 +58,14 @@ func clear() -> void:
 	_generation += 1
 	if _entrance and _entrance.is_valid():
 		_entrance.kill()
+	if _morph and _morph.is_valid():
+		_morph.kill()
 	if is_instance_valid(_canvas):
 		remove_child(_canvas)
 		_canvas.queue_free()
 	_canvas = null
 	_stage = null
-	_garage_primary = null
-	_garage_back = null
+	_garage_actions.clear()
 	_vehicle_buttons.clear()
 	visible = false
 
@@ -120,8 +120,7 @@ func show_garage(selected: String, unlocked: Array, context: String, next_text: 
 	var back := _button("BACK", Rect2(COLUMN_X, 612, 240, 64), &"back")
 	var driver := _button("DRIVER LOOK", Rect2(COLUMN_X + 258, 612, 300, 64), &"driver")
 	var next := _button(next_text, Rect2(868, 612, 340, 64), &"play_vehicle", true)
-	_garage_primary = next
-	_garage_back = back
+	_garage_actions = [back, driver, next]
 	next.name = "GaragePrimaryAction"
 	_wire_rows([car_row, [back, driver, next]])
 	for button: Button in car_row:
@@ -206,9 +205,10 @@ func _scroll_cues(scroll: ScrollContainer) -> void:
 	before.position = Vector2(scroll.position.x + SCROLL_CUE_INSET, scroll.position.y + SHELF_BLEED)
 	after.position = Vector2(scroll.position.x + scroll.size.x - after.size.x - SCROLL_CUE_INSET, scroll.position.y + SHELF_BLEED)
 	var bar := scroll.get_h_scroll_bar()
+	# The bleed around the cards is not a car: only a card cut off counts.
 	var refresh := func(_value: float = 0.0) -> void:
-		before.visible = bar.value > 0.5
-		after.visible = bar.value + bar.page < bar.max_value - 0.5
+		before.visible = bar.value > SHELF_BLEED + 0.5
+		after.visible = bar.value + bar.page < bar.max_value - SHELF_BLEED - 0.5
 	bar.value_changed.connect(refresh)
 	bar.changed.connect(refresh)
 	refresh.call()
@@ -233,9 +233,9 @@ func _choose_vehicle(id: String) -> void:
 	_show_shape(id)
 	for candidate: String in _vehicle_buttons:
 		(_vehicle_buttons[candidate] as Button).set("selected", candidate == id)
-	if is_instance_valid(_garage_primary):
-		_garage_primary.focus_neighbor_top = _garage_primary.get_path_to(_vehicle_buttons[id])
-		_garage_back.focus_neighbor_top = _garage_back.get_path_to(_vehicle_buttons[id])
+	# Up from any action returns to the chosen car, wherever the shelf is scrolled.
+	for action: Button in _garage_actions:
+		action.focus_neighbor_top = action.get_path_to(_vehicle_buttons[id])
 	vehicle_selected.emit(id)
 
 

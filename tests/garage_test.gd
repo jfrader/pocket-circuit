@@ -8,6 +8,9 @@ extends SceneTree
 const CATALOG := preload("res://data/championship/catalog.gd")
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
 
+## More cars than the shelf shows at once (eight shipped cars fit).
+const SHELF_FITS := 9
+
 var _failed := false
 
 
@@ -28,9 +31,8 @@ func _run_test() -> void:
 		var night: RunSession = app.call("start_run", 1741000 + attempt * 31) as RunSession
 		if RUN_WALK.walk_to(app, night, "rival"):
 			RUN_WALK.settle(app, night)
-			won_id = String(night.won_cars()[0]["id"])
-			app.call("abandon_run")
-			break
+			if won_id.is_empty():
+				won_id = String(night.won_cars()[0]["id"])
 		app.call("abandon_run")
 	if not _expect(not won_id.is_empty() and won_id in (app.call("garage_car_ids") as Array), "an abandoned night still banks its won car"):
 		return
@@ -75,10 +77,17 @@ func _run_test() -> void:
 	if not _expect(not origin.visible and String(stage.get("compare_label")) == "YOUR CAR" and (stage.get("compare_shape") as Dictionary).is_empty(), "the car the player holds is drawn alone"):
 		return
 
-	var scroll := menu.find_child("ShelfScroll", true, false) as ScrollContainer
-	var bar := scroll.get_h_scroll_bar()
 	var after := menu.find_child("ShelfMoreAfter", true, false) as Control
-	if not _expect(after.visible == (bar.value + bar.page < bar.max_value - 0.5), "the MORE cue matches what the shelf hides"):
+	var before := menu.find_child("ShelfMoreBefore", true, false) as Control
+	(buttons[roster[0]] as Button).grab_focus()
+	for frame in 3:
+		await process_frame
+	if not _expect(roster.size() > SHELF_FITS and after.visible and not before.visible, "at the first car a full shelf shows MORE to the right only (cars %d)" % roster.size()):
+		return
+	(buttons[roster[roster.size() - 1]] as Button).grab_focus()
+	for frame in 3:
+		await process_frame
+	if not _expect(not after.visible and before.visible, "at the last car the shelf shows MORE to the left only"):
 		return
 
 	if _failed:

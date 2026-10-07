@@ -115,7 +115,7 @@ func _run_test() -> void:
 	# Node screens must retain their action and description without clipping the legend.
 	var screens := [
 		["show_run_bench", "BenchRepair", String(RUN_UI.TYPES["bench"]["copy"])],
-		["show_run_parts_van", "VanBuy15", String(RUN_UI.TYPES["parts_van"]["copy"])],
+		["show_run_parts_van", "VanBuy_spare_shell", String(RUN_UI.TYPES["parts_van"]["copy"])],
 		["show_run_lockup", "LockupOpen", String(RUN_UI.TYPES["lockup"]["copy"])],
 		["show_run_errand", "ErrandPay", String(RUN_UI.TYPES["errand"]["copy"])],
 	]

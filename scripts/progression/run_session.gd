@@ -20,6 +20,8 @@ const STARTER_CAR_TYPE := "compact"
 const CAR_ORIGIN_START := "start"
 const CAR_ORIGIN_RIVAL := "rival"
 const CAR_ORIGIN_LOCKUP := "lockup"
+## A placeholder roll used to validate an owned-car record (its real roll lives in run_state).
+const NO_ROLL := {"speed": 0.0, "accel": 0.0, "grip": 0.0, "drift": 0.0, "boost": 0.0, "tough": 0.0}
 
 const RUN_POINTS_BY_FINISH: Dictionary = {
 	1: 6,
@@ -44,7 +46,8 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##   resolve_rival(id, won): a win adds the rival's car (won_cars()); a loss costs
 ##     RIVAL_LOSS_POINTS_COST, and wear when the points do not cover it.
 ##   bench_repair(car) / bench_fit(car, part): one of the two per bench visit.
-##   spend(cost): parts van purchase from points.
+##   buy_part(part_id): one parts van purchase at its listed price in points.
+##   start_race(id, field): marks a race as running; it resolves exactly once.
 ##   open_lockup(): the act's one free car.
 ##   resolve_errand(choice): 0 takes ERRAND_PAY_POINTS, 1 steps the current
 ##     car's wear back one level.
@@ -67,6 +70,9 @@ var installed_parts: Dictionary = {}
 var last_bench_visited: String = ""
 var bench_action_done: bool = false
 var resolved_nodes: Dictionary = {}
+## The race-type stop whose race has started and not been reported:
+## {"node": id, "field": racers}. Empty when no race is running.
+var race_in_flight: Dictionary = {}
 
 static func create(p_run_seed: int) -> RunSession:
 	var sess: RunSession = new()
@@ -99,6 +105,18 @@ func available_nodes() -> Array[Dictionary]:
 	if is_race_pending():
 		return [current_node()]
 	return current_map.get_children(current_node_id)
+
+## Marks the current unraced race-type stop as racing. Whatever ends that race
+## (a result, a quit, a closed game) has to resolve it; it is never re-raced.
+func start_race(node_id: String, field_size: int) -> bool:
+	if node_id != current_node_id or not is_race_pending():
+		return false
+	race_in_flight = {"node": node_id, "field": field_size}
+	return true
+
+## A race that never got past its loading screen did not happen.
+func cancel_race() -> void:
+	race_in_flight = {}
 
 ## A race-type node has to be raced before the run moves past it.
 func is_race_pending() -> bool:
@@ -138,6 +156,7 @@ func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dic
 	if resolved_nodes.has(node_id):
 		return {"error": "already resolved"}
 	resolved_nodes[node_id] = true
+	race_in_flight = {}
 	var n: Dictionary = current_node()
 	var ntype: String = String(n.get("type", ""))
 	var pos: int = clampi(finish_position, 1, maxi(field_size, 1))
@@ -189,6 +208,7 @@ func resolve_rival(node_id: String, won: bool) -> Dictionary:
 	if resolved_nodes.has(node_id):
 		return {"error": "already resolved"}
 	resolved_nodes[node_id] = true
+	race_in_flight = {}
 	var outcome: Dictionary = {"won": won}
 	if won:
 		outcome["car"] = _win_car(node_id, CAR_ORIGIN_RIVAL, "")
@@ -260,6 +280,29 @@ static func normalize_won_car(value: Variant) -> Dictionary:
 	}
 
 
+## Stored owned cars: the starter plus won cars that pass normalize_won_car.
+static func _normalize_owned(value: Variant) -> Dictionary:
+	var owned := {}
+	if value is not Dictionary:
+		return owned
+	for vehicle_id: Variant in value as Dictionary:
+		var record: Variant = (value as Dictionary)[vehicle_id]
+		if record is not Dictionary:
+			continue
+		if String(vehicle_id) == STARTER_CAR:
+			owned[STARTER_CAR] = {"type": STARTER_CAR_TYPE, "won_from": CAR_ORIGIN_START}
+			continue
+		var probe := (record as Dictionary).duplicate()
+		probe["id"] = String(vehicle_id)
+		probe["roll"] = NO_ROLL
+		var clean := normalize_won_car(probe)
+		if not clean.is_empty():
+			clean.erase("id")
+			clean.erase("roll")
+			owned[String(vehicle_id)] = clean
+	return owned
+
+
 ## Every car won this run, in the order they were won.
 func won_cars() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -303,19 +346,19 @@ func _can_do_bench_action(_car_key: String) -> bool:
 		return false
 	return true
 
-func spend(cost: int) -> bool:
-	if failed or completed or cost <= 0:
+## Buys one part at the parts van for its listed price; one purchase per visit.
+func buy_part(part_id: String) -> bool:
+	if failed or completed or not _is_current_node_type("parts_van") or resolved_nodes.has(current_node_id):
 		return false
-	if resolved_nodes.has(current_node_id):
+	var cost := int(VAN_PART_COSTS.get(part_id, -1))
+	if cost < 0 or run_points < cost:
 		return false
-	if run_points >= cost:
-		run_points -= cost
-		resolved_nodes[current_node_id] = true
-		return true
-	return false
+	run_points -= cost
+	resolved_nodes[current_node_id] = true
+	return true
 
 func open_lockup() -> Dictionary:
-	if failed or completed or lockup_used:
+	if failed or completed or lockup_used or not _is_current_node_type("lockup"):
 		return {}
 	if resolved_nodes.has(current_node_id):
 		return {}
@@ -392,6 +435,7 @@ static func serialize(sess: RunSession) -> Dictionary:
 		"last_bench_visited": sess.last_bench_visited,
 		"bench_action_done": sess.bench_action_done,
 		"resolved_nodes": sess.resolved_nodes.duplicate(true),
+		"race_in_flight": sess.race_in_flight.duplicate(true),
 	}
 
 static func deserialize(data: Dictionary) -> RunSession:
@@ -406,7 +450,9 @@ static func deserialize(data: Dictionary) -> RunSession:
 		sess.current_node_id = String(data.get("current_node_id", ""))
 		sess.run_points = int(data.get("run_points", 0))
 		sess.current_car_id = String(data.get("current_car_id", STARTER_CAR))
-		sess.owned_cars = (data.get("owned_cars", {}) as Dictionary).duplicate(true)
+		sess.owned_cars = _normalize_owned(data.get("owned_cars"))
+		if not sess.owned_cars.has(sess.current_car_id):
+			return null
 		sess.lockup_used = bool(data.get("lockup_used", false))
 		sess.failed = bool(data.get("failed", false))
 		sess.completed = bool(data.get("completed", false))
@@ -414,6 +460,8 @@ static func deserialize(data: Dictionary) -> RunSession:
 		sess.last_bench_visited = String(data.get("last_bench_visited", ""))
 		sess.bench_action_done = bool(data.get("bench_action_done", false))
 		sess.resolved_nodes = (data.get("resolved_nodes", {}) as Dictionary).duplicate(true)
+		var in_flight: Variant = data.get("race_in_flight", {})
+		sess.race_in_flight = (in_flight as Dictionary).duplicate(true) if in_flight is Dictionary else {}
 	else:
 		return null
 	return sess
