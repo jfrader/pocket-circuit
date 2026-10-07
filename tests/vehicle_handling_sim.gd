@@ -16,12 +16,12 @@ func _initialize() -> void:
 
 func _run() -> void:
 	var rows: Array[Dictionary] = []
-	rows.append(await _measure("straight_280", 1, 280.0, 0.6, 0.0, false, 25))
-	rows.append(await _measure("straight_280", 2, 280.0, 0.6, 0.0, false, 25))
-	rows.append(await _measure("steer_mid", 1, 280.0, 0.5, 1.0, false, 35))
-	rows.append(await _measure("steer_mid", 2, 280.0, 0.5, 1.0, false, 35))
-	rows.append(await _measure("steer_fast_throttle", 1, 0.0, 1.0, 1.0, false, 40, 0.85))
-	rows.append(await _measure("steer_fast_throttle", 2, 0.0, 1.0, 1.0, false, 40, 0.85))
+	rows.append(await _measure("straight_280", 1, 280.0, 0.6, 0.0, false, 8))
+	rows.append(await _measure("straight_280", 2, 280.0, 0.6, 0.0, false, 8))
+	rows.append(await _measure("steer_mid", 1, 280.0, 0.5, 1.0, false, 12))
+	rows.append(await _measure("steer_mid", 2, 280.0, 0.5, 1.0, false, 12))
+	rows.append(await _measure("steer_fast_throttle", 1, 0.0, 1.0, 1.0, false, 12, 0.85))
+	rows.append(await _measure("steer_fast_throttle", 2, 0.0, 1.0, 1.0, false, 12, 0.85))
 	print("HANDLING_SIM")
 	print("scenario,ver,slip,yaw,heading,speed")
 	for row: Dictionary in rows:
