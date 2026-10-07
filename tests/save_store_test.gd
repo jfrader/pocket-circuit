@@ -273,7 +273,6 @@ func _test_current_run_migration(store: SaveStore) -> bool:
 		"schema_version": 1,
 		"run_seed": 424242,
 		"run_points": 12,
-		"run_budget": 33,
 		"current_node_id": "1_3",
 		"current_car_id": "rustbug",
 		"owned_cars": {"rustbug": "compact"},
@@ -281,19 +280,34 @@ func _test_current_run_migration(store: SaveStore) -> bool:
 	if not _expect(store.save_data(v5_with_run), "save v5 with current_run data"):
 		return false
 	loaded = store.load_data()
-	if not _expect(int(loaded["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_budget",0)) == 33, "v5 current_run data roundtrips via normalize"):
+	if not _expect(int(loaded["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_points",0)) == 12, "v5 current_run data roundtrips via normalize"):
 		return false
 
-	# future v6 crafted save -> read only, defaults (current_run={}), disk untouched
-	_write_raw(TEST_PATH, "{\"version\":6,\"current_run\":{\"run_seed\":999},\"best_event_finishes\":{\"kitchen_crumb_rush\":1}}")
+	# garage: a v5 save has none; stored won cars are validated and deduplicated
+	_write_raw(TEST_PATH, "{\"version\":5,\"current_run\":{}}")
 	loaded = store.load_data()
-	if not _expect(loaded["current_run"] == {} and loaded["best_event_finishes"].is_empty(), "v6 future yields safe defaults including empty current_run, no old data"):
+	if not _expect(loaded["garage_cars"] == [], "a v5 save migrates to an empty garage"):
 		return false
-	if not _expect(int(_read_json(TEST_PATH)["version"]) == 6 and store.is_read_only, "v6 must leave disk at 6 and set read-only"):
+	var good := {"id": "car-1-a1-3_2", "seed": 77, "type": "coupe", "roll": {"speed": 0.1, "accel": -0.05, "grip": 0.02, "drift": -0.02, "boost": 0.05, "tough": -0.1}, "won_from": "rival", "act": 1}
+	var with_garage := store.default_data()
+	with_garage["garage_cars"] = [good, good, {"id": "car-x", "type": "suv", "roll": good["roll"], "won_from": "rival"}, {"id": "car-y", "type": "coupe", "roll": {"speed": 0.1}, "won_from": "rival"}, "junk"]
+	if not _expect(store.save_data(with_garage), "a save with garage cars writes"):
 		return false
-	if not _expect(not store.save_data(store.default_data()), "read-only rejects write on v6"):
+	loaded = store.load_data()
+	if not _expect(loaded["garage_cars"] == [good], "the garage keeps one copy of each valid car and drops broken ones (got %s)" % str(loaded["garage_cars"])):
 		return false
-	if not _expect(int(_read_json(TEST_PATH)["version"]) == 6, "rejected write leaves v6 untouched"):
+
+	# a save from a future version -> read only, defaults (current_run={}), disk untouched
+	var future := int(SAVE_STORE_SCRIPT.CURRENT_VERSION) + 1
+	_write_raw(TEST_PATH, "{\"version\":%d,\"current_run\":{\"run_seed\":999},\"best_event_finishes\":{\"kitchen_crumb_rush\":1}}" % future)
+	loaded = store.load_data()
+	if not _expect(loaded["current_run"] == {} and loaded["best_event_finishes"].is_empty(), "a future save yields safe defaults including empty current_run, no old data"):
+		return false
+	if not _expect(int(_read_json(TEST_PATH)["version"]) == future and store.is_read_only, "a future save stays on disk and sets read-only"):
+		return false
+	if not _expect(not store.save_data(store.default_data()), "read-only rejects writes over a future save"):
+		return false
+	if not _expect(int(_read_json(TEST_PATH)["version"]) == future, "a rejected write leaves the future save untouched"):
 		return false
 	return true
 

@@ -455,7 +455,42 @@ static func get_vehicle(vehicle_id: String) -> Dictionary:
 	for vehicle: Dictionary in VEHICLES:
 		if String(vehicle["id"]) == vehicle_id:
 			return vehicle.duplicate(true)
+	return VehicleDirectory.get_vehicle(vehicle_id)
+
+
+## The shipped car whose chassis and engine a generated car of this type builds on.
+static func base_vehicle_for_type(car_type: String) -> Dictionary:
+	for vehicle: Dictionary in VEHICLES:
+		if String((vehicle["car_art"] as Dictionary)["type"]) == car_type:
+			return vehicle.duplicate(true)
 	return {}
+
+
+## Describes a won car ({id, seed, type, roll, won_from, act}) in the catalog's
+## vehicle shape: its name, look and handling line come from the procedural
+## generator, its physics from its type's base car moved by its roll.
+static func generated_vehicle(car: Dictionary) -> Dictionary:
+	var car_type := String(car.get("type", ""))
+	var base := base_vehicle_for_type(car_type)
+	var generated := ProceduralCarGenerator.generate(int(car.get("seed", 0)), car_type)
+	if base.is_empty() or generated.is_empty():
+		return {}
+	var handling: Dictionary = generated["handling"]
+	return {
+		"id": String(car["id"]),
+		"name": String(generated["display_name"]),
+		"archetype": String(handling["display_name"]),
+		"strength": String(handling["description"]),
+		"tradeoff": "",
+		"unlock": "Won in a run",
+		"tint": String((generated["palette"] as Dictionary)["body_mid"]).trim_prefix("#"),
+		"car_art": {"seed": int(car["seed"]), "type": car_type, "options": {"palette": String(generated["palette_id"]), "parts": (generated["parts"] as Dictionary).duplicate(true)}},
+		"stats_path": String(base["stats_path"]),
+		"base_vehicle": String(base["id"]),
+		"roll": (car.get("roll", {}) as Dictionary).duplicate(true),
+		"won_from": String(car.get("won_from", "")),
+		"act": int(car.get("act", 0)),
+	}
 
 
 static func get_driver(driver_id: String) -> Dictionary:
@@ -497,6 +532,17 @@ static func championship_vehicle_ids() -> Array[String]:
 		if avail != "quick_race":
 			ids.append(String(vehicle["id"]))
 	return ids
+
+
+## Garage order: grouped by car type, then by handling line, then by name.
+static func garage_order(vehicle_ids: Array[String]) -> Array[String]:
+	var ordered := vehicle_ids.duplicate()
+	var key := func(vehicle_id: String) -> Array:
+		var vehicle := get_vehicle(vehicle_id)
+		var car_type := String((vehicle.get("car_art", {}) as Dictionary).get("type", ""))
+		return [ProceduralCarGenerator.SUPPORTED_TYPES.find(car_type), String(vehicle.get("archetype", "")), String(vehicle.get("name", vehicle_id))]
+	ordered.sort_custom(func(a: String, b: String) -> bool: return key.call(a) < key.call(b))
+	return ordered
 
 
 static func quick_race_vehicle_ids() -> Array[String]:
@@ -598,6 +644,8 @@ static func create_vehicle_stats(vehicle_id: String) -> VehicleStats:
 		push_error("Vehicle '%s' could not load VehicleStats from %s" % [String(vehicle.get("id", vehicle_id)), stats_path])
 		return VehicleStats.new()
 	var resource := source.duplicate(true) as VehicleStats
+	if vehicle.has("roll"):
+		resource = CarProfile.apply_roll(resource, vehicle["roll"])
 	for validation_error: String in resource.get_validation_errors():
 		push_error("Vehicle '%s' has invalid physics data: %s" % [String(vehicle["id"]), validation_error])
 	return resource

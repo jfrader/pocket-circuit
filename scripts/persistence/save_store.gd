@@ -1,7 +1,7 @@
 class_name SaveStore
 extends RefCounted
 
-const CURRENT_VERSION := 5
+const CURRENT_VERSION := 6
 ## Player portrait seed. 91001 is the shipped driver-cast seed, so an untouched
 ## save keeps rendering the original player portrait.
 const PLAYER_AVATAR_DEFAULT_SEED := 91001
@@ -13,6 +13,7 @@ const CIRCUIT_IDENTITIES := preload("res://scripts/progression/championship_circ
 const MASTERY := preload("res://scripts/progression/mastery_run.gd")
 const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
+const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 
 var save_path: String
 var last_load_error: String = ""
@@ -55,6 +56,7 @@ func default_data() -> Dictionary:
 		"reduced_motion": false,
 		"first_run": true,
 		"current_run": {},
+		"garage_cars": [],
 	}
 
 
@@ -210,6 +212,8 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	var stored_roster: Variant = raw.get("driver_roster")
 	normalized["driver_roster"] = (stored_roster as Dictionary).duplicate(true) if stored_roster is Dictionary else {}
 
+	normalized["garage_cars"] = _normalize_garage(raw.get("garage_cars"))
+
 	var stored_run: Variant = raw.get("current_run")
 	normalized["current_run"] = (stored_run as Dictionary).duplicate(true) if stored_run is Dictionary else {}
 
@@ -226,6 +230,21 @@ func _normalize(raw: Dictionary) -> Dictionary:
 		if raw.get(key) is bool:
 			normalized[key] = raw[key]
 	return normalized
+
+
+## Cars won in runs, each validated by the run model, without duplicate ids.
+func _normalize_garage(value: Variant) -> Array:
+	var garage: Array = []
+	var seen := {}
+	if value is not Array:
+		return garage
+	for entry: Variant in value as Array:
+		var car := RUN_SESSION.normalize_won_car(entry)
+		if car.is_empty() or seen.has(car["id"]):
+			continue
+		seen[car["id"]] = true
+		garage.append(car)
+	return garage
 
 
 func _derive_progress(raw_finishes: Dictionary) -> Dictionary:

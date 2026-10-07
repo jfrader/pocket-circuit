@@ -175,6 +175,7 @@ func _ready() -> void:
 	var stored_run: Variant = _save_data.get("current_run", {})
 	if stored_run is Dictionary and not (stored_run as Dictionary).is_empty():
 		_current_run_session = RUN_SESSION.deserialize(stored_run as Dictionary)
+	_install_held_vehicles()
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
 	_apply_settings()
@@ -1374,6 +1375,7 @@ func start_run(run_seed: int) -> RunSession:
 func persist_current_run() -> void:
 	last_run_error = ""
 	_finish_run_if_over()
+	_install_held_vehicles()
 	var candidate := _save_data.duplicate(true)
 	candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
 	if candidate == _save_data:
@@ -1393,37 +1395,49 @@ func abandon_run() -> void:
 	persist_current_run()
 
 
-## One-way: when a run ends (is_complete or is_failed), owned_cars are committed
-## to the save's unlocked_vehicles (dedup, append only). Run is cleared so no
-## dead current_run lingers. Hook lives here (called at top of persist) so every
-## resolution path (race result, bench, etc) benefits and uses _save_candidate.
+## One-way: when a run ends (complete or failed) every car it won joins the
+## garage (append only, no duplicates) and the run is cleared. Called at the top
+## of persist_current_run so every resolution path ends the run the same way.
 func _finish_run_if_over() -> void:
 	if _current_run_session == null:
 		return
 	if not (_current_run_session.is_complete() or _current_run_session.is_failed()):
 		return
-	var owned: Dictionary = _current_run_session.owned_cars
-	var current_unlocked: Array = _save_data.get("unlocked_vehicles", ["rustbug"]) as Array
-	var unlocked: Array = current_unlocked.duplicate(true)
-	for k: Variant in owned.keys():
-		var vid: String = String(k)
-		if not (vid in unlocked):
-			unlocked.append(vid)
+	var garage: Array = (_save_data.get("garage_cars", []) as Array).duplicate(true)
+	var held := {}
+	for car: Dictionary in garage:
+		held[String(car["id"])] = true
+	for car: Dictionary in _current_run_session.won_cars():
+		if not held.has(String(car["id"])):
+			garage.append(car)
 	_current_run_session = null
-	var candidate: Dictionary = _save_data.duplicate(true)
-	candidate["unlocked_vehicles"] = unlocked
-	candidate["current_run"] = {}
-	if candidate == _save_data:
-		return
-	if is_save_read_only():
-		return
-	if _save_candidate(candidate):
-		_save_data = candidate
+	_save_data["garage_cars"] = garage
 
 
-## Starts a new run using system time (unix seconds) as seed. This is intentionally
-## non-deterministic for live play (different every NEW RUN press). Tests and
-## reproducible cases use start_run(fixed_seed) directly.
+## Installs every generated car the player holds (the garage and the active run)
+## so they resolve by id like shipped cars.
+func _install_held_vehicles() -> void:
+	var cars: Array = (_save_data.get("garage_cars", []) as Array).duplicate(true)
+	if _current_run_session != null:
+		cars.append_array(_current_run_session.won_cars())
+	VehicleDirectory.install(cars.map(func(car: Dictionary) -> Dictionary: return CATALOG.generated_vehicle(car)))
+
+
+## Quick Race is the garage: the shipped cars plus every car won, in garage order.
+func quick_race_roster() -> Array[String]:
+	var ids := CATALOG.quick_race_vehicle_ids()
+	ids.append_array(garage_car_ids())
+	return CATALOG.garage_order(ids)
+
+
+## The garage's won cars, newest last.
+func garage_car_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for car: Dictionary in _save_data.get("garage_cars", []):
+		ids.append(String(car["id"]))
+	return ids
+
+
 func start_new_run() -> RunSession:
 	var seed: int = int(Time.get_unix_time_from_system())
 	return start_run(seed)
