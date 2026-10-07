@@ -315,6 +315,148 @@ func show_run_board() -> void:
 	_focus_first()
 
 
+func _run_context(sess: RunSession) -> void:
+	_add_kicker("RUN · ACT %d" % sess.current_map.act)
+	_add_section("POINTS", "%d" % sess.run_points)
+	_add_section("BUDGET", "%d" % sess.run_budget)
+	var car_id: String = sess.current_car_id
+	var wear: String = "?"
+	if sess.run_state != null:
+		wear = sess.run_state.get_car_wear(car_id)
+	_add_section("CURRENT CAR", "%s · %s" % [car_id, wear])
+
+
+func show_run_bench() -> void:
+	_screen = "run_bench"
+	_event_id = ""
+	_reset_quick_race_state()
+	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
+	var sess_var: Variant = _app.call("current_run_session")
+	var sess: RunSession = sess_var as RunSession
+	if sess == null or sess.current_map == null:
+		show_run_board()
+		return
+	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
+	_add_heading("BENCH")
+	_run_context(sess)
+	_add_spacer(8)
+	_add_button("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, false, "BenchRepair")
+	_add_button("FIT SPARE", Callable(self, "_on_bench_fit_pressed"), false, false, "BenchFit")
+	if sess.current_map.is_last_row(int(sess.current_node().get("row", -1))):
+		_add_button("CONTINUE", Callable(self, "_on_bench_continue_pressed"), false, false, "BenchContinue")
+	_add_button("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	_footer.text = "REPAIR OR FIT — NEVER BOTH  ·  " + BACK_HINT
+	_focus_first()
+
+
+func show_run_parts_van() -> void:
+	_screen = "run_parts_van"
+	_event_id = ""
+	_reset_quick_race_state()
+	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
+	var sess_var: Variant = _app.call("current_run_session")
+	var sess: RunSession = sess_var as RunSession
+	if sess == null or sess.current_map == null:
+		show_run_board()
+		return
+	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
+	_add_heading("PARTS VAN")
+	_run_context(sess)
+	_add_spacer(8)
+	_add_button("TYRE SET · 15", Callable(self, "_on_van_buy_pressed").bind(15), true, sess.run_budget < 15, "VanBuy15")
+	_add_button("TOOL KIT · 8", Callable(self, "_on_van_buy_pressed").bind(8), false, sess.run_budget < 8, "VanBuy8")
+	_add_button("SPARE SHELL · 25", Callable(self, "_on_van_buy_pressed").bind(25), false, sess.run_budget < 25, "VanBuy25")
+	_add_button("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	_footer.text = "SPEND FROM THE RUN BUDGET  ·  " + BACK_HINT
+	_focus_first()
+
+
+func show_run_lockup() -> void:
+	_screen = "run_lockup"
+	_event_id = ""
+	_reset_quick_race_state()
+	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
+	var sess_var: Variant = _app.call("current_run_session")
+	var sess: RunSession = sess_var as RunSession
+	if sess == null or sess.current_map == null:
+		show_run_board()
+		return
+	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
+	_add_heading("LOCKUP")
+	_run_context(sess)
+	_add_copy("One free car per act.", SKIN.CREAM_DIM)
+	_add_spacer(8)
+	_add_button("OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
+	_add_button("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	_footer.text = "SCARCE — ONCE PER ACT  ·  " + BACK_HINT
+	_focus_first()
+
+
+func show_run_errand() -> void:
+	_screen = "run_errand"
+	_event_id = ""
+	_reset_quick_race_state()
+	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
+	var sess_var: Variant = _app.call("current_run_session")
+	var sess: RunSession = sess_var as RunSession
+	if sess == null or sess.current_map == null:
+		show_run_board()
+		return
+	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
+	_add_heading("ERRAND")
+	_run_context(sess)
+	_add_copy("Pick one favour.", SKIN.CREAM_DIM)
+	_add_spacer(8)
+	_add_button("TAKE THE CASH", Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandCash")
+	_add_button("TAKE THE POINTS", Callable(self, "_on_errand_choice_pressed").bind(1), false, false, "ErrandPoints")
+	_add_button("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	_footer.text = "A CHOICE, NOT A REWARD  ·  " + BACK_HINT
+	_focus_first()
+
+
+func _on_bench_repair_pressed() -> void:
+	_play_ui_confirm()
+	var sess_var: Variant = _app.call("current_run_session")
+	var sess: RunSession = sess_var as RunSession
+	if sess != null:
+		_app.call("run_bench_repair", sess.current_car_id)
+	show_run_board()
+
+
+func _on_bench_fit_pressed() -> void:
+	_play_ui_confirm()
+	_app.call("run_bench_fit", "spare")
+	show_run_board()
+
+
+func _on_bench_continue_pressed() -> void:
+	_play_ui_confirm()
+	_app.call("run_bench_continue")
+	show_run_board()
+
+
+func _on_van_buy_pressed(cost: int) -> void:
+	_play_ui_confirm()
+	_app.call("run_spend", cost)
+	show_run_board()
+
+
+func _on_lockup_open_pressed() -> void:
+	_play_ui_confirm()
+	_app.call("run_open_lockup")
+	show_run_board()
+
+
+func _on_errand_choice_pressed(choice: int) -> void:
+	_play_ui_confirm()
+	_app.call("run_resolve_errand", choice)
+	show_run_board()
+
+
 func show_briefing(event_id: String) -> void:
 	var event: Dictionary = _app.call("get_championship_event", event_id)
 	if event.is_empty():
@@ -637,6 +779,8 @@ func go_back() -> void:
 				show_briefing(_event_id)
 		"run_board":
 			show_title()
+		"run_bench", "run_parts_van", "run_lockup", "run_errand":
+			show_run_board()
 		"ending":
 			_app.call("finish_ending", "map")
 
@@ -1298,18 +1442,30 @@ func _ordinal(value: int) -> String:
 
 func _on_run_node_pressed(node_id: String) -> void:
 	_play_ui_confirm()
+	var node_type := ""
 	var sess_var: Variant = _app.call("current_run_session")
 	var sess: RunSession = sess_var as RunSession
 	if sess != null and sess.current_map != null:
 		var node: Dictionary = sess.current_map.get_node(node_id) as Dictionary
-		var ntype: String = String(node.get("type", ""))
-		if ntype == "race" or ntype == "act_rival":
-			# Race nodes hand over to the real race flow; the result resolves the run.
-			_app.call("start_run_race", node_id)
-			return
-	var ok: bool = bool(_app.call("enter_run_node", node_id))
-	if ok:
-		show_run_board()
+		node_type = String(node.get("type", ""))
+	if node_type == "race" or node_type == "act_rival":
+		# Race nodes hand over to the real race flow; the result resolves the run.
+		_app.call("start_run_race", node_id)
+		return
+	if not bool(_app.call("enter_run_node", node_id)):
+		return
+	match node_type:
+		"bench":
+			show_run_bench()
+		"parts_van":
+			show_run_parts_van()
+		"lockup":
+			show_run_lockup()
+		"errand":
+			show_run_errand()
+		_:
+			# Rival (and anything else not yet wired) keeps the position-only rule.
+			show_run_board()
 
 
 func _on_new_run_pressed() -> void:
