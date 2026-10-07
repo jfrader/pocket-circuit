@@ -1452,6 +1452,9 @@ func _on_run_node_pressed(node_id: String) -> void:
 		# Race nodes hand over to the real race flow; the result resolves the run.
 		_app.call("start_run_race", node_id)
 		return
+	if node_type == "rival":
+		_app.call("start_run_rival", node_id)
+		return
 	if not bool(_app.call("enter_run_node", node_id)):
 		return
 	match node_type:
@@ -1464,7 +1467,7 @@ func _on_run_node_pressed(node_id: String) -> void:
 		"errand":
 			show_run_errand()
 		_:
-			# Rival (and anything else not yet wired) keeps the position-only rule.
+			# position-only default for unknown node types
 			show_run_board()
 
 
