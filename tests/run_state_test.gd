@@ -14,7 +14,7 @@ func _initialize() -> void:
 func _run_test() -> void:
 	# --- Determinism and basic creation
 	var seed_a := 424242
-	var rs: RunState = RUN_STATE.create(seed_a)
+	var rs := RUN_STATE.create(seed_a)
 	if not _expect(rs.run_seed == seed_a, "create should retain the run seed"):
 		return
 	if not _expect(rs.act == null and rs.row == null, "act/row start nullable"):
@@ -143,7 +143,7 @@ func _run_test() -> void:
 		return
 
 	# --- Serialization round-trip
-	var rs2: RunState = RUN_STATE.create(987654)
+	var rs2 := RUN_STATE.create(987654)
 	rs2.get_or_create_car_roll("rustbug", "compact")
 	rs2.get_or_create_car_roll("pinbolt", "coupe")
 	rs2.set_car_wear("rustbug", "dusty")
@@ -156,7 +156,7 @@ func _run_test() -> void:
 	if not _expect((snap["car_rolls"] as Dictionary).has("rustbug") and (snap["car_wear"] as Dictionary)["rustbug"] == "dusty", "serialize includes rolls and wear"):
 		return
 
-	var rs3: RunState = RUN_STATE.deserialize(snap)
+	var rs3 := RUN_STATE.deserialize(snap)
 	if not _expect(rs3.run_seed == 987654 and rs3.act == 1 and rs3.row == 3, "deserialize restores scalars"):
 		return
 	var restored_roll: Dictionary = rs3.get_or_create_car_roll("rustbug", "compact")
@@ -168,12 +168,12 @@ func _run_test() -> void:
 	# Deserialize tolerates bad wear
 	var bad: Dictionary = snap.duplicate(true)
 	(bad["car_wear"] as Dictionary)["rustbug"] = "broken"
-	var rs_bad: RunState = RUN_STATE.deserialize(bad)
+	var rs_bad := RUN_STATE.deserialize(bad)
 	if not _expect(rs_bad.get_car_wear("rustbug") == "clean", "bad wear falls back safely"):
 		return
 
 	# Empty deserialize works
-	var empty: RunState = RUN_STATE.deserialize({})
+	var empty := RUN_STATE.deserialize({})
 	if not _expect(empty.run_seed == 0 and empty.car_rolls.is_empty(), "empty data yields default run state"):
 		return
 
