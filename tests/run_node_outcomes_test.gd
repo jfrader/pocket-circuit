@@ -1,10 +1,11 @@
 extends SceneTree
 
-## GURI-1740 node-outcome slice: bench (repair XOR fit, plus continue at the
-## final bench), parts van spends, the once-per-act lockup and the errand choice
-## all resolve through the App seams, persist, and advance the act at the end.
+## Node outcomes through the App seams: bench (repair XOR fit), parts van
+## purchases from points, the once-per-act lockup, the errand choice, and the
+## act rival closing the act. Each persists.
 
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const RUN_WALK := preload("res://tests/support/run_walk.gd")
 
 var _failed := false
 
@@ -25,15 +26,10 @@ func _run_test() -> void:
 
 	# --- Bench: damage, repair, then refuse the fit (repair XOR fit) ---
 	var bench_run: RunSession = app.call("start_run", 900001) as RunSession
-	if not _expect(bench_run != null, "start_run must create a session"):
-		return
-	var bench_id := _walk_to_type(app, bench_run, "bench", 60)
-	if not _expect(not bench_id.is_empty(), "a bench must be reachable (walk)"):
+	if not _expect(bench_run != null and RUN_WALK.walk_to(app, bench_run, "bench"), "a bench must be reachable"):
 		return
 	var car: String = bench_run.current_car_id
-	bench_run.register_crash(0.6)
-	if not _expect(bench_run.run_state.get_car_wear(car) == "dusty", "a medium crash must wear the car to dusty"):
-		return
+	bench_run.run_state.set_car_wear(car, "dusty")
 	if not _expect(bool(app.call("run_bench_repair", car)), "repair must succeed at the bench"):
 		return
 	if not _expect(bench_run.run_state.get_car_wear(car) == "clean", "repair must restore the car"):
@@ -41,39 +37,31 @@ func _run_test() -> void:
 	if not _expect(not bool(app.call("run_bench_fit", "spare")), "fitting after repairing in the same visit must be refused"):
 		return
 
-	# --- Parts van: an exact spend, an overspend refusal, and the save follows ---
+	# --- Parts van: an exact spend of points, an overspend refusal, and the save follows ---
 	var van_run: RunSession = app.call("start_run", 900002) as RunSession
-	if not _expect(van_run != null, "start_run must create a session"):
+	if not _expect(van_run != null and RUN_WALK.walk_to(app, van_run, "parts_van"), "a parts van must be reachable"):
 		return
-	var van_id := _walk_to_type(app, van_run, "parts_van", 60)
-	if not _expect(not van_id.is_empty(), "a parts van must be reachable (walk)"):
+	van_run.run_points = 12
+	if not _expect(not bool(app.call("run_buy_part", "spare_shell")), "a part above the points must be refused"):
 		return
-	var budget_before: int = van_run.run_budget
-	if not _expect(bool(app.call("run_spend", 8)), "a spend inside the budget must succeed"):
+	if not _expect(bool(app.call("run_buy_part", "tyre_set")), "a part inside the points must sell"):
 		return
-	if not _expect(van_run.run_budget == budget_before - 8, "the spend must debit exactly its cost"):
-		return
-	if not _expect(not bool(app.call("run_spend", 999999)), "an overspend must be refused"):
+	if not _expect(van_run.run_points == 12 - int(RunSession.VAN_PART_COSTS["tyre_set"]), "the purchase must debit exactly its listed price"):
 		return
 	var live_store: Object = app.get("_save_store")
-	var path := String(live_store.get("save_path"))
-	var saved: Dictionary = SAVE_STORE.new(path).load_data()
-	var saved_run: Dictionary = saved.get("current_run", {}) as Dictionary
-	if not _expect(int(saved_run.get("run_budget", -1)) == van_run.run_budget, "the save must carry the spent budget"):
+	var saved: Dictionary = SAVE_STORE.new(String(live_store.get("save_path"))).load_data()
+	if not _expect(int((saved.get("current_run", {}) as Dictionary).get("run_points", -1)) == van_run.run_points, "the save must carry the spent points"):
 		return
 
 	# --- Lockup: one free car, once per act ---
-	# The lockup is scarce by design (6% quota), so try a few runs.
+	# The lockup is scarce by design, so try a few runs.
 	var lock_run: RunSession = null
-	var lock_id := ""
-	for attempt in 6:
-		lock_run = app.call("start_run", 900003 + attempt) as RunSession
-		if lock_run == null:
-			continue
-		lock_id = _walk_to_type(app, lock_run, "lockup", 80)
-		if not lock_id.is_empty():
+	for attempt in 8:
+		lock_run = app.call("start_run", 900003 + attempt * 101) as RunSession
+		if RUN_WALK.walk_to(app, lock_run, "lockup"):
 			break
-	if not _expect(not lock_id.is_empty(), "a lockup must be reachable within a few runs"):
+		lock_run = null
+	if not _expect(lock_run != null, "a lockup must be reachable within a few runs"):
 		return
 	var owned_before: int = lock_run.owned_cars.size()
 	if not _expect(bool(app.call("run_open_lockup")), "opening the lockup must grant a car"):
@@ -83,38 +71,29 @@ func _run_test() -> void:
 	if not _expect(not bool(app.call("run_open_lockup")), "the lockup must be scarce (once per act)"):
 		return
 
-	# --- Errand: choice 0 pays cash ---
+	# --- Errand: the pay adds points; the tune-up steps wear back ---
 	var errand_run: RunSession = app.call("start_run", 900004) as RunSession
-	if not _expect(errand_run != null, "start_run must create a session"):
+	if not _expect(errand_run != null and RUN_WALK.walk_to(app, errand_run, "errand"), "an errand must be reachable"):
 		return
-	var errand_id := _walk_to_type(app, errand_run, "errand", 60)
-	if not _expect(not errand_id.is_empty(), "an errand must be reachable (walk)"):
+	var errand_points: int = errand_run.run_points
+	if not _expect(bool(app.call("run_resolve_errand", 0)), "the pay must resolve"):
 		return
-	var errand_budget: int = errand_run.run_budget
-	if not _expect(bool(app.call("run_resolve_errand", 0)), "the errand choice must resolve"):
+	if not _expect(errand_run.run_points == errand_points + RunSession.ERRAND_PAY_POINTS, "the pay must add its points"):
 		return
-	if not _expect(errand_run.run_budget == errand_budget + 12, "the cash errand must add its documented 12"):
+	var tune_run: RunSession = app.call("start_run", 900004) as RunSession
+	RUN_WALK.walk_to(app, tune_run, "errand")
+	tune_run.run_state.set_car_wear(tune_run.current_car_id, "rusty")
+	if not _expect(bool(app.call("run_resolve_errand", 1)) and tune_run.run_state.get_car_wear(tune_run.current_car_id) == "dusty", "the tune-up must step wear back one level"):
 		return
 
-	# --- The act ends at the final bench: continue advances it ---
+	# --- The act ends on the act rival: beating it opens the next act ---
 	var walk_run: RunSession = app.call("start_run", 900005) as RunSession
-	if not _expect(walk_run != null, "start_run must create a session"):
-		return
-	var steps := 0
-	while steps < 60 and not walk_run.current_map.is_last_row(int(walk_run.current_node().get("row", -1))):
-		steps += 1
-		var options: Array[Dictionary] = walk_run.available_nodes()
-		if options.is_empty():
-			break
-		if not bool(app.call("enter_run_node", String(options[0].get("id", "")))):
-			break
-	if not _expect(walk_run.current_map.is_last_row(int(walk_run.current_node().get("row", -1))), "the walk must reach the final bench row"):
+	if not _expect(walk_run != null and RUN_WALK.walk_to(app, walk_run, "act_rival"), "every route must reach the act rival"):
 		return
 	if not _expect(int(walk_run.current_map.act) == 1, "a fresh run starts in act 1"):
 		return
-	if not _expect(bool(app.call("run_bench_continue")), "continuing at the final bench must advance the act"):
-		return
-	if not _expect(int(walk_run.current_map.act) == 2, "the act must advance to 2"):
+	RUN_WALK.settle(app, walk_run)
+	if not _expect(int(walk_run.current_map.act) == 2 and walk_run.is_race_pending(), "beating the act rival must open act 2 on its opening race"):
 		return
 
 	app.call("abandon_run")
@@ -122,27 +101,6 @@ func _run_test() -> void:
 		return
 	print("RUN_NODE_OUTCOMES_TEST PASS")
 	quit(0)
-
-
-## Walks greedily (position-only for every type) until `wanted` is an available
-## child, then enters it. Returns the node id or "" when the budget runs out.
-func _walk_to_type(app: Object, session: RunSession, wanted: String, budget: int) -> String:
-	var steps := 0
-	while steps < budget:
-		steps += 1
-		var options: Array[Dictionary] = session.available_nodes()
-		for entry: Dictionary in options:
-			var nid := String(entry.get("id", ""))
-			var node: Dictionary = session.current_map.get_node(nid) as Dictionary
-			if String(node.get("type", "")) == wanted:
-				if bool(app.call("enter_run_node", nid)):
-					return nid
-				return ""
-		if options.is_empty():
-			return ""
-		if not bool(app.call("enter_run_node", String(options[0].get("id", "")))):
-			return ""
-	return ""
 
 
 func _expect(condition: bool, message: String) -> bool:

@@ -5,6 +5,9 @@ extends SceneTree
 ## and the route back to the board).
 
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
+## Generous: the scene builds a generated circuit before its countdown.
+const RACE_SCENE_FRAME_LIMIT := 3000
 
 var _failed := false
 
@@ -79,6 +82,66 @@ func _run_test() -> void:
 	var saved: Dictionary = SAVE_STORE.new(path).load_data()
 	var saved_run: Dictionary = saved.get("current_run", {}) as Dictionary
 	if not _expect(int(saved_run.get("run_points", -1)) == sess.run_points, "the save must carry the awarded points"):
+		return
+
+	# A started run race is marked in the save, cannot be restarted or retried,
+	# and quitting it is a did-not-finish that resolves the stop for good.
+	var quit_run: RunSession = app.call("start_run", 52525) as RunSession
+	var opening := quit_run.current_node_id
+	# A loading screen that fails and is backed out of costs nothing.
+	app.call("start_run_race", opening)
+	app.set("_transitioning_to_race", true)
+	app.call("fail_race_loading", "test: the circuit did not build")
+	app.call("_cancel_race_loading")
+	for frame in 3:
+		await process_frame
+	if not _expect(quit_run.is_race_pending() and quit_run.race_in_flight.is_empty(), "a race that never left its loading screen is still there to race"):
+		return
+
+	# The race scene itself marks the race when its countdown begins.
+	app.call("start_run_race", opening)
+	var race := (load(RACE_SCENE) as PackedScene).instantiate()
+	root.add_child(race)
+	var waited := 0
+	while quit_run.race_in_flight.is_empty() and waited < RACE_SCENE_FRAME_LIMIT:
+		waited += 1
+		await process_frame
+	if not _expect(String(quit_run.race_in_flight.get("node", "")) == opening, "the race scene's countdown marks the run race as running"):
+		return
+	race.queue_free()
+	await process_frame
+	quit_run.race_in_flight = {}
+	if not _expect(bool(app.call("start_run_race", opening)), "the opening race starts"):
+		return
+	app.call("race_started")
+	if not _expect(not quit_run.race_in_flight.is_empty(), "a started race is marked"):
+		return
+	var on_disk: Dictionary = SAVE_STORE.new(path).load_data().get("current_run", {}) as Dictionary
+	if not _expect(String((on_disk.get("race_in_flight", {}) as Dictionary).get("node", "")) == opening, "a started race is in the save before it is driven"):
+		return
+	if not _expect(not bool(app.call("can_retry_race")), "a run race offers no restart or retry"):
+		return
+	app.call("retry_race", false)
+	if not _expect(quit_run.race_in_flight.get("node", "") == opening and not quit_run.resolved_nodes.has(opening), "retry does nothing in a run"):
+		return
+	app.call("abandon_race")
+	for frame in 3:
+		await process_frame
+	if not _expect(quit_run.resolved_nodes.has(opening) and quit_run.race_in_flight.is_empty(), "quitting a run race resolves it"):
+		return
+	if not _expect(quit_run.run_points == 0 and quit_run.run_state.get_car_wear(quit_run.current_car_id) != "clean", "a quit race scores nothing and wears the car"):
+		return
+	if not _expect(not bool(app.call("start_run_race", opening)), "a quit race cannot be started again"):
+		return
+
+	# A race left running when the game closed resolves the same way on boot.
+	var closed: RunSession = app.call("start_run", 63636) as RunSession
+	app.call("start_run_race", closed.current_node_id)
+	app.call("race_started")
+	var reloaded := RunSession.deserialize(SAVE_STORE.new(path).load_data().get("current_run", {}) as Dictionary)
+	app.set("_current_run_session", reloaded)
+	app.call("_settle_race_in_flight")
+	if not _expect(reloaded.resolved_nodes.has(reloaded.current_node_id) and reloaded.race_in_flight.is_empty(), "a race interrupted by a closed game resolves on boot"):
 		return
 
 	app.call("abandon_run")

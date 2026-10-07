@@ -282,8 +282,8 @@ func _run_one_real_drive_race(app: Node, seed: int) -> Dictionary:
 	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d"):
 		return {}
 	if app.get("_loading_failed"):
-		_expect(false, "loading must not fail")
-		return {}
+		if not _expect(false, "loading must not fail"):
+			return {}
 
 	var race := current_scene
 	if not _expect(race != null and race.scene_file_path == RACE_SCENE, "must be in race scene"):

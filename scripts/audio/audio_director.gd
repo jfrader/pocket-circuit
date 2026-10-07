@@ -760,9 +760,7 @@ func warm_vehicle_audio(vehicle_id: String, progress: Callable = Callable()) -> 
 	var entry: Dictionary = ChampionshipCatalogScript.get_vehicle(vehicle_id)
 	if entry.is_empty():
 		return false
-	var stats := load(String(entry.get("stats_path", ""))) as VehicleStats
-	if stats == null:
-		return false
+	var stats: VehicleStats = ChampionshipCatalogScript.create_vehicle_stats(vehicle_id)
 	var recipe := EngineRecipeLibraryScript.resolve(vehicle_id, stats)
 	var voice := await EngineVoiceGenerator.prepare_cached(recipe, progress)
 	if progress.is_valid():

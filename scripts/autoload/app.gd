@@ -20,6 +20,11 @@ const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd
 const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 ## Every race fields the player plus three opponents.
 const ROSTER_SIZE := 3
+const RUN_ACT_RIVAL_DIFFICULTY := "clockwork"
+const RUN_SEED_MAX := 0x7FFFFFFF
+## A run race finished this far down the field (or not at all) costs wear.
+const RUN_CRASH_FINISH_POSITION := 3
+const RUN_CRASH_SEVERITY := 0.6
 const LOADING_FRAME_BUDGET_USEC := 50_000
 
 signal joypad_connection_changed(connected: bool)
@@ -27,6 +32,9 @@ signal joypad_connection_changed(connected: bool)
 var current_race_session: Dictionary = {}
 ## Active roguelike run, restored from the save on boot (null when there is none).
 var _current_run_session: RunSession = null
+var last_run_error: String = ""
+## Why the run is not on disk yet ("" once a run save lands); the board shows it.
+var run_save_error := ""
 var _quick_roster: Dictionary = {}
 
 
@@ -170,6 +178,10 @@ func _ready() -> void:
 	var stored_run: Variant = _save_data.get("current_run", {})
 	if stored_run is Dictionary and not (stored_run as Dictionary).is_empty():
 		_current_run_session = RUN_SESSION.deserialize(stored_run as Dictionary)
+		if _current_run_session == null:
+			_save_data["current_run"] = {}
+	_install_held_vehicles()
+	_settle_race_in_flight()
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
 	_apply_settings()
@@ -319,6 +331,8 @@ func confirm_new_championship() -> bool:
 		"personal_ghosts": _save_data.get("personal_ghosts", []).duplicate(true),
 		"circuit_history": _save_data.get("circuit_history", []).duplicate(true),
 		"favorite_circuits": _save_data.get("favorite_circuits", []).duplicate(true),
+		"garage_cars": _save_data.get("garage_cars", []).duplicate(true),
+		"current_run": _save_data.get("current_run", {}).duplicate(true),
 	}
 	var candidate := _save_store.default_data()
 	for key: String in preserved_settings:
@@ -1138,10 +1152,7 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 	if bool(current_race_session.get("result_committed", false)):
 		return true
 	var event: Dictionary = current_race_session.get("event", {})
-	# The declared field size is authoritative: a session may carry its opponents
-	# from a saved roster, but the event always states how many cars it fields.
-	var declared := maxi((event.get("opponents", []) as Array).size(), int(event.get("opponent_count", 0)))
-	var racer_count := clampi(declared + 1, 1, 4)
+	var racer_count := _field_size(event)
 	current_race_session["result"] = {
 		"position": clampi(player_position, 1, racer_count),
 		"time": maxf(0.0, total_time),
@@ -1159,18 +1170,7 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 		var pos: int = int(res.get("position", 4))
 		var dnf_flag: bool = bool(res.get("dnf", false))
 		var node_id: String = String(current_race_session.get("run_node_id", ""))
-		var field_size: int = racer_count
-		if _current_run_session != null and node_id != "":
-			var resolve_out: Dictionary = _current_run_session.resolve_race(node_id, pos, field_size)
-			# Inspected: the result dict built by race_manager.get_results() (and passed through prototype)
-			# carries only position/dnf/time/finished/vehicle/driver_name; no crash/damage count field.
-			# Use documented minimal mapping (dnf or pos>=3 -> 0.6 like RIVAL_LOSS_SEVERITY).
-			var severity: float = 0.0
-			if dnf_flag or pos >= 3:
-				severity = 0.6
-			if severity > 0.0:
-				_current_run_session.register_crash(severity)
-			persist_current_run()
+		_commit_run_result(node_id, pos, dnf_flag, racer_count)
 		current_race_session["result_summary"] = {
 			"run": true,
 			"position": pos,
@@ -1288,8 +1288,20 @@ func continue_after_race(transition_scene: bool = true) -> void:
 		get_tree().change_scene_to_file(BOOT_SCENE)
 
 
+## The declared field size is authoritative: a session may carry its opponents
+## from a saved roster, but the event always states how many cars it fields.
+static func _field_size(event: Dictionary) -> int:
+	var declared := maxi((event.get("opponents", []) as Array).size(), int(event.get("opponent_count", 0)))
+	return clampi(declared + 1, 1, 4)
+
+
+## A run race is raced once: no restart mid-race and no retry after it.
+func can_retry_race() -> bool:
+	return String(current_race_session.get("mode", "")) != "run"
+
+
 func retry_race(reload_scene: bool = true) -> void:
-	if current_race_session.is_empty() or _transitioning_to_race:
+	if current_race_session.is_empty() or _transitioning_to_race or not can_retry_race():
 		return
 	if String(current_race_session.get("mode", "")) == "mastery":
 		var identity: Dictionary = current_race_session.get("mastery_identity", {})
@@ -1350,6 +1362,8 @@ func abandon_race() -> void:
 	if current_race_session.is_empty() or current_race_session.has("result"):
 		return
 	var mode := String(current_race_session.get("mode", "quick"))
+	if mode == "run":
+		_settle_race_in_flight()
 	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map"))
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
@@ -1363,37 +1377,90 @@ func current_run_session() -> RunSession:
 
 ## Starts a fresh run for the seed and persists its opening state.
 func start_run(run_seed: int) -> RunSession:
+	if _current_run_session != null:
+		abandon_run()
+		if _current_run_session != null and not is_save_read_only():
+			# The old night could not be saved; it stays until it can. A read-only
+			# save never will, so there the new night simply replaces it.
+			return null
 	_current_run_session = RUN_SESSION.create(run_seed)
 	persist_current_run()
 	return _current_run_session
 
 
-## Persists the active run. The flow layer calls this after every resolved node.
+## Persists the active run. A run that has ended (won or lost) is written out
+## in the same save as the cars it won joining the garage (one-way); the run is
+## only dropped once that save lands, so a failed write loses nothing.
 func persist_current_run() -> void:
+	last_run_error = ""
+	var ended := _current_run_session != null and (_current_run_session.is_complete() or _current_run_session.is_failed())
 	var candidate := _save_data.duplicate(true)
-	candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
-	if candidate == _save_data:
-		return
-	if is_save_read_only():
-		return
-	if not _save_candidate(candidate):
-		return
-	_save_data = candidate
+	if ended:
+		candidate["garage_cars"] = _garage_with(_current_run_session.won_cars())
+		candidate["current_run"] = {}
+	else:
+		candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
+	if candidate != _save_data:
+		if is_save_read_only():
+			last_run_error = "save is read-only"
+		elif not _save_candidate(candidate):
+			last_run_error = "save failed"
+		else:
+			_save_data = candidate
+	run_save_error = last_run_error
+	if ended and last_run_error.is_empty():
+		_current_run_session = null
+	_install_held_vehicles()
 
 
-## Clears the active run (finished or abandoned) and removes it from the save.
+## Abandoning is losing the night: the run ends like any failed run, so the
+## cars it won still join the garage and the saved run is cleared.
 func abandon_run() -> void:
-	_current_run_session = null
+	if _current_run_session != null:
+		_current_run_session.failed = true
 	persist_current_run()
 
 
+## Every car in the garage plus the ones this night won (append only, no duplicates).
+func _garage_with(won: Array[Dictionary]) -> Array:
+	var garage: Array = (_save_data.get("garage_cars", []) as Array).duplicate(true)
+	var held := {}
+	for car: Dictionary in garage:
+		held[String(car["id"])] = true
+	for car: Dictionary in won:
+		if not held.has(String(car["id"])):
+			garage.append(car)
+	return garage
 
-## Starts a new run using system time (unix seconds) as seed. This is intentionally
-## non-deterministic for live play (different every NEW RUN press). Tests and
-## reproducible cases use start_run(fixed_seed) directly.
+
+## Installs every generated car the player holds (the garage and the active run)
+## so they resolve by id like shipped cars.
+func _install_held_vehicles() -> void:
+	var cars: Array = (_save_data.get("garage_cars", []) as Array).duplicate(true)
+	if _current_run_session != null:
+		cars.append_array(_current_run_session.won_cars())
+	VehicleDirectory.install(cars.map(func(car: Dictionary) -> Dictionary: return CATALOG.generated_vehicle(car)))
+
+
+## Quick Race is the garage: the shipped cars plus every car won, in garage order.
+func quick_race_roster() -> Array[String]:
+	var ids := CATALOG.quick_race_vehicle_ids()
+	ids.append_array(garage_car_ids())
+	return CATALOG.garage_order(ids)
+
+
+## The garage's won cars, newest last.
+func garage_car_ids() -> Array[String]:
+	var ids: Array[String] = []
+	for car: Dictionary in _save_data.get("garage_cars", []):
+		ids.append(String(car["id"]))
+	return ids
+
+
+## Starts a new run on a random seed (every NEW RUN is a different night).
+## Tests and reproducible cases use start_run(fixed_seed) directly.
 func start_new_run() -> RunSession:
-	var seed: int = int(Time.get_unix_time_from_system())
-	return start_run(seed)
+	return start_run(_random_seed(RUN_SEED_MAX))
 
 
 ## Delegates to the session to move to a child node (if allowed), then persists
@@ -1405,131 +1472,172 @@ func enter_run_node(node_id: String) -> bool:
 	var ok: bool = _current_run_session.enter_node(node_id)
 	if ok:
 		persist_current_run()
-	return ok
+	else:
+		last_run_error = "refused"
 	return ok
 
-func start_run_race(node_id: String = "") -> bool:
-	if _current_run_session == null or _transitioning_to_race:
+func _advance_or_check_node(node_id: String, allowed_types: Array) -> bool:
+	if _current_run_session == null:
+		last_run_error = "no active run"
 		return false
-	var target_id: String = node_id
+	var target_id := node_id
 	if target_id.is_empty():
 		target_id = String(_current_run_session.current_node().get("id", ""))
+	if target_id == String(_current_run_session.current_node().get("id", "")):
+		var ntype := String(_current_run_session.current_node().get("type", ""))
+		if not allowed_types.has(ntype):
+			last_run_error = "wrong node type"
+			return false
+		return true
 	var allowed := false
 	for entry: Dictionary in _current_run_session.available_nodes():
 		if String(entry.get("id", "")) == target_id:
 			allowed = true
 			break
 	if not allowed:
+		last_run_error = "node not an available child"
 		return false
-	var node: Dictionary = (_current_run_session.current_map.get_node(target_id) as Dictionary) if _current_run_session.current_map != null else {}
+	var node: Dictionary = _current_run_session.current_map.get_node(target_id) if _current_run_session.current_map != null else {}
 	var ntype: String = String(node.get("type", ""))
-	if ntype != "race" and ntype != "act_rival":
+	if not allowed_types.has(ntype):
+		last_run_error = "wrong node type"
 		return false
 	if not _current_run_session.enter_node(target_id):
+		last_run_error = "failed to enter node"
 		return false
-	node_id = target_id
 	persist_current_run()
+	return true
+
+func start_run_race(node_id: String = "") -> bool:
+	return _start_run_event(node_id, ["race", "act_rival"])
+
+
+func start_run_rival(node_id: String = "") -> bool:
+	return _start_run_event(node_id, ["rival"])
+
+
+## Enters (or re-checks) a race-type run node and builds its race session: a
+## full field for races, the hardest difficulty for the act rival, a one-on-one
+## duel for rivals.
+func _start_run_event(node_id: String, allowed_types: Array) -> bool:
+	if _transitioning_to_race:
+		last_run_error = "transitioning to race"
+		return false
+	if not _advance_or_check_node(node_id, allowed_types):
+		return false
+	if not _current_run_session.is_race_pending():
+		last_run_error = "already raced"
+		return false
+	var node: Dictionary = _current_run_session.current_node()
+	var target_id := String(node.get("id", ""))
+	var node_type := String(node.get("type", ""))
+	var duel := node_type == "rival"
 	var vehicle_id: String = _current_run_session.current_car_id
 	_roll_quick_roster()
 	_install_roster_for("quick")
-	var event_id: String = "run_%s" % node_id
+	var opponents: Array = _roster_ids(_quick_roster)
+	if duel:
+		opponents = opponents.slice(0, 1)
+	var event_id: String = "run_%s" % target_id
 	var event: Dictionary = {
 		"id": event_id,
-		"name": "Run Race " + node_id,
+		"name": ("Run Rival " if duel else "Run Race ") + target_id,
 		"theme": "kitchen",
 		"room": "classic",
 		"seed": _current_run_session.run_seed,
 		"circuit": "generated",
-		"race_format": "circuit",
+		"race_format": "rival_duel" if duel else "circuit",
 		"reverse": false,
-		"opponent_count": ROSTER_SIZE,
-		"opponents": _roster_ids(_quick_roster),
+		"opponent_count": opponents.size(),
+		"opponents": opponents,
 	}
 	current_race_session = {
 		"mode": "run",
 		"event_id": event_id,
 		"event": event,
 		"vehicle_id": vehicle_id,
-		"difficulty": String(_save_data.get("difficulty", "club_circuit")),
+		"difficulty": RUN_ACT_RIVAL_DIFFICULTY if node_type == "act_rival" else String(_save_data.get("difficulty", "club_circuit")),
 		"result_committed": false,
-		"run_node_id": node_id,
+		"run_node_id": target_id,
 	}
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
 	return true
 
 
-## Run node outcome seams (non-race). Validate current node type matches, delegate to session,
-## persist on success. Return bool success. For data-returning session calls (lockup, errand)
-## we return bool (action performed) and caller inspects session state after; keeps seam shape uniform.
-func run_bench_repair(car_key: String) -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "bench":
-		return false
-	var ok: bool = _current_run_session.bench_repair(car_key)
-	if ok:
+## The race scene calls this when its countdown begins: from here a run race
+## counts, so it is marked (and saved) as running until its result lands.
+## A race that never got this far (cancelled or failed loading) costs nothing.
+func race_started() -> void:
+	if String(current_race_session.get("mode", "")) != "run" or _current_run_session == null:
+		return
+	if _current_run_session.start_race(String(current_race_session.get("run_node_id", "")), _field_size(current_race_session.get("event", {}))):
 		persist_current_run()
-	return ok
 
-func run_bench_fit(part: String) -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "bench":
-		return false
-	var car_key: String = _current_run_session.current_car_id
-	var ok: bool = _current_run_session.bench_fit(car_key, part)
-	if ok:
-		persist_current_run()
-	return ok
 
-func run_bench_continue() -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "bench":
-		return false
-	var ok: bool = _current_run_session.bench_continue()
-	if ok:
+## A run race that started and was never reported (quit, abandoned, or the game
+## closed mid-race) ends as a did-not-finish in last place. A mark that no longer
+## matches the run is dropped rather than retried on every boot.
+func _settle_race_in_flight() -> void:
+	if _current_run_session == null or _current_run_session.race_in_flight.is_empty():
+		return
+	var flight: Dictionary = _current_run_session.race_in_flight
+	var field := int(flight.get("field", 1))
+	_commit_run_result(String(flight.get("node", "")), field, true, field)
+	if _current_run_session != null and not _current_run_session.race_in_flight.is_empty():
+		_current_run_session.race_in_flight = {}
 		persist_current_run()
-	return ok
 
-func run_spend(cost: int) -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "parts_van":
-		return false
-	var ok: bool = _current_run_session.spend(cost)
-	if ok:
-		persist_current_run()
-	return ok
 
-func run_open_lockup() -> bool:
-	if _current_run_session == null:
-		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "lockup":
-		return false
-	var res: Dictionary = _current_run_session.open_lockup()
-	var ok: bool = res.size() > 0
-	if ok:
-		persist_current_run()
-	return ok
+## Applies a run race outcome exactly once: rivals through resolve_rival (which
+## owns its own loss penalty), races and the act rival through resolve_race plus
+## the crash wear of a poor finish. A refused resolution applies nothing.
+func _commit_run_result(node_id: String, position: int, dnf: bool, field_size: int) -> void:
+	if _current_run_session == null or node_id.is_empty():
+		return
+	if String(_current_run_session.current_node().get("type", "")) == "rival":
+		_current_run_session.resolve_rival(node_id, position == 1 and not dnf)
+	else:
+		var outcome: Dictionary = _current_run_session.resolve_race(node_id, position, field_size)
+		if outcome.has("error"):
+			last_run_error = String(outcome["error"])
+			return
+		if dnf or position >= RUN_CRASH_FINISH_POSITION:
+			_current_run_session.register_crash(RUN_CRASH_SEVERITY)
+	persist_current_run()
 
-func run_resolve_errand(choice: int) -> bool:
-	if _current_run_session == null:
+
+## Run node outcome seams (non-race). Each validates the node, applies the
+## session action and persists it. The return value is the logical outcome; a
+## failed save is reported through last_run_error, never by undoing the move.
+func run_bench_repair(car_key: String, node_id: String = "") -> bool:
+	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_repair(car_key))
+
+
+func run_bench_fit(part: String, node_id: String = "") -> bool:
+	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_fit(_current_run_session.current_car_id, part))
+
+
+func run_buy_part(part_id: String, node_id: String = "") -> bool:
+	return _run_seam(node_id, "parts_van", func() -> bool: return _current_run_session.buy_part(part_id))
+
+
+func run_open_lockup(node_id: String = "") -> bool:
+	return _run_seam(node_id, "lockup", func() -> bool: return not _current_run_session.open_lockup().is_empty())
+
+
+func run_resolve_errand(choice: int, node_id: String = "") -> bool:
+	return _run_seam(node_id, "errand", func() -> bool: return not _current_run_session.resolve_errand(choice).has("error"))
+
+
+func _run_seam(node_id: String, node_type: String, action: Callable) -> bool:
+	if not _advance_or_check_node(node_id, [node_type]):
 		return false
-	var n: Dictionary = _current_run_session.current_node()
-	if String(n.get("type", "")) != "errand":
+	if not bool(action.call()):
+		last_run_error = "refused"
 		return false
-	var res: Dictionary = _current_run_session.resolve_errand(choice)
-	var ok: bool = not res.has("error")
-	if ok:
-		persist_current_run()
-	return ok
+	persist_current_run()
+	return true
 
 
 func update_setting(key: String, value: Variant) -> bool:
