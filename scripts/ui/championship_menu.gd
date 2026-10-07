@@ -56,14 +56,16 @@ func clear() -> void:
 	visible = false
 
 
-func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustbug", unlocked: Array = ["rustbug"]) -> void:
+func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustbug", unlocked: Array = ["rustbug"], recovery_message: String = "") -> void:
 	_begin()
 	_add_stage(TITLE_STAGE).configure(&"title", vehicle_id, "rae", "kitchen", TITLE_RIVAL, unlocked)
 	_label("POCKET", Rect2(COLUMN_X - 4, 40, 560, 104), 88, SKIN.CREAM)
 	_label("CIRCUIT", Rect2(COLUMN_X - 4, 124, 580, 116), 100, SKIN.YELLOW)
 	_tape("GRAND HOUSEHOLD CIRCUIT", Vector2(COLUMN_X + 6, 246), SKIN.ORANGE, 17)
 	var status := "CONTINUE YOUR CHAMPIONSHIP" if has_progress else "TINY RACING. BIG STAKES."
-	if read_only:
+	if not recovery_message.is_empty():
+		status = recovery_message
+	elif read_only:
 		status = "SAVE READ-ONLY · QUICK RACE AVAILABLE"
 	_label(status, Rect2(COLUMN_X + 4, 290, COLUMN_WIDTH, 30), 18, SKIN.CREAM_DIM)
 	var play := _button("PLAY", Rect2(COLUMN_X, 336, COLUMN_WIDTH, 82), &"championship", true)
