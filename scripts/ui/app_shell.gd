@@ -701,7 +701,8 @@ func _on_art_action(action: StringName) -> void:
 		&"championship":
 			_app.call("continue_championship" if _app.call("has_championship_progress") else "request_new_championship")
 		&"new_run":
-			_app.call("request_new_championship")
+			_app.call("start_new_run")
+			show_run_board()
 		&"quick_race":
 			_app.call("open_quick_race")
 		&"quick_strip":
