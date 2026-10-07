@@ -12,7 +12,7 @@ func _run_test() -> void:
 	var main_seed: int = 424242
 
 	# --- Main scripted run: walk leftmost, resolve all types, transit acts, complete
-	var sess: RunSession = RUN_SESSION.create(main_seed)
+	var sess = RUN_SESSION.create(main_seed)
 	if not _expect(sess != null, "create returns instance"):
 		return
 	if not _expect(sess.run_seed == main_seed and sess.run_budget == 60 and sess.run_points == 0, "initial budget/points/seed"):
@@ -116,7 +116,7 @@ func _run_test() -> void:
 		return
 
 	# --- Failing run: wear out the car
-	var fail_sess: RunSession = RUN_SESSION.create(424242)
+	var fail_sess = RUN_SESSION.create(424242)
 	# resolve start minimally
 	fail_sess.resolve_race(String(fail_sess.current_node().get("id", "")), 1, 4)
 	# force attrition to dented
@@ -128,7 +128,7 @@ func _run_test() -> void:
 		return
 
 	# --- Lose on act rival ends run
-	var lose_sess: RunSession = RUN_SESSION.create(98765)
+	var lose_sess = RUN_SESSION.create(98765)
 	var lost_act: bool = false
 	var lose_steps: int = 0
 	while lose_steps < 50 and not lose_sess.is_failed():
@@ -160,7 +160,7 @@ func _run_test() -> void:
 		return
 
 	# --- Bench exclusivity across calls, spend over, lockup scarcity (already in main)
-	var btest: RunSession = RUN_SESSION.create(11111)
+	var btest = RUN_SESSION.create(11111)
 	# advance to a bench by walking
 	var bwalk: int = 0
 	while bwalk < 30 and not btest.is_failed():
@@ -184,8 +184,8 @@ func _run_test() -> void:
 		pass
 
 	# --- Determinism: same seed + ops produce same state
-	var s1: RunSession = RUN_SESSION.create(55555)
-	var s2: RunSession = RUN_SESSION.create(55555)
+	var s1 = RUN_SESSION.create(55555)
+	var s2 = RUN_SESSION.create(55555)
 	# mirror some ops
 	for s in [s1, s2]:
 		s.resolve_race(String(s.current_node().get("id", "")), 2, 4)
@@ -202,7 +202,7 @@ func _run_test() -> void:
 
 	# --- Serialize roundtrip
 	var snap: Dictionary = RUN_SESSION.serialize(sess)
-	var restored: RunSession = RUN_SESSION.deserialize(snap)
+	var restored = RUN_SESSION.deserialize(snap)
 	if not _expect(restored.run_seed == sess.run_seed and restored.run_points == sess.run_points and restored.run_budget == sess.run_budget, "serialize basics roundtrip"):
 		return
 	if not _expect(restored.current_node_id == sess.current_node_id and restored.is_complete() == sess.is_complete(), "position and terminal state roundtrip"):
