@@ -1370,6 +1370,7 @@ func start_run(run_seed: int) -> RunSession:
 
 ## Persists the active run. The flow layer calls this after every resolved node.
 func persist_current_run() -> void:
+	_finish_run_if_over()
 	var candidate := _save_data.duplicate(true)
 	candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
 	if candidate == _save_data:
@@ -1386,6 +1387,33 @@ func abandon_run() -> void:
 	_current_run_session = null
 	persist_current_run()
 
+
+## One-way: when a run ends (is_complete or is_failed), owned_cars are committed
+## to the save's unlocked_vehicles (dedup, append only). Run is cleared so no
+## dead current_run lingers. Hook lives here (called at top of persist) so every
+## resolution path (race result, bench, etc) benefits and uses _save_candidate.
+func _finish_run_if_over() -> void:
+	if _current_run_session == null:
+		return
+	if not (_current_run_session.is_complete() or _current_run_session.is_failed()):
+		return
+	var owned: Dictionary = _current_run_session.owned_cars
+	var current_unlocked: Array = _save_data.get("unlocked_vehicles", ["rustbug"]) as Array
+	var unlocked: Array = current_unlocked.duplicate(true)
+	for k: Variant in owned.keys():
+		var vid: String = String(k)
+		if not (vid in unlocked):
+			unlocked.append(vid)
+	_current_run_session = null
+	var candidate: Dictionary = _save_data.duplicate(true)
+	candidate["unlocked_vehicles"] = unlocked
+	candidate["current_run"] = {}
+	if candidate == _save_data:
+		return
+	if is_save_read_only():
+		return
+	if _save_candidate(candidate):
+		_save_data = candidate
 
 
 ## Starts a new run using system time (unix seconds) as seed. This is intentionally
