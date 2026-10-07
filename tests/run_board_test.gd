@@ -132,15 +132,37 @@ func _run_test() -> void:
 			return
 		if not _expect(legend != null and legend.get_global_rect().end.y <= root.get_visible_rect().end.y and back.get_global_rect().end.y < legend.get_global_rect().position.y, "%s must keep actions and legend inside the logical viewport" % screen[0]):
 			return
+	# With a run in progress the title offers to continue it, not to replace it.
+	shell.call("show_title")
+	await process_frame
+	var continue_button := _button_with_text(shell, "CONTINUE RUN")
+	if not _expect(continue_button != null and _button_with_text(shell, "NEW RUN") == null, "the title offers CONTINUE RUN while a run is on"):
+		return
+	continue_button.pressed.emit()
+	await process_frame
+	if not _expect(shell.find_child("RunBoard", true, false) != null and app.call("current_run_session") == sess, "CONTINUE RUN returns to the same run"):
+		return
 	app.call("abandon_run")
 	shell.call("show_title")
 	await process_frame
+	if not _expect(_button_with_text(shell, "NEW RUN") != null, "with no run the title offers NEW RUN"):
+		return
 	if not _expect((shell.get("_run_backdrop") as ColorRect).visible == false, "leaving a run screen must restore the title backdrop"):
 		return
 	if _failed:
 		return
 	print("RUN_BOARD_TEST PASS")
 	quit(0)
+
+
+func _button_with_text(node: Node, text: String) -> Button:
+	if node is Button and (node as Button).text == text and (node as Button).is_visible_in_tree():
+		return node as Button
+	for child in node.get_children():
+		var found := _button_with_text(child, text)
+		if found != null:
+			return found
+	return null
 
 
 func _has_label(node: Node, text: String) -> bool:

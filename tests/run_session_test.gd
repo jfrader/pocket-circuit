@@ -98,6 +98,8 @@ func _check_bench_and_van() -> void:
 		return
 	if not _expect(not sess.bench_fit(car, "spare") and not sess.bench_repair(car), "one bench action per visit"):
 		return
+	if not _expect(sess.open_lockup().is_empty() and sess.lockup_used == false, "a lockup opens only at a lockup"):
+		return
 	var van = RUN_SESSION.create(22222)
 	if not _expect(_walk_to(van, "parts_van"), "a route reaches a parts van"):
 		return
@@ -179,6 +181,15 @@ func _check_determinism_and_save() -> void:
 	var broken_map := snap.duplicate(true)
 	broken_map["current_map"] = {}
 	if not _expect(RUN_SESSION.deserialize(broken_map) == null, "an unreadable map rejects the whole run"):
+		return
+	var junk_owned := snap.duplicate(true)
+	junk_owned["owned_cars"] = {"rustbug": {"type": "compact", "won_from": "start"}, "car-x": "compact", "car-y": {"type": "suv", "won_from": "rival", "seed": 3, "act": 1}}
+	var cleaned = RUN_SESSION.deserialize(junk_owned)
+	if not _expect(cleaned != null and cleaned.owned_cars.keys() == ["rustbug"], "unreadable owned cars are dropped on load"):
+		return
+	var carless := snap.duplicate(true)
+	carless["owned_cars"] = {}
+	if not _expect(RUN_SESSION.deserialize(carless) == null, "a run without the car it drives is rejected"):
 		return
 	var old := snap.duplicate(true)
 	old["schema_version"] = RUN_SESSION.SCHEMA_VERSION - 1

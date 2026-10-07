@@ -784,6 +784,9 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 
 
 func _run_countdown() -> void:
+	var app := get_node_or_null("/root/App")
+	if app and app.has_method("race_started"):
+		app.call("race_started")
 	var director := _audio_director()
 	if director != null and director.has_method("stop_live_rotation"):
 		director.call("stop_live_rotation")
