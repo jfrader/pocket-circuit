@@ -1,7 +1,7 @@
 class_name SaveStore
 extends RefCounted
 
-const CURRENT_VERSION := 4
+const CURRENT_VERSION := 5
 ## Player portrait seed. 91001 is the shipped driver-cast seed, so an untouched
 ## save keeps rendering the original player portrait.
 const PLAYER_AVATAR_DEFAULT_SEED := 91001
@@ -54,6 +54,7 @@ func default_data() -> Dictionary:
 		"reduced_camera_shake": false,
 		"reduced_motion": false,
 		"first_run": true,
+		"current_run": {},
 	}
 
 
@@ -208,6 +209,9 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	# only guarantees it is a dictionary rather than inventing domain rules.
 	var stored_roster: Variant = raw.get("driver_roster")
 	normalized["driver_roster"] = (stored_roster as Dictionary).duplicate(true) if stored_roster is Dictionary else {}
+
+	var stored_run: Variant = raw.get("current_run")
+	normalized["current_run"] = (stored_run as Dictionary).duplicate(true) if stored_run is Dictionary else {}
 
 	var difficulty: Variant = raw.get("difficulty", "club_circuit")
 	if difficulty is String and difficulty in VALID_DIFFICULTIES:
