@@ -1389,9 +1389,11 @@ func persist_current_run() -> void:
 	_save_data = candidate
 
 
-## Clears the active run (finished or abandoned) and removes it from the save.
+## Abandoning is losing the night: the run ends like any failed run, so the
+## cars it won still join the garage and the saved run is cleared.
 func abandon_run() -> void:
-	_current_run_session = null
+	if _current_run_session != null:
+		_current_run_session.failed = true
 	persist_current_run()
 
 

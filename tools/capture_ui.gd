@@ -4,7 +4,7 @@ extends SceneTree
 ## Usage:
 ##   PC_SHOT_SCREEN=board PC_SHOT_PATH=/tmp/shot.png \
 ##     xvfb-run -a godot --path . --script res://tools/capture_ui.gd
-## Screens: title, board, bench, van, lockup, errand, discovery.
+## Screens: title, garage, garage_won, board, bench, van, lockup, errand, discovery.
 ## Optional PC_SHOT_CROP="x,y,w,h" crops the capture for close review.
 
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
@@ -31,6 +31,22 @@ func _run() -> void:
 		shell.call("show_title")
 	elif shot == "discovery":
 		shell.call("show_discovery")
+	elif shot == "garage":
+		shell.call("show_vehicle_select", "", true)
+	elif shot == "garage_won":
+		# Win a duel on a few nights and abandon each, so the garage holds won cars.
+		for attempt in 12:
+			var night: RunSession = app.call("start_run", 1741000 + attempt * 31) as RunSession
+			if RUN_WALK.walk_to(app, night, "rival"):
+				RUN_WALK.settle(app, night)
+			app.call("abandon_run")
+		shell.call("show_vehicle_select", "", true)
+		for i in 4:
+			await process_frame
+		var won: Array[String] = app.call("garage_car_ids")
+		var menu := shell.get("_art_menu") as Control
+		var focus_id := OS.get_environment("PC_SHOT_CAR")
+		((menu.get("_vehicle_buttons") as Dictionary)[focus_id if not focus_id.is_empty() else won[won.size() - 1]] as Button).grab_focus()
 	elif shot == "board":
 		app.call("start_run", 424242)
 		shell.call("show_run_board")

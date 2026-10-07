@@ -596,7 +596,7 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	_page.hide()
 	_art_menu.set("reduced_motion", _reduced_motion_enabled())
 	var context := "QUICK STRIP · YOUR MACHINE" if _quick_strip else ("QUICK RACE · YOUR MACHINE" if quick_race else String(event.get("name", "CHAMPIONSHIP")).to_upper())
-	_art_menu.call("show_garage", selected_vehicle, unlocked_vehicles, context, "NEXT: TRACK" if quick_race and event_id.is_empty() else "PLAY", roster)
+	_art_menu.call("show_garage", selected_vehicle, unlocked_vehicles, context, "NEXT: TRACK" if quick_race and event_id.is_empty() else "PLAY", roster, "THE GARAGE" if quick_race else "SELECT YOUR CAR")
 
 
 func show_driver(return_action: Callable = Callable()) -> void:

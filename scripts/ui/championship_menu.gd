@@ -17,8 +17,18 @@ const ROW_GAP := 12
 const TITLE_STAGE := Rect2(640, 28, 600, 640)
 const GARAGE_STAGE := Rect2(590, 30, 650, 420)
 const SHELF := Rect2(72, 460, 1136, 106)
-const SHELF_GAP := 14.0
+const SHELF_GAP := 10.0
+const SHELF_GROUP_GAP := 30.0
+const SHELF_CARD_WIDTH := 116.0
+## Room above the cards for the type tapes, and around them for focus rings.
+const SHELF_LABEL_HEIGHT := 30.0
+const SHELF_BLEED := 8.0
 const CAR_ICON_WIDTH := 34
+const SHAPE_MORPH_SECONDS := 0.18
+const PROFILE_TOP := 266.0
+const ORIGIN_DROP := 36.0
+const SCROLL_CUE_INSET := 6.0
+const ORIGIN_COPY := {"rival": "WON IN A DUEL · ACT %d", "lockup": "FOUND IN A LOCKUP · ACT %d"}
 const TITLE_RIVAL := "cass"
 
 var reduced_motion := false
@@ -34,6 +44,10 @@ var _generation := 0
 var _entrance: Tween
 var _garage_primary: Button
 var _garage_back: Button
+var _origin: Label
+var _holding_id := ""
+var _shapes: Dictionary = {}
+var _morph: Tween
 
 
 func _ready() -> void:
@@ -82,15 +96,18 @@ func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustb
 	_focus_later(play if not play.disabled else second_row.back(), _generation)
 
 
-func show_garage(selected: String, unlocked: Array, context: String, next_text: String, roster: Array = []) -> void:
+func show_garage(selected: String, unlocked: Array, context: String, next_text: String, roster: Array = [], title: String = "SELECT YOUR CAR") -> void:
 	_begin()
 	_unlocked = unlocked
+	_shapes.clear()
 	_stage = _add_stage(GARAGE_STAGE)
-	_label("SELECT YOUR CAR", Rect2(COLUMN_X, 40, COLUMN_WIDTH, 58), 40, SKIN.CREAM)
+	_label(title, Rect2(COLUMN_X, 40, COLUMN_WIDTH, 58), 40, SKIN.CREAM)
 	_tape(context, Vector2(COLUMN_X + 6, 104), SKIN.YELLOW, 15)
 	_vehicle_name = _label("", Rect2(COLUMN_X, 150, COLUMN_WIDTH, 70), 54, SKIN.YELLOW)
 	_archetype = _label("", Rect2(COLUMN_X + 4, 226, COLUMN_WIDTH, 30), 20, SKIN.ORANGE)
-	_profile = _label("", Rect2(COLUMN_X + 4, 264, 480, 150), 16, SKIN.CREAM_DIM, false)
+	_origin = _tape("", Vector2(COLUMN_X + 6, PROFILE_TOP), SKIN.CREAM, 13)
+	_origin.name = "GarageOrigin"
+	_profile = _label("", Rect2(COLUMN_X + 4, PROFILE_TOP, 480, 130), 16, SKIN.CREAM_DIM, false)
 	_profile.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	var display_ids: Array[String] = []
 	if roster.is_empty():
@@ -99,29 +116,7 @@ func show_garage(selected: String, unlocked: Array, context: String, next_text: 
 		for item in roster:
 			display_ids.append(String(item))
 	_shelf(Rect2(SHELF.position.x - 16, SHELF.end.y - 2, SHELF.size.x + 32, 26))
-	var pitch := (SHELF.size.x + SHELF_GAP) / float(display_ids.size())
-	var car_row: Array[Button] = []
-	for index in display_ids.size():
-		var id := display_ids[index]
-		var vehicle: Dictionary = CATALOG.get_vehicle(id)
-		var available := id in unlocked
-		var slot := Rect2(SHELF.position.x + pitch * index, SHELF.position.y, pitch - SHELF_GAP, SHELF.size.y)
-		var button := _button("", slot, &"")
-		button.name = "Vehicle_" + id
-		button.text = String(vehicle.get("name", id)).to_upper() + ("" if available else "\n" + String(vehicle.get("unlock", "")).to_upper())
-		button.add_theme_font_size_override("font_size", 14)
-		button.icon = IDENTITIES.car_texture(id)
-		button.expand_icon = true
-		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
-		button.add_theme_constant_override("icon_max_width", CAR_ICON_WIDTH)
-		button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-		button.disabled = not available
-		if available:
-			button.focus_entered.connect(_choose_vehicle.bind(id))
-			button.pressed.connect(_choose_vehicle.bind(id))
-		_vehicle_buttons[id] = button
-		car_row.append(button)
+	var car_row := _shelf_cards(display_ids, unlocked)
 	var back := _button("BACK", Rect2(COLUMN_X, 612, 240, 64), &"back")
 	var driver := _button("DRIVER LOOK", Rect2(COLUMN_X + 258, 612, 300, 64), &"driver")
 	var next := _button(next_text, Rect2(868, 612, 340, 64), &"play_vehicle", true)
@@ -133,8 +128,90 @@ func show_garage(selected: String, unlocked: Array, context: String, next_text: 
 		button.focus_neighbor_bottom = button.get_path_to(next)
 	_label("ENTER / A  CONFIRM", Rect2(630, 632, 238, 26), 14, SKIN.CREAM_DIM).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var initial := selected if selected in unlocked else "rustbug"
+	_holding_id = initial
 	_choose_vehicle(initial)
 	_focus_later(_vehicle_buttons.get(initial, next), _generation)
+
+
+## The shelf: cars grouped by type under a tape, one card each, scrolling
+## sideways with focus once the garage outgrows the bench.
+func _shelf_cards(display_ids: Array[String], unlocked: Array) -> Array[Button]:
+	var scroll := ScrollContainer.new()
+	scroll.name = "ShelfScroll"
+	scroll.position = SHELF.position - Vector2(SHELF_BLEED, SHELF_LABEL_HEIGHT + SHELF_BLEED)
+	scroll.size = SHELF.size + Vector2(SHELF_BLEED * 2.0, SHELF_LABEL_HEIGHT + SHELF_BLEED * 2.0)
+	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
+	scroll.follow_focus = true
+	_canvas.add_child(scroll)
+	var content := Control.new()
+	content.mouse_filter = Control.MOUSE_FILTER_PASS
+	scroll.add_child(content)
+	var cards: Array[Button] = []
+	var x := SHELF_BLEED
+	var group := ""
+	for id in display_ids:
+		var vehicle: Dictionary = CATALOG.get_vehicle(id)
+		var car_type := String((vehicle.get("car_art", {}) as Dictionary).get("type", ""))
+		if car_type != group:
+			if not group.is_empty():
+				x += SHELF_GROUP_GAP - SHELF_GAP
+			group = car_type
+			var tape := Label.new()
+			tape.text = car_type.to_upper()
+			tape.position = Vector2(x + 4.0, 0.0)
+			tape.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			SKIN.style_tape(tape, SKIN.YELLOW, 12)
+			content.add_child(tape)
+		var available := id in unlocked
+		var button := _make_button("", &"")
+		button.name = "Vehicle_" + id
+		button.position = Vector2(x, SHELF_LABEL_HEIGHT + SHELF_BLEED)
+		button.size = Vector2(SHELF_CARD_WIDTH, SHELF.size.y)
+		button.text = String(vehicle.get("name", id)).to_upper() + ("" if available else "\n" + String(vehicle.get("unlock", "")).to_upper())
+		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		button.add_theme_font_size_override("font_size", 13)
+		button.icon = IDENTITIES.car_texture(id)
+		button.expand_icon = true
+		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
+		button.add_theme_constant_override("icon_max_width", CAR_ICON_WIDTH)
+		button.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+		button.disabled = not available
+		if available:
+			button.focus_entered.connect(_choose_vehicle.bind(id))
+			button.pressed.connect(_choose_vehicle.bind(id))
+		content.add_child(button)
+		if vehicle.has("won_from"):
+			var mark := Label.new()
+			mark.text = "WON"
+			mark.position = button.position + Vector2(-4.0, -10.0)
+			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			SKIN.style_tape(mark, SKIN.ORANGE, 11)
+			content.add_child(mark)
+		_vehicle_buttons[id] = button
+		cards.append(button)
+		x += SHELF_CARD_WIDTH + SHELF_GAP
+	content.custom_minimum_size = Vector2(x - SHELF_GAP + SHELF_BLEED, scroll.size.y)
+	_scroll_cues(scroll)
+	return cards
+
+
+## "MORE" tapes at the shelf ends whenever cars sit out of view on that side.
+func _scroll_cues(scroll: ScrollContainer) -> void:
+	var before := _tape("‹ MORE", Vector2.ZERO, SKIN.ORANGE, 12)
+	var after := _tape("MORE ›", Vector2.ZERO, SKIN.ORANGE, 12)
+	before.name = "ShelfMoreBefore"
+	after.name = "ShelfMoreAfter"
+	before.position = Vector2(scroll.position.x + SCROLL_CUE_INSET, scroll.position.y + SHELF_BLEED)
+	after.position = Vector2(scroll.position.x + scroll.size.x - after.size.x - SCROLL_CUE_INSET, scroll.position.y + SHELF_BLEED)
+	var bar := scroll.get_h_scroll_bar()
+	var refresh := func(_value: float = 0.0) -> void:
+		before.visible = bar.value > 0.5
+		after.visible = bar.value + bar.page < bar.max_value - 0.5
+	bar.value_changed.connect(refresh)
+	bar.changed.connect(refresh)
+	refresh.call()
 
 
 func _choose_vehicle(id: String) -> void:
@@ -145,13 +222,41 @@ func _choose_vehicle(id: String) -> void:
 	_stage.configure(&"vehicle", id, "rae", "kitchen", "", _unlocked)
 	_vehicle_name.text = String(vehicle["name"]).to_upper()
 	_archetype.text = String(vehicle["archetype"]).to_upper()
-	_profile.text = "+ %s\n– %s" % [String(vehicle.get("strength", "")), String(vehicle.get("tradeoff", ""))]
+	var origin := String(vehicle.get("won_from", ""))
+	_origin.visible = ORIGIN_COPY.has(origin)
+	if _origin.visible:
+		_origin.text = String(ORIGIN_COPY[origin]) % int(vehicle.get("act", 1))
+		_origin.reset_size()
+	_profile.position.y = PROFILE_TOP + (ORIGIN_DROP if _origin.visible else 0.0)
+	var tradeoff := String(vehicle.get("tradeoff", ""))
+	_profile.text = "+ %s" % String(vehicle.get("strength", "")) + ("" if tradeoff.is_empty() else "\n– %s" % tradeoff)
+	_show_shape(id)
 	for candidate: String in _vehicle_buttons:
 		(_vehicle_buttons[candidate] as Button).set("selected", candidate == id)
 	if is_instance_valid(_garage_primary):
 		_garage_primary.focus_neighbor_top = _garage_primary.get_path_to(_vehicle_buttons[id])
 		_garage_back.focus_neighbor_top = _garage_back.get_path_to(_vehicle_buttons[id])
 	vehicle_selected.emit(id)
+
+
+## Draws the car's six-axis shape against the car the player came in with.
+func _show_shape(id: String) -> void:
+	var compare := {} if id == _holding_id else _shape_of(_holding_id)
+	var label := "YOUR CAR" if id == _holding_id else "VS " + String(CATALOG.get_vehicle(_holding_id).get("name", _holding_id)).to_upper()
+	_stage.show_shape(_shape_of(id), compare, label)
+	if _morph and _morph.is_valid():
+		_morph.kill()
+	if reduced_motion:
+		_stage.shape_blend = 1.0
+		return
+	_morph = create_tween()
+	_morph.tween_property(_stage, "shape_blend", 1.0, SHAPE_MORPH_SECONDS).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+
+
+func _shape_of(id: String) -> Dictionary:
+	if not _shapes.has(id):
+		_shapes[id] = CarProfile.shape(CATALOG.create_vehicle_stats(id))
+	return _shapes[id]
 
 
 func _begin() -> void:
