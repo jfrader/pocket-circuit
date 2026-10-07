@@ -1360,6 +1360,26 @@ func abandon_run() -> void:
 	persist_current_run()
 
 
+
+## Starts a new run using system time (unix seconds) as seed. This is intentionally
+## non-deterministic for live play (different every NEW RUN press). Tests and
+## reproducible cases use start_run(fixed_seed) directly.
+func start_new_run() -> RunSession:
+	var seed: int = int(Time.get_unix_time_from_system())
+	return start_run(seed)
+
+
+## Delegates to the session to move to a child node (if allowed), then persists
+## the run. Returns true on success. Real per-node outcomes (races, benches,
+## rivals, etc) are resolved in later slices; this slice only advances position.
+func enter_run_node(node_id: String) -> bool:
+	if _current_run_session == null:
+		return false
+	var ok: bool = _current_run_session.enter_node(node_id)
+	if ok:
+		persist_current_run()
+	return ok
+
 func update_setting(key: String, value: Variant) -> bool:
 	var candidate := _save_data.duplicate(true)
 	match key:
