@@ -30,6 +30,7 @@ func _run_test() -> void:
 		return
 	var pre_owned_win: Dictionary = sess.owned_cars.duplicate(true)
 	if not _walk_to_act3_final_bench_and_resolve(app, sess):
+		_expect(false, "the walk must reach the act-3 final bench")
 		return
 	# resolve final bench action to trigger is_complete (see RunSession._maybe_complete_on_final_bench)
 	var ckey: String = sess.current_car_id
@@ -109,10 +110,19 @@ func _walk_to_act3_final_bench_and_resolve(app: Node, sess: RunSession) -> bool:
 	# Stop when positioned on act-3 final bench (before its resolve).
 	var steps: int = 0
 	var max_steps: int = 300
+	var last_id: String = ""
+	var same_id: int = 0
 	while steps < max_steps:
 		steps += 1
 		if sess.current_map == null:
 			return false
+		if sess.current_node_id == last_id:
+			same_id += 1
+			if same_id > 6:
+				return false
+		else:
+			same_id = 0
+			last_id = sess.current_node_id
 		var curr: Dictionary = sess.current_node()
 		var ctype: String = String(curr.get("type", ""))
 		var act: int = 0
