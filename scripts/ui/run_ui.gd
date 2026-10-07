@@ -7,16 +7,19 @@ const INK := Color("e9ecf1")
 const MUTED := Color("8b95a5")
 const DIM := Color("5a6577")
 const AMBER := Color("f2a53c")
+const BOSS_EDGE := Color("674b29")
+const LIVE_EDGE := Color("657587")
 const ROOMS := {1: "Kitchen Counter", 2: "Workshop Bench", 3: "Office Desk"}
 const TYPES := {
-	"race": {"name": "Race", "cost": "small wear", "copy": "Four cars, a rolled circuit. The filler, and the place you test a build.", "icon": preload("res://assets/ui/run_map/node_race.svg")},
-	"rival": {"name": "Rival", "cost": "heavy wear", "copy": "One-on-one, contact. The reliable source of a car.", "icon": preload("res://assets/ui/run_map/node_rival.svg")},
+	"race": {"name": "Race", "cost": "wear", "copy": "Four cars, a rolled circuit. The filler, and the place you test a build.", "icon": preload("res://assets/ui/run_map/node_race.svg")},
+	"rival": {"name": "Rival", "cost": "points or wear", "copy": "One-on-one, contact. The reliable source of a car.", "icon": preload("res://assets/ui/run_map/node_rival.svg")},
 	"bench": {"name": "Bench", "cost": "the visit", "copy": "No race. Repair the car, or fit one part. Never both.", "icon": preload("res://assets/ui/run_map/node_bench.svg")},
-	"parts_van": {"name": "Parts van", "cost": "points", "copy": "No race. Spend points on parts, with a downside on each.", "icon": preload("res://assets/ui/run_map/node_parts_van.svg")},
-	"lockup": {"name": "Lockup", "cost": "nothing", "copy": "No race. A free car, no fight. Rare, and fought over.", "icon": preload("res://assets/ui/run_map/node_lockup.svg")},
+	"parts_van": {"name": "Parts van", "cost": "points", "copy": "No race. Spend points on parts.", "icon": preload("res://assets/ui/run_map/node_parts_van.svg")},
+	"lockup": {"name": "Lockup", "cost": "free", "copy": "No race. A free car, no fight. Rare, and fought over.", "icon": preload("res://assets/ui/run_map/node_lockup.svg")},
 	"errand": {"name": "Errand", "cost": "varies", "copy": "A choice, no race. The cast wants something; it has a price.", "icon": preload("res://assets/ui/run_map/node_errand.svg")},
 	"act_rival": {"name": "Act rival", "cost": "the run", "copy": "A generated driver carrying the act's hardest AI profile. One race decides the act.", "icon": preload("res://assets/ui/run_map/node_boss.svg")},
 }
+const VAN_PARTS := [["TOOL KIT", 8], ["TYRE SET", 15], ["SPARE SHELL", 25]]
 const CURRENT_RING := preload("res://assets/ui/run_map/ring_current.svg")
 
 static var _mono: FontVariation
@@ -78,7 +81,7 @@ static func stats(host: VBoxContainer, session: RunSession) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 38)
 	parent.add_child(row)
-	for entry: Array in [["POINTS", str(session.run_points)], ["BUDGET", str(session.run_budget)], ["OWNED", str(session.owned_cars.size())]]:
+	for entry: Array in [["POINTS", str(session.run_points)], ["OWNED", str(session.owned_cars.size())]]:
 		var column := VBoxContainer.new()
 		column.add_theme_constant_override("separation", 4)
 		row.add_child(column)

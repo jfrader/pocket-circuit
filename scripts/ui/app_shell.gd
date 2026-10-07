@@ -280,6 +280,7 @@ func show_run_board() -> void:
 		if not button.disabled:
 			_register_button_focus(button)
 	var detail := VBoxContainer.new()
+	detail.name = "RunDetail"
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_theme_constant_override("separation", 6)
 	columns.add_child(detail)
@@ -369,10 +370,7 @@ func show_run_bench() -> void:
 	_run_node_intro(sess, "bench")
 	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, false, "BenchRepair")
 	_run_action("FIT SPARE", Callable(self, "_on_bench_fit_pressed"), false, false, "BenchFit")
-	if sess.current_map.is_last_row(int(sess.current_node().get("row", -1))):
-		_run_action("CONTINUE", Callable(self, "_on_bench_continue_pressed"), false, false, "BenchContinue")
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_footer.text = "REPAIR OR FIT — NEVER BOTH  ·  " + BACK_HINT
 	_focus_first()
 
 
@@ -388,12 +386,11 @@ func show_run_parts_van() -> void:
 		show_run_board()
 		return
 	_run_node_intro(sess, "parts_van")
-	_run_actions.add_child(RUN_UI.label("SPEND FROM THE RUN BUDGET", 11, RUN_UI.AMBER, true))
-	_run_action("TYRE SET · 15", Callable(self, "_on_van_buy_pressed").bind(15), true, sess.run_budget < 15, "VanBuy15")
-	_run_action("TOOL KIT · 8", Callable(self, "_on_van_buy_pressed").bind(8), false, sess.run_budget < 8, "VanBuy8")
-	_run_action("SPARE SHELL · 25", Callable(self, "_on_van_buy_pressed").bind(25), false, sess.run_budget < 25, "VanBuy25")
+	_run_actions.add_child(RUN_UI.label("SPEND POINTS", 11, RUN_UI.AMBER, true))
+	for part: Array in RUN_UI.VAN_PARTS:
+		var cost := int(part[1])
+		_run_action("%s · %d" % [String(part[0]), cost], Callable(self, "_on_van_buy_pressed").bind(cost), false, sess.run_points < cost, "VanBuy%d" % cost)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_footer.text = "SPEND FROM THE RUN BUDGET  ·  " + BACK_HINT
 	_focus_first()
 
 
@@ -411,7 +408,6 @@ func show_run_lockup() -> void:
 	_run_node_intro(sess, "lockup")
 	_run_action("OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_footer.text = "SCARCE — ONCE PER ACT  ·  " + BACK_HINT
 	_focus_first()
 
 
@@ -427,10 +423,10 @@ func show_run_errand() -> void:
 		show_run_board()
 		return
 	_run_node_intro(sess, "errand")
-	_run_action("TAKE THE CASH", Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandCash")
-	_run_action("TAKE THE POINTS", Callable(self, "_on_errand_choice_pressed").bind(1), false, false, "ErrandPoints")
+	var car_clean := sess.run_state.get_car_wear(sess.current_car_id) == RunState.WEAR_LEVELS[0]
+	_run_action("TAKE THE PAY · %d" % RunSession.ERRAND_PAY_POINTS, Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandPay")
+	_run_action("TAKE A TUNE-UP", Callable(self, "_on_errand_choice_pressed").bind(1), false, car_clean, "ErrandTuneUp")
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_footer.text = "A CHOICE, NOT A REWARD  ·  " + BACK_HINT
 	_focus_first()
 
 
@@ -446,12 +442,6 @@ func _on_bench_repair_pressed() -> void:
 func _on_bench_fit_pressed() -> void:
 	_play_ui_confirm()
 	_app.call("run_bench_fit", "spare")
-	show_run_board()
-
-
-func _on_bench_continue_pressed() -> void:
-	_play_ui_confirm()
-	_app.call("run_bench_continue")
 	show_run_board()
 
 

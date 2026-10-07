@@ -3,6 +3,8 @@ extends Control
 const UI := preload("res://scripts/ui/run_ui.gd")
 const PADDING := 36.0
 const BOSS_Y := 72.0
+const BOSS_LABEL_SIZE := Vector2(136, 20)
+const BOSS_LABEL_GAP := 26.0
 const ROW_TOP := 144.0
 const BOTTOM := 30.0
 
@@ -52,14 +54,16 @@ func _layout() -> void:
 	var extent := size.max(custom_minimum_size)
 	for id: String in _buttons:
 		var node: Dictionary = _map.get_node(id)
+		# The act rival row sits apart at the top; the walker rows fill the rest.
+		var row := int(node["row"])
+		var boss_row := _map.num_rows - 1
 		var centre := Vector2(
 			PADDING + float(node["col"]) * (extent.x - PADDING * 2.0) / float(RunMap.NUM_COLUMNS - 1),
-			lerpf(extent.y - BOTTOM, ROW_TOP, float(node["row"]) / float(maxi(1, _map.num_rows - 1)))
+			BOSS_Y if row == boss_row else lerpf(extent.y - BOTTOM, ROW_TOP, float(row) / float(maxi(1, boss_row - 1)))
 		)
-		if String(node["type"]) == "act_rival":
-			centre = Vector2(extent.x * 0.5, BOSS_Y)
-			_boss_label.position = Vector2(centre.x - 68, BOSS_Y + 26)
-			_boss_label.size = Vector2(136, 20)
+		if row == boss_row:
+			_boss_label.size = BOSS_LABEL_SIZE
+			_boss_label.position = Vector2(centre.x - BOSS_LABEL_SIZE.x * 0.5, centre.y + BOSS_LABEL_GAP)
 		_centres[id] = centre
 		var button := _buttons[id] as Button
 		button.position = centre - button.size * 0.5
@@ -76,9 +80,9 @@ func _draw() -> void:
 			var child_id := String(child["id"])
 			var color := UI.LINE
 			if String(child["type"]) == "act_rival":
-				color = Color("674b29")
+				color = UI.BOSS_EDGE
 			if id == _current and child_id in _available:
-				color = Color("657587")
+				color = UI.LIVE_EDGE
 			draw_line(_centres[id] as Vector2, _centres[child_id] as Vector2, color, 1.0, true)
 	if _centres.has(_current):
 		var centre: Vector2 = _centres[_current]

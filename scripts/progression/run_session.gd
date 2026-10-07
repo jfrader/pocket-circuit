@@ -1,14 +1,17 @@
 class_name RunSession
 extends RefCounted
 
-const SCHEMA_VERSION := 1
+const SCHEMA_VERSION := 2
+
+const FINAL_ACT := 3
+const RACE_NODE_TYPES: Array[String] = ["race", "rival", "act_rival"]
 
 const RUN_MAP := preload("res://scripts/progression/run_map.gd")
 const RUN_STATE := preload("res://scripts/progression/run_state.gd")
 
-const INITIAL_BUDGET := 60
 const INITIAL_POINTS := 0
-const RIVAL_LOSS_BUDGET_COST := 15
+const RIVAL_LOSS_POINTS_COST := 10
+const ERRAND_PAY_POINTS := 6
 const RIVAL_LOSS_SEVERITY := 0.6
 const LOCKUP_CAR_TYPE := "compact"
 
@@ -19,88 +22,36 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 	4: 0,
 }
 
-## Run session layer (GURI-1740 first slice): pure logic over the run map + run state.
-## No UI, no scenes, no Node dependencies. All deterministic from run_seed.
+## Run session layer: pure logic over the run map + run state. No UI, no
+## scenes, no Node dependencies. Deterministic from run_seed.
 ##
-## Creation:
-##   create(run_seed) -> act 1 map, positioned on start node (race), budget=60, points=0,
-##   initial car "rustbug" (compact) owned+current with roll+clean wear.
+## Points are the run's only currency: races pay RUN_POINTS_BY_FINISH, the
+## parts van and a lost rival duel spend them.
 ##
-## Navigation (map edges strictly enforced):
-##   available_nodes() -> Array[Dictionary] (children of current)
-##   current_node() -> Dictionary
-##   enter_node(id: String) -> bool
-##   On enter bench: reset per-visit action flag.
-##   On resolving the final bench (last row): act<3 advances to next act via map regen, act==3 sets completed.
-##   Use bench_continue() to advance final bench without requiring a repair/fit action this visit.
+## create(run_seed): act 1 map, on the opening race, 0 points, rustbug clean.
+## available_nodes() / enter_node(id): moves along map edges only, and never
+##   past a race-type node that has not been raced.
 ##
-## Per-type resolution (game layer calls with real outcomes after node "play"):
-##   All require node_id matches current and type matches, else refuse (return error or false).
+## Resolution (the node must be current, unresolved and of the right type):
+##   resolve_race(id, pos, field): pays points. On the act rival, a win
+##     advances the act (act 3 completes the run) and any other finish fails it.
+##   resolve_rival(id, won): a win adds the rival's car; a loss costs
+##     RIVAL_LOSS_POINTS_COST, and wear when the points do not cover it.
+##   bench_repair(car) / bench_fit(car, part): one of the two per bench visit.
+##   spend(cost): parts van purchase from points.
+##   open_lockup(): the act's one free car.
+##   resolve_errand(choice): 0 takes ERRAND_PAY_POINTS, 1 steps the current
+##     car's wear back one level.
 ##
-##   resolve_race(node_id, finish_position: int, field_size: int) -> Dictionary
-##     Awards from RUN_POINTS_BY_FINISH (pos clamped 1..field).
-##     qualified = (pos <= maxi(1, field_size/2 + 1))
-##     If type=="act_rival":
-##       pos==1 and act<3: advance act (regenerate map from same seed, reset to start of next, lockup=false)
-##       pos>1: failed=true (loss on act rival ends the run)
-##     Returns: {points_gained:int, qualified:bool, act_advanced:bool, run_failed:bool}
-##
-##   resolve_rival(node_id, won: bool) -> Dictionary
-##     If won: fabricate vid="rival_"+node_id, type=_rival_type_for_act(act) e.g. "coupe",
-##             get_or_create roll via run_state, add to owned_cars, return car info.
-##     If lost: budget = max(0, budget-15); if cost exceeded available then also register_crash(0.6)
-##     Returns: for win {car: {vehicle_id,car_type,roll}}, for loss {cost, wear_advanced:bool}
-##
-##   bench_repair(car_key: String) -> bool
-##   bench_fit(car_key: String, part: String) -> bool
-##     ONLY on current "bench" node visit, and only ONE of the two per visit.
-##     After first action on this bench node, the other (and repeat) refused (return false).
-##     repair: if car_key owned or current, run_state.set wear = restore_at_bench (clean)
-##     fit: installed_parts[car_key] = part (effect out of scope for this layer)
-##     Documented rule: bench is mutually exclusive repair-OR-fit; layer makes calling both impossible.
-##
-##   bench_continue() -> bool
-##     Allowed on any current bench node (final or not). Does not count against the repair/fit action.
-##     If the bench is the final row of act<3: performs the act advance (regens map, resets flags).
-##     If final of act 3: sets completed.
-##
-##   spend(cost: int) -> bool   # for parts_van node
-##     deducts from run_budget if affordable, else false. No negative budget.
-##
-##   open_lockup() -> Dictionary
-##     If !lockup_used (scarce, once per act): vid="lockup_act%d"%act , type=compact,
-##     add to owned, mark used, return {vehicle_id,car_type,roll}
-##     Subsequent calls in act return {}
-##
-##   resolve_errand(choice: int) -> Dictionary
-##     Documented minimal outcome table:
-##       0: +12 budget ("quick gig")
-##       1: +3 points ("tip off")
-##       else: step back one wear level on current car if not clean ("tune up")
-##     Returns {effect: "budget"|"points"|"restore", amount: int}
-##
-## Attrition:
-##   register_crash(severity: float)
-##     run_state.advance_wear on CURRENT car; if reaches "dented" then failed=true
-##     Bench repair is ONLY way to restore (via restore_at_bench).
-##   is_failed() -> bool  (also true if current wear is worn_out)
-##
-## Run end:
-##   is_complete() -> bool  (resolved the final bench of act 3 without having failed)
-##   serialize() / deserialize() roundtrips full session (map+state+position+budgets+owned+flags)
-##
-## Ownership:
-##   Starts with rustbug. Rival wins and lockups add more (with rolls in run_state).
-##   Bench/repairs/fits apply to any owned or current car_key.
-##
-## Determinism: same seed + same enter/resolve sequence + same outcome args => identical state.
+## register_crash(severity) advances wear; worn out fails the run.
+## serialize()/deserialize() round-trip the whole session; a schema mismatch
+## or an unreadable inner block deserializes to null.
 
 var run_seed: int = 0
 var run_state: RunState
 var current_map: RunMap
 var current_node_id: String = ""
 var run_points: int = 0
-var run_budget: int = 0
 var current_car_id: String = "rustbug"
 var owned_cars: Dictionary = {}
 var lockup_used: bool = false
@@ -119,7 +70,6 @@ static func create(p_run_seed: int) -> RunSession:
 	var start_n: Dictionary = sess.current_map.get_start_node()
 	sess.current_node_id = String(start_n.get("id", ""))
 	sess.run_points = INITIAL_POINTS
-	sess.run_budget = INITIAL_BUDGET
 	sess.current_car_id = "rustbug"
 	sess.owned_cars = {}
 	sess.lockup_used = false
@@ -136,10 +86,18 @@ static func create(p_run_seed: int) -> RunSession:
 	sess.run_state.row = 0
 	return sess
 
+## The stops the player can take next: the current node while it is an
+## unraced race, otherwise its children.
 func available_nodes() -> Array[Dictionary]:
-	if current_map == null or current_node_id.is_empty():
+	if current_map == null or current_node_id.is_empty() or failed or completed:
 		return []
+	if is_race_pending():
+		return [current_node()]
 	return current_map.get_children(current_node_id)
+
+## A race-type node has to be raced before the run moves past it.
+func is_race_pending() -> bool:
+	return String(current_node().get("type", "")) in RACE_NODE_TYPES and not resolved_nodes.has(current_node_id)
 
 func current_node() -> Dictionary:
 	if current_map == null or current_node_id.is_empty():
@@ -148,6 +106,8 @@ func current_node() -> Dictionary:
 
 func enter_node(node_id: String) -> bool:
 	if failed or completed or current_map == null or current_node_id.is_empty():
+		return false
+	if is_race_pending():
 		return false
 	var kids: Array[Dictionary] = current_map.get_children(current_node_id)
 	var is_valid: bool = false
@@ -188,11 +148,11 @@ func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dic
 	}
 	if ntype == "act_rival":
 		if pos == 1:
-			var next_act: int = current_map.act + 1
-			if next_act <= 3:
-				_advance_to_act(next_act)
+			if current_map.act < FINAL_ACT:
+				_advance_to_act(current_map.act + 1)
 				outcome["act_advanced"] = true
-			# for act 3 rival win: stay in act 3, must still reach final bench node to complete run
+			else:
+				completed = true
 		else:
 			failed = true
 			outcome["run_failed"] = true
@@ -236,10 +196,9 @@ func resolve_rival(node_id: String, won: bool) -> Dictionary:
 			"roll": roll.duplicate(true),
 		}
 	else:
-		var pre_budget: int = run_budget
-		run_budget = maxi(0, run_budget - RIVAL_LOSS_BUDGET_COST)
-		var over: bool = pre_budget < RIVAL_LOSS_BUDGET_COST
-		outcome["cost"] = RIVAL_LOSS_BUDGET_COST
+		var over: bool = run_points < RIVAL_LOSS_POINTS_COST
+		run_points = maxi(0, run_points - RIVAL_LOSS_POINTS_COST)
+		outcome["cost"] = RIVAL_LOSS_POINTS_COST
 		outcome["wear_advanced"] = over
 		if over:
 			register_crash(RIVAL_LOSS_SEVERITY)
@@ -270,7 +229,6 @@ func bench_repair(car_key: String) -> bool:
 	var restored: String = RUN_STATE.restore_at_bench(cur_w)
 	run_state.set_car_wear(car_key, restored)
 	bench_action_done = true
-	_maybe_complete_on_final_bench()
 	return true
 
 func bench_fit(car_key: String, part: String) -> bool:
@@ -282,33 +240,7 @@ func bench_fit(car_key: String, part: String) -> bool:
 		return false
 	installed_parts[car_key] = part
 	bench_action_done = true
-	_maybe_complete_on_final_bench()
 	return true
-
-func bench_continue() -> bool:
-	if failed or completed:
-		return false
-	if not _is_current_node_type("bench"):
-		return false
-	# explicit continue path so final bench can advance act without repair/fit being possible or wanted.
-	# repair XOR fit per visit remains enforced by _can_do + bench_action_done.
-	_maybe_complete_on_final_bench()
-	return true
-
-## Resolving the forced final bench (last row, always bench type) ends the current act:
-## - act < 3: _advance_to_act (regens map from same seed, resets to start of next act, lockup_used=false)
-## - act == 3: set completed=true
-## Invoked after bench action or via bench_continue.
-func _maybe_complete_on_final_bench() -> void:
-	if current_map == null:
-		return
-	if not current_map.is_last_row(int(run_state.row)):
-		return
-	if current_map.act == 3:
-		completed = true
-	else:
-		_advance_to_act(current_map.act + 1)
-
 
 func _can_do_bench_action(_car_key: String) -> bool:
 	if failed or completed:
@@ -324,8 +256,8 @@ func spend(cost: int) -> bool:
 		return false
 	if resolved_nodes.has(current_node_id):
 		return false
-	if run_budget >= cost:
-		run_budget -= cost
+	if run_points >= cost:
+		run_points -= cost
 		resolved_nodes[current_node_id] = true
 		return true
 	return false
@@ -356,13 +288,9 @@ func resolve_errand(choice: int) -> Dictionary:
 	var eff: String = ""
 	var amt: int = 0
 	if choice == 0:
-		run_budget += 12
-		eff = "budget"
-		amt = 12
-	elif choice == 1:
-		run_points += 3
+		run_points += ERRAND_PAY_POINTS
 		eff = "points"
-		amt = 3
+		amt = ERRAND_PAY_POINTS
 	else:
 		var cw: String = run_state.get_car_wear(current_car_id)
 		var prev: String = _previous_wear_level(cw)
@@ -411,7 +339,6 @@ static func serialize(sess: RunSession) -> Dictionary:
 		"current_map": map_snap,
 		"current_node_id": sess.current_node_id,
 		"run_points": sess.run_points,
-		"run_budget": sess.run_budget,
 		"current_car_id": sess.current_car_id,
 		"owned_cars": own,
 		"lockup_used": sess.lockup_used,
@@ -428,13 +355,12 @@ static func deserialize(data: Dictionary) -> RunSession:
 	var ver: Variant = data.get("schema_version", 0)
 	if (ver is int or ver is float) and int(ver) == SCHEMA_VERSION:
 		sess.run_seed = int(data.get("run_seed", 0))
-		var st_d: Dictionary = data.get("run_state", {}) as Dictionary
-		sess.run_state = RUN_STATE.deserialize(st_d)
-		var mp_d: Dictionary = data.get("current_map", {}) as Dictionary
-		sess.current_map = RUN_MAP.deserialize(mp_d)
+		sess.run_state = RUN_STATE.deserialize(data.get("run_state", {}) as Dictionary)
+		sess.current_map = RUN_MAP.deserialize(data.get("current_map", {}) as Dictionary)
+		if sess.run_state == null or sess.current_map == null:
+			return null
 		sess.current_node_id = String(data.get("current_node_id", ""))
 		sess.run_points = int(data.get("run_points", 0))
-		sess.run_budget = int(data.get("run_budget", 0))
 		sess.current_car_id = String(data.get("current_car_id", "rustbug"))
 		sess.owned_cars = (data.get("owned_cars", {}) as Dictionary).duplicate(true)
 		sess.lockup_used = bool(data.get("lockup_used", false))
@@ -452,6 +378,6 @@ func _to_string() -> String:
 	var actv: int = 0
 	if current_map != null:
 		actv = current_map.act
-	return "RunSession(seed=%d, act=%d, node=%s, pts=%d, budget=%d, failed=%s, complete=%s)" % [
-		run_seed, actv, current_node_id, run_points, run_budget, str(failed), str(completed)
+	return "RunSession(seed=%d, act=%d, node=%s, pts=%d, failed=%s, complete=%s)" % [
+		run_seed, actv, current_node_id, run_points, str(failed), str(completed)
 	]
