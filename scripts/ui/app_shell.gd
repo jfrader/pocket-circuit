@@ -1296,6 +1296,15 @@ func _ordinal(value: int) -> String:
 
 func _on_run_node_pressed(node_id: String) -> void:
 	_play_ui_confirm()
+	var sess_var: Variant = _app.call("current_run_session")
+	var sess: RunSession = sess_var as RunSession
+	if sess != null and sess.current_map != null:
+		var node: Dictionary = sess.current_map.get_node(node_id) as Dictionary
+		var ntype: String = String(node.get("type", ""))
+		if ntype == "race" or ntype == "act_rival":
+			# Race nodes hand over to the real race flow; the result resolves the run.
+			_app.call("start_run_race", node_id)
+			return
 	var ok: bool = bool(_app.call("enter_run_node", node_id))
 	if ok:
 		show_run_board()
