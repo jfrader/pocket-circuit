@@ -1127,7 +1127,7 @@ func _leave_race_loading() -> void:
 	_transitioning_to_race = false
 	_loading_failed = false
 	var mode := String(current_race_session.get("mode", "quick"))
-	_destination = "discovery" if mode == "discovery" else ("title" if mode == "quick" else "map")
+	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode == "quick" else "map"))
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
 
@@ -1150,6 +1150,33 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 	}
 	var mode := String(current_race_session["mode"])
 	if mode in ["quick", "discovery"]:
+		current_race_session["result_committed"] = true
+		current_race_session.erase("save_error")
+		return true
+
+	if mode == "run":
+		var res: Dictionary = current_race_session.get("result", {}) as Dictionary
+		var pos: int = int(res.get("position", 4))
+		var dnf_flag: bool = bool(res.get("dnf", false))
+		var node_id: String = String(current_race_session.get("run_node_id", ""))
+		var field_size: int = racer_count
+		if _current_run_session != null and node_id != "":
+			var resolve_out: Dictionary = _current_run_session.resolve_race(node_id, pos, field_size)
+			# Inspected: the result dict built by race_manager.get_results() (and passed through prototype)
+			# carries only position/dnf/time/finished/vehicle/driver_name; no crash/damage count field.
+			# Use documented minimal mapping (dnf or pos>=3 -> 0.6 like RIVAL_LOSS_SEVERITY).
+			var severity: float = 0.0
+			if dnf_flag or pos >= 3:
+				severity = 0.6
+			if severity > 0.0:
+				_current_run_session.register_crash(severity)
+			persist_current_run()
+		current_race_session["result_summary"] = {
+			"run": true,
+			"position": pos,
+			"node_id": node_id,
+		}
+		current_race_session["post_race_destination"] = "run_board"
 		current_race_session["result_committed"] = true
 		current_race_session.erase("save_error")
 		return true
@@ -1323,7 +1350,7 @@ func abandon_race() -> void:
 	if current_race_session.is_empty() or current_race_session.has("result"):
 		return
 	var mode := String(current_race_session.get("mode", "quick"))
-	_destination = "discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map")
+	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map"))
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
 
@@ -1380,6 +1407,57 @@ func enter_run_node(node_id: String) -> bool:
 		persist_current_run()
 	return ok
 	return ok
+
+func start_run_race(node_id: String = "") -> bool:
+	if _current_run_session == null or _transitioning_to_race:
+		return false
+	var target_id: String = node_id
+	if target_id.is_empty():
+		target_id = String(_current_run_session.current_node().get("id", ""))
+	var allowed := false
+	for entry: Dictionary in _current_run_session.available_nodes():
+		if String(entry.get("id", "")) == target_id:
+			allowed = true
+			break
+	if not allowed:
+		return false
+	var node: Dictionary = (_current_run_session.current_map.get_node(target_id) as Dictionary) if _current_run_session.current_map != null else {}
+	var ntype: String = String(node.get("type", ""))
+	if ntype != "race" and ntype != "act_rival":
+		return false
+	if not _current_run_session.enter_node(target_id):
+		return false
+	node_id = target_id
+	persist_current_run()
+	var vehicle_id: String = _current_run_session.current_car_id
+	_roll_quick_roster()
+	_install_roster_for("quick")
+	var event_id: String = "run_%s" % node_id
+	var event: Dictionary = {
+		"id": event_id,
+		"name": "Run Race " + node_id,
+		"theme": "kitchen",
+		"room": "classic",
+		"seed": _current_run_session.run_seed,
+		"circuit": "generated",
+		"race_format": "circuit",
+		"reverse": false,
+		"opponent_count": ROSTER_SIZE,
+		"opponents": _roster_ids(_quick_roster),
+	}
+	current_race_session = {
+		"mode": "run",
+		"event_id": event_id,
+		"event": event,
+		"vehicle_id": vehicle_id,
+		"difficulty": String(_save_data.get("difficulty", "club_circuit")),
+		"result_committed": false,
+		"run_node_id": node_id,
+	}
+	if not _test_mode:
+		_begin_race_transition(vehicle_id)
+	return true
+
 
 func update_setting(key: String, value: Variant) -> bool:
 	var candidate := _save_data.duplicate(true)
@@ -1461,6 +1539,8 @@ func _sync_current_scene() -> void:
 				_shell.call("show_map", _last_result_summary)
 			"discovery":
 				_shell.call("show_discovery")
+			"run_board":
+				_shell.call("show_run_board")
 			"ending":
 				_shell.call("show_ending")
 			_:
