@@ -109,6 +109,21 @@ func _store_cache(fingerprint: String, preview: Dictionary) -> void:
 		_cache.erase(_cache_order.pop_front())
 
 
+func _exit_tree() -> void:
+	# Deterministic teardown (GURI-1680): drop pending tickets, the cache and the
+	# worker so a quit mid-preview cannot leave state behind.
+	_pending_order.clear()
+	_pending.clear()
+	_active_entry.clear()
+	_active_fingerprint = ""
+	_cache.clear()
+	_cache_order.clear()
+	if is_instance_valid(_worker):
+		_worker.free()
+	_worker = null
+	_active_workers = 0
+
+
 func _touch_cache(fingerprint: String) -> void:
 	_cache_order.erase(fingerprint)
 	_cache_order.append(fingerprint)
