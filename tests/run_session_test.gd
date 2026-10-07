@@ -38,10 +38,6 @@ func _run_test() -> void:
 	var max_steps: int = 200
 	while steps < max_steps and not sess.is_failed() and not sess.is_complete():
 		steps += 1
-		var cur: Dictionary = sess.current_node()
-		var ctype: String = String(cur.get("type", ""))
-		if ctype != "":
-			seen_types[ctype] = true
 		var avail: Array[Dictionary] = sess.available_nodes()
 		if avail.is_empty():
 			break
@@ -60,6 +56,8 @@ func _run_test() -> void:
 			break
 		var after_enter: Dictionary = sess.current_node()
 		var etype: String = String(after_enter.get("type", ""))
+		if etype != "":
+			seen_types[etype] = true
 		if etype == "race" or etype == "act_rival":
 			var fsize: int = 2 if etype == "act_rival" else 4
 			var pos: int = 1
@@ -110,7 +108,7 @@ func _run_test() -> void:
 	for t: String in all_types:
 		if not seen_types.has(t):
 			missed.append(t)
-	print("DEBUG seen_types=", seen_types.keys(), " missed=", missed, " transits=", act_transits)
+	print("DEBUG seen_types=", seen_types.keys(), " missed=", missed, " transits=", act_transits, " final_act=", (sess.current_map.act if sess.current_map else 0), " row=", sess.run_state.row, " complete=", sess.is_complete(), " steps=", steps)
 	# require complete + transit; tolerate missing rare quota on the reached path for this slice
 	if not _expect(sess.is_complete() and not sess.is_failed(), "main run reaches complete without fail"):
 		return
