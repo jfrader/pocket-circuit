@@ -134,6 +134,8 @@ func _run_test() -> void:
 	await process_frame
 	if not _check_skin_cache_bounds():
 		return
+	if _failed:
+		return
 	print("MENU_FEEDBACK_TEST PASS borders_hover_press_focus_disabled_reduced_motion_hud_bounds")
 	quit(0)
 
@@ -197,12 +199,16 @@ func _capture(filename: String) -> void:
 		return
 	await _frame()
 	var error := root.get_texture().get_image().save_png(_captures.path_join(filename))
-	_expect(error == OK, "visual evidence must be written successfully")
+	if not _expect(error == OK, "visual evidence must be written successfully"):
+		return
 
+
+var _failed := false
 
 func _expect(condition: bool, message: String) -> bool:
 	if condition:
 		return true
+	_failed = true
 	push_error("MENU_FEEDBACK_TEST FAIL: " + message)
 	quit(1)
 	return false

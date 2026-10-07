@@ -15,6 +15,12 @@ class MockApp extends Node:
 	var favorites: Array = []
 	var save_read_only := false
 
+	func current_run_session() -> RunSession:
+		return null
+
+	func quick_race_roster() -> Array[String]:
+		return preload("res://data/championship/catalog.gd").quick_race_vehicle_ids()
+
 	func get_save_data() -> Dictionary:
 		return {"selected_vehicle": "rustbug", "unlocked_vehicles": ["rustbug"], "reduced_motion": false}
 

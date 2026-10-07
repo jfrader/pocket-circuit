@@ -32,6 +32,7 @@ class RacePauseOverlay extends Control:
 			get_viewport().set_input_as_handled()
 
 
+const PAUSE_RETURN_LABELS := {"discovery": "Return to Discovery", "quick": "Return to Title", "strip": "Return to Title", "run": "Return to the Board"}
 const RUSTBUG_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
@@ -783,6 +784,9 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 
 
 func _run_countdown() -> void:
+	var app := get_node_or_null("/root/App")
+	if app and app.has_method("race_started"):
+		app.call("race_started")
 	var director := _audio_director()
 	if director != null and director.has_method("stop_live_rotation"):
 		director.call("stop_live_rotation")
@@ -968,7 +972,8 @@ func _update_results(results: Array) -> void:
 			status,
 		])
 	lines.append("")
-	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if String(_session.get("mode", "quick")) in ["quick", "discovery"] else "RESULT SAVED · CONTINUE OR RETRY"
+	var mode := String(_session.get("mode", "quick"))
+	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if mode in ["quick", "discovery"] else ("RESULT SAVED · CONTINUE" if mode == "run" else "RESULT SAVED · CONTINUE OR RETRY")
 	var app := get_node_or_null("/root/App")
 	var live_session: Dictionary = app.call("get_current_race_session") if app and app.has_method("get_current_race_session") else {}
 	var summary: Dictionary = live_session.get("result_summary", {})
@@ -1291,9 +1296,11 @@ func _create_pause_overlay() -> void:
 	menu_column.add_child(menu_heading)
 	_pause_resume_button = _add_pause_button(menu_column, "Resume", _toggle_pause, true)
 	_add_pause_button(menu_column, "Settings", _show_pause_settings)
-	_add_pause_button(menu_column, "Restart", restart_race)
+	var app := get_node_or_null("/root/App")
+	if app == null or not app.has_method("can_retry_race") or bool(app.call("can_retry_race")):
+		_add_pause_button(menu_column, "Restart", restart_race)
 	var mode := String(_session.get("mode", "quick"))
-	var return_label := "Return to Discovery" if mode == "discovery" else ("Return to Title" if mode == "quick" else "Return to Championship")
+	var return_label: String = PAUSE_RETURN_LABELS.get(mode, "Return to Championship")
 	_add_pause_button(menu_column, return_label, request_abandon)
 
 	_pause_settings_panel = PanelContainer.new()
@@ -1317,7 +1324,6 @@ func _create_pause_overlay() -> void:
 	settings_heading.text = "RACE SETTINGS"
 	settings_heading.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	settings_column.add_child(settings_heading)
-	var app := get_node_or_null("/root/App")
 	var settings: Dictionary = app.call("get_save_data") if app and app.has_method("get_save_data") else {}
 	_pause_settings_first_control = _add_pause_setting_slider(settings_column, "Master", "master_volume", float(settings.get("master_volume", 1.0)))
 	_add_pause_setting_slider(settings_column, "Music", "music_volume", float(settings.get("music_volume", 0.8)))
@@ -1439,6 +1445,8 @@ func _add_pause_button(parent: Control, text: String, callback: Callable, primar
 
 
 func _on_retry_pressed() -> void:
+	if not _retry_button.visible:
+		return
 	if _save_error.is_empty():
 		restart_race()
 	else:
@@ -1456,16 +1464,17 @@ func _on_mastery_pressed() -> void:
 func _attempt_result_commit(results: Array) -> void:
 	var committed := _report_result_to_app(results)
 	var mastery_mode := String(_session.get("mode", "")) == "mastery"
-	_retry_button.disabled = false
+	var app := get_node_or_null("/root/App")
+	_retry_button.visible = not committed or app == null or not app.has_method("can_retry_race") or bool(app.call("can_retry_race"))
+	_retry_button.disabled = not _retry_button.visible
 	_continue_button.disabled = not committed and not mastery_mode
 	_retry_button.text = "RETRY" if committed else "RETRY SAVE"
-	var app := get_node_or_null("/root/App")
 	var mastery_available := committed and app and app.has_method("can_start_mastery_rematch") and bool(app.call("can_start_mastery_rematch"))
 	_mastery_button.visible = mastery_available
 	_mastery_button.disabled = not mastery_available
 	_layout_result_actions(mastery_available)
 	_retry_button.focus_neighbor_right = _retry_button.get_path_to(_mastery_button if mastery_available else _continue_button)
-	_continue_button.focus_neighbor_left = _continue_button.get_path_to(_mastery_button if mastery_available else _retry_button)
+	_continue_button.focus_neighbor_left = _continue_button.get_path_to(_mastery_button if mastery_available else (_retry_button if _retry_button.visible else _continue_button))
 	if mastery_available:
 		_mastery_button.focus_neighbor_left = _mastery_button.get_path_to(_retry_button)
 		_mastery_button.focus_neighbor_right = _mastery_button.get_path_to(_continue_button)
@@ -1481,6 +1490,8 @@ func _layout_result_actions(mastery_available: bool) -> void:
 		_retry_button.position.x = 26.0
 		_mastery_button.position.x = 225.0
 		_continue_button.position.x = 424.0
+	elif not _retry_button.visible:
+		_continue_button.position.x = 225.0
 	else:
 		_retry_button.position.x = 126.0
 		_continue_button.position.x = 324.0

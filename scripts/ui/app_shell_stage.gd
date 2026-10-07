@@ -7,8 +7,12 @@ const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const DriverDirectory := preload("res://scripts/progression/driver_directory.gd")
 const CAR_ASPECT := 0.75
 const CARD_ASPECT := 1.24
-const STAT_KEYS: Array[String] = ["speed", "grip", "mass", "drift"]
-const SPEC_CARD_MAX_HEIGHT := 300.0
+const SHAPE_CARD_MAX_HEIGHT := 330.0
+const SHAPE_RINGS := 4
+## The innermost a shape vertex sits, so a weak axis still reads as a corner.
+const SHAPE_FLOOR := 0.14
+const SHAPE_DASH := 5.0
+const SHAPE_RADIUS_RATIO := 0.33
 const CONFETTI_SEED := 1278
 const CONFETTI_PIECES := 46
 const ROOM_ICON_RADIUS := 32.0
@@ -19,6 +23,16 @@ var driver_id := "rae"
 var secondary_driver_id := ""
 var theme_id := "kitchen"
 var unlocked_vehicle_ids: Array[String] = ["rustbug"]
+## The garage's six-axis shape: the car shown, the car it is compared with,
+## and how far the drawing has travelled from the previous car (0..1).
+var shape: Dictionary = {}
+var compare_shape: Dictionary = {}
+var compare_label := ""
+var shape_blend := 1.0:
+	set(value):
+		shape_blend = value
+		queue_redraw()
+var _shape_from: Dictionary = {}
 
 
 func _ready() -> void:
@@ -177,13 +191,29 @@ func _draw_title_stage() -> void:
 	_draw_roster(Rect2(mat.position.x + 16.0, mat.end.y - mat.size.y * 0.2, mat.size.x - 32.0, mat.size.y * 0.17), CATALOG.championship_vehicle_ids())
 
 
+## Moves the garage shape to a new car; the caller animates shape_blend to 1.
+func show_shape(next_shape: Dictionary, next_compare: Dictionary, next_compare_label: String) -> void:
+	_shape_from = _blended_shape() if not shape.is_empty() else next_shape
+	shape = next_shape
+	compare_shape = next_compare
+	compare_label = next_compare_label
+	shape_blend = 0.0
+
+
+func _blended_shape() -> Dictionary:
+	var out := {}
+	for axis: String in CarProfile.AXES:
+		out[axis] = lerpf(float(_shape_from.get(axis, 0.0)), float(shape.get(axis, 0.0)), shape_blend)
+	return out
+
+
 func _draw_vehicle_stage() -> void:
-	var table_radius := minf(size.x * 0.34, size.y * 0.46)
-	var table_center := Vector2(size.x * 0.36, size.y * 0.5)
+	var table_radius := minf(size.x * 0.27, size.y * 0.44)
+	var table_center := Vector2(size.x * 0.29, size.y * 0.5)
 	_draw_turntable(table_center, table_radius)
 	draw_car(self, table_center, table_radius * 1.45, vehicle_id, -0.35)
-	var card_height := minf(size.y * 0.76, SPEC_CARD_MAX_HEIGHT)
-	_draw_spec_card(Rect2(size.x * 0.7, (size.y - card_height) * 0.5, size.x * 0.28, card_height), CATALOG.get_vehicle(vehicle_id))
+	var card_height := minf(size.y * 0.8, SHAPE_CARD_MAX_HEIGHT)
+	_draw_shape_card(Rect2(size.x * 0.6, (size.y - card_height) * 0.5, size.x * 0.38, card_height))
 
 
 func _draw_briefing_stage() -> void:
@@ -313,17 +343,53 @@ func _draw_turntable(center: Vector2, radius: float) -> void:
 	draw_arc(center, radius + SKIN.LINE + 5.0, PI * 0.1, PI * 0.65, 24, SKIN.ORANGE, 6.0, true)
 
 
-func _draw_spec_card(rect: Rect2, vehicle: Dictionary) -> void:
+func _draw_shape_card(rect: Rect2) -> void:
 	SKIN.draw_plate(self, rect, SKIN.CREAM)
-	SKIN.draw_tape(self, Vector2(rect.get_center().x, rect.position.y + 2.0), Vector2(rect.size.x * 0.5, 20.0), -0.05)
-	var ratings: Dictionary = vehicle.get("ratings", {})
-	var row_height := (rect.size.y - 30.0) / float(STAT_KEYS.size())
-	var tube_width := rect.size.x - 28.0 - SKIN.SHADOW
-	for index in STAT_KEYS.size():
-		var key := STAT_KEYS[index]
-		var top := rect.position.y + 22.0 + row_height * index
-		SKIN.draw_text(self, Vector2(rect.position.x + 15.0, top + 18.0), key.to_upper(), 14, SKIN.INK)
-		SKIN.draw_tube(self, Rect2(rect.position.x + 14.0, top + 26.0, tube_width, 18.0), float(ratings.get(key, 0.0)), _stat_color(key), SKIN.CREAM)
+	var tape_center := Vector2(rect.get_center().x, rect.position.y + 4.0)
+	SKIN.draw_tape(self, tape_center, Vector2(rect.size.x * 0.66, 24.0), -0.03)
+	SKIN.draw_text(self, Vector2(rect.position.x, tape_center.y + 5.0), compare_label, 13, SKIN.INK, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	if shape.is_empty():
+		return
+	var center := rect.get_center() + Vector2(0.0, 12.0)
+	var radius := minf(rect.size.x, rect.size.y) * SHAPE_RADIUS_RATIO
+	for ring in range(1, SHAPE_RINGS + 1):
+		var ring_points := _shape_points(center, radius * float(ring) / float(SHAPE_RINGS), {}, 1.0)
+		ring_points.append(ring_points[0])
+		draw_polyline(ring_points, Color(SKIN.INK, 0.12), 1.0, true)
+	for corner: Vector2 in _shape_points(center, radius, {}, 1.0):
+		draw_line(center, corner, Color(SKIN.INK, 0.12), 1.0, true)
+	var shown := _blended_shape()
+	var points := _shape_points(center, radius, shown)
+	draw_colored_polygon(points, Color(SKIN.ORANGE, 0.82))
+	var outline := points.duplicate()
+	outline.append(points[0])
+	draw_polyline(outline, SKIN.INK, 2.0, true)
+	for point: Vector2 in points:
+		draw_circle(point, 3.5, SKIN.INK)
+		draw_circle(point, 2.0, SKIN.YELLOW)
+	if not compare_shape.is_empty():
+		var compared := _shape_points(center, radius, compare_shape)
+		for index in compared.size():
+			draw_dashed_line(compared[index], compared[(index + 1) % compared.size()], SKIN.BLUE, 2.5, SHAPE_DASH, true)
+	var label_points := _shape_points(center, radius + 22.0, {}, 1.0)
+	for index in CarProfile.AXES.size():
+		var axis := CarProfile.AXES[index]
+		var at := label_points[index]
+		SKIN.draw_text(self, at + Vector2(-40.0, 4.0), axis.to_upper(), 12, SKIN.INK, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
+		if compare_shape.is_empty():
+			continue
+		var delta := roundi((float(shape.get(axis, 0.0)) - float(compare_shape.get(axis, 0.0))) * 100.0)
+		if delta != 0:
+			SKIN.draw_text(self, at + Vector2(-40.0, 18.0), "%+d" % delta, 12, SKIN.LIME if delta > 0 else SKIN.RED, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
+
+
+## Hexagon corners clockwise from the top; each axis value pushes its corner out.
+func _shape_points(center: Vector2, radius: float, values: Dictionary, fixed: float = -1.0) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for index in CarProfile.AXES.size():
+		var reach := fixed if fixed >= 0.0 else lerpf(SHAPE_FLOOR, 1.0, float(values.get(CarProfile.AXES[index], 0.0)))
+		points.append(center + Vector2.from_angle(-PI * 0.5 + TAU * float(index) / float(CarProfile.AXES.size())) * radius * reach)
+	return points
 
 
 func _draw_track_card(rect: Rect2, room: String) -> void:
@@ -424,14 +490,3 @@ func _ring(color: Color, width: int, radius: int) -> StyleBoxFlat:
 
 static func _first_name(id: String) -> String:
 	return String(CATALOG.get_driver(id).get("name", id)).get_slice(" ", 0).to_upper()
-
-
-func _stat_color(key: String) -> Color:
-	match key:
-		"speed":
-			return SKIN.ORANGE
-		"grip":
-			return SKIN.LIME
-		"mass":
-			return SKIN.BLUE
-	return SKIN.YELLOW

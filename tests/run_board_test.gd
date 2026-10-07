@@ -4,6 +4,8 @@ extends SceneTree
 ## the available nodes, and entering a node moves + persists the session.
 
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const RUN_UI := preload("res://scripts/ui/run_ui.gd")
+const RUN_WALK := preload("res://tests/support/run_walk.gd")
 
 var _failed := false
 
@@ -49,18 +51,54 @@ func _run_test() -> void:
 	if not _expect(str(enabled) == str(available), "the enabled nodes must equal available_nodes (got %s want %s)" % [str(enabled), str(available)]):
 		return
 
-	# The header carries the session values.
-	if not _expect(_has_label(board.get_parent(), str(sess.run_budget)), "the header must show the run budget"):
-		return
-	if not _expect(_has_label(board.get_parent(), str(sess.run_points)), "the header must show the run points"):
+	if not _expect(available.size() == 1 and available[0] == sess.current_node_id, "a fresh run offers only its opening race"):
 		return
 
-	# Press one available node: the session moves and the save follows.
-	if not _expect(available.size() > 0, "the run must have an available node"):
+	# The detail column carries the session values.
+	var detail := shell.find_child("RunDetail", true, false) as Control
+	if not _expect(detail != null, "the board must have its detail column"):
 		return
-	var target_id: String = available[0]
+	if not _expect(_has_label(detail, str(sess.run_points)), "the detail must show the run points"):
+		return
+	if not _expect(_has_label(detail, str(sess.owned_cars.size())), "the detail must show owned cars"):
+		return
+	if not _expect(_has_label(detail, "%s · %s" % [sess.current_car_id, sess.run_state.get_car_wear(sess.current_car_id)]), "the detail must show car and wear"):
+		return
+	var legend := shell.find_child("RunLegend", true, false) as Control
+	if not _expect(legend != null and legend.get_global_rect().end.y <= root.get_visible_rect().end.y, "the map legend must fit inside the logical viewport"):
+		return
+	for node_id: String in sess.current_map.nodes:
+		var marker := board.get_node_or_null("Node_" + node_id.replace("_", "-")) as Button
+		if not _expect(marker != null and marker.icon != null and marker.flat and marker.text.is_empty(), "every stop must be an SVG marker, not a text chip"):
+			return
+		if not _expect(Rect2(Vector2.ZERO, board.size).encloses(marker.get_rect()), "map markers must stay inside their card"):
+			return
+		if String(sess.current_map.get_node(node_id).get("type", "")) == "act_rival":
+			if not _expect(is_equal_approx(marker.position.x + marker.size.x * 0.5, board.size.x * 0.5), "the act rival must be centred above the route"):
+				return
+			for other: Node in board.get_children():
+				if other is Button and other != marker:
+					if not _expect(marker.position.y < (other as Button).position.y, "the act rival must be above ordinary nodes"):
+						return
+
+	# Pressing the opening race starts it; once raced, its children open.
+	var opening := board.get_node_or_null("Node_" + sess.current_node_id.replace("_", "-")) as Button
+	opening.pressed.emit()
+	await process_frame
+	var race_session: Dictionary = app.get("current_race_session")
+	if not _expect(String(race_session.get("run_node_id", "")) == sess.current_node_id, "pressing the opening race must start it"):
+		return
+	app.call("report_race_result", RUN_WALK.WIN, 1.0, [], false, {})
+	shell.call("show_run_board")
+	await process_frame
+	await process_frame
+	board = shell.find_child("RunBoard", true, false) as Control
+	var children: Array[Dictionary] = sess.available_nodes()
+	if not _expect(not children.is_empty() and String(children[0]["id"]) != sess.current_node_id, "a raced opening offers its children"):
+		return
+	var target_id := String(children[0]["id"])
 	var button := board.get_node_or_null("Node_" + target_id.replace("_", "-")) as Button
-	if not _expect(button != null, "the node button must exist for %s" % target_id):
+	if not _expect(button != null and not button.disabled, "the child marker must be pressable for %s" % target_id):
 		return
 	button.pressed.emit()
 	await process_frame
@@ -74,11 +112,57 @@ func _run_test() -> void:
 	if not _expect(String(saved_run.get("current_node_id", "")) == target_id, "the save must persist the entered node"):
 		return
 
+	# Node screens must retain their action and description without clipping the legend.
+	var screens := [
+		["show_run_bench", "BenchRepair", String(RUN_UI.TYPES["bench"]["copy"])],
+		["show_run_parts_van", "VanBuy_spare_shell", String(RUN_UI.TYPES["parts_van"]["copy"])],
+		["show_run_lockup", "LockupOpen", String(RUN_UI.TYPES["lockup"]["copy"])],
+		["show_run_errand", "ErrandPay", String(RUN_UI.TYPES["errand"]["copy"])],
+	]
+	for screen: Array in screens:
+		shell.call(String(screen[0]))
+		for frame in 4:
+			await process_frame
+		var action := shell.find_child(String(screen[1]), true, false) as Button
+		var back := shell.find_child("ActionBack", true, false) as Button
+		legend = shell.find_child("RunLegend", true, false) as Control
+		if not _expect(action != null and back != null, "%s must retain its actions" % screen[0]):
+			return
+		if not _expect(_has_label(shell, String(screen[2])), "%s must show its node description" % screen[0]):
+			return
+		if not _expect(legend != null and legend.get_global_rect().end.y <= root.get_visible_rect().end.y and back.get_global_rect().end.y < legend.get_global_rect().position.y, "%s must keep actions and legend inside the logical viewport" % screen[0]):
+			return
+	# With a run in progress the title offers to continue it, not to replace it.
+	shell.call("show_title")
+	await process_frame
+	var continue_button := _button_with_text(shell, "YOUR RUN")
+	if not _expect(continue_button != null and _button_with_text(shell, "NEW RUN") == null, "the title offers YOUR RUN while a run is on"):
+		return
+	continue_button.pressed.emit()
+	await process_frame
+	if not _expect(shell.find_child("RunBoard", true, false) != null and app.call("current_run_session") == sess, "YOUR RUN returns to the same run"):
+		return
 	app.call("abandon_run")
+	shell.call("show_title")
+	await process_frame
+	if not _expect(_button_with_text(shell, "NEW RUN") != null, "with no run the title offers NEW RUN"):
+		return
+	if not _expect((shell.get("_run_backdrop") as ColorRect).visible == false, "leaving a run screen must restore the title backdrop"):
+		return
 	if _failed:
 		return
 	print("RUN_BOARD_TEST PASS")
 	quit(0)
+
+
+func _button_with_text(node: Node, text: String) -> Button:
+	if node is Button and (node as Button).text == text and (node as Button).is_visible_in_tree():
+		return node as Button
+	for child in node.get_children():
+		var found := _button_with_text(child, text)
+		if found != null:
+			return found
+	return null
 
 
 func _has_label(node: Node, text: String) -> bool:

@@ -26,8 +26,8 @@ func _run() -> void:
 		surface.closed = false
 		MATERIALS.apply(world, resolved)
 		var material := surface.material as ShaderMaterial
-		assert(material.get_shader_parameter("paint_opacity") == resolved["course"]["paint_opacity"])
-		assert(material.get_shader_parameter("surface_grain") == (floor_node.material as ShaderMaterial).get_shader_parameter("surface_grain"))
+		if not _expect(material.get_shader_parameter("paint_opacity") == resolved["course"]["paint_opacity"], "opacity match"): return
+		if not _expect(material.get_shader_parameter("surface_grain") == (floor_node.material as ShaderMaterial).get_shader_parameter("surface_grain"), "grain match"): return
 		root.add_child(viewport)
 		if DisplayServer.get_name() != "headless":
 			surface.hide()
@@ -38,20 +38,22 @@ func _run() -> void:
 			var maximum := 0
 			for index in bare.size():
 				maximum = maxi(maximum, absi(int(bare[index]) - int(neutral[index])))
-			assert(maximum <= PIXEL_TOLERANCE, "zero-coat substrate must remain continuous across turns: " + String(theme))
+			if not _expect(maximum <= PIXEL_TOLERANCE, "zero-coat substrate must remain continuous across turns: " + String(theme)): return
 			material.set_shader_parameter("paint_opacity", resolved["course"]["paint_opacity"])
 			var painted := await _pixels(viewport)
 			var changed_pixels := 0
 			for index in range(0, bare.size(), 4):
 				if absi(int(bare[index]) - int(painted[index])) > PIXEL_TOLERANCE:
 					changed_pixels += 1
-			assert(changed_pixels > VIEW_SIZE.x * VIEW_SIZE.y / 10, "paint must remain visible, not just render its substrate")
+			if not _expect(changed_pixels > VIEW_SIZE.x * VIEW_SIZE.y / 10, "paint must remain visible, not just render its substrate"): return
 			print("PAINTED_PIXELS ", theme, " zero_coat_max=", maximum, " changed=", changed_pixels)
 		root.remove_child(viewport)
 		viewport.free()
 		await process_frame
 	if DisplayServer.get_name() == "headless":
 		print("PAINTED_PIXELS skipped=headless; run natively for framebuffer assertions")
+	if _failed:
+		return
 	print("PAINTED_COURSE_RENDER_TEST PASS shared_substrate_visible_pigment")
 	quit(0)
 
@@ -61,3 +63,12 @@ func _pixels(viewport: SubViewport) -> PackedByteArray:
 	var image := viewport.get_texture().get_image()
 	image.convert(Image.FORMAT_RGBA8)
 	return image.get_data()
+
+var _failed := false
+func _expect(condition: bool, message: String) -> bool:
+	if not condition:
+		_failed = true
+		push_error("FAIL: " + message)
+		quit(1)
+		return false
+	return true

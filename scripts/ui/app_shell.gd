@@ -2,6 +2,8 @@ extends CanvasLayer
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
+const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
+const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
 const ROUTE_SCRIPT := preload("res://scripts/ui/championship_route_menu.gd")
 const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
@@ -22,6 +24,8 @@ var _content: VBoxContainer
 var _stage: AppShellStage
 var _route: Control
 var _footer: Label
+var _run_backdrop: ColorRect
+var _run_actions: VBoxContainer
 var _button_focus_chain: Array[Button] = []
 var _screen := "title"
 var _event_id := ""
@@ -69,7 +73,7 @@ func show_title() -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	_page.hide()
 	_art_menu.set("reduced_motion", _reduced_motion_enabled())
-	_art_menu.call("show_title", has_progress, save_read_only, _selected_vehicle(progress), progress.get("unlocked_vehicles", ["rustbug"]), recovery_message)
+	_art_menu.call("show_title", has_progress, save_read_only, _selected_vehicle(progress), progress.get("unlocked_vehicles", ["rustbug"]), recovery_message, _app.call("current_run_session") != null)
 	_app.call("prepare_circuit_preview", _current_quick_identity())
 
 
@@ -259,71 +263,104 @@ func show_run_board() -> void:
 		_footer.text = BACK_HINT
 		_focus_first()
 		return
-	var car_id: String = sess.current_car_id
-	_configure_stage(&"map", car_id, "rae", "workshop")
-	_add_kicker("RUN · ACT %d" % sess.current_map.act)
-	_add_heading("BOARD")
-	_add_section("POINTS", "%d" % sess.run_points)
-	_add_section("BUDGET", "%d" % sess.run_budget)
-	var wear: String = "?"
-	if sess.run_state != null:
-		wear = sess.run_state.get_car_wear(car_id)
-	_add_section("CURRENT CAR", "%s · %s" % [car_id, wear])
-	var owned_count: int = sess.owned_cars.size()
-	_add_section("OWNED", "%d" % owned_count)
-	_add_spacer(6)
-	# Board with positioned node buttons. y decreases with growing row (higher rows toward top of board).
-	var board := Control.new()
+	_run_surface()
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 64)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 8)
+	columns.add_child(left)
+	var board := RUN_MAP_VIEW.new()
 	board.name = "RunBoard"
-	board.custom_minimum_size = Vector2(520.0, 240.0)
-	_content.add_child(board)
-	var col_step: float = 68.0
-	var row_step: float = 38.0
-	var base_y: float = 200.0
-	var avail: Array[Dictionary] = sess.available_nodes()
-	var avail_ids: Array[String] = []
-	for a: Dictionary in avail:
-		avail_ids.append(String(a.get("id", "")))
-	var curr_id: String = sess.current_node_id
-	var node_list: Array[Dictionary] = []
-	for r: int in range(sess.current_map.num_rows):
-		var row_list: Array[Dictionary] = sess.current_map.get_nodes_in_row(r)
-		for n: Dictionary in row_list:
-			node_list.append(n)
-	for n: Dictionary in node_list:
-		var nid: String = String(n.get("id", ""))
-		var nr: int = int(n.get("row", 0))
-		var nc: int = int(n.get("col", 0))
-		var is_curr: bool = (nid == curr_id)
-		var is_avail: bool = nid in avail_ids
-		var t: String = String(n.get("type", "race"))
-		var txt: String = ("> " if is_curr else "") + nid + "\n" + t
-		var cb: Callable = Callable(self, "_on_run_node_pressed").bind(nid) if is_avail else Callable()
-		var btn: Button = _make_button(txt, cb, false, not is_avail, "Node_" + nid.replace("_", "-"))
-		btn.custom_minimum_size = Vector2(62.0, 34.0)
-		btn.position = Vector2(20.0 + float(nc) * col_step, base_y - float(nr) * row_step)
-		if is_curr:
-			btn.modulate = Color(1.0, 0.95, 0.4)
-		board.add_child(btn)
-		if is_avail:
-			_register_button_focus(btn)
-	_add_spacer(8)
-	_add_button("NEW RUN", Callable(self, "_on_new_run_pressed"), false, false, "ActionNewRun")
-	_add_button("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
-	_add_button("BACK", Callable(self, "show_title"), false, false, "ActionBack")
-	_footer.text = "ADVANCE VIA ENABLED NODES  ·  " + BACK_HINT
+	left.add_child(board)
+	left.add_child(RUN_UI.label("CHOOSE THE NEXT STOP", 11, RUN_UI.MUTED, true))
+	var buttons: Array[Button] = board.configure(sess, Callable(self, "_on_run_node_pressed"))
+	for button: Button in buttons:
+		_wire_button_audio(button)
+		if not button.disabled:
+			_register_button_focus(button)
+	var detail := VBoxContainer.new()
+	detail.name = "RunDetail"
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.add_theme_constant_override("separation", 6)
+	columns.add_child(detail)
+	RUN_UI.spacer(detail, 8)
+	detail.add_child(RUN_UI.label("THE RUN · ACT %d / 3" % sess.current_map.act, 12, RUN_UI.AMBER, true))
+	var heading := RUN_UI.label(String(RUN_UI.ROOMS[sess.current_map.act]).replace(" ", "\n"), 44)
+	detail.add_child(heading)
+	RUN_UI.spacer(detail, 8)
+	RUN_UI.stats(detail, sess)
+	RUN_UI.spacer(detail, 8)
+	_run_actions = detail
+	if sess.is_failed() or sess.is_complete():
+		detail.add_child(RUN_UI.label("NIGHT OVER", 12, RUN_UI.AMBER, true))
+	var unsaved := String(_app.get("run_save_error"))
+	if not unsaved.is_empty():
+		detail.add_child(RUN_UI.label("NOT SAVED · " + unsaved.to_upper(), 12, RUN_UI.AMBER, true))
+		if not bool(_app.call("is_save_read_only")):
+			_run_action("SAVE AGAIN", Callable(self, "_on_save_run_again"), true, false, "ActionSaveAgain")
+	_run_action("NEW RUN", Callable(self, "_on_new_run_pressed"), false, false, "ActionNewRun")
+	_run_action("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
+	_run_action("BACK", Callable(self, "show_title"), false, false, "ActionBack")
+	RUN_UI.spacer(_content, 10)
+	RUN_UI.divider(_content)
+	_content.add_child(RUN_UI.legend(sess.current_map))
+	_content.add_child(RUN_UI.key_row(["RING · CURRENT STOP", "COLOUR · AVAILABLE", "DIM · LOCKED"]))
 	_focus_first()
 
 
-func _run_context(sess: RunSession) -> void:
-	_add_kicker("RUN · ACT %d" % sess.current_map.act)
-	_add_section("POINTS", "%d" % sess.run_points)
-	_add_section("BUDGET", "%d" % sess.run_budget)
-	var car_id: String = sess.current_car_id
-	var wear: String = "?"
-	if sess.run_state != null:
-		wear = sess.run_state.get_car_wear(car_id)
-	_add_section("CURRENT CAR", "%s · %s" % [car_id, wear])
+func _run_surface() -> void:
+	_configure_stage(&"title")
+	_run_backdrop.show()
+	_footer.get_parent().hide()
+	_content.add_theme_constant_override("separation", 14)
+
+
+func _run_node_intro(sess: RunSession, kind: String) -> void:
+	_run_surface()
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 64)
+	_content.add_child(columns)
+	var detail := VBoxContainer.new()
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.add_theme_constant_override("separation", 6)
+	columns.add_child(detail)
+	RUN_UI.spacer(detail, 8)
+	detail.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, RUN_UI.MUTED, true))
+	RUN_UI.spacer(detail, 8)
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 16)
+	title_row.add_child(RUN_UI.icon(kind, 36))
+	title_row.add_child(RUN_UI.label(String(RUN_UI.TYPES[kind]["name"]), 48))
+	detail.add_child(title_row)
+	var copy := RUN_UI.label(String(RUN_UI.TYPES[kind]["copy"]), 20, RUN_UI.MUTED)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_child(copy)
+	RUN_UI.spacer(detail, 6)
+	RUN_UI.stats(detail, sess)
+	RUN_UI.spacer(detail, 12)
+	_run_actions = detail
+	var board := RUN_MAP_VIEW.new()
+	board.name = "RunContextMap"
+	columns.add_child(board)
+	# The context map is read-only; actions on this stop remain the only focus targets.
+	var buttons: Array[Button] = board.configure(sess, Callable())
+	for button: Button in buttons:
+		button.disabled = true
+		button.focus_mode = Control.FOCUS_NONE
+		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	RUN_UI.divider(_content)
+	_content.add_child(RUN_UI.legend(sess.current_map))
+
+
+func _run_action(text: String, callback: Callable, primary: bool = false, disabled: bool = false, node_name: String = "") -> void:
+	var button := RUN_UI.action(text, primary, disabled)
+	button.name = node_name
+	button.pressed.connect(callback)
+	_wire_button_audio(button)
+	_run_actions.add_child(button)
+	if not disabled:
+		_register_button_focus(button)
 
 
 func show_run_bench() -> void:
@@ -337,16 +374,10 @@ func show_run_bench() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
-	_add_heading("BENCH")
-	_run_context(sess)
-	_add_spacer(8)
-	_add_button("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, false, "BenchRepair")
-	_add_button("FIT SPARE", Callable(self, "_on_bench_fit_pressed"), false, false, "BenchFit")
-	if sess.current_map.is_last_row(int(sess.current_node().get("row", -1))):
-		_add_button("CONTINUE", Callable(self, "_on_bench_continue_pressed"), false, false, "BenchContinue")
-	_add_button("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_footer.text = "REPAIR OR FIT — NEVER BOTH  ·  " + BACK_HINT
+	_run_node_intro(sess, "bench")
+	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, false, "BenchRepair")
+	_run_action("FIT SPARE", Callable(self, "_on_bench_fit_pressed"), false, false, "BenchFit")
+	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	_focus_first()
 
 
@@ -361,15 +392,12 @@ func show_run_parts_van() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
-	_add_heading("PARTS VAN")
-	_run_context(sess)
-	_add_spacer(8)
-	_add_button("TYRE SET · 15", Callable(self, "_on_van_buy_pressed").bind(15), true, sess.run_budget < 15, "VanBuy15")
-	_add_button("TOOL KIT · 8", Callable(self, "_on_van_buy_pressed").bind(8), false, sess.run_budget < 8, "VanBuy8")
-	_add_button("SPARE SHELL · 25", Callable(self, "_on_van_buy_pressed").bind(25), false, sess.run_budget < 25, "VanBuy25")
-	_add_button("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_footer.text = "SPEND FROM THE RUN BUDGET  ·  " + BACK_HINT
+	_run_node_intro(sess, "parts_van")
+	_run_actions.add_child(RUN_UI.label("SPEND POINTS", 11, RUN_UI.AMBER, true))
+	for part: String in RunSession.VAN_PART_COSTS:
+		var cost := int(RunSession.VAN_PART_COSTS[part])
+		_run_action("%s · %d" % [String(RUN_UI.VAN_PART_NAMES[part]), cost], Callable(self, "_on_van_buy_pressed").bind(part), false, sess.run_points < cost, "VanBuy_" + part)
+	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	_focus_first()
 
 
@@ -384,14 +412,9 @@ func show_run_lockup() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
-	_add_heading("LOCKUP")
-	_run_context(sess)
-	_add_copy("One free car per act.", SKIN.CREAM_DIM)
-	_add_spacer(8)
-	_add_button("OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
-	_add_button("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_footer.text = "SCARCE — ONCE PER ACT  ·  " + BACK_HINT
+	_run_node_intro(sess, "lockup")
+	_run_action("OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
+	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	_focus_first()
 
 
@@ -406,15 +429,11 @@ func show_run_errand() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_configure_stage(&"map", sess.current_car_id, "rae", "workshop")
-	_add_heading("ERRAND")
-	_run_context(sess)
-	_add_copy("Pick one favour.", SKIN.CREAM_DIM)
-	_add_spacer(8)
-	_add_button("TAKE THE CASH", Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandCash")
-	_add_button("TAKE THE POINTS", Callable(self, "_on_errand_choice_pressed").bind(1), false, false, "ErrandPoints")
-	_add_button("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_footer.text = "A CHOICE, NOT A REWARD  ·  " + BACK_HINT
+	_run_node_intro(sess, "errand")
+	var car_clean := sess.run_state.get_car_wear(sess.current_car_id) == RunState.WEAR_LEVELS[0]
+	_run_action("TAKE THE PAY · %d" % RunSession.ERRAND_PAY_POINTS, Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandPay")
+	_run_action("TAKE A TUNE-UP", Callable(self, "_on_errand_choice_pressed").bind(1), false, car_clean, "ErrandTuneUp")
+	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	_focus_first()
 
 
@@ -433,15 +452,9 @@ func _on_bench_fit_pressed() -> void:
 	show_run_board()
 
 
-func _on_bench_continue_pressed() -> void:
+func _on_van_buy_pressed(part_id: String) -> void:
 	_play_ui_confirm()
-	_app.call("run_bench_continue")
-	show_run_board()
-
-
-func _on_van_buy_pressed(cost: int) -> void:
-	_play_ui_confirm()
-	_app.call("run_spend", cost)
+	_app.call("run_buy_part", part_id)
 	show_run_board()
 
 
@@ -583,14 +596,14 @@ func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
 	var unlocked_vehicles: Array = progress.get("unlocked_vehicles", ["rustbug"])
 	var roster: Array = []
 	if quick_race:
-		roster = CATALOG.quick_race_vehicle_ids()
+		roster = _app.call("quick_race_roster")
 		unlocked_vehicles = roster  # Quick Race accepts any in its roster; no championship unlock required
 	else:
 		roster = CATALOG.championship_vehicle_ids()
 	_page.hide()
 	_art_menu.set("reduced_motion", _reduced_motion_enabled())
 	var context := "QUICK STRIP · YOUR MACHINE" if _quick_strip else ("QUICK RACE · YOUR MACHINE" if quick_race else String(event.get("name", "CHAMPIONSHIP")).to_upper())
-	_art_menu.call("show_garage", selected_vehicle, unlocked_vehicles, context, "NEXT: TRACK" if quick_race and event_id.is_empty() else "PLAY", roster)
+	_art_menu.call("show_garage", selected_vehicle, unlocked_vehicles, context, "NEXT: TRACK" if quick_race and event_id.is_empty() else "PLAY", roster, "THE GARAGE" if quick_race else "SELECT YOUR CAR")
 
 
 func show_driver(return_action: Callable = Callable()) -> void:
@@ -793,6 +806,12 @@ func _build_base() -> void:
 	_root.theme = SKIN.make_theme()
 	add_child(_root)
 	_root.add_child(SKIN.workbench_backdrop())
+	_run_backdrop = ColorRect.new()
+	_run_backdrop.color = RUN_UI.BG
+	_run_backdrop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_run_backdrop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.hide()
+	_root.add_child(_run_backdrop)
 	var margin := MarginContainer.new()
 	_page = margin
 	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -872,6 +891,9 @@ func _apply_compact_button_art(button: Button) -> void:
 
 func _clear_content() -> void:
 	_page.show()
+	_run_backdrop.hide()
+	_footer.get_parent().show()
+	_run_actions = null
 	if is_instance_valid(_route):
 		_route.hide()
 	_art_menu.call("clear")
@@ -921,6 +943,8 @@ func _on_art_action(action: StringName) -> void:
 			_app.call("continue_championship" if _app.call("has_championship_progress") else "request_new_championship")
 		&"new_run":
 			_app.call("start_new_run")
+			show_run_board()
+		&"your_run":
 			show_run_board()
 		&"quick_race":
 			_app.call("open_quick_race")
@@ -1394,7 +1418,7 @@ func _roll_quick_race() -> void:
 func _start_quick_race() -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	var vehicle_id := _quick_race_vehicle_id if not _quick_race_vehicle_id.is_empty() else _selected_vehicle(progress)
-	var qids := CATALOG.quick_race_vehicle_ids()
+	var qids: Array[String] = _app.call("quick_race_roster")
 	if not vehicle_id in qids:
 		vehicle_id = qids[0] if not qids.is_empty() else "rustbug"
 	_app.call("start_circuit_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id, _quick_race_reverse, _quick_race_length_tier)
@@ -1403,7 +1427,7 @@ func _start_quick_race() -> void:
 func _start_quick_strip() -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	var vehicle_id := _quick_strip_vehicle_id if not _quick_strip_vehicle_id.is_empty() else _selected_vehicle(progress)
-	var qids := CATALOG.quick_race_vehicle_ids()
+	var qids: Array[String] = _app.call("quick_race_roster")
 	if not vehicle_id in qids:
 		vehicle_id = qids[0] if not qids.is_empty() else "rustbug"
 	_app.call("start_strip_race", _quick_race_theme, _quick_race_room, _quick_race_seed, vehicle_id, _quick_race_reverse, _quick_race_length_tier)
@@ -1452,6 +1476,9 @@ func _on_run_node_pressed(node_id: String) -> void:
 		# Race nodes hand over to the real race flow; the result resolves the run.
 		_app.call("start_run_race", node_id)
 		return
+	if node_type == "rival":
+		_app.call("start_run_rival", node_id)
+		return
 	if not bool(_app.call("enter_run_node", node_id)):
 		return
 	match node_type:
@@ -1464,13 +1491,22 @@ func _on_run_node_pressed(node_id: String) -> void:
 		"errand":
 			show_run_errand()
 		_:
-			# Rival (and anything else not yet wired) keeps the position-only rule.
+			# position-only default for unknown node types
 			show_run_board()
 
 
 func _on_new_run_pressed() -> void:
 	_app.call("start_new_run")
 	show_run_board()
+
+
+func _on_save_run_again() -> void:
+	_play_ui_confirm()
+	_app.call("persist_current_run")
+	if _app.call("current_run_session") == null:
+		show_title()
+	else:
+		show_run_board()
 
 
 func _on_abandon_run() -> void:

@@ -18,6 +18,24 @@
 - **First Godot project** — do not assume prior repo conventions; follow this
   file and the spec.
 
+## Review discipline
+
+Added after the run-board handoff (2026-10-07) went out with a screen nobody had
+looked at rendered. Not optional:
+
+- **Look at it.** No UI change is finished until its author has captured every
+  changed screen and reviewed the image. The loop is
+  `PC_SHOT_SCREEN=board PC_SHOT_PATH=/tmp/shot.png xvfb-run -a godot --path . --script res://tools/capture_ui.gd`
+  (crop with `PC_SHOT_CROP=x,y,w,h`). Never hand a screen to the operator unseen.
+- **One front at a time.** Do not open a new workstream while an unreviewed
+  change is in flight: finish it, review it, then start the next.
+- **Evidence, not claims.** A "PASS" quotes the marker line and the command that
+  produced it; a timing claim names the measurement. Capture `$?` before any
+  command substitution. A test that cannot fail is a defect, and so is an
+  assertion that cannot stop the run (hard failure flags, no soft asserts).
+- **Fresh eyes.** New work is reviewed by someone other than its author (a
+  review agent or the operator) before it is considered done.
+
 ## Golden rule
 
 Spec §127 order, never reversed: vehicle feel → camera → track readability →

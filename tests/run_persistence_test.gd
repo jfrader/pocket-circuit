@@ -4,6 +4,7 @@ extends SceneTree
 ## fresh boot, and abandoning it clears the field.
 
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 
 var _failed := false
@@ -22,13 +23,11 @@ func _run_test() -> void:
 		return
 	if not _expect(app.call("current_run_session") == sess, "the app must expose the active run"):
 		return
-	# Resolve one node so the persisted state is mid-run, not just the opening.
+	# Race the opening and step past it so the persisted state is mid-run.
+	RUN_WALK.settle(app, sess)
 	var options: Array[Dictionary] = sess.available_nodes()
-	if not _expect(options.size() > 0, "the opening node must have children"):
+	if not _expect(not options.is_empty() and bool(app.call("enter_run_node", String(options[0]["id"]))), "entering a child of the raced opening must succeed"):
 		return
-	if not _expect(sess.enter_node(String(options[0].get("id", ""))), "entering the first node must succeed"):
-		return
-	app.call("persist_current_run")
 
 	# Reload from disk exactly like a fresh boot would.
 	var live_store: Object = app.get("_save_store")
@@ -40,7 +39,7 @@ func _run_test() -> void:
 		return
 	if not _expect(resumed.current_node_id == sess.current_node_id, "the current node must survive the roundtrip (got %s want %s)" % [resumed.current_node_id, sess.current_node_id]):
 		return
-	if not _expect(resumed.run_budget == sess.run_budget and resumed.run_points == sess.run_points, "budget and points must survive"):
+	if not _expect(resumed.run_points == sess.run_points and resumed.run_points > 0 and resumed.resolved_nodes == sess.resolved_nodes, "points and raced stops must survive"):
 		return
 	if not _expect(resumed.owned_cars.size() == sess.owned_cars.size(), "owned cars must survive"):
 		return

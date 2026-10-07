@@ -13,7 +13,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "tools"))
 from test_success_marker import fixed_fps_for, marker_for
-from validate_release_config import validate_gamestruments_readme
+from validate_release_config import missing_uid_sidecars, stray_uid_sidecars, test_source_violations, validate_gamestruments_readme
 
 
 class CompletionMarkerTests(unittest.TestCase):
@@ -131,6 +131,19 @@ class GodotGateTests(unittest.TestCase):
     def test_script_error_with_zero_exit_fails(self):
         result = self.run_worker('print("FIXTURE PASS"); print("SCRIPT ERROR: broken fixture")')
         self.assertNotEqual(result.returncode, 0)
+
+    def test_failed_assertion_with_success_marker_and_zero_exit_fails(self):
+        for failure in ("FAIL: deliberate", "  \tFAIL: deliberate", "Assertion failed", "at fixture: Assertion failed: deliberate"):
+            for stream in ("sys.stdout", "sys.stderr"):
+                with self.subTest(failure=failure, stream=stream):
+                    result = self.run_worker(f'import sys; print({failure!r}, file={stream}); print("FIXTURE PASS")')
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("failed assertion", result.stderr)
+                    self.assertIn(failure, result.stdout)
+
+    def test_failure_scan_does_not_reject_ordinary_output(self):
+        result = self.run_worker('print("EXPECTED_FAIL: negative case checked"); print("FIXTURE PASS")')
+        self.assertEqual(result.returncode, 0, result.stderr)
 
     def test_missing_completion_marker_fails(self):
         result = self.run_worker('print("still preparing")')
@@ -324,3 +337,29 @@ print("MAPPED_READER PASS", flush=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(loaded.read(), original)
             self.assertEqual(destination.read_bytes(), compiled.read_bytes())
+
+
+class UidSidecarTests(unittest.TestCase):
+    def test_scripts_and_shaders_need_a_sidecar(self):
+        paths = ["a.gd", "a.gd.uid", "b.gd", "c.gdshader", "d.tscn", "e.tres", "f.txt"]
+        self.assertEqual(sorted(missing_uid_sidecars(paths)), ["b.gd", "c.gdshader"])
+
+    def test_scene_and_resource_sidecars_are_stray(self):
+        paths = ["a.gd", "a.gd.uid", "b.gdshader.uid", "c.tscn", "c.tscn.uid", "d.tres.uid"]
+        self.assertEqual(sorted(stray_uid_sidecars(paths)), ["c.tscn.uid", "d.tres.uid"])
+
+
+class TestSourceBanTests(unittest.TestCase):
+    def test_assert_is_reported(self):
+        self.assertEqual(
+            test_source_violations({"tests/a_test.gd": "func _run():\n\tassert(x)\n"}),
+            ["tests/a_test.gd: uses assert(); use a failing _expect"],
+        )
+
+    def test_unpathed_save_store_is_reported(self):
+        violations = test_source_violations({"tests/b_test.gd": "var store = SAVE_STORE.new()\n"})
+        self.assertEqual(violations, ["tests/b_test.gd: builds a SaveStore on the player's save path"])
+
+    def test_pathed_store_and_expect_pass(self):
+        source = 'var store = SAVE_STORE.new("user://tests/x.json")\nif not _expect(x, "x"): return\n'
+        self.assertEqual(test_source_violations({"tests/c_test.gd": source}), [])
