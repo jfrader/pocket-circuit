@@ -56,6 +56,22 @@ func debug_metrics() -> Dictionary:
 	}
 
 
+func _exit_tree() -> void:
+	# Deterministic teardown (GURI-1680): a quit mid-pass must not leave workers,
+	# retained resources or queued keys behind.
+	_active = false
+	_texture_paths.clear()
+	_vehicle_ids.clear()
+	_prewarmed_resources.clear()
+	_roster_keys.clear()
+	if is_instance_valid(_worker):
+		_worker.free()
+	_worker = null
+	if is_instance_valid(_roster_worker):
+		_roster_worker.free()
+	_roster_worker = null
+
+
 func _collect_texture_paths() -> Array[String]:
 	# Every full-path texture the generated-track catalog can place. This is the
 	# union the race's own outline loop walks across all themes and story kits.

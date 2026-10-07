@@ -86,9 +86,15 @@ func _run_test() -> void:
 	await _tap_joypad_button(1)
 	if not _expect(not paused and not pause_overlay.visible, "gamepad B should resume from the pause menu"):
 		return
-	root.remove_child(race)
-	race.free()
-	current_scene = null
+	# Leave through the real abandon path (GURI-1680): quitting from a hand-freed
+	# scene left intermittent exit leaks, because the scene change and the
+	# background prewarm were still mid-flight. A player quitting the race takes
+	# this path, so the test does too.
+	app.call("abandon_race")
+	var settle_deadline := Time.get_ticks_msec() + 20000
+	while Time.get_ticks_msec() < settle_deadline and (current_scene == null or current_scene.scene_file_path != BOOT_SCENE.resource_path):
+		await process_frame
+	await _wait_frames(5)
 	print("CONTROLLER_FLOW_TEST PASS")
 	quit(0)
 
