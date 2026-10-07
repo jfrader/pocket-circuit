@@ -1161,15 +1161,24 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 		var node_id: String = String(current_race_session.get("run_node_id", ""))
 		var field_size: int = racer_count
 		if _current_run_session != null and node_id != "":
-			var resolve_out: Dictionary = _current_run_session.resolve_race(node_id, pos, field_size)
-			# Inspected: the result dict built by race_manager.get_results() (and passed through prototype)
-			# carries only position/dnf/time/finished/vehicle/driver_name; no crash/damage count field.
-			# Use documented minimal mapping (dnf or pos>=3 -> 0.6 like RIVAL_LOSS_SEVERITY).
-			var severity: float = 0.0
-			if dnf_flag or pos >= 3:
-				severity = 0.6
-			if severity > 0.0:
-				_current_run_session.register_crash(severity)
+			var node_type: String = ""
+			var n: Dictionary = _current_run_session.current_node()
+			node_type = String(n.get("type", ""))
+			if node_type == "rival":
+				var won: bool = pos == 1
+				var _rival_out: Dictionary = _current_run_session.resolve_rival(node_id, won)
+				# The rival budget/wear penalty (RIVAL_LOSS_*) is applied inside resolve_rival alone.
+				# Win: adds exactly one owned car. Loss: budget cost (or wear if overdrawn). Do not double-apply.
+			else:
+				var resolve_out: Dictionary = _current_run_session.resolve_race(node_id, pos, field_size)
+				# Inspected: the result dict built by race_manager.get_results() (and passed through prototype)
+				# carries only position/dnf/time/finished/vehicle/driver_name; no crash/damage count field.
+				# Use documented minimal mapping (dnf or pos>=3 -> 0.6 like RIVAL_LOSS_SEVERITY).
+				var severity: float = 0.0
+				if dnf_flag or pos >= 3:
+					severity = 0.6
+				if severity > 0.0:
+					_current_run_session.register_crash(severity)
 			persist_current_run()
 		current_race_session["result_summary"] = {
 			"run": true,
@@ -1485,6 +1494,63 @@ func start_run_race(node_id: String = "") -> bool:
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
 	return true
+
+func start_run_rival(node_id: String = "") -> bool:
+	if _current_run_session == null or _transitioning_to_race:
+		return false
+	var target_id: String = node_id
+	if target_id.is_empty():
+		target_id = String(_current_run_session.current_node().get("id", ""))
+	var allowed: bool = false
+	for entry: Dictionary in _current_run_session.available_nodes():
+		if String(entry.get("id", "")) == target_id:
+			allowed = true
+			break
+	if not allowed:
+		return false
+	var node: Dictionary = (_current_run_session.current_map.get_node(target_id) as Dictionary) if _current_run_session.current_map != null else {}
+	var ntype: String = String(node.get("type", ""))
+	if ntype != "rival":
+		return false
+	if not _current_run_session.enter_node(target_id):
+		return false
+	node_id = target_id
+	persist_current_run()
+	var vehicle_id: String = _current_run_session.current_car_id
+	_roll_quick_roster()
+	_install_roster_for("quick")
+	var event_id: String = "run_%s" % node_id
+	var roster_ids: Array = _roster_ids(_quick_roster)
+	var opp: Array = []
+	if roster_ids.size() > 0:
+		opp = [String(roster_ids[0])]
+	var event: Dictionary = {
+		"id": event_id,
+		"name": "Run Rival " + node_id,
+		"theme": "kitchen",
+		"room": "classic",
+		"seed": _current_run_session.run_seed,
+		"circuit": "generated",
+		"race_format": "rival_duel",
+		"reverse": false,
+		"opponent_count": 1,
+		"opponents": opp,
+	}
+	current_race_session = {
+		"mode": "run",
+		"event_id": event_id,
+		"event": event,
+		"vehicle_id": vehicle_id,
+		"difficulty": String(_save_data.get("difficulty", "club_circuit")),
+		"result_committed": false,
+		"run_node_id": node_id,
+	}
+	if not _test_mode:
+		_begin_race_transition(vehicle_id)
+	return true
+
+
+
 
 
 ## Run node outcome seams (non-race). Validate current node type matches, delegate to session,
