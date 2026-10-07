@@ -1127,7 +1127,7 @@ func _leave_race_loading() -> void:
 	_transitioning_to_race = false
 	_loading_failed = false
 	var mode := String(current_race_session.get("mode", "quick"))
-	_destination = "discovery" if mode == "discovery" else ("title" if mode == "quick" else "map")
+	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode == "quick" else "map"))
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
 
@@ -1350,7 +1350,7 @@ func abandon_race() -> void:
 	if current_race_session.is_empty() or current_race_session.has("result"):
 		return
 	var mode := String(current_race_session.get("mode", "quick"))
-	_destination = "discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map")
+	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map"))
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
 
@@ -1405,18 +1405,28 @@ func enter_run_node(node_id: String) -> bool:
 	var ok: bool = _current_run_session.enter_node(node_id)
 	if ok:
 		persist_current_run()
+	return ok
 
-func start_run_race() -> bool:
+func start_run_race(node_id: String = "") -> bool:
 	if _current_run_session == null or _transitioning_to_race:
 		return false
-	var curr_node: Dictionary = _current_run_session.current_node()
-	var ntype: String = String(curr_node.get("type", ""))
+	var target_id: String = node_id
+	if target_id.is_empty():
+		target_id = String(_current_run_session.current_node().get("id", ""))
+	var allowed := false
+	for entry: Dictionary in _current_run_session.available_nodes():
+		if String(entry.get("id", "")) == target_id:
+			allowed = true
+			break
+	if not allowed:
+		return false
+	var node: Dictionary = (_current_run_session.current_map.get_node(target_id) as Dictionary) if _current_run_session.current_map != null else {}
+	var ntype: String = String(node.get("type", ""))
 	if ntype != "race" and ntype != "act_rival":
 		return false
-	var node_id: String = String(curr_node.get("id", ""))
-	var entered: bool = _current_run_session.enter_node(node_id)
-	if not entered:
+	if not _current_run_session.enter_node(target_id):
 		return false
+	node_id = target_id
 	persist_current_run()
 	var vehicle_id: String = _current_run_session.current_car_id
 	_roll_quick_roster()
@@ -1528,6 +1538,8 @@ func _sync_current_scene() -> void:
 				_shell.call("show_map", _last_result_summary)
 			"discovery":
 				_shell.call("show_discovery")
+			"run_board":
+				_shell.call("show_run_board")
 			"ending":
 				_shell.call("show_ending")
 			_:
