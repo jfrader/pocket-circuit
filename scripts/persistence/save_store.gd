@@ -1,7 +1,7 @@
 class_name SaveStore
 extends RefCounted
 
-const CURRENT_VERSION := 4
+const CURRENT_VERSION := 5
 ## Player portrait seed. 91001 is the shipped driver-cast seed, so an untouched
 ## save keeps rendering the original player portrait.
 const PLAYER_AVATAR_DEFAULT_SEED := 91001
