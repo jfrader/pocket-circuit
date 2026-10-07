@@ -60,6 +60,12 @@ class TestApp extends Node:
 	func has_championship_progress() -> bool:
 		return true
 
+	func current_run_session() -> RunSession:
+		return null
+
+	func quick_race_roster() -> Array[String]:
+		return preload("res://data/championship/catalog.gd").quick_race_vehicle_ids()
+
 	func get_save_data() -> Dictionary:
 		return save_data
 

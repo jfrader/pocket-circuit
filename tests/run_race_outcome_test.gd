@@ -5,6 +5,9 @@ extends SceneTree
 ## and the route back to the board).
 
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
+## Generous: the scene builds a generated circuit before its countdown.
+const RACE_SCENE_FRAME_LIMIT := 3000
 
 var _failed := false
 
@@ -85,16 +88,34 @@ func _run_test() -> void:
 	# and quitting it is a did-not-finish that resolves the stop for good.
 	var quit_run: RunSession = app.call("start_run", 52525) as RunSession
 	var opening := quit_run.current_node_id
-	# Leaving before the countdown (a cancelled or failed loading screen) costs nothing.
+	# A loading screen that fails and is backed out of costs nothing.
 	app.call("start_run_race", opening)
-	app.call("abandon_race")
+	app.set("_transitioning_to_race", true)
+	app.call("fail_race_loading", "test: the circuit did not build")
+	app.call("_cancel_race_loading")
 	for frame in 3:
 		await process_frame
-	if not _expect(quit_run.is_race_pending() and quit_run.race_in_flight.is_empty(), "a race left before its countdown is still there to race"):
+	if not _expect(quit_run.is_race_pending() and quit_run.race_in_flight.is_empty(), "a race that never left its loading screen is still there to race"):
 		return
+
+	# The race scene itself marks the race when its countdown begins.
+	app.call("start_run_race", opening)
+	var race := (load(RACE_SCENE) as PackedScene).instantiate()
+	root.add_child(race)
+	var waited := 0
+	while quit_run.race_in_flight.is_empty() and waited < RACE_SCENE_FRAME_LIMIT:
+		waited += 1
+		await process_frame
+	if not _expect(String(quit_run.race_in_flight.get("node", "")) == opening, "the race scene's countdown marks the run race as running"):
+		return
+	race.queue_free()
+	await process_frame
+	quit_run.race_in_flight = {}
 	if not _expect(bool(app.call("start_run_race", opening)), "the opening race starts"):
 		return
 	app.call("race_started")
+	if not _expect(not quit_run.race_in_flight.is_empty(), "a started race is marked"):
+		return
 	var on_disk: Dictionary = SAVE_STORE.new(path).load_data().get("current_run", {}) as Dictionary
 	if not _expect(String((on_disk.get("race_in_flight", {}) as Dictionary).get("node", "")) == opening, "a started race is in the save before it is driven"):
 		return

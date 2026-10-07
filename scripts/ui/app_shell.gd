@@ -292,6 +292,8 @@ func show_run_board() -> void:
 	RUN_UI.stats(detail, sess)
 	RUN_UI.spacer(detail, 8)
 	_run_actions = detail
+	if sess.is_failed() or sess.is_complete():
+		detail.add_child(RUN_UI.label("NIGHT OVER", 12, RUN_UI.AMBER, true))
 	var unsaved := String(_app.get("run_save_error"))
 	if not unsaved.is_empty():
 		detail.add_child(RUN_UI.label("NOT SAVED · " + unsaved.to_upper(), 12, RUN_UI.AMBER, true))
@@ -942,7 +944,7 @@ func _on_art_action(action: StringName) -> void:
 		&"new_run":
 			_app.call("start_new_run")
 			show_run_board()
-		&"continue_run":
+		&"your_run":
 			show_run_board()
 		&"quick_race":
 			_app.call("open_quick_race")

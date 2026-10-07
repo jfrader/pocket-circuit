@@ -1379,8 +1379,9 @@ func current_run_session() -> RunSession:
 func start_run(run_seed: int) -> RunSession:
 	if _current_run_session != null:
 		abandon_run()
-		if _current_run_session != null:
-			# The old night could not be saved; it stays until it can.
+		if _current_run_session != null and not is_save_read_only():
+			# The old night could not be saved; it stays until it can. A read-only
+			# save never will, so there the new night simply replaces it.
 			return null
 	_current_run_session = RUN_SESSION.create(run_seed)
 	persist_current_run()

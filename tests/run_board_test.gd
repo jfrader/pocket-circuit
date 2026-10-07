@@ -135,12 +135,12 @@ func _run_test() -> void:
 	# With a run in progress the title offers to continue it, not to replace it.
 	shell.call("show_title")
 	await process_frame
-	var continue_button := _button_with_text(shell, "CONTINUE RUN")
-	if not _expect(continue_button != null and _button_with_text(shell, "NEW RUN") == null, "the title offers CONTINUE RUN while a run is on"):
+	var continue_button := _button_with_text(shell, "YOUR RUN")
+	if not _expect(continue_button != null and _button_with_text(shell, "NEW RUN") == null, "the title offers YOUR RUN while a run is on"):
 		return
 	continue_button.pressed.emit()
 	await process_frame
-	if not _expect(shell.find_child("RunBoard", true, false) != null and app.call("current_run_session") == sess, "CONTINUE RUN returns to the same run"):
+	if not _expect(shell.find_child("RunBoard", true, false) != null and app.call("current_run_session") == sess, "YOUR RUN returns to the same run"):
 		return
 	app.call("abandon_run")
 	shell.call("show_title")

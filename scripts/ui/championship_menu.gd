@@ -86,10 +86,8 @@ func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustb
 	play.disabled = read_only and not has_progress
 	# The run (roguelike) is a mode from the start: it seeds its own starter car,
 	# so it must not wait for championship progress.
-	var second_actions := [&"continue_run" if has_run else &"new_run", &"quick_race", &"quick_strip"]
+	var second_actions := [&"your_run" if has_run else &"new_run", &"quick_race", &"quick_strip"]
 	var second_row := _button_row(second_actions, Rect2(COLUMN_X, 436, COLUMN_WIDTH, 54), 20)
-	if has_progress:
-		second_row[0].disabled = read_only
 	var last_row := _button_row([&"options", &"discovery", &"credits", &"quit"], Rect2(COLUMN_X, 504, COLUMN_WIDTH, 48), 16)
 	_wire_rows([[play], second_row, last_row])
 	_label("ARROWS / STICK  MOVE   ·   ENTER / A  SELECT", Rect2(COLUMN_X + 4, 646, 640, 26), 14, SKIN.CREAM_DIM)
