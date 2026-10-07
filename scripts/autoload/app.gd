@@ -1539,18 +1539,15 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 	if duel:
 		opponents = opponents.slice(0, 1)
 	var event_id: String = "run_%s" % target_id
-	var event: Dictionary = {
-		"id": event_id,
-		"name": ("Run Rival " if duel else "Run Race ") + target_id,
-		"theme": "kitchen",
-		"room": "classic",
-		"seed": _current_run_session.run_seed,
-		"circuit": "generated",
-		"race_format": "rival_duel" if duel else "circuit",
-		"reverse": false,
-		"opponent_count": opponents.size(),
-		"opponents": opponents,
-	}
+	var event := _event_with_generated_identity({"opponents": opponents}, _run_circuit(target_id))
+	if event.is_empty():
+		last_run_error = "circuit could not be drawn"
+		return false
+	# The circuit decides the track; the stop decides who races on it.
+	event["id"] = event_id
+	event["race_format"] = "rival_duel" if duel else "circuit"
+	event["opponents"] = opponents
+	event["opponent_count"] = opponents.size()
 	current_race_session = {
 		"mode": "run",
 		"event_id": event_id,
@@ -1563,6 +1560,21 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
 	return true
+
+
+## The circuit a run stop races on: drawn from the run seed, the act and the
+## stop like a Quick Race draw, in the act's room. The same stop always gets the
+## same circuit; different stops and acts get different ones.
+func _run_circuit(stop_id: String) -> Dictionary:
+	var act := _current_run_session.current_map.act
+	var seed := _current_run_session.circuit_seed(stop_id)
+	return GENERATED_CIRCUITS.create(
+		StringName(CATALOG.get_act(act)["id"]),
+		GENERATED_CIRCUITS.room_for_route_seed(seed),
+		seed,
+		seed % 2 == 1,
+		act
+	)
 
 
 ## The race scene calls this when its countdown begins: from here a run race

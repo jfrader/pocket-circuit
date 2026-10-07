@@ -5,6 +5,7 @@ extends SceneTree
 ## and the route back to the board).
 
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 ## Generous: the scene builds a generated circuit before its countdown.
 const RACE_SCENE_FRAME_LIMIT := 3000
@@ -84,6 +85,33 @@ func _run_test() -> void:
 	if not _expect(int(saved_run.get("run_points", -1)) == sess.run_points, "the save must carry the awarded points"):
 		return
 
+	# Every stop races its own circuit, in the act's room, and keeps it.
+	var tour: RunSession = app.call("start_run", 74747) as RunSession
+	var first_stop := tour.current_node_id
+	var first := _run_circuit(app, first_stop)
+	if not _expect(String(first.get("theme", "")) == "kitchen", "act 1 races in the kitchen"):
+		return
+	if not _expect(String(_run_circuit(app, first_stop).get("fingerprint", "")) == String(first["fingerprint"]), "the same stop keeps the same circuit"):
+		return
+	RUN_WALK.settle(app, tour)
+	if not _expect(RUN_WALK.walk_to(app, tour, "race"), "a second race is reachable in act 1"):
+		return
+	var second := _run_circuit(app, tour.current_node_id)
+	if not _expect(String(second["fingerprint"]) != String(first["fingerprint"]), "a different stop races a different circuit"):
+		return
+	if not _expect(RUN_WALK.walk_to(app, tour, "act_rival"), "the act rival is reachable"):
+		return
+	RUN_WALK.settle(app, tour)
+	var act_two := _run_circuit(app, tour.current_node_id)
+	if not _expect(tour.current_map.act == 2 and String(act_two.get("theme", "")) == "workshop", "act 2 races in the workshop"):
+		return
+	var duel_run: RunSession = app.call("start_run", 85858) as RunSession
+	if RUN_WALK.walk_to(app, duel_run, "rival"):
+		app.call("start_run_rival", duel_run.current_node_id)
+		var duel_event: Dictionary = (app.get("current_race_session") as Dictionary).get("event", {})
+		if not _expect(String(duel_event.get("race_format", "")) == "rival_duel" and int(duel_event.get("opponent_count", 0)) == 1 and duel_event.has("generated_circuit_identity"), "a duel stays one on one on its generated circuit"):
+			return
+
 	# A started run race is marked in the save, cannot be restarted or retried,
 	# and quitting it is a did-not-finish that resolves the stop for good.
 	var quit_run: RunSession = app.call("start_run", 52525) as RunSession
@@ -149,6 +177,13 @@ func _run_test() -> void:
 		return
 	print("RUN_RACE_OUTCOME_TEST PASS")
 	quit(0)
+
+
+## Starts the stop's race (test mode: no scene change) and returns its circuit.
+func _run_circuit(app: Object, stop_id: String) -> Dictionary:
+	app.call("start_run_race", stop_id)
+	var event: Dictionary = (app.get("current_race_session") as Dictionary).get("event", {})
+	return event.get("generated_circuit_identity", {})
 
 
 func _expect(condition: bool, message: String) -> bool:
