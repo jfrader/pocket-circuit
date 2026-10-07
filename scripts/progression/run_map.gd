@@ -510,7 +510,7 @@ static func serialize(rm: RunMap) -> Dictionary:
 static func deserialize(data: Dictionary) -> RunMap:
 	var rm := new()
 	var ver: Variant = data.get("schema_version", 0)
-	if ver is int and int(ver) == SCHEMA_VERSION:
+	if (ver is int or ver is float) and int(ver) == SCHEMA_VERSION:
 		rm.run_seed = int(data.get("run_seed", 0))
 		rm.act = int(data.get("act", 1))
 		rm.num_rows = int(data.get("num_rows", 0))

@@ -17,6 +17,7 @@ const RACE_ASSET_PRELOADER := preload("res://scripts/race/race_asset_preloader.g
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
 const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
+const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 ## Every race fields the player plus three opponents.
 const ROSTER_SIZE := 3
 const LOADING_FRAME_BUDGET_USEC := 50_000
@@ -24,6 +25,8 @@ const LOADING_FRAME_BUDGET_USEC := 50_000
 signal joypad_connection_changed(connected: bool)
 
 var current_race_session: Dictionary = {}
+## Active roguelike run, restored from the save on boot (null when there is none).
+var _current_run_session: RunSession = null
 var _quick_roster: Dictionary = {}
 
 
@@ -164,6 +167,9 @@ func _ready() -> void:
 	if _test_mode:
 		_save_store.remove_save()
 	_save_data = _save_store.load_data()
+	var stored_run: Variant = _save_data.get("current_run", {})
+	if stored_run is Dictionary and not (stored_run as Dictionary).is_empty():
+		_current_run_session = RUN_SESSION.deserialize(stored_run as Dictionary)
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
 	_apply_settings()
@@ -1321,6 +1327,59 @@ func abandon_race() -> void:
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
 
+
+## The active roguelike run, or null. Only this path writes the run; Quick Race
+## never writes back to it.
+func current_run_session() -> RunSession:
+	return _current_run_session
+
+
+## Starts a fresh run for the seed and persists its opening state.
+func start_run(run_seed: int) -> RunSession:
+	_current_run_session = RUN_SESSION.create(run_seed)
+	persist_current_run()
+	return _current_run_session
+
+
+## Persists the active run. The flow layer calls this after every resolved node.
+func persist_current_run() -> void:
+	var candidate := _save_data.duplicate(true)
+	candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
+	if candidate == _save_data:
+		return
+	if is_save_read_only():
+		return
+	if not _save_candidate(candidate):
+		return
+	_save_data = candidate
+
+
+## Clears the active run (finished or abandoned) and removes it from the save.
+func abandon_run() -> void:
+	_current_run_session = null
+	persist_current_run()
+
+
+
+## Starts a new run using system time (unix seconds) as seed. This is intentionally
+## non-deterministic for live play (different every NEW RUN press). Tests and
+## reproducible cases use start_run(fixed_seed) directly.
+func start_new_run() -> RunSession:
+	var seed: int = int(Time.get_unix_time_from_system())
+	return start_run(seed)
+
+
+## Delegates to the session to move to a child node (if allowed), then persists
+## the run. Returns true on success. Real per-node outcomes (races, benches,
+## rivals, etc) are resolved in later slices; this slice only advances position.
+func enter_run_node(node_id: String) -> bool:
+	if _current_run_session == null:
+		return false
+	var ok: bool = _current_run_session.enter_node(node_id)
+	if ok:
+		persist_current_run()
+	return ok
+	return ok
 
 func update_setting(key: String, value: Variant) -> bool:
 	var candidate := _save_data.duplicate(true)

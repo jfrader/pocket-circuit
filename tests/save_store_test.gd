@@ -18,7 +18,7 @@ func _run_test() -> void:
 	var data := store.default_data()
 	if not _expect(not bool(data["championship_started"]), "new saves should not start a championship implicitly"):
 		return
-	if not _expect(int(data["version"]) == 4 and int(data["championship_circuit"]["seed"]) == 665001 and data["championship_circuit"]["events"].size() == CATALOG.EVENTS.size() and (data["mastery_circuit_metrics"] as Dictionary).is_empty() and data["circuit_history"].is_empty() and data["favorite_circuits"].is_empty(), "new saves should carry complete circuit identity and empty mastery/discovery collections"):
+	if not _expect(int(data["version"]) == 5 and int(data["championship_circuit"]["seed"]) == 665001 and data["championship_circuit"]["events"].size() == CATALOG.EVENTS.size() and (data["mastery_circuit_metrics"] as Dictionary).is_empty() and data["circuit_history"].is_empty() and data["favorite_circuits"].is_empty(), "new saves should carry complete circuit identity and empty mastery/discovery collections"):
 		return
 	if not _expect(not bool(data["reduced_motion"]), "reduced motion should default off"):
 		return
@@ -153,20 +153,22 @@ func _run_test() -> void:
 	if not _expect(is_equal_approx(float(loaded["engine_volume"]), float(loaded["sfx_volume"])) and is_equal_approx(float(loaded["tyre_volume"]), float(loaded["sfx_volume"])), "saves without engine or tyre volume should start from the saved SFX level"):
 		return
 	var migrated_identity: Dictionary = loaded["championship_circuit"]
-	if not _expect(int(loaded["version"]) == 4 and int(migrated_identity["seed"]) == 665001 and migrated_identity["events"].size() == CATALOG.EVENTS.size() and loaded["mastery_records"].is_empty() and loaded["personal_ghosts"].is_empty() and loaded["circuit_history"].is_empty() and loaded["favorite_circuits"].is_empty(), "version 1 saves should receive deterministic identity and empty mastery/discovery archives in memory"):
+	if not _expect(int(loaded["version"]) == 5 and int(migrated_identity["seed"]) == 665001 and migrated_identity["events"].size() == CATALOG.EVENTS.size() and loaded["mastery_records"].is_empty() and loaded["personal_ghosts"].is_empty() and loaded["circuit_history"].is_empty() and loaded["favorite_circuits"].is_empty(), "version 1 saves should receive deterministic identity and empty mastery/discovery archives in memory"):
 		return
 	if not _expect(int(_read_json(TEST_PATH)["version"]) == 1, "loading a legacy save should not rewrite it before a validated save action"):
 		return
 	if not _expect(store.save_data(loaded), "a migrated save should persist safely: %s" % store.last_save_error):
 		return
 	var migrated_on_disk := _read_json(TEST_PATH)
-	if not _expect(int(migrated_on_disk["version"]) == 4 and int(migrated_on_disk["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "persisting migration should upgrade the schema without changing player progress"):
+	if not _expect(int(migrated_on_disk["version"]) == 5 and int(migrated_on_disk["best_event_finishes"]["kitchen_crumb_rush"]) == 2, "persisting migration should upgrade the schema without changing player progress"):
 		return
 	if not _expect(store.load_data()["championship_circuit"] == migrated_identity, "reloading a persisted migration should retain the exact generated identity"):
 		return
 	if not _test_legacy_vehicle_selections(store):
 		return
 	if not _test_generator_version_migration(store):
+		return
+	if not _test_current_run_migration(store):
 		return
 
 	store.remove_save()
@@ -247,6 +249,52 @@ func _test_generator_version_migration(store: SaveStore) -> bool:
 		return false
 	return true
 
+
+
+func _test_current_run_migration(store: SaveStore) -> bool:
+	# v4 legacy without current_run -> {} , progress untouched, disk not yet upgraded
+	_write_raw(TEST_PATH, "{\"version\":4,\"best_event_finishes\":{\"kitchen_crumb_rush\":1},\"completed_events\":[\"kitchen_crumb_rush\"]}")
+	var loaded := store.load_data()
+	if not _expect(loaded.get("current_run") == {} and loaded["completed_events"] == ["kitchen_crumb_rush"], "old v4 normalises current_run to {} and leaves progress/records untouched"):
+		return false
+	if not _expect(int(_read_json(TEST_PATH)["version"]) == 4, "v4 load leaves disk at old version"):
+		return false
+	# persist migrates version to 5 and keeps current_run
+	if not _expect(store.save_data(loaded), "save of migrated v4+current_run"):
+		return false
+	var on_disk := _read_json(TEST_PATH)
+	if not _expect(int(on_disk["version"]) == 5 and on_disk.get("current_run") == {}, "save after v4 load writes v5 and current_run:{} "):
+		return false
+
+	# hand v5 with mid-run data persists and reloads
+	var v5_with_run := store.default_data()
+	v5_with_run["current_run"] = {
+		"schema_version": 1,
+		"run_seed": 424242,
+		"run_points": 12,
+		"run_budget": 33,
+		"current_node_id": "1_3",
+		"current_car_id": "rustbug",
+		"owned_cars": {"rustbug": "compact"},
+	}
+	if not _expect(store.save_data(v5_with_run), "save v5 with current_run data"):
+		return false
+	loaded = store.load_data()
+	if not _expect(int(loaded["version"]) == 5 and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_budget",0)) == 33, "v5 current_run data roundtrips via normalize"):
+		return false
+
+	# future v6 crafted save -> read only, defaults (current_run={}), disk untouched
+	_write_raw(TEST_PATH, "{\"version\":6,\"current_run\":{\"run_seed\":999},\"best_event_finishes\":{\"kitchen_crumb_rush\":1}}")
+	loaded = store.load_data()
+	if not _expect(loaded["current_run"] == {} and loaded["best_event_finishes"].is_empty(), "v6 future yields safe defaults including empty current_run, no old data"):
+		return false
+	if not _expect(int(_read_json(TEST_PATH)["version"]) == 6 and store.is_read_only, "v6 must leave disk at 6 and set read-only"):
+		return false
+	if not _expect(not store.save_data(store.default_data()), "read-only rejects write on v6"):
+		return false
+	if not _expect(int(_read_json(TEST_PATH)["version"]) == 6, "rejected write leaves v6 untouched"):
+		return false
+	return true
 
 func _write_raw(path: String, text: String) -> void:
 	var file := FileAccess.open(path, FileAccess.WRITE)
