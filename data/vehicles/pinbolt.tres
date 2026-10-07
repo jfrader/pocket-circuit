@@ -1,10 +1,9 @@
-[gd_resource type="Resource" script_class="VehicleStats" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="VehicleStats" format=3 uid="uid://iqj0navydu76"]
 
 [ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_stats"]
 
 [resource]
 script = ExtResource("1_stats")
-physics_model_version = 2
 mass = 0.74
 wheelbase = 37.0
 front_weight_ratio = 0.54
@@ -12,7 +11,7 @@ engine_force = 710.0
 launch_torque_multiplier = 1.12
 torque_peak_ratio = 0.27
 torque_at_max_speed = 0.35
-torque_falloff_exponent = 1.80
+torque_falloff_exponent = 1.8
 max_speed = 655.0
 reverse_speed = 245.0
 rolling_resistance = 16.0
@@ -26,15 +25,13 @@ slip_falloff_rate = 0.18
 max_steer_angle_deg = 37.0
 steering_response = 11.5
 high_speed_steer_ratio = 0.61
-arcade_high_speed_steer_ratio = 0.82
-arcade_throttle_oversteer = 0.32
 steer_fade_start_ratio = 0.38
 yaw_stability_rate = 5.0
 brake_force = 1000.0
 handbrake_force = 220.0
 drift_min_speed = 150.0
 drift_entry_steer = 0.42
-drift_rear_grip_ratio = 0.50
+drift_rear_grip_ratio = 0.5
 drift_yaw_assist = 1.2
 drift_grip_recovery_rate = 10.0
 drift_optimal_slip_deg = 22.0
@@ -45,14 +42,13 @@ boost_recharge = 7.5
 boost_drain_rate = 34.0
 durability = 46.0
 engine_power = 700.0
-acceleration = 1.10
+acceleration = 1.1
 steering_rate = 4.05
 grip = 0.94
 lateral_grip = 12.4
-drift_factor = 0.20
+drift_factor = 0.2
 legacy_mass = 0.78
 legacy_max_speed = 640.0
-legacy_reverse_speed = 250.0
 legacy_steering_response = 10.2
 legacy_brake_force = 1100.0
 legacy_handbrake_force = 220.0

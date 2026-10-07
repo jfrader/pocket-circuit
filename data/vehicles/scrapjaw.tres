@@ -1,22 +1,21 @@
-[gd_resource type="Resource" script_class="VehicleStats" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="VehicleStats" format=3 uid="uid://dgl8mxwu7byvo"]
 
 [ext_resource type="Script" path="res://scripts/vehicle/vehicle_stats.gd" id="1_stats"]
 
 [resource]
 script = ExtResource("1_stats")
-physics_model_version = 2
 mass = 1.22
 wheelbase = 43.0
 front_weight_ratio = 0.56
 engine_force = 1260.0
-launch_torque_multiplier = 1.10
+launch_torque_multiplier = 1.1
 torque_peak_ratio = 0.38
 torque_at_max_speed = 0.38
 torque_falloff_exponent = 1.35
 max_speed = 715.0
 reverse_speed = 220.0
 rolling_resistance = 27.0
-aero_drag_coefficient = 0.000680
+aero_drag_coefficient = 0.00068
 front_grip = 1.08
 rear_grip = 1.17
 front_cornering_stiffness = 4500.0
@@ -25,15 +24,13 @@ post_peak_grip_ratio = 0.72
 slip_falloff_rate = 0.22
 max_steer_angle_deg = 28.5
 steering_response = 5.5
-high_speed_steer_ratio = 0.50
-arcade_high_speed_steer_ratio = 0.82
-arcade_throttle_oversteer = 0.32
+high_speed_steer_ratio = 0.5
 steer_fade_start_ratio = 0.24
 yaw_stability_rate = 3.8
 brake_force = 1250.0
 handbrake_force = 360.0
 drift_min_speed = 145.0
-drift_entry_steer = 0.40
+drift_entry_steer = 0.4
 drift_rear_grip_ratio = 0.42
 drift_yaw_assist = 1.4
 drift_grip_recovery_rate = 4.5
@@ -45,10 +42,7 @@ boost_recharge = 8.0
 boost_drain_rate = 30.0
 durability = 75.0
 engine_power = 780.0
-acceleration = 1.0
 steering_rate = 3.1
-grip = 0.90
-lateral_grip = 11.0
 drift_factor = 0.22
 legacy_mass = 1.15
 legacy_max_speed = 700.0
@@ -56,7 +50,6 @@ legacy_reverse_speed = 240.0
 legacy_steering_response = 7.2
 legacy_brake_force = 1050.0
 legacy_handbrake_force = 280.0
-legacy_boost_power = 500.0
 legacy_boost_capacity = 90.0
 legacy_boost_recharge = 8.0
 legacy_durability = 75.0
