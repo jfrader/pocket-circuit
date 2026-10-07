@@ -358,10 +358,10 @@ class UidSidecarTests(unittest.TestCase):
             "d.gdshader",  # missing
             "e.txt",  # not a resource
             "e.txt.uid",
-            "ignored/addon.gd",  # would be reported if passed, but git never includes ignored
+            "ignored/addon.gd",  # reported when handed in; a real git ls-files never yields ignored paths
         ]
         missing = missing_uid_sidecars(paths)
-        self.assertEqual(sorted(missing), ["b.tscn", "c.tres", "d.gdshader"])
+        self.assertEqual(sorted(missing), ["b.tscn", "c.tres", "d.gdshader", "ignored/addon.gd"])
 
     def test_ignored_directories_never_reach_the_check(self):
         # git ls-files only yields tracked files; ignored paths (e.g. under addons/godot_mcp)
