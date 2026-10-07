@@ -9,6 +9,7 @@ const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
 const RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
+const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 
 const PAGE_MARGIN := 48
 const PAGE_TOP := 28
@@ -238,6 +239,80 @@ func show_discovery() -> void:
 	_content.add_child(_discovery_panel)
 	_discovery_panel.configure(_app)
 	_footer.text = BACK_HINT
+
+func show_run_board() -> void:
+	_screen = "run_board"
+	_event_id = ""
+	_reset_quick_race_state()
+	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
+	var sess_var: Variant = _app.call("current_run_session")
+	var sess: RunSession = sess_var as RunSession
+	if sess == null or sess.current_map == null:
+		_configure_stage(&"map", "rustbug", "rae", "workshop")
+		_add_kicker("RUN BOARD")
+		_add_heading("NO ACTIVE RUN")
+		_add_copy("Start a run to see the board.", SKIN.CREAM_DIM)
+		_add_spacer(8)
+		_add_button("NEW RUN", Callable(self, "_on_new_run_pressed"), true)
+		_add_button("BACK TO TITLE", Callable(self, "show_title"))
+		_footer.text = BACK_HINT
+		_focus_first()
+		return
+	var car_id: String = sess.current_car_id
+	_configure_stage(&"map", car_id, "rae", "workshop")
+	_add_kicker("RUN · ACT %d" % sess.current_map.act)
+	_add_heading("BOARD")
+	_add_section("POINTS", "%d" % sess.run_points)
+	_add_section("BUDGET", "%d" % sess.run_budget)
+	var wear: String = "?"
+	if sess.run_state != null:
+		wear = sess.run_state.get_car_wear(car_id)
+	_add_section("CURRENT CAR", "%s · %s" % [car_id, wear])
+	var owned_count: int = sess.owned_cars.size()
+	_add_section("OWNED", "%d" % owned_count)
+	_add_spacer(6)
+	# Board with positioned node buttons. y decreases with growing row (higher rows toward top of board).
+	var board := Control.new()
+	board.name = "RunBoard"
+	board.custom_minimum_size = Vector2(520.0, 240.0)
+	_content.add_child(board)
+	var col_step: float = 68.0
+	var row_step: float = 38.0
+	var base_y: float = 200.0
+	var avail: Array[Dictionary] = sess.available_nodes()
+	var avail_ids: Array[String] = []
+	for a: Dictionary in avail:
+		avail_ids.append(String(a.get("id", "")))
+	var curr_id: String = sess.current_node_id
+	var node_list: Array[Dictionary] = []
+	for r: int in range(sess.current_map.num_rows):
+		var row_list: Array[Dictionary] = sess.current_map.get_nodes_in_row(r)
+		for n: Dictionary in row_list:
+			node_list.append(n)
+	for n: Dictionary in node_list:
+		var nid: String = String(n.get("id", ""))
+		var nr: int = int(n.get("row", 0))
+		var nc: int = int(n.get("col", 0))
+		var is_curr: bool = (nid == curr_id)
+		var is_avail: bool = nid in avail_ids
+		var t: String = String(n.get("type", "race"))
+		var txt: String = ("> " if is_curr else "") + nid + "\n" + t
+		var cb: Callable = Callable(self, "_on_run_node_pressed").bind(nid) if is_avail else Callable()
+		var btn: Button = _make_button(txt, cb, false, not is_avail, "Node_" + nid.replace("_", "-"))
+		btn.custom_minimum_size = Vector2(62.0, 34.0)
+		btn.position = Vector2(20.0 + float(nc) * col_step, base_y - float(nr) * row_step)
+		if is_curr:
+			btn.modulate = Color(1.0, 0.95, 0.4)
+		board.add_child(btn)
+		if is_avail:
+			_register_button_focus(btn)
+	_add_spacer(8)
+	_add_button("NEW RUN", Callable(self, "_on_new_run_pressed"), false, false, "ActionNewRun")
+	_add_button("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
+	_add_button("BACK", Callable(self, "show_title"), false, false, "ActionBack")
+	_footer.text = "ADVANCE VIA ENABLED NODES  ·  " + BACK_HINT
+	_focus_first()
 
 
 func show_briefing(event_id: String) -> void:
@@ -560,6 +635,8 @@ func go_back() -> void:
 				show_quick_race()
 			else:
 				show_briefing(_event_id)
+		"run_board":
+			show_title()
 		"ending":
 			_app.call("finish_ending", "map")
 
@@ -699,7 +776,8 @@ func _on_art_action(action: StringName) -> void:
 		&"championship":
 			_app.call("continue_championship" if _app.call("has_championship_progress") else "request_new_championship")
 		&"new_run":
-			_app.call("request_new_championship")
+			_app.call("start_new_run")
+			show_run_board()
 		&"quick_race":
 			_app.call("open_quick_race")
 		&"quick_strip":
@@ -1217,3 +1295,28 @@ func _ordinal(value: int) -> String:
 			return "3RD"
 		_:
 			return "%dTH" % value
+
+func _on_run_node_pressed(node_id: String) -> void:
+	_play_ui_confirm()
+	var sess_var: Variant = _app.call("current_run_session")
+	var sess: RunSession = sess_var as RunSession
+	if sess != null and sess.current_map != null:
+		var node: Dictionary = sess.current_map.get_node(node_id) as Dictionary
+		var ntype: String = String(node.get("type", ""))
+		if ntype == "race" or ntype == "act_rival":
+			# Race nodes hand over to the real race flow; the result resolves the run.
+			_app.call("start_run_race", node_id)
+			return
+	var ok: bool = bool(_app.call("enter_run_node", node_id))
+	if ok:
+		show_run_board()
+
+
+func _on_new_run_pressed() -> void:
+	_app.call("start_new_run")
+	show_run_board()
+
+
+func _on_abandon_run() -> void:
+	_app.call("abandon_run")
+	show_title()
