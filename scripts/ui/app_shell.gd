@@ -267,9 +267,13 @@ func show_run_board() -> void:
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 64)
 	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.add_theme_constant_override("separation", 8)
+	columns.add_child(left)
 	var board := RUN_MAP_VIEW.new()
 	board.name = "RunBoard"
-	columns.add_child(board)
+	left.add_child(board)
+	left.add_child(RUN_UI.label("CHOOSE THE NEXT STOP", 11, RUN_UI.MUTED, true))
 	var buttons: Array[Button] = board.configure(sess, Callable(self, "_on_run_node_pressed"))
 	for button: Button in buttons:
 		_wire_button_audio(button)
@@ -286,7 +290,6 @@ func show_run_board() -> void:
 	RUN_UI.spacer(detail, 8)
 	RUN_UI.stats(detail, sess)
 	RUN_UI.spacer(detail, 8)
-	detail.add_child(RUN_UI.label("CHOOSE THE NEXT STOP", 11, RUN_UI.MUTED, true))
 	_run_actions = detail
 	_run_action("NEW RUN", Callable(self, "_on_new_run_pressed"), false, false, "ActionNewRun")
 	_run_action("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
