@@ -17,6 +17,7 @@ const RACE_ASSET_PRELOADER := preload("res://scripts/race/race_asset_preloader.g
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
 const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
+const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 ## Every race fields the player plus three opponents.
 const ROSTER_SIZE := 3
 const LOADING_FRAME_BUDGET_USEC := 50_000
@@ -24,6 +25,8 @@ const LOADING_FRAME_BUDGET_USEC := 50_000
 signal joypad_connection_changed(connected: bool)
 
 var current_race_session: Dictionary = {}
+## Active roguelike run, restored from the save on boot (null when there is none).
+var _current_run_session: RunSession = null
 var _quick_roster: Dictionary = {}
 
 
@@ -164,6 +167,9 @@ func _ready() -> void:
 	if _test_mode:
 		_save_store.remove_save()
 	_save_data = _save_store.load_data()
+	var stored_run: Variant = _save_data.get("current_run", {})
+	if stored_run is Dictionary and not (stored_run as Dictionary).is_empty():
+		_current_run_session = RUN_SESSION.deserialize(stored_run as Dictionary)
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
 	reduced_motion = bool(_save_data["reduced_motion"])
 	_apply_settings()
@@ -1320,6 +1326,38 @@ func abandon_race() -> void:
 	_destination = "discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map")
 	current_race_session.clear()
 	get_tree().change_scene_to_file(BOOT_SCENE)
+
+
+## The active roguelike run, or null. Only this path writes the run; Quick Race
+## never writes back to it.
+func current_run_session() -> RunSession:
+	return _current_run_session
+
+
+## Starts a fresh run for the seed and persists its opening state.
+func start_run(run_seed: int) -> RunSession:
+	_current_run_session = RUN_SESSION.create(run_seed)
+	persist_current_run()
+	return _current_run_session
+
+
+## Persists the active run. The flow layer calls this after every resolved node.
+func persist_current_run() -> void:
+	var candidate := _save_data.duplicate(true)
+	candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
+	if candidate == _save_data:
+		return
+	if is_save_read_only():
+		return
+	if not _save_candidate(candidate):
+		return
+	_save_data = candidate
+
+
+## Clears the active run (finished or abandoned) and removes it from the save.
+func abandon_run() -> void:
+	_current_run_session = null
+	persist_current_run()
 
 
 func update_setting(key: String, value: Variant) -> bool:
