@@ -25,6 +25,8 @@ jobs:
           python3 -c 'import shutil; assert shutil.disk_usage(".").free > 8 * 1024**3, "At least 8 GiB free disk is required"'
           command -v ffprobe
           command -v magick || command -v convert
+      - name: Test the Godot installer retry and verify path
+        run: python3 tools/test_install_ci_godot.py
       - name: Install verified Godot editor and native templates
         run: python3 tools/install_ci_godot.py "$RUNNER_TEMP/pocket-godot" >> "$GITHUB_ENV"
       - name: Full source, smoke and package gates
