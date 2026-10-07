@@ -98,6 +98,27 @@ def unquote(value: str) -> str:
     return value
 
 
+def missing_uid_sidecars(paths: list[str]) -> list[str]:
+    """Return tracked Godot resource paths that lack a tracked sibling .uid.
+
+    Pure function: takes list of paths (e.g. from "git ls-files -z".split("\0")),
+    returns the base resource paths missing their .uid. Only the four Godot
+    resource suffixes are considered; ignored files never appear in input.
+    """
+    resource_suffixes = (".gd", ".tscn", ".tres", ".gdshader")
+    tracked = {p for p in paths if p}
+    resources = [
+        p
+        for p in tracked
+        if any(p.endswith(suf) for suf in resource_suffixes)
+    ]
+    missing = []
+    for res in resources:
+        if f"{res}.uid" not in tracked:
+            missing.append(res)
+    return missing
+
+
 def validate_upload_wrapper(upload_wrapper: Path, errors: list[str]) -> None:
     with tempfile.TemporaryDirectory(prefix="pocket-circuit-steam-wrapper-") as temporary:
         temporary_path = Path(temporary)
@@ -537,6 +558,15 @@ def main() -> int:
         tracked_builds = [path for path in tracked_output if path.startswith("builds/")]
         if tracked_builds:
             errors.append(f"build artifacts are tracked: {', '.join(tracked_builds)}")
+
+        missing_uid = missing_uid_sidecars(tracked_output)
+        if missing_uid:
+            shown = sorted(missing_uid)[:5]
+            capped = ", ".join(shown) + ("..." if len(missing_uid) > 5 else "")
+            errors.append(
+                f"tracked Godot resources without .uid sidecars: {capped} "
+                "(commit the missing .uid sidecars — Godot regenerates them on import)"
+            )
 
     if errors:
         for error in errors:
