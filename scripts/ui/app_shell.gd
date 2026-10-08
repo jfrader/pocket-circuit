@@ -83,7 +83,7 @@ func show_reset_confirmation() -> void:
 	_configure_stage(&"title")
 	_add_kicker("NEW CHAMPIONSHIP")
 	_add_heading("Erase the current standings?")
-	_add_copy("Best finishes, act wins, and car unlocks will be erased.")
+	_add_copy("Best finishes, act wins and championship car unlocks will be erased.")
 	_add_spacer(18)
 	_add_button("ERASE & START AGAIN", Callable(_app, "confirm_new_championship"), true)
 	_add_button("KEEP CURRENT CHAMPIONSHIP", Callable(self, "show_title"))
