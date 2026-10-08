@@ -234,9 +234,9 @@ native templates and prints the `GODOT_BIN` and `XDG_DATA_HOME` environment
 values to export. Check host load before interpreting wall-clock tests and
 keep graphical QA separate from the full gate.
 
-The manually dispatched `Release gates` workflow retains the same gate on a
-trusted repository runner labeled `pocket-circuit-ci`, with read-only
-repository permissions. It builds candidates, not published releases.
+The manually dispatched `Release gates` workflow runs the same gate on a
+GitHub-hosted runner with read-only repository permissions. It builds
+candidates, not published releases.
 
 ```bash
 ./tools/build_release.sh /absolute/path/to/pocket-circuit-release

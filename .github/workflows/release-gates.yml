@@ -12,12 +12,16 @@ concurrency:
 
 jobs:
   release:
-    runs-on: [self-hosted, pocket-circuit-ci]
+    runs-on: ubuntu-24.04
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           persist-credentials: false
+      - name: Install media tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg imagemagick
       - name: Check host capacity and dependencies
         shell: bash
         run: |
