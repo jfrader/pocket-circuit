@@ -25,7 +25,6 @@ const RUN_SEED_MAX := 0x7FFFFFFF
 ## A run race finished this far down the field (or not at all) costs wear.
 const RUN_CRASH_FINISH_POSITION := 3
 const RUN_CRASH_SEVERITY := 0.6
-const LOADING_FRAME_BUDGET_USEC := 50_000
 
 signal joypad_connection_changed(connected: bool)
 
@@ -1026,18 +1025,6 @@ func loading_step(phase: String) -> void:
 	await _yield_loading_frame()
 
 
-func _throttled_loading_step(phase: String) -> void:
-	# Dense per-resource loops update the phase text every iteration but only
-	# yield a rendered frame once the time budget is spent. This keeps the
-	# loading screen responsive and cancellable without paying a full frame
-	# (plus GPU sync) for every dependency or generated image.
-	if is_instance_valid(_loading_screen):
-		_loading_screen.call("set_phase", phase)
-	if Time.get_ticks_usec() - _last_loading_frame_yield < LOADING_FRAME_BUDGET_USEC:
-		return
-	await _yield_loading_frame()
-
-
 func _yield_loading_frame() -> void:
 	_last_loading_frame_yield = Time.get_ticks_usec()
 	await get_tree().process_frame
@@ -1067,15 +1054,13 @@ func _begin_race_transition(vehicle_id: String = "") -> void:
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
-	var resources: Dictionary = {}
-	var loaded := await _load_scene_resources(RACE_SCENE, resources)
+	var packed := await _load_off_main_thread(RACE_SCENE) as PackedScene
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
-	if not loaded:
+	if packed == null:
 		fail_race_loading("Race resources could not be loaded")
 		return
-	var packed := resources.get(RACE_SCENE) as PackedScene
 	# Synthesize this car's engine voice and crash/boost one-shots behind the
 	# loading screen; the race scene would otherwise pay for them on its first
 	# live frame.
@@ -1115,35 +1100,24 @@ func _opponent_audio_vehicle_ids() -> PackedStringArray:
 	return ids
 
 
-func _load_scene_resources(path: String, resources: Dictionary) -> bool:
-	if _loading_cancelled:
-		return false
-	if resources.has(path):
-		return true
-	# Yield to the loading screen on a time budget (rather than once per
-	# dependency) so it stays responsive and can cancel without paying a
-	# rendered frame + GPU sync for every resource.
-	await _throttled_loading_step("Loading race resources")
-	if _loading_cancelled:
-		return false
-	resources[path] = null
-	var scripts: Array[String] = []
-	var assets: Array[String] = []
-	for dependency in ResourceLoader.get_dependencies(path):
-		var resource_path := String(dependency).split("::")[-1]
-		if resource_path.get_extension() == "gd":
-			scripts.append(resource_path)
-		else:
-			assets.append(resource_path)
-	assets.append_array(scripts)
-	for dependency: String in assets:
-		if not await _load_scene_resources(dependency, resources):
-			return false
-	# Scene scripts can preload textures. Keep their compilation and GPU resource
-	# creation on the main thread; the throttled yield above covers responsiveness
-	# while `change_scene_to_packed`'s own frame yield handles the final GPU sync.
-	resources[path] = load(path)
-	return resources[path] != null
+## Loads a resource and everything it depends on with the loader's worker
+## threads, painting loading frames while they compile: the race script alone
+## is a ~190 ms compile, too long for one frame. A request the menu prewarm
+## already made is reused. A failed threaded request falls back to a blocking
+## load.
+func _load_off_main_thread(path: String) -> Resource:
+	if ResourceLoader.has_cached(path):
+		return load(path)
+	if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE \
+			and ResourceLoader.load_threaded_request(path, "", true) != OK:
+		return load(path)
+	while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		await _yield_loading_frame()
+		if is_instance_valid(_loading_screen):
+			_loading_screen.call("set_phase", "Loading race resources")
+	if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_LOADED:
+		return ResourceLoader.load_threaded_get(path)
+	return load(path)
 
 
 func complete_race_loading() -> bool:
