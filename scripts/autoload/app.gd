@@ -204,6 +204,13 @@ func _exit_tree() -> void:
 	if _prewarm_room_root != null and is_instance_valid(_prewarm_room_root):
 		_prewarm_room_root.free()
 	_prewarm_room_root = null
+	# A threaded race load still in flight, or finished but never collected,
+	# must be collected before the engine shuts down: in flight it breaks the
+	# loader, uncollected it leaks its resources. The get waits like the prewarm
+	# worker waits for its thread, then releases the request.
+	if not _threaded_load_path.is_empty() and ResourceLoader.load_threaded_get_status(_threaded_load_path) != ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
+		ResourceLoader.load_threaded_get(_threaded_load_path)
+	_threaded_load_path = ""
 	if _test_mode and _save_store:
 		_save_store.remove_save()
 
@@ -616,6 +623,8 @@ func generated_circuit_identity(theme: StringName, room: StringName, seed: int, 
 ## Off-tree room being built by the prewarm; freed on app teardown if a quit
 ## happens mid-build.
 var _prewarm_room_root: Node = null
+## The threaded race-scene load in flight, if any; waited for on exit.
+var _threaded_load_path := ""
 ## Circuits waiting to be prewarmed, one job at a time, and the keys queued or running.
 var _prewarm_queue: Array[Dictionary] = []
 var _prewarm_keys: Dictionary = {}
@@ -1111,14 +1120,16 @@ func _load_off_main_thread(path: String) -> Resource:
 	if ResourceLoader.has_cached(path):
 		return load(path)
 	if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE \
-			and ResourceLoader.load_threaded_request(path, "", true) != OK:
+			and ResourceLoader.load_threaded_request(path) != OK:
 		return load(path)
+	_threaded_load_path = path
 	var deadline := Time.get_ticks_msec() + RACE_LOAD_TIMEOUT_MSEC
 	while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
 		if _loading_cancelled or Time.get_ticks_msec() > deadline:
 			return null
 		await _yield_loading_frame()
 	# Loaded or failed, the get releases the request (null on failure).
+	_threaded_load_path = ""
 	return ResourceLoader.load_threaded_get(path)
 
 
