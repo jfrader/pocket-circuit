@@ -275,6 +275,8 @@ func show_run_board() -> void:
 	left.add_child(board)
 	left.add_child(RUN_UI.label("CHOOSE THE NEXT STOP", 11, RUN_UI.MUTED, true))
 	var buttons: Array[Button] = board.configure(sess, Callable(self, "_on_run_node_pressed"))
+	if _app.has_method("prewarm_run_stops"):
+		_app.call("prewarm_run_stops")
 	for button: Button in buttons:
 		_wire_button_audio(button)
 		if not button.disabled:

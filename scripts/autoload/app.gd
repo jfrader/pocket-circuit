@@ -615,6 +615,10 @@ func generated_circuit_identity(theme: StringName, room: StringName, seed: int, 
 ## Off-tree room being built by the prewarm; freed on app teardown if a quit
 ## happens mid-build.
 var _prewarm_room_root: Node = null
+## Circuits waiting to be prewarmed, one job at a time, and the keys queued or running.
+var _prewarm_queue: Array[Dictionary] = []
+var _prewarm_keys: Dictionary = {}
+var _prewarm_running := false
 
 
 ## Fire-and-forget pre-generation for a generated circuit event while the player
@@ -624,21 +628,58 @@ var _prewarm_room_root: Node = null
 ## + pack), and per-vehicle motion plans (where reproducible from the event).
 ## All steps yield cooperatively. Failures are ignored; the race path will
 ## still do any missing work on demand.
+## Queues a generated circuit to be prepared ahead of its race. Jobs run one
+## at a time (they share the off-tree room slot) and each circuit is queued at
+## most once until it lands in the cache.
 func prewarm_generated_circuit(event: Dictionary) -> void:
 	if String(event.get("circuit", "")) != "generated":
 		return
 	var key := TRACK_BUILDER.generated_circuit_cache_key(event)
+	if not key.is_empty() and (_prewarm_keys.has(key) or not TRACK_BUILDER.cached_prepared(key).is_empty()):
+		return
 	if not key.is_empty():
-		var prepared: Dictionary = TRACK_BUILDER.cached_prepared(key)
-		if not prepared.is_empty():
-			return
-	var theme := StringName(event.get("theme", "kitchen"))
-	var room := StringName(event.get("room", "classic"))
-	var seed := int(event.get("seed", 0))
-	var options: Dictionary = TRACK_BUILDER.generated_circuit_options(event)
-	var preparation := RACE_PREPARATION.new()
-	add_child(preparation)
-	call_deferred("_execute_prewarm_job", preparation, theme, room, seed, options, key)
+		_prewarm_keys[key] = true
+	_prewarm_queue.append({
+		"theme": StringName(event.get("theme", "kitchen")),
+		"room": StringName(event.get("room", "classic")),
+		"seed": int(event.get("seed", 0)),
+		"options": TRACK_BUILDER.generated_circuit_options(event),
+		"key": key,
+	})
+	if not _prewarm_running:
+		_prewarm_running = true
+		call_deferred("_run_prewarm_queue")
+
+
+## Warms the circuits of the race-type stops the run board offers right now.
+func prewarm_run_stops() -> void:
+	if _current_run_session == null:
+		return
+	for stop: Dictionary in _current_run_session.available_nodes():
+		if String(stop.get("type", "")) in RunSession.RACE_NODE_TYPES:
+			var circuit := _run_circuit(String(stop["id"]))
+			if not circuit.is_empty():
+				prewarm_generated_circuit(GENERATED_CIRCUITS.apply_to_event(circuit))
+
+
+func _run_prewarm_queue() -> void:
+	while not _prewarm_queue.is_empty():
+		var job: Dictionary = _prewarm_queue.pop_front()
+		var key := String(job["key"])
+		if key.is_empty() or TRACK_BUILDER.cached_prepared(key).is_empty():
+			var preparation := RACE_PREPARATION.new()
+			add_child(preparation)
+			await _execute_prewarm_job(preparation, job["theme"], job["room"], int(job["seed"]), job["options"], key)
+		_prewarm_keys.erase(key)
+	_prewarm_running = false
+
+
+## A race that starts loading takes the CPU: circuits still waiting in the
+## prewarm queue are dropped (the job already running finishes).
+func _drop_queued_prewarms() -> void:
+	for job: Dictionary in _prewarm_queue:
+		_prewarm_keys.erase(String(job["key"]))
+	_prewarm_queue.clear()
 
 
 func _execute_prewarm_job(preparation: Node, theme: StringName, room: StringName, seed: int, options: Dictionary, key: String) -> void:
@@ -1005,6 +1046,7 @@ func _yield_loading_frame() -> void:
 
 func _begin_race_transition(vehicle_id: String = "") -> void:
 	_transitioning_to_race = true
+	_drop_queued_prewarms()
 	_loading_cancelled = false
 	_loading_failed = false
 	get_tree().paused = false
