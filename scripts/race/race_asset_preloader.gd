@@ -113,8 +113,8 @@ func _wait_until_menu() -> bool:
 	return is_inside_tree()
 
 
-## Compiles the race scene's scripts on a worker so `App._load_scene_resources`
-## no longer pays GDScript compilation on its first dependency pass.
+## Compiles the race scene's scripts on a worker during menu idle, so the race
+## load finds them already compiled in the loader cache.
 func _warm_race_compilation() -> void:
 	if not await _wait_until_menu():
 		return
@@ -187,9 +187,9 @@ func _noop_audio_progress() -> void:
 
 
 static func _load_scene_tree(path: String, visited: Dictionary) -> Dictionary:
-	# Mirrors App._load_scene_resources' recursive dependency walk, but on a
-	# worker thread. `load()` compiles GDScript and is thread-safe; the compiled
-	# resources land in the shared loader cache for the race to reuse.
+	# Walks the scene's dependencies on a worker thread. `load()` compiles
+	# GDScript and is thread-safe; the compiled resources land in the shared
+	# loader cache for the race to reuse.
 	if visited.has(path):
 		return {}
 	visited[path] = true
@@ -200,9 +200,9 @@ static func _load_scene_tree(path: String, visited: Dictionary) -> Dictionary:
 
 
 static func _collect_race_resource_paths(path: String, visited: Dictionary, out: Array[String]) -> void:
-	# Mirrors the dep walk in _load_scene_resources and _load_scene_tree.
-	# We request threaded loads for the scene and every asset/script dep so
-	# that the race's loading walk sees only cache hits.
+	# Mirrors the dependency walk in _load_scene_tree. We request threaded
+	# loads for the scene and every asset/script dep so the race load sees only
+	# cache hits.
 	if visited.has(path):
 		return
 	visited[path] = true
