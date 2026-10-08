@@ -1,5 +1,8 @@
 extends Node
 
+## A race scene load that has not finished by then fails instead of leaving
+## the loading screen waiting forever.
+const RACE_LOAD_TIMEOUT_MSEC := 60000
 const BOOT_SCENE := "res://scenes/boot/boot.tscn"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const CATALOG := preload("res://data/championship/catalog.gd")
@@ -128,7 +131,6 @@ var _transitioning_to_race := false
 var _loading_screen: CanvasLayer
 var _loading_cancelled := false
 var _loading_failed := false
-var _last_loading_frame_yield := 0
 var loading_metrics: Dictionary = {}
 var _mastery_calibration_queue: Array[String] = []
 var _mastery_calibration_active := false
@@ -1026,7 +1028,6 @@ func loading_step(phase: String) -> void:
 
 
 func _yield_loading_frame() -> void:
-	_last_loading_frame_yield = Time.get_ticks_usec()
 	await get_tree().process_frame
 	if DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
@@ -1102,22 +1103,23 @@ func _opponent_audio_vehicle_ids() -> PackedStringArray:
 
 ## Loads a resource and everything it depends on with the loader's worker
 ## threads, painting loading frames while they compile: the race script alone
-## is a ~190 ms compile, too long for one frame. A request the menu prewarm
-## already made is reused. A failed threaded request falls back to a blocking
-## load.
+## is a ~190 ms compile, too long for one frame. If the menu prewarm already
+## requested it, that request is joined (and released by our get). Returns null
+## when the player cancels or the load fails or outlasts RACE_LOAD_TIMEOUT_MSEC;
+## a cancelled request keeps running in the background for the next attempt.
 func _load_off_main_thread(path: String) -> Resource:
 	if ResourceLoader.has_cached(path):
 		return load(path)
 	if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE \
 			and ResourceLoader.load_threaded_request(path, "", true) != OK:
 		return load(path)
+	var deadline := Time.get_ticks_msec() + RACE_LOAD_TIMEOUT_MSEC
 	while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+		if _loading_cancelled or Time.get_ticks_msec() > deadline:
+			return null
 		await _yield_loading_frame()
-		if is_instance_valid(_loading_screen):
-			_loading_screen.call("set_phase", "Loading race resources")
-	if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_LOADED:
-		return ResourceLoader.load_threaded_get(path)
-	return load(path)
+	# Loaded or failed, the get releases the request (null on failure).
+	return ResourceLoader.load_threaded_get(path)
 
 
 func complete_race_loading() -> bool:
