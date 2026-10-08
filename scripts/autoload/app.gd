@@ -621,25 +621,21 @@ var _prewarm_keys: Dictionary = {}
 var _prewarm_running := false
 
 
-## Fire-and-forget pre-generation for a generated circuit event while the player
-## is on a preview or results screen that has idle time. The prepared layout
-## is computed on a NORMAL data job; the continuation then also warms scenery
-## outlines (on data jobs), the assembled room (off-tree via assemble_runtime
-## + pack), and per-vehicle motion plans (where reproducible from the event).
-## All steps yield cooperatively. Failures are ignored; the race path will
-## still do any missing work on demand.
-## Queues a generated circuit to be prepared ahead of its race. Jobs run one
-## at a time (they share the off-tree room slot) and each circuit is queued at
-## most once until it lands in the cache.
+## Queues a generated circuit to be prepared while the player is on a screen
+## with idle time: the layout on a data job, then the scenery outlines and the
+## packed room. Jobs run one at a time (they share the off-tree room slot), the
+## newest request first (it is what the player is looking at), and a circuit is
+## queued at most once until it is cached. A failed job is ignored; the race
+## path still does any missing work on demand.
 func prewarm_generated_circuit(event: Dictionary) -> void:
 	if String(event.get("circuit", "")) != "generated":
 		return
 	var key := TRACK_BUILDER.generated_circuit_cache_key(event)
-	if not key.is_empty() and (_prewarm_keys.has(key) or not TRACK_BUILDER.cached_prepared(key).is_empty()):
+	if not key.is_empty() and (_prewarm_keys.has(key) or TRACK_BUILDER.has_prepared(key)):
 		return
 	if not key.is_empty():
 		_prewarm_keys[key] = true
-	_prewarm_queue.append({
+	_prewarm_queue.push_front({
 		"theme": StringName(event.get("theme", "kitchen")),
 		"room": StringName(event.get("room", "classic")),
 		"seed": int(event.get("seed", 0)),
@@ -666,7 +662,7 @@ func _run_prewarm_queue() -> void:
 	while not _prewarm_queue.is_empty():
 		var job: Dictionary = _prewarm_queue.pop_front()
 		var key := String(job["key"])
-		if key.is_empty() or TRACK_BUILDER.cached_prepared(key).is_empty():
+		if key.is_empty() or not TRACK_BUILDER.has_prepared(key):
 			var preparation := RACE_PREPARATION.new()
 			add_child(preparation)
 			await _execute_prewarm_job(preparation, job["theme"], job["room"], int(job["seed"]), job["options"], key)
@@ -675,7 +671,8 @@ func _run_prewarm_queue() -> void:
 
 
 ## A race that starts loading takes the CPU: circuits still waiting in the
-## prewarm queue are dropped (the job already running finishes).
+## prewarm queue are dropped, and the job already running stops after its
+## current stage (see _execute_prewarm_job).
 func _drop_queued_prewarms() -> void:
 	for job: Dictionary in _prewarm_queue:
 		_prewarm_keys.erase(String(job["key"]))
@@ -689,8 +686,12 @@ func _execute_prewarm_job(preparation: Node, theme: StringName, room: StringName
 	)
 	if not prepared.is_empty() and not key.is_empty():
 		TRACK_BUILDER.store_prepared(key, prepared)
-		await _warm_scenery_outlines(preparation, prepared)
-		await _warm_room_if_missing(key, prepared)
+		# A race that started loading meanwhile needs the main thread more than
+		# the room and outlines of a circuit it may not even race.
+		if not _transitioning_to_race:
+			await _warm_scenery_outlines(preparation, prepared)
+		if not _transitioning_to_race:
+			await _warm_room_if_missing(key, prepared)
 		# Motions warmed via separate RaceAssetPreloader pool + roster hooks (see prewarm_championship_event).
 	if preparation:
 		preparation.queue_free()

@@ -1341,6 +1341,11 @@ static func mark_packed_scene_owners(root: Node) -> void:
 ## fingerprints (preferred) or deterministic (theme, room, seed, options).
 ## Eviction is oldest-first (insertion order). Size capped low because the
 ## prepared dicts and packed scenes are heavy.
+## Whether a prepared circuit is cached, without copying it.
+static func has_prepared(key: String) -> bool:
+	return not key.is_empty() and _generated_prepared_cache.get(key) is Dictionary
+
+
 static func cached_prepared(key: String) -> Dictionary:
 	if key.is_empty() or not _generated_prepared_cache.has(key):
 		return {}
