@@ -1,0 +1,93 @@
+<title>Pocket Circuit promo cards</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@700;800&display=block" rel="stylesheet">
+<style>
+:root{--ink:#1a1f23;--cream:#f5f0e3;--yellow:#f4c65a;--orange:#e85a2e;--red:#c81e2e;--tape:rgba(244,198,90,.9)}
+html,body{margin:0;width:1920px;height:1080px;background:transparent;overflow:hidden;font-family:"Open Sans",sans-serif;font-weight:800;color:var(--ink)}
+.card{position:absolute;inset:0;display:none}
+.on{display:block}
+/* caption plate: lower left, like the in-game cream plates */
+.plate{position:absolute;left:96px;bottom:120px;transform-origin:0 100%;
+  animation:plateIn var(--d) linear both}
+.plate .box{background:var(--cream);border:6px solid var(--ink);border-radius:18px;padding:18px 40px 22px;
+  box-shadow:10px 10px 0 rgba(26,31,35,.6);font-size:96px;line-height:1;letter-spacing:1px;white-space:nowrap}
+.plate .tape{position:absolute;left:-26px;top:-34px;background:var(--tape);padding:8px 26px;font-size:30px;letter-spacing:3px;
+  transform:rotate(-4deg);box-shadow:0 2px 0 rgba(0,0,0,.15);animation:tapeIn var(--d) linear both}
+.plate .box span.hl{color:var(--orange)}
+@keyframes plateIn{
+  0%{transform:translateX(-140px) rotate(-6deg) scale(.6);opacity:0}
+  6%{transform:translateX(12px) rotate(1.5deg) scale(1.06);opacity:1}
+  10%{transform:translateX(0) rotate(-1deg) scale(1);opacity:1}
+  88%{transform:translateX(0) rotate(-1deg) scale(1);opacity:1}
+  100%{transform:translateX(-60px) rotate(-3deg) scale(.9);opacity:0}}
+@keyframes tapeIn{0%,7%{transform:rotate(-4deg) scaleX(0);transform-origin:0 50%}13%{transform:rotate(-4deg) scaleX(1.04)}16%,100%{transform:rotate(-4deg) scaleX(1)}}
+
+/* logo */
+.logo{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.logo .w{font-size:230px;line-height:.86;letter-spacing:4px;-webkit-text-stroke:0;text-shadow:0 0 0 var(--ink),12px 12px 0 var(--ink)}
+.logo .p{color:var(--cream);animation:slamA var(--d) linear both}
+.logo .c{color:var(--yellow);animation:slamB var(--d) linear both}
+.logo .sub{white-space:nowrap;margin-top:34px;background:var(--orange);color:var(--cream);font-size:40px;letter-spacing:6px;padding:10px 30px;border:5px solid var(--ink);
+  transform:rotate(-2deg);animation:subIn var(--d) linear both}
+.logo .glow{position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(17,19,22,.62) 0%,rgba(17,19,22,.35) 42%,rgba(17,19,22,0) 70%);animation:fade var(--d) linear both}
+@keyframes slamA{0%{transform:scale(3);opacity:0}7%{transform:scale(.94);opacity:1}10%{transform:scale(1.02)}13%,88%{transform:scale(1);opacity:1}100%{transform:scale(1.15);opacity:0}}
+@keyframes slamB{0%,5%{transform:scale(3);opacity:0}12%{transform:scale(.94);opacity:1}15%{transform:scale(1.02)}18%,88%{transform:scale(1);opacity:1}100%{transform:scale(1.15);opacity:0}}
+@keyframes subIn{0%,17%{transform:rotate(-2deg) scaleX(0);opacity:0}22%{transform:rotate(-2deg) scaleX(1.05);opacity:1}25%,88%{transform:rotate(-2deg) scaleX(1);opacity:1}100%{opacity:0}}
+@keyframes fade{0%{opacity:0}6%,90%{opacity:1}100%{opacity:0}}
+
+/* end card */
+.end{position:absolute;inset:0;background:#111316;overflow:hidden}
+.end .bg{position:absolute;inset:-40px;background:
+  repeating-linear-gradient(90deg,rgba(92,70,56,.55) 0 3px,transparent 3px 140px),
+  linear-gradient(180deg,#3f2a22,#2a1d17);opacity:.9}
+.end .lamp{position:absolute;inset:0;background:radial-gradient(ellipse 60% 55% at 50% 42%,rgba(244,198,90,.28),rgba(0,0,0,0) 70%)}
+.end .stack{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;transform:translateY(-30px)}
+.end .w{font-size:190px;line-height:.86;letter-spacing:4px;text-shadow:11px 11px 0 var(--ink)}
+.end .p{color:var(--cream);animation:endA var(--d) linear both}
+.end .c{color:var(--yellow);animation:endB var(--d) linear both}
+.stamp{white-space:nowrap;margin-top:60px;border:10px solid var(--red);color:var(--red);background:rgba(245,240,227,.96);border-radius:14px;
+  font-size:104px;letter-spacing:6px;padding:6px 44px 10px;transform:rotate(-5deg);box-shadow:12px 12px 0 rgba(0,0,0,.45);
+  animation:stamp var(--d) linear both}
+.plats{margin-top:46px;color:var(--cream);font-size:40px;letter-spacing:10px;opacity:.9;animation:plats var(--d) linear both}
+@keyframes endA{0%{transform:translateY(-40px);opacity:0}8%{transform:translateY(0);opacity:1}100%{opacity:1}}
+@keyframes endB{0%,4%{transform:translateY(-40px);opacity:0}12%{transform:translateY(0);opacity:1}100%{opacity:1}}
+@keyframes stamp{0%,20%{transform:rotate(-14deg) scale(3.2);opacity:0}25%{transform:rotate(-4deg) scale(.92);opacity:1}28%{transform:rotate(-5deg) scale(1.03)}31%,100%{transform:rotate(-5deg) scale(1);opacity:1}}
+@keyframes plats{0%,36%{opacity:0;transform:translateY(16px)}44%,100%{opacity:.9;transform:none}}
+.plate.right{left:auto;right:70px;bottom:110px;transform-origin:100% 100%}
+.plate.right .box{line-height:1.02;text-align:right}
+.nextstack{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:34px}
+.ntape{background:var(--tape);font-size:44px;letter-spacing:8px;padding:10px 34px;transform:rotate(-3deg);animation:tapeN var(--d) linear both}
+.item{background:var(--cream);border:6px solid var(--ink);border-radius:16px;padding:12px 38px 16px;font-size:72px;box-shadow:9px 9px 0 rgba(0,0,0,.5);white-space:nowrap}
+.item .hl{color:var(--orange)}
+.i1{animation:itemIn var(--d) linear both;--s:12.5%}
+.i2{animation:itemIn2 var(--d) linear both}
+.i3{animation:itemIn3 var(--d) linear both}
+@keyframes tapeN{0%{transform:rotate(-3deg) scaleX(0);opacity:0}6%{transform:rotate(-3deg) scaleX(1.05);opacity:1}9%,100%{transform:rotate(-3deg) scaleX(1);opacity:1}}
+@keyframes itemIn{0%,10%{transform:translateY(40px) scale(.6) rotate(-2deg);opacity:0}15%{transform:scale(1.05) rotate(1deg);opacity:1}18%,100%{transform:scale(1) rotate(-1deg);opacity:1}}
+@keyframes itemIn2{0%,22.5%{transform:translateY(40px) scale(.6) rotate(2deg);opacity:0}27.5%{transform:scale(1.05) rotate(-1deg);opacity:1}30.5%,100%{transform:scale(1) rotate(1deg);opacity:1}}
+@keyframes itemIn3{0%,35%{transform:translateY(40px) scale(.6) rotate(-2deg);opacity:0}40%{transform:scale(1.05) rotate(1deg);opacity:1}43%,100%{transform:scale(1) rotate(-.5deg);opacity:1}}
+</style>
+
+<div id="logo" class="card"><div class="logo"><div class="glow"></div>
+  <div class="w p">POCKET</div><div class="w c">CIRCUIT</div><div class="sub">GRAND HOUSEHOLD CIRCUIT</div></div></div>
+
+<div id="tiny" class="card"><div class="plate"><div class="tape">KITCHEN · WORKSHOP · OFFICE</div><div class="box">TINY CARS. <span class="hl">BIG ROOMS.</span></div></div></div>
+<div id="gen" class="card"><div class="plate right"><div class="tape">NEW SEED, NEW CIRCUIT</div><div class="box">A NEW CIRCUIT<br><span class="hl">EVERY RACE</span></div></div></div>
+<div id="drift" class="card"><div class="plate"><div class="tape">HANDBRAKE · BOOST</div><div class="box">DRIFT. BOOST. <span class="hl">PASS.</span></div></div></div>
+<div id="strip" class="card"><div class="plate"><div class="tape">QUICK STRIP</div><div class="box">OUTRUN THE <span class="hl">CHASER</span></div></div></div>
+<div id="music" class="card"><div class="plate"><div class="tape">LIVE SOUNDTRACK</div><div class="box">EVERY CIRCUIT HAS <span class="hl">ITS OWN SCORE</span></div></div></div>
+<div id="rivals" class="card"><div class="plate"><div class="tape">NAMES · FACES · CARS</div><div class="box">NEW RIVALS <span class="hl">EVERY RACE</span></div></div></div>
+<div id="next" class="card"><div class="end"><div class="bg"></div><div class="lamp"></div><div class="nextstack"><div class="ntape">COMING NEXT</div><div class="item i1">ROGUELIKE CHAMPIONSHIP RUNS</div><div class="item i2">SPLIT-SCREEN · LAN · <span class="hl">ONLINE</span></div></div></div></div>
+
+<div id="end" class="card"><div class="end"><div class="bg"></div><div class="lamp"></div>
+  <div class="stack"><div class="w p">POCKET</div><div class="w c">CIRCUIT</div>
+  <div class="stamp">PUBLIC ALPHA TESTING</div><div class="plats">LINUX · WINDOWS</div></div></div></div>
+
+<script>
+function show(id,dur){
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('on',c.id===id));
+  document.documentElement.style.setProperty('--d',dur+'s');
+  document.getAnimations().forEach(a=>a.pause());
+}
+function at(t){document.getAnimations().forEach(a=>{a.pause();a.currentTime=t*1000})}
+</script>
