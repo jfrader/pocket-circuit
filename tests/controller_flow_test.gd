@@ -2,6 +2,7 @@ extends SceneTree
 
 const BOOT_SCENE := preload("res://scenes/boot/boot.tscn")
 const RACE_SCENE := preload("res://scenes/race/prototype_race.tscn")
+const RACE_LOAD_WAIT := preload("res://tests/support/race_load_wait.gd")
 
 
 func _initialize() -> void:
@@ -50,9 +51,7 @@ func _run_test() -> void:
 	await _tap_joypad_button(0)
 	if not _expect(app.call("is_race_loading"), "accepting Play should display preparation before gameplay"):
 		return
-	var loading_deadline := Time.get_ticks_msec() + 25000
-	while app.call("is_race_loading") and Time.get_ticks_msec() < loading_deadline:
-		await process_frame
+	await RACE_LOAD_WAIT.finished(self, app)
 	if not _expect(not app.call("is_race_loading"), "preparation should reach the ready grid within its wall-clock deadline"):
 		return
 	var race := current_scene

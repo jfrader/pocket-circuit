@@ -3,6 +3,7 @@ extends SceneTree
 const BOOT_SCENE := preload("res://scenes/boot/boot.tscn")
 const RACE_SCENE := preload("res://scenes/race/prototype_race.tscn")
 const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
+const RACE_LOAD_WAIT := preload("res://tests/support/race_load_wait.gd")
 
 
 func _initialize() -> void:
@@ -23,9 +24,7 @@ func _run_test() -> void:
 		return
 	if not _expect(app.call("start_discovery_race", identity, "rustbug", String(preview["loaded_fingerprint"])), "a confirmed preview should begin discovery loading"):
 		return
-	var deadline := Time.get_ticks_msec() + 35000
-	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
-		await process_frame
+	await RACE_LOAD_WAIT.finished(self, app)
 	var race := current_scene
 	if not _expect(not app.call("is_race_loading") and race != null and race.scene_file_path == RACE_SCENE.resource_path, "discovery preparation should reach the loaded race within its deadline"):
 		return

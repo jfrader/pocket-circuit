@@ -6,6 +6,7 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 
 const NUM_RACES := 12
 const BASE_SEED := 424242
+const RACE_LOAD_WAIT := preload("res://tests/support/race_load_wait.gd")
 
 var _race_results: Array[Dictionary] = []
 
@@ -67,9 +68,7 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 	if not _expect(ok, "start_circuit_race must succeed for seed %d" % seed):
 		return false
 
-	var deadline := Time.get_ticks_msec() + 30000
-	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
-		await process_frame
+	await RACE_LOAD_WAIT.finished(self, app)
 	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d" % seed):
 		return false
 	if app.get("_loading_failed"):
@@ -108,7 +107,7 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 	app.call("continue_after_race", true)
 
 	# Wait for scene switch back
-	deadline = Time.get_ticks_msec() + 10000
+	var deadline := Time.get_ticks_msec() + 10000
 	while current_scene != null and current_scene.scene_file_path == RACE_SCENE and Time.get_ticks_msec() < deadline:
 		await process_frame
 	await process_frame

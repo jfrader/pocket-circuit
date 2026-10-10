@@ -35,6 +35,7 @@ const DRIVE_SECONDS := 5.5  # real driving time per race to exercise per-tick co
 ## long driving session instead of the ~5s window every prior harness used.
 const LONG_TRACE_SECONDS := 90.0
 const LONG_TRACE_SAMPLE_SECONDS := 1.0
+const RACE_LOAD_WAIT := preload("res://tests/support/race_load_wait.gd")
 
 var _race_results: Array[Dictionary] = []
 
@@ -106,9 +107,7 @@ func _run_long_trace(app: Node) -> void:
 	if not _expect(ok, "start_circuit_race must succeed for long trace seed %d" % seed):
 		return
 
-	var deadline := Time.get_ticks_msec() + 60000
-	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
-		await process_frame
+	await RACE_LOAD_WAIT.finished(self, app)
 	if not _expect(not app.call("is_race_loading") and not app.get("_loading_failed"), "loading must complete for long trace"):
 		return
 
@@ -276,10 +275,8 @@ func _find_node_named(from: Node, wanted: String) -> Node:
 func _run_one_real_drive_race(app: Node, seed: int) -> Dictionary:
 	var ok: bool = app.call("start_circuit_race", &"kitchen", &"classic", seed, "rustbug")
 
-	var deadline := Time.get_ticks_msec() + 30000
-	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
-		await process_frame
-	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d"):
+	await RACE_LOAD_WAIT.finished(self, app)
+	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d" % seed):
 		return {}
 	if app.get("_loading_failed"):
 		if not _expect(false, "loading must not fail"):
@@ -359,7 +356,7 @@ func _run_one_real_drive_race(app: Node, seed: int) -> Dictionary:
 
 	app.call("continue_after_race", true)
 
-	deadline = Time.get_ticks_msec() + 10000
+	var deadline := Time.get_ticks_msec() + 10000
 	while current_scene != null and current_scene.scene_file_path == RACE_SCENE and Time.get_ticks_msec() < deadline:
 		await process_frame
 	await process_frame
