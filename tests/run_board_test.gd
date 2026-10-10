@@ -6,6 +6,7 @@ extends SceneTree
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
+const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
 
 var _failed := false
 
@@ -37,21 +38,31 @@ func _run_test() -> void:
 	if not _expect(board != null, "the board must render"):
 		return
 
-	# The enabled node set must equal available_nodes() exactly.
-	var enabled: Array[String] = []
+	# Every stop can be picked to read it; the reachable ones are available_nodes().
+	var reachable: Array[String] = []
 	for child: Node in board.get_children():
-		var button := child as Button
-		if button != null and not button.disabled:
-			enabled.append(String(button.name).replace("-", "_").trim_prefix("Node_"))
+		var marker_button := child as Button
+		if marker_button == null or not marker_button.has_meta("stop_id"):
+			continue
+		if not _expect(not marker_button.disabled, "every stop must be pickable"):
+			return
+		if bool(marker_button.get_meta("reachable")):
+			reachable.append(String(marker_button.get_meta("stop_id")))
 	var available: Array[String] = []
 	for entry: Dictionary in sess.available_nodes():
 		available.append(String(entry.get("id", "")))
-	enabled.sort()
+	reachable.sort()
 	available.sort()
-	if not _expect(str(enabled) == str(available), "the enabled nodes must equal available_nodes (got %s want %s)" % [str(enabled), str(available)]):
+	if not _expect(str(reachable) == str(available), "the reachable stops must equal available_nodes (got %s want %s)" % [str(reachable), str(available)]):
 		return
-
 	if not _expect(available.size() == 1 and available[0] == sess.current_node_id, "a fresh run offers only its opening race"):
+		return
+	# The board opens on the opening race, picked, with its card and a live RACE.
+	var go := shell.find_child("RunGo", true, false) as Button
+	if not _expect(board.call("selected_id") == sess.current_node_id and go != null and not go.disabled and go.text == String(RUN_UI.GO_LABELS["race"]), "the board opens on the opening race with RACE ready"):
+		return
+	var circuit: Dictionary = app.call("run_stop_circuit", sess.current_node_id)
+	if not _expect(_has_label_containing(shell.find_child("RunStop", true, false), String(circuit.get("display_name", "?"))), "the stop card names the circuit it races on"):
 		return
 
 	# The detail column carries the session values.
@@ -81,12 +92,30 @@ func _run_test() -> void:
 					if not _expect(marker.position.y < (other as Button).position.y, "the act rival must be above ordinary nodes"):
 						return
 
-	# Pressing the opening race starts it; once raced, its children open.
+	# A d-pad leaves the map's right edge into the stop's go button.
+	for edge: Button in board.call("right_edge_markers"):
+		if not _expect(edge.get_node_or_null(edge.focus_neighbor_right) == go, "the map's right edge leads to the go button"):
+			return
+	# Once the map has popped in, the picked stop rests enlarged.
+	await create_timer(1.0).timeout
+	if not _expect((board.call("marker", sess.current_node_id) as Button).scale.is_equal_approx(Vector2.ONE * RUN_MAP_VIEW.SELECTED_SCALE), "the picked stop keeps its size after the map pops in"):
+		return
+	# Leaving the board while the car drives drops that go, and going still works after.
+	go.pressed.emit()
+	await process_frame
+	shell.call("show_title")
+	await _settle_travel()
+	if not _expect(String((app.get("current_race_session") as Dictionary).get("run_node_id", "")).is_empty() and not bool(shell.get("_run_going")), "leaving the board on the way drops the go"):
+		return
+	shell.call("show_run_board")
+	await process_frame
+	board = shell.find_child("RunBoard", true, false) as Control
+	# Pressing the picked opening race goes: the car drives there and it starts.
 	var opening := board.get_node_or_null("Node_" + sess.current_node_id.replace("_", "-")) as Button
 	opening.pressed.emit()
-	await process_frame
+	await _settle_travel()
 	var race_session: Dictionary = app.get("current_race_session")
-	if not _expect(String(race_session.get("run_node_id", "")) == sess.current_node_id, "pressing the opening race must start it"):
+	if not _expect(String(race_session.get("run_node_id", "")) == sess.current_node_id, "pressing the picked opening race must start it"):
 		return
 	app.call("report_race_result", RUN_WALK.WIN, 1.0, [], false, {})
 	shell.call("show_run_board")
@@ -96,14 +125,27 @@ func _run_test() -> void:
 	var children: Array[Dictionary] = sess.available_nodes()
 	if not _expect(not children.is_empty() and String(children[0]["id"]) != sess.current_node_id, "a raced opening offers its children"):
 		return
-	var target_id := String(children[0]["id"])
-	var button := board.get_node_or_null("Node_" + target_id.replace("_", "-")) as Button
-	if not _expect(button != null and not button.disabled, "the child marker must be pressable for %s" % target_id):
+	# Picking a stop only shows it; an out-of-reach stop cannot be gone to.
+	var standing := sess.current_node_id
+	var far_id := ""
+	for node_id: String in sess.current_map.nodes:
+		if node_id != standing and not sess.available_nodes().any(func(n: Dictionary) -> bool: return n["id"] == node_id):
+			far_id = node_id
+	(board.get_node_or_null("Node_" + far_id.replace("_", "-")) as Button).pressed.emit()
+	await process_frame
+	go = shell.find_child("RunGo", true, false) as Button
+	if not _expect(sess.current_node_id == standing and board.call("selected_id") == far_id and go.disabled and go.focus_mode == Control.FOCUS_NONE and _has_label(shell, "OUT OF REACH"), "picking an out-of-reach stop shows it and offers no way there"):
 		return
+	var target_id := String(children[children.size() - 1]["id"])
+	var button := board.get_node_or_null("Node_" + target_id.replace("_", "-")) as Button
 	button.pressed.emit()
-	await process_frame
-	await process_frame
-	if not _expect(String(sess.current_node_id) == target_id, "pressing a node must enter it"):
+	await _settle_travel()
+	var target_kind := String(sess.current_map.get_node(target_id)["type"])
+	if not _expect(sess.current_node_id == standing and board.call("selected_id") == target_id and _has_label(shell, String(RUN_UI.TYPES[target_kind]["name"])), "picking a reachable stop shows it without going"):
+		return
+	(shell.find_child("RunGo", true, false) as Button).pressed.emit()
+	await _settle_travel()
+	if not _expect(String(sess.current_node_id) == target_id, "the go button must enter the picked stop"):
 		return
 	var live_store: Object = app.get("_save_store")
 	var path := String(live_store.get("save_path"))
@@ -144,6 +186,20 @@ func _run_test() -> void:
 			side = shell.find_child("RunContextMap", true, false) as Control
 		if not _expect(side != null and side.get_global_rect().end.x <= root.get_visible_rect().end.x, "%s must keep its right-hand card inside the logical viewport" % screen[0]):
 			return
+	# Reduced motion: the map is whole at once and the car arrives without driving.
+	app.call("update_setting", "reduced_motion", true)
+	shell.call("show_run_board")
+	await process_frame
+	board = shell.find_child("RunBoard", true, false) as Control
+	var markers_rest := true
+	for child: Node in board.get_children():
+		if child is Button and ((child as Button).modulate.a < 1.0 or not (child as Button).scale.is_equal_approx(Vector2.ONE * (RUN_MAP_VIEW.SELECTED_SCALE if String(child.get_meta("stop_id", "")) == board.call("selected_id") else 1.0))):
+			markers_rest = false
+	var started := Time.get_ticks_msec()
+	await board.call("travel_to", String(board.call("selected_id")))
+	if not _expect(float(board.get("_reveal")) == 1.0 and markers_rest and Time.get_ticks_msec() - started < int(RUN_MAP_VIEW.TRAVEL_TIME * 1000.0), "with reduced motion the board shows at rest and the car does not drive"):
+		return
+	app.call("update_setting", "reduced_motion", false)
 	# With a run in progress the title offers to continue it, not to replace it.
 	shell.call("show_title")
 	await process_frame
@@ -175,6 +231,22 @@ func _button_with_text(node: Node, text: String) -> Button:
 		if found != null:
 			return found
 	return null
+
+
+## Waits out the car's drive along the map.
+func _settle_travel() -> void:
+	await create_timer(RUN_MAP_VIEW.TRAVEL_TIME + 0.3).timeout
+
+
+func _has_label_containing(node: Node, text: String) -> bool:
+	if node == null:
+		return false
+	if node is Label and String((node as Label).text).contains(text):
+		return true
+	for child in node.get_children():
+		if _has_label_containing(child, text):
+			return true
+	return false
 
 
 func _has_label(node: Node, text: String) -> bool:
