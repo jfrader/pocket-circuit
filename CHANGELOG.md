@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Run parts: each parts van stocks three parts rolled for that van, each printing what it gives and what it takes. Bought parts are held; a bench fits one to the car you are driving instead of repairing it. A fitted part changes how that car drives for the rest of the night. Won cars go to the garage without parts.
 - Quick Strip: a one-off strip battle from the title screen. Sweepers and chicanes run north along a four-lane printed fabric runner between two household rooms. Civilian toy cars share the northbound lanes; sparser oncoming cars and delivery trucks approach on the left, with headlights and amber truck markers. Traffic yields before merging and recovers after bumps. One rival chases from behind, with a capture arc when it closes in. Reach the finish to win; get caught or run past the time limit and the attempt ends. Results do not save.
 
 ### Changed

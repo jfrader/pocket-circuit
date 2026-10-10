@@ -24,13 +24,19 @@ const AXIS_FIELDS := {
 static func apply_roll(base: VehicleStats, roll: Dictionary) -> VehicleStats:
 	var rolled := base.duplicate(true) as VehicleStats
 	for axis: String in AXES:
-		var amount := clampf(float(roll.get(axis, 0.0)), -1.0, 1.0)
 		for field: String in AXIS_FIELDS[axis]:
-			var limits: Array = VehicleStats.PARAMETER_RANGES[field]
-			var value := float(base.get(field))
-			var edge := float(limits[1]) if amount > 0.0 else float(limits[0])
-			rolled.set(field, value + (edge - value) * absf(amount))
+			move_field(rolled, field, float(roll.get(axis, 0.0)))
 	return rolled
+
+
+## Moves one stat by `amount` (-1..1) of its remaining room toward the edge of
+## its range in that direction.
+static func move_field(stats: VehicleStats, field: String, amount: float) -> void:
+	var limits: Array = VehicleStats.PARAMETER_RANGES[field]
+	var step := clampf(amount, -1.0, 1.0)
+	var value := float(stats.get(field))
+	var edge := float(limits[1]) if step > 0.0 else float(limits[0])
+	stats.set(field, value + (edge - value) * absf(step))
 
 
 ## Each axis as 0..1: the mean position of its stats inside their ranges.

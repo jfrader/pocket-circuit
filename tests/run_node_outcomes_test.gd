@@ -34,19 +34,22 @@ func _run_test() -> void:
 		return
 	if not _expect(bench_run.run_state.get_car_wear(car) == "clean", "repair must restore the car"):
 		return
-	if not _expect(not bool(app.call("run_bench_fit", "spare")), "fitting after repairing in the same visit must be refused"):
+	bench_run.parts_held.append(RunParts.deal(3, bench_run.car_stats(car))[0])
+	if not _expect(not bool(app.call("run_bench_fit", 0)) and bench_run.parts_held.size() == 1, "fitting after repairing in the same visit must be refused"):
 		return
 
 	# --- Parts van: an exact spend of points, an overspend refusal, and the save follows ---
 	var van_run: RunSession = app.call("start_run", 900002) as RunSession
 	if not _expect(van_run != null and RUN_WALK.walk_to(app, van_run, "parts_van"), "a parts van must be reachable"):
 		return
-	van_run.run_points = 12
-	if not _expect(not bool(app.call("run_buy_part", "spare_shell")), "a part above the points must be refused"):
+	var part: Dictionary = van_run.van_stock()[0]
+	van_run.run_points = RunParts.cost(part) - 1
+	if not _expect(not bool(app.call("run_buy_part", String(part["part"]))), "a part above the points must be refused"):
 		return
-	if not _expect(bool(app.call("run_buy_part", "tyre_set")), "a part inside the points must sell"):
+	van_run.run_points = 20
+	if not _expect(bool(app.call("run_buy_part", String(part["part"]))), "a part inside the points must sell"):
 		return
-	if not _expect(van_run.run_points == 12 - int(RunSession.VAN_PART_COSTS["tyre_set"]), "the purchase must debit exactly its listed price"):
+	if not _expect(van_run.run_points == 20 - RunParts.cost(part), "the purchase must debit exactly its listed price"):
 		return
 	var live_store: Object = app.get("_save_store")
 	var saved: Dictionary = SAVE_STORE.new(String(live_store.get("save_path"))).load_data()

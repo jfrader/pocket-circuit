@@ -1692,8 +1692,8 @@ func run_bench_repair(car_key: String, node_id: String = "") -> bool:
 	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_repair(car_key))
 
 
-func run_bench_fit(part: String, node_id: String = "") -> bool:
-	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_fit(_current_run_session.current_car_id, part))
+func run_bench_fit(held_index: int, node_id: String = "") -> bool:
+	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_fit(_current_run_session.current_car_id, held_index))
 
 
 ## Drives the car just won from now on; the offer closes.
