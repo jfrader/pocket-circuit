@@ -23,6 +23,7 @@ const OFFER_SHAPE_SIZE := Vector2(420, 400)
 const OFFER_REVEAL_SCALE := 0.4
 const OFFER_REVEAL_TURN := -0.6
 const OFFER_REVEAL_TIME := 0.4
+const STEAM_DROP_MARGIN := 24.0
 
 var _app: Node
 var _root: Control
@@ -426,6 +427,33 @@ func _run_surface() -> void:
 	_run_backdrop.show()
 	_footer.get_parent().hide()
 	_content.add_theme_constant_override("separation", 14)
+	call_deferred("show_steam_drop")
+
+
+## Announces the car Steam dropped for a run win, once, over whatever run
+## screen is up; one that dropped during a race waits for the next one.
+func show_steam_drop() -> void:
+	var car: Dictionary = _app.get("steam_drop")
+	if car.is_empty() or not visible or not _run_backdrop.visible:
+		return
+	_app.set("steam_drop", {})
+	var banner := RUN_UI.action(RUN_UI.STEAM_DROP_LINE % String(CATALOG.generated_vehicle(car).get("name", "")).to_upper(), true)
+	banner.name = "SteamDrop"
+	banner.focus_mode = Control.FOCUS_NONE
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(banner)
+	banner.reset_size()
+	var rest := Vector2(_root.size.x - banner.size.x - STEAM_DROP_MARGIN, STEAM_DROP_MARGIN)
+	banner.position = rest
+	if _reduced_motion_enabled():
+		get_tree().create_timer(RUN_UI.BANNER_HOLD).timeout.connect(banner.queue_free)
+		return
+	banner.position = rest - Vector2(0.0, banner.size.y + STEAM_DROP_MARGIN)
+	var tween := banner.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(banner, "position", rest, RUN_UI.BANNER_IN)
+	tween.tween_interval(RUN_UI.BANNER_HOLD)
+	tween.tween_property(banner, "modulate:a", 0.0, RUN_UI.BANNER_OUT)
+	tween.tween_callback(banner.queue_free)
 
 
 ## A stop's screen: its copy, the run's stats and its actions on the left;
@@ -504,7 +532,7 @@ func show_run_offer() -> void:
 	detail.add_theme_constant_override("separation", 6)
 	columns.add_child(detail)
 	RUN_UI.spacer(detail, 8)
-	detail.add_child(RUN_UI.label(String(RUN_UI.ORIGIN_COPY.get(String(offered.get("won_from", "")), "")) % int(offered.get("act", 1)), 11, RUN_UI.AMBER, true))
+	detail.add_child(RUN_UI.label(RUN_UI.origin_line(offered), 11, RUN_UI.AMBER, true))
 	RUN_UI.spacer(detail, 8)
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 16)

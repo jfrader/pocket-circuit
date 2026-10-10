@@ -17,6 +17,7 @@ const GENERATED_RULES := preload("res://scripts/race/generated_circuit_rules.gd"
 const CIRCUIT_LIBRARY := preload("res://scripts/persistence/circuit_library.gd")
 const CIRCUIT_PREVIEW_QUEUE := preload("res://scripts/race/circuit_preview_queue.gd")
 const RACE_ASSET_PRELOADER := preload("res://scripts/race/race_asset_preloader.gd")
+const STEAM_SERVICE := preload("res://scripts/steam/steam_service.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
 const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
@@ -138,6 +139,10 @@ var _mastery_calibration_worker: Node
 var _mastery_calibration_failures: Dictionary = {}
 var _circuit_preview_queue: Node
 var _race_asset_preloader: Node
+## Steam's inventory, when Steam is there; see SteamService.
+var steam: Node
+## The car Steam last dropped for a run win, until the board has shown it.
+var steam_drop: Dictionary = {}
 
 
 func _enter_tree() -> void:
@@ -185,6 +190,13 @@ func _ready() -> void:
 			_save_data["current_run"] = {}
 			if not is_save_read_only():
 				_save_candidate(_save_data.duplicate(true))
+	steam = STEAM_SERVICE.new()
+	steam.name = "SteamService"
+	add_child(steam)
+	steam.cars_changed.connect(_on_steam_cars_changed)
+	steam.car_dropped.connect(_on_steam_car_dropped)
+	if not _test_mode and steam.connect_steam():
+		steam.refresh()
 	_install_held_vehicles()
 	_settle_race_in_flight()
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
@@ -1490,10 +1502,11 @@ func _garage_with(won: Array[Dictionary]) -> Array:
 	return garage
 
 
-## Installs every generated car the player holds (the garage and the active run)
-## so they resolve by id like shipped cars.
+## Installs every generated car the player holds (the garage, their Steam cars
+## and the active run) so they resolve by id like shipped cars.
 func _install_held_vehicles() -> void:
 	var cars: Array = (_save_data.get("garage_cars", []) as Array).duplicate(true)
+	cars.append_array(_save_data.get("steam_cars", []))
 	if _current_run_session != null:
 		cars.append_array(_current_run_session.car_records())
 	VehicleDirectory.install(cars.map(func(car: Dictionary) -> Dictionary: return CATALOG.generated_vehicle(car)))
@@ -1503,7 +1516,29 @@ func _install_held_vehicles() -> void:
 func quick_race_roster() -> Array[String]:
 	var ids := CATALOG.quick_race_vehicle_ids()
 	ids.append_array(garage_car_ids())
+	for car: Dictionary in _save_data.get("steam_cars", []):
+		ids.append(String(car["id"]))
 	return CATALOG.garage_order(ids)
+
+
+## The Steam inventory as read: it replaces the cached copy, which offline
+## play keeps showing. A cache that cannot be saved still installs.
+func _on_steam_cars_changed(cars: Array[Dictionary]) -> void:
+	var candidate := _save_data.duplicate(true)
+	candidate["steam_cars"] = cars.duplicate(true)
+	if candidate == _save_data:
+		return
+	if is_save_read_only() or not _save_candidate(candidate):
+		_save_data["steam_cars"] = cars.duplicate(true)
+	else:
+		_save_data = candidate
+	_install_held_vehicles()
+
+
+func _on_steam_car_dropped(car: Dictionary) -> void:
+	steam_drop = car.duplicate(true)
+	if is_instance_valid(_shell):
+		_shell.call("show_steam_drop")
 
 
 ## The garage's won cars, newest last.
@@ -1679,7 +1714,9 @@ func _commit_run_result(node_id: String, position: int, dnf: bool, field_size: i
 	if _current_run_session == null or node_id.is_empty():
 		return
 	if String(_current_run_session.current_node().get("type", "")) == "rival":
-		_current_run_session.resolve_rival(node_id, position == 1 and not dnf)
+		var duel: Dictionary = _current_run_session.resolve_rival(node_id, position == 1 and not dnf)
+		if not (duel.get("car", {}) as Dictionary).is_empty():
+			steam.trigger_car_drop()
 	else:
 		var outcome: Dictionary = _current_run_session.resolve_race(node_id, position, field_size)
 		if outcome.has("error"):
@@ -1724,7 +1761,10 @@ func run_buy_part(part_id: String, node_id: String = "") -> bool:
 
 
 func run_open_lockup(node_id: String = "") -> bool:
-	return _run_seam(node_id, "lockup", func() -> bool: return not _current_run_session.open_lockup().is_empty())
+	var opened := _run_seam(node_id, "lockup", func() -> bool: return not _current_run_session.open_lockup().is_empty())
+	if opened:
+		steam.trigger_car_drop()
+	return opened
 
 
 func run_resolve_errand(choice: int, node_id: String = "") -> bool:

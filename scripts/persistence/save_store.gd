@@ -57,6 +57,7 @@ func default_data() -> Dictionary:
 		"first_run": true,
 		"current_run": {},
 		"garage_cars": [],
+		"steam_cars": [],
 	}
 
 
@@ -212,7 +213,8 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	var stored_roster: Variant = raw.get("driver_roster")
 	normalized["driver_roster"] = (stored_roster as Dictionary).duplicate(true) if stored_roster is Dictionary else {}
 
-	normalized["garage_cars"] = _normalize_garage(raw.get("garage_cars"))
+	normalized["garage_cars"] = _normalize_cars(raw.get("garage_cars"), [RUN_SESSION.CAR_ORIGIN_RIVAL, RUN_SESSION.CAR_ORIGIN_LOCKUP])
+	normalized["steam_cars"] = _normalize_cars(raw.get("steam_cars"), [SteamCars.ORIGIN])
 
 	var stored_run: Variant = raw.get("current_run")
 	normalized["current_run"] = (stored_run as Dictionary).duplicate(true) if stored_run is Dictionary else {}
@@ -232,14 +234,15 @@ func _normalize(raw: Dictionary) -> Dictionary:
 	return normalized
 
 
-## Cars won in runs, each validated by the run model, without duplicate ids.
-func _normalize_garage(value: Variant) -> Array:
+## Stored cars from `origins` (won in runs, or the last Steam inventory read),
+## each validated by the run model, without duplicate ids.
+func _normalize_cars(value: Variant, origins: Array) -> Array:
 	var garage: Array = []
 	var seen := {}
 	if value is not Array:
 		return garage
 	for entry: Variant in value as Array:
-		var car := RUN_SESSION.normalize_won_car(entry)
+		var car := RUN_SESSION.normalize_car(entry, origins)
 		if car.is_empty() or seen.has(car["id"]):
 			continue
 		seen[car["id"]] = true
