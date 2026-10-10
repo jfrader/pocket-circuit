@@ -3,6 +3,7 @@ extends SceneTree
 const IDENTITIES := preload("res://scripts/race/generated_circuit_identity.gd")
 const CORE := preload("res://scripts/race/track_builder_core.gd")
 const WAIT_TIMEOUT_MS := 60000
+const RACE_LOAD_WAIT := preload("res://tests/support/race_load_wait.gd")
 var capture_dir := OS.get_environment("PC_QUICK_RACE_CAPTURE_DIR")
 
 
@@ -32,9 +33,7 @@ func _run() -> void:
 			return
 		if not await _click(shell, "PLAY"):
 			return
-		var deadline := Time.get_ticks_msec() + WAIT_TIMEOUT_MS
-		while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
-			await process_frame
+		await RACE_LOAD_WAIT.finished(self, app)
 		if not _expect(not app.call("is_race_loading") and current_scene.has_node("RaceManager"), "Play must finish loading " + expected_theme):
 			return
 		var session: Dictionary = app.call("get_current_race_session")
@@ -42,6 +41,7 @@ func _run() -> void:
 		if not _expect(session["event"]["theme"] == expected_theme and String(track.get_meta("theme")) == expected_theme, "loaded race must match the displayed theme"):
 			return
 		var manager := current_scene.get_node("RaceManager") as RaceManager
+		var deadline := Time.get_ticks_msec() + WAIT_TIMEOUT_MS
 		while not manager.is_running and Time.get_ticks_msec() < deadline:
 			await physics_frame
 		if not _expect(manager.is_running, "selected theme must reach GO"):
