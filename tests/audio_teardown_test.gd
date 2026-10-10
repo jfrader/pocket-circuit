@@ -3,6 +3,7 @@ extends SceneTree
 const APP_PATH := "/root/App"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const NUM_CYCLES := 3
+const RACE_LOAD_WAIT := preload("res://tests/support/race_load_wait.gd")
 
 var _cycles: Array[Dictionary] = []
 
@@ -59,10 +60,8 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 	if not _expect(ok, "start_circuit_race must succeed for seed %d" % seed):
 		return false
 
-	var deadline := Time.get_ticks_msec() + 30000
-	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
-		await process_frame
-	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d"):
+	await RACE_LOAD_WAIT.finished(self, app)
+	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d" % seed):
 		return false
 
 	await process_frame
@@ -80,7 +79,7 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 
 	app.call("continue_after_race", true)
 
-	deadline = Time.get_ticks_msec() + 10000
+	var deadline := Time.get_ticks_msec() + 10000
 	while current_scene != null and current_scene.scene_file_path == RACE_SCENE and Time.get_ticks_msec() < deadline:
 		await process_frame
 	await process_frame

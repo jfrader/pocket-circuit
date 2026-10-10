@@ -7,6 +7,8 @@ const INK := Color("e9ecf1")
 const MUTED := Color("8b95a5")
 const DIM := Color("5a6577")
 const AMBER := Color("f2a53c")
+const UPSIDE := Color("5fbf7f")
+const DOWNSIDE := Color("e0605a")
 const BOSS_EDGE := Color("674b29")
 const LIVE_EDGE := Color("657587")
 const CATALOG := preload("res://data/championship/catalog.gd")
@@ -15,14 +17,16 @@ const TYPES := {
 	"race": {"name": "Race", "cost": "wear", "copy": "Four cars, a rolled circuit. The filler, and the place you test a build.", "icon": preload("res://assets/ui/run_map/node_race.svg")},
 	"rival": {"name": "Rival", "cost": "points or wear", "copy": "One-on-one, contact. The reliable source of a car.", "icon": preload("res://assets/ui/run_map/node_rival.svg")},
 	"bench": {"name": "Bench", "cost": "the visit", "copy": "No race. Repair the car, or fit one part. Never both.", "icon": preload("res://assets/ui/run_map/node_bench.svg")},
-	"parts_van": {"name": "Parts van", "cost": "points", "copy": "No race. Spend points on parts.", "icon": preload("res://assets/ui/run_map/node_parts_van.svg")},
+	"parts_van": {"name": "Parts van", "cost": "points", "copy": "No race. Spend points on parts, with a downside on each.", "icon": preload("res://assets/ui/run_map/node_parts_van.svg")},
 	"lockup": {"name": "Lockup", "cost": "free", "copy": "No race. A free car, no fight. Rare, and fought over.", "icon": preload("res://assets/ui/run_map/node_lockup.svg")},
 	"errand": {"name": "Errand", "cost": "varies", "copy": "A choice, no race. The cast wants something; it has a price.", "icon": preload("res://assets/ui/run_map/node_errand.svg")},
 	"act_rival": {"name": "Act rival", "cost": "the run", "copy": "A generated driver carrying the act's hardest AI profile. One race decides the act.", "icon": preload("res://assets/ui/run_map/node_boss.svg")},
 }
-const VAN_PART_NAMES := {"tool_kit": "TOOL KIT", "tyre_set": "TYRE SET", "spare_shell": "SPARE SHELL"}
 ## Where a won car came from, as the garage and the run's car offer say it.
 const ORIGIN_COPY := {"rival": "WON IN A DUEL · ACT %d", "lockup": "FOUND IN A LOCKUP · ACT %d"}
+## The right-hand card of a run screen: the map, or a stop's parts.
+const CARD_SIZE := Vector2(520, 516)
+const PART_BUTTON_HEIGHT := 92.0
 const CURRENT_RING := preload("res://assets/ui/run_map/ring_current.svg")
 
 static var _mono: FontVariation
@@ -84,7 +88,7 @@ static func stats(host: VBoxContainer, session: RunSession) -> void:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 38)
 	parent.add_child(row)
-	for entry: Array in [["POINTS", str(session.run_points)], ["OWNED", str(session.owned_cars.size())]]:
+	for entry: Array in [["POINTS", str(session.run_points)], ["OWNED", str(session.owned_cars.size())], ["PARTS", str(session.parts_held.size())]]:
 		var column := VBoxContainer.new()
 		column.add_theme_constant_override("separation", 4)
 		row.add_child(column)
@@ -96,8 +100,59 @@ static func stats(host: VBoxContainer, session: RunSession) -> void:
 	if session.run_state != null:
 		wear = session.run_state.get_car_wear(session.current_car_id)
 	parent.add_child(label("%s · %s" % [car_name(session.current_car_id), wear], 18))
+	var fitted := session.fitted_parts(session.current_car_id).map(func(part: Dictionary) -> String: return RunParts.part_name(part))
+	if not fitted.is_empty():
+		var fitted_line := label("FITTED · %s" % ", ".join(PackedStringArray(fitted)).to_upper(), 11, MUTED, true)
+		fitted_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		parent.add_child(fitted_line)
 	spacer(parent, 6)
 	divider(parent)
+
+
+## A card of parts under a header: returns the card and the list to fill. The
+## list scrolls to the focused part when the pile outgrows the card.
+static func parts_card(header: String) -> Array[Control]:
+	var card := PanelContainer.new()
+	card.custom_minimum_size = CARD_SIZE
+	var style := StyleBoxFlat.new()
+	style.bg_color = PANEL
+	style.border_color = LINE
+	style.set_border_width_all(1)
+	style.set_content_margin_all(22)
+	card.add_theme_stylebox_override("panel", style)
+	var column := VBoxContainer.new()
+	column.add_theme_constant_override("separation", 14)
+	card.add_child(column)
+	column.add_child(label(header, 10, MUTED, true))
+	var scroll := ScrollContainer.new()
+	scroll.follow_focus = true
+	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	column.add_child(scroll)
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 8)
+	list.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	scroll.add_child(list)
+	return [card, list]
+
+
+## A part as one button: its title, then what it gives and what it takes.
+static func part_button(part: Dictionary, title: String, disabled: bool) -> Button:
+	var button := action("", false, disabled)
+	button.custom_minimum_size.y = PART_BUTTON_HEIGHT
+	var lines := VBoxContainer.new()
+	lines.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	lines.offset_left = 18
+	lines.offset_right = -18
+	lines.alignment = BoxContainer.ALIGNMENT_CENTER
+	lines.add_theme_constant_override("separation", 4)
+	lines.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	lines.modulate.a = 0.45 if disabled else 1.0
+	button.add_child(lines)
+	for line: Label in [label(title, 13, INK, true), label("+ " + RunParts.upside_copy(part), 13, UPSIDE, true), label("− " + RunParts.downside_copy(part), 13, DOWNSIDE, true)]:
+		line.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		lines.add_child(line)
+	return button
 
 
 ## A car's display name (generated cars have their own), never its id.

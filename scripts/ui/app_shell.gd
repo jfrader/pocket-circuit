@@ -325,7 +325,9 @@ func _run_surface() -> void:
 	_content.add_theme_constant_override("separation", 14)
 
 
-func _run_node_intro(sess: RunSession, kind: String) -> void:
+## A stop's screen: its copy, the run's stats and its actions on the left;
+## `side` on the right, or the read-only map when there is none.
+func _run_node_intro(sess: RunSession, kind: String, side: Control = null) -> void:
 	_run_surface()
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 64)
@@ -349,26 +351,32 @@ func _run_node_intro(sess: RunSession, kind: String) -> void:
 	RUN_UI.stats(detail, sess)
 	RUN_UI.spacer(detail, 12)
 	_run_actions = detail
-	var board := RUN_MAP_VIEW.new()
-	board.name = "RunContextMap"
-	columns.add_child(board)
-	# The context map is read-only; actions on this stop remain the only focus targets.
-	var buttons: Array[Button] = board.configure(sess, Callable())
-	for button: Button in buttons:
-		button.disabled = true
-		button.focus_mode = Control.FOCUS_NONE
-		button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if side != null:
+		columns.add_child(side)
+	else:
+		var board := RUN_MAP_VIEW.new()
+		board.name = "RunContextMap"
+		columns.add_child(board)
+		# The context map is read-only; actions on this stop remain the only focus targets.
+		var buttons: Array[Button] = board.configure(sess, Callable())
+		for button: Button in buttons:
+			button.disabled = true
+			button.focus_mode = Control.FOCUS_NONE
+			button.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	RUN_UI.divider(_content)
 	_content.add_child(RUN_UI.legend(sess.current_map))
 
 
 func _run_action(text: String, callback: Callable, primary: bool = false, disabled: bool = false, node_name: String = "") -> void:
-	var button := RUN_UI.action(text, primary, disabled)
+	_add_run_button(_run_actions, RUN_UI.action(text, primary, disabled), callback, node_name)
+
+
+func _add_run_button(parent: Node, button: Button, callback: Callable, node_name: String) -> void:
 	button.name = node_name
 	button.pressed.connect(callback)
 	_wire_button_audio(button)
-	_run_actions.add_child(button)
-	if not disabled:
+	parent.add_child(button)
+	if not button.disabled:
 		_register_button_focus(button)
 
 
@@ -449,9 +457,14 @@ func show_run_bench() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_run_node_intro(sess, "bench")
-	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, false, "BenchRepair")
-	_run_action("FIT SPARE", Callable(self, "_on_bench_fit_pressed"), false, false, "BenchFit")
+	var used := sess.bench_action_done
+	var card := RUN_UI.parts_card("YOUR PARTS · FIT ONE" if not sess.parts_held.is_empty() else "NO PARTS HELD")
+	card[0].name = "BenchParts"
+	_run_node_intro(sess, "bench", card[0])
+	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, used, "BenchRepair")
+	for index: int in sess.parts_held.size():
+		var part: Dictionary = sess.parts_held[index]
+		_add_run_button(card[1], RUN_UI.part_button(part, "FIT %s" % RunParts.part_name(part).to_upper(), used), Callable(self, "_on_bench_fit_pressed").bind(index), "BenchFit_%d" % index)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	_focus_first()
 
@@ -467,13 +480,17 @@ func show_run_parts_van() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_run_node_intro(sess, "parts_van")
-	_run_actions.add_child(RUN_UI.label("SPEND POINTS", 11, RUN_UI.AMBER, true))
-	for part: String in RunSession.VAN_PART_COSTS:
-		var cost := int(RunSession.VAN_PART_COSTS[part])
-		_run_action("%s · %d" % [String(RUN_UI.VAN_PART_NAMES[part]), cost], Callable(self, "_on_van_buy_pressed").bind(part), false, sess.run_points < cost, "VanBuy_" + part)
+	var bought := sess.resolved_nodes.has(sess.current_node_id)
+	var card := RUN_UI.parts_card("IN THE VAN · ONE PER VISIT")
+	card[0].name = "VanParts"
+	_run_node_intro(sess, "parts_van", card[0])
+	for part: Dictionary in sess.van_stock():
+		var cost := RunParts.cost(part)
+		_add_run_button(card[1], RUN_UI.part_button(part, "%s · %d POINTS" % [RunParts.part_name(part).to_upper(), cost], bought or sess.run_points < cost), Callable(self, "_on_van_buy_pressed").bind(String(part["part"])), "VanBuy_" + String(part["part"]))
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_focus_first()
+	# The first part the points can buy takes focus, not BACK on the left.
+	_queue_content_entrance()
+	_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
 
 
 func show_run_lockup() -> void:
@@ -521,9 +538,9 @@ func _on_bench_repair_pressed() -> void:
 	show_run_board()
 
 
-func _on_bench_fit_pressed() -> void:
+func _on_bench_fit_pressed(held_index: int) -> void:
 	_play_ui_confirm()
-	_app.call("run_bench_fit", "spare")
+	_app.call("run_bench_fit", held_index)
 	show_run_board()
 
 

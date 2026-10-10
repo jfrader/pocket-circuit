@@ -106,25 +106,35 @@ func _check_bench_and_van() -> void:
 	var car: String = sess.current_car_id
 	if not _expect(sess.bench_repair(car), "repair at the bench"):
 		return
-	if not _expect(not sess.bench_fit(car, "spare") and not sess.bench_repair(car), "one bench action per visit"):
+	sess.parts_held.append(RunParts.deal(1, sess.car_stats(car))[0])
+	if not _expect(not sess.bench_fit(car, 0) and not sess.bench_repair(car) and sess.parts_held.size() == 1, "one bench action per visit"):
 		return
 	if not _expect(sess.open_lockup().is_empty() and sess.lockup_used == false, "a lockup opens only at a lockup"):
 		return
 	var van = RUN_SESSION.create(22222)
 	if not _expect(_walk_to(van, "parts_van"), "a route reaches a parts van"):
 		return
-	var cheapest: int = RUN_SESSION.VAN_PART_COSTS.values().min()
+	var cheapest: int = RunParts.UPSIDES.values().map(func(part: Dictionary) -> int: return int(part["cost"])).min()
 	if not _expect(cheapest <= int(RUN_SESSION.RUN_POINTS_BY_FINISH[1]), "one race win buys the cheapest part"):
 		return
+	var stock: Array[Dictionary] = van.van_stock()
+	if not _expect(stock.size() == RunParts.VAN_STOCK, "the van stocks its rolled parts"):
+		return
+	var unstocked := ""
+	for part_id: String in RunParts.UPSIDES:
+		if not stock.any(func(part: Dictionary) -> bool: return part["part"] == part_id):
+			unstocked = part_id
 	van.run_points = 20
-	if not _expect(not van.buy_part("rocket") and van.run_points == 20, "the van sells only its listed parts"):
+	if not _expect(not van.buy_part(unstocked) and not van.buy_part("rocket") and van.run_points == 20, "the van sells only what it stocks"):
 		return
-	van.run_points = 14
-	if not _expect(not van.buy_part("spare_shell") and van.run_points == 14, "a part above the points is refused"):
+	var part: Dictionary = stock[0]
+	van.run_points = RunParts.cost(part) - 1
+	if not _expect(not van.buy_part(String(part["part"])) and van.run_points == RunParts.cost(part) - 1, "a part above the points is refused"):
 		return
-	if not _expect(van.buy_part("tyre_set") and van.run_points == 14 - int(RUN_SESSION.VAN_PART_COSTS["tyre_set"]), "a purchase spends exactly its listed price"):
+	van.run_points = 20
+	if not _expect(van.buy_part(String(part["part"])) and van.run_points == 20 - RunParts.cost(part) and van.parts_held == [part], "a purchase spends exactly its price and the part is held"):
 		return
-	if not _expect(not van.buy_part("tool_kit"), "the van sells once per visit"):
+	if not _expect(not van.buy_part(String(stock[1]["part"])), "the van sells once per visit"):
 		return
 
 
@@ -256,7 +266,7 @@ func _resolve_current(sess, win: bool) -> void:
 		"bench":
 			sess.bench_repair(sess.current_car_id)
 		"parts_van":
-			sess.buy_part("tool_kit")
+			sess.buy_part(String(sess.van_stock()[0]["part"]))
 		"lockup":
 			sess.open_lockup()
 		"errand":
