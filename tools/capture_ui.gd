@@ -79,7 +79,7 @@ func _run() -> void:
 		# Full screens: points to spend at the van, a pile of parts at the bench.
 		sess.run_points = 20
 		if shot == "bench":
-			sess.parts_held = RunParts.deal(sess.run_seed)
+			sess.parts_held = RunParts.deal(sess.run_seed, sess.car_stats(sess.current_car_id))
 		shell.call("show_run_" + ("parts_van" if shot == "van" else shot))
 	for i in 8:
 		await process_frame

@@ -9,6 +9,7 @@ const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const RUN_STATE := preload("res://scripts/progression/run_state.gd")
 
 var _failed := false
 
@@ -57,22 +58,34 @@ func _check_parts() -> void:
 		return
 
 
-## A van's stock comes from its roll: the same stop deals the same parts, each
-## distinct with an allowed downside, and the rolls reach every part.
+## A van's stock comes from its roll and the car it sells to: the same stop
+## deals the same parts, each distinct with an allowed downside and an upside
+## that changes that car; every car type, rolled to either extreme, still fills
+## a van, and the vans reach every part.
 func _check_deal() -> void:
 	var seen := {}
-	for roll: int in 200:
-		var stock := RunParts.deal(roll)
-		if not _expect(stock == RunParts.deal(roll) and stock.size() == RunParts.VAN_STOCK, "a van roll deals the same %d parts" % RunParts.VAN_STOCK):
-			return
-		var ids := {}
-		for part: Dictionary in stock:
-			ids[part["part"]] = true
-			seen[part["part"]] = true
-			if not _expect(String(part["downside"]) in RunParts.downsides_for(String(part["part"])), "a dealt downside is allowed for its part"):
-				return
-		if not _expect(ids.size() == stock.size(), "a van stocks distinct parts"):
-			return
+	var limit: float = RUN_STATE.TIER_ENVELOPES.values().max()
+	for car_type: String in ProceduralCarGenerator.SUPPORTED_TYPES:
+		var base := CATALOG.create_vehicle_stats(String(CATALOG.base_vehicle_for_type(car_type)["id"]))
+		for sign: float in [0.0, 1.0, -1.0]:
+			var roll := {}
+			for axis: String in CarProfile.AXES:
+				roll[axis] = sign * limit
+			var car := CarProfile.apply_roll(base, roll)
+			for stop_roll: int in 60:
+				var stock := RunParts.deal(stop_roll, car)
+				if not _expect(stock == RunParts.deal(stop_roll, car) and stock.size() == RunParts.VAN_STOCK, "a %s van roll deals the same %d parts" % [car_type, RunParts.VAN_STOCK]):
+					return
+				var ids := {}
+				for part: Dictionary in stock:
+					ids[part["part"]] = true
+					seen[part["part"]] = true
+					if not _expect(String(part["downside"]) in RunParts.downsides_for(String(part["part"])), "a dealt downside is allowed for its part"):
+						return
+					if not _expect(RunParts.upside_gain(car, String(part["part"])) >= RunParts.MIN_UPSIDE_GAIN, "a %s van never sells %s, which would barely change it" % [car_type, part["part"]]):
+						return
+				if not _expect(ids.size() == stock.size(), "a van stocks distinct parts"):
+					return
 	if not _expect(seen.size() == RunParts.UPSIDES.size(), "the vans reach every part"):
 		return
 
@@ -82,18 +95,18 @@ func _check_deal() -> void:
 func _check_session() -> void:
 	var sess = RUN_SESSION.create(5150)
 	var starter: String = sess.current_car_id
-	var part: Dictionary = RunParts.deal(9)[0]
+	var part: Dictionary = RunParts.deal(9, sess.car_stats(starter))[0]
 	sess.parts_held.append(part)
 	sess.current_node_id = "test_bench"
 	sess.current_map.nodes["test_bench"] = {"id": "test_bench", "type": "bench"}
 	sess.last_bench_visited = "test_bench"
 	if not _expect(not sess.bench_fit(starter, 1) and sess.bench_fit(starter, 0), "a bench fits a held part by its place in the pile"):
 		return
-	if not _expect(sess.parts_held.is_empty() and sess.fitted_parts(starter) == [part] and sess.car_record(starter)["parts"] == [part], "the fitted part leaves the pile and rides on the car"):
+	if not _expect(sess.parts_held.is_empty() and sess.fitted_parts(starter) == [part] and sess.car_record(starter)["fitted_parts"] == [part], "the fitted part leaves the pile and rides on the car"):
 		return
 	var won_id: String = sess._add_car("test", RUN_SESSION.CAR_ORIGIN_RIVAL, ProceduralCarGenerator.SUPPORTED_TYPES)
 	sess.installed_parts[won_id] = [part]
-	if not _expect(not sess.won_car(won_id).has("parts") and sess.car_record(won_id)["parts"] == [part], "a won car goes to the garage without its parts"):
+	if not _expect(not sess.won_car(won_id).has("fitted_parts") and sess.car_record(won_id)["fitted_parts"] == [part], "a won car goes to the garage without its parts"):
 		return
 	var data: Dictionary = RUN_SESSION.serialize(sess)
 	data["installed_parts"]["ghost-car"] = [part]
@@ -156,6 +169,7 @@ func _check_screens() -> void:
 		return
 	var car: String = sess.current_car_id
 	var before := CATALOG.create_vehicle_stats(car)
+	sess.parts_held.append(stock[1])
 	shell.call("show_run_bench")
 	for frame in 4:
 		await process_frame
@@ -166,17 +180,19 @@ func _check_screens() -> void:
 		return
 	fit.pressed.emit()
 	await process_frame
-	if not _expect(sess.fitted_parts(car) == [stock[0]] and sess.parts_held.is_empty() and sess.bench_action_done, "fitting uses the bench visit and puts the part on the car"):
+	if not _expect(sess.fitted_parts(car) == [stock[0]] and sess.parts_held == [stock[1]] and sess.bench_action_done, "fitting uses the bench visit and puts the part on the car"):
 		return
 	var after := CATALOG.create_vehicle_stats(car)
-	var moved := false
-	for field: String in (RunParts.UPSIDES[stock[0]["part"]]["moves"] as Dictionary):
-		moved = moved or not is_equal_approx(float(after.get(field)), float(before.get(field)))
-	if not _expect(moved, "the car the race builds has the part's handling"):
+	var expected := RunParts.apply(before, [stock[0]])
+	for field: String in VehicleStats.PARAMETER_RANGES:
+		if not _expect(is_equal_approx(float(after.get(field)), float(expected.get(field))), "the car the race builds has the part's handling (%s)" % field):
+			return
+	if not _expect(RunParts.upside_gain(before, String(stock[0]["part"])) >= RunParts.MIN_UPSIDE_GAIN, "the fitted part changes the car"):
 		return
 	shell.call("show_run_bench")
 	await process_frame
-	if not _expect((shell.find_child("BenchRepair", true, false) as Button).disabled, "a used bench offers nothing more"):
+	var left := shell.find_child("BenchFit_0", true, false) as Button
+	if not _expect((shell.find_child("BenchRepair", true, false) as Button).disabled and left != null and left.disabled, "a used bench offers nothing more"):
 		return
 	app.call("abandon_run")
 

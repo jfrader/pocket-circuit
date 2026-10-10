@@ -115,7 +115,12 @@ func _run_test() -> void:
 	# Node screens must retain their action and description without clipping the
 	# legend; the bench with a full pile of parts is its tallest. The van is
 	# checked on a real van in run_parts_test.
-	sess.parts_held = RunParts.deal(7)
+	sess.parts_held = RunParts.deal(7, sess.car_stats(sess.current_car_id))
+	# A long night of fits wraps under the car instead of widening the column.
+	var night_of_fits: Array = []
+	for stop_roll: int in 3:
+		night_of_fits.append_array(RunParts.deal(8 + stop_roll, sess.car_stats(sess.current_car_id)))
+	sess.installed_parts[sess.current_car_id] = night_of_fits
 	var screens := [
 		["show_run_bench", "BenchFit_%d" % (RunParts.VAN_STOCK - 1), String(RUN_UI.TYPES["bench"]["copy"])],
 		["show_run_lockup", "LockupOpen", String(RUN_UI.TYPES["lockup"]["copy"])],
@@ -133,6 +138,11 @@ func _run_test() -> void:
 		if not _expect(_has_label(shell, String(screen[2])), "%s must show its node description" % screen[0]):
 			return
 		if not _expect(legend != null and legend.get_global_rect().end.y <= root.get_visible_rect().end.y and back.get_global_rect().end.y < legend.get_global_rect().position.y, "%s must keep actions and legend inside the logical viewport" % screen[0]):
+			return
+		var side := shell.find_child("BenchParts", true, false) as Control
+		if side == null:
+			side = shell.find_child("RunContextMap", true, false) as Control
+		if not _expect(side != null and side.get_global_rect().end.x <= root.get_visible_rect().end.x, "%s must keep its right-hand card inside the logical viewport" % screen[0]):
 			return
 	# With a run in progress the title offers to continue it, not to replace it.
 	shell.call("show_title")

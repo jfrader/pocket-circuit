@@ -106,7 +106,7 @@ func _check_bench_and_van() -> void:
 	var car: String = sess.current_car_id
 	if not _expect(sess.bench_repair(car), "repair at the bench"):
 		return
-	sess.parts_held.append(RunParts.deal(1)[0])
+	sess.parts_held.append(RunParts.deal(1, sess.car_stats(car))[0])
 	if not _expect(not sess.bench_fit(car, 0) and not sess.bench_repair(car) and sess.parts_held.size() == 1, "one bench action per visit"):
 		return
 	if not _expect(sess.open_lockup().is_empty() and sess.lockup_used == false, "a lockup opens only at a lockup"):
