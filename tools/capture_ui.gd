@@ -81,9 +81,8 @@ func _run() -> void:
 		if shot == "bench":
 			sess.parts_held = RunParts.deal(sess.run_seed, sess.car_stats(sess.current_car_id))
 		shell.call("show_run_" + ("parts_van" if shot == "van" else shot))
-	for i in 8:
-		await process_frame
-	await process_frame
+	# Let entrance motion finish before the shot.
+	await create_timer(1.0).timeout
 	var img := root.get_texture().get_image()
 	var crop := OS.get_environment("PC_SHOT_CROP")
 	if not crop.is_empty():

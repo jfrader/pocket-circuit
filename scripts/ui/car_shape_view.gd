@@ -11,21 +11,39 @@ const RINGS := 4
 const FLOOR := 0.14
 const DASH := 5.0
 const RADIUS_RATIO := 0.33
+## Seconds a shape takes to grow out of the one it is shown against.
+const MORPH_TIME := 0.45
 
 var shape: Dictionary = {}
 var compare_shape: Dictionary = {}
 var label := ""
+var _morph_from: Dictionary = {}
+var _morph := 1.0
 
 
-func show_shape(next_shape: Dictionary, next_compare: Dictionary, next_label: String) -> void:
+## Shows a shape; given `morph_from`, the polygon grows out of that shape.
+func show_shape(next_shape: Dictionary, next_compare: Dictionary, next_label: String, morph_from: Dictionary = {}) -> void:
 	shape = next_shape
 	compare_shape = next_compare
 	label = next_label
+	_morph_from = morph_from
+	_morph = 1.0
+	if not morph_from.is_empty():
+		_morph = 0.0
+		var tween := create_tween().set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tween.tween_method(func(at: float) -> void:
+			_morph = at
+			queue_redraw(), 0.0, 1.0, MORPH_TIME)
 	queue_redraw()
 
 
 func _draw() -> void:
-	draw_card(self, Rect2(Vector2.ZERO, size), shape, shape, compare_shape, label)
+	var shown := shape
+	if _morph < 1.0:
+		shown = {}
+		for axis: Variant in shape:
+			shown[axis] = lerpf(float(_morph_from.get(axis, shape[axis])), float(shape[axis]), _morph)
+	draw_card(self, Rect2(Vector2.ZERO, size), shown, shape, compare_shape, label)
 
 
 ## `shown` is what the polygon draws (it may be mid-morph); `target` is the

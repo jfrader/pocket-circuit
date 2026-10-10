@@ -19,6 +19,10 @@ const PAGE_TOP := 28
 const BACK_HINT := "ESC / B  BACK"
 const OFFER_CAR_ICON := 56.0
 const OFFER_SHAPE_SIZE := Vector2(420, 400)
+## The won car on the offer grows and turns in from this scale and angle.
+const OFFER_REVEAL_SCALE := 0.4
+const OFFER_REVEAL_TURN := -0.6
+const OFFER_REVEAL_TIME := 0.4
 
 var _app: Node
 var _root: Control
@@ -28,7 +32,13 @@ var _stage: AppShellStage
 var _route: Control
 var _footer: Label
 var _run_backdrop: ColorRect
-var _run_actions: VBoxContainer
+var _run_actions: BoxContainer
+## The board's map, the picked stop's card, and whether the car is driving to a stop.
+var _run_board: RUN_MAP_VIEW
+var _run_stop_card: VBoxContainer
+var _run_going := false
+## The run stats last shown, so the next screen animates what changed.
+var _run_stats_seen: Dictionary = {}
 var _button_focus_chain: Array[Button] = []
 var _screen := "title"
 var _event_id := ""
@@ -271,6 +281,7 @@ func show_run_board() -> void:
 		_focus_first()
 		return
 	_run_surface()
+	var night_over := sess.is_failed() or sess.is_complete()
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 64)
 	_content.add_child(columns)
@@ -279,43 +290,108 @@ func show_run_board() -> void:
 	columns.add_child(left)
 	var board := RUN_MAP_VIEW.new()
 	board.name = "RunBoard"
+	board.reduced_motion = _reduced_motion_enabled()
 	left.add_child(board)
-	left.add_child(RUN_UI.label("CHOOSE THE NEXT STOP", 11, RUN_UI.MUTED, true))
-	var buttons: Array[Button] = board.configure(sess, Callable(self, "_on_run_node_pressed"))
+	left.add_child(RUN_UI.label(RUN_UI.BOARD_CONTROLS, 10, RUN_UI.MUTED, true))
+	var buttons: Array[Button] = board.configure(sess, not night_over, IDENTITIES.car_texture(sess.current_car_id))
+	_run_board = board
 	if _app.has_method("prewarm_run_stops"):
 		_app.call("prewarm_run_stops")
 	for button: Button in buttons:
 		_wire_button_audio(button)
-		if not button.disabled:
-			_register_button_focus(button)
 	var detail := VBoxContainer.new()
 	detail.name = "RunDetail"
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	detail.add_theme_constant_override("separation", 6)
 	columns.add_child(detail)
-	RUN_UI.spacer(detail, 8)
-	detail.add_child(RUN_UI.label("THE RUN · ACT %d / 3" % sess.current_map.act, 12, RUN_UI.AMBER, true))
-	var heading := RUN_UI.label(String(RUN_UI.ROOMS[sess.current_map.act]).replace(" ", "\n"), 44)
-	detail.add_child(heading)
-	RUN_UI.spacer(detail, 8)
-	RUN_UI.stats(detail, sess)
-	RUN_UI.spacer(detail, 8)
+	detail.add_child(RUN_UI.label("THE RUN · ACT %d / %d · %s" % [sess.current_map.act, RunSession.FINAL_ACT, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 12, RUN_UI.AMBER, true))
+	_run_stats(detail, sess)
+	_run_stop_card = VBoxContainer.new()
+	_run_stop_card.name = "RunStop"
+	_run_stop_card.add_theme_constant_override("separation", 6)
+	_run_stop_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	detail.add_child(_run_stop_card)
 	_run_actions = detail
-	if sess.is_failed() or sess.is_complete():
-		detail.add_child(RUN_UI.label("NIGHT OVER", 12, RUN_UI.AMBER, true))
 	var unsaved := String(_app.get("run_save_error"))
+	if night_over:
+		_run_stop_card.add_child(RUN_UI.label("NIGHT OVER", 12, RUN_UI.AMBER, true))
+		_run_stop_card.add_child(RUN_UI.label(RUN_UI.NIGHT_WON if sess.is_complete() else RUN_UI.NIGHT_LOST, 20, RUN_UI.MUTED))
 	if not unsaved.is_empty():
 		detail.add_child(RUN_UI.label("NOT SAVED · " + unsaved.to_upper(), 12, RUN_UI.AMBER, true))
 		if not bool(_app.call("is_save_read_only")):
 			_run_action("SAVE AGAIN", Callable(self, "_on_save_run_again"), true, false, "ActionSaveAgain")
-	_run_action("NEW RUN", Callable(self, "_on_new_run_pressed"), false, false, "ActionNewRun")
-	_run_action("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
+	if night_over:
+		_run_action("NEW RUN", Callable(self, "_on_new_run_pressed"), unsaved.is_empty(), false, "ActionNewRun")
+	var secondary := HBoxContainer.new()
+	secondary.add_theme_constant_override("separation", 8)
+	detail.add_child(secondary)
+	_run_actions = secondary
+	if not night_over:
+		_run_action("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
 	_run_action("BACK", Callable(self, "show_title"), false, false, "ActionBack")
+	_run_actions = detail
 	RUN_UI.spacer(_content, 10)
 	RUN_UI.divider(_content)
 	_content.add_child(RUN_UI.legend(sess.current_map))
-	_content.add_child(RUN_UI.key_row(["RING · CURRENT STOP", "COLOUR · AVAILABLE", "DIM · LOCKED"]))
-	_focus_first()
+	_queue_content_entrance()
+	if night_over:
+		_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
+		return
+	board.stop_selected.connect(_show_run_stop.bind(sess))
+	board.stop_confirmed.connect(_go_to_run_stop)
+	var first := sess.current_node_id if sess.is_race_pending() else String(sess.available_nodes()[0]["id"]) if not sess.available_nodes().is_empty() else sess.current_node_id
+	board.select(first)
+	_grab_button_focus_after_layout(board.marker(first), _entrance_generation)
+
+
+## The run's stats, animating what changed since they were last shown.
+func _run_stats(host: VBoxContainer, sess: RunSession) -> void:
+	RUN_UI.stats(host, sess, _run_stats_seen, _reduced_motion_enabled())
+	_run_stats_seen = RUN_UI.stats_snapshot(sess)
+
+
+## The picked stop's card: what it is, what it pays and costs, its circuit when
+## it is raced, and the button that goes there when it can be reached.
+func _show_run_stop(stop_id: String, sess: RunSession) -> void:
+	if not is_instance_valid(_run_stop_card):
+		return
+	for child: Node in _run_stop_card.get_children():
+		_run_stop_card.remove_child(child)
+		child.queue_free()
+	var node: Dictionary = sess.current_map.get_node(stop_id)
+	var kind := String(node.get("type", ""))
+	var reachable := _run_board.is_reachable(stop_id)
+	var state := "NEXT STOP" if reachable else "DONE" if sess.resolved_nodes.has(stop_id) else "YOU ARE HERE" if stop_id == sess.current_node_id else "OUT OF REACH"
+	RUN_UI.spacer(_run_stop_card, 6)
+	_run_stop_card.add_child(RUN_UI.label(state, 11, RUN_UI.AMBER if reachable else RUN_UI.MUTED, true))
+	var title := HBoxContainer.new()
+	title.add_theme_constant_override("separation", 14)
+	title.add_child(RUN_UI.icon(kind, 34))
+	title.add_child(RUN_UI.label(String(RUN_UI.TYPES[kind]["name"]), 38))
+	_run_stop_card.add_child(title)
+	var line := RUN_UI.label(String(RUN_UI.TYPES[kind]["copy"]), 18, RUN_UI.MUTED)
+	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_run_stop_card.add_child(line)
+	var circuit: Dictionary = _app.call("run_stop_circuit", stop_id) if kind in RunSession.RACE_NODE_TYPES else {}
+	_run_stop_card.add_child(RUN_UI.facts(RUN_UI.stop_facts(kind, sess, circuit)))
+	RUN_UI.spacer(_run_stop_card, 4)
+	var go := RUN_UI.action(String(RUN_UI.GO_LABELS[kind]), true, not reachable)
+	go.name = "RunGo"
+	go.pressed.connect(_go_to_run_stop.bind(stop_id))
+	_wire_button_audio(go)
+	_run_stop_card.add_child(go)
+	RUN_UI.stagger_in(_run_stop_card.get_children(), _reduced_motion_enabled())
+
+
+## Drives the car to the stop on the map, then opens it (a race starts loading).
+func _go_to_run_stop(stop_id: String) -> void:
+	if _run_going or not is_instance_valid(_run_board) or not _run_board.is_reachable(stop_id):
+		return
+	_run_going = true
+	_play_ui_confirm()
+	await _run_board.travel_to(stop_id)
+	_run_going = false
+	_on_run_node_pressed(stop_id)
 
 
 func _run_surface() -> void:
@@ -348,7 +424,7 @@ func _run_node_intro(sess: RunSession, kind: String, side: Control = null) -> vo
 	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail.add_child(copy)
 	RUN_UI.spacer(detail, 6)
-	RUN_UI.stats(detail, sess)
+	_run_stats(detail, sess)
 	RUN_UI.spacer(detail, 12)
 	_run_actions = detail
 	if side != null:
@@ -356,13 +432,10 @@ func _run_node_intro(sess: RunSession, kind: String, side: Control = null) -> vo
 	else:
 		var board := RUN_MAP_VIEW.new()
 		board.name = "RunContextMap"
+		board.reduced_motion = _reduced_motion_enabled()
 		columns.add_child(board)
 		# The context map is read-only; actions on this stop remain the only focus targets.
-		var buttons: Array[Button] = board.configure(sess, Callable())
-		for button: Button in buttons:
-			button.disabled = true
-			button.focus_mode = Control.FOCUS_NONE
-			button.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		board.configure(sess, false)
 	RUN_UI.divider(_content)
 	_content.add_child(RUN_UI.legend(sess.current_map))
 
@@ -416,13 +489,20 @@ func show_run_offer() -> void:
 	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	title_row.add_child(art)
 	title_row.add_child(RUN_UI.label(String(offered.get("name", "")), 48))
+	if not _reduced_motion_enabled():
+		art.pivot_offset = Vector2(OFFER_CAR_ICON, OFFER_CAR_ICON) * 0.5
+		art.scale = Vector2.ONE * OFFER_REVEAL_SCALE
+		art.rotation = OFFER_REVEAL_TURN
+		var reveal := art.create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+		reveal.tween_property(art, "scale", Vector2.ONE, OFFER_REVEAL_TIME)
+		reveal.tween_property(art, "rotation", 0.0, OFFER_REVEAL_TIME)
 	detail.add_child(title_row)
 	detail.add_child(RUN_UI.label(String(offered.get("archetype", "")).to_upper(), 14, RUN_UI.AMBER, true))
 	var line := RUN_UI.label(String(offered.get("strength", "")), 20, RUN_UI.MUTED)
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	detail.add_child(line)
 	RUN_UI.spacer(detail, 6)
-	RUN_UI.stats(detail, sess)
+	_run_stats(detail, sess)
 	RUN_UI.spacer(detail, 12)
 	_run_actions = detail
 	_run_action("DRIVE IT", Callable(self, "_on_offer_pressed").bind(true), true, false, "ActionTakeOffer")
@@ -432,10 +512,12 @@ func show_run_offer() -> void:
 	card.custom_minimum_size = OFFER_SHAPE_SIZE
 	card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	columns.add_child(card)
+	var current_shape := CarProfile.shape(CATALOG.create_vehicle_stats(sess.current_car_id))
 	card.show_shape(
 		CarProfile.shape(CATALOG.create_vehicle_stats(sess.pending_offer)),
-		CarProfile.shape(CATALOG.create_vehicle_stats(sess.current_car_id)),
-		"VS " + current_name.to_upper()
+		current_shape,
+		"VS " + current_name.to_upper(),
+		{} if _reduced_motion_enabled() else current_shape
 	)
 	_focus_first()
 
@@ -1402,6 +1484,7 @@ func _run_content_entrance(generation: int) -> void:
 	_content_tween.set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	_content_tween.tween_property(_content, "position", resting_position, 0.18)
 	_content_tween.tween_property(_content, "modulate:a", 1.0, 0.16)
+	RUN_UI.stagger_in(_button_focus_chain, false)
 
 
 func _reduced_motion_enabled() -> bool:
@@ -1557,7 +1640,6 @@ func _ordinal(value: int) -> String:
 			return "%dTH" % value
 
 func _on_run_node_pressed(node_id: String) -> void:
-	_play_ui_confirm()
 	var node_type := ""
 	var sess_var: Variant = _app.call("current_run_session")
 	var sess: RunSession = sess_var as RunSession
