@@ -27,7 +27,7 @@ const GO_LABELS := {
 	"race": "RACE", "rival": "DUEL", "act_rival": "RACE THE ACT RIVAL", "bench": "GO TO THE BENCH",
 	"parts_van": "GO TO THE VAN", "lockup": "GO TO THE LOCKUP", "errand": "TAKE THE ERRAND",
 }
-const BOARD_CONTROLS := "CLICK A STOP TO SEE IT · CLICK IT AGAIN OR ENTER TO GO"
+const BOARD_CONTROLS := "CLICK OR MOVE TO A STOP TO SEE IT · CLICK IT AGAIN, ENTER OR A TO GO"
 const NIGHT_WON := "You took the circuit before sunrise."
 const NIGHT_LOST := "Cars won tonight are in Quick Race."
 ## Seconds a changed count ticks, holds its difference, and fades it.
@@ -233,7 +233,7 @@ static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -
 			rows.append(["LOSE", "the run"])
 		"bench":
 			rows.append(["REPAIR", "one wear level"])
-			rows.append(["OR FIT", "one of your %d parts" % session.parts_held.size()])
+			rows.append(["OR FIT", "one of your %d parts" % session.parts_held.size() if not session.parts_held.is_empty() else "no parts held"])
 		"parts_van":
 			rows.append(["STOCK", "%d parts, one sale" % RunParts.VAN_STOCK])
 			rows.append(["YOU HAVE", "%d points" % session.run_points])
@@ -283,6 +283,8 @@ static func action(text: String, primary: bool = false, disabled: bool = false) 
 	var button := Button.new()
 	button.text = text
 	button.disabled = disabled
+	if disabled:
+		button.focus_mode = Control.FOCUS_NONE
 	button.custom_minimum_size.y = 44
 	button.alignment = HORIZONTAL_ALIGNMENT_LEFT
 	button.add_theme_font_override("font", mono_font())
@@ -322,7 +324,6 @@ static func marker(kind: String, current: bool, interactive: bool) -> Button:
 	button.size = button.custom_minimum_size
 	button.flat = true
 	button.disabled = not interactive
-	button.tooltip_text = "%s · %s\n%s" % [TYPES[kind]["name"], TYPES[kind]["cost"], TYPES[kind]["copy"]]
 	button.add_theme_color_override("icon_normal_color", Color.WHITE)
 	button.add_theme_color_override("icon_disabled_color", Color.WHITE if current else Color(0.85, 0.85, 0.85, 0.75))
 	button.add_theme_color_override("icon_hover_color", Color.WHITE)
@@ -340,14 +341,6 @@ static func marker(kind: String, current: bool, interactive: bool) -> Button:
 			style.set_border_width_all(0 if state == "focus" else 1)
 		button.add_theme_stylebox_override(state, style)
 	return button
-
-
-static func key_row(entries: Array[String]) -> HBoxContainer:
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 36)
-	for entry: String in entries:
-		row.add_child(label(entry, 10, MUTED, true))
-	return row
 
 
 static func legend(map: RunMap) -> HBoxContainer:

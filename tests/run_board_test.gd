@@ -92,6 +92,24 @@ func _run_test() -> void:
 					if not _expect(marker.position.y < (other as Button).position.y, "the act rival must be above ordinary nodes"):
 						return
 
+	# A d-pad leaves the map's right edge into the stop's go button.
+	for edge: Button in board.call("right_edge_markers"):
+		if not _expect(edge.get_node_or_null(edge.focus_neighbor_right) == go, "the map's right edge leads to the go button"):
+			return
+	# Once the map has popped in, the picked stop rests enlarged.
+	await create_timer(1.0).timeout
+	if not _expect((board.call("marker", sess.current_node_id) as Button).scale.is_equal_approx(Vector2.ONE * RUN_MAP_VIEW.SELECTED_SCALE), "the picked stop keeps its size after the map pops in"):
+		return
+	# Leaving the board while the car drives drops that go, and going still works after.
+	go.pressed.emit()
+	await process_frame
+	shell.call("show_title")
+	await _settle_travel()
+	if not _expect(String((app.get("current_race_session") as Dictionary).get("run_node_id", "")).is_empty() and not bool(shell.get("_run_going")), "leaving the board on the way drops the go"):
+		return
+	shell.call("show_run_board")
+	await process_frame
+	board = shell.find_child("RunBoard", true, false) as Control
 	# Pressing the picked opening race goes: the car drives there and it starts.
 	var opening := board.get_node_or_null("Node_" + sess.current_node_id.replace("_", "-")) as Button
 	opening.pressed.emit()
@@ -116,7 +134,7 @@ func _run_test() -> void:
 	(board.get_node_or_null("Node_" + far_id.replace("_", "-")) as Button).pressed.emit()
 	await process_frame
 	go = shell.find_child("RunGo", true, false) as Button
-	if not _expect(sess.current_node_id == standing and board.call("selected_id") == far_id and go.disabled and _has_label(shell, "OUT OF REACH"), "picking an out-of-reach stop shows it and offers no way there"):
+	if not _expect(sess.current_node_id == standing and board.call("selected_id") == far_id and go.disabled and go.focus_mode == Control.FOCUS_NONE and _has_label(shell, "OUT OF REACH"), "picking an out-of-reach stop shows it and offers no way there"):
 		return
 	var target_id := String(children[children.size() - 1]["id"])
 	var button := board.get_node_or_null("Node_" + target_id.replace("_", "-")) as Button
