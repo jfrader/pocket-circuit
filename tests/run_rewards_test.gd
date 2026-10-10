@@ -76,7 +76,7 @@ func _run_test() -> void:
 
 	# The next night starts from the starter car alone, and the garage keeps the car.
 	var next: RunSession = app.call("start_run", 31337) as RunSession
-	if not _expect(next.owned_cars.keys() == [RunSession.STARTER_CAR] and next.won_cars().is_empty(), "a new night starts with the starter car only"):
+	if not _expect(next.owned_cars.size() == 1 and next.won_cars().is_empty() and not car_id in next.owned_cars, "a new night starts with its own starter car only"):
 		return
 	if not _expect(car_id in (app.call("quick_race_roster") as Array), "the garage outlives the next night"):
 		return

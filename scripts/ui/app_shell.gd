@@ -4,6 +4,7 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
+const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
 const ROUTE_SCRIPT := preload("res://scripts/ui/championship_route_menu.gd")
 const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
@@ -16,6 +17,8 @@ const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 const PAGE_MARGIN := 48
 const PAGE_TOP := 28
 const BACK_HINT := "ESC / B  BACK"
+const OFFER_CAR_ICON := 56.0
+const OFFER_SHAPE_SIZE := Vector2(420, 400)
 
 var _app: Node
 var _root: Control
@@ -252,6 +255,10 @@ func show_run_board() -> void:
 	_content.add_theme_constant_override("separation", 4)
 	var sess_var: Variant = _app.call("current_run_session")
 	var sess: RunSession = sess_var as RunSession
+	# A car won on a night that is still going is offered before the next stop.
+	if sess != null and not sess.pending_offer.is_empty() and not sess.is_failed() and not sess.is_complete():
+		show_run_offer()
+		return
 	if sess == null or sess.current_map == null:
 		_configure_stage(&"map", "rustbug", "rae", "workshop")
 		_add_kicker("RUN BOARD")
@@ -363,6 +370,72 @@ func _run_action(text: String, callback: Callable, primary: bool = false, disabl
 	_run_actions.add_child(button)
 	if not disabled:
 		_register_button_focus(button)
+
+
+## A car just won: drive it from now on, or keep the current one. Its shape is
+## drawn against the car the player is driving.
+func show_run_offer() -> void:
+	_screen = "run_offer"
+	_event_id = ""
+	_reset_quick_race_state()
+	_clear_content()
+	_content.add_theme_constant_override("separation", 4)
+	var sess: RunSession = _app.call("current_run_session") as RunSession
+	if sess == null or sess.pending_offer.is_empty():
+		show_run_board()
+		return
+	var offered := CATALOG.get_vehicle(sess.pending_offer)
+	var current_name := RUN_UI.car_name(sess.current_car_id)
+	_run_surface()
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 64)
+	_content.add_child(columns)
+	var detail := VBoxContainer.new()
+	detail.name = "RunOffer"
+	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.add_theme_constant_override("separation", 6)
+	columns.add_child(detail)
+	RUN_UI.spacer(detail, 8)
+	detail.add_child(RUN_UI.label(String(RUN_UI.ORIGIN_COPY.get(String(offered.get("won_from", "")), "")) % int(offered.get("act", 1)), 11, RUN_UI.AMBER, true))
+	RUN_UI.spacer(detail, 8)
+	var title_row := HBoxContainer.new()
+	title_row.add_theme_constant_override("separation", 16)
+	var art := TextureRect.new()
+	art.texture = IDENTITIES.car_texture(sess.pending_offer)
+	art.custom_minimum_size = Vector2(OFFER_CAR_ICON, OFFER_CAR_ICON)
+	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+	title_row.add_child(art)
+	title_row.add_child(RUN_UI.label(String(offered.get("name", "")), 48))
+	detail.add_child(title_row)
+	detail.add_child(RUN_UI.label(String(offered.get("archetype", "")).to_upper(), 14, RUN_UI.AMBER, true))
+	var line := RUN_UI.label(String(offered.get("strength", "")), 20, RUN_UI.MUTED)
+	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	detail.add_child(line)
+	RUN_UI.spacer(detail, 6)
+	RUN_UI.stats(detail, sess)
+	RUN_UI.spacer(detail, 12)
+	_run_actions = detail
+	_run_action("DRIVE IT", Callable(self, "_on_offer_pressed").bind(true), true, false, "ActionTakeOffer")
+	_run_action("KEEP THE %s" % current_name.to_upper(), Callable(self, "_on_offer_pressed").bind(false), false, false, "ActionKeepCar")
+	var card := CarShapeView.new()
+	card.name = "OfferShape"
+	card.custom_minimum_size = OFFER_SHAPE_SIZE
+	card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	columns.add_child(card)
+	card.show_shape(
+		CarProfile.shape(CATALOG.create_vehicle_stats(sess.pending_offer)),
+		CarProfile.shape(CATALOG.create_vehicle_stats(sess.current_car_id)),
+		"VS " + current_name.to_upper()
+	)
+	_focus_first()
+
+
+func _on_offer_pressed(take: bool) -> void:
+	_play_ui_confirm()
+	_app.call("run_take_offer" if take else "run_decline_offer")
+	show_run_board()
 
 
 func show_run_bench() -> void:
@@ -792,7 +865,7 @@ func go_back() -> void:
 				show_quick_race()
 			else:
 				show_briefing(_event_id)
-		"run_board":
+		"run_board", "run_offer":
 			show_title()
 		"run_bench", "run_parts_van", "run_lockup", "run_errand":
 			show_run_board()

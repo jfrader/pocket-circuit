@@ -1481,7 +1481,7 @@ func _garage_with(won: Array[Dictionary]) -> Array:
 func _install_held_vehicles() -> void:
 	var cars: Array = (_save_data.get("garage_cars", []) as Array).duplicate(true)
 	if _current_run_session != null:
-		cars.append_array(_current_run_session.won_cars())
+		cars.append_array(_current_run_session.car_records())
 	VehicleDirectory.install(cars.map(func(car: Dictionary) -> Dictionary: return CATALOG.generated_vehicle(car)))
 
 
@@ -1680,6 +1680,23 @@ func run_bench_repair(car_key: String, node_id: String = "") -> bool:
 
 func run_bench_fit(part: String, node_id: String = "") -> bool:
 	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_fit(_current_run_session.current_car_id, part))
+
+
+## Drives the car just won, or keeps the current one; either way the offer closes.
+func run_take_offer() -> bool:
+	return _resolve_offer(func() -> bool: return _current_run_session.take_offer())
+
+
+func run_decline_offer() -> bool:
+	return _resolve_offer(func() -> bool: return _current_run_session.decline_offer())
+
+
+func _resolve_offer(action: Callable) -> bool:
+	if _current_run_session == null or not bool(action.call()):
+		last_run_error = "no offer"
+		return false
+	persist_current_run()
+	return true
 
 
 func run_buy_part(part_id: String, node_id: String = "") -> bool:

@@ -20,6 +20,8 @@ const TYPES := {
 	"act_rival": {"name": "Act rival", "cost": "the run", "copy": "A generated driver carrying the act's hardest AI profile. One race decides the act.", "icon": preload("res://assets/ui/run_map/node_boss.svg")},
 }
 const VAN_PART_NAMES := {"tool_kit": "TOOL KIT", "tyre_set": "TYRE SET", "spare_shell": "SPARE SHELL"}
+## Where a won car came from, as the garage and the run's car offer say it.
+const ORIGIN_COPY := {"rival": "WON IN A DUEL · ACT %d", "lockup": "FOUND IN A LOCKUP · ACT %d"}
 const CURRENT_RING := preload("res://assets/ui/run_map/ring_current.svg")
 
 static var _mono: FontVariation
@@ -92,9 +94,14 @@ static func stats(host: VBoxContainer, session: RunSession) -> void:
 	var wear := "?"
 	if session.run_state != null:
 		wear = session.run_state.get_car_wear(session.current_car_id)
-	parent.add_child(label("%s · %s" % [session.current_car_id, wear], 18))
+	parent.add_child(label("%s · %s" % [car_name(session.current_car_id), wear], 18))
 	spacer(parent, 6)
 	divider(parent)
+
+
+## A car's display name (generated cars have their own), never its id.
+static func car_name(vehicle_id: String) -> String:
+	return String(preload("res://data/championship/catalog.gd").get_vehicle(vehicle_id).get("name", vehicle_id))
 
 
 static func action(text: String, primary: bool = false, disabled: bool = false) -> Button:
