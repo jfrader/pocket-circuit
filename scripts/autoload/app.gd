@@ -141,8 +141,8 @@ var _circuit_preview_queue: Node
 var _race_asset_preloader: Node
 ## Steam's inventory, when Steam is there; see SteamService.
 var steam: Node
-## The car Steam last dropped for a run win, until the board has shown it.
-var steam_drop: Dictionary = {}
+## Cars Steam dropped for this night's wins, until a run screen shows them.
+var steam_drops: Array[Dictionary] = []
 
 
 func _enter_tree() -> void:
@@ -1453,6 +1453,7 @@ func start_run(run_seed: int) -> RunSession:
 			# save never will, so there the new night simply replaces it.
 			return null
 	_current_run_session = RUN_SESSION.create(run_seed)
+	steam_drops.clear()
 	persist_current_run()
 	return _current_run_session
 
@@ -1528,17 +1529,17 @@ func _on_steam_cars_changed(cars: Array[Dictionary]) -> void:
 	candidate["steam_cars"] = cars.duplicate(true)
 	if candidate == _save_data:
 		return
-	if is_save_read_only() or not _save_candidate(candidate):
-		_save_data["steam_cars"] = cars.duplicate(true)
-	else:
-		_save_data = candidate
+	# A cache write: it never reports into the player's save errors.
+	if not is_save_read_only():
+		_save_store.save_data(candidate)
+	_save_data["steam_cars"] = cars.duplicate(true)
 	_install_held_vehicles()
 
 
 func _on_steam_car_dropped(car: Dictionary) -> void:
-	steam_drop = car.duplicate(true)
+	steam_drops.append(car.duplicate(true))
 	if is_instance_valid(_shell):
-		_shell.call("show_steam_drop")
+		_shell.call("show_steam_drops")
 
 
 ## The garage's won cars, newest last.

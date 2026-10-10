@@ -24,6 +24,7 @@ const OFFER_REVEAL_SCALE := 0.4
 const OFFER_REVEAL_TURN := -0.6
 const OFFER_REVEAL_TIME := 0.4
 const STEAM_DROP_MARGIN := 24.0
+const STEAM_DROP_GAP := 8.0
 
 var _app: Node
 var _root: Control
@@ -427,23 +428,29 @@ func _run_surface() -> void:
 	_run_backdrop.show()
 	_footer.get_parent().hide()
 	_content.add_theme_constant_override("separation", 14)
-	call_deferred("show_steam_drop")
+	call_deferred("show_steam_drops")
 
 
-## Announces the car Steam dropped for a run win, once, over whatever run
-## screen is up; one that dropped during a race waits for the next one.
-func show_steam_drop() -> void:
-	var car: Dictionary = _app.get("steam_drop")
-	if car.is_empty() or not visible or not _run_backdrop.visible:
+## Announces each car Steam dropped for a run win, once, over whatever run
+## screen is up; ones that dropped during a race wait for the next one.
+func show_steam_drops() -> void:
+	var queued: Variant = _app.get("steam_drops")
+	if queued is not Array or (queued as Array).is_empty() or not visible or not _run_backdrop.visible:
 		return
-	_app.set("steam_drop", {})
+	var drops := queued as Array
+	for index: int in drops.size():
+		_show_steam_drop(drops[index], index)
+	drops.clear()
+
+
+func _show_steam_drop(car: Dictionary, slot: int) -> void:
 	var banner := RUN_UI.action(RUN_UI.STEAM_DROP_LINE % String(CATALOG.generated_vehicle(car).get("name", "")).to_upper(), true)
-	banner.name = "SteamDrop"
+	banner.name = "SteamDrop%d" % slot
 	banner.focus_mode = Control.FOCUS_NONE
 	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_root.add_child(banner)
 	banner.reset_size()
-	var rest := Vector2(_root.size.x - banner.size.x - STEAM_DROP_MARGIN, STEAM_DROP_MARGIN)
+	var rest := Vector2(_root.size.x - banner.size.x - STEAM_DROP_MARGIN, STEAM_DROP_MARGIN + slot * (banner.size.y + STEAM_DROP_GAP))
 	banner.position = rest
 	if _reduced_motion_enabled():
 		get_tree().create_timer(RUN_UI.BANNER_HOLD).timeout.connect(banner.queue_free)
@@ -810,6 +817,10 @@ func _briefing_mastery_targets(state: Dictionary) -> String:
 
 
 func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
+	# Cars traded in or out since the last read show next time the garage opens.
+	var steam: Variant = _app.get("steam")
+	if steam is Node:
+		(steam as Node).call("refresh")
 	_screen = "vehicle_select"
 	_event_id = event_id
 	_quick_race = quick_race

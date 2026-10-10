@@ -33,7 +33,7 @@ class FakeSteam:
 		var items: Array[Dictionary] = []
 		if drop_due and definition == SteamCars.GENERATOR_ID:
 			next_item_id += 1
-			var item := {"item_id": next_item_id, "item_definition": SteamCars.CAR_ITEM_IDS["coupe"], "tags": "pace:b8;bite:b0;punch:b4;livery:l17"}
+			var item := {"item_id": next_item_id, "item_definition": SteamCars.CAR_ITEM_IDS["coupe"], "tags": "pace:b8;bite:b0;punch:b4"}
 			owned.append(item)
 			items.append(item)
 		return _open(items)
@@ -67,7 +67,7 @@ func _initialize() -> void:
 
 
 func _run_test() -> void:
-	for check: Callable in [_check_itemdefs, _check_decode]:
+	for check: Callable in [_check_itemdefs, _check_labels, _check_decode]:
 		check.call()
 		if _failed:
 			return
@@ -112,17 +112,33 @@ func _check_itemdefs() -> void:
 		values[tag] = Array(String(tag_def["tag_generator_values"]).split(";")).map(func(token: String) -> String: return token.split(":")[0])
 	for car_type: String in SteamCars.CAR_ITEM_IDS:
 		for pace: String in values["pace"]:
-			var tags := "pace:%s;bite:%s;punch:%s;livery:%s" % [pace, values["bite"][0], values["punch"][-1], values["livery"][-1]]
+			var tags := "pace:%s;bite:%s;punch:%s" % [pace, values["bite"][0], values["punch"][-1]]
 			if not _expect(not SteamCars.car_from_item(SteamCars.CAR_ITEM_IDS[car_type], 1, tags).is_empty(), "every rolled value decodes (%s %s)" % [car_type, tags]):
+				return
+
+
+## Steam applies only tags with an English string: every category and value
+## the definitions can roll has one.
+func _check_labels() -> void:
+	var labels := SteamCars.tag_labels()
+	for item: Dictionary in SteamCars.itemdefs(480)["items"]:
+		var tag_strings: Array = []
+		if item["type"] == "tag_generator":
+			tag_strings = Array(String(item["tag_generator_values"]).split(";")).map(func(token: String) -> String: return "%s:%s" % [item["tag_generator_name"], token.split(":")[0]])
+		elif item.has("tags"):
+			tag_strings = Array(String(item["tags"]).split(";"))
+		for tag: String in tag_strings:
+			var parts := tag.split(":")
+			if not _expect(labels.has(parts[0]) and not String(labels[parts[0]]["name"]).is_empty() and not String((labels[parts[0]]["values"] as Dictionary).get(parts[1], "")).is_empty(), "the tag %s has an English string" % tag):
 				return
 
 
 ## An item is the same car everywhere: zero-sum like a run roll, inside its
 ## type's envelope, the middle buckets level, and anything else is no car.
 func _check_decode() -> void:
-	var tags := "type:muscle;pace:b8;bite:b2;punch:b4;livery:l9"
+	var tags := "type:muscle;pace:b8;bite:b2;punch:b4"
 	var car := SteamCars.car_from_item(SteamCars.CAR_ITEM_IDS["muscle"], 4242, tags)
-	if not _expect(car == SteamCars.car_from_item(SteamCars.CAR_ITEM_IDS["muscle"], 4242, "livery:l9;punch:b4;bite:b2;pace:b8"), "the same item rebuilds the same car, whatever the tag order"):
+	if not _expect(car == SteamCars.car_from_item(SteamCars.CAR_ITEM_IDS["muscle"], 4242, "punch:b4;bite:b2;pace:b8"), "the same item rebuilds the same car, whatever the tag order"):
 		return
 	var envelope := RUN_STATE.get_envelope_for_type("muscle")
 	if not _expect(car["id"] == "steam-4242" and car["type"] == "muscle" and car["won_from"] == SteamCars.ORIGIN and is_equal_approx(car["roll"]["speed"], envelope) and is_equal_approx(car["roll"]["tough"], -envelope) and is_zero_approx(car["roll"]["accel"]), "buckets set the pair deviations across the type's envelope"):
@@ -131,10 +147,11 @@ func _check_decode() -> void:
 		return
 	if not _expect(not RunSession.normalize_car(car, [SteamCars.ORIGIN]).is_empty(), "a Steam car passes the stored-car check"):
 		return
-	var other := SteamCars.car_from_item(SteamCars.CAR_ITEM_IDS["muscle"], 4243, "pace:b8;bite:b2;punch:b4;livery:l10")
-	if not _expect(other["seed"] != car["seed"], "a different livery is a different look"):
+	var twin := SteamCars.car_from_item(SteamCars.CAR_ITEM_IDS["muscle"], 4243, "pace:b8;bite:b2;punch:b4")
+	var other := SteamCars.car_from_item(SteamCars.CAR_ITEM_IDS["muscle"], 4244, "pace:b8;bite:b3;punch:b4")
+	if not _expect(twin["seed"] == car["seed"] and twin["roll"] == car["roll"] and other["seed"] != car["seed"], "same buckets are the same car; different buckets a different look"):
 		return
-	for bad: Array in [[999, "pace:b4;bite:b4;punch:b4;livery:l0"], [SteamCars.CAR_ITEM_IDS["buggy"], "pace:b4;bite:b4;punch:b4"], [SteamCars.CAR_ITEM_IDS["buggy"], "pace:b9;bite:b4;punch:b4;livery:l0"], [SteamCars.CAR_ITEM_IDS["buggy"], "pace:b4;bite:b4;punch:b4;livery:l256"]]:
+	for bad: Array in [[999, "pace:b4;bite:b4;punch:b4"], [SteamCars.CAR_ITEM_IDS["buggy"], "pace:b4;bite:b4"], [SteamCars.CAR_ITEM_IDS["buggy"], "pace:b9;bite:b4;punch:b4"], [SteamCars.CAR_ITEM_IDS["buggy"], "pace:4;bite:b4;punch:b4"]]:
 		if not _expect(SteamCars.car_from_item(int(bad[0]), 1, String(bad[1])).is_empty(), "an item that is not a whole car decodes to nothing (%s)" % str(bad)):
 			return
 
@@ -192,14 +209,20 @@ func _check_app() -> void:
 		sess = app.call("start_run", 1827000 + attempt * 31) as RunSession
 		if RUN_WALK.walk_to(app, sess, "rival"):
 			break
-	shell.call("show_run_board")
+	# The duel's race hides the menus: its drop waits for the next run screen.
+	shell.visible = false
 	RUN_WALK.settle(app, sess)
 	if not _expect(not sess.pending_offer.is_empty() and fake.drops == 1, "winning a duel asks Steam for a drop"):
 		return
 	fake.answer()
 	await process_frame
+	if not _expect(shell.find_child("SteamDrop0", true, false) == null and (app.get("steam_drops") as Array).size() == 1, "a drop during a race waits"):
+		return
+	shell.visible = true
+	shell.call("show_run_board")
 	await process_frame
-	if not _expect(shell.find_child("SteamDrop", true, false) != null and Dictionary(app.get("steam_drop")).is_empty(), "the drop is announced once over the run screen"):
+	await process_frame
+	if not _expect(shell.find_child("SteamDrop0", true, false) != null and (app.get("steam_drops") as Array).is_empty(), "the drop is announced once over the next run screen"):
 		return
 	fake.answer()
 	var steam_cars: Array = app.call("get_save_data")["steam_cars"]
@@ -214,6 +237,21 @@ func _check_app() -> void:
 	fake.answer()
 	if not _expect((app.call("get_save_data")["steam_cars"] as Array).is_empty() and not (app.call("quick_race_roster") as Array).has(dropped_id), "a car traded away leaves the garage"):
 		return
+	# A lockup asks too; a new night forgets drops it never showed.
+	var lock_run: RunSession = null
+	for attempt in 12:
+		lock_run = app.call("start_run", 900003 + attempt * 101) as RunSession
+		if RUN_WALK.walk_to(app, lock_run, "lockup"):
+			break
+	var asked := fake.drops
+	if not _expect(bool(app.call("run_open_lockup")) and fake.drops == asked + 1, "opening a lockup asks Steam for a drop"):
+		return
+	shell.visible = false
+	fake.answer()
+	app.call("start_run", 31337)
+	if not _expect((app.get("steam_drops") as Array).is_empty(), "a new night starts with no drops waiting"):
+		return
+	shell.visible = true
 	app.call("abandon_run")
 
 
