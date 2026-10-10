@@ -301,8 +301,8 @@ func _prepare_race_async() -> void:
 		if not keys_to_prepare.has(sk):
 			keys_to_prepare.append(sk)
 	for visual_key: String in keys_to_prepare:
-		var display := visual_key.split("|", true, 1)[0] if visual_key.find("|") != -1 else visual_key
-		await _loading_step("Preparing %s animation" % display.capitalize())
+		var vehicle_id := visual_key.split("|", true, 1)[0] if visual_key.find("|") != -1 else visual_key
+		await _loading_step("Preparing %s animation" % String(CATALOG.get_vehicle(vehicle_id).get("name", vehicle_id.capitalize())))
 		var plan := IDENTITIES.motion_preparation_plan_for_key(visual_key)
 		if not (plan["jobs"] as Array).is_empty():
 			var rendered: Dictionary = await preparation.run_data_job(IDENTITIES.render_motion_plan.bind(plan))

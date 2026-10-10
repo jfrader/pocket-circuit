@@ -62,7 +62,7 @@ func _run_test() -> void:
 		return
 	if not _expect(_has_label(detail, str(sess.owned_cars.size())), "the detail must show owned cars"):
 		return
-	if not _expect(_has_label(detail, "%s · %s" % [sess.current_car_id, sess.run_state.get_car_wear(sess.current_car_id)]), "the detail must show car and wear"):
+	if not _expect(_has_label(detail, "%s · %s" % [RUN_UI.car_name(sess.current_car_id), sess.run_state.get_car_wear(sess.current_car_id)]), "the detail must show the car's name and wear"):
 		return
 	var legend := shell.find_child("RunLegend", true, false) as Control
 	if not _expect(legend != null and legend.get_global_rect().end.y <= root.get_visible_rect().end.y, "the map legend must fit inside the logical viewport"):

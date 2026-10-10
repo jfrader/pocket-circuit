@@ -4,7 +4,7 @@ extends SceneTree
 ## Usage:
 ##   PC_SHOT_SCREEN=board PC_SHOT_PATH=/tmp/shot.png \
 ##     xvfb-run -a godot --path . --script res://tools/capture_ui.gd
-## Screens: title, garage, garage_won, board, bench, van, lockup, errand, discovery.
+## Screens: title, garage, garage_won, offer, board, bench, van, lockup, errand, discovery.
 ## Optional PC_SHOT_CROP="x,y,w,h" crops the capture for close review.
 
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
@@ -31,6 +31,19 @@ func _run() -> void:
 		shell.call("show_title")
 	elif shot == "discovery":
 		shell.call("show_discovery")
+	elif shot == "offer":
+		var offered := false
+		for attempt in 12:
+			var night: RunSession = app.call("start_run", 1827000 + attempt * 31) as RunSession
+			if RUN_WALK.walk_to(app, night, "rival"):
+				RUN_WALK.settle(app, night)
+				offered = not night.pending_offer.is_empty()
+				break
+		if not offered:
+			push_error("no duel win to offer")
+			quit(1)
+			return
+		shell.call("show_run_board")
 	elif shot == "garage":
 		shell.call("show_vehicle_select", "", true)
 	elif shot == "garage_won":

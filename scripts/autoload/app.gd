@@ -179,7 +179,11 @@ func _ready() -> void:
 	if stored_run is Dictionary and not (stored_run as Dictionary).is_empty():
 		_current_run_session = RUN_SESSION.deserialize(stored_run as Dictionary)
 		if _current_run_session == null:
+			# The run cannot be resumed; the cars it won still go to the garage.
+			_save_data["garage_cars"] = _garage_with(RUN_SESSION.salvage_won_cars(stored_run as Dictionary))
 			_save_data["current_run"] = {}
+			if not is_save_read_only():
+				_save_candidate(_save_data.duplicate(true))
 	_install_held_vehicles()
 	_settle_race_in_flight()
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
@@ -1481,7 +1485,7 @@ func _garage_with(won: Array[Dictionary]) -> Array:
 func _install_held_vehicles() -> void:
 	var cars: Array = (_save_data.get("garage_cars", []) as Array).duplicate(true)
 	if _current_run_session != null:
-		cars.append_array(_current_run_session.won_cars())
+		cars.append_array(_current_run_session.car_records())
 	VehicleDirectory.install(cars.map(func(car: Dictionary) -> Dictionary: return CATALOG.generated_vehicle(car)))
 
 
@@ -1680,6 +1684,24 @@ func run_bench_repair(car_key: String, node_id: String = "") -> bool:
 
 func run_bench_fit(part: String, node_id: String = "") -> bool:
 	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_fit(_current_run_session.current_car_id, part))
+
+
+## Drives the car just won from now on; the offer closes.
+func run_take_offer() -> bool:
+	return _resolve_offer(func() -> bool: return _current_run_session.take_offer())
+
+
+## Keeps the current car; the won one stays won and the offer closes.
+func run_decline_offer() -> bool:
+	return _resolve_offer(func() -> bool: return _current_run_session.decline_offer())
+
+
+func _resolve_offer(action: Callable) -> bool:
+	if _current_run_session == null or not bool(action.call()):
+		last_run_error = "no offer"
+		return false
+	persist_current_run()
+	return true
 
 
 func run_buy_part(part_id: String, node_id: String = "") -> bool:

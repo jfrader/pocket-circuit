@@ -26,7 +26,16 @@ func _check_opening() -> void:
 	var sess = RUN_SESSION.create(424242)
 	if not _expect(sess != null and sess.run_seed == 424242 and sess.run_points == RUN_SESSION.INITIAL_POINTS, "a run starts on its seed with the starting points"):
 		return
-	if not _expect(sess.current_car_id == "rustbug" and sess.run_state.get_car_wear("rustbug") == "clean", "a run starts in a clean rustbug"):
+	var starter: Dictionary = sess.car_record(sess.current_car_id)
+	if not _expect(String(starter.get("won_from", "")) == RUN_SESSION.CAR_ORIGIN_START and String(starter["type"]) in RUN_SESSION.STARTER_TYPES and sess.run_state.get_car_wear(sess.current_car_id) == "clean", "a night is dealt a clean starter car of a starter type"):
+		return
+	if not _expect(sess.won_cars().is_empty() and sess.pending_offer.is_empty(), "the starter is not a won car and nothing is offered yet"):
+		return
+	var starter_looks := {}
+	for night in 12:
+		var other = RUN_SESSION.create(424242 + night * 977)
+		starter_looks["%s|%d" % [other.car_record(other.current_car_id)["type"], other.car_record(other.current_car_id)["seed"]]] = true
+	if not _expect(starter_looks.size() == 12, "different nights deal different starter cars"):
 		return
 	var start: Dictionary = sess.current_node()
 	if not _expect(String(start.get("type", "")) == "race" and sess.is_race_pending(), "the run opens on an unraced race"):
@@ -55,6 +64,7 @@ func _check_full_run() -> void:
 		if not acts_seen.has(sess.current_map.act):
 			acts_seen.append(sess.current_map.act)
 		_resolve_current(sess, true)
+		sess.decline_offer()
 		if sess.is_complete() or sess.is_failed():
 			break
 		var avail: Array[Dictionary] = sess.available_nodes()
@@ -138,8 +148,41 @@ func _check_rival_loss() -> void:
 	var win = RUN_SESSION.create(33333)
 	_walk_to(win, "rival")
 	var owned_before: int = win.owned_cars.size()
+	var starter_id: String = win.current_car_id
 	var win_out: Dictionary = win.resolve_rival(win.current_node_id, true)
 	if not _expect(win_out.has("car") and win.owned_cars.size() == owned_before + 1, "beating a rival wins its car"):
+		return
+	var won_id := String(win_out["car"]["id"])
+	if not _expect(win.pending_offer == won_id and win.current_car_id == starter_id, "a won car is offered, not forced"):
+		return
+	var next_stop := String(win.current_map.get_children(win.current_node_id)[0]["id"])
+	if not _expect(not win.enter_node(next_stop), "the run does not move on while a won car waits for an answer"):
+		return
+	var offered_snap: Dictionary = RUN_SESSION.serialize(win)
+	var stale := offered_snap.duplicate(true)
+	stale["schema_version"] = RUN_SESSION.SCHEMA_VERSION - 1
+	var salvaged: Array[Dictionary] = RUN_SESSION.salvage_won_cars(stale)
+	if not _expect(RUN_SESSION.deserialize(stale) == null and salvaged.size() == win.won_cars().size() and salvaged[salvaged.size() - 1]["id"] == won_id, "a run that cannot be restored still hands over every car it won"):
+		return
+	var self_offer := offered_snap.duplicate(true)
+	self_offer["pending_offer"] = win.current_car_id
+	if not _expect(RUN_SESSION.deserialize(self_offer).pending_offer.is_empty(), "a stored offer of the car already driven is dropped"):
+		return
+	if not _expect(RUN_SESSION.deserialize(offered_snap).pending_offer == won_id, "an open offer survives a save"):
+		return
+	win.run_state.set_car_wear(starter_id, "rusty")
+	if not _expect(win.take_offer() and win.current_car_id == won_id and win.pending_offer.is_empty(), "taking the offer drives the won car"):
+		return
+	if not _expect(win.run_state.get_car_wear(won_id) == "clean" and win.run_state.get_car_wear(starter_id) == "rusty", "the won car starts clean and the car left behind keeps its wear"):
+		return
+	if not _expect(not win.take_offer() and not win.decline_offer(), "an offer closes once"):
+		return
+	var keep = RUN_SESSION.create(33333)
+	_walk_to(keep, "rival")
+	var kept_id: String = keep.current_car_id
+	var won_before: int = keep.won_cars().size()
+	keep.resolve_rival(keep.current_node_id, true)
+	if not _expect(keep.decline_offer() and keep.current_car_id == kept_id and keep.won_cars().size() == won_before + 1, "declining keeps the current car and the won one stays won"):
 		return
 
 
@@ -183,9 +226,12 @@ func _check_determinism_and_save() -> void:
 	if not _expect(RUN_SESSION.deserialize(broken_map) == null, "an unreadable map rejects the whole run"):
 		return
 	var junk_owned := snap.duplicate(true)
-	junk_owned["owned_cars"] = {"rustbug": {"type": "compact", "won_from": "start"}, "car-x": "compact", "car-y": {"type": "suv", "won_from": "rival", "seed": 3, "act": 1}}
+	var junk_cars: Dictionary = (snap["owned_cars"] as Dictionary).duplicate(true)
+	junk_cars["car-x"] = "compact"
+	junk_cars["car-y"] = {"type": "suv", "won_from": "rival", "seed": 3, "act": 1}
+	junk_owned["owned_cars"] = junk_cars
 	var cleaned = RUN_SESSION.deserialize(junk_owned)
-	if not _expect(cleaned != null and cleaned.owned_cars.keys() == ["rustbug"], "unreadable owned cars are dropped on load"):
+	if not _expect(cleaned != null and cleaned.owned_cars.keys() == (snap["owned_cars"] as Dictionary).keys(), "unreadable owned cars are dropped on load"):
 		return
 	var carless := snap.duplicate(true)
 	carless["owned_cars"] = {}
@@ -224,6 +270,7 @@ func _walk_to(sess, wanted: String) -> bool:
 		if String(sess.current_node().get("type", "")) == wanted:
 			return true
 		_resolve_current(sess, true)
+		sess.decline_offer()
 		var next := _first_of_type(sess, wanted)
 		if next.is_empty():
 			return false

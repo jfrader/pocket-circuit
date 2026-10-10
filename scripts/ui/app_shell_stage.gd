@@ -8,11 +8,6 @@ const DriverDirectory := preload("res://scripts/progression/driver_directory.gd"
 const CAR_ASPECT := 0.75
 const CARD_ASPECT := 1.24
 const SHAPE_CARD_MAX_HEIGHT := 330.0
-const SHAPE_RINGS := 4
-## The innermost a shape vertex sits, so a weak axis still reads as a corner.
-const SHAPE_FLOOR := 0.14
-const SHAPE_DASH := 5.0
-const SHAPE_RADIUS_RATIO := 0.33
 const CONFETTI_SEED := 1278
 const CONFETTI_PIECES := 46
 const ROOM_ICON_RADIUS := 32.0
@@ -344,52 +339,7 @@ func _draw_turntable(center: Vector2, radius: float) -> void:
 
 
 func _draw_shape_card(rect: Rect2) -> void:
-	SKIN.draw_plate(self, rect, SKIN.CREAM)
-	var tape_center := Vector2(rect.get_center().x, rect.position.y + 4.0)
-	SKIN.draw_tape(self, tape_center, Vector2(rect.size.x * 0.66, 24.0), -0.03)
-	SKIN.draw_text(self, Vector2(rect.position.x, tape_center.y + 5.0), compare_label, 13, SKIN.INK, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	if shape.is_empty():
-		return
-	var center := rect.get_center() + Vector2(0.0, 12.0)
-	var radius := minf(rect.size.x, rect.size.y) * SHAPE_RADIUS_RATIO
-	for ring in range(1, SHAPE_RINGS + 1):
-		var ring_points := _shape_points(center, radius * float(ring) / float(SHAPE_RINGS), {}, 1.0)
-		ring_points.append(ring_points[0])
-		draw_polyline(ring_points, Color(SKIN.INK, 0.12), 1.0, true)
-	for corner: Vector2 in _shape_points(center, radius, {}, 1.0):
-		draw_line(center, corner, Color(SKIN.INK, 0.12), 1.0, true)
-	var shown := _blended_shape()
-	var points := _shape_points(center, radius, shown)
-	draw_colored_polygon(points, Color(SKIN.ORANGE, 0.82))
-	var outline := points.duplicate()
-	outline.append(points[0])
-	draw_polyline(outline, SKIN.INK, 2.0, true)
-	for point: Vector2 in points:
-		draw_circle(point, 3.5, SKIN.INK)
-		draw_circle(point, 2.0, SKIN.YELLOW)
-	if not compare_shape.is_empty():
-		var compared := _shape_points(center, radius, compare_shape)
-		for index in compared.size():
-			draw_dashed_line(compared[index], compared[(index + 1) % compared.size()], SKIN.BLUE, 2.5, SHAPE_DASH, true)
-	var label_points := _shape_points(center, radius + 22.0, {}, 1.0)
-	for index in CarProfile.AXES.size():
-		var axis := CarProfile.AXES[index]
-		var at := label_points[index]
-		SKIN.draw_text(self, at + Vector2(-40.0, 4.0), axis.to_upper(), 12, SKIN.INK, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
-		if compare_shape.is_empty():
-			continue
-		var delta := roundi((float(shape.get(axis, 0.0)) - float(compare_shape.get(axis, 0.0))) * 100.0)
-		if delta != 0:
-			SKIN.draw_text(self, at + Vector2(-40.0, 18.0), "%+d" % delta, 12, SKIN.LIME if delta > 0 else SKIN.RED, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
-
-
-## Hexagon corners clockwise from the top; each axis value pushes its corner out.
-func _shape_points(center: Vector2, radius: float, values: Dictionary, fixed: float = -1.0) -> PackedVector2Array:
-	var points := PackedVector2Array()
-	for index in CarProfile.AXES.size():
-		var reach := fixed if fixed >= 0.0 else lerpf(SHAPE_FLOOR, 1.0, float(values.get(CarProfile.AXES[index], 0.0)))
-		points.append(center + Vector2.from_angle(-PI * 0.5 + TAU * float(index) / float(CarProfile.AXES.size())) * radius * reach)
-	return points
+	CarShapeView.draw_card(self, rect, _blended_shape(), shape, compare_shape, compare_label)
 
 
 func _draw_track_card(rect: Rect2, room: String) -> void:
