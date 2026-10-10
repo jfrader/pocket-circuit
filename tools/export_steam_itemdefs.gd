@@ -1,6 +1,8 @@
 extends SceneTree
 
-## Writes the Steamworks item definitions for the car drops.
+## Writes the Steamworks item definitions for the car drops, and beside them
+## (<path>.tags.txt) the English string for every tag category and value,
+## which Steam needs before it applies a tag.
 ## Usage:
 ##   PC_STEAM_APP_ID=<app id> PC_ITEMDEFS_PATH=/tmp/itemdefs.json \
 ##     godot --headless --path . --script res://tools/export_steam_itemdefs.gd
@@ -20,5 +22,16 @@ func _initialize() -> void:
 		return
 	file.store_string(JSON.stringify(SteamCars.itemdefs(app_id), "\t"))
 	file.close()
+	var labels := FileAccess.open(path + ".tags.txt", FileAccess.WRITE)
+	if labels == null:
+		push_error("cannot write %s.tags.txt" % path)
+		quit(1)
+		return
+	var tags := SteamCars.tag_labels()
+	for category: String in tags:
+		labels.store_line("%s = %s" % [category, tags[category]["name"]])
+		for token: String in tags[category]["values"]:
+			labels.store_line("%s:%s = %s" % [category, token, tags[category]["values"][token]])
+	labels.close()
 	print("ITEMDEFS WRITTEN ", path)
 	quit(0)

@@ -35,7 +35,8 @@ type and rolls its tags within the drop limits. The ids, weights and limits
 live in `scripts/steam/steam_cars.gd`.
 
 1. Install GodotSteam before any Steam build: `./tools/fetch_godotsteam.sh`.
-   Without it the game runs with Steam off and no items show.
+   Without it the game runs with Steam off: no drops, and only the Steam cars
+   a save already listed.
 2. Generate the item definitions for the app:
 
    ```bash
@@ -43,18 +44,26 @@ live in `scripts/steam/steam_cars.gd`.
      godot --headless --path . --script res://tools/export_steam_itemdefs.gd
    ```
 
-3. In Steamworks, Inventory Service: enable it, upload `/tmp/itemdefs.json`,
-   and add an icon per car type. Keep the items Private while testing; only
-   the publisher's partner group sees them.
-4. Test with two partner accounts on the Steam client: win cars in runs until a
-   drop lands, check the car in Quick Race, trade it to the other account, and
+   It also writes `/tmp/itemdefs.json.tags.txt`, the English string for every
+   tag category and value.
+3. In Steamworks, Inventory Service: enable it and upload `/tmp/itemdefs.json`.
+   Enter every string from the `.tags.txt` file as the tag's English
+   localization; Steam ignores tags without one, and a car without its tags
+   does not show in the garage. Set `ICON_URL` and `ICON_LARGE_URL` in
+   `scripts/steam/steam_cars.gd` to the hosted icons so a re-upload keeps
+   them. Keep the items Private while testing; only the publisher's partner
+   group sees them.
+4. Test with two partner accounts on the Steam client. A first drop needs
+   `DROP_INTERVAL_MINUTES` of playtime, and a win while no drop is due gets
+   none. Win cars in runs until a drop lands, check the car in Quick Race, trade it to the other account, and
    check that the other account's garage shows the same car. Repeat on Steam
    Deck.
 5. Tune `DROP_INTERVAL_MINUTES`, `DROP_WINDOW_MINUTES` and
    `DROP_MAX_PER_WINDOW` if drops feel too rare or too common, regenerate and
    re-upload.
-6. Make the items public. They are tradable and not marketable; opening the
-   Community Market needs Valve and a new item definition upload.
+6. Make the items public. They are tradable and not marketable. For the
+   Community Market, ask Valve first; it also needs `marketable` set and a new
+   upload.
 
 For local runs outside the Steam client, set `POCKET_CIRCUIT_STEAM_APP_ID` to
 the app id. Never ship `steam_appid.txt`.
