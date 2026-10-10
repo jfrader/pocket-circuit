@@ -21,6 +21,9 @@ addons/gamestruments/bin/
 addons/gamestruments/*.gdextension
 addons/gamestruments/*.gdextension.uid
 
+# GodotSteam GDExtension (install with tools/fetch_godotsteam.sh)
+addons/godotsteam/
+
 # Editor / OS
 .DS_Store
 Thumbs.db

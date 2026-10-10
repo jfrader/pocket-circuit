@@ -23,6 +23,8 @@ const OFFER_SHAPE_SIZE := Vector2(420, 400)
 const OFFER_REVEAL_SCALE := 0.4
 const OFFER_REVEAL_TURN := -0.6
 const OFFER_REVEAL_TIME := 0.4
+const STEAM_DROP_MARGIN := 24.0
+const STEAM_DROP_GAP := 8.0
 
 var _app: Node
 var _root: Control
@@ -426,6 +428,39 @@ func _run_surface() -> void:
 	_run_backdrop.show()
 	_footer.get_parent().hide()
 	_content.add_theme_constant_override("separation", 14)
+	call_deferred("show_steam_drops")
+
+
+## Announces each car Steam dropped for a run win, once, over whatever run
+## screen is up; ones that dropped during a race wait for the next one.
+func show_steam_drops() -> void:
+	var queued: Variant = _app.get("steam_drops")
+	if queued is not Array or (queued as Array).is_empty() or not visible or not _run_backdrop.visible:
+		return
+	var drops := queued as Array
+	for index: int in drops.size():
+		_show_steam_drop(drops[index], index)
+	drops.clear()
+
+
+func _show_steam_drop(car: Dictionary, slot: int) -> void:
+	var banner := RUN_UI.action(RUN_UI.STEAM_DROP_LINE % String(CATALOG.generated_vehicle(car).get("name", "")).to_upper(), true)
+	banner.name = "SteamDrop%d" % slot
+	banner.focus_mode = Control.FOCUS_NONE
+	banner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_root.add_child(banner)
+	banner.reset_size()
+	var rest := Vector2(_root.size.x - banner.size.x - STEAM_DROP_MARGIN, STEAM_DROP_MARGIN + slot * (banner.size.y + STEAM_DROP_GAP))
+	banner.position = rest
+	if _reduced_motion_enabled():
+		get_tree().create_timer(RUN_UI.BANNER_HOLD).timeout.connect(banner.queue_free)
+		return
+	banner.position = rest - Vector2(0.0, banner.size.y + STEAM_DROP_MARGIN)
+	var tween := banner.create_tween().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(banner, "position", rest, RUN_UI.BANNER_IN)
+	tween.tween_interval(RUN_UI.BANNER_HOLD)
+	tween.tween_property(banner, "modulate:a", 0.0, RUN_UI.BANNER_OUT)
+	tween.tween_callback(banner.queue_free)
 
 
 ## A stop's screen: its copy, the run's stats and its actions on the left;
@@ -504,7 +539,7 @@ func show_run_offer() -> void:
 	detail.add_theme_constant_override("separation", 6)
 	columns.add_child(detail)
 	RUN_UI.spacer(detail, 8)
-	detail.add_child(RUN_UI.label(String(RUN_UI.ORIGIN_COPY.get(String(offered.get("won_from", "")), "")) % int(offered.get("act", 1)), 11, RUN_UI.AMBER, true))
+	detail.add_child(RUN_UI.label(RUN_UI.origin_line(offered), 11, RUN_UI.AMBER, true))
 	RUN_UI.spacer(detail, 8)
 	var title_row := HBoxContainer.new()
 	title_row.add_theme_constant_override("separation", 16)
@@ -782,6 +817,10 @@ func _briefing_mastery_targets(state: Dictionary) -> String:
 
 
 func show_vehicle_select(event_id: String, quick_race: bool = false) -> void:
+	# Cars traded in or out since the last read show next time the garage opens.
+	var steam: Variant = _app.get("steam")
+	if steam is Node:
+		(steam as Node).call("refresh")
 	_screen = "vehicle_select"
 	_event_id = event_id
 	_quick_race = quick_race

@@ -181,7 +181,7 @@ func _shelf_cards(display_ids: Array[String], unlocked: Array) -> Array[Button]:
 		content.add_child(button)
 		if vehicle.has("won_from"):
 			var mark := Label.new()
-			mark.text = "WON"
+			mark.text = String(RUN_UI.SHELF_MARKS.get(String(vehicle["won_from"]), ""))
 			mark.position = button.position + Vector2(-4.0, -10.0)
 			mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			SKIN.style_tape(mark, SKIN.ORANGE, 11)
@@ -223,7 +223,7 @@ func _choose_vehicle(id: String) -> void:
 	var origin := String(vehicle.get("won_from", ""))
 	_origin.visible = RUN_UI.ORIGIN_COPY.has(origin)
 	if _origin.visible:
-		_origin.text = String(RUN_UI.ORIGIN_COPY[origin]) % int(vehicle.get("act", 1))
+		_origin.text = RUN_UI.origin_line(vehicle)
 		_origin.reset_size()
 	_profile.position.y = PROFILE_TOP + (ORIGIN_DROP if _origin.visible else 0.0)
 	var tradeoff := String(vehicle.get("tradeoff", ""))

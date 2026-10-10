@@ -38,7 +38,7 @@ const FLASH_FADE := 0.5
 const STAGGER := 0.035
 const STAGGER_TIME := 0.16
 ## Where a won car came from, as the garage and the run's car offer say it.
-const ORIGIN_COPY := {"rival": "WON IN A DUEL · ACT %d", "lockup": "FOUND IN A LOCKUP · ACT %d"}
+const ORIGIN_COPY := {"rival": "WON IN A DUEL · ACT {act}", "lockup": "FOUND IN A LOCKUP · ACT {act}", "steam": "IN YOUR STEAM INVENTORY"}
 ## The right-hand card of a run screen: the map, or a stop's parts.
 const CARD_SIZE := Vector2(520, 516)
 const PART_BUTTON_HEIGHT := 92.0
@@ -272,6 +272,20 @@ static func stagger_in(controls: Array, reduced_motion: bool) -> void:
 		var tween := control.create_tween().set_parallel(true).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 		tween.tween_property(control, "modulate:a", 1.0, STAGGER_TIME).set_delay(STAGGER * index)
 		index += 1
+
+
+## The tape on a garage card for a car that was won or dropped.
+const SHELF_MARKS := {"rival": "WON", "lockup": "WON", "steam": "STEAM"}
+const STEAM_DROP_LINE := "STEAM DROP · %s"
+## Seconds the Steam drop banner slides in, holds and fades.
+const BANNER_IN := 0.25
+const BANNER_HOLD := 3.5
+const BANNER_OUT := 0.6
+
+
+## Where a won car came from, or "" for a car that was not won.
+static func origin_line(vehicle: Dictionary) -> String:
+	return String(ORIGIN_COPY.get(String(vehicle.get("won_from", "")), "")).format({"act": int(vehicle.get("act", 1))})
 
 
 ## A car's display name (generated cars have their own), never its id.
