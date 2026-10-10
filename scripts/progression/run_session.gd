@@ -12,7 +12,6 @@ const RUN_STATE := preload("res://scripts/progression/run_state.gd")
 const INITIAL_POINTS := 0
 const RIVAL_LOSS_POINTS_COST := 10
 const ERRAND_PAY_POINTS := 6
-const VAN_PART_COSTS := {"tool_kit": 5, "tyre_set": 10, "spare_shell": 15}
 const RIVAL_LOSS_SEVERITY := 0.6
 const LOCKUP_CAR_TYPE := "compact"
 ## The starter-tier types a night's starter car is dealt from.
@@ -48,8 +47,10 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##     advances the act (act 3 completes the run) and any other finish fails it.
 ##   resolve_rival(id, won): a win adds the rival's car (won_cars()); a loss costs
 ##     RIVAL_LOSS_POINTS_COST, and wear when the points do not cover it.
-##   bench_repair(car) / bench_fit(car, part): one of the two per bench visit.
-##   buy_part(part_id): one parts van purchase at its listed price in points.
+##   bench_repair(car) / bench_fit(car, held_index): one of the two per bench
+##     visit; a fit moves a held part onto that car for the rest of the night.
+##   buy_part(part_id): one of van_stock(), at its price in points, into
+##     parts_held; one purchase per van.
 ##   start_race(id, field): marks a race as running; it resolves exactly once.
 ##   open_lockup(): the act's one free car.
 ##   resolve_errand(choice): 0 takes ERRAND_PAY_POINTS, 1 steps the current
@@ -69,7 +70,10 @@ var owned_cars: Dictionary = {}
 var lockup_used: bool = false
 var failed: bool = false
 var completed: bool = false
+## The parts fitted to each car this night: vehicle id -> [RunParts part].
 var installed_parts: Dictionary = {}
+## Parts bought and not fitted yet, oldest first.
+var parts_held: Array[Dictionary] = []
 var last_bench_visited: String = ""
 var bench_action_done: bool = false
 var resolved_nodes: Dictionary = {}
@@ -92,6 +96,7 @@ static func create(p_run_seed: int) -> RunSession:
 	sess.failed = false
 	sess.completed = false
 	sess.installed_parts = {}
+	sess.parts_held = []
 	sess.last_bench_visited = ""
 	sess.bench_action_done = false
 	sess.current_car_id = sess._add_car("start", CAR_ORIGIN_START, STARTER_TYPES)
@@ -118,17 +123,23 @@ func start_race(node_id: String, field_size: int) -> bool:
 
 ## The seed of the circuit a stop races on, from the run, the act and the stop.
 func circuit_seed(stop_id: String) -> int:
-	return _circuit_roll("route", stop_id)
+	return _stop_roll("route", stop_id)
 
 ## Whether a stop's circuit runs reversed: its own stream, mixed through the
 ## engine's PCG generator because String.hash's low bit follows the route
 ## seed's and would tie the direction to the room.
 func circuit_reversed(stop_id: String) -> bool:
 	var mix := RandomNumberGenerator.new()
-	mix.seed = _circuit_roll("reverse", stop_id)
+	mix.seed = _stop_roll("reverse", stop_id)
 	return mix.randi() % 2 == 1
 
-func _circuit_roll(stream: String, stop_id: String) -> int:
+## The parts the current stop's van stocks; empty anywhere else.
+func van_stock() -> Array[Dictionary]:
+	if not _is_current_node_type("parts_van"):
+		return []
+	return RunParts.deal(_stop_roll("van", current_node_id))
+
+func _stop_roll(stream: String, stop_id: String) -> int:
 	return ("pocket-circuit|run-circuit|%s|%d|act%d|%s" % [stream, run_seed, current_map.act, stop_id]).hash() & 0x7FFFFFFF
 
 ## A race-type node has to be raced before the run moves past it.
@@ -278,7 +289,7 @@ func decline_offer() -> bool:
 	return true
 
 
-## Any car of the night as a record {id, seed, type, roll, won_from, act}.
+## Any car of the night as a record {id, seed, type, roll, won_from, act, parts}.
 func car_record(vehicle_id: String) -> Dictionary:
 	var record: Dictionary = owned_cars.get(vehicle_id, {})
 	if record.is_empty():
@@ -286,14 +297,18 @@ func car_record(vehicle_id: String) -> Dictionary:
 	var out := record.duplicate(true)
 	out["id"] = vehicle_id
 	out["roll"] = run_state.get_or_create_car_roll(vehicle_id, String(record["type"]))
+	out["parts"] = fitted_parts(vehicle_id)
 	return out
 
 
-## A won car as the garage stores it; {} for the night's starter car.
+## A won car as the garage stores it: no parts, they stay with the night.
+## {} for the night's starter car.
 func won_car(vehicle_id: String) -> Dictionary:
 	if String((owned_cars.get(vehicle_id, {}) as Dictionary).get("won_from", "")) == CAR_ORIGIN_START:
 		return {}
-	return car_record(vehicle_id)
+	var car := car_record(vehicle_id)
+	car.erase("parts")
+	return car
 
 
 ## Every car of the night, the starter included.
@@ -358,6 +373,18 @@ static func _normalize_owned(value: Variant) -> Dictionary:
 	return owned
 
 
+## Stored fitted parts, kept only on cars the night owns.
+static func _normalize_installed(value: Variant, owned: Dictionary) -> Dictionary:
+	var installed := {}
+	if value is not Dictionary:
+		return installed
+	for vehicle_id: Variant in value as Dictionary:
+		var parts := RunParts.normalize_list((value as Dictionary)[vehicle_id])
+		if owned.has(String(vehicle_id)) and not parts.is_empty():
+			installed[String(vehicle_id)] = parts
+	return installed
+
+
 ## The won cars a stored run holds, even when the run itself can no longer be
 ## restored (another schema, a broken map): each one is checked like a garage
 ## car, so a night that cannot be resumed still hands over what it won.
@@ -404,16 +431,20 @@ func bench_repair(car_key: String) -> bool:
 	bench_action_done = true
 	return true
 
-func bench_fit(car_key: String, part: String) -> bool:
-	if not _can_do_bench_action(car_key):
+func bench_fit(car_key: String, held_index: int) -> bool:
+	if not _can_do_bench_action(car_key) or not owned_cars.has(car_key):
 		return false
-	if not owned_cars.has(car_key) and car_key != current_car_id:
+	if held_index < 0 or held_index >= parts_held.size():
 		return false
-	if part.is_empty():
-		return false
-	installed_parts[car_key] = part
+	var fitted: Array = installed_parts.get(car_key, [])
+	fitted.append(parts_held.pop_at(held_index))
+	installed_parts[car_key] = fitted
 	bench_action_done = true
 	return true
+
+## The parts fitted to a car this night, in the order they went on.
+func fitted_parts(vehicle_id: String) -> Array[Dictionary]:
+	return RunParts.normalize_list(installed_parts.get(vehicle_id, []))
 
 func _can_do_bench_action(_car_key: String) -> bool:
 	if failed or completed:
@@ -424,16 +455,17 @@ func _can_do_bench_action(_car_key: String) -> bool:
 		return false
 	return true
 
-## Buys one part at the parts van for its listed price; one purchase per visit.
+## Buys one of this van's parts for its price; one purchase per van.
 func buy_part(part_id: String) -> bool:
-	if failed or completed or not _is_current_node_type("parts_van") or resolved_nodes.has(current_node_id):
+	if failed or completed or resolved_nodes.has(current_node_id):
 		return false
-	var cost := int(VAN_PART_COSTS.get(part_id, -1))
-	if cost < 0 or run_points < cost:
-		return false
-	run_points -= cost
-	resolved_nodes[current_node_id] = true
-	return true
+	for part: Dictionary in van_stock():
+		if part["part"] == part_id and run_points >= RunParts.cost(part):
+			run_points -= RunParts.cost(part)
+			parts_held.append(part)
+			resolved_nodes[current_node_id] = true
+			return true
+	return false
 
 func open_lockup() -> Dictionary:
 	if failed or completed or lockup_used or not _is_current_node_type("lockup"):
@@ -510,6 +542,7 @@ static func serialize(sess: RunSession) -> Dictionary:
 		"failed": sess.failed,
 		"completed": sess.completed,
 		"installed_parts": inst,
+		"parts_held": sess.parts_held.duplicate(true),
 		"last_bench_visited": sess.last_bench_visited,
 		"bench_action_done": sess.bench_action_done,
 		"resolved_nodes": sess.resolved_nodes.duplicate(true),
@@ -535,7 +568,8 @@ static func deserialize(data: Dictionary) -> RunSession:
 		sess.lockup_used = bool(data.get("lockup_used", false))
 		sess.failed = bool(data.get("failed", false))
 		sess.completed = bool(data.get("completed", false))
-		sess.installed_parts = (data.get("installed_parts", {}) as Dictionary).duplicate(true)
+		sess.installed_parts = _normalize_installed(data.get("installed_parts"), sess.owned_cars)
+		sess.parts_held = RunParts.normalize_list(data.get("parts_held"))
 		sess.last_bench_visited = String(data.get("last_bench_visited", ""))
 		sess.bench_action_done = bool(data.get("bench_action_done", false))
 		sess.resolved_nodes = (data.get("resolved_nodes", {}) as Dictionary).duplicate(true)

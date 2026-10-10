@@ -20,7 +20,7 @@ var _boss_label: Label
 func configure(session: RunSession, on_pressed: Callable) -> Array[Button]:
 	_map = session.current_map
 	_current = session.current_node_id
-	custom_minimum_size = Vector2(520, 516)
+	custom_minimum_size = UI.CARD_SIZE
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	_header = UI.label("RUN · ACT %d · %s · SEED %d" % [_map.act, String(UI.ROOMS[_map.act]).to_upper(), _map.run_seed], 10, UI.MUTED, true)
 	_header.position = Vector2(22, 18)
