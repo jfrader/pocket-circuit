@@ -70,7 +70,7 @@ func _run_one_quick_race(app: Node, seed: int) -> bool:
 	var deadline := Time.get_ticks_msec() + 30000
 	while app.call("is_race_loading") and Time.get_ticks_msec() < deadline:
 		await process_frame
-	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d"):
+	if not _expect(not app.call("is_race_loading"), "loading must complete for seed %d" % seed):
 		return false
 	if app.get("_loading_failed"):
 		if not _expect(false, "loading must not fail"):
