@@ -17,7 +17,6 @@ const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const RACE_PREPARATION := preload("res://scripts/race/race_preparation.gd")
-const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 
 var _app: Node
 var _active := false
@@ -27,7 +26,6 @@ var _texture_index := 0
 var _vehicle_ids: Array[String] = []
 var _vehicle_index := 0
 var _worker: Node
-var _prewarmed_resources: Dictionary = {}  # retain strong refs so cache holds the race scene + dep set
 
 
 func start(app: Node) -> void:
@@ -52,7 +50,6 @@ func debug_metrics() -> Dictionary:
 		"visual_keys_remaining": maxi(0, _vehicle_ids.size() - _vehicle_index),
 		# "vehicles_remaining" kept for back-compat with any external prints
 		"vehicles_remaining": maxi(0, _vehicle_ids.size() - _vehicle_index),
-		"prewarmed_resources": _prewarmed_resources.size(),
 	}
 
 
@@ -62,7 +59,6 @@ func _exit_tree() -> void:
 	_active = false
 	_texture_paths.clear()
 	_vehicle_ids.clear()
-	_prewarmed_resources.clear()
 	_roster_keys.clear()
 	if is_instance_valid(_worker):
 		_worker.free()
@@ -92,9 +88,6 @@ func _run() -> void:
 	await _precompute_vehicles()
 	if not is_inside_tree():
 		return
-	await _prewarm_race_resources()
-	if not is_inside_tree():
-		return
 	await _prewarm_vehicle_audios()
 	if not is_inside_tree():
 		return
@@ -113,55 +106,14 @@ func _wait_until_menu() -> bool:
 	return is_inside_tree()
 
 
-## Compiles the race scene's scripts on a worker during menu idle, so the race
-## load finds them already compiled in the loader cache.
+## Loads the race scene, scripts and all, on the App's race loader during menu
+## idle: one loader, so a race started meanwhile joins it instead of compiling
+## the same scripts a second time.
 func _warm_race_compilation() -> void:
 	if not await _wait_until_menu():
 		return
-	_worker = RACE_PREPARATION.new()
-	_worker.name = "RaceAssetCompileWorker"
-	add_child(_worker)
-	await _worker.run_data_job(_load_scene_tree.bind(RACE_SCENE, {}))
-	_worker.queue_free()
-	_worker = null
-
-
-func _prewarm_race_resources() -> void:
-	# Use threaded load for the race scene and its full dep tree (scripts, packed
-	# sub-scenes, textures, shaders). Request during menu idle; poll+retrieve to
-	# force cache population and retain refs. Best-effort, yields to menu gate.
-	if not await _wait_until_menu():
-		return
-	var paths: Array[String] = []
-	_collect_race_resource_paths(RACE_SCENE, {}, paths)
-	var requested := 0
-	for p: String in paths:
-		if ResourceLoader.exists(p) and ResourceLoader.load_threaded_get_status(p) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE:
-			ResourceLoader.load_threaded_request(p)
-			requested += 1
-	if requested == 0:
-		return
-	# Poll completion (spreading over frames) and retain.
-	var pending: Array[String] = paths
-	var attempts := 0
-	while pending and attempts < 180:  # generous ~3s ceiling
-		if not await _wait_until_menu():
-			return
-		attempts += 1
-		var still: Array[String] = []
-		for p: String in pending:
-			var st := ResourceLoader.load_threaded_get_status(p)
-			if st == ResourceLoader.THREAD_LOAD_LOADED:
-				if not _prewarmed_resources.has(p):
-					var res: Resource = ResourceLoader.load_threaded_get(p)
-					if res != null:
-						_prewarmed_resources[p] = res
-			elif st == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
-				still.append(p)
-			# drop failed/unknown
-		pending = still
-		if pending:
-			await get_tree().process_frame
+	if is_instance_valid(_app) and _app.has_method("warm_race_scene"):
+		await _app.warm_race_scene()
 
 
 func _prewarm_vehicle_audios() -> void:
@@ -184,34 +136,6 @@ func _prewarm_vehicle_audios() -> void:
 
 func _noop_audio_progress() -> void:
 	pass
-
-
-static func _load_scene_tree(path: String, visited: Dictionary) -> Dictionary:
-	# Walks the scene's dependencies on a worker thread. `load()` compiles
-	# GDScript and is thread-safe; the compiled resources land in the shared
-	# loader cache for the race to reuse.
-	if visited.has(path):
-		return {}
-	visited[path] = true
-	for dependency in ResourceLoader.get_dependencies(path):
-		_load_scene_tree(String(dependency).split("::")[-1], visited)
-	load(path)
-	return {}
-
-
-static func _collect_race_resource_paths(path: String, visited: Dictionary, out: Array[String]) -> void:
-	# Mirrors the dependency walk in _load_scene_tree. We request threaded
-	# loads for the scene and every asset/script dep so the race load sees only
-	# cache hits.
-	if visited.has(path):
-		return
-	visited[path] = true
-	if not ResourceLoader.exists(path):
-		return
-	out.append(path)
-	for dependency in ResourceLoader.get_dependencies(path):
-		var rp := String(dependency).split("::")[-1]
-		_collect_race_resource_paths(rp, visited, out)
 
 
 func _precompute_outlines() -> void:

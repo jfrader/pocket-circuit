@@ -21,14 +21,20 @@ func _run_test() -> void:
 		return
 	if not _expect(not ResourceLoader.has_cached(RACE_SCENE), "the race scene starts uncached in a fresh process"):
 		return
-	app.set("_loading_cancelled", true)
+	# Cancel once the load is under way, the way ESC on the loading screen does.
+	var result := {}
 	var frames := [0]
-	var counter := func() -> void: frames[0] += 1
-	process_frame.connect(counter)
-	var loaded: Resource = await app.call("_load_race_scene")
-	process_frame.disconnect(counter)
+	var load_and_record := func() -> void: result["scene"] = await app.call("_load_race_scene")
+	load_and_record.call()
+	await process_frame
+	if not _expect(not result.has("scene") and app.get("_race_scene_thread") != null, "a cold load is still running on its worker"):
+		return
+	app.set("_loading_cancelled", true)
+	while not result.has("scene") and frames[0] <= CANCEL_FRAME_LIMIT:
+		await process_frame
+		frames[0] += 1
 	app.set("_loading_cancelled", false)
-	if not _expect(loaded == null and frames[0] <= CANCEL_FRAME_LIMIT, "a cancelled load returns at once (null after %d frames)" % frames[0]):
+	if not _expect(result.has("scene") and result["scene"] == null, "a cancelled load returns at once (still waiting after %d frames)" % frames[0]):
 		return
 	# The load keeps running in the background and the next race joins it.
 	var again: Resource = await app.call("_load_race_scene")
