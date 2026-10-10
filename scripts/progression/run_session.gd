@@ -1,7 +1,7 @@
 class_name RunSession
 extends RefCounted
 
-const SCHEMA_VERSION := 2
+const SCHEMA_VERSION := 3
 
 const FINAL_ACT := 3
 const RACE_NODE_TYPES: Array[String] = ["race", "rival", "act_rival"]
@@ -15,8 +15,8 @@ const ERRAND_PAY_POINTS := 6
 const VAN_PART_COSTS := {"tool_kit": 5, "tyre_set": 10, "spare_shell": 15}
 const RIVAL_LOSS_SEVERITY := 0.6
 const LOCKUP_CAR_TYPE := "compact"
-const STARTER_CAR := "rustbug"
-const STARTER_CAR_TYPE := "compact"
+## The starter-tier types a night's starter car is dealt from.
+const STARTER_TYPES: Array[String] = ["compact", "buggy"]
 const CAR_ORIGIN_START := "start"
 const CAR_ORIGIN_RIVAL := "rival"
 const CAR_ORIGIN_LOCKUP := "lockup"
@@ -36,7 +36,10 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ## Points are the run's only currency: races pay RUN_POINTS_BY_FINISH, the
 ## parts van and a lost rival duel spend them.
 ##
-## create(run_seed): act 1 map, on the opening race, 0 points, rustbug clean.
+## create(run_seed): act 1 map, on the opening race, 0 points, and a starter
+##   car dealt from the seed (a generated compact or buggy, starter envelope).
+## take_offer() / decline_offer(): a won car is offered to drive; the car left
+##   behind keeps its wear.
 ## available_nodes() / enter_node(id): moves along map edges only, and never
 ##   past a race-type node that has not been raced.
 ##
@@ -61,7 +64,7 @@ var run_state: RunState
 var current_map: RunMap
 var current_node_id: String = ""
 var run_points: int = 0
-var current_car_id: String = STARTER_CAR
+var current_car_id: String = ""
 var owned_cars: Dictionary = {}
 var lockup_used: bool = false
 var failed: bool = false
@@ -73,6 +76,8 @@ var resolved_nodes: Dictionary = {}
 ## The race-type stop whose race has started and not been reported:
 ## {"node": id, "field": racers}. Empty when no race is running.
 var race_in_flight: Dictionary = {}
+## The car just won and offered to drive instead of the current one ("" when none).
+var pending_offer: String = ""
 
 static func create(p_run_seed: int) -> RunSession:
 	var sess: RunSession = new()
@@ -82,7 +87,6 @@ static func create(p_run_seed: int) -> RunSession:
 	var start_n: Dictionary = sess.current_map.get_start_node()
 	sess.current_node_id = String(start_n.get("id", ""))
 	sess.run_points = INITIAL_POINTS
-	sess.current_car_id = STARTER_CAR
 	sess.owned_cars = {}
 	sess.lockup_used = false
 	sess.failed = false
@@ -90,9 +94,7 @@ static func create(p_run_seed: int) -> RunSession:
 	sess.installed_parts = {}
 	sess.last_bench_visited = ""
 	sess.bench_action_done = false
-	sess.owned_cars[STARTER_CAR] = {"type": STARTER_CAR_TYPE, "won_from": CAR_ORIGIN_START}
-	sess.run_state.get_or_create_car_roll(STARTER_CAR, STARTER_CAR_TYPE)
-	sess.run_state.set_car_wear(STARTER_CAR, RUN_STATE.WEAR_LEVELS[0])
+	sess.current_car_id = sess._add_car("start", CAR_ORIGIN_START, STARTER_TYPES)
 	sess.run_state.act = 1
 	sess.run_state.row = 0
 	return sess
@@ -141,7 +143,8 @@ func current_node() -> Dictionary:
 func enter_node(node_id: String) -> bool:
 	if failed or completed or current_map == null or current_node_id.is_empty():
 		return false
-	if is_race_pending():
+	# A race-type stop is raced, and a won car is answered, before moving on.
+	if is_race_pending() or not pending_offer.is_empty():
 		return false
 	var kids: Array[Dictionary] = current_map.get_children(current_node_id)
 	var is_valid: bool = false
@@ -222,7 +225,7 @@ func resolve_rival(node_id: String, won: bool) -> Dictionary:
 	race_in_flight = {}
 	var outcome: Dictionary = {"won": won}
 	if won:
-		outcome["car"] = _win_car(node_id, CAR_ORIGIN_RIVAL, "")
+		outcome["car"] = _win_car(node_id, CAR_ORIGIN_RIVAL, ProceduralCarGenerator.SUPPORTED_TYPES)
 	else:
 		var over: bool = run_points < RIVAL_LOSS_POINTS_COST
 		run_points = maxi(0, run_points - RIVAL_LOSS_POINTS_COST)
@@ -238,22 +241,47 @@ func _is_current_node_type(nt: String) -> bool:
 	var n: Dictionary = current_node()
 	return String(n.get("type", "")) == nt
 
-## Adds a car won at this stop: a unique id, a seed for its look, a type
-## (rolled for rivals, fixed for lockups) and its run roll.
-func _win_car(stop_id: String, origin: String, fixed_type: String) -> Dictionary:
+## Adds a generated car to the night: a unique id, a seed for its look, a
+## type dealt from `types` and its run roll, clean. Returns its id.
+func _add_car(stop_id: String, origin: String, types: Array[String]) -> String:
 	var vid := "car-%d-a%d-%s" % [run_seed, current_map.act, stop_id]
 	var car_seed := vid.hash() & 0x7FFFFFFF
-	var types := ProceduralCarGenerator.SUPPORTED_TYPES
-	var car_type := fixed_type if not fixed_type.is_empty() else types[car_seed % types.size()]
+	var car_type := types[car_seed % types.size()]
 	owned_cars[vid] = {"type": car_type, "seed": car_seed, "won_from": origin, "act": current_map.act}
 	run_state.get_or_create_car_roll(vid, car_type)
+	run_state.set_car_wear(vid, RUN_STATE.WEAR_LEVELS[0])
+	return vid
+
+
+## A car won at this stop is offered to drive; the current car is kept until
+## the offer is taken.
+func _win_car(stop_id: String, origin: String, types: Array[String]) -> Dictionary:
+	var vid := _add_car(stop_id, origin, types)
+	pending_offer = vid
 	return won_car(vid)
 
 
-## A won car as the garage stores it: {id, seed, type, roll, won_from, act}.
-func won_car(vehicle_id: String) -> Dictionary:
+## Drives the offered car from now on. The car left behind keeps its wear.
+func take_offer() -> bool:
+	if pending_offer.is_empty() or failed or completed:
+		return false
+	current_car_id = pending_offer
+	pending_offer = ""
+	return true
+
+
+## Keeps the current car; the offered one stays won.
+func decline_offer() -> bool:
+	if pending_offer.is_empty():
+		return false
+	pending_offer = ""
+	return true
+
+
+## Any car of the night as a record {id, seed, type, roll, won_from, act}.
+func car_record(vehicle_id: String) -> Dictionary:
 	var record: Dictionary = owned_cars.get(vehicle_id, {})
-	if String(record.get("won_from", "")) == CAR_ORIGIN_START:
+	if record.is_empty():
 		return {}
 	var out := record.duplicate(true)
 	out["id"] = vehicle_id
@@ -261,8 +289,27 @@ func won_car(vehicle_id: String) -> Dictionary:
 	return out
 
 
+## A won car as the garage stores it; {} for the night's starter car.
+func won_car(vehicle_id: String) -> Dictionary:
+	if String((owned_cars.get(vehicle_id, {}) as Dictionary).get("won_from", "")) == CAR_ORIGIN_START:
+		return {}
+	return car_record(vehicle_id)
+
+
+## Every car of the night, the starter included.
+func car_records() -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	for vehicle_id: String in owned_cars:
+		out.append(car_record(vehicle_id))
+	return out
+
+
 ## A stored won car with every field checked, or {} when it cannot be trusted.
 static func normalize_won_car(value: Variant) -> Dictionary:
+	return _normalize_car(value, [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP])
+
+
+static func _normalize_car(value: Variant, origins: Array) -> Dictionary:
 	if value is not Dictionary:
 		return {}
 	var car := value as Dictionary
@@ -272,7 +319,7 @@ static func normalize_won_car(value: Variant) -> Dictionary:
 	var roll: Variant = car.get("roll")
 	if car_id is not String or String(car_id).is_empty() or car_type not in ProceduralCarGenerator.SUPPORTED_TYPES:
 		return {}
-	if origin not in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] or roll is not Dictionary:
+	if origin not in origins or roll is not Dictionary:
 		return {}
 	var limit: float = RUN_STATE.TIER_ENVELOPES.values().max()
 	var clean_roll := {}
@@ -291,7 +338,7 @@ static func normalize_won_car(value: Variant) -> Dictionary:
 	}
 
 
-## Stored owned cars: the starter plus won cars that pass normalize_won_car.
+## Stored owned cars, each checked like a garage car (the starter included).
 static func _normalize_owned(value: Variant) -> Dictionary:
 	var owned := {}
 	if value is not Dictionary:
@@ -300,18 +347,38 @@ static func _normalize_owned(value: Variant) -> Dictionary:
 		var record: Variant = (value as Dictionary)[vehicle_id]
 		if record is not Dictionary:
 			continue
-		if String(vehicle_id) == STARTER_CAR:
-			owned[STARTER_CAR] = {"type": STARTER_CAR_TYPE, "won_from": CAR_ORIGIN_START}
-			continue
 		var probe := (record as Dictionary).duplicate()
 		probe["id"] = String(vehicle_id)
 		probe["roll"] = NO_ROLL
-		var clean := normalize_won_car(probe)
+		var clean := _normalize_car(probe, [CAR_ORIGIN_START, CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP])
 		if not clean.is_empty():
 			clean.erase("id")
 			clean.erase("roll")
 			owned[String(vehicle_id)] = clean
 	return owned
+
+
+## The won cars a stored run holds, even when the run itself can no longer be
+## restored (another schema, a broken map): each one is checked like a garage
+## car, so a night that cannot be resumed still hands over what it won.
+static func salvage_won_cars(data: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var owned: Variant = data.get("owned_cars")
+	var state: Variant = data.get("run_state")
+	var rolls: Variant = (state as Dictionary).get("car_rolls", {}) if state is Dictionary else {}
+	if owned is not Dictionary or rolls is not Dictionary:
+		return out
+	for vehicle_id: Variant in owned as Dictionary:
+		var record: Variant = (owned as Dictionary)[vehicle_id]
+		if record is not Dictionary:
+			continue
+		var probe := (record as Dictionary).duplicate()
+		probe["id"] = String(vehicle_id)
+		probe["roll"] = (rolls as Dictionary).get(vehicle_id)
+		var car := normalize_won_car(probe)
+		if not car.is_empty():
+			out.append(car)
+	return out
 
 
 ## Every car won this run, in the order they were won.
@@ -375,7 +442,7 @@ func open_lockup() -> Dictionary:
 		return {}
 	resolved_nodes[current_node_id] = true
 	lockup_used = true
-	return _win_car("lockup", CAR_ORIGIN_LOCKUP, LOCKUP_CAR_TYPE)
+	return _win_car("lockup", CAR_ORIGIN_LOCKUP, [LOCKUP_CAR_TYPE] as Array[String])
 
 func resolve_errand(choice: int) -> Dictionary:
 	if not _is_current_node_type("errand"):
@@ -447,6 +514,7 @@ static func serialize(sess: RunSession) -> Dictionary:
 		"bench_action_done": sess.bench_action_done,
 		"resolved_nodes": sess.resolved_nodes.duplicate(true),
 		"race_in_flight": sess.race_in_flight.duplicate(true),
+		"pending_offer": sess.pending_offer,
 	}
 
 static func deserialize(data: Dictionary) -> RunSession:
@@ -460,7 +528,7 @@ static func deserialize(data: Dictionary) -> RunSession:
 			return null
 		sess.current_node_id = String(data.get("current_node_id", ""))
 		sess.run_points = int(data.get("run_points", 0))
-		sess.current_car_id = String(data.get("current_car_id", STARTER_CAR))
+		sess.current_car_id = String(data.get("current_car_id", ""))
 		sess.owned_cars = _normalize_owned(data.get("owned_cars"))
 		if not sess.owned_cars.has(sess.current_car_id):
 			return null
@@ -473,6 +541,10 @@ static func deserialize(data: Dictionary) -> RunSession:
 		sess.resolved_nodes = (data.get("resolved_nodes", {}) as Dictionary).duplicate(true)
 		var in_flight: Variant = data.get("race_in_flight", {})
 		sess.race_in_flight = (in_flight as Dictionary).duplicate(true) if in_flight is Dictionary else {}
+		var offer := String(data.get("pending_offer", ""))
+		var offered_from := String((sess.owned_cars.get(offer, {}) as Dictionary).get("won_from", ""))
+		var offerable := offered_from in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] and offer != sess.current_car_id
+		sess.pending_offer = offer if offerable else ""
 	else:
 		return null
 	return sess

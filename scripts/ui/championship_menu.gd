@@ -10,6 +10,7 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
+const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const DESIGN_SIZE := Vector2(1280, 720)
 const COLUMN_X := 72.0
 const COLUMN_WIDTH := 510.0
@@ -28,7 +29,6 @@ const SHAPE_MORPH_SECONDS := 0.18
 const PROFILE_TOP := 266.0
 const ORIGIN_DROP := 36.0
 const SCROLL_CUE_INSET := 6.0
-const ORIGIN_COPY := {"rival": "WON IN A DUEL · ACT %d", "lockup": "FOUND IN A LOCKUP · ACT %d"}
 const TITLE_RIVAL := "cass"
 
 var reduced_motion := false
@@ -221,9 +221,9 @@ func _choose_vehicle(id: String) -> void:
 	_vehicle_name.text = String(vehicle["name"]).to_upper()
 	_archetype.text = String(vehicle["archetype"]).to_upper()
 	var origin := String(vehicle.get("won_from", ""))
-	_origin.visible = ORIGIN_COPY.has(origin)
+	_origin.visible = RUN_UI.ORIGIN_COPY.has(origin)
 	if _origin.visible:
-		_origin.text = String(ORIGIN_COPY[origin]) % int(vehicle.get("act", 1))
+		_origin.text = String(RUN_UI.ORIGIN_COPY[origin]) % int(vehicle.get("act", 1))
 		_origin.reset_size()
 	_profile.position.y = PROFILE_TOP + (ORIGIN_DROP if _origin.visible else 0.0)
 	var tradeoff := String(vehicle.get("tradeoff", ""))
