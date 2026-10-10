@@ -1,7 +1,7 @@
 extends SceneTree
 
 ## GURI-1857 (Race loading compiles its scripts off the main thread): a cancelled
-## race load stops waiting on the threaded loader at once instead of holding the
+## race load stops waiting on its worker at once instead of holding the
 ## loading screen until the compile ends.
 
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
@@ -25,13 +25,13 @@ func _run_test() -> void:
 	var frames := [0]
 	var counter := func() -> void: frames[0] += 1
 	process_frame.connect(counter)
-	var loaded: Resource = await app.call("_load_off_main_thread", RACE_SCENE)
+	var loaded: Resource = await app.call("_load_race_scene")
 	process_frame.disconnect(counter)
 	app.set("_loading_cancelled", false)
 	if not _expect(loaded == null and frames[0] <= CANCEL_FRAME_LIMIT, "a cancelled load returns at once (null after %d frames)" % frames[0]):
 		return
-	# The request keeps running in the background and the next load reuses it.
-	var again: Resource = await app.call("_load_off_main_thread", RACE_SCENE)
+	# The load keeps running in the background and the next race joins it.
+	var again: Resource = await app.call("_load_race_scene")
 	if not _expect(again is PackedScene, "the next load gets the race scene"):
 		return
 	if _failed:
