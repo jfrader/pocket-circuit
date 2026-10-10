@@ -292,13 +292,12 @@ func show_run_board() -> void:
 	board.name = "RunBoard"
 	board.reduced_motion = _reduced_motion_enabled()
 	left.add_child(board)
-	left.add_child(RUN_UI.label(RUN_UI.BOARD_CONTROLS, 10, RUN_UI.MUTED, true))
-	var buttons: Array[Button] = board.configure(sess, not night_over, IDENTITIES.car_texture(sess.current_car_id))
+	if not night_over:
+		left.add_child(RUN_UI.label(RUN_UI.BOARD_CONTROLS, 10, RUN_UI.MUTED, true))
+	board.configure(sess, not night_over, IDENTITIES.car_texture(sess.current_car_id))
 	_run_board = board
 	if _app.has_method("prewarm_run_stops"):
 		_app.call("prewarm_run_stops")
-	for button: Button in buttons:
-		_wire_button_audio(button)
 	var detail := VBoxContainer.new()
 	detail.name = "RunDetail"
 	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
@@ -319,7 +318,7 @@ func show_run_board() -> void:
 	if not unsaved.is_empty():
 		detail.add_child(RUN_UI.label("NOT SAVED · " + unsaved.to_upper(), 12, RUN_UI.AMBER, true))
 		if not bool(_app.call("is_save_read_only")):
-			_run_action("SAVE AGAIN", Callable(self, "_on_save_run_again"), true, false, "ActionSaveAgain")
+			_run_action("SAVE AGAIN", Callable(self, "_on_save_run_again"), night_over, false, "ActionSaveAgain")
 	if night_over:
 		_run_action("NEW RUN", Callable(self, "_on_new_run_pressed"), unsaved.is_empty(), false, "ActionNewRun")
 	var secondary := HBoxContainer.new()
@@ -338,7 +337,8 @@ func show_run_board() -> void:
 		_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
 		return
 	board.stop_selected.connect(_show_run_stop.bind(sess))
-	board.stop_confirmed.connect(_go_to_run_stop)
+	board.stop_selected.connect(func(_stop_id: String) -> void: _play_ui_move())
+	board.stop_confirmed.connect(_go_to_run_stop.bind(true))
 	var first := sess.current_node_id if sess.is_race_pending() else String(sess.available_nodes()[0]["id"]) if not sess.available_nodes().is_empty() else sess.current_node_id
 	board.select(first)
 	_grab_button_focus_after_layout(board.marker(first), _entrance_generation)
@@ -377,21 +377,48 @@ func _show_run_stop(stop_id: String, sess: RunSession) -> void:
 	RUN_UI.spacer(_run_stop_card, 4)
 	var go := RUN_UI.action(String(RUN_UI.GO_LABELS[kind]), true, not reachable)
 	go.name = "RunGo"
-	go.pressed.connect(_go_to_run_stop.bind(stop_id))
+	go.pressed.connect(_go_to_run_stop.bind(stop_id, false))
 	_wire_button_audio(go)
 	_run_stop_card.add_child(go)
+	_link_board_focus(stop_id)
 	RUN_UI.stagger_in(_run_stop_card.get_children(), _reduced_motion_enabled())
 
 
+## The map's right-hand column leads into the stop's go button (or the first
+## live action when it is out of reach), and back to the picked stop.
+func _link_board_focus(stop_id: String) -> void:
+	var exits: Array[Control] = []
+	for node: Node in _content.find_children("*", "Button", true, false):
+		var button := node as Button
+		if not button.has_meta("stop_id") and button.focus_mode != Control.FOCUS_NONE and button.is_inside_tree():
+			exits.append(button)
+	if exits.is_empty():
+		return
+	var picked := _run_board.marker(stop_id)
+	for marker: Button in _run_board.right_edge_markers():
+		marker.focus_neighbor_right = marker.get_path_to(exits[0])
+	for exit: Control in exits:
+		exit.focus_neighbor_left = exit.get_path_to(picked)
+
+
 ## Drives the car to the stop on the map, then opens it (a race starts loading).
-func _go_to_run_stop(stop_id: String) -> void:
+## Leaving the board on the way drops the go.
+func _go_to_run_stop(stop_id: String, play_confirm: bool) -> void:
 	if _run_going or not is_instance_valid(_run_board) or not _run_board.is_reachable(stop_id):
 		return
 	_run_going = true
-	_play_ui_confirm()
-	await _run_board.travel_to(stop_id)
+	if play_confirm:
+		_play_ui_confirm()
+	var generation := _entrance_generation
+	var drive := _run_board.travel_to(stop_id)
+	if drive > 0.0:
+		await get_tree().create_timer(drive).timeout
+	if generation != _entrance_generation or not is_instance_valid(_run_board):
+		return
 	_run_going = false
 	_on_run_node_pressed(stop_id)
+	if generation == _entrance_generation and is_instance_valid(_run_board):
+		_run_board.reset_token()
 
 
 func _run_surface() -> void:
@@ -1064,6 +1091,7 @@ func _apply_compact_button_art(button: Button) -> void:
 
 
 func _clear_content() -> void:
+	_run_going = false
 	_page.show()
 	_run_backdrop.hide()
 	_footer.get_parent().show()

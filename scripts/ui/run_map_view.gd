@@ -28,6 +28,7 @@ const TOKEN_SIZE := Vector2(30, 30)
 const REVEAL_TIME := 0.55
 const POP_TIME := 0.22
 const POP_STAGGER := 0.035
+const POP_FROM := 0.4
 const TRAVEL_TIME := 0.45
 const PULSE_PERIOD := 1.4
 const DASH := 7.0
@@ -122,7 +123,7 @@ func selected_id() -> String:
 
 ## Picks a stop: it grows and gets the ring, and the route to it flows.
 func select(stop_id: String) -> void:
-	if not _buttons.has(stop_id) or stop_id == _selected:
+	if _travelling or not _buttons.has(stop_id) or stop_id == _selected:
 		return
 	_selected = stop_id
 	# Keyboard focus follows the pick, so the map shows one ring.
@@ -138,23 +139,36 @@ func marker(stop_id: String) -> Button:
 	return _buttons.get(stop_id) as Button
 
 
-## Drives the car token from the current stop to `stop_id`; returns when it
-## arrives (at once with reduced motion).
-func travel_to(stop_id: String) -> void:
-	if not _centres.has(stop_id) or not _centres.has(_current):
-		return
+## The markers in the map's rightmost column, where focus leaves the map.
+func right_edge_markers() -> Array[Button]:
+	var out: Array[Button] = []
+	for id: String in _buttons:
+		if int(_map.get_node(id)["col"]) == RunMap.NUM_COLUMNS - 1:
+			out.append(_buttons[id] as Button)
+	return out
+
+
+## Starts the car token's drive from the current stop to `stop_id` and
+## returns how long it takes (0 with reduced motion). Picks are ignored on the
+## way. The caller waits on the tree, which outlives this map.
+func travel_to(stop_id: String) -> float:
+	if _token == null or not _centres.has(stop_id) or not _centres.has(_current):
+		return 0.0
 	var to: Vector2 = _centres[stop_id]
-	if _token == null:
-		return
 	_token.rotation = (to - (_centres[_current] as Vector2)).angle() + PI * 0.5
+	_travelling = true
 	if reduced_motion:
 		_token.position = to - TOKEN_SIZE * 0.5
-		return
-	_travelling = true
+		return 0.0
 	var tween := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(_token, "position", to - TOKEN_SIZE * 0.5, TRAVEL_TIME)
-	await tween.finished
+	return TRAVEL_TIME
+
+
+## Puts the token back on the current stop, after a go that did not happen.
+func reset_token() -> void:
 	_travelling = false
+	_layout()
 
 
 func _on_marker_focused(stop_id: String) -> void:
@@ -164,6 +178,8 @@ func _on_marker_focused(stop_id: String) -> void:
 
 
 func _on_marker_pressed(stop_id: String) -> void:
+	if _travelling:
+		return
 	if _picked_by_press:
 		_picked_by_press = false
 		return
@@ -177,13 +193,17 @@ func _rest_markers() -> void:
 	for id: String in _buttons:
 		var button := _buttons[id] as Button
 		button.pivot_offset = button.size * 0.5
-		button.scale = Vector2.ONE * (SELECTED_SCALE if id == _selected else 1.0)
+		button.scale = _rest_scale(id)
 		var alpha := 1.0
 		if id == _current and _token != null:
 			alpha = UNDER_TOKEN_ALPHA
 		elif id != _current and not id in _available:
 			alpha = DONE_ALPHA if _done.has(id) else LOCKED_ALPHA
 		button.self_modulate.a = alpha
+
+
+func _rest_scale(stop_id: String) -> Vector2:
+	return Vector2.ONE * (SELECTED_SCALE if stop_id == _selected else 1.0)
 
 
 func _play_reveal() -> void:
@@ -194,12 +214,12 @@ func _play_reveal() -> void:
 		queue_redraw(), 0.0, 1.0, REVEAL_TIME)
 	for id: String in _buttons:
 		var button := _buttons[id] as Button
-		var rest := button.scale
-		button.scale = rest * 0.4
+		button.scale = _rest_scale(id) * POP_FROM
 		button.modulate.a = 0.0
 		var pop := create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 		var delay := POP_STAGGER * float(_map.get_node(id)["row"])
-		pop.tween_property(button, "scale", rest, POP_TIME).set_delay(delay)
+		# The size it grows to is read as it grows, so a pick made meanwhile holds.
+		pop.tween_method(func(at: float) -> void: button.scale = _rest_scale(id) * lerpf(POP_FROM, 1.0, at), 0.0, 1.0, POP_TIME).set_delay(delay)
 		pop.tween_property(button, "modulate:a", 1.0, POP_TIME).set_delay(delay)
 
 
