@@ -1628,6 +1628,11 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 	return true
 
 
+## The circuit a run stop races on, for the board to show before it is raced.
+func run_stop_circuit(stop_id: String) -> Dictionary:
+	return _run_circuit(stop_id) if _current_run_session != null else {}
+
+
 ## The circuit a run stop races on: drawn from the run seed, the act and the
 ## stop like a Quick Race draw, in the act's room. The same stop always gets the
 ## same circuit; different stops and acts get different ones.
