@@ -136,6 +136,12 @@ static func generate_car_roll(run_seed: int, tier: String, car_type: String, veh
 	var d_speed := (u_speed * 2.0 - 1.0) * env
 	var d_grip := (u_grip * 2.0 - 1.0) * env
 	var d_accel := (u_accel * 2.0 - 1.0) * env
+	return roll_from_pairs(d_speed, d_grip, d_accel)
+
+
+## A zero-sum roll from its three free deviations: each one is mirrored onto
+## its partner axis (speed<->tough, grip<->drift, accel<->boost).
+static func roll_from_pairs(d_speed: float, d_grip: float, d_accel: float) -> Dictionary:
 	var roll := {
 		"speed": d_speed,
 		"accel": d_accel,
