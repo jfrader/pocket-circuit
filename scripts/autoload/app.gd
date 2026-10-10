@@ -208,6 +208,11 @@ func _exit_tree() -> void:
 	if _prewarm_room_root != null and is_instance_valid(_prewarm_room_root):
 		_prewarm_room_root.free()
 	_prewarm_room_root = null
+	# A race scene load still running is waited for, like the prewarm workers.
+	if _race_scene_thread != null and _race_scene_thread.is_started():
+		_race_scene_thread.wait_to_finish()
+	_race_scene_thread = null
+	_race_scene = null
 	if _test_mode and _save_store:
 		_save_store.remove_save()
 
@@ -620,6 +625,10 @@ func generated_circuit_identity(theme: StringName, room: StringName, seed: int, 
 ## Off-tree room being built by the prewarm; freed on app teardown if a quit
 ## happens mid-build.
 var _prewarm_room_root: Node = null
+## The worker loading the race scene, while it runs; waited for on exit.
+var _race_scene_thread: Thread = null
+## The loaded race scene, kept so later races start from the cache.
+var _race_scene: PackedScene = null
 ## Circuits waiting to be prewarmed, one job at a time, and the keys queued or running.
 var _prewarm_queue: Array[Dictionary] = []
 var _prewarm_keys: Dictionary = {}
@@ -1059,7 +1068,7 @@ func _begin_race_transition(vehicle_id: String = "") -> void:
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
-	var packed := await _load_off_main_thread(RACE_SCENE) as PackedScene
+	var packed := await _load_race_scene()
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
@@ -1105,25 +1114,32 @@ func _opponent_audio_vehicle_ids() -> PackedStringArray:
 	return ids
 
 
-## Loads a resource and everything it depends on with the loader's worker
-## threads, painting loading frames while they compile: the race script alone
-## is a ~190 ms compile, too long for one frame. If the menu prewarm already
-## requested it, that request is joined (and released by our get). Returns null
-## when the player cancels or the load fails or outlasts RACE_LOAD_TIMEOUT_MSEC;
-## a cancelled request keeps running in the background for the next attempt.
-func _load_off_main_thread(path: String) -> Resource:
-	if ResourceLoader.has_cached(path):
-		return load(path)
-	if ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_INVALID_RESOURCE \
-			and ResourceLoader.load_threaded_request(path, "", true) != OK:
-		return load(path)
+## Loads the race scene and everything it depends on on a worker thread,
+## painting loading frames while it compiles: the race script alone is a
+## ~190 ms compile, too long for one frame. Returns null when the player
+## cancels, or the load fails or outlasts RACE_LOAD_TIMEOUT_MSEC; a load left
+## running finishes in the background and the next race joins it.
+func _load_race_scene() -> PackedScene:
+	if _race_scene != null:
+		return _race_scene
+	if _race_scene_thread == null:
+		_race_scene_thread = Thread.new()
+		if _race_scene_thread.start(_load_in_worker.bind(RACE_SCENE)) != OK:
+			_race_scene_thread = null
+			_race_scene = load(RACE_SCENE) as PackedScene
+			return _race_scene
 	var deadline := Time.get_ticks_msec() + RACE_LOAD_TIMEOUT_MSEC
-	while ResourceLoader.load_threaded_get_status(path) == ResourceLoader.THREAD_LOAD_IN_PROGRESS:
+	while _race_scene_thread.is_alive():
 		if _loading_cancelled or Time.get_ticks_msec() > deadline:
 			return null
 		await _yield_loading_frame()
-	# Loaded or failed, the get releases the request (null on failure).
-	return ResourceLoader.load_threaded_get(path)
+	_race_scene = _race_scene_thread.wait_to_finish() as PackedScene
+	_race_scene_thread = null
+	return _race_scene
+
+
+static func _load_in_worker(path: String) -> Resource:
+	return load(path)
 
 
 func complete_race_loading() -> bool:
