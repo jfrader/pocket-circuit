@@ -327,10 +327,11 @@ func car_records() -> Array[Dictionary]:
 
 ## A stored won car with every field checked, or {} when it cannot be trusted.
 static func normalize_won_car(value: Variant) -> Dictionary:
-	return _normalize_car(value, [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP])
+	return normalize_car(value, [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP])
 
 
-static func _normalize_car(value: Variant, origins: Array) -> Dictionary:
+## A stored car from one of `origins` with every field checked, or {}.
+static func normalize_car(value: Variant, origins: Array) -> Dictionary:
 	if value is not Dictionary:
 		return {}
 	var car := value as Dictionary
@@ -371,7 +372,7 @@ static func _normalize_owned(value: Variant) -> Dictionary:
 		var probe := (record as Dictionary).duplicate()
 		probe["id"] = String(vehicle_id)
 		probe["roll"] = NO_ROLL
-		var clean := _normalize_car(probe, [CAR_ORIGIN_START, CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP])
+		var clean := normalize_car(probe, [CAR_ORIGIN_START, CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP])
 		if not clean.is_empty():
 			clean.erase("id")
 			clean.erase("roll")

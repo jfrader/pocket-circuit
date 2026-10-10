@@ -27,6 +27,38 @@ Create Steam Auto-Cloud entries for both roots and include
 on each OS, a cross-device download, offline play, and conflict handling before
 enabling Cloud for customers.
 
+## Car items (Steam Inventory Service)
+
+Cars won in runs can drop as Steam items that players trade. Steam rolls each
+car: a run win asks the playtime generator for a drop, and Steam picks the car
+type and rolls its tags within the drop limits. The ids, weights and limits
+live in `scripts/steam/steam_cars.gd`.
+
+1. Install GodotSteam before any Steam build: `./tools/fetch_godotsteam.sh`.
+   Without it the game runs with Steam off and no items show.
+2. Generate the item definitions for the app:
+
+   ```bash
+   PC_STEAM_APP_ID='<STEAM_APP_ID>' PC_ITEMDEFS_PATH=/tmp/itemdefs.json \
+     godot --headless --path . --script res://tools/export_steam_itemdefs.gd
+   ```
+
+3. In Steamworks, Inventory Service: enable it, upload `/tmp/itemdefs.json`,
+   and add an icon per car type. Keep the items Private while testing; only
+   the publisher's partner group sees them.
+4. Test with two partner accounts on the Steam client: win cars in runs until a
+   drop lands, check the car in Quick Race, trade it to the other account, and
+   check that the other account's garage shows the same car. Repeat on Steam
+   Deck.
+5. Tune `DROP_INTERVAL_MINUTES`, `DROP_WINDOW_MINUTES` and
+   `DROP_MAX_PER_WINDOW` if drops feel too rare or too common, regenerate and
+   re-upload.
+6. Make the items public. They are tradable and not marketable; opening the
+   Community Market needs Valve and a new item definition upload.
+
+For local runs outside the Steam client, set `POCKET_CIRCUIT_STEAM_APP_ID` to
+the app id. Never ship `steam_appid.txt`.
+
 ## Build and depot upload
 
 1. Install the official Godot 4.7.2 Linux and Windows x86_64 release templates.
