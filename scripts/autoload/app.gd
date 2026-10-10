@@ -1,5 +1,8 @@
 extends Node
 
+## A race scene load that has not finished by then fails instead of leaving
+## the loading screen waiting forever.
+const RACE_LOAD_TIMEOUT_MSEC := 60000
 const BOOT_SCENE := "res://scenes/boot/boot.tscn"
 const RACE_SCENE := "res://scenes/race/prototype_race.tscn"
 const CATALOG := preload("res://data/championship/catalog.gd")
@@ -25,7 +28,6 @@ const RUN_SEED_MAX := 0x7FFFFFFF
 ## A run race finished this far down the field (or not at all) costs wear.
 const RUN_CRASH_FINISH_POSITION := 3
 const RUN_CRASH_SEVERITY := 0.6
-const LOADING_FRAME_BUDGET_USEC := 50_000
 
 signal joypad_connection_changed(connected: bool)
 
@@ -129,7 +131,6 @@ var _transitioning_to_race := false
 var _loading_screen: CanvasLayer
 var _loading_cancelled := false
 var _loading_failed := false
-var _last_loading_frame_yield := 0
 var loading_metrics: Dictionary = {}
 var _mastery_calibration_queue: Array[String] = []
 var _mastery_calibration_active := false
@@ -207,6 +208,11 @@ func _exit_tree() -> void:
 	if _prewarm_room_root != null and is_instance_valid(_prewarm_room_root):
 		_prewarm_room_root.free()
 	_prewarm_room_root = null
+	# A race scene load still running is waited for, like the prewarm workers.
+	if _race_scene_thread != null and _race_scene_thread.is_started():
+		_race_scene_thread.wait_to_finish()
+	_race_scene_thread = null
+	_race_scene = null
 	if _test_mode and _save_store:
 		_save_store.remove_save()
 
@@ -619,6 +625,10 @@ func generated_circuit_identity(theme: StringName, room: StringName, seed: int, 
 ## Off-tree room being built by the prewarm; freed on app teardown if a quit
 ## happens mid-build.
 var _prewarm_room_root: Node = null
+## The worker loading the race scene, while it runs; waited for on exit.
+var _race_scene_thread: Thread = null
+## The loaded race scene, kept so later races start from the cache.
+var _race_scene: PackedScene = null
 ## Circuits waiting to be prewarmed, one job at a time, and the keys queued or running.
 var _prewarm_queue: Array[Dictionary] = []
 var _prewarm_keys: Dictionary = {}
@@ -1030,20 +1040,7 @@ func loading_step(phase: String) -> void:
 	await _yield_loading_frame()
 
 
-func _throttled_loading_step(phase: String) -> void:
-	# Dense per-resource loops update the phase text every iteration but only
-	# yield a rendered frame once the time budget is spent. This keeps the
-	# loading screen responsive and cancellable without paying a full frame
-	# (plus GPU sync) for every dependency or generated image.
-	if is_instance_valid(_loading_screen):
-		_loading_screen.call("set_phase", phase)
-	if Time.get_ticks_usec() - _last_loading_frame_yield < LOADING_FRAME_BUDGET_USEC:
-		return
-	await _yield_loading_frame()
-
-
 func _yield_loading_frame() -> void:
-	_last_loading_frame_yield = Time.get_ticks_usec()
 	await get_tree().process_frame
 	if DisplayServer.get_name() != "headless":
 		await RenderingServer.frame_post_draw
@@ -1071,15 +1068,13 @@ func _begin_race_transition(vehicle_id: String = "") -> void:
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
-	var resources: Dictionary = {}
-	var loaded := await _load_scene_resources(RACE_SCENE, resources)
+	var packed := await _load_race_scene()
 	if _loading_cancelled:
 		_leave_race_loading()
 		return
-	if not loaded:
+	if packed == null:
 		fail_race_loading("Race resources could not be loaded")
 		return
-	var packed := resources.get(RACE_SCENE) as PackedScene
 	# Synthesize this car's engine voice and crash/boost one-shots behind the
 	# loading screen; the race scene would otherwise pay for them on its first
 	# live frame.
@@ -1119,35 +1114,50 @@ func _opponent_audio_vehicle_ids() -> PackedStringArray:
 	return ids
 
 
-func _load_scene_resources(path: String, resources: Dictionary) -> bool:
-	if _loading_cancelled:
-		return false
-	if resources.has(path):
-		return true
-	# Yield to the loading screen on a time budget (rather than once per
-	# dependency) so it stays responsive and can cancel without paying a
-	# rendered frame + GPU sync for every resource.
-	await _throttled_loading_step("Loading race resources")
-	if _loading_cancelled:
-		return false
-	resources[path] = null
-	var scripts: Array[String] = []
-	var assets: Array[String] = []
-	for dependency in ResourceLoader.get_dependencies(path):
-		var resource_path := String(dependency).split("::")[-1]
-		if resource_path.get_extension() == "gd":
-			scripts.append(resource_path)
-		else:
-			assets.append(resource_path)
-	assets.append_array(scripts)
-	for dependency: String in assets:
-		if not await _load_scene_resources(dependency, resources):
-			return false
-	# Scene scripts can preload textures. Keep their compilation and GPU resource
-	# creation on the main thread; the throttled yield above covers responsiveness
-	# while `change_scene_to_packed`'s own frame yield handles the final GPU sync.
-	resources[path] = load(path)
-	return resources[path] != null
+## Loads the race scene and everything it depends on on a worker thread,
+## painting loading frames while it compiles: the race script alone is a
+## ~190 ms compile, too long for one frame. Returns null when the player
+## cancels, or the load fails or outlasts RACE_LOAD_TIMEOUT_MSEC; a load left
+## running finishes in the background and the next race joins it.
+func _load_race_scene() -> PackedScene:
+	_start_race_scene_load()
+	var deadline := Time.get_ticks_msec() + RACE_LOAD_TIMEOUT_MSEC
+	while _race_scene_thread != null and _race_scene_thread.is_alive():
+		if _loading_cancelled or Time.get_ticks_msec() > deadline:
+			return null
+		await _yield_loading_frame()
+	_collect_race_scene_load()
+	return _race_scene
+
+
+## Loads the race scene on the same worker during menu idle, so the first race
+## starts from it. A race started meanwhile joins this load.
+func warm_race_scene() -> void:
+	_start_race_scene_load()
+	while _race_scene_thread != null and _race_scene_thread.is_alive():
+		await get_tree().process_frame
+	_collect_race_scene_load()
+
+
+func _start_race_scene_load() -> void:
+	if _race_scene != null or _race_scene_thread != null:
+		return
+	_race_scene_thread = Thread.new()
+	if _race_scene_thread.start(_load_in_worker.bind(RACE_SCENE)) != OK:
+		_race_scene_thread = null
+		_race_scene = load(RACE_SCENE) as PackedScene
+
+
+## Takes a finished load's scene; a failed load leaves none, so the next race
+## starts a new one.
+func _collect_race_scene_load() -> void:
+	if _race_scene_thread != null and not _race_scene_thread.is_alive():
+		_race_scene = _race_scene_thread.wait_to_finish() as PackedScene
+		_race_scene_thread = null
+
+
+static func _load_in_worker(path: String) -> Resource:
+	return load(path)
 
 
 func complete_race_loading() -> bool:

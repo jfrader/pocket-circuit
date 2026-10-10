@@ -1,8 +1,8 @@
 extends SceneTree
 
 ## Guards the menu-time race asset preloader (GURI-1627): a full pass must
-## finish and retain the race scene's resource set, so the race loading walk
-## sees cache hits instead of paying the loads.
+## finish with the race scene loaded and held by the App, so the first race
+## starts from it instead of paying the load.
 
 const BOOT_SCENE := "res://scenes/boot/boot.tscn"
 
@@ -26,10 +26,9 @@ func _run() -> void:
 		await process_frame
 	if not _expect(bool(preloader.call("is_finished")), "the menu preloader must finish"):
 		return
-	var metrics: Dictionary = preloader.call("debug_metrics")
-	if not _expect(int(metrics.get("prewarmed_resources", 0)) > 0, "the preloader must retain the race resource set"):
+	if not _expect(app.get("_race_scene") is PackedScene and app.get("_race_scene_thread") == null, "the menu warm must leave the App holding the race scene"):
 		return
-	print("RACE_ASSET_PRELOADER_TEST PASS resources=", int(metrics.get("prewarmed_resources", 0)))
+	print("RACE_ASSET_PRELOADER_TEST PASS")
 	quit(0)
 
 
