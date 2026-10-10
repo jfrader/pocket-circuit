@@ -143,7 +143,8 @@ func current_node() -> Dictionary:
 func enter_node(node_id: String) -> bool:
 	if failed or completed or current_map == null or current_node_id.is_empty():
 		return false
-	if is_race_pending():
+	# A race-type stop is raced, and a won car is answered, before moving on.
+	if is_race_pending() or not pending_offer.is_empty():
 		return false
 	var kids: Array[Dictionary] = current_map.get_children(current_node_id)
 	var is_valid: bool = false
@@ -357,6 +358,29 @@ static func _normalize_owned(value: Variant) -> Dictionary:
 	return owned
 
 
+## The won cars a stored run holds, even when the run itself can no longer be
+## restored (another schema, a broken map): each one is checked like a garage
+## car, so a night that cannot be resumed still hands over what it won.
+static func salvage_won_cars(data: Dictionary) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	var owned: Variant = data.get("owned_cars")
+	var state: Variant = data.get("run_state")
+	var rolls: Variant = (state as Dictionary).get("car_rolls", {}) if state is Dictionary else {}
+	if owned is not Dictionary or rolls is not Dictionary:
+		return out
+	for vehicle_id: Variant in owned as Dictionary:
+		var record: Variant = (owned as Dictionary)[vehicle_id]
+		if record is not Dictionary:
+			continue
+		var probe := (record as Dictionary).duplicate()
+		probe["id"] = String(vehicle_id)
+		probe["roll"] = (rolls as Dictionary).get(vehicle_id)
+		var car := normalize_won_car(probe)
+		if not car.is_empty():
+			out.append(car)
+	return out
+
+
 ## Every car won this run, in the order they were won.
 func won_cars() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
@@ -518,7 +542,9 @@ static func deserialize(data: Dictionary) -> RunSession:
 		var in_flight: Variant = data.get("race_in_flight", {})
 		sess.race_in_flight = (in_flight as Dictionary).duplicate(true) if in_flight is Dictionary else {}
 		var offer := String(data.get("pending_offer", ""))
-		sess.pending_offer = offer if sess.owned_cars.has(offer) else ""
+		var offered_from := String((sess.owned_cars.get(offer, {}) as Dictionary).get("won_from", ""))
+		var offerable := offered_from in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] and offer != sess.current_car_id
+		sess.pending_offer = offer if offerable else ""
 	else:
 		return null
 	return sess

@@ -25,8 +25,9 @@ static func settle(app: Object, session: RunSession, position: int = WIN) -> voi
 			app.call("run_resolve_errand", 0)
 
 
-## Moves along the run, racing every race-type stop it passes (and winning),
-## until it stands on an unsettled stop of the wanted type. Prefers a wanted
+## Moves along the run, racing every race-type stop it passes (and winning,
+## keeping its car when a won one is offered), until it stands on an unsettled
+## stop of the wanted type. Prefers a wanted
 ## child when one is offered. Returns false if the run ends or the steps run
 ## out first.
 static func walk_to(app: Object, session: RunSession, wanted: String, max_steps: int = 80) -> bool:
@@ -38,6 +39,8 @@ static func walk_to(app: Object, session: RunSession, wanted: String, max_steps:
 		if session.is_race_pending():
 			settle(app, session)
 			continue
+		if not session.pending_offer.is_empty():
+			app.call("run_decline_offer")
 		var options: Array[Dictionary] = session.available_nodes()
 		if options.is_empty():
 			return false

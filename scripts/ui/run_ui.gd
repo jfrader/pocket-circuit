@@ -9,6 +9,7 @@ const DIM := Color("5a6577")
 const AMBER := Color("f2a53c")
 const BOSS_EDGE := Color("674b29")
 const LIVE_EDGE := Color("657587")
+const CATALOG := preload("res://data/championship/catalog.gd")
 const ROOMS := {1: "Kitchen Counter", 2: "Workshop Bench", 3: "Office Desk"}
 const TYPES := {
 	"race": {"name": "Race", "cost": "wear", "copy": "Four cars, a rolled circuit. The filler, and the place you test a build.", "icon": preload("res://assets/ui/run_map/node_race.svg")},
@@ -101,7 +102,7 @@ static func stats(host: VBoxContainer, session: RunSession) -> void:
 
 ## A car's display name (generated cars have their own), never its id.
 static func car_name(vehicle_id: String) -> String:
-	return String(preload("res://data/championship/catalog.gd").get_vehicle(vehicle_id).get("name", vehicle_id))
+	return String(CATALOG.get_vehicle(vehicle_id).get("name", vehicle_id))
 
 
 static func action(text: String, primary: bool = false, disabled: bool = false) -> Button:

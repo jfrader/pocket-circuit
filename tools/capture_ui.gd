@@ -32,11 +32,17 @@ func _run() -> void:
 	elif shot == "discovery":
 		shell.call("show_discovery")
 	elif shot == "offer":
+		var offered := false
 		for attempt in 12:
 			var night: RunSession = app.call("start_run", 1827000 + attempt * 31) as RunSession
 			if RUN_WALK.walk_to(app, night, "rival"):
 				RUN_WALK.settle(app, night)
+				offered = not night.pending_offer.is_empty()
 				break
+		if not offered:
+			push_error("no duel win to offer")
+			quit(1)
+			return
 		shell.call("show_run_board")
 	elif shot == "garage":
 		shell.call("show_vehicle_select", "", true)

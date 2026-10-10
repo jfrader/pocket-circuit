@@ -179,7 +179,11 @@ func _ready() -> void:
 	if stored_run is Dictionary and not (stored_run as Dictionary).is_empty():
 		_current_run_session = RUN_SESSION.deserialize(stored_run as Dictionary)
 		if _current_run_session == null:
+			# The run cannot be resumed; the cars it won still go to the garage.
+			_save_data["garage_cars"] = _garage_with(RUN_SESSION.salvage_won_cars(stored_run as Dictionary))
 			_save_data["current_run"] = {}
+			if not is_save_read_only():
+				_save_candidate(_save_data.duplicate(true))
 	_install_held_vehicles()
 	_settle_race_in_flight()
 	reduced_camera_shake = bool(_save_data["reduced_camera_shake"])
@@ -1682,11 +1686,12 @@ func run_bench_fit(part: String, node_id: String = "") -> bool:
 	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_fit(_current_run_session.current_car_id, part))
 
 
-## Drives the car just won, or keeps the current one; either way the offer closes.
+## Drives the car just won from now on; the offer closes.
 func run_take_offer() -> bool:
 	return _resolve_offer(func() -> bool: return _current_run_session.take_offer())
 
 
+## Keeps the current car; the won one stays won and the offer closes.
 func run_decline_offer() -> bool:
 	return _resolve_offer(func() -> bool: return _current_run_session.decline_offer())
 

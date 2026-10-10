@@ -64,6 +64,7 @@ func _check_full_run() -> void:
 		if not acts_seen.has(sess.current_map.act):
 			acts_seen.append(sess.current_map.act)
 		_resolve_current(sess, true)
+		sess.decline_offer()
 		if sess.is_complete() or sess.is_failed():
 			break
 		var avail: Array[Dictionary] = sess.available_nodes()
@@ -154,7 +155,19 @@ func _check_rival_loss() -> void:
 	var won_id := String(win_out["car"]["id"])
 	if not _expect(win.pending_offer == won_id and win.current_car_id == starter_id, "a won car is offered, not forced"):
 		return
+	var next_stop := String(win.current_map.get_children(win.current_node_id)[0]["id"])
+	if not _expect(not win.enter_node(next_stop), "the run does not move on while a won car waits for an answer"):
+		return
 	var offered_snap: Dictionary = RUN_SESSION.serialize(win)
+	var stale := offered_snap.duplicate(true)
+	stale["schema_version"] = RUN_SESSION.SCHEMA_VERSION - 1
+	var salvaged: Array[Dictionary] = RUN_SESSION.salvage_won_cars(stale)
+	if not _expect(RUN_SESSION.deserialize(stale) == null and salvaged.size() == win.won_cars().size() and salvaged[salvaged.size() - 1]["id"] == won_id, "a run that cannot be restored still hands over every car it won"):
+		return
+	var self_offer := offered_snap.duplicate(true)
+	self_offer["pending_offer"] = win.current_car_id
+	if not _expect(RUN_SESSION.deserialize(self_offer).pending_offer.is_empty(), "a stored offer of the car already driven is dropped"):
+		return
 	if not _expect(RUN_SESSION.deserialize(offered_snap).pending_offer == won_id, "an open offer survives a save"):
 		return
 	win.run_state.set_car_wear(starter_id, "rusty")
@@ -257,6 +270,7 @@ func _walk_to(sess, wanted: String) -> bool:
 		if String(sess.current_node().get("type", "")) == wanted:
 			return true
 		_resolve_current(sess, true)
+		sess.decline_offer()
 		var next := _first_of_type(sess, wanted)
 		if next.is_empty():
 			return false
