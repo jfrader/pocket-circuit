@@ -66,8 +66,9 @@ func _run() -> void:
 	elif WALK.has(shot):
 		var target := String(WALK[shot])
 		var found := false
+		var sess: RunSession = null
 		for attempt in 6:
-			var sess: RunSession = app.call("start_run", 900100 + attempt) as RunSession
+			sess = app.call("start_run", 900100 + attempt) as RunSession
 			found = RUN_WALK.walk_to(app, sess, target)
 			if found:
 				break
@@ -75,6 +76,10 @@ func _run() -> void:
 			push_error("no " + target + " found")
 			quit(1)
 			return
+		# Full screens: points to spend at the van, a pile of parts at the bench.
+		sess.run_points = 20
+		if shot == "bench":
+			sess.parts_held = RunParts.deal(sess.run_seed)
 		shell.call("show_run_" + ("parts_van" if shot == "van" else shot))
 	for i in 8:
 		await process_frame

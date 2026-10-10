@@ -112,10 +112,12 @@ func _run_test() -> void:
 	if not _expect(String(saved_run.get("current_node_id", "")) == target_id, "the save must persist the entered node"):
 		return
 
-	# Node screens must retain their action and description without clipping the legend.
+	# Node screens must retain their action and description without clipping the
+	# legend; the bench with a full pile of parts is its tallest. The van is
+	# checked on a real van in run_parts_test.
+	sess.parts_held = RunParts.deal(7)
 	var screens := [
-		["show_run_bench", "BenchRepair", String(RUN_UI.TYPES["bench"]["copy"])],
-		["show_run_parts_van", "VanBuy_spare_shell", String(RUN_UI.TYPES["parts_van"]["copy"])],
+		["show_run_bench", "BenchFit_%d" % (RunParts.VAN_STOCK - 1), String(RUN_UI.TYPES["bench"]["copy"])],
 		["show_run_lockup", "LockupOpen", String(RUN_UI.TYPES["lockup"]["copy"])],
 		["show_run_errand", "ErrandPay", String(RUN_UI.TYPES["errand"]["copy"])],
 	]

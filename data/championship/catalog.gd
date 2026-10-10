@@ -466,9 +466,10 @@ static func base_vehicle_for_type(car_type: String) -> Dictionary:
 	return {}
 
 
-## Describes a won car ({id, seed, type, roll, won_from, act}) in the catalog's
-## vehicle shape: its name, look and handling line come from the procedural
-## generator, its physics from its type's base car moved by its roll.
+## Describes a won car ({id, seed, type, roll, won_from, act, parts?}) in the
+## catalog's vehicle shape: its name, look and handling line come from the
+## procedural generator, its physics from its type's base car moved by its roll
+## and then by the run parts fitted to it.
 static func generated_vehicle(car: Dictionary) -> Dictionary:
 	var car_type := String(car.get("type", ""))
 	var base := base_vehicle_for_type(car_type)
@@ -488,6 +489,7 @@ static func generated_vehicle(car: Dictionary) -> Dictionary:
 		"stats_path": String(base["stats_path"]),
 		"base_vehicle": String(base["id"]),
 		"roll": (car.get("roll", {}) as Dictionary).duplicate(true),
+		"parts": RunParts.normalize_list(car.get("parts", [])),
 		"won_from": String(car.get("won_from", "")),
 		"act": int(car.get("act", 0)),
 	}
@@ -646,6 +648,8 @@ static func create_vehicle_stats(vehicle_id: String) -> VehicleStats:
 	var resource := source.duplicate(true) as VehicleStats
 	if vehicle.has("roll"):
 		resource = CarProfile.apply_roll(resource, vehicle["roll"])
+	if vehicle.has("parts"):
+		resource = RunParts.apply(resource, vehicle["parts"])
 	for validation_error: String in resource.get_validation_errors():
 		push_error("Vehicle '%s' has invalid physics data: %s" % [String(vehicle["id"]), validation_error])
 	return resource
