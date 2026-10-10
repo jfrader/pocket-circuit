@@ -34,7 +34,7 @@ func _run_test() -> void:
 		return
 	if not _expect(bench_run.run_state.get_car_wear(car) == "clean", "repair must restore the car"):
 		return
-	bench_run.parts_held.append(RunParts.deal(3)[0])
+	bench_run.parts_held.append(RunParts.deal(3, bench_run.car_stats(car))[0])
 	if not _expect(not bool(app.call("run_bench_fit", 0)) and bench_run.parts_held.size() == 1, "fitting after repairing in the same visit must be refused"):
 		return
 

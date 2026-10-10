@@ -102,7 +102,9 @@ static func stats(host: VBoxContainer, session: RunSession) -> void:
 	parent.add_child(label("%s · %s" % [car_name(session.current_car_id), wear], 18))
 	var fitted := session.fitted_parts(session.current_car_id).map(func(part: Dictionary) -> String: return RunParts.part_name(part))
 	if not fitted.is_empty():
-		parent.add_child(label("FITTED · %s" % ", ".join(PackedStringArray(fitted)).to_upper(), 11, MUTED, true))
+		var fitted_line := label("FITTED · %s" % ", ".join(PackedStringArray(fitted)).to_upper(), 11, MUTED, true)
+		fitted_line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		parent.add_child(fitted_line)
 	spacer(parent, 6)
 	divider(parent)
 

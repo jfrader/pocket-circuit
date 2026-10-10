@@ -8,6 +8,7 @@ const RACE_NODE_TYPES: Array[String] = ["race", "rival", "act_rival"]
 
 const RUN_MAP := preload("res://scripts/progression/run_map.gd")
 const RUN_STATE := preload("res://scripts/progression/run_state.gd")
+const CATALOG := preload("res://data/championship/catalog.gd")
 
 const INITIAL_POINTS := 0
 const RIVAL_LOSS_POINTS_COST := 10
@@ -133,11 +134,16 @@ func circuit_reversed(stop_id: String) -> bool:
 	mix.seed = _stop_roll("reverse", stop_id)
 	return mix.randi() % 2 == 1
 
-## The parts the current stop's van stocks; empty anywhere else.
+## The parts the current stop's van stocks for the car being driven; empty
+## anywhere else.
 func van_stock() -> Array[Dictionary]:
 	if not _is_current_node_type("parts_van"):
 		return []
-	return RunParts.deal(_stop_roll("van", current_node_id))
+	return RunParts.deal(_stop_roll("van", current_node_id), car_stats(current_car_id))
+
+## A car of the night's physics as the race builds it: its roll, then its parts.
+func car_stats(vehicle_id: String) -> VehicleStats:
+	return CATALOG.build_vehicle_stats(CATALOG.generated_vehicle(car_record(vehicle_id)))
 
 func _stop_roll(stream: String, stop_id: String) -> int:
 	return ("pocket-circuit|run-circuit|%s|%d|act%d|%s" % [stream, run_seed, current_map.act, stop_id]).hash() & 0x7FFFFFFF
@@ -289,7 +295,7 @@ func decline_offer() -> bool:
 	return true
 
 
-## Any car of the night as a record {id, seed, type, roll, won_from, act, parts}.
+## Any car of the night as a record {id, seed, type, roll, won_from, act, fitted_parts}.
 func car_record(vehicle_id: String) -> Dictionary:
 	var record: Dictionary = owned_cars.get(vehicle_id, {})
 	if record.is_empty():
@@ -297,7 +303,7 @@ func car_record(vehicle_id: String) -> Dictionary:
 	var out := record.duplicate(true)
 	out["id"] = vehicle_id
 	out["roll"] = run_state.get_or_create_car_roll(vehicle_id, String(record["type"]))
-	out["parts"] = fitted_parts(vehicle_id)
+	out["fitted_parts"] = fitted_parts(vehicle_id)
 	return out
 
 
@@ -307,7 +313,7 @@ func won_car(vehicle_id: String) -> Dictionary:
 	if String((owned_cars.get(vehicle_id, {}) as Dictionary).get("won_from", "")) == CAR_ORIGIN_START:
 		return {}
 	var car := car_record(vehicle_id)
-	car.erase("parts")
+	car.erase("fitted_parts")
 	return car
 
 

@@ -10,12 +10,14 @@ extends RefCounted
 ##
 ## Both sides move VehicleStats fields by a fraction of the room left toward
 ## the edge of the field's range (CarProfile.move_field, the rule a car's roll
-## uses), so stacked parts stay inside every range.
+## uses), so stacked parts stay inside every range. A stat near its edge has
+## little room left, so a van only stocks parts whose upside moves the car it
+## is selling to by at least MIN_UPSIDE_GAIN of the range.
 
 const UPSIDES := {
 	"power_scoop": {"name": "Power Scoop", "cost": 10, "copy": "Drifts fill the boost faster", "moves": {"boost_recharge": 0.6, "drift_boost_max_reward": 0.4}},
 	"slick_tyres": {"name": "Slick Tyres", "cost": 10, "copy": "More grip in the corners", "moves": {"front_grip": 0.45, "rear_grip": 0.45}},
-	"short_gears": {"name": "Short Gears", "cost": 5, "copy": "Quicker off the line", "moves": {"launch_torque_multiplier": 0.7, "engine_force": 0.3}},
+	"short_gears": {"name": "Short Gears", "cost": 5, "copy": "Quicker off the line", "moves": {"launch_torque_multiplier": 0.7, "engine_force": 0.15}},
 	"long_gears": {"name": "Long Gears", "cost": 10, "copy": "Higher top speed", "moves": {"max_speed": 0.5}},
 	"quick_rack": {"name": "Quick Rack", "cost": 5, "copy": "Sharper turn-in", "moves": {"steering_response": 0.6, "max_steer_angle_deg": 0.3}},
 	"drift_diff": {"name": "Drift Diff", "cost": 10, "copy": "Drifts start easier and swing wider", "moves": {"drift_entry_steer": -0.5, "drift_min_speed": -0.5, "drift_yaw_assist": 0.4}},
@@ -42,20 +44,33 @@ const DOWNSIDES := {
 
 ## How many parts one van stocks.
 const VAN_STOCK := 3
+## The least an upside must move the car, as a share of its stats' ranges.
+const MIN_UPSIDE_GAIN := 0.05
 
 
-## The parts a van stocks, from that stop's roll: distinct parts, each with a
-## downside dealt from the ones it allows.
-static func deal(stop_roll: int) -> Array[Dictionary]:
+## The parts a van stocks for a car, from that stop's roll: distinct parts that
+## would change that car, each with a downside dealt from the ones it allows.
+static func deal(stop_roll: int, car: VehicleStats) -> Array[Dictionary]:
 	var rng := RandomNumberGenerator.new()
 	rng.seed = stop_roll
-	var pool: Array = UPSIDES.keys()
+	var pool: Array = UPSIDES.keys().filter(func(part_id: String) -> bool: return upside_gain(car, part_id) >= MIN_UPSIDE_GAIN)
 	var stock: Array[Dictionary] = []
 	while stock.size() < VAN_STOCK and not pool.is_empty():
 		var part_id := String(pool.pop_at(rng.randi_range(0, pool.size() - 1)))
 		var allowed := downsides_for(part_id)
 		stock.append({"part": part_id, "downside": allowed[rng.randi_range(0, allowed.size() - 1)]})
 	return stock
+
+
+## How far a part's upside moves a car: the mean share of each stat's range.
+static func upside_gain(car: VehicleStats, part_id: String) -> float:
+	var moves: Dictionary = UPSIDES[part_id]["moves"]
+	var moved := RunParts.apply(car, [{"part": part_id, "downside": downsides_for(part_id)[0]}])
+	var total := 0.0
+	for field: String in moves:
+		var limits: Array = VehicleStats.PARAMETER_RANGES[field]
+		total += absf(float(moved.get(field)) - float(car.get(field))) / (float(limits[1]) - float(limits[0]))
+	return total / moves.size()
 
 
 ## The downsides a part can carry: every one that moves none of its upside's stats.
