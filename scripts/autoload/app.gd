@@ -1120,22 +1120,40 @@ func _opponent_audio_vehicle_ids() -> PackedStringArray:
 ## cancels, or the load fails or outlasts RACE_LOAD_TIMEOUT_MSEC; a load left
 ## running finishes in the background and the next race joins it.
 func _load_race_scene() -> PackedScene:
-	if _race_scene != null:
-		return _race_scene
-	if _race_scene_thread == null:
-		_race_scene_thread = Thread.new()
-		if _race_scene_thread.start(_load_in_worker.bind(RACE_SCENE)) != OK:
-			_race_scene_thread = null
-			_race_scene = load(RACE_SCENE) as PackedScene
-			return _race_scene
+	_start_race_scene_load()
 	var deadline := Time.get_ticks_msec() + RACE_LOAD_TIMEOUT_MSEC
-	while _race_scene_thread.is_alive():
+	while _race_scene_thread != null and _race_scene_thread.is_alive():
 		if _loading_cancelled or Time.get_ticks_msec() > deadline:
 			return null
 		await _yield_loading_frame()
-	_race_scene = _race_scene_thread.wait_to_finish() as PackedScene
-	_race_scene_thread = null
+	_collect_race_scene_load()
 	return _race_scene
+
+
+## Loads the race scene on the same worker during menu idle, so the first race
+## starts from it. A race started meanwhile joins this load.
+func warm_race_scene() -> void:
+	_start_race_scene_load()
+	while _race_scene_thread != null and _race_scene_thread.is_alive():
+		await get_tree().process_frame
+	_collect_race_scene_load()
+
+
+func _start_race_scene_load() -> void:
+	if _race_scene != null or _race_scene_thread != null:
+		return
+	_race_scene_thread = Thread.new()
+	if _race_scene_thread.start(_load_in_worker.bind(RACE_SCENE)) != OK:
+		_race_scene_thread = null
+		_race_scene = load(RACE_SCENE) as PackedScene
+
+
+## Takes a finished load's scene; a failed load leaves none, so the next race
+## starts a new one.
+func _collect_race_scene_load() -> void:
+	if _race_scene_thread != null and not _race_scene_thread.is_alive():
+		_race_scene = _race_scene_thread.wait_to_finish() as PackedScene
+		_race_scene_thread = null
 
 
 static func _load_in_worker(path: String) -> Resource:
