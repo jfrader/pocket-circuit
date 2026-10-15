@@ -306,11 +306,22 @@ class GateDispatchTests(unittest.TestCase):
 
     def launch(self, root, fake_godot, parallelism, tests, serial=(), env=None):
         # Output goes to files, not pipes: a leaked process holding a pipe open
-        # would otherwise hide when the gate itself returned. The caller traps
-        # signals like build_release.sh so it waits for the gate's own cleanup.
+        # would otherwise hide when the gate itself returned. Exercise the same
+        # caller-owned cancellation stage as build_release.sh, under its flags.
+        # Sentinel traps verify the stage restores handlers it temporarily owns;
+        # after-gate stands for the exports that only success may reach.
+        caller = '''source "$1"; shift
+trap 'exit 99' HUP INT TERM
+caller_traps="$(trap -p HUP INT TERM)"
+gate_status=0
+run_release_gate "$@" || gate_status=$?
+[[ "$(trap -p HUP INT TERM)" == "$caller_traps" ]] || exit 98
+(( gate_status == 0 )) || exit "$gate_status"
+: > "$1/after-gate"
+'''
         with open(root / "gate.out", "w") as out, open(root / "gate.err", "w") as err:
             return subprocess.Popen(
-                ["bash", "-c", 'source "$1"; shift; trap "exit 129" HUP; trap "exit 130" INT; trap "exit 143" TERM; run_gate_tests "$@"',
+                ["bash", "-Eeuo", "pipefail", "-c", caller,
                  "gate-test", str(ROOT / "tools/godot_gate.sh"),
                  str(root), str(fake_godot), parallelism, *serial, "--", *(f"tests/{name}.gd" for name in tests)],
                 env={**os.environ, "TMPDIR": str(root / "tmp"), **(env or {})},
@@ -343,6 +354,18 @@ class GateDispatchTests(unittest.TestCase):
             result, launches = self.dispatch(root, godot, "2", names, serial=("tests/delta.gd",))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(launches, sorted(f"tests/{name}.gd" for name in names))
+            self.assertTrue((root / "after-gate").exists())
+            self.assert_owned_state_released(root)
+
+    def test_direct_gate_call_keeps_its_scratch_cleanup(self):
+        with self.fixture({"alpha": "pass"}) as (root, godot):
+            result = subprocess.run(
+                ["bash", "-Eeuo", "pipefail", "-c", 'source "$1"; shift; run_gate_tests "$@"',
+                 "gate-test", str(ROOT / "tools/godot_gate.sh"), str(root), str(godot), "1", "--", "tests/alpha.gd"],
+                env={**os.environ, "TMPDIR": str(root / "tmp")},
+                capture_output=True, text=True, timeout=15,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
             self.assert_owned_state_released(root)
 
     def test_every_failed_test_is_reported_before_refusing(self):
@@ -436,8 +459,29 @@ class GateDispatchTests(unittest.TestCase):
                 os.killpg(gate.pid, signal.SIGTERM)
                 result, _ = self.finish(root, gate)
                 self.assertTrue(started, "lingering tests never started")
-                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(result.returncode, 143, result.stderr)
+                self.assertFalse((root / "after-gate").exists())
                 self.assert_owned_state_released(root)
+
+    def test_pid_terminated_caller_waits_for_tests_and_scratch(self):
+        for serial in ((), ("tests/alpha.gd",)):
+            with self.subTest(serial=serial), self.fixture({"alpha": "linger"}) as (root, godot):
+                gate = self.launch(root, godot, "1", ["alpha"], serial=serial)
+                try:
+                    self.assertTrue(wait_for(lambda: (root / "ready/alpha").exists()))
+                    os.kill(gate.pid, signal.SIGTERM)
+                    try:
+                        gate.wait(timeout=5)
+                    except subprocess.TimeoutExpired:
+                        self.fail("PID-only TERM did not stop the caller and its gate")
+                    result, _ = self.finish(root, gate)
+                    self.assertEqual(result.returncode, 143, result.stderr)
+                    self.assertFalse((root / "after-gate").exists())
+                    self.assert_owned_state_released(root)
+                finally:
+                    if gate.poll() is None:
+                        os.killpg(gate.pid, signal.SIGTERM)
+                        gate.wait(timeout=10)
 
     def test_killed_gate_still_stops_its_tests(self):
         # SIGKILL leaves the gate no chance to clean up, so its test processes
