@@ -225,6 +225,18 @@ func _run_test() -> void:
 		await process_frame
 	if not _expect(String(quit_run.race_in_flight.get("node", "")) == opening, "the race scene's countdown marks the run race as running"):
 		return
+	race.set("_results_finalized", true)
+	race.set("_save_error", "Injected display failure")
+	var continue_action := race.get("_continue_button") as Button
+	continue_action.disabled = true
+	race.call("_update_results", [])
+	var result_copy := (race.get("_results_label") as Label).text.to_upper()
+	if not _expect(result_copy.contains("RETRY SAVE") and not result_copy.contains("CONTINUE"), "unsaved results must not offer a disabled continue action"):
+		return
+	continue_action.disabled = false
+	race.call("_update_results", [])
+	if not _expect((race.get("_results_label") as Label).text.to_upper().contains("CONTINUE"), "unsaved results may name continue when it is enabled"):
+		return
 	race.queue_free()
 	await process_frame
 	quit_run.race_in_flight = {}

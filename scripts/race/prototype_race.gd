@@ -992,7 +992,8 @@ func _update_results(results: Array) -> void:
 			lines.append("PERSONAL BEST GHOST SAVED")
 		final_prompt = "NO TIME SAVED · CONTINUE OR RETRY" if bool(summary.get("mastery_dnf", false)) else "TIME TRIAL SAVED · CONTINUE OR RETRY"
 	if not _save_error.is_empty():
-		final_prompt = "Couldn't save this time trial. Championship is unchanged — continue anytime." if String(_session.get("mode", "")) == "mastery" else "Couldn't save. Retry save, or continue without it."
+		var actions := "RETRY SAVE" if _continue_button.disabled else "RETRY SAVE OR CONTINUE"
+		final_prompt = "NOT SAVED · " + actions
 	lines.append("FINALIZING..." if not _results_finalized else final_prompt)
 	_results_label.text = "\n".join(lines)
 
