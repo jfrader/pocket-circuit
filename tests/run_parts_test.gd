@@ -97,9 +97,16 @@ func _check_session() -> void:
 	var starter: String = sess.current_car_id
 	var part: Dictionary = RunParts.deal(9, sess.car_stats(starter))[0]
 	sess.parts_held.append(part)
-	sess.current_node_id = "test_bench"
-	sess.current_map.nodes["test_bench"] = {"id": "test_bench", "type": "bench"}
-	sess.last_bench_visited = "test_bench"
+	var bench: Dictionary = {}
+	for node: Dictionary in sess.current_map.nodes.values():
+		if String(node.get("type", "")) == "bench":
+			bench = node
+			break
+	if not _expect(not bench.is_empty(), "a generated run provides a valid bench fixture"):
+		return
+	sess.current_node_id = String(bench["id"])
+	sess.run_state.row = int(bench["row"])
+	sess.last_bench_visited = sess.current_node_id
 	if not _expect(not sess.bench_fit(starter, 1) and sess.bench_fit(starter, 0), "a bench fits a held part by its place in the pile"):
 		return
 	if not _expect(sess.parts_held.is_empty() and sess.fitted_parts(starter) == [part] and sess.car_record(starter)["fitted_parts"] == [part], "the fitted part leaves the pile and rides on the car"):
