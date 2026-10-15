@@ -14,6 +14,36 @@ run. Test the packaged release build, not only the editor project.
   unsupported future save versions remain untouched.
 - [ ] Completing the championship leaves all completed events replayable.
 
+## Runs and the garage
+
+- [ ] A fresh profile can start a run; YOUR RUN resumes its seed, act, stop,
+  points, car, wear, held/fitted parts, and pending offer after a process restart.
+- [ ] Select and confirm stops with mouse, keyboard, and controller. Opening
+  races are playable; completed races cannot resolve twice or be retried.
+- [ ] Loading cancellation leaves the race available. Quit or process exit after
+  countdown settles one last-place DNF on resume, with its stated consequences.
+- [ ] Each act reaches its mandatory rival; victory advances the act or ends the
+  night. Boss loss and worn-out cars end the night with the correct outcome
+  visible after saving, not NO ACTIVE RUN.
+- [ ] Rival and lockup wins show DRIVE IT / KEEP. Both choices preserve the won
+  car; DRIVE IT changes the next race's car. The garage receives winnings once
+  when a run ends or is replaced, without adding fitted run parts.
+- [ ] Van purchase spends the stated points once and grants its named part.
+  Bench fitting consumes a held part and applies its upside and downside to the
+  next race. Repair and fitting remain mutually exclusive per visit.
+- [ ] Race wear, rival loss, full bench repair, and errand tune-up match their
+  displayed costs and effects. Each errand resolves only once.
+- [ ] Failed countdown/result/terminal writes show an unsaved state. Retry saves
+  the existing outcome without duplicating points, wear, cars, or purchases.
+  Repeat with a process restart after the failed write.
+- [ ] Malformed current-run nodes, acts, edges, and nested values recover safely
+  before displaying the board; valid unrelated progress and garage data survive.
+- [ ] BACK/restart keeps each unused bench, van, lockup, or errand reopenable
+  until choosing a child route. Used actions cannot repeat; after moving on,
+  the previous stop cannot reopen.
+- [ ] Different stops have their intended circuit identities and act rooms;
+  restarting the same stop preserves its circuit and direction.
+
 ## All nine events
 
 - [ ] Crumb Rush (`kitchen_crumb_rush`)
