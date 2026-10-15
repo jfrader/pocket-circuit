@@ -5,6 +5,7 @@ const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
 const RUN_BOARD_SCENE := preload("res://scripts/ui/run_board_scene.gd")
 const RUN_BENCH_SCENE := preload("res://scripts/ui/run_bench_scene.gd")
+const RUN_VAN_SCENE := preload("res://scripts/ui/run_van_scene.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
@@ -734,13 +735,60 @@ func show_run_parts_van() -> void:
 		show_run_board()
 		return
 	var bought := sess.resolved_nodes.has(sess.current_node_id)
+	_run_surface()
+	var scene := RUN_VAN_SCENE.new()
+	scene.name = "RunVanScene"
+	scene.act = sess.current_map.act
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 110)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size.x = 420
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
+	var header := PanelContainer.new()
+	header.name = "VanChalkboard"
+	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	left.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
+	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["parts_van"]["name"]), 30, SKIN.CREAM))
+	var copy := RUN_UI.label(String(RUN_UI.TYPES["parts_van"]["copy"]), 16, SKIN.CREAM)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(copy)
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
+	RUN_UI.spacer(left, 240)
+	_run_actions = left
+	var rack := VBoxContainer.new()
+	rack.add_theme_constant_override("separation", 0)
+	columns.add_child(rack)
+	RUN_UI.spacer(rack, 64)
 	var card := RUN_UI.parts_card("IN THE VAN · ONE PER VISIT")
 	card[0].name = "VanParts"
-	_run_node_intro(sess, "parts_van", card[0])
+	card[0].custom_minimum_size = Vector2(520, 456)
+	var rail := StyleBoxFlat.new()
+	rail.bg_color = Color.TRANSPARENT
+	rail.set_content_margin_all(14)
+	card[0].add_theme_stylebox_override("panel", rail)
+	RUN_BOARD_SCENE.chalk_labels(card[0])
+	rack.add_child(card[0])
 	for part: Dictionary in sess.van_stock():
 		var cost := RunParts.cost(part)
-		_add_run_button(card[1], RUN_UI.part_button(part, "%s · %d POINTS" % [RunParts.part_name(part).to_upper(), cost], bought or sess.run_points < cost), Callable(self, "_on_van_buy_pressed").bind(String(part["part"])), "VanBuy_" + String(part["part"]))
+		var buy := RUN_UI.part_button(part, "%s · %d POINTS" % [RunParts.part_name(part).to_upper(), cost], bought or sess.run_points < cost)
+		scene.register_pack(buy, part)
+		_add_run_button(card[1], buy, Callable(self, "_on_van_buy_pressed").bind(String(part["part"])), "VanBuy_" + String(part["part"]))
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	RUN_BENCH_SCENE.dress_button(left.get_child(left.get_child_count() - 1) as Button)
+	var legend := RUN_UI.legend(sess.current_map)
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
 	# The first part the points can buy takes focus, not BACK on the left.
 	_queue_content_entrance()
 	_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
@@ -816,7 +864,21 @@ func _finish_bench_confirmation(kind: StringName, button_name: String, part_id: 
 func _on_van_buy_pressed(part_id: String) -> void:
 	_play_ui_confirm()
 	_app.call("run_buy_part", part_id)
-	show_run_board()
+	_finish_van_confirmation(part_id)
+
+
+func _finish_van_confirmation(part_id: String) -> void:
+	var generation := _entrance_generation
+	var scene := _run_backdrop.get_node_or_null("RunVanScene") as RUN_VAN_SCENE
+	var button := _content.find_child("VanBuy_" + part_id, true, false) as Button
+	if scene != null and button != null:
+		for action: Node in _content.find_children("VanBuy_*", "Button", true, false):
+			(action as Button).disabled = true
+		var duration := scene.confirm(button)
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	if generation == _entrance_generation and _screen == "run_parts_van":
+		show_run_board()
 
 
 func _on_lockup_open_pressed() -> void:
