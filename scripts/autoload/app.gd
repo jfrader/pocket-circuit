@@ -1530,7 +1530,12 @@ func _install_held_vehicles() -> void:
 	if _current_run_session != null:
 		cars.append_array(_current_run_session.car_records())
 	elif _ended_run_board != null:
-		cars.append_array(_ended_run_board.car_records())
+		var held := {}
+		for car: Dictionary in cars:
+			held[String(car["id"])] = true
+		for car: Dictionary in _ended_run_board.car_records():
+			if not held.has(String(car["id"])):
+				cars.append(car)
 	VehicleDirectory.install(cars.map(func(car: Dictionary) -> Dictionary: return CATALOG.generated_vehicle(car)))
 
 

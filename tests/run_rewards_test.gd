@@ -47,6 +47,12 @@ func _run_test() -> void:
 	var live: Dictionary = CATALOG.get_vehicle(car_id)
 	if not _expect(not live.is_empty() and not String(live["name"]).is_empty() and live.has("car_art"), "a won car resolves like a shipped car during the run"):
 		return
+	if not _expect(bool(app.call("run_take_offer")) and RUN_WALK.walk_to(app, sess, "bench"), "the won car reaches a bench to fit a run part"):
+		return
+	var part: Dictionary = RunParts.deal(1806, sess.car_stats(car_id))[0]
+	sess.parts_held.append(part)
+	if not _expect(bool(app.call("run_bench_fit", 0)) and not (CATALOG.get_vehicle(car_id).get("fitted_parts", []) as Array).is_empty(), "fitting a real held part changes the live won car"):
+		return
 
 	# Lose the night on the act rival: the car still goes to the garage.
 	if not _expect(RUN_WALK.walk_to(app, sess, "act_rival"), "the run reaches the act rival"):
@@ -63,6 +69,15 @@ func _run_test() -> void:
 	var saved: Dictionary = SAVE_STORE.new(path).load_data()
 	var garage: Array = saved.get("garage_cars", [])
 	if not _expect(garage.size() == 1 and String(garage[0]["id"]) == car_id, "the won car is in the saved garage exactly once"):
+		return
+	if not _expect((CATALOG.get_vehicle(car_id).get("fitted_parts", []) as Array).is_empty(), "terminal presentation does not put run parts back on the garage car"):
+		return
+	var garage_stats := CATALOG.build_vehicle_stats(CATALOG.generated_vehicle(garage[0]))
+	var live_stats := CATALOG.create_vehicle_stats(car_id)
+	for field: String in VehicleStats.PARAMETER_RANGES:
+		if not _expect(is_equal_approx(float(live_stats.get(field)), float(garage_stats.get(field))), "Quick Race uses the saved unfitted garage stat: " + field):
+			return
+	if not _expect(not (CATALOG.get_vehicle(sess.current_car_id).get("car_art", {}) as Dictionary).is_empty(), "terminal current-car art still resolves"):
 		return
 	if not _expect((saved["current_run"] as Dictionary).is_empty(), "the saved run is cleared"):
 		return
