@@ -70,7 +70,7 @@ validate_gate_parallelism() {
 # recreating anything.
 run_test_isolated() (
 	local project_root="$1" godot_bin="$2" scratch_dir="$3" results_file="$4" test_relative="$5"
-	local test_dir result=0
+	local test_dir result=0 line
 	test_dir="$(mktemp -d "$scratch_dir/test.XXXXXX")" || return 1
 	mkdir -- "$test_dir/data" "$test_dir/config" "$test_dir/cache" "$test_dir/state" "$test_dir/tmp" \
 		|| { rm -rf -- "$test_dir"; return 1; }
@@ -79,6 +79,11 @@ run_test_isolated() (
 		run_godot_test_checked "$project_root" "$godot_bin" "$test_relative" >"$test_dir/log" 2>&1 || result=1
 	if (( result == 0 )); then
 		printf 'PASS %s\n' "$test_relative"
+		# Keep literal completion markers and benchmark measurements in the
+		# retained gate log, attributed even when parallel output interleaves.
+		while IFS= read -r line || [[ -n "$line" ]]; do
+			printf '[%s] %s\n' "$test_relative" "$line" || { result=1; break; }
+		done < "$test_dir/log"
 		printf 'PASS\t%s\n' "$test_relative" >> "$results_file" || result=1
 	else
 		printf 'FAIL %s\n' "$test_relative" >&2

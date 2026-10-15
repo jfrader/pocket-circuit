@@ -354,6 +354,9 @@ run_release_gate "$@" || gate_status=$?
             result, launches = self.dispatch(root, godot, "2", names, serial=("tests/delta.gd",))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(launches, sorted(f"tests/{name}.gd" for name in names))
+            for name in names:
+                self.assertIn(f"[tests/{name}.gd] {name.upper()}_TEST PASS", result.stdout,
+                              "Successful tests must retain their literal marker in gate evidence")
             self.assertTrue((root / "after-gate").exists())
             self.assert_owned_state_released(root)
 
