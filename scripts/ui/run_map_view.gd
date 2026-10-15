@@ -11,6 +11,8 @@ signal stop_selected(stop_id: String)
 signal stop_confirmed(stop_id: String)
 
 const UI := preload("res://scripts/ui/run_ui.gd")
+const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
+const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const PADDING := 36.0
 const BOSS_Y := 72.0
 const BOSS_LABEL_SIZE := Vector2(136, 20)
@@ -35,6 +37,9 @@ const DASH := 7.0
 const DASH_SPEED := 22.0
 
 var reduced_motion := false
+var tabletop := false
+var route_visuals_visible := true
+var _props: Dictionary = {}
 
 var _map: RunMap
 var _buttons: Dictionary = {}
@@ -64,6 +69,8 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 	custom_minimum_size = UI.CARD_SIZE
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	_header = UI.label("ACT %d · %s · SEED %d" % [_map.act, String(UI.ROOMS[_map.act]).to_upper(), _map.run_seed], 10, UI.MUTED, true)
+	if tabletop:
+		_header.add_theme_color_override("font_color", SKIN.CREAM)
 	_header.position = Vector2(22, 18)
 	add_child(_header)
 	for entry: Dictionary in session.available_nodes():
@@ -84,6 +91,18 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 				button.focus_entered.connect(_on_marker_focused.bind(id))
 				button.pressed.connect(_on_marker_pressed.bind(id))
 			add_child(button)
+			if tabletop:
+				var prop := BOARD_TOKEN.new()
+				prop.name = "ToyToken"
+				prop.kind = kind
+				prop.reduced_motion = reduced_motion
+				prop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+				button.add_child(prop)
+				_props[id] = prop
+				for state: String in ["normal", "hover", "pressed", "focus"]:
+					button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
+				for state: String in ["icon_normal_color", "icon_hover_color", "icon_pressed_color", "icon_focus_color", "icon_disabled_color", "icon_hover_pressed_color"]:
+					button.add_theme_color_override(state, Color.TRANSPARENT)
 			_buttons[id] = button
 			result.append(button)
 			if kind == "act_rival":
@@ -93,7 +112,7 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 				plate.bg_color = UI.PANEL
 				_boss_label.add_theme_stylebox_override("normal", plate)
 				add_child(_boss_label)
-	if token != null and interactive:
+	if token != null and (interactive or tabletop):
 		_token = TextureRect.new()
 		_token.name = "CarToken"
 		_token.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
@@ -104,6 +123,7 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 		_token.pivot_offset = TOKEN_SIZE * 0.5
 		_token.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_token.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_token.z_index = 3 if tabletop else 0
 		add_child(_token)
 	resized.connect(_layout)
 	_layout()
@@ -115,6 +135,14 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 
 func is_reachable(stop_id: String) -> bool:
 	return stop_id in _available
+
+
+func hide_route_visuals() -> void:
+	route_visuals_visible = false
+	for child: Node in get_children():
+		if child is CanvasItem:
+			(child as CanvasItem).hide()
+	queue_redraw()
 
 
 func selected_id() -> String:
@@ -200,6 +228,9 @@ func _rest_markers() -> void:
 		elif id != _current and not id in _available:
 			alpha = DONE_ALPHA if _done.has(id) else LOCKED_ALPHA
 		button.self_modulate.a = alpha
+		if _props.has(id):
+			_props[id].modulate.a = maxf(alpha, 0.62)
+			_props[id].set_selected(id == _selected)
 
 
 func _rest_scale(stop_id: String) -> Vector2:
@@ -255,8 +286,13 @@ func _layout() -> void:
 
 
 func _draw() -> void:
-	draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL)
-	draw_rect(Rect2(Vector2.ONE * 0.5, size - Vector2.ONE), UI.LINE, false, 1.0)
+	if not route_visuals_visible:
+		return
+	if not tabletop:
+		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL)
+		draw_rect(Rect2(Vector2.ONE * 0.5, size - Vector2.ONE), UI.LINE, false, 1.0)
+	else:
+		SKIN.draw_tape(self, Vector2(size.x * 0.5, 25), Vector2(size.x - 20, 36), -0.012, Color("39463c"))
 	if _map == null:
 		return
 	var rows := float(maxi(1, _map.num_rows - 1))
@@ -267,7 +303,7 @@ func _draw() -> void:
 			continue
 		for child: Dictionary in _map.get_children(id):
 			var child_id := String(child["id"])
-			var color := UI.LINE
+			var color := Color("a6a596") if tabletop else UI.LINE
 			if String(child["type"]) == "act_rival":
 				color = UI.BOSS_EDGE
 			if id == _current and child_id in _available:
@@ -277,6 +313,9 @@ func _draw() -> void:
 			if id == _current and child_id == _selected and child_id in _available:
 				_draw_flow(from, to)
 			else:
+				if tabletop:
+					draw_line(from + Vector2(3, 4), to + Vector2(3, 4), Color(0.02, 0.03, 0.05, 0.25), 6.0, true)
+					draw_line(from, to, Color(color, 0.5), 4.0, true)
 				draw_line(from, to, color, 1.0, true)
 	var pulse := 0.5 + 0.5 * sin(_clock * TAU / PULSE_PERIOD)
 	if _interactive:
