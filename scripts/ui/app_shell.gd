@@ -4,6 +4,7 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
 const RUN_BOARD_SCENE := preload("res://scripts/ui/run_board_scene.gd")
+const RUN_BENCH_SCENE := preload("res://scripts/ui/run_bench_scene.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
@@ -647,14 +648,77 @@ func show_run_bench() -> void:
 		show_run_board()
 		return
 	var used := sess.bench_action_done
+	_run_surface()
+	var scene := RUN_BENCH_SCENE.new()
+	scene.name = "RunBenchScene"
+	scene.act = sess.current_map.act
+	scene.car_id = sess.current_car_id
+	scene.held_parts = sess.parts_held.duplicate(true)
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 76)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size.x = 520
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
+	var header := PanelContainer.new()
+	header.name = "BenchChalkboard"
+	var chalk := StyleBoxFlat.new()
+	chalk.bg_color = Color("26362f")
+	chalk.border_color = Color("806446")
+	chalk.set_border_width_all(5)
+	chalk.set_content_margin_all(14)
+	chalk.shadow_color = Color(0.01, 0.02, 0.04, 0.55)
+	chalk.shadow_size = 4
+	chalk.shadow_offset = Vector2(5, 7)
+	header.add_theme_stylebox_override("panel", chalk)
+	left.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
+	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["bench"]["name"]), 30, SKIN.CREAM))
+	var copy := RUN_UI.label(String(RUN_UI.TYPES["bench"]["copy"]), 16, SKIN.CREAM)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(copy)
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
+	RUN_UI.spacer(left, 228)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 12)
+	left.add_child(actions)
+	_run_actions = actions
 	var card := RUN_UI.parts_card("YOUR PARTS · FIT ONE" if not sess.parts_held.is_empty() else "NO PARTS HELD")
 	card[0].name = "BenchParts"
-	_run_node_intro(sess, "bench", card[0])
+	card[0].custom_minimum_size = Vector2(420, 516)
+	card[0].size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var paper := StyleBoxFlat.new()
+	paper.bg_color = Color("d8c89f")
+	paper.border_color = SKIN.INK
+	paper.set_border_width_all(2)
+	paper.set_content_margin_all(14)
+	paper.shadow_color = Color(0.01, 0.02, 0.04, 0.5)
+	paper.shadow_size = 4
+	paper.shadow_offset = Vector2(6, 8)
+	card[0].add_theme_stylebox_override("panel", paper)
+	RUN_BOARD_SCENE.ink_labels(card[0])
+	columns.add_child(card[0])
 	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, used, "BenchRepair")
+	RUN_BENCH_SCENE.dress_button(actions.get_child(0) as Button, true)
 	for index: int in sess.parts_held.size():
 		var part: Dictionary = sess.parts_held[index]
-		_add_run_button(card[1], RUN_UI.part_button(part, "FIT %s" % RunParts.part_name(part).to_upper(), used), Callable(self, "_on_bench_fit_pressed").bind(index), "BenchFit_%d" % index)
+		var fit := RUN_UI.part_button(part, "FIT %s" % RunParts.part_name(part).to_upper(), used)
+		RUN_BENCH_SCENE.dress_part(fit, part)
+		_add_run_button(card[1], fit, Callable(self, "_on_bench_fit_pressed").bind(index), "BenchFit_%d" % index)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	RUN_BENCH_SCENE.dress_button(actions.get_child(1) as Button)
+	var legend := RUN_UI.legend(sess.current_map)
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
 	_focus_first()
 
 
@@ -724,13 +788,29 @@ func _on_bench_repair_pressed() -> void:
 	var sess: RunSession = sess_var as RunSession
 	if sess != null:
 		_app.call("run_bench_repair", sess.current_car_id)
-	show_run_board()
+	_finish_bench_confirmation(&"repair", "BenchRepair")
 
 
 func _on_bench_fit_pressed(held_index: int) -> void:
 	_play_ui_confirm()
+	var scene := _run_backdrop.get_node_or_null("RunBenchScene") as RUN_BENCH_SCENE
+	var part_id := String(scene.held_parts[held_index]["part"]) if scene != null and held_index >= 0 and held_index < scene.held_parts.size() else ""
 	_app.call("run_bench_fit", held_index)
-	show_run_board()
+	_finish_bench_confirmation(&"fit", "BenchFit_%d" % held_index, part_id)
+
+
+func _finish_bench_confirmation(kind: StringName, button_name: String, part_id: String = "") -> void:
+	var generation := _entrance_generation
+	var scene := _run_backdrop.get_node_or_null("RunBenchScene") as RUN_BENCH_SCENE
+	var button := _content.find_child(button_name, true, false) as Button
+	if scene != null and button != null:
+		for action: Node in _content.find_children("Bench*", "Button", true, false):
+			(action as Button).disabled = true
+		var duration := scene.confirm(button, kind, part_id)
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	if generation == _entrance_generation and _screen == "run_bench":
+		show_run_board()
 
 
 func _on_van_buy_pressed(part_id: String) -> void:
