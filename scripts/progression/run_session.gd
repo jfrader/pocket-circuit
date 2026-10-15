@@ -40,8 +40,8 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##   car dealt from the seed (a generated compact or buggy, starter envelope).
 ## take_offer() / decline_offer(): a won car is offered to drive; the car left
 ##   behind keeps its wear.
-## available_nodes() / enter_node(id): moves along map edges only, and never
-##   past a race-type node that has not been raced.
+## available_nodes() / enter_node(id): reopens unused current stops or moves
+##   along map edges, never past a race-type node that has not been raced.
 ##
 ## Resolution (the node must be current, unresolved and of the right type):
 ##   resolve_race(id, pos, field): pays points. On the act rival, a win
@@ -105,14 +105,17 @@ static func create(p_run_seed: int) -> RunSession:
 	sess.run_state.row = 0
 	return sess
 
-## The stops the player can take next: the current node while it is an
-## unraced race, otherwise its children.
+## Races must be finished first. Optional stops stay open alongside their
+## child routes until their action is used or the player takes a child.
 func available_nodes() -> Array[Dictionary]:
 	if current_map == null or current_node_id.is_empty() or failed or completed:
 		return []
 	if is_race_pending():
 		return [current_node()]
-	return current_map.get_children(current_node_id)
+	var options := current_map.get_children(current_node_id)
+	if is_stop_pending():
+		options.append(current_node())
+	return options
 
 ## Marks the current unraced race-type stop as racing. Whatever ends that race
 ## (a result, a quit, a closed game) has to resolve it; it is never re-raced.
@@ -152,6 +155,19 @@ func _stop_roll(stream: String, stop_id: String) -> int:
 func is_race_pending() -> bool:
 	return String(current_node().get("type", "")) in RACE_NODE_TYPES and not resolved_nodes.has(current_node_id)
 
+## Whether the current stop still has an action to open from the board.
+func is_stop_pending() -> bool:
+	if failed or completed:
+		return false
+	var kind := String(current_node().get("type", ""))
+	if kind in RACE_NODE_TYPES:
+		return is_race_pending()
+	if kind == "bench":
+		return last_bench_visited == current_node_id and not bench_action_done
+	if kind == "lockup":
+		return not lockup_used and not resolved_nodes.has(current_node_id)
+	return kind in ["parts_van", "errand"] and not resolved_nodes.has(current_node_id)
+
 func current_node() -> Dictionary:
 	if current_map == null or current_node_id.is_empty():
 		return {}
@@ -160,8 +176,12 @@ func current_node() -> Dictionary:
 func enter_node(node_id: String) -> bool:
 	if failed or completed or current_map == null or current_node_id.is_empty():
 		return false
+	if not pending_offer.is_empty():
+		return false
+	if node_id == current_node_id:
+		return is_stop_pending()
 	# A race-type stop is raced, and a won car is answered, before moving on.
-	if is_race_pending() or not pending_offer.is_empty():
+	if is_race_pending():
 		return false
 	var kids: Array[Dictionary] = current_map.get_children(current_node_id)
 	var is_valid: bool = false
