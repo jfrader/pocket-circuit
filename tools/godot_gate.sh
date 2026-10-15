@@ -104,11 +104,49 @@ run_owned() {
 # Signal trap for run_gate_tests: stop the owner, and with it every test
 # process, before exiting so the exit trap removes scratch nothing still uses.
 stop_gate_owner() {
+	# A group signal and the caller's forwarded TERM can both arrive here.
+	trap '' HUP INT TERM
 	if [[ -n "${gate_owner_pid:-}" ]]; then
 		kill -TERM "$gate_owner_pid" 2>/dev/null || true
 		wait "$gate_owner_pid" || true
 	fi
 	exit "$1"
+}
+
+# Signal handler for the caller-owned release stage. Its PID and cancellation
+# status are local to run_release_gate; repeated signals cannot interrupt cleanup.
+stop_release_gate() {
+	release_cancel_status="$1"
+	if [[ -n "$release_gate_pid" ]]; then
+		trap '' HUP INT TERM
+		kill -TERM "$release_gate_pid" 2>/dev/null || true
+		wait "$release_gate_pid" || true
+	fi
+}
+
+# The caller must wait on a background gate so PID-only signals interrupt wait,
+# rather than being deferred until a foreground subshell finishes. This stage
+# owns signal handling only until its gate has stopped and removed its scratch.
+run_release_gate() {
+	local release_gate_pid= release_cancel_status=0 status=0 saved_traps
+	saved_traps="$(trap -p HUP INT TERM)"
+	trap 'stop_release_gate 129' HUP
+	trap 'stop_release_gate 130' INT
+	trap 'stop_release_gate 143' TERM
+	run_gate_tests_worker "$@" &
+	release_gate_pid=$!
+	# A signal can arrive between starting the child and assigning its PID.
+	if (( release_cancel_status != 0 )); then
+		stop_release_gate "$release_cancel_status"
+	fi
+	wait "$release_gate_pid" || status=$?
+	release_gate_pid=
+	trap - HUP INT TERM
+	eval "$saved_traps"
+	if (( release_cancel_status != 0 )); then
+		status="$release_cancel_status"
+	fi
+	return "$status"
 }
 
 # Runs the source test gate: the listed serial tests one at a time, the rest in
@@ -120,7 +158,11 @@ stop_gate_owner() {
 # tests started has ended, and all scratch lives in one directory removed on
 # exit or on HUP, INT or TERM.
 # Usage: run_gate_tests <project-root> <godot-bin> <parallelism> [serial-test...] -- <test...>
-run_gate_tests() (
+# Keep direct callers isolated too. The release stage launches the worker body
+# directly: backgrounding this subshell wrapper would add an unowned Bash parent.
+run_gate_tests() ( run_gate_tests_worker "$@" )
+
+run_gate_tests_worker() {
 	local project_root="$1" godot_bin="$2" parallelism="$3"
 	shift 3
 	local serial_tests=() parallel_tests=() failed=()
@@ -154,7 +196,8 @@ run_gate_tests() (
 
 	local scratch results_file gate_owner_pid=
 	scratch="$(mktemp -d "${TMPDIR:-/tmp}/pocket-circuit-gate.XXXXXX")" || return 1
-	trap 'rm -rf -- "$scratch"' EXIT
+	# EXIT can run after this worker function's local scope has unwound.
+	trap "$(printf 'rm -rf -- %q' "$scratch")" EXIT
 	trap 'stop_gate_owner 129' HUP
 	trap 'stop_gate_owner 130' INT
 	trap 'stop_gate_owner 143' TERM
@@ -230,4 +273,4 @@ run_gate_tests() (
 		printf '  %s\n' "${failed[@]}" >&2
 		return 1
 	fi
-)
+}

@@ -119,16 +119,12 @@ serial_tests=(
 )
 
 # The remaining tests run in parallel; run_gate_tests accounts for every one.
-# With these traps set, a signal waits for the gate to stop its test processes
-# and remove its scratch instead of ending this script first.
-trap 'exit 129' HUP
-trap 'exit 130' INT
-trap 'exit 143' TERM
-if ! run_gate_tests "$PROJECT_ROOT" "$godot_bin" "$gate_parallelism" "${serial_tests[@]}" -- "${tests[@]#"$PROJECT_ROOT"/}"; then
+gate_status=0
+run_release_gate "$PROJECT_ROOT" "$godot_bin" "$gate_parallelism" "${serial_tests[@]}" -- "${tests[@]#"$PROJECT_ROOT"/}" || gate_status=$?
+if (( gate_status != 0 )); then
 	printf 'Release tests failed; no exports will be attempted.\n' >&2
-	exit 1
+	exit "$gate_status"
 fi
-trap - HUP INT TERM
 
 printf 'Smoke-testing the boot scene...\n'
 POCKET_CIRCUIT_EXPECT_OUTPUT="RELEASE_RACE_SMOKE PASS" \
