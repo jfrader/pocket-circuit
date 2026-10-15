@@ -67,6 +67,7 @@ func load_data() -> Dictionary:
 	recovery_message = ""
 	var primary := _read_candidate(save_path)
 	if String(primary["status"]) == "ok":
+		_report_run_recovery(primary)
 		return primary["data"] as Dictionary
 	if String(primary["status"]) == "future":
 		recovery_message = "Save is from a newer version (v%d) — running read-only" % int(primary["version"])
@@ -77,6 +78,7 @@ func load_data() -> Dictionary:
 	if String(backup["status"]) == "ok":
 		last_load_error = "%s; recovered validated backup" % String(primary["diagnostic"])
 		recovery_message = "Save recovered from backup"
+		_report_run_recovery(backup)
 		return backup["data"] as Dictionary
 	if String(backup["status"]) == "future":
 		recovery_message = "Save is from a newer version (v%d) — running read-only" % int(backup["version"])
@@ -124,7 +126,7 @@ func save_data(data: Dictionary) -> bool:
 	var backup_path := save_path + ".bak"
 	var backup_absolute := _absolute_path(backup_path)
 	var primary_candidate := _read_candidate(save_path)
-	if String(primary_candidate["status"]) == "ok":
+	if String(primary_candidate["status"]) == "ok" and not primary_candidate.get("run_recovered", false):
 		var backup_temp_path := backup_path + ".tmp"
 		_remove_if_present(backup_temp_path)
 		if not _copy_file(save_path, backup_temp_path):
@@ -171,6 +173,8 @@ func remove_save() -> void:
 
 
 func _canonicalize_for_disk(raw: Dictionary) -> Dictionary:
+	if _invalid_run(raw.get("current_run", {})):
+		return {}
 	var normalized := _normalize(raw)
 	var parsed: Variant = JSON.parse_string(JSON.stringify(normalized))
 	if parsed is not Dictionary:
@@ -293,7 +297,31 @@ func _read_candidate(path: String) -> Dictionary:
 		var version := int(raw_version)
 		if version > CURRENT_VERSION:
 			return {"status": "future", "version": version, "diagnostic": "Unsupported save version %d" % version}
-	return {"status": "ok", "data": _normalize(raw)}
+	var normalized := _normalize(raw)
+	var stored_run: Variant = raw.get("current_run", {})
+	if _invalid_run(stored_run):
+		var cars: Array = normalized["garage_cars"]
+		if stored_run is Dictionary:
+			cars.append_array(RUN_SESSION.salvage_won_cars(stored_run))
+		normalized["garage_cars"] = _normalize_cars(cars, [RUN_SESSION.CAR_ORIGIN_RIVAL, RUN_SESSION.CAR_ORIGIN_LOCKUP])
+		normalized["current_run"] = {}
+		return {"status": "ok", "data": normalized, "run_recovered": true, "diagnostic": "Unreadable active run at %s; remaining save data preserved" % path}
+	return {"status": "ok", "data": normalized}
+
+
+func _invalid_run(value: Variant) -> bool:
+	if value is not Dictionary:
+		return true
+	return not value.is_empty() and RUN_SESSION.deserialize(value) == null
+
+
+func _report_run_recovery(candidate: Dictionary) -> void:
+	if not candidate.get("run_recovered", false):
+		return
+	var diagnostic: String = candidate["diagnostic"]
+	last_load_error = diagnostic if last_load_error.is_empty() else last_load_error + "; " + diagnostic
+	var message := "Unreadable active run removed; remaining save data preserved"
+	recovery_message = message if recovery_message.is_empty() else recovery_message + "; " + message
 
 
 func _future_version_defaults(version: int, source: String) -> Dictionary:

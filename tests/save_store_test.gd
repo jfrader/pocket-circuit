@@ -5,6 +5,7 @@ const SAVE_STORE_SCRIPT := preload("res://scripts/persistence/save_store.gd")
 const CIRCUIT_IDENTITIES := preload("res://scripts/progression/championship_circuit_identity.gd")
 const MASTERY := preload("res://scripts/progression/mastery_run.gd")
 const PERSONAL_GHOST := preload("res://scripts/race/personal_ghost.gd")
+const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 const TEST_PATH := "user://tests/pocket_circuit_save_store_test.json"
 
 
@@ -267,20 +268,15 @@ func _test_current_run_migration(store: SaveStore) -> bool:
 	if not _expect(int(on_disk["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and on_disk.get("current_run") == {}, "save after v4 load writes current version and current_run:{} "):
 		return false
 
-	# hand v5 with mid-run data persists and reloads
-	var v5_with_run := store.default_data()
-	v5_with_run["current_run"] = {
-		"schema_version": 1,
-		"run_seed": 424242,
-		"run_points": 12,
-		"current_node_id": "1_3",
-		"current_car_id": "rustbug",
-		"owned_cars": {"rustbug": "compact"},
-	}
-	if not _expect(store.save_data(v5_with_run), "save v5 with current_run data"):
+	# A complete supported run persists and reloads through the save boundary.
+	var with_run := store.default_data()
+	var run := RUN_SESSION.create(424242)
+	run.run_points = 12
+	with_run["current_run"] = RUN_SESSION.serialize(run)
+	if not _expect(store.save_data(with_run), "save supported current_run data"):
 		return false
 	loaded = store.load_data()
-	if not _expect(int(loaded["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_points",0)) == 12, "v5 current_run data roundtrips via normalize"):
+	if not _expect(int(loaded["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_points",0)) == 12, "supported current_run data roundtrips via normalize"):
 		return false
 
 	# garage: a v5 save has none; stored won cars are validated and deduplicated
