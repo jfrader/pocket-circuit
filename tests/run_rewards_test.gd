@@ -54,6 +54,12 @@ func _run_test() -> void:
 	RUN_WALK.settle(app, sess, 2)
 	if not _expect(app.call("current_run_session") == null, "a lost night clears the run"):
 		return
+	var shell := app.get("_shell") as CanvasLayer
+	shell.call("show_run_board")
+	await process_frame
+	if not _expect(_has_label(shell, "NIGHT OVER") and not _has_label(shell, "NO ACTIVE RUN"), "a saved lost night still shows its terminal board"):
+		return
+	app.call("persist_current_run")
 	var saved: Dictionary = SAVE_STORE.new(path).load_data()
 	var garage: Array = saved.get("garage_cars", [])
 	if not _expect(garage.size() == 1 and String(garage[0]["id"]) == car_id, "the won car is in the saved garage exactly once"):
@@ -77,6 +83,10 @@ func _run_test() -> void:
 	# The next night starts from the starter car alone, and the garage keeps the car.
 	var next: RunSession = app.call("start_run", 31337) as RunSession
 	if not _expect(next.owned_cars.size() == 1 and next.won_cars().is_empty() and not car_id in next.owned_cars, "a new night starts with its own starter car only"):
+		return
+	shell.call("show_run_board")
+	await process_frame
+	if not _expect(not _has_label(shell, "NIGHT OVER"), "NEW RUN clears the previous terminal presentation"):
 		return
 	if not _expect(car_id in (app.call("quick_race_roster") as Array), "the garage outlives the next night"):
 		return
@@ -110,7 +120,6 @@ func _run_test() -> void:
 		return
 	if not _expect(app.call("start_new_run") == null and app.call("current_run_session") == blocked, "a new run never replaces a night that is not saved yet"):
 		return
-	var shell := app.get("_shell") as CanvasLayer
 	shell.call("show_run_board")
 	await process_frame
 	var save_again := shell.find_child("ActionSaveAgain", true, false) as Button
@@ -120,6 +129,32 @@ func _run_test() -> void:
 	save_again.pressed.emit()
 	await process_frame
 	if not _expect(app.call("current_run_session") == null and blocked_car in (app.call("garage_car_ids") as Array), "saving again lands the held night with its car"):
+		return
+	if not _expect(_has_label(shell, "NIGHT OVER") and shell.find_child("ActionSaveAgain", true, false) == null, "SAVE AGAIN retains the terminal board and removes its save warning"):
+		return
+	app.call("persist_current_run")
+	var saved_garage: Array = SAVE_STORE.new(path).load_data()["garage_cars"]
+	if not _expect(saved_garage.filter(func(car: Dictionary) -> bool: return String(car["id"]) == blocked_car).size() == 1, "terminal presentation never transfers a reward twice"):
+		return
+	# Wins and wear endings use the same terminal presentation, never a durable run.
+	var victory: RunSession = app.call("start_run", 71717) as RunSession
+	for act in RunSession.FINAL_ACT:
+		if not _expect(RUN_WALK.walk_to(app, victory, "act_rival"), "the winning night reaches each act rival"):
+			return
+		RUN_WALK.settle(app, victory)
+	shell.call("show_run_board")
+	await process_frame
+	if not _expect(victory.is_complete() and app.call("current_run_session") == null and _has_label(shell, "NIGHT OVER"), "a saved winning night retains its terminal board"):
+		return
+	var worn: RunSession = app.call("start_run", 72727) as RunSession
+	for crash in 8:
+		worn.register_crash(1.0)
+	app.call("persist_current_run")
+	shell.call("show_run_board")
+	await process_frame
+	if not _expect(worn.is_failed() and app.call("current_run_session") == null and _has_label(shell, "NIGHT OVER"), "a saved wear ending retains its terminal board"):
+		return
+	if not _expect((SAVE_STORE.new(path).load_data()["current_run"] as Dictionary).is_empty(), "a reboot has no ended run to resume or transfer again"):
 		return
 
 	# A new championship resets the championship, not the garage.

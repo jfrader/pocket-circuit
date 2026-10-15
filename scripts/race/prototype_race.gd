@@ -786,7 +786,10 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 func _run_countdown() -> void:
 	var app := get_node_or_null("/root/App")
 	if app and app.has_method("race_started"):
-		app.call("race_started")
+		if not bool(app.call("race_started")):
+			_countdown_active = false
+			app.call("abandon_race")
+			return
 	var director := _audio_director()
 	if director != null and director.has_method("stop_live_rotation"):
 		director.call("stop_live_rotation")
@@ -1514,6 +1517,9 @@ func _report_result_to_app(results: Array) -> bool:
 			var committed := bool(app.call("report_race_result", int(result["position"]), finish_time, results, bool(result.get("dnf", false)), performance))
 			if not committed and app.has_method("get_last_save_error"):
 				_save_error = String(app.call("get_last_save_error"))
+				if app.has_method("get_current_race_session"):
+					var pending: Dictionary = app.call("get_current_race_session")
+					_save_error = String(pending.get("save_error", _save_error))
 			return committed
 	return true
 
