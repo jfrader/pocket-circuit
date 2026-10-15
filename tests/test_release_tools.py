@@ -5,9 +5,11 @@ import mmap
 import os
 import select
 import shutil
+import signal
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -165,14 +167,36 @@ class GodotGateTests(unittest.TestCase):
 
 # Fake Godot for dispatcher tests: the first line of each fixture test selects
 # its behaviour. Every launch is logged so tests can prove what actually ran.
+# Processes it starts carry the fixture root in argv so tests can find them.
 FAKE_DISPATCH_GODOT = r'''#!/usr/bin/env python3
-import os, signal, sys
+import json, os, signal, subprocess, sys, time
 root = sys.argv[sys.argv.index("--path") + 1]
 script = sys.argv[sys.argv.index("--script") + 1].removeprefix("res://")
+name = os.path.basename(script).removesuffix(".gd")
 with open(os.path.join(root, "launches.log"), "a") as log:
     log.write(script + "\n")
+with open(os.path.join(root, "events.log"), "a") as log:
+    log.write(f"start {script}\n")
 behaviour = open(os.path.join(root, script)).readline().removeprefix("#").strip()
-marker = os.path.basename(script).removesuffix(".gd").upper() + "_TEST PASS"
+marker = name.upper() + "_TEST PASS"
+
+def record(directory, text):
+    os.makedirs(os.path.join(root, directory), exist_ok=True)
+    with open(os.path.join(root, directory, name), "a") as handle:
+        handle.write(text)
+
+def spawn_detached_sleeper():
+    # Leaves its process group and session, as a daemonising helper would.
+    sleeper = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(60)", root],
+                               start_new_session=True, stdin=subprocess.DEVNULL,
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    record("pids", f"{sleeper.pid}\n")
+
+def linger():
+    # A slow test: still running when its worker is gone or the gate stops.
+    record("pids", f"{os.getpid()}\n")
+    record("ready", "ready\n")
+    time.sleep(60)
 
 def worker_argv_and_pid():
     # Walk up to the outermost bash worker that xargs launched for this test.
@@ -192,13 +216,62 @@ if behaviour == "fail":
     sys.exit(1)
 if behaviour == "kill-worker":
     os.kill(worker_argv_and_pid()[0], signal.SIGKILL)
+    spawn_detached_sleeper()
+    linger()
+if behaviour == "leak":
+    spawn_detached_sleeper()
+if behaviour == "linger":
+    linger()
+if behaviour == "report-env":
+    names = ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME", "TMPDIR")
+    record("env", json.dumps({key: os.environ.get(key) for key in names}))
+    save = os.path.join(os.environ.get("XDG_DATA_HOME") or os.path.expanduser("~/.local/share"),
+                        "godot/app_userdata/fixture", name + ".json")
+    os.makedirs(os.path.dirname(save), exist_ok=True)
+    with open(save, "w") as handle:
+        handle.write("{}")
 if behaviour == "forge-duplicate":
     argv = worker_argv_and_pid()[1]
     results_file = argv[argv.index(script.encode()) - 1].decode()
     with open(results_file, "a") as results:
         results.write(f"PASS\t{script}\n")
 print(marker)
+with open(os.path.join(root, "events.log"), "a") as log:
+    log.write(f"end {script}\n")
 '''
+
+
+def fixture_processes(root):
+    """Live processes (not zombies) whose argv mentions the fixture root."""
+    needle = os.fsencode(str(root))
+    found = []
+    for entry in os.listdir("/proc"):
+        if not entry.isdigit() or int(entry) == os.getpid():
+            continue
+        try:
+            with open(f"/proc/{entry}/cmdline", "rb") as handle:
+                argv = handle.read()
+            with open(f"/proc/{entry}/stat") as handle:
+                state = handle.read().rsplit(")", 1)[1].split()[0]
+        except OSError:
+            continue
+        if needle in argv and state != "Z":
+            found.append((int(entry), argv.replace(b"\0", b" ").decode(errors="replace")))
+    return found
+
+
+def process_parent(pid):
+    with open(f"/proc/{pid}/stat") as handle:
+        return int(handle.read().rsplit(")", 1)[1].split()[1])
+
+
+def wait_for(predicate, seconds=15):
+    deadline = time.monotonic() + seconds
+    while not predicate():
+        if time.monotonic() > deadline:
+            return False
+        time.sleep(0.02)
+    return True
 
 
 class GateDispatchTests(unittest.TestCase):
@@ -215,17 +288,54 @@ class GateDispatchTests(unittest.TestCase):
             fake_godot = root / "godot"
             fake_godot.write_text(FAKE_DISPATCH_GODOT)
             fake_godot.chmod(0o755)
-            yield root, fake_godot
+            # The gate's TMPDIR: everything it leaves here is leaked scratch.
+            (root / "tmp").mkdir()
+            try:
+                yield root, fake_godot
+            finally:
+                # A broken gate can leave fixture processes behind; stop them so
+                # one failure cannot leak into the host or later tests.
+                def stopped():
+                    for pid, _ in fixture_processes(root):
+                        try:
+                            os.kill(pid, signal.SIGKILL)
+                        except ProcessLookupError:
+                            pass
+                    return not fixture_processes(root)
+                wait_for(stopped)
 
-    def dispatch(self, root, fake_godot, parallelism, tests, serial=()):
-        result = subprocess.run(
-            ["bash", "-c", 'source "$1"; shift; run_gate_tests "$@"', "gate-test", str(ROOT / "tools/godot_gate.sh"),
-             str(root), str(fake_godot), parallelism, *serial, "--", *(f"tests/{name}.gd" for name in tests)],
-            capture_output=True, text=True, timeout=60,
-        )
+    def launch(self, root, fake_godot, parallelism, tests, serial=(), env=None):
+        # Output goes to files, not pipes: a leaked process holding a pipe open
+        # would otherwise hide when the gate itself returned. The caller traps
+        # signals like build_release.sh so it waits for the gate's own cleanup.
+        with open(root / "gate.out", "w") as out, open(root / "gate.err", "w") as err:
+            return subprocess.Popen(
+                ["bash", "-c", 'source "$1"; shift; trap "exit 129" HUP; trap "exit 130" INT; trap "exit 143" TERM; run_gate_tests "$@"',
+                 "gate-test", str(ROOT / "tools/godot_gate.sh"),
+                 str(root), str(fake_godot), parallelism, *serial, "--", *(f"tests/{name}.gd" for name in tests)],
+                env={**os.environ, "TMPDIR": str(root / "tmp"), **(env or {})},
+                stdin=subprocess.DEVNULL, stdout=out, stderr=err, start_new_session=True,
+            )
+
+    def finish(self, root, gate):
+        returncode = gate.wait(timeout=60)
+        result = subprocess.CompletedProcess(gate.args, returncode, (root / "gate.out").read_text(), (root / "gate.err").read_text())
         log = root / "launches.log"
         launches = sorted(log.read_text().splitlines()) if log.exists() else []
         return result, launches
+
+    def dispatch(self, root, fake_godot, parallelism, tests, serial=(), env=None):
+        return self.finish(root, self.launch(root, fake_godot, parallelism, tests, serial, env))
+
+    def assert_owned_state_released(self, root):
+        # Checked the moment the gate returns: nothing it started may still run
+        # (and so later recreate a result or scratch file), and no scratch stays.
+        self.assertEqual(fixture_processes(root), [], "the gate returned while test processes were still running")
+        self.assertEqual(sorted(os.listdir(root / "tmp")), [], "the gate left scratch files behind")
+
+    def recorded_pids(self, root, name):
+        path = root / "pids" / name
+        return [int(line) for line in path.read_text().split()] if path.exists() else []
 
     def test_all_passing_tests_pass(self):
         names = {"alpha": "pass", "beta": "pass", "gamma": "pass", "delta": "pass"}
@@ -233,6 +343,7 @@ class GateDispatchTests(unittest.TestCase):
             result, launches = self.dispatch(root, godot, "2", names, serial=("tests/delta.gd",))
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(launches, sorted(f"tests/{name}.gd" for name in names))
+            self.assert_owned_state_released(root)
 
     def test_every_failed_test_is_reported_before_refusing(self):
         names = {"alpha": "fail", "beta": "pass", "gamma": "fail", "delta": "fail"}
@@ -243,6 +354,39 @@ class GateDispatchTests(unittest.TestCase):
             for name in ("alpha", "gamma", "delta"):
                 self.assertIn(f"  tests/{name}.gd\n", result.stderr)
             self.assertNotIn("  tests/beta.gd", result.stderr)
+            self.assertNotIn("did not", result.stderr, "recorded test failures are not infrastructure failures")
+            self.assert_owned_state_released(root)
+
+    def test_every_test_gets_disposable_user_data(self):
+        names = {"solo": "report-env", "alpha": "report-env", "beta": "report-env"}
+        with self.fixture(names) as (root, godot):
+            player = {key: root / "player" / key.lower() for key in ("XDG_DATA_HOME", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_STATE_HOME")}
+            for path in player.values():
+                path.mkdir(parents=True)
+                (path / "keep.txt").write_text("player data\n")
+            result, _ = self.dispatch(root, godot, "2", names, serial=("tests/solo.gd",), env={k: str(v) for k, v in player.items()})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            seen = {key: set() for key in player}
+            for name in names:
+                with self.subTest(test=name):
+                    reported = json.loads((root / "env" / name).read_text())
+                    for key, player_path in player.items():
+                        value = reported[key]
+                        self.assertTrue(value, f"{key} must be set for every test")
+                        self.assertFalse(Path(value).is_relative_to(player_path), f"{key} must not be the player's")
+                        self.assertTrue(Path(value).is_relative_to(root / "tmp"), f"{key} must be gate scratch")
+                        self.assertFalse(Path(value).exists(), f"{key} must be removed once the gate returns")
+                        seen[key].add(value)
+                    self.assertTrue(Path(reported["TMPDIR"]).is_relative_to(root / "tmp"))
+            for key, values in seen.items():
+                self.assertEqual(len(values), len(names), f"{key} must differ between tests")
+            for path in player.values():
+                self.assertEqual(sorted(os.listdir(path)), ["keep.txt"], "tests must not touch player storage")
+            # Serial still means alone: no other test started while solo ran.
+            events = (root / "events.log").read_text().splitlines()
+            start = events.index("start tests/solo.gd")
+            self.assertEqual(events[start + 1], "end tests/solo.gd")
+            self.assert_owned_state_released(root)
 
     def test_invalid_parallelism_fails_before_any_launch(self):
         with self.fixture({"alpha": "pass", "beta": "pass"}) as (root, godot):
@@ -261,11 +405,54 @@ class GateDispatchTests(unittest.TestCase):
             self.assertIn("tests/alpha.gd (no result recorded", result.stderr)
 
     def test_worker_killed_before_recording_fails_closed(self):
-        with self.fixture({"alpha": "pass", "victim": "kill-worker"}) as (root, godot):
-            result, launches = self.dispatch(root, godot, "1", ["alpha", "victim"])
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn("tests/victim.gd", launches)
-            self.assertIn("tests/victim.gd (no result recorded", result.stderr)
+        # The victim's fake Godot SIGKILLs its outer worker, so no trap in that
+        # worker can run, then lingers with a detached child of its own.
+        for serial in ((), ("tests/victim.gd",)):
+            with self.subTest(serial=serial), self.fixture({"alpha": "pass", "victim": "kill-worker"}) as (root, godot):
+                result, launches = self.dispatch(root, godot, "1", ["alpha", "victim"], serial=serial)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertIn("tests/victim.gd", launches)
+                self.assertEqual(len(self.recorded_pids(root, "victim")), 2, "the slow descendants must have started")
+                self.assertIn("tests/victim.gd (no result recorded", result.stderr)
+                self.assertNotIn("  tests/alpha.gd", result.stderr)
+                self.assert_owned_state_released(root)
+
+    def test_process_left_behind_by_a_passing_test_fails_and_is_stopped(self):
+        for serial in ((), ("tests/leaky.gd",)):
+            with self.subTest(serial=serial), self.fixture({"alpha": "pass", "leaky": "leak"}) as (root, godot):
+                result, _ = self.dispatch(root, godot, "2", ["alpha", "leaky"], serial=serial)
+                self.assertNotEqual(result.returncode, 0)
+                self.assertEqual(len(self.recorded_pids(root, "leaky")), 1)
+                self.assertIn("left running", result.stderr)
+                self.assert_owned_state_released(root)
+
+    def test_terminated_gate_stops_its_tests_and_scratch(self):
+        names = {"solo": "linger", "alpha": "linger", "beta": "linger"}
+        # With parallelism 2 the first two scheduled tests start; serially, only solo.
+        for serial, waiting in (((), ("solo", "alpha")), (("tests/solo.gd",), ("solo",))):
+            with self.subTest(serial=serial), self.fixture(names) as (root, godot):
+                gate = self.launch(root, godot, "2", names, serial=serial)
+                started = wait_for(lambda: all((root / "ready" / name).exists() for name in waiting))
+                os.killpg(gate.pid, signal.SIGTERM)
+                result, _ = self.finish(root, gate)
+                self.assertTrue(started, "lingering tests never started")
+                self.assertNotEqual(result.returncode, 0)
+                self.assert_owned_state_released(root)
+
+    def test_killed_gate_still_stops_its_tests(self):
+        # SIGKILL leaves the gate no chance to clean up, so its test processes
+        # must be stopped by the owner it started; scratch removal needs the gate.
+        with self.fixture({"alpha": "linger", "beta": "linger"}) as (root, godot):
+            gate = self.launch(root, godot, "2", ["alpha", "beta"])
+            try:
+                self.assertTrue(wait_for(lambda: all((root / "ready" / name).exists() for name in ("alpha", "beta"))))
+                owners = [pid for pid, argv in fixture_processes(root) if "gate_owner.py" in argv]
+                self.assertEqual(len(owners), 1, "the parallel phase must run under one process owner")
+                os.kill(process_parent(owners[0]), signal.SIGKILL)
+                self.assertTrue(wait_for(lambda: not fixture_processes(root)), fixture_processes(root))
+            finally:
+                gate.kill()
+                gate.wait(timeout=60)
 
     def test_duplicate_completion_record_fails_closed(self):
         with self.fixture({"alpha": "pass", "twice": "forge-duplicate"}) as (root, godot):

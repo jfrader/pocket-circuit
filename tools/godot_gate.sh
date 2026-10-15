@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 
+# This file's directory, for gate_owner.py; callers source this file.
+GODOT_GATE_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd -P)"
+
 run_godot_checked() (
 	set -o pipefail
 	local command_log
@@ -60,31 +63,62 @@ validate_gate_parallelism() {
 	fi
 }
 
-# Runs one test in its own process and user-data dir, so tests touching user://
-# save files cannot collide, then appends exactly one PASS/FAIL record.
+# Runs one test in its own process with a disposable XDG root and TMPDIR inside
+# the gate's scratch directory, so tests touching user:// save files can neither
+# collide nor reach the player's data, then appends exactly one PASS/FAIL
+# record. Once the gate removes its scratch, a late write fails rather than
+# recreating anything.
 run_test_isolated() (
-	local project_root="$1" godot_bin="$2" results_file="$3" test_relative="$4"
-	local iso_dir log_file result=0
-	iso_dir="$(mktemp -d "${TMPDIR:-/tmp}/pc-test-userdata.XXXXXX")" || return 1
-	log_file="$(mktemp "${TMPDIR:-/tmp}/pc-test-log.XXXXXX")" || { rm -rf -- "$iso_dir"; return 1; }
-	XDG_DATA_HOME="$iso_dir" run_godot_test_checked "$project_root" "$godot_bin" "$test_relative" >"$log_file" 2>&1 || result=1
+	local project_root="$1" godot_bin="$2" scratch_dir="$3" results_file="$4" test_relative="$5"
+	local test_dir result=0
+	test_dir="$(mktemp -d "$scratch_dir/test.XXXXXX")" || return 1
+	mkdir -- "$test_dir/data" "$test_dir/config" "$test_dir/cache" "$test_dir/state" "$test_dir/tmp" \
+		|| { rm -rf -- "$test_dir"; return 1; }
+	XDG_DATA_HOME="$test_dir/data" XDG_CONFIG_HOME="$test_dir/config" XDG_CACHE_HOME="$test_dir/cache" \
+		XDG_STATE_HOME="$test_dir/state" TMPDIR="$test_dir/tmp" \
+		run_godot_test_checked "$project_root" "$godot_bin" "$test_relative" >"$test_dir/log" 2>&1 || result=1
 	if (( result == 0 )); then
 		printf 'PASS %s\n' "$test_relative"
 		printf 'PASS\t%s\n' "$test_relative" >> "$results_file" || result=1
 	else
 		printf 'FAIL %s\n' "$test_relative" >&2
 		printf 'FAIL\t%s\n' "$test_relative" >> "$results_file"
-		sed 's/^/  /' "$log_file" >&2
+		sed 's/^/  /' "$test_dir/log" >&2
 	fi
-	rm -rf -- "$iso_dir" "$log_file"
+	rm -rf -- "$test_dir"
 	return "$result"
 )
 
+# Runs a command under gate_owner.py, which kills and reaps every process the
+# command leaves behind (even below a SIGKILLed worker) before returning. It
+# runs in the background so a trapped signal can interrupt the wait.
+run_owned() {
+	python3 "$GODOT_GATE_DIR/gate_owner.py" "$@" &
+	gate_owner_pid=$!
+	local status=0
+	wait "$gate_owner_pid" || status=$?
+	gate_owner_pid=
+	return "$status"
+}
+
+# Signal trap for run_gate_tests: stop the owner, and with it every test
+# process, before exiting so the exit trap removes scratch nothing still uses.
+stop_gate_owner() {
+	if [[ -n "${gate_owner_pid:-}" ]]; then
+		kill -TERM "$gate_owner_pid" 2>/dev/null || true
+		wait "$gate_owner_pid" || true
+	fi
+	exit "$1"
+}
+
 # Runs the source test gate: the listed serial tests one at a time, the rest in
-# parallel. Every scheduled test must record exactly one result, so a worker
-# that never launched, was killed or recorded twice fails the gate, and so does
-# any xargs error not explained by a recorded test failure. All failures are
-# listed before returning non-zero.
+# parallel, each isolated by run_test_isolated. Every scheduled test must record
+# exactly one result, so a worker that never launched, was killed or recorded
+# twice fails the gate, and so does a test leaving processes running or any
+# worker error not explained by a recorded test failure. All failures are listed
+# before returning non-zero. Results are read only after every process the
+# tests started has ended, and all scratch lives in one directory removed on
+# exit or on HUP, INT or TERM.
 # Usage: run_gate_tests <project-root> <godot-bin> <parallelism> [serial-test...] -- <test...>
 run_gate_tests() (
 	local project_root="$1" godot_bin="$2" parallelism="$3"
@@ -118,28 +152,41 @@ run_gate_tests() (
 		is_serial[$serial]=1
 	done
 
-	local results_file
-	results_file="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-gate-results.XXXXXX")" || return 1
+	local scratch results_file gate_owner_pid=
+	scratch="$(mktemp -d "${TMPDIR:-/tmp}/pocket-circuit-gate.XXXXXX")" || return 1
+	trap 'rm -rf -- "$scratch"' EXIT
+	trap 'stop_gate_owner 129' HUP
+	trap 'stop_gate_owner 130' INT
+	trap 'stop_gate_owner 143' TERM
+	results_file="$scratch/results"
+	: > "$results_file" || return 1
+	export -f run_godot_checked run_godot_test_checked run_test_isolated
+
+	# Serial tests run alone, outside xargs, but isolated like the others.
+	# Status 1 is a failure the test recorded; anything else means its worker
+	# died or left processes running.
+	local serial_result
 	for test_relative in "${scheduled[@]}"; do
 		if [[ -z "${is_serial[$test_relative]:-}" ]]; then
 			parallel_tests+=("$test_relative")
 			continue
 		fi
 		printf 'Running %s...\n' "$test_relative"
-		if run_godot_test_checked "$project_root" "$godot_bin" "$test_relative"; then
-			printf 'PASS\t%s\n' "$test_relative" >> "$results_file"
-		else
-			printf 'FAIL\t%s\n' "$test_relative" >> "$results_file"
+		serial_result=0
+		run_owned bash -c 'run_test_isolated "$@"' _ \
+			"$project_root" "$godot_bin" "$scratch" "$results_file" "$test_relative" \
+			|| serial_result=$?
+		if (( serial_result > 1 )); then
+			failed+=("serial gate worker for $test_relative did not complete (exit $serial_result)")
 		fi
 	done
 
 	local xargs_result=0
 	if (( ${#parallel_tests[@]} > 0 )); then
 		printf 'Running %d gate tests with parallelism %s...\n' "${#parallel_tests[@]}" "$parallelism"
-		export -f run_godot_checked run_godot_test_checked run_test_isolated
-		printf '%s\0' "${parallel_tests[@]}" \
-			| xargs -0 -P "$parallelism" -I{} bash -c 'run_test_isolated "$@"' _ \
-				"$project_root" "$godot_bin" "$results_file" {} \
+		printf '%s\0' "${parallel_tests[@]}" > "$scratch/parallel-tests" || return 1
+		run_owned xargs -0 -a "$scratch/parallel-tests" -P "$parallelism" -I{} bash -c 'run_test_isolated "$@"' _ \
+			"$project_root" "$godot_bin" "$scratch" "$results_file" {} \
 			|| xargs_result=$?
 	fi
 
@@ -156,7 +203,6 @@ run_gate_tests() (
 			failed+=("unexpected gate result record: $outcome $test_relative")
 		fi
 	done < "$results_file"
-	rm -f -- "$results_file"
 
 	local pass_count fail_count
 	for test_relative in "${scheduled[@]}"; do
@@ -173,7 +219,8 @@ run_gate_tests() (
 		fi
 	done
 	# xargs exits 123 when a worker returned 1-125, which recorded failures
-	# explain; any other non-zero status means workers failed to run or died.
+	# explain; any other non-zero status means workers failed to run or died,
+	# or (125 from gate_owner.py) left processes running.
 	if (( xargs_result != 0 )) && ! (( xargs_result == 123 && ${#failed[@]} > 0 )); then
 		failed+=("parallel gate workers did not all complete (xargs exit $xargs_result)")
 	fi
