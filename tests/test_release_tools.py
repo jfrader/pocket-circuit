@@ -149,6 +149,136 @@ class GodotGateTests(unittest.TestCase):
         result = self.run_worker('print("still preparing")')
         self.assertNotEqual(result.returncode, 0)
 
+    def test_marker_must_be_a_whole_output_word(self):
+        for line in ("FIXTURE PASS_NOT_FINISHED", "FIXTURE PASSED", "PRE_FIXTURE PASS", "NOT FIXTURE PASS", "FIXTURE PAS"):
+            with self.subTest(line=line):
+                result = self.run_worker(f'print({line!r}); print("shutting down")')
+                self.assertNotEqual(result.returncode, 0, "a marker prefix or suffix must not count as completion")
+                self.assertIn("expected success marker", result.stderr)
+
+    def test_marker_with_details_and_later_shutdown_output_passes(self):
+        for line in ("FIXTURE PASS", "FIXTURE PASS checked=12 assets=3"):
+            with self.subTest(line=line):
+                result = self.run_worker(f'print("loading"); print({line!r}); print("Godot shutdown: freed resources")')
+                self.assertEqual(result.returncode, 0, result.stderr)
+
+
+# Fake Godot for dispatcher tests: the first line of each fixture test selects
+# its behaviour. Every launch is logged so tests can prove what actually ran.
+FAKE_DISPATCH_GODOT = r'''#!/usr/bin/env python3
+import os, signal, sys
+root = sys.argv[sys.argv.index("--path") + 1]
+script = sys.argv[sys.argv.index("--script") + 1].removeprefix("res://")
+with open(os.path.join(root, "launches.log"), "a") as log:
+    log.write(script + "\n")
+behaviour = open(os.path.join(root, script)).readline().removeprefix("#").strip()
+marker = os.path.basename(script).removesuffix(".gd").upper() + "_TEST PASS"
+
+def worker_argv_and_pid():
+    # Walk up to the outermost bash worker that xargs launched for this test.
+    found = None
+    pid = os.getppid()
+    while pid > 1:
+        with open(f"/proc/{pid}/cmdline", "rb") as handle:
+            argv = handle.read().split(b"\0")
+        if os.path.basename(argv[0]) == b"bash" and any(b"run_test_isolated" in arg for arg in argv):
+            found = (pid, argv)
+        with open(f"/proc/{pid}/stat") as handle:
+            pid = int(handle.read().rsplit(")", 1)[1].split()[1])
+    return found
+
+if behaviour == "fail":
+    print("FAIL: deliberate fixture failure")
+    sys.exit(1)
+if behaviour == "kill-worker":
+    os.kill(worker_argv_and_pid()[0], signal.SIGKILL)
+if behaviour == "forge-duplicate":
+    argv = worker_argv_and_pid()[1]
+    results_file = argv[argv.index(script.encode()) - 1].decode()
+    with open(results_file, "a") as results:
+        results.write(f"PASS\t{script}\n")
+print(marker)
+'''
+
+
+class GateDispatchTests(unittest.TestCase):
+    @contextmanager
+    def fixture(self, behaviours):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            (root / "tests").mkdir()
+            (root / "tools").mkdir()
+            shutil.copyfile(ROOT / "tools/test_success_marker.py", root / "tools/test_success_marker.py")
+            for name, behaviour in behaviours.items():
+                marker = name.upper() + "_TEST PASS"
+                (root / f"tests/{name}.gd").write_text(f'# {behaviour}\nprint("{marker}")\n')
+            fake_godot = root / "godot"
+            fake_godot.write_text(FAKE_DISPATCH_GODOT)
+            fake_godot.chmod(0o755)
+            yield root, fake_godot
+
+    def dispatch(self, root, fake_godot, parallelism, tests, serial=()):
+        result = subprocess.run(
+            ["bash", "-c", 'source "$1"; shift; run_gate_tests "$@"', "gate-test", str(ROOT / "tools/godot_gate.sh"),
+             str(root), str(fake_godot), parallelism, *serial, "--", *(f"tests/{name}.gd" for name in tests)],
+            capture_output=True, text=True, timeout=60,
+        )
+        log = root / "launches.log"
+        launches = sorted(log.read_text().splitlines()) if log.exists() else []
+        return result, launches
+
+    def test_all_passing_tests_pass(self):
+        names = {"alpha": "pass", "beta": "pass", "gamma": "pass", "delta": "pass"}
+        with self.fixture(names) as (root, godot):
+            result, launches = self.dispatch(root, godot, "2", names, serial=("tests/delta.gd",))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(launches, sorted(f"tests/{name}.gd" for name in names))
+
+    def test_every_failed_test_is_reported_before_refusing(self):
+        names = {"alpha": "fail", "beta": "pass", "gamma": "fail", "delta": "fail"}
+        with self.fixture(names) as (root, godot):
+            result, launches = self.dispatch(root, godot, "2", names, serial=("tests/delta.gd",))
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(len(launches), 4, "one failure must not stop the remaining tests")
+            for name in ("alpha", "gamma", "delta"):
+                self.assertIn(f"  tests/{name}.gd\n", result.stderr)
+            self.assertNotIn("  tests/beta.gd", result.stderr)
+
+    def test_invalid_parallelism_fails_before_any_launch(self):
+        with self.fixture({"alpha": "pass", "beta": "pass"}) as (root, godot):
+            for parallelism in ("", "0", "-1", "abc", "2x", "1.5", " 2", "08"):
+                with self.subTest(parallelism=parallelism):
+                    result, launches = self.dispatch(root, godot, parallelism, ["alpha", "beta"])
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("parallelism", result.stderr)
+                    self.assertEqual(launches, [])
+
+    def test_xargs_launch_failure_fails_closed(self):
+        with self.fixture({"alpha": "pass", "beta": "pass"}) as (root, godot):
+            result, launches = self.dispatch(root, godot, "99999999999999999999", ["alpha", "beta"])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(launches, [])
+            self.assertIn("tests/alpha.gd (no result recorded", result.stderr)
+
+    def test_worker_killed_before_recording_fails_closed(self):
+        with self.fixture({"alpha": "pass", "victim": "kill-worker"}) as (root, godot):
+            result, launches = self.dispatch(root, godot, "1", ["alpha", "victim"])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("tests/victim.gd", launches)
+            self.assertIn("tests/victim.gd (no result recorded", result.stderr)
+
+    def test_duplicate_completion_record_fails_closed(self):
+        with self.fixture({"alpha": "pass", "twice": "forge-duplicate"}) as (root, godot):
+            result, _ = self.dispatch(root, godot, "2", ["alpha", "twice"])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn("tests/twice.gd (duplicate results", result.stderr)
+
+    def test_duplicate_scheduled_test_fails_before_any_launch(self):
+        with self.fixture({"alpha": "pass"}) as (root, godot):
+            result, launches = self.dispatch(root, godot, "2", ["alpha", "alpha"])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertEqual(launches, [])
+
 
 class NativeAddonDocumentationTests(unittest.TestCase):
     def readme(self):
