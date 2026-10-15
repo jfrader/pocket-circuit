@@ -36,6 +36,8 @@
 
 ### Fixed
 - Car comparison headings stay inside their offer and garage cards.
+- Unused run stops stay open after Back or a restart until you choose the next route.
+- Run-only parts no longer follow won cars into Quick Race after the night ends.
 - Run endings keep the night's outcome visible after saving, and race results distinguish saved progress from a failed write.
 - Invalid run saves are rejected before opening the board instead of leaving an unusable route.
 - Run stop cards state the actual finish/DNF wear penalty and full bench repair.
