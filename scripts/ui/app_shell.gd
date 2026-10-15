@@ -3,6 +3,7 @@ extends CanvasLayer
 const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
+const RUN_BOARD_SCENE := preload("res://scripts/ui/run_board_scene.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
@@ -284,39 +285,75 @@ func show_run_board() -> void:
 		return
 	_run_surface()
 	var night_over := sess.is_failed() or sess.is_complete()
+	var tabletop := RUN_BOARD_SCENE.new()
+	tabletop.name = "RunTabletop"
+	tabletop.act = sess.current_map.act
+	tabletop.scene_mode = &"night_won" if sess.is_complete() else &"night_lost" if sess.is_failed() else &"board"
+	tabletop.car_id = sess.current_car_id
+	tabletop.reduced_motion = _reduced_motion_enabled()
+	tabletop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(tabletop)
+	tabletop.arrive()
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 64)
+	columns.add_theme_constant_override("separation", 76)
 	_content.add_child(columns)
 	var left := VBoxContainer.new()
 	left.add_theme_constant_override("separation", 8)
 	columns.add_child(left)
 	var board := RUN_MAP_VIEW.new()
 	board.name = "RunBoard"
+	board.tabletop = true
 	board.reduced_motion = _reduced_motion_enabled()
 	left.add_child(board)
 	if not night_over:
-		left.add_child(RUN_UI.label(RUN_UI.BOARD_CONTROLS, 10, RUN_UI.MUTED, true))
+		var instructions := RUN_UI.label(RUN_UI.BOARD_CONTROLS, 10, SKIN.CREAM, true)
+		instructions.add_theme_stylebox_override("normal", RUN_BOARD_SCENE.label_tape())
+		left.add_child(instructions)
 	board.configure(sess, not night_over, IDENTITIES.car_texture(sess.current_car_id))
+	if night_over:
+		board.hide_route_visuals()
 	_run_board = board
 	if _app.has_method("prewarm_run_stops"):
 		_app.call("prewarm_run_stops")
 	var detail := VBoxContainer.new()
 	detail.name = "RunDetail"
-	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.custom_minimum_size.x = 420
+	detail.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	detail.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	detail.add_theme_constant_override("separation", 6)
 	columns.add_child(detail)
-	detail.add_child(RUN_UI.label("THE RUN · ACT %d / %d · %s" % [sess.current_map.act, RunSession.FINAL_ACT, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 12, RUN_UI.AMBER, true))
-	_run_stats(detail, sess)
+	var chalkboard := RUN_BOARD_SCENE.new()
+	chalkboard.name = "RunChalkboard"
+	chalkboard.chalkboard = true
+	chalkboard.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	chalkboard.show_behind_parent = true
+	detail.add_child(chalkboard)
+	var chalk_inset := MarginContainer.new()
+	chalk_inset.name = "ChalkboardInset"
+	for edge: String in ["left", "right", "top", "bottom"]:
+		chalk_inset.add_theme_constant_override("margin_" + edge, RUN_BOARD_SCENE.CHALK_PADDING)
+	detail.add_child(chalk_inset)
+	var chalk_content := VBoxContainer.new()
+	chalk_content.add_theme_constant_override("separation", 6)
+	chalk_inset.add_child(chalk_content)
+	var act_label := RUN_UI.label("THE RUN · ACT %d / %d · %s" % [sess.current_map.act, RunSession.FINAL_ACT, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 12, SKIN.CREAM, true)
+	act_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	act_label.visible = not night_over
+	chalk_content.add_child(act_label)
+	_run_stats(chalk_content, sess)
+	RUN_BOARD_SCENE.chalk_labels(chalk_content)
 	_run_stop_card = VBoxContainer.new()
 	_run_stop_card.name = "RunStop"
 	_run_stop_card.add_theme_constant_override("separation", 6)
-	_run_stop_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_run_stop_card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	detail.add_child(_run_stop_card)
 	_run_actions = detail
 	var unsaved := String(_app.get("run_save_error"))
 	if night_over:
 		_run_stop_card.add_child(RUN_UI.label("NIGHT OVER", 12, RUN_UI.AMBER, true))
-		_run_stop_card.add_child(RUN_UI.label(RUN_UI.NIGHT_WON if sess.is_complete() else RUN_UI.NIGHT_LOST, 20, RUN_UI.MUTED))
+		var ending := RUN_UI.label(RUN_UI.NIGHT_WON if sess.is_complete() else RUN_UI.NIGHT_LOST, 20, RUN_UI.MUTED)
+		ending.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_run_stop_card.add_child(ending)
 	if not unsaved.is_empty():
 		detail.add_child(RUN_UI.label("NOT SAVED · " + unsaved.to_upper(), 12, RUN_UI.AMBER, true))
 		if not bool(_app.call("is_save_read_only")):
@@ -332,8 +369,15 @@ func show_run_board() -> void:
 	_run_action("BACK", Callable(self, "show_title"), false, false, "ActionBack")
 	_run_actions = detail
 	RUN_UI.spacer(_content, 10)
-	RUN_UI.divider(_content)
-	_content.add_child(RUN_UI.legend(sess.current_map))
+	if not night_over:
+		RUN_UI.divider(_content)
+	var legend := RUN_UI.legend(sess.current_map)
+	legend.visible = not night_over
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
+	if night_over:
+		RUN_BOARD_SCENE.ink_labels(_run_stop_card)
 	_queue_content_entrance()
 	if night_over:
 		_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
@@ -382,6 +426,7 @@ func _show_run_stop(stop_id: String, sess: RunSession) -> void:
 	go.pressed.connect(_go_to_run_stop.bind(stop_id, false))
 	_wire_button_audio(go)
 	_run_stop_card.add_child(go)
+	RUN_BOARD_SCENE.ink_labels(_run_stop_card)
 	_link_board_focus(stop_id)
 	RUN_UI.stagger_in(_run_stop_card.get_children(), _reduced_motion_enabled())
 
@@ -1133,6 +1178,9 @@ func _clear_content() -> void:
 	_run_going = false
 	_page.show()
 	_run_backdrop.hide()
+	for dressing: Node in _run_backdrop.get_children():
+		_run_backdrop.remove_child(dressing)
+		dressing.queue_free()
 	_footer.get_parent().show()
 	_run_actions = null
 	if is_instance_valid(_route):
