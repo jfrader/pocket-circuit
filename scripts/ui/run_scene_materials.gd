@@ -11,7 +11,6 @@ const SHADOW_STRIP := preload("res://assets/textures/edge_dressing/shadow_strip.
 const WRENCH := preload("res://assets/textures/workshop_hero/hero_workshop_wrench.png")
 const MAT_GRAIN := preload("res://assets/textures/world_materials/workshop_mat.png")
 const CARDBOARD := preload("res://assets/textures/ground_dressing/workshop_cardboard_scrap.png")
-const TAPE_ROLL := preload("res://assets/textures/environment_pilot/workshop_masking_tape.png")
 const TAPE_CORNER := preload("res://assets/textures/track_boundary/workshop_tape_corner.png")
 const STICKY_CORNER := preload("res://assets/textures/track_boundary/office_sticky_corner.png")
 const ROOM_DRESSING := {

@@ -159,7 +159,34 @@ func _draw() -> void:
 		SKIN.draw_tape(self, Vector2(size.x - 20, size.y * 0.4), Vector2(125, 28), -0.7, SKIN.CREAM)
 		for line in 7:
 			draw_line(Vector2(size.x - 46, size.y * 0.55 + line * 9), Vector2(size.x, size.y * 0.55 + line * 9), Color(SKIN.CREAM, 0.22), 1)
-	draw_texture_rect(MATERIALS.TAPE_ROLL, Rect2(size.x - 110, 8, 88, 88), false, Color(0.8, 0.8, 0.65, 0.8))
+	_draw_tape_roll(Rect2(size.x - 112, 6, 88, 88))
+
+
+## A rolled masking tape with its core, standing on the table edge. Drawn
+## procedurally: the painted roll source lives under assets/textures/
+## environment_pilot/, which export presets exclude.
+func _draw_tape_roll(rect: Rect2) -> void:
+	MATERIALS.shadow(self, Rect2(rect.position + Vector2(6, 16), rect.size), true)
+	var center := rect.get_center()
+	var radius := rect.size.x * 0.5
+	# A slight top-down tilt so the roll reads as a cylinder, not a disc.
+	draw_set_transform(center, 0.0, Vector2(1.0, 0.82))
+	# Outer paper with a visible thickness edge.
+	draw_circle(Vector2.ZERO, radius, Color("e2d4ae"))
+	draw_arc(Vector2.ZERO, radius * 0.96, 0, TAU, 96, Color("c3b183"), 2.5, true)
+	draw_arc(Vector2.ZERO, radius * 0.99, 0.6, 2.6, 48, Color("f2e6c4"), 2.0, true)
+	# Wound paper: fine, low-contrast layers.
+	for ring in 4:
+		var r := radius * (0.38 + 0.09 * ring)
+		draw_arc(Vector2.ZERO, r, 0, TAU, 96, Color("b3a377", 0.5), 1.2, true)
+	# Hollow core: cardboard wall around a dark opening.
+	draw_circle(Vector2.ZERO, radius * 0.30, Color("c9a56c"))
+	draw_circle(Vector2.ZERO, radius * 0.24, Color("5b4a30"))
+	draw_circle(Vector2.ZERO, radius * 0.20, Color("3a2f1f"))
+	draw_arc(Vector2.ZERO, radius * 0.26, PI * 0.7, PI * 1.6, 24, Color("e8cf9c"), 2.0, true)
+	# Contact shading on the lower rim.
+	draw_arc(Vector2.ZERO, radius * 0.96, PI * 0.15, PI * 0.85, 48, Color(0.01, 0.02, 0.04, 0.12), 2.5, true)
+	draw_set_transform(Vector2.ZERO)
 
 
 func _draw_saucer(center: Vector2) -> void:
