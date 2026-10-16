@@ -278,6 +278,15 @@ func _test_current_run_migration(store: SaveStore) -> bool:
 	loaded = store.load_data()
 	if not _expect(int(loaded["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_points",0)) == 12, "supported current_run data roundtrips via normalize"):
 		return false
+	var restored := RUN_SESSION.deserialize(loaded["current_run"])
+	if not _expect(restored != null and restored.node_opponents == run.node_opponents, "save store preserves every node's assigned drivers"):
+		return false
+	with_run["current_run"].erase("node_opponents")
+	if not _expect(store.save_data(with_run), "save legacy run without assigned drivers"):
+		return false
+	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
+	if not _expect(restored != null and not restored.opponents_for_node(restored.current_node_id).is_empty(), "legacy run loads and supplies a race field"):
+		return false
 
 	# garage: a v5 save has none; stored won cars are validated and deduplicated
 	_write_raw(TEST_PATH, "{\"version\":5,\"current_run\":{}}")
