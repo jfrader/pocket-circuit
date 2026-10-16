@@ -17,6 +17,17 @@ func _run_test() -> void:
 	var store := SAVE_STORE_SCRIPT.new(TEST_PATH) as SaveStore
 	store.remove_save()
 	var data := store.default_data()
+	if not _expect(data.get("run_intro_seen", true) == false, "brand-new profiles have not seen the run intro"):
+		return
+	if not _expect(store.save_data(data), "intro migration fixture creates its save directory"):
+		return
+	var legacy_intro := data.duplicate(true)
+	legacy_intro.erase("run_intro_seen")
+	_write_raw(TEST_PATH, JSON.stringify(legacy_intro))
+	if not _expect(not _read_json(TEST_PATH).has("run_intro_seen") and bool(store.load_data().get("run_intro_seen", false)), "existing saves without the additive intro flag normalize to seen"):
+		return
+	if not _expect(store.save_data(data) and store.load_data().get("run_intro_seen", true) == false, "an explicitly unseen intro flag survives saving before dismissal"):
+		return
 	if not _expect(not bool(data["championship_started"]), "new saves should not start a championship implicitly"):
 		return
 	if not _expect(int(data["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(data["championship_circuit"]["seed"]) == 665001 and data["championship_circuit"]["events"].size() == CATALOG.EVENTS.size() and (data["mastery_circuit_metrics"] as Dictionary).is_empty() and data["circuit_history"].is_empty() and data["favorite_circuits"].is_empty(), "new saves should carry complete circuit identity and empty mastery/discovery collections"):

@@ -4,6 +4,7 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
 const RUN_BOARD_SCENE := preload("res://scripts/ui/run_board_scene.gd")
+const RUN_BOARD_INTRO := preload("res://scripts/ui/run_board_intro.gd")
 const RUN_BENCH_SCENE := preload("res://scripts/ui/run_bench_scene.gd")
 const RUN_VAN_SCENE := preload("res://scripts/ui/run_van_scene.gd")
 const RUN_LOCKUP_SCENE := preload("res://scripts/ui/run_lockup_scene.gd")
@@ -35,6 +36,8 @@ var _stage: AppShellStage
 var _route: Control
 var _footer: Label
 var _run_backdrop: ColorRect
+var _run_intro: Control
+var _run_intro_pending := false
 var _run_actions: BoxContainer
 ## The board's map, the picked stop's card, and whether the car is driving to a stop.
 var _run_board: RUN_MAP_VIEW
@@ -412,6 +415,32 @@ func show_run_board() -> void:
 	var first := sess.current_node_id if sess.is_stop_pending() else String(sess.available_nodes()[0]["id"]) if not sess.available_nodes().is_empty() else sess.current_node_id
 	board.preview(first)
 	_grab_button_focus_after_layout(board.marker(first), _entrance_generation)
+	if _run_intro_pending:
+		_run_intro_pending = false
+		if not bool((_app.call("get_save_data") as Dictionary).get("run_intro_seen", true)):
+			_show_run_intro(tabletop, board)
+
+
+func _show_run_intro(tabletop: Control, board: Control) -> void:
+	var note := RUN_BOARD_INTRO.new()
+	note.name = "RunIntro"
+	note.reduced_motion = _reduced_motion_enabled()
+	var marker: Button = board.call("marker", board.call("selected_id"))
+	if marker.position.x + marker.size.x * 0.5 < RUN_BOARD_SCENE.MAP_SIZE.x * 0.5:
+		note.anchor_position.x = RUN_BOARD_SCENE.PAGE_INSET.x + RUN_BOARD_SCENE.MAP_SIZE.x - RUN_BOARD_INTRO.NOTE_RECT.size.x - RUN_BOARD_INTRO.EDGE_MARGIN
+	_run_intro = note
+	note.dismissed.connect(func() -> void:
+		_run_intro = null
+		_app.call("dismiss_run_intro"))
+	tabletop.add_child(note)
+	board.connect("stop_selected", note.dismiss.unbind(1))
+	for node: Node in _content.find_children("*", "Button", true, false):
+		(node as Button).pressed.connect(note.dismiss)
+
+
+func _dismiss_run_intro() -> void:
+	if is_instance_valid(_run_intro):
+		_run_intro.call("dismiss")
 
 
 ## The run's stats, animating what changed since they were last shown.
@@ -1484,6 +1513,7 @@ func _apply_compact_button_art(button: Button) -> void:
 
 
 func _clear_content() -> void:
+	_dismiss_run_intro()
 	_page.add_theme_constant_override("margin_left", PAGE_MARGIN)
 	_page.add_theme_constant_override("margin_right", PAGE_MARGIN)
 	_page.add_theme_constant_override("margin_top", PAGE_TOP)
@@ -1544,9 +1574,9 @@ func _on_art_action(action: StringName) -> void:
 		&"championship":
 			_app.call("continue_championship" if _app.call("has_championship_progress") else "request_new_championship")
 		&"new_run":
-			_app.call("start_new_run")
-			show_run_board()
+			_on_new_run_pressed()
 		&"your_run":
+			_app.call("dismiss_run_intro")
 			show_run_board()
 		&"quick_race":
 			_app.call("open_quick_race")
@@ -2098,7 +2128,9 @@ func _on_run_node_pressed(node_id: String) -> void:
 
 
 func _on_new_run_pressed() -> void:
-	_app.call("start_new_run")
+	var session: RunSession = _app.call("start_new_run")
+	var progress: Dictionary = _app.call("get_save_data")
+	_run_intro_pending = session != null and not bool(progress.get("run_intro_seen", true))
 	show_run_board()
 
 
