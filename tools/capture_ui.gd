@@ -107,8 +107,14 @@ func _run() -> void:
 		var focus_id := OS.get_environment("PC_SHOT_CAR")
 		((menu.get("_vehicle_buttons") as Dictionary)[focus_id if not focus_id.is_empty() else won[won.size() - 1]] as Button).grab_focus()
 	elif shot == "board":
-		app.call("start_run", 424242)
-		shell.call("show_run_board")
+		if OS.get_environment("PC_SHOT_FRESH") == "1":
+			if bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", true)) or app.call("current_run_session") != null:
+				_fail("PC_SHOT_FRESH requires a new profile without an active run")
+				return
+			shell.call("_on_art_action", &"new_run")
+		else:
+			app.call("start_run", 424242)
+			shell.call("show_run_board")
 	elif WALK.has(shot):
 		var target := String(WALK[shot])
 		var found := false

@@ -6,6 +6,8 @@ const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const BOARD_IDENTITY := preload("res://scripts/ui/run_board_identity.gd")
 const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
+const INTRO := preload("res://scripts/ui/run_board_intro.gd")
+const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
 
 class EmptyAssignments extends RunSession:
 	func opponents_for_node(_node_id: String) -> Dictionary:
@@ -24,6 +26,8 @@ func _run() -> void:
 		await process_frame
 	var app := root.get_node("App")
 	var shell := app.get("_shell") as CanvasLayer
+	if not await _test_intro(app, shell):
+		return
 	if not _expect(bool(app.call("update_setting", "reduced_motion", false)), "material-motion fixture enables ambient motion"):
 		return
 	var session: RunSession = app.call("start_run", 2426001)
@@ -201,6 +205,86 @@ func _run() -> void:
 	victory_light.queue_free()
 	print("RUN_BOARD_SCENE_TEST PASS rooms=3 endings=2 route=hidden shadow=single reduced_motion=fade_only")
 	quit(0)
+
+
+func _test_intro(app: Node, shell: CanvasLayer) -> bool:
+	if not _expect(not bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", true)), "fresh profile begins with an unseen run intro"):
+		return false
+	shell.call("_on_art_action", &"new_run")
+	for frame in 4:
+		await process_frame
+	await create_timer(0.2).timeout
+	var note := shell.find_child("RunIntro", true, false) as Control
+	var session: RunSession = app.call("current_run_session")
+	var board := shell.find_child("RunBoard", true, false) as Control
+	if not _expect(note != null and note.is_visible_in_tree() and note.mouse_filter == Control.MOUSE_FILTER_IGNORE and note.focus_mode == Control.FOCUS_NONE and root.gui_get_focus_owner() == board.call("marker", session.current_node_id), "first NEW RUN shows a nonblocking note without stealing initial marker focus"):
+		return false
+	var copy := note.get_node("RunIntroCopy") as Label
+	if not _expect(copy.text == INTRO.COPY and copy.get_line_count() <= 3 and note.position.y == INTRO.NOTE_RECT.position.y and note.size == INTRO.NOTE_RECT.size and Rect2(Vector2.ZERO, note.size).grow(-8).encloses(copy.get_rect()) and not note.get_global_rect().intersects((board.call("marker", session.current_node_id) as Control).get_global_rect()), "intro is three literal lines on a contained slip clear of the opening marker"):
+		return false
+	(board.call("marker", session.current_node_id) as Button).pressed.emit()
+	await process_frame
+	if not _expect(shell.find_child("RunIntro", true, false) == null and shell.get("_screen") == "run_board" and not bool(shell.get("_run_going")), "first press dismisses intro and only picks the preview, without travel"):
+		return false
+	var store: SaveStore = app.get("_save_store")
+	var loaded := SAVE_STORE.new(store.save_path).load_data()
+	if not _expect(bool(loaded.get("run_intro_seen", false)), "dismissal is written to the profile save"):
+		return false
+	app.set("_save_data", loaded)
+	app.set("_current_run_session", RunSession.deserialize(loaded["current_run"]))
+	shell.call("show_run_board")
+	await process_frame
+	if not _expect(shell.find_child("RunIntro", true, false) == null, "save/load never reopens the dismissed note"):
+		return false
+	if not _expect(bool(app.call("confirm_new_championship")) and bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", false)), "championship reset preserves the additive intro flag"):
+		return false
+	shell.call("_on_art_action", &"new_run")
+	await process_frame
+	if not _expect(shell.find_child("RunIntro", true, false) == null, "subsequent NEW RUN never repeats the note"):
+		return false
+	var fresh := (app.call("get_save_data") as Dictionary).duplicate(true)
+	fresh["run_intro_seen"] = false
+	app.set("_save_data", fresh)
+	app.call("update_setting", "reduced_motion", true)
+	shell.call("_on_art_action", &"new_run")
+	for frame in 4:
+		await process_frame
+	note = shell.find_child("RunIntro", true, false) as Control
+	if not _expect(note != null and note.modulate == Color.WHITE and note.position == note.get("anchor_position"), "reduced-motion intro is static"):
+		return false
+	board = shell.find_child("RunBoard", true, false) as Control
+	session = app.call("current_run_session")
+	for id: String in session.current_map.nodes:
+		if id != session.current_node_id:
+			(board.call("marker", id) as Button).grab_focus()
+			break
+	await process_frame
+	if not _expect(shell.find_child("RunIntro", true, false) == null and bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", false)), "focus travel dismisses the static intro and marks it seen"):
+		return false
+	fresh = (app.call("get_save_data") as Dictionary).duplicate(true)
+	fresh["run_intro_seen"] = false
+	app.set("_save_data", fresh)
+	shell.call("_on_art_action", &"new_run")
+	for frame in 4:
+		await process_frame
+	board = shell.find_child("RunBoard", true, false) as Control
+	var preview := String(board.call("selected_id"))
+	if not _expect(shell.find_child("RunIntro", true, false) != null, "input fixture begins with an intro note"):
+		return false
+	for down: bool in [true, false]:
+		var move := InputEventAction.new()
+		move.action = &"ui_up"
+		move.pressed = down
+		Input.parse_input_event(move)
+		await process_frame
+	if not _expect(shell.find_child("RunIntro", true, false) == null and board.call("selected_id") != preview and bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", false)), "first directional input dismisses without consuming the board's focus movement"):
+		return false
+	fresh = (app.call("get_save_data") as Dictionary).duplicate(true)
+	fresh["run_intro_seen"] = false
+	app.set("_save_data", fresh)
+	shell.call("_on_art_action", &"your_run")
+	await process_frame
+	return _expect(shell.find_child("RunIntro", true, false) == null and bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", false)), "resuming an existing run skips and retires an unseen intro")
 
 
 func _expect_ending(shell: CanvasLayer, mode: StringName, hero_name: String, tint: Color) -> bool:

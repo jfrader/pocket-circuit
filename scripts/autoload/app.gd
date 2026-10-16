@@ -353,6 +353,7 @@ func confirm_new_championship() -> bool:
 		"reduced_motion": _save_data["reduced_motion"],
 		"player_avatar_seed": get_player_avatar_seed(),
 		"first_run": false,
+		"run_intro_seen": bool(_save_data.get("run_intro_seen", true)),
 		"mastery_records": _save_data.get("mastery_records", []).duplicate(true),
 		"personal_ghosts": _save_data.get("personal_ghosts", []).duplicate(true),
 		"circuit_history": _save_data.get("circuit_history", []).duplicate(true),
@@ -1461,6 +1462,13 @@ func current_run_session() -> RunSession:
 
 func run_board_session() -> RunSession:
 	return _current_run_session if _current_run_session != null else _ended_run_board
+
+
+func dismiss_run_intro() -> bool:
+	if bool(_save_data.get("run_intro_seen", true)):
+		return true
+	_save_data["run_intro_seen"] = true
+	return _save_candidate(_save_data)
 
 
 ## Starts a fresh run for the seed and persists its opening state.
