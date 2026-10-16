@@ -1413,6 +1413,7 @@ func _build_base() -> void:
 	margin.add_theme_constant_override("margin_right", PAGE_MARGIN)
 	margin.add_theme_constant_override("margin_bottom", roundi(SKIN.BENCH_LIP) + 6)
 	_root.add_child(margin)
+	margin.minimum_size_changed.connect(func() -> void: margin.set_deferred("size", _root.size))
 	var page := VBoxContainer.new()
 	page.add_theme_constant_override("separation", 8)
 	margin.add_child(page)

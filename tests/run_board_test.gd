@@ -229,17 +229,17 @@ func _run_test() -> void:
 	# With a run in progress the title offers to continue it, not to replace it.
 	shell.call("show_title")
 	await process_frame
-	var continue_button := _button_with_text(shell, "YOUR RUN")
-	if not _expect(continue_button != null and _button_with_text(shell, "NEW RUN") == null, "the title offers YOUR RUN while a run is on"):
+	var continue_button := _button_with_text(shell, "PLAY")
+	if not _expect(continue_button != null and _button_with_text(shell, "NEW RUN") == null and _button_with_text(shell, "YOUR RUN") == null, "primary PLAY replaces separate NEW RUN/YOUR RUN labels"):
 		return
 	continue_button.pressed.emit()
 	await process_frame
-	if not _expect(shell.find_child("RunBoard", true, false) != null and app.call("current_run_session") == sess, "YOUR RUN returns to the same run"):
+	if not _expect(shell.find_child("RunBoard", true, false) != null and app.call("current_run_session") == sess, "PLAY returns to the same existing run"):
 		return
 	app.call("abandon_run")
 	shell.call("show_title")
 	await process_frame
-	if not _expect(_button_with_text(shell, "NEW RUN") != null, "with no run the title offers NEW RUN"):
+	if not _expect(_button_with_text(shell, "PLAY") != null, "with no run the title offers primary PLAY"):
 		return
 	if not _expect((shell.get("_run_backdrop") as ColorRect).visible == false, "leaving a run screen must restore the title backdrop"):
 		return
