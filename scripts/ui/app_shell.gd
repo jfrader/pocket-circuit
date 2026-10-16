@@ -6,6 +6,7 @@ const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
 const RUN_BOARD_SCENE := preload("res://scripts/ui/run_board_scene.gd")
 const RUN_BENCH_SCENE := preload("res://scripts/ui/run_bench_scene.gd")
 const RUN_VAN_SCENE := preload("res://scripts/ui/run_van_scene.gd")
+const RUN_LOCKUP_SCENE := preload("res://scripts/ui/run_lockup_scene.gd")
 const RUN_MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
@@ -809,9 +810,59 @@ func show_run_lockup() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_run_node_intro(sess, "lockup")
+	_run_surface()
+	var scene := RUN_LOCKUP_SCENE.new()
+	scene.name = "RunLockupScene"
+	scene.act = sess.current_map.act
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.already_open = sess.lockup_used
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 110)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size = Vector2(420, RUN_LOCKUP_SCENE.UI_COLUMN_HEIGHT)
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
+	var header := PanelContainer.new()
+	header.name = "LockupChalkboard"
+	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	RUN_MATERIALS.finish_panel(header, true)
+	left.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
+	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["lockup"]["name"]), 30, SKIN.CREAM))
+	var copy := RUN_UI.label(String(RUN_UI.TYPES["lockup"]["copy"]), 16, SKIN.CREAM)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(copy)
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
+	var action_space := Control.new()
+	action_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(action_space)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 12)
+	left.add_child(actions)
+	_run_actions = actions
+	var context := RUN_MAP_VIEW.new()
+	context.name = "RunContextMap"
+	context.reduced_motion = _reduced_motion_enabled()
+	columns.add_child(context)
+	context.configure(sess, false)
+	context.hide_route_visuals()
 	_run_action("OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
+	RUN_BENCH_SCENE.dress_button(actions.get_child(0) as Button, true)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	RUN_BENCH_SCENE.dress_button(actions.get_child(1) as Button)
+	RUN_UI.spacer(_content, RUN_LOCKUP_SCENE.LEGEND_SPACER)
+	var legend := RUN_UI.legend(sess.current_map)
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
 	_focus_first()
 
 
@@ -887,8 +938,22 @@ func _finish_van_confirmation(part_id: String) -> void:
 
 func _on_lockup_open_pressed() -> void:
 	_play_ui_confirm()
-	_app.call("run_open_lockup")
-	show_run_board()
+	var opened := bool(_app.call("run_open_lockup"))
+	_finish_lockup_confirmation(opened)
+
+
+func _finish_lockup_confirmation(opened: bool) -> void:
+	var generation := _entrance_generation
+	var scene := _run_backdrop.get_node_or_null("RunLockupScene") as RUN_LOCKUP_SCENE
+	var button := _content.find_child("LockupOpen", true, false) as Button
+	var sess: RunSession = _app.call("current_run_session") as RunSession
+	if opened and scene != null and button != null and sess != null and not sess.pending_offer.is_empty():
+		button.disabled = true
+		var duration := scene.confirm(button, sess.pending_offer)
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	if generation == _entrance_generation and _screen == "run_lockup":
+		show_run_board()
 
 
 func _on_errand_choice_pressed(choice: int) -> void:
