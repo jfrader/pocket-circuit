@@ -51,7 +51,7 @@ func _run_test() -> void:
 		return
 	var part: Dictionary = RunParts.deal(1806, sess.car_stats(car_id))[0]
 	sess.parts_held.append(part)
-	if not _expect(bool(app.call("run_bench_fit", 0)) and not (CATALOG.get_vehicle(car_id).get("fitted_parts", []) as Array).is_empty(), "fitting a real held part changes the live won car"):
+	if not _expect(bool(app.call("run_bench_fit", 0)) and not (sess.car_record(car_id).get("fitted_parts", []) as Array).is_empty(), "fitting a real held part changes the live won car"):
 		return
 
 	# Lose the night on the act rival: the car still goes to the garage.
@@ -85,12 +85,11 @@ func _run_test() -> void:
 		return
 
 	var vehicle: Dictionary = CATALOG.get_vehicle(car_id)
-	var base: Dictionary = CATALOG.base_vehicle_for_type(String(garage[0]["type"]))
-	if not _expect(String(vehicle.get("name", "")) != String(base["name"]), "a won car has its own generated name"):
+	if not _expect(not String(vehicle.get("name", "")).is_empty(), "the won car keeps the rival vehicle's real name"):
 		return
 	var rolled := CATALOG.create_vehicle_stats(car_id)
-	var shipped := CATALOG.create_vehicle_stats(String(base["id"]))
-	if not _expect(not is_equal_approx(rolled.max_speed, shipped.max_speed) or not is_equal_approx(rolled.engine_force, shipped.engine_force), "a won car drives on its roll, not on its base car"):
+	var shipped := CATALOG.create_vehicle_stats(car_id)
+	if not _expect(is_equal_approx(rolled.max_speed, shipped.max_speed) and is_equal_approx(rolled.engine_force, shipped.engine_force), "the won car drives exactly like the car the rival drove"):
 		return
 	if not _expect(car_id in (app.call("quick_race_roster") as Array), "Quick Race offers the won car"):
 		return
@@ -126,6 +125,8 @@ func _run_test() -> void:
 	if not _expect(not blocked.won_cars().is_empty(), "the third duel wins a car"):
 		return
 	var blocked_car := String(blocked.won_cars()[0]["id"])
+	if not _expect(blocked.send_it_home(), "sending the haul home makes it collection-safe before the block"):
+		return
 	var store: Object = app.get("_save_store")
 	app.set("_save_store", FailingSaveStore.new(path))
 	app.call("abandon_run")
