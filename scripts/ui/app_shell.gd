@@ -7,6 +7,7 @@ const RUN_BOARD_SCENE := preload("res://scripts/ui/run_board_scene.gd")
 const RUN_BENCH_SCENE := preload("res://scripts/ui/run_bench_scene.gd")
 const RUN_VAN_SCENE := preload("res://scripts/ui/run_van_scene.gd")
 const RUN_LOCKUP_SCENE := preload("res://scripts/ui/run_lockup_scene.gd")
+const RUN_ERRAND_SCENE := preload("res://scripts/ui/run_errand_scene.gd")
 const RUN_MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
@@ -877,12 +878,68 @@ func show_run_errand() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_run_node_intro(sess, "errand")
+	_run_surface()
+	var scene := RUN_ERRAND_SCENE.new()
+	scene.name = "RunErrandScene"
+	scene.act = sess.current_map.act
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 110)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size = Vector2(420, RUN_ERRAND_SCENE.UI_COLUMN_HEIGHT)
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
+	var header := PanelContainer.new()
+	header.name = "ErrandChalkboard"
+	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	RUN_MATERIALS.finish_panel(header, true)
+	left.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
+	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["errand"]["name"]), 30, SKIN.CREAM))
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
+	var action_space := Control.new()
+	action_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(action_space)
+	var back_row := HBoxContainer.new()
+	left.add_child(back_row)
+	var context := RUN_MAP_VIEW.new()
+	context.name = "RunContextMap"
+	context.reduced_motion = _reduced_motion_enabled()
+	columns.add_child(context)
+	context.configure(sess, false)
+	context.hide_route_visuals()
+	var slips := VBoxContainer.new()
+	slips.name = "ErrandSlips"
+	slips.add_theme_constant_override("separation", 22)
+	slips.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	slips.offset_left = 24
+	slips.offset_right = -24
+	slips.offset_top = 128
+	slips.offset_bottom = -100
+	context.add_child(slips)
+	_run_actions = slips
 	var car_clean := sess.run_state.get_car_wear(sess.current_car_id) == RunState.WEAR_LEVELS[0]
 	_run_action("TAKE THE PAY · %d" % RunSession.ERRAND_PAY_POINTS, Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandPay")
+	scene.register_choice(slips.get_child(0) as Button, 0)
 	_run_action("TAKE A TUNE-UP", Callable(self, "_on_errand_choice_pressed").bind(1), false, car_clean, "ErrandTuneUp")
+	scene.register_choice(slips.get_child(1) as Button, 1)
+	_run_actions = back_row
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_focus_first()
+	RUN_BENCH_SCENE.dress_button(back_row.get_child(0) as Button)
+	var legend := RUN_UI.legend(sess.current_map)
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
+	_queue_content_entrance()
+	_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
 
 
 func _on_bench_repair_pressed() -> void:
@@ -958,8 +1015,22 @@ func _finish_lockup_confirmation(opened: bool) -> void:
 
 func _on_errand_choice_pressed(choice: int) -> void:
 	_play_ui_confirm()
-	_app.call("run_resolve_errand", choice)
-	show_run_board()
+	var resolved := bool(_app.call("run_resolve_errand", choice))
+	_finish_errand_confirmation(choice, resolved)
+
+
+func _finish_errand_confirmation(choice: int, resolved: bool) -> void:
+	var generation := _entrance_generation
+	var scene := _run_backdrop.get_node_or_null("RunErrandScene") as RUN_ERRAND_SCENE
+	var button := _content.find_child("ErrandPay" if choice == 0 else "ErrandTuneUp", true, false) as Button
+	if resolved and scene != null and button != null:
+		for action: Node in _content.find_children("Errand*", "Button", true, false):
+			(action as Button).disabled = true
+		var duration := scene.confirm(button, choice)
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	if generation == _entrance_generation and _screen == "run_errand":
+		show_run_board()
 
 
 func show_briefing(event_id: String) -> void:
