@@ -62,6 +62,8 @@ func _run() -> void:
 		var toy := marker.get_node_or_null("ToyToken") as Control
 		if not _expect(toy != null and toy.mouse_filter == Control.MOUSE_FILTER_IGNORE, "physical toys leave input on the existing marker"):
 			return
+		if not _expect(board.call("selected_id") == session.current_node_id and bool(toy.get("selected")), "opening preview retains its selected ring and physical token highlight"):
+			return
 		toy.set("reduced_motion", true)
 		toy.call("set_selected", true)
 		if not _expect(is_zero_approx(float(toy.get("lift"))), "reduced motion selects without token lift"):

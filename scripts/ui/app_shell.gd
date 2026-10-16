@@ -386,7 +386,7 @@ func show_run_board() -> void:
 	board.stop_selected.connect(func(_stop_id: String) -> void: _play_ui_move())
 	board.stop_confirmed.connect(_go_to_run_stop.bind(true))
 	var first := sess.current_node_id if sess.is_stop_pending() else String(sess.available_nodes()[0]["id"]) if not sess.available_nodes().is_empty() else sess.current_node_id
-	board.select(first)
+	board.preview(first)
 	_grab_button_focus_after_layout(board.marker(first), _entrance_generation)
 
 

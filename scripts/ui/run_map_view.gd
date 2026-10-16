@@ -49,6 +49,8 @@ var _current := ""
 var _available: Array[String] = []
 var _done: Dictionary = {}
 var _selected := ""
+var _picked := ""
+var _setting_selection := false
 var _interactive := false
 var _picked_by_press := false
 var _header: Label
@@ -152,13 +154,31 @@ func selected_id() -> String:
 
 ## Picks a stop: it grows and gets the ring, and the route to it flows.
 func select(stop_id: String) -> void:
-	if _travelling or not _buttons.has(stop_id) or stop_id == _selected:
+	if _travelling or not _buttons.has(stop_id):
+		return
+	_picked = stop_id
+	_set_selected(stop_id)
+
+
+## Initial facts and ring are visible, but automatic focus does not count as a pick.
+func preview(stop_id: String) -> void:
+	if _travelling or not _buttons.has(stop_id):
+		return
+	_picked = ""
+	_picked_by_press = false
+	_set_selected(stop_id)
+
+
+func _set_selected(stop_id: String) -> void:
+	if stop_id == _selected:
 		return
 	_selected = stop_id
 	# Keyboard focus follows the pick, so the map shows one ring.
 	var button := _buttons[stop_id] as Button
 	if _interactive and button.is_inside_tree() and not button.has_focus():
+		_setting_selection = true
 		button.grab_focus()
+		_setting_selection = false
 	_rest_markers()
 	queue_redraw()
 	stop_selected.emit(stop_id)
@@ -201,8 +221,10 @@ func reset_token() -> void:
 
 
 func _on_marker_focused(stop_id: String) -> void:
+	if _setting_selection:
+		return
 	# A mouse press focuses before it presses: that press only picks the stop.
-	_picked_by_press = stop_id != _selected and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
+	_picked_by_press = stop_id != _picked and Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT)
 	select(stop_id)
 
 
@@ -212,7 +234,7 @@ func _on_marker_pressed(stop_id: String) -> void:
 	if _picked_by_press:
 		_picked_by_press = false
 		return
-	if stop_id != _selected:
+	if stop_id != _picked:
 		select(stop_id)
 		return
 	stop_confirmed.emit(stop_id)
