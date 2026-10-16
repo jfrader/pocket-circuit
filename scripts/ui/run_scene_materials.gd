@@ -27,6 +27,10 @@ const SUN_SLOPE := 0.55
 const SUN_PHASE := 0.2
 const SUN_RISE := Vector2(0.02, 0.16)
 const SUN_FALL := Vector2(0.51, 0.72)
+const CHALK_TILE_SCALE := 1.5
+const CHALK_CORE_ALPHA := 0.5
+const TOKEN_CONTACT_SPREAD := 1.16
+const TOKEN_HIGHLIGHT := Color("fff3d6")
 static var _brush: ImageTexture
 static var _hero_cache: Dictionary = {}
 static var _mote_shader: Shader
@@ -95,13 +99,45 @@ static func finish_button(button: Button) -> void:
 		grain(button, Rect2(Vector2(4, 4), button.size - Vector2(8, 8))))
 
 
-static func chalk_line(item: CanvasItem, from: Vector2, to: Vector2, tint: Color) -> void:
+## A chalk/tape stroke. The brush is tiled at its own scale, so its alpha noise
+## breaks the stroke up along its length, over a thin solid core that keeps the
+## connection continuous.
+static func chalk_line(item: CanvasItem, from: Vector2, to: Vector2, tint: Color, width: float = 6.0) -> void:
 	var length := from.distance_to(to)
 	if length <= 0.0:
 		return
+	var brush := chalk_brush()
+	var span := float(brush.get_width()) * CHALK_TILE_SCALE
 	item.draw_set_transform(from, (to - from).angle())
-	item.draw_texture_rect(chalk_brush(), Rect2(0, -3, length, 6), false, tint)
+	item.draw_line(Vector2.ZERO, Vector2(length, 0), Color(tint, tint.a * CHALK_CORE_ALPHA), maxf(1.0, width * 0.25), true)
+	var at := 0.0
+	while at < length:
+		var step := minf(span, length - at)
+		var source := Rect2(0, 0, step / CHALK_TILE_SCALE, brush.get_height())
+		item.draw_texture_rect_region(brush, Rect2(at, -width * 0.5, step, width), source, tint)
+		at += span
 	item.draw_set_transform(Vector2.ZERO)
+
+
+## A round tabletop token lit from the upper left: a soft ambient shadow and a
+## tight contact shadow, a narrow shaded side wall below the face, the rim in
+## `rim` at `rim_width`, and a lamp highlight on its upper-left edge at
+## `highlight` strength. Lifting raises the face and lets the contact shadow
+## spread and fade. Returns the face centre.
+static func token(item: CanvasItem, center: Vector2, radius: float, face: Color, edge: Color, rim: Color, depth: float, lift: float = 0.0, rim_width: float = 2.0, highlight: float = 1.0) -> Vector2:
+	shadow(item, Rect2(center + Vector2(3, 5) - Vector2.ONE * radius * 1.35, Vector2.ONE * radius * 2.7), true, 0.4)
+	var contact := radius * TOKEN_CONTACT_SPREAD + lift * 1.5
+	item.draw_texture_rect(SHADOW_CIRCLE, Rect2(center + Vector2(1, depth + 1) - Vector2.ONE * contact, Vector2.ONE * contact * 2.0), false, Color(SHADOW_TINT, 0.95 - lift * 0.12))
+	var top := center - Vector2(0, lift)
+	# The side wall: dark where it meets the table, a step lighter under the face.
+	item.draw_circle(top + Vector2(0, depth), radius, edge)
+	item.draw_circle(top + Vector2(0, depth * 0.5), radius, edge.lerp(face, 0.45))
+	item.draw_circle(top, radius, face)
+	item.draw_arc(top, radius - 2.5, PI * 0.15, PI * 0.85, 32, Color(0, 0, 0, 0.3), 2.5, true)
+	item.draw_arc(top, radius - 1.0, 0, TAU, 48, rim, rim_width, true)
+	item.draw_arc(top, radius - 0.6, PI * 1.02, PI * 1.58, 24, Color(TOKEN_HIGHLIGHT, 0.75 * highlight), 1.4, true)
+	item.draw_arc(top, radius - 3.2, PI * 1.08, PI * 1.5, 20, Color(TOKEN_HIGHLIGHT, 0.4 * highlight), 1.0, true)
+	return top
 
 
 static func add_room_dressing(parent: Control, act: int, seed_value: int, enabled: bool = true) -> Control:

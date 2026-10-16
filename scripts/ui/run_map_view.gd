@@ -9,6 +9,9 @@ extends Control
 
 signal stop_selected(stop_id: String)
 signal stop_confirmed(stop_id: String)
+## Where the board's light gathers, in map coordinates: the player's stop first,
+## then the stops that can be gone to.
+signal focus_changed(points: PackedVector2Array)
 
 const UI := preload("res://scripts/ui/run_ui.gd")
 const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
@@ -17,6 +20,7 @@ const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const PADDING := 36.0
 const BOSS_Y := 72.0
 const BOSS_LABEL_SIZE := Vector2(136, 20)
+const BOSS_TAG_SIZE := Vector2(84, 20)
 const BOSS_LABEL_GAP := 26.0
 const ROW_TOP := 144.0
 const BOTTOM := 30.0
@@ -39,6 +43,20 @@ const TRAVEL_TIME := 0.45
 const PULSE_PERIOD := 1.4
 const DASH := 7.0
 const DASH_SPEED := 22.0
+const HEADER_SIZE := 22
+const NIGHT_SIZE := 13
+const NIGHT_TONE := Color(SKIN.CREAM, 0.58)
+const NIGHT_GAP := 18.0
+## Tabletop routes by how close they are to the player's next move: chalk
+## alpha and width, then the ink underlay's alpha and width. Routes the player
+## can take now are brightest and widest, so width carries the order as well
+## as tone.
+const ROUTE_LIVE := Color("fff4dc")
+const ROUTE_TIERS := {
+	&"live": [1.0, 7.0, 0.42, 10.0],
+	&"near": [0.78, 6.0, 0.22, 6.0],
+	&"far": [0.36, 4.5, 0.08, 5.0],
+}
 
 var reduced_motion := false
 var tabletop := false
@@ -59,6 +77,7 @@ var _setting_selection := false
 var _interactive := false
 var _picked_by_press := false
 var _header: Label
+var _night: Label
 var _boss_label: Label
 var _reveal := 1.0
 var _clock := 0.0
@@ -80,12 +99,17 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 	if tabletop:
 		_header.add_theme_color_override("font_color", SKIN.CREAM)
 		if _interactive:
+			# The act and room lead; the night's number is a quiet reference after them.
 			_header.name = "MapMetadata"
-			_header.text = "NIGHT %d · ACT %d · %s" % [session.run_seed, _map.act, String(UI.ROOMS[_map.act]).to_upper()]
+			_header.text = "ACT %d · %s" % [_map.act, String(UI.ROOMS[_map.act]).to_upper()]
 			_header.add_theme_font_override("font", ThemeDB.fallback_font)
-			_header.add_theme_font_size_override("font_size", 20)
-	_header.position = Vector2(22, 10 if tabletop and _interactive else 18)
+			_header.add_theme_font_size_override("font_size", HEADER_SIZE)
+			_night = UI.label("NIGHT %d" % session.run_seed, NIGHT_SIZE, NIGHT_TONE)
+			_night.name = "MapNight"
+	_header.position = Vector2(22, 8 if tabletop and _interactive else 18)
 	add_child(_header)
+	if _night != null:
+		add_child(_night)
 	for entry: Dictionary in session.available_nodes():
 		_available.append(String(entry["id"]))
 	var result: Array[Button] = []
@@ -111,6 +135,8 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 				prop.name = "StopChip"
 				prop.kind = kind
 				prop.done = _done.has(id) and id != _current
+				# Only the player's stop and those they can go to wear the lead rim.
+				prop.reachable = id == _current or id in _available
 				prop.reduced_motion = reduced_motion
 				if interactive:
 					button.mouse_entered.connect(func() -> void: prop.hovered = true)
@@ -128,10 +154,12 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 			_buttons[id] = button
 			result.append(button)
 			if kind == "act_rival":
-				_boss_label = UI.label("ACT RIVAL", 10, UI.AMBER, true)
+				# On the table it is a small tag rather than another mono caption.
+				_boss_label = UI.label("ACT RIVAL", 11 if tabletop else 10, UI.AMBER, not tabletop)
 				_boss_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 				var plate := StyleBoxFlat.new()
-				plate.bg_color = UI.PANEL
+				plate.bg_color = Color(SKIN.INK, 0.72) if tabletop else UI.PANEL
+				plate.set_corner_radius_all(3 if tabletop else 0)
 				_boss_label.add_theme_stylebox_override("normal", plate)
 				add_child(_boss_label)
 	if token != null and (interactive or tabletop):
@@ -165,6 +193,18 @@ func hide_route_visuals() -> void:
 		if child is CanvasItem:
 			(child as CanvasItem).hide()
 	queue_redraw()
+
+
+## How close a route is to the player's next move: `live` leaves the player's
+## stop for one they can go to, `near` continues from those stops or retraces
+## the night's trail, and `far` is the rest of the act.
+func route_tier(from_id: String, to_id: String) -> StringName:
+	if from_id == _current and to_id in _available:
+		return &"live"
+	var travelled := (_done.has(from_id) or from_id == _current) and (_done.has(to_id) or to_id == _current)
+	if from_id in _available or travelled:
+		return &"near"
+	return &"far"
 
 
 func selected_id() -> String:
@@ -321,13 +361,25 @@ func _layout() -> void:
 			boss_y if row == boss_row else lerpf(extent.y - bottom_padding, ROW_TOP, float(row) / float(maxi(1, boss_row - 1)))
 		)
 		if row == boss_row:
-			_boss_label.size = BOSS_LABEL_SIZE
-			_boss_label.position = Vector2(centre.x - BOSS_LABEL_SIZE.x * 0.5, centre.y + BOSS_LABEL_GAP)
+			var tag := BOSS_TAG_SIZE if tabletop else BOSS_LABEL_SIZE
+			_boss_label.size = tag
+			_boss_label.position = Vector2(centre.x - tag.x * 0.5, centre.y + BOSS_LABEL_GAP)
 		_centres[id] = centre
 		var button := _buttons[id] as Button
 		button.position = centre - button.size * 0.5
 	if _token != null and not _travelling and _centres.has(_current):
 		_token.position = (_centres[_current] as Vector2) - _token.size * 0.5
+	if _night != null:
+		# Baseline-aligned after the act and room.
+		var header_height := _header.get_minimum_size().y
+		_night.size = _night.get_minimum_size()
+		_night.position = Vector2(_header.position.x + _header.get_minimum_size().x + NIGHT_GAP, _header.position.y + header_height - _night.size.y - 2.0)
+	if _interactive and _centres.has(_current):
+		var focus := PackedVector2Array([_centres[_current]])
+		for id: String in _available:
+			if _centres.has(id):
+				focus.append(_centres[id])
+		focus_changed.emit(focus)
 	queue_redraw()
 
 
@@ -339,9 +391,11 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ONE * 0.5, size - Vector2.ONE), UI.LINE, false, 1.0)
 	else:
 		if _interactive:
-			draw_colored_polygon(PackedVector2Array([Vector2(12, 7), Vector2(size.x - 18, 4), Vector2(size.x - 12, 35), Vector2(size.x - 30, 39), Vector2(14, 42), Vector2(8, 25)]), Color("344a41"))
-			MATERIALS.grain(self, Rect2(15, 10, size.x - 40, 26), true)
-			draw_line(Vector2(18, 40), Vector2(size.x - 32, 37), Color(SKIN.CREAM, 0.24), 1, true)
+			# The header tape ends just after the night's number.
+			var end := size.x - 12.0 if _night == null else minf(size.x - 12.0, _night.position.x + _night.size.x + 34.0)
+			draw_colored_polygon(PackedVector2Array([Vector2(12, 7), Vector2(end - 6, 4), Vector2(end, 35), Vector2(end - 18, 39), Vector2(14, 42), Vector2(8, 25)]), Color("344a41"))
+			MATERIALS.grain(self, Rect2(15, 10, end - 28, 26), true)
+			draw_line(Vector2(18, 40), Vector2(end - 20, 37), Color(SKIN.CREAM, 0.24), 1, true)
 	if _map == null:
 		return
 	var rows := float(maxi(1, _map.num_rows - 1))
@@ -352,21 +406,27 @@ func _draw() -> void:
 			continue
 		for child: Dictionary in _map.get_children(id):
 			var child_id := String(child["id"])
+			var live := id == _current and child_id in _available
 			var color := Color("a6a596") if tabletop else UI.LINE
 			if String(child["type"]) == "act_rival":
 				color = UI.BOSS_EDGE
-			if id == _current and child_id in _available:
-				color = UI.LIVE_EDGE
+			if live:
+				color = ROUTE_LIVE if tabletop else UI.LIVE_EDGE
 			var from: Vector2 = _centres[id]
 			var to: Vector2 = from.lerp(_centres[child_id] as Vector2, shown)
-			if id == _current and child_id == _selected and child_id in _available:
+			var flowing := live and child_id == _selected
+			if tabletop:
+				var tier: Array = ROUTE_TIERS[route_tier(id, child_id)]
+				var chalk := color if live else color.lightened(0.25)
+				draw_line(from, to, Color(SKIN.INK, tier[2]), tier[3], true)
+				# Under the flowing dashes the route stays drawn, faintly, end to end.
+				MATERIALS.chalk_line(self, from, to, Color(chalk, float(tier[0]) * (0.4 if flowing else 1.0)), tier[1])
+				if flowing:
+					_draw_flow(from, to, tier[1])
+			elif flowing:
 				_draw_flow(from, to)
 			else:
-				if tabletop:
-					draw_line(from, to, Color(SKIN.INK, 0.23), 5, true)
-					MATERIALS.chalk_line(self, from, to, color.lightened(0.25))
-				else:
-					draw_line(from, to, color, 1.0, true)
+				draw_line(from, to, color, 1.0, true)
 	var pulse := 0.5 + 0.5 * sin(_clock * TAU / PULSE_PERIOD)
 	if _interactive:
 		for id: String in _available:
@@ -390,7 +450,7 @@ func _draw() -> void:
 
 
 ## The route to the picked stop, as dashes running toward it.
-func _draw_flow(from: Vector2, to: Vector2) -> void:
+func _draw_flow(from: Vector2, to: Vector2, width: float = 6.0) -> void:
 	var length := from.distance_to(to)
 	if length <= 0.0:
 		return
@@ -401,7 +461,7 @@ func _draw_flow(from: Vector2, to: Vector2) -> void:
 		var end := minf(at + DASH, length)
 		if end > start:
 			if tabletop:
-				MATERIALS.chalk_line(self, from + direction * start, from + direction * end, UI.AMBER)
+				MATERIALS.chalk_line(self, from + direction * start, from + direction * end, UI.AMBER, width)
 			else:
 				draw_line(from + direction * start, from + direction * end, UI.AMBER, 2.0, true)
 		at += DASH * 2.0

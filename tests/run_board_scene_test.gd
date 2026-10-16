@@ -9,6 +9,8 @@ const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const STOP_CAR := preload("res://scripts/ui/run_stop_car.gd")
 const INTRO := preload("res://scripts/ui/run_board_intro.gd")
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
+const MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
+const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
 
 class EmptyAssignments extends RunSession:
 	func opponents_for_node(_node_id: String) -> Dictionary:
@@ -72,8 +74,31 @@ func _run() -> void:
 			return
 		var metadata := shell.find_child("RunMetadata", true, false) as Label
 		var header := board.get_node("MapMetadata") as Label
-		if not _expect(metadata.get_line_count() == 2 and header.text == "NIGHT %d · ACT %d · %s" % [session.run_seed, act, String(SCENE.ROOM_NAMES[act]).to_upper()] and header.get_theme_font_size("font_size") == 20 and board.get_node_or_null("MapSeed") == null and header.text.count(str(session.run_seed)) == 1, "painted night/act/room header shows the night identifier once, with no residual seed label"):
+		var night := board.get_node_or_null("MapNight") as Label
+		if not _expect(metadata.get_line_count() == 2 and header.text == "ACT %d · %s" % [act, String(SCENE.ROOM_NAMES[act]).to_upper()] and night != null and night.text == "NIGHT %d" % session.run_seed and board.get_node_or_null("MapSeed") == null and (header.text + night.text).count(str(session.run_seed)) == 1, "painted header leads with act and room and shows the night identifier once, with no residual seed label"):
 			return
+		if not _expect(night.get_theme_font_size("font_size") < header.get_theme_font_size("font_size") and night.get_theme_color("font_color").a < header.get_theme_color("font_color").a and night.position.x >= header.position.x + header.size.x and night.get_rect().end.y <= header.get_rect().end.y + 1.0, "the night number sits after the act and room, smaller and quieter"):
+			return
+		var lamp := (table.get_node("Lamplight") as ColorRect).material as ShaderMaterial
+		var focus: PackedVector2Array = table.call("focus_points")
+		var available: Array = session.available_nodes()
+		var current_marker := board.call("marker", session.current_node_id) as Button
+		if not _expect(int(lamp.get_shader_parameter("focus_count")) == focus.size() and focus.size() == 1 + available.size() and focus[0].is_equal_approx(current_marker.position + current_marker.size * 0.5), "the board's light gathers on the player's stop and each stop they can go to"):
+			return
+		var tiers: Dictionary = {}
+		for id: String in session.current_map.nodes:
+			for child: Dictionary in session.current_map.get_children(id):
+				var tier: StringName = board.call("route_tier", id, String(child["id"]))
+				tiers[tier] = true
+				if id == session.current_node_id and board.call("is_reachable", String(child["id"])) and not _expect(tier == &"live", "every route the player can take now is in the brightest tier"):
+					return
+		var route_tiers: Dictionary = MAP_VIEW.ROUTE_TIERS
+		# At the start the only move is the pending race, so routes onward from it lead.
+		if not _expect(tiers.has(&"near") and tiers.has(&"far") and not tiers.has(&"live"), "with a race pending, routes on from the player's stop lead and the rest of the act recedes"):
+			return
+		for wider: Array in [[&"live", &"near"], [&"near", &"far"]]:
+			if not _expect(float(route_tiers[wider[0]][1]) > float(route_tiers[wider[1]][1]) and float(route_tiers[wider[0]][0]) > float(route_tiers[wider[1]][0]), "nearer routes are wider as well as brighter, so tone is not the only cue"):
+				return
 		if not _expect(bool((shell.find_child("RunChalkboard", true, false) as Control).get("refined_cards")), "active detail opts into finer layered chalkboard and paper edges"):
 			return
 		var chip_icons: Dictionary = {}
@@ -82,7 +107,16 @@ func _run() -> void:
 			var chip := (board.call("marker", id) as Button).get_node_or_null("StopChip") as Control
 			if not _expect(chip != null and chip.get("kind") == kind and chip.call("icon") == RUN_UI.TYPES[kind]["icon"] and chip.get("car_look") == null and chip.find_children("*", "TextureRect", true, false).is_empty(), "every map stop is an abstract chip carrying its kind's map icon, never a car sprite"):
 				return
+			var leads: bool = id == session.current_node_id or bool(board.call("is_reachable", id))
+			var chip_selected := bool(chip.get("selected")) or bool(chip.get("hovered"))
+			if not chip_selected and not _expect(chip.call("rim_tier") == (&"reachable" if leads else &"distant"), "stops the player can go to wear the lead rim and the rest of the act sits back"):
+				return
 			chip_icons[chip.call("icon")] = true
+		var rim_tiers: Dictionary = BOARD_TOKEN.RIM_TIERS
+		if not _expect(float(rim_tiers[&"reachable"][0]) > float(rim_tiers[&"distant"][0]) and float(rim_tiers[&"reachable"][1]) > float(rim_tiers[&"distant"][1]), "reachable chip rims are brighter and thicker than distant ones, so tone is not the only cue"):
+			return
+		if not _expect(SCENE.FOCUS_CHOICE_REACH <= SCENE.FOCUS_PLAYER_REACH and SCENE.FOCUS_PLAYER_REACH < 0.1 and SCENE.FOCUS_PEAK < 0.9, "the focus light is small, soft pools rather than a wash over the map"):
+			return
 		var legend_icons: Dictionary = {}
 		for icon: Node in shell.find_child("RunLegend", true, false).find_children("*", "TextureRect", true, false):
 			legend_icons[(icon as TextureRect).texture] = true
@@ -180,6 +214,24 @@ func _run() -> void:
 		await process_frame
 		if not _expect(shell.find_child("RunTabletop", true, false) == null, "tabletop scenery does not leak onto other screens"):
 			return
+	session.current_map.act = 1
+	RUN_WALK.settle(app, session)
+	if not session.pending_offer.is_empty():
+		app.call("run_decline_offer")
+	shell.call("show_run_board")
+	await process_frame
+	await process_frame
+	var moved := shell.find_child("RunBoard", true, false) as Control
+	var live_routes := 0
+	for child: Dictionary in session.current_map.get_children(session.current_node_id):
+		var child_id := String(child["id"])
+		if bool(moved.call("is_reachable", child_id)):
+			live_routes += 1
+			if not _expect(moved.call("route_tier", session.current_node_id, child_id) == &"live", "after a race, every route to a stop the player can go to is in the brightest tier"):
+				return
+	var moved_focus: PackedVector2Array = shell.find_child("RunTabletop", true, false).call("focus_points")
+	if not _expect(live_routes > 0 and moved_focus.size() == 1 + session.available_nodes().size(), "after a race the light gathers on the player and each next choice"):
+		return
 	if not _expect(bool(app.call("update_setting", "reduced_motion", true)), "reduced-motion setting is persisted for shell presentation"):
 		return
 	var victory: RunSession = app.call("start_run", 71717)
@@ -328,6 +380,9 @@ func _expect_ending(shell: CanvasLayer, mode: StringName, hero_name: String, tin
 	if not _expect(shadow.modulate.r < 0.1 and shadow.modulate.a > 0.3, "white-alpha shadow artwork is tinted dark at runtime"):
 		return false
 	if not _expect(table.get_node("BeamDust").get_child_count() == 0 and table.get("_lamp_pulse") == null, "reduced motion disables all motes and lamp pulses"):
+		return false
+	var lamp := (table.get_node("Lamplight") as ColorRect).material as ShaderMaterial
+	if not _expect([null, 0].has(lamp.get_shader_parameter("focus_count")), "endings keep their own light, without the board's focus pool"):
 		return false
 	var resting_position := hero.position
 	await create_timer(0.4).timeout
