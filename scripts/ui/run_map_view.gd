@@ -13,6 +13,7 @@ signal stop_confirmed(stop_id: String)
 const UI := preload("res://scripts/ui/run_ui.gd")
 const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
+const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const PADDING := 36.0
 const BOSS_Y := 72.0
 const BOSS_LABEL_SIZE := Vector2(136, 20)
@@ -293,6 +294,9 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ONE * 0.5, size - Vector2.ONE), UI.LINE, false, 1.0)
 	else:
 		SKIN.draw_tape(self, Vector2(size.x * 0.5, 25), Vector2(size.x - 20, 36), -0.012, Color("39463c"))
+		MATERIALS.grain(self, Rect2(12, 8, size.x - 24, 32), true)
+		draw_texture_rect_region(MATERIALS.TAPE_CORNER, Rect2(8, 9, 18, 32), Rect2(180, 110, 80, 50), Color("73836b"))
+		draw_texture_rect(MATERIALS.STICKY_CORNER, Rect2(size.x - 42, -2, 46, 46), false, Color("66795c"))
 	if _map == null:
 		return
 	var rows := float(maxi(1, _map.num_rows - 1))
@@ -314,9 +318,9 @@ func _draw() -> void:
 				_draw_flow(from, to)
 			else:
 				if tabletop:
-					draw_line(from + Vector2(3, 4), to + Vector2(3, 4), Color(0.02, 0.03, 0.05, 0.25), 6.0, true)
-					draw_line(from, to, Color(color, 0.5), 4.0, true)
-				draw_line(from, to, color, 1.0, true)
+					MATERIALS.chalk_line(self, from, to, color.lightened(0.25))
+				else:
+					draw_line(from, to, color, 1.0, true)
 	var pulse := 0.5 + 0.5 * sin(_clock * TAU / PULSE_PERIOD)
 	if _interactive:
 		for id: String in _available:
@@ -344,7 +348,10 @@ func _draw_flow(from: Vector2, to: Vector2) -> void:
 		var start := maxf(at, 0.0)
 		var end := minf(at + DASH, length)
 		if end > start:
-			draw_line(from + direction * start, from + direction * end, UI.AMBER, 2.0, true)
+			if tabletop:
+				MATERIALS.chalk_line(self, from + direction * start, from + direction * end, UI.AMBER)
+			else:
+				draw_line(from + direction * start, from + direction * end, UI.AMBER, 2.0, true)
 		at += DASH * 2.0
 
 

@@ -17,9 +17,13 @@ var _parts: Dictionary = {}
 var _colors: Dictionary = {}
 var _cabin := false
 var _accent := Color("e7ba65")
+var _raster_scale := 1.0
+var _canvas_size := SIZE
 
 
-func render(payload: Dictionary, spin: int = 0, steer: float = 0.0) -> Dictionary:
+func render(payload: Dictionary, spin: int = 0, steer: float = 0.0, pixel_scale: int = 2) -> Dictionary:
+	_raster_scale = float(pixel_scale) / 2.0
+	_canvas_size = Vector2i(Vector2(SIZE) * _raster_scale)
 	_type = payload["type"]
 	_parts = payload["parts"]
 	var p: Dictionary = payload["palette"]
@@ -67,11 +71,11 @@ func _point(x: float, y: float) -> Vector2:
 		if y < 22 or y > 108:
 			px += signf(px - 47.5) * 3
 		py = 10 + (py - 8) * 1.12 if py < 48 else 55 + (py - 48) * 0.85
-	return Vector2(roundf(px), roundf(py))
+	return Vector2(roundf(px * _raster_scale), roundf(py * _raster_scale))
 
 
 func _blank() -> Image:
-	var image := Image.create(SIZE.x, SIZE.y, false, Image.FORMAT_RGBA8)
+	var image := Image.create(_canvas_size.x, _canvas_size.y, false, Image.FORMAT_RGBA8)
 	image.fill(Color.TRANSPARENT)
 	return image
 
@@ -97,10 +101,23 @@ func _line(image: Image, points: Array, color: Color) -> void:
 	for i in range(points.size() - 1):
 		var a := _point(points[i][0], points[i][1])
 		var b := _point(points[i + 1][0], points[i + 1][1])
+		if _raster_scale > 1.0:
+			_stroke_segment(image, a, b, color)
+			continue
 		var steps := int(maxf(absf(b.x - a.x), absf(b.y - a.y)))
 		for j in range(steps + 1):
 			var p := a.lerp(b, float(j) / float(maxi(steps, 1)))
 			_pixel(image, roundi(p.x), roundi(p.y), color)
+
+
+func _stroke_segment(image: Image, a: Vector2, b: Vector2, color: Color) -> void:
+	var radius := _raster_scale * 0.5
+	var bounds := Rect2(a, Vector2.ZERO).expand(b).grow(radius)
+	for y in range(floori(bounds.position.y), ceili(bounds.end.y) + 1):
+		for x in range(floori(bounds.position.x), ceili(bounds.end.x) + 1):
+			var sample := Vector2(x, y)
+			if sample.distance_squared_to(Geometry2D.get_closest_point_to_segment(sample, a, b)) <= radius * radius:
+				_pixel(image, x, y, color)
 
 
 func _poly(image: Image, points: Array, color: Color) -> void:
@@ -217,13 +234,13 @@ func _render(spin: int = 0, steer: float = 0.0) -> Dictionary:
 
 func _composite(body: Image, glass: Image, wheels: Image, trim: Image) -> Dictionary:
 	var shadow := _blank()
-	for y in range(SIZE.y):
-		for x in range(SIZE.x):
+	for y in range(_canvas_size.y):
+		for x in range(_canvas_size.x):
 			if body.get_pixel(x, y).a > 0 or wheels.get_pixel(x, y).a > 0 or trim.get_pixel(x, y).a > 0:
-				_pixel(shadow, x+1, y+2, Color(0.035,0.055,0.07,0.35))
+				_pixel(shadow, x + roundi(_raster_scale), y + roundi(_raster_scale * 2), Color(0.035,0.055,0.07,0.35))
 	var car := _blank()
 	for layer in [shadow, wheels, body, glass, trim]:
-		car.blend_rect(layer, Rect2i(Vector2i.ZERO, SIZE), Vector2i.ZERO)
+		car.blend_rect(layer, Rect2i(Vector2i.ZERO, _canvas_size), Vector2i.ZERO)
 	return {"car": car, "body": body, "glass": glass, "wheels": wheels, "trim": trim}
 
 
@@ -232,12 +249,16 @@ func _wheel(image: Image, center: Vector2, angle: float, spin: int) -> void:
 	var half_width := 6 if _type == "buggy" else (5 if _type == "muscle" else 4)
 	var half_height := 12 if _type == "buggy" else 10
 	# Inverse sampling rotates one local tyre around a fixed axle without holes.
-	for dy in range(-15, 16):
-		for dx in range(-15, 16):
-			var p := Vector2(dx, dy).rotated(-angle)
+	var reach := ceili(15 * _raster_scale)
+	for dy in range(-reach, reach + 1):
+		for dx in range(-reach, reach + 1):
+			var p := Vector2(dx, dy).rotated(-angle) / _raster_scale
 			var u := roundi(p.x)
 			var v := roundi(p.y)
-			if abs(u) > half_width or abs(v) > half_height or (abs(u) == half_width and abs(v) >= half_height-1):
+			if _raster_scale == 1.0:
+				if abs(u) > half_width or abs(v) > half_height or (abs(u) == half_width and abs(v) >= half_height-1):
+					continue
+			elif absf(p.x) > half_width + 0.5 or absf(p.y) > half_height + 0.5 or (absf(p.x) >= half_width - 0.5 and absf(p.y) >= half_height - 0.5):
 				continue
 			var color := Color("111a22")
 			if abs(u) < half_width and abs(v) < half_height-1:
@@ -305,8 +326,8 @@ func _livery(body: Image) -> void:
 			for y in [24, 32, 40]:
 				_poly(paint, [[25,y],[37,y+5],[37,y+8],[25,y+3]], _accent)
 	# Clip graphics to painted surfaces; glass and hardware are composited later.
-	for y in range(SIZE.y):
-		for x in range(SIZE.x):
+	for y in range(_canvas_size.y):
+		for x in range(_canvas_size.x):
 			var c := body.get_pixel(x, y)
 			if c.a == 0 or c == _colors[INK] or c == _colors[DEEP]:
 				continue
@@ -410,7 +431,7 @@ func _buggy(spin: int, steer: float) -> Dictionary:
 	var wheels := _blank()
 	for x in [15, 80]:
 		for y in [36, 98]:
-			_wheel(wheels, Vector2(x,y), deg_to_rad(steer) if y == 36 else 0.0, spin)
+			_wheel(wheels, _point(x, y), deg_to_rad(steer) if y == 36 else 0.0, spin)
 	var body := _blank()
 	for y in [36, 98]:
 		_rect(body, 17, y-2, 62, 5, INK)
