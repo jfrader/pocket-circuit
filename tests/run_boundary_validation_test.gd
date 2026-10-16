@@ -15,6 +15,7 @@ func _run_test() -> void:
 	_test_valid_runs()
 	_test_route_roundtrips()
 	_test_invalid_runs()
+	_test_haul_validation()
 	_test_save_recovery()
 	if _failed:
 		quit(1)
@@ -63,6 +64,48 @@ func _test_valid_runs() -> void:
 	normalized["installed_parts"] = {car_id: [part, false], "unowned-car": [part]}
 	var restored := SESSION.deserialize(normalized)
 	_expect(restored != null and restored.parts_held == [part] and restored.fitted_parts(car_id) == [part] and not restored.installed_parts.has("unowned-car"), "optional part entries retain existing drop-invalid normalization")
+
+func _test_haul_validation() -> void:
+	var session := SESSION.create(33333)
+	var base := SESSION.serialize(session)
+	var fields := ["boot_cars", "impounded_cars", "pending_chaser", "pending_offer_driver", "pending_offer_points", "tow_count", "nitro_count"]
+	for key: String in fields:
+		base.erase(key)
+	var legacy := SESSION.deserialize(base)
+	_expect(legacy != null and legacy.boot_cars.is_empty() and legacy.impounded_cars.is_empty() and legacy.pending_chaser == null and legacy.tow_count == 0 and legacy.nitro_count == 0, "legacy haul fields normalize cold and empty")
+	for key: String in ["tow_count", "nitro_count", "pending_offer_points"]:
+		for bad: Variant in [-1, 0.5, true, "1", {}, INF, 0x80000000]:
+			var broken := base.duplicate(true)
+			broken[key] = bad
+			_expect(SESSION.deserialize(broken) == null, "malformed haul number rejected: " + key)
+	for key: String in ["boot_cars", "impounded_cars", "pending_offer_driver", "pending_chaser"]:
+		for bad: Variant in [false, 1, "junk"]:
+			var broken := base.duplicate(true)
+			broken[key] = bad
+			_expect(SESSION.deserialize(broken) == null, "malformed haul container rejected: " + key)
+	var offer := session._win_car(session.current_node_id, SESSION.CAR_ORIGIN_RIVAL, SESSION.STARTER_TYPES)
+	var vid: String = offer["id"]
+	_expect(session.race_it_now(), "boundary fixture hot choice")
+	var hot := SESSION.serialize(session)
+	_expect(SESSION.deserialize(hot) != null, "valid haul state loads")
+	for bad: Variant in [{"unknown": {}}, {session.current_car_id: "junk"}, {vid: {"id": "fake"}}]:
+		var broken := hot.duplicate(true)
+		broken["boot_cars"] = bad
+		_expect(SESSION.deserialize(broken) == null, "boot must contain owned won cars and roster identities")
+	for bad: Variant in [[vid], ["unknown"], [session.owned_cars.keys()[0]], [false]]:
+		var broken := hot.duplicate(true)
+		broken["impounded_cars"] = bad
+		_expect(SESSION.deserialize(broken) == null, "impound rejects boot overlap, missing cars and starter")
+	for key: String in ["id", "name", "vehicle_id", "avatar_art", "ai_style", "haul_vehicle_id", "chase_vehicle_id"]:
+		var broken := hot.duplicate(true)
+		broken["pending_chaser"][key] = "junk"
+		_expect(SESSION.deserialize(broken) == null, "malformed chaser field rejected: " + key)
+	_expect(SESSION.salvage_won_cars(hot).is_empty(), "recovery never banks boot cars")
+	session.impound_haul()
+	var captured := SESSION.serialize(session)
+	_expect(SESSION.deserialize(captured) != null and SESSION.salvage_won_cars(captured).is_empty(), "impound persists and is excluded from recovery rewards")
+	captured["impounded_cars"].append(vid)
+	_expect(SESSION.deserialize(captured) == null, "duplicate impound is rejected")
 
 func _test_invalid_runs() -> void:
 	var base := SESSION.serialize(SESSION.create(4242))

@@ -298,6 +298,30 @@ func _test_current_run_migration(store: SaveStore) -> bool:
 	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
 	if not _expect(restored != null and not restored.opponents_for_node(restored.current_node_id).is_empty(), "legacy run loads and supplies a race field"):
 		return false
+	for key: String in ["boot_cars", "impounded_cars", "pending_chaser", "pending_offer_driver", "pending_offer_points", "tow_count", "nitro_count"]:
+		with_run["current_run"].erase(key)
+	if not _expect(store.save_data(with_run), "save legacy run without haul state"):
+		return false
+	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
+	if not _expect(restored != null and restored.boot_cars.is_empty() and restored.pending_chaser == null and restored.tow_count == 0, "legacy haul state normalizes cold through SaveStore"):
+		return false
+	var haul := RUN_SESSION.create(33333)
+	var offered := haul._win_car(haul.current_node_id, RUN_SESSION.CAR_ORIGIN_RIVAL, RUN_SESSION.STARTER_TYPES)
+	if not _expect(haul.race_it_now() and haul.add_tow(2) and haul.add_nitro(3), "haul save fixture"):
+		return false
+	with_run["current_run"] = RUN_SESSION.serialize(haul)
+	if not _expect(store.save_data(with_run), "save hot haul"):
+		return false
+	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
+	if not _expect(restored != null and restored.boot_cars == haul.boot_cars and restored.pending_chaser == haul.pending_chaser and restored.tow_count == 2 and restored.nitro_count == 3, "haul identities, counts and chaser survive SaveStore normalization"):
+		return false
+	haul.impound_haul()
+	with_run["current_run"] = RUN_SESSION.serialize(haul)
+	if not _expect(store.save_data(with_run), "save impounded haul"):
+		return false
+	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
+	if not _expect(restored != null and restored.impounded_cars == [offered["id"]] and restored.collection_safe_cars().is_empty(), "impounded cars survive SaveStore without becoming collection rewards"):
+		return false
 
 	# garage: a v5 save has none; stored won cars are validated and deduplicated
 	_write_raw(TEST_PATH, "{\"version\":5,\"current_run\":{}}")
