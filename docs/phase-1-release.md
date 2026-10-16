@@ -3,9 +3,11 @@
 ## Product
 
 Phase 1 is scoped as a complete premium offline game for Windows, Linux, and
-Steam Deck. It is not intended to ship as an online-game preview. At release, a
-player must be able to begin, complete, and replay the entire championship
-without an account or network connection.
+Steam Deck. It is not intended to ship as an online-game preview. The primary
+experience is the Run: a night-by-night roguelike drive across the house that
+begins straight from the title's PLAY. Beside it, the championship campaign
+must be completable and replayable end to end — begin, complete, and replay
+the entire championship without an account or network connection.
 
 The release uses the bracket pressure, recurring rivals, short event intros,
 and vehicle unlock rhythm associated with classic miniature arcade racers.
