@@ -45,12 +45,18 @@ for platform_dir in "$linux_dir" "$windows_dir"; do
   mkdir -p -- "$platform_dir"
 done
 
-if ! command -v sha256sum >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1 || ! command -v tee >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1 || { ! command -v magick >/dev/null 2>&1 && ! command -v convert >/dev/null 2>&1; }; then
-	printf 'python3, sha256sum, ImageMagick (magick or convert), ffprobe, grep, tee, and timeout are required.\n' >&2
+if ! command -v sha256sum >/dev/null 2>&1 || ! command -v ffprobe >/dev/null 2>&1 || ! command -v grep >/dev/null 2>&1 || ! command -v tee >/dev/null 2>&1 || ! command -v timeout >/dev/null 2>&1 || ! command -v xargs >/dev/null 2>&1 || { ! command -v magick >/dev/null 2>&1 && ! command -v convert >/dev/null 2>&1; }; then
+	printf 'python3, sha256sum, ImageMagick (magick or convert), ffprobe, grep, tee, timeout, and xargs are required.\n' >&2
 	exit 1
 fi
 
 source "$PROJECT_ROOT/tools/godot_gate.sh"
+
+# Default 4 (not 6) on an 8-core shared host so the longest serial and parallel
+# tests still have CPU headroom under load; PC_GATE_PARALLELISM overrides.
+# Checked here so a bad value fails before the slow sync and import steps.
+gate_parallelism="${PC_GATE_PARALLELISM:-4}"
+validate_gate_parallelism "$gate_parallelism" || exit 1
 
 export GAMESTRUMENTS_ADDON_DIR="${GAMESTRUMENTS_ADDON_DIR:-$PROJECT_ROOT/vendor/gamestruments}"
 printf 'Syncing Gamestruments live engine from %s...\n' "$GAMESTRUMENTS_ADDON_DIR"
@@ -102,9 +108,6 @@ if (( ${#tests[@]} == 0 )); then
   exit 1
 fi
 
-failed_tests=()
-failures_file="$(mktemp "${TMPDIR:-/tmp}/pocket-circuit-gate-failures.XXXXXX")"
-
 # Tests that assert on wall-clock responsiveness stay serial so CPU contention
 # from the parallel workers cannot skew their timings.
 serial_tests=(
@@ -115,78 +118,12 @@ serial_tests=(
 	"tests/track_outer_cut_map_test.gd"
 )
 
-run_test_serial() {
-	local test_relative="$1"
-	printf 'Running %s...\n' "$test_relative"
-	if ! run_godot_test_checked "$PROJECT_ROOT" "$godot_bin" "$test_relative"; then
-		printf '%s\n' "$test_relative" >> "$failures_file"
-	fi
-}
-
-# The remaining tests run in parallel, each in its own process with its own
-# user-data dir, so tests touching user:// save files cannot collide.
-run_test_isolated() {
-	local test_relative="$1"
-	local iso_dir log_file
-	iso_dir="$(mktemp -d "${TMPDIR:-/tmp}/pc-test-userdata.XXXXXX")"
-	log_file="$(mktemp "${TMPDIR:-/tmp}/pc-test-log.XXXXXX")"
-	local status=0
-	if XDG_DATA_HOME="$iso_dir" run_godot_test_checked "$PROJECT_ROOT" "$godot_bin" "$test_relative" >"$log_file" 2>&1; then
-		status=0
-	else
-		status=1
-	fi
-	if (( status == 0 )); then
-		printf 'PASS %s\n' "$test_relative"
-	else
-		printf 'FAIL %s\n' "$test_relative" >&2
-		printf '%s\n' "$test_relative" >> "$failures_file"
-		sed 's/^/  /' "$log_file" >&2
-	fi
-	rm -rf -- "$iso_dir" "$log_file"
-	return "$status"
-}
-
-parallel_tests=()
-for test_path in "${tests[@]}"; do
-	test_relative="${test_path#"$PROJECT_ROOT"/}"
-	is_serial=false
-	for serial in "${serial_tests[@]}"; do
-		if [[ "$test_relative" == "$serial" ]]; then
-			is_serial=true
-			break
-		fi
-	done
-	if $is_serial; then
-		run_test_serial "$test_relative"
-	else
-		parallel_tests+=("$test_relative")
-	fi
-done
-
-export PROJECT_ROOT godot_bin failures_file
-export -f run_godot_checked run_godot_test_checked run_test_isolated
-
-# Default 4 (not 6) on an 8-core shared host so the longest serial and parallel
-# tests still have CPU headroom under load; PC_GATE_PARALLELISM overrides.
-gate_parallelism="${PC_GATE_PARALLELISM:-4}"
-if (( ${#parallel_tests[@]} > 0 )); then
-	printf 'Running %d gate tests with parallelism %s...\n' "${#parallel_tests[@]}" "$gate_parallelism"
-	# xargs returns 123 when a worker fails; failures are tracked via
-	# failures_file so the pipeline result is intentionally discarded.
-	printf '%s\n' "${parallel_tests[@]}" | xargs -P "$gate_parallelism" -I{} bash -c 'run_test_isolated "$@"' _ {} || true
-fi
-
-if [[ -s "$failures_file" ]]; then
-	while IFS= read -r line; do
-		failed_tests+=("$line")
-	done < "$failures_file"
-fi
-rm -f -- "$failures_file"
-if (( ${#failed_tests[@]} > 0 )); then
-	printf 'Release tests failed; no exports will be attempted:\n' >&2
-	printf '  %s\n' "${failed_tests[@]}" >&2
-	exit 1
+# The remaining tests run in parallel; run_gate_tests accounts for every one.
+gate_status=0
+run_release_gate "$PROJECT_ROOT" "$godot_bin" "$gate_parallelism" "${serial_tests[@]}" -- "${tests[@]#"$PROJECT_ROOT"/}" || gate_status=$?
+if (( gate_status != 0 )); then
+	printf 'Release tests failed; no exports will be attempted.\n' >&2
+	exit "$gate_status"
 fi
 
 printf 'Smoke-testing the boot scene...\n'

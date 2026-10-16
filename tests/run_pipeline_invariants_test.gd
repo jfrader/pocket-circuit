@@ -58,9 +58,8 @@ func _test_map_invariants() -> void:
 func _test_double_resolutions() -> void:
 	# Test spend
 	var sess1 = RUN_SESSION.create(100)
-	sess1.current_node_id = "test_node"
+	_move_to_type(sess1, "parts_van")
 	sess1.run_points = 60
-	sess1.current_map.nodes["test_node"] = {"id": "test_node", "type": "parts_van"}
 	var stock: Array[Dictionary] = sess1.van_stock()
 	var s1 = sess1.buy_part(String(stock[0]["part"]))
 	if not _expect(s1, "first spend ok"): return
@@ -75,12 +74,10 @@ func _test_double_resolutions() -> void:
 	
 	# Test resolve_race
 	var sess2 = RUN_SESSION.create(101)
-	sess2.current_node_id = "test_race"
-	sess2.current_map.nodes["test_race"] = {"id": "test_race", "type": "race"}
-	var r1 = sess2.resolve_race("test_race", 1, 4)
+	var r1 = sess2.resolve_race(sess2.current_node_id, 1, 4)
 	if not _expect(not r1.has("error"), "first race resolve ok"): return
 	if not _expect(sess2.run_points == 6, "points awarded"): return
-	var r2 = sess2.resolve_race("test_race", 1, 4)
+	var r2 = sess2.resolve_race(sess2.current_node_id, 1, 4)
 	if not _expect(r2.has("error"), "second race resolve refused"): return
 	if not _expect(sess2.run_points == 6, "points not awarded again"): return
 
@@ -96,7 +93,7 @@ func _test_save_failures() -> void:
 	if not _expect(not ok, "seam refused due to wrong type"): return
 	if not _expect(app.last_run_error != "", "last_run_error is non-empty on refusal: " + app.last_run_error): return
 	
-	app._current_run_session.current_map.nodes[app._current_run_session.current_node_id]["type"] = "parts_van"
+	_move_to_type(app._current_run_session, "parts_van")
 	var van_part := String(app._current_run_session.van_stock()[0]["part"])
 	ok = app.run_buy_part(van_part, "")
 	if not _expect(ok, "seam accepted"): return
@@ -105,12 +102,19 @@ func _test_save_failures() -> void:
 	# Test read-only save
 	store.is_read_only = true
 	app._current_run_session.resolved_nodes.clear()
-	app._current_run_session.current_map.nodes[app._current_run_session.current_node_id]["type"] = "parts_van"
 	ok = app.run_buy_part(van_part, "")
 	if not _expect(ok, "seam accepted logically"): return
 	if not _expect(app.last_run_error != "", "last_run_error is non-empty on read-only save: " + app.last_run_error): return
 	
 	app.free()
+
+func _move_to_type(session: RunSession, kind: String) -> void:
+	for node: Dictionary in session.current_map.nodes.values():
+		if node["type"] == kind:
+			session.current_node_id = node["id"]
+			session.run_state.row = node["row"]
+			return
+	_expect(false, "generated fixture contains " + kind)
 
 func _test_deserialize_mismatch() -> void:
 	var data = {"schema_version": 9999}
@@ -120,4 +124,3 @@ func _test_deserialize_mismatch() -> void:
 	if not _expect(res2 == null, "RunState deserialize mismatch returns null"): return
 	var res3 = RUN_SESSION.deserialize(data)
 	if not _expect(res3 == null, "RunSession deserialize mismatch returns null"): return
-

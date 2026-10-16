@@ -40,8 +40,8 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##   car dealt from the seed (a generated compact or buggy, starter envelope).
 ## take_offer() / decline_offer(): a won car is offered to drive; the car left
 ##   behind keeps its wear.
-## available_nodes() / enter_node(id): moves along map edges only, and never
-##   past a race-type node that has not been raced.
+## available_nodes() / enter_node(id): reopens unused current stops or moves
+##   along map edges, never past a race-type node that has not been raced.
 ##
 ## Resolution (the node must be current, unresolved and of the right type):
 ##   resolve_race(id, pos, field): pays points. On the act rival, a win
@@ -105,14 +105,17 @@ static func create(p_run_seed: int) -> RunSession:
 	sess.run_state.row = 0
 	return sess
 
-## The stops the player can take next: the current node while it is an
-## unraced race, otherwise its children.
+## Races must be finished first. Optional stops stay open alongside their
+## child routes until their action is used or the player takes a child.
 func available_nodes() -> Array[Dictionary]:
 	if current_map == null or current_node_id.is_empty() or failed or completed:
 		return []
 	if is_race_pending():
 		return [current_node()]
-	return current_map.get_children(current_node_id)
+	var options := current_map.get_children(current_node_id)
+	if is_stop_pending():
+		options.append(current_node())
+	return options
 
 ## Marks the current unraced race-type stop as racing. Whatever ends that race
 ## (a result, a quit, a closed game) has to resolve it; it is never re-raced.
@@ -152,6 +155,19 @@ func _stop_roll(stream: String, stop_id: String) -> int:
 func is_race_pending() -> bool:
 	return String(current_node().get("type", "")) in RACE_NODE_TYPES and not resolved_nodes.has(current_node_id)
 
+## Whether the current stop still has an action to open from the board.
+func is_stop_pending() -> bool:
+	if failed or completed:
+		return false
+	var kind := String(current_node().get("type", ""))
+	if kind in RACE_NODE_TYPES:
+		return is_race_pending()
+	if kind == "bench":
+		return last_bench_visited == current_node_id and not bench_action_done
+	if kind == "lockup":
+		return not lockup_used and not resolved_nodes.has(current_node_id)
+	return kind in ["parts_van", "errand"] and not resolved_nodes.has(current_node_id)
+
 func current_node() -> Dictionary:
 	if current_map == null or current_node_id.is_empty():
 		return {}
@@ -160,8 +176,12 @@ func current_node() -> Dictionary:
 func enter_node(node_id: String) -> bool:
 	if failed or completed or current_map == null or current_node_id.is_empty():
 		return false
+	if not pending_offer.is_empty():
+		return false
+	if node_id == current_node_id:
+		return is_stop_pending()
 	# A race-type stop is raced, and a won car is answered, before moving on.
-	if is_race_pending() or not pending_offer.is_empty():
+	if is_race_pending():
 		return false
 	var kids: Array[Dictionary] = current_map.get_children(current_node_id)
 	var is_valid: bool = false
@@ -343,11 +363,13 @@ static func normalize_car(value: Variant, origins: Array) -> Dictionary:
 		return {}
 	if origin not in origins or roll is not Dictionary:
 		return {}
+	if not RUN_MAP.is_integer(car.get("seed", 0), 0, RUN_MAP.HASH_MASK) or not RUN_MAP.is_integer(car.get("act", 1), 1, FINAL_ACT):
+		return {}
 	var limit: float = RUN_STATE.TIER_ENVELOPES.values().max()
 	var clean_roll := {}
 	for axis: String in CarProfile.AXES:
 		var amount: Variant = (roll as Dictionary).get(axis)
-		if not (amount is float or amount is int):
+		if not (amount is float or amount is int) or not is_finite(float(amount)):
 			return {}
 		clean_roll[axis] = clampf(float(amount), -limit, limit)
 	return {
@@ -366,6 +388,8 @@ static func _normalize_owned(value: Variant) -> Dictionary:
 	if value is not Dictionary:
 		return owned
 	for vehicle_id: Variant in value as Dictionary:
+		if vehicle_id is not String or vehicle_id.is_empty():
+			continue
 		var record: Variant = (value as Dictionary)[vehicle_id]
 		if record is not Dictionary:
 			continue
@@ -403,6 +427,8 @@ static func salvage_won_cars(data: Dictionary) -> Array[Dictionary]:
 	if owned is not Dictionary or rolls is not Dictionary:
 		return out
 	for vehicle_id: Variant in owned as Dictionary:
+		if vehicle_id is not String or vehicle_id.is_empty():
+			continue
 		var record: Variant = (owned as Dictionary)[vehicle_id]
 		if record is not Dictionary:
 			continue
@@ -558,37 +584,81 @@ static func serialize(sess: RunSession) -> Dictionary:
 	}
 
 static func deserialize(data: Dictionary) -> RunSession:
+	if not RUN_MAP.is_integer(data.get("schema_version"), SCHEMA_VERSION, SCHEMA_VERSION):
+		return null
+	if not RUN_MAP.is_integer(data.get("run_seed"), 0, RUN_MAP.HASH_MASK) or not RUN_MAP.is_integer(data.get("run_points"), 0, _maximum_points()):
+		return null
+	for key: String in ["run_state", "current_map", "owned_cars", "installed_parts", "resolved_nodes"]:
+		if data.get(key) is not Dictionary:
+			return null
+	for key: String in ["current_node_id", "current_car_id", "last_bench_visited"]:
+		if data.get(key) is not String:
+			return null
+	for key: String in ["lockup_used", "failed", "completed", "bench_action_done"]:
+		if data.get(key) is not bool:
+			return null
+	if data.get("parts_held") is not Array or data.get("race_in_flight", {}) is not Dictionary or data.get("pending_offer", "") is not String:
+		return null
 	var sess: RunSession = new()
-	var ver: Variant = data.get("schema_version", 0)
-	if (ver is int or ver is float) and int(ver) == SCHEMA_VERSION:
-		sess.run_seed = int(data.get("run_seed", 0))
-		sess.run_state = RUN_STATE.deserialize(data.get("run_state", {}) as Dictionary)
-		sess.current_map = RUN_MAP.deserialize(data.get("current_map", {}) as Dictionary)
-		if sess.run_state == null or sess.current_map == null:
+	sess.run_seed = int(data["run_seed"])
+	sess.run_state = RUN_STATE.deserialize(data["run_state"])
+	sess.current_map = RUN_MAP.deserialize(data["current_map"])
+	if sess.run_state == null or sess.current_map == null:
+		return null
+	sess.current_node_id = data["current_node_id"]
+	var node := sess.current_node()
+	if node.is_empty() or sess.run_state.act != sess.current_map.act or sess.run_state.row != node["row"]:
+		return null
+	if sess.run_state.run_seed != sess.run_seed or sess.current_map.run_seed != sess.run_seed:
+		return null
+	sess.run_points = int(data["run_points"])
+	sess.current_car_id = data["current_car_id"]
+	sess.owned_cars = _normalize_owned(data["owned_cars"])
+	if not sess.owned_cars.has(sess.current_car_id):
+		return null
+	for vehicle_id: String in sess.owned_cars:
+		if not sess.run_state.car_rolls.has(vehicle_id) or not sess.run_state.car_wear.has(vehicle_id):
 			return null
-		sess.current_node_id = String(data.get("current_node_id", ""))
-		sess.run_points = int(data.get("run_points", 0))
-		sess.current_car_id = String(data.get("current_car_id", ""))
-		sess.owned_cars = _normalize_owned(data.get("owned_cars"))
-		if not sess.owned_cars.has(sess.current_car_id):
+	sess.lockup_used = data["lockup_used"]
+	sess.failed = data["failed"]
+	sess.completed = data["completed"]
+	if sess.completed and (sess.failed or sess.current_map.act != FINAL_ACT or node["type"] != "act_rival"):
+		return null
+	for vehicle_id: Variant in data["installed_parts"]:
+		var parts: Variant = data["installed_parts"][vehicle_id]
+		if vehicle_id is not String or parts is not Array:
 			return null
-		sess.lockup_used = bool(data.get("lockup_used", false))
-		sess.failed = bool(data.get("failed", false))
-		sess.completed = bool(data.get("completed", false))
-		sess.installed_parts = _normalize_installed(data.get("installed_parts"), sess.owned_cars)
-		sess.parts_held = RunParts.normalize_list(data.get("parts_held"))
-		sess.last_bench_visited = String(data.get("last_bench_visited", ""))
-		sess.bench_action_done = bool(data.get("bench_action_done", false))
-		sess.resolved_nodes = (data.get("resolved_nodes", {}) as Dictionary).duplicate(true)
-		var in_flight: Variant = data.get("race_in_flight", {})
-		sess.race_in_flight = (in_flight as Dictionary).duplicate(true) if in_flight is Dictionary else {}
-		var offer := String(data.get("pending_offer", ""))
-		var offered_from := String((sess.owned_cars.get(offer, {}) as Dictionary).get("won_from", ""))
-		var offerable := offered_from in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] and offer != sess.current_car_id
-		sess.pending_offer = offer if offerable else ""
-	else:
+	sess.installed_parts = _normalize_installed(data["installed_parts"], sess.owned_cars)
+	sess.parts_held = RunParts.normalize_list(data["parts_held"])
+	sess.last_bench_visited = data["last_bench_visited"]
+	sess.bench_action_done = data["bench_action_done"]
+	if not sess.last_bench_visited.is_empty() and sess.current_map.get_node(sess.last_bench_visited).get("type") != "bench":
+		return null
+	sess.resolved_nodes = data["resolved_nodes"].duplicate(true)
+	for nid: Variant in sess.resolved_nodes:
+		if nid is not String or not sess.current_map.nodes.has(nid) or sess.resolved_nodes[nid] is not bool or not sess.resolved_nodes[nid]:
+			return null
+	sess.race_in_flight = data.get("race_in_flight", {}).duplicate(true)
+	if not sess.race_in_flight.is_empty():
+		if sess.race_in_flight.get("node") != sess.current_node_id or not sess.is_race_pending() or not RUN_MAP.is_integer(sess.race_in_flight.get("field"), 1, RUN_MAP.HASH_MASK):
+			return null
+	var offer: String = data.get("pending_offer", "")
+	if not offer.is_empty():
+		var offered_from: Variant = sess.owned_cars.get(offer, {}).get("won_from")
+		if offered_from not in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] or offer == sess.current_car_id:
+			offer = ""
+	sess.pending_offer = offer
+	if sess.completed and not sess.resolved_nodes.has(sess.current_node_id):
 		return null
 	return sess
+
+## A route visits one stop per row; even paying the largest reward at every
+## stop across every act cannot exceed this bound.
+static func _maximum_points() -> int:
+	var stops := 0
+	for spec: Dictionary in RUN_MAP.ACT_SPECS.values():
+		stops += int(spec["rows"]) + 1
+	return INITIAL_POINTS + stops * maxi(ERRAND_PAY_POINTS, int(RUN_POINTS_BY_FINISH.values().max()))
 
 func _to_string() -> String:
 	var actv: int = 0

@@ -222,7 +222,7 @@ static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -
 		"race":
 			rows.append(["FIELD", "%d cars" % RunSession.RUN_POINTS_BY_FINISH.size()])
 			rows.append(["PAYS", "%s points, 1st to last" % " · ".join(pays)])
-			rows.append(["COSTS", "wear when you crash"])
+			rows.append(["COSTS", "wear at finish %d+ or DNF" % App.RUN_CRASH_FINISH_POSITION])
 		"rival":
 			rows.append(["FIELD", "one on one, contact"])
 			rows.append(["WIN", "their car"])
@@ -232,7 +232,7 @@ static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -
 			rows.append(["WIN", "act %d" % (session.current_map.act + 1) if session.current_map.act < RunSession.FINAL_ACT else "the night"])
 			rows.append(["LOSE", "the run"])
 		"bench":
-			rows.append(["REPAIR", "one wear level"])
+			rows.append(["REPAIR", "restore to clean"])
 			rows.append(["OR FIT", "one of your %d parts" % session.parts_held.size() if not session.parts_held.is_empty() else "no parts held"])
 		"parts_van":
 			rows.append(["STOCK", "%d parts, one sale" % RunParts.VAN_STOCK])

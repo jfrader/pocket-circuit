@@ -265,7 +265,7 @@ func show_run_board() -> void:
 	_reset_quick_race_state()
 	_clear_content()
 	_content.add_theme_constant_override("separation", 4)
-	var sess_var: Variant = _app.call("current_run_session")
+	var sess_var: Variant = _app.call("run_board_session")
 	var sess: RunSession = sess_var as RunSession
 	# A car won on a night that is still going is offered before the next stop.
 	if sess != null and not sess.pending_offer.is_empty() and not sess.is_failed() and not sess.is_complete():
@@ -341,7 +341,7 @@ func show_run_board() -> void:
 	board.stop_selected.connect(_show_run_stop.bind(sess))
 	board.stop_selected.connect(func(_stop_id: String) -> void: _play_ui_move())
 	board.stop_confirmed.connect(_go_to_run_stop.bind(true))
-	var first := sess.current_node_id if sess.is_race_pending() else String(sess.available_nodes()[0]["id"]) if not sess.available_nodes().is_empty() else sess.current_node_id
+	var first := sess.current_node_id if sess.is_stop_pending() else String(sess.available_nodes()[0]["id"]) if not sess.available_nodes().is_empty() else sess.current_node_id
 	board.select(first)
 	_grab_button_focus_after_layout(board.marker(first), _entrance_generation)
 
@@ -1744,10 +1744,7 @@ func _on_new_run_pressed() -> void:
 func _on_save_run_again() -> void:
 	_play_ui_confirm()
 	_app.call("persist_current_run")
-	if _app.call("current_run_session") == null:
-		show_title()
-	else:
-		show_run_board()
+	show_run_board()
 
 
 func _on_abandon_run() -> void:
