@@ -2228,14 +2228,15 @@ func _on_abandon_run() -> void:
 	if abandon == null or _content.find_child("AbandonConfirm", true, false) != null:
 		return
 	var secondary := abandon.get_parent() as Control
-	secondary.hide()
-	var strip := VBoxContainer.new()
+	abandon.hide()
+	var strip := HBoxContainer.new()
 	strip.name = "AbandonConfirm"
 	strip.add_theme_constant_override("separation", 8)
-	secondary.get_parent().add_child(strip)
-	var warning := RUN_UI.label("THE NIGHT ENDS - CARS NOT BANKED ARE LOST", 12, RUN_UI.AMBER, true)
+	secondary.add_child(strip)
+	var warning := RUN_UI.label("THE NIGHT ENDS - CARS NOT BANKED ARE LOST", 13, Color("8d322a"), true)
 	warning.name = "AbandonWarning"
 	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	warning.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	strip.add_child(warning)
 	var confirm := RUN_UI.action("ABANDON THE NIGHT")
 	confirm.name = "ActionConfirmAbandon"
@@ -2247,7 +2248,7 @@ func _on_abandon_run() -> void:
 	keep.pressed.connect(func() -> void:
 		strip.get_parent().remove_child(strip)
 		strip.queue_free()
-		secondary.show()
+		abandon.show()
 		abandon.grab_focus())
 	_wire_button_audio(keep)
 	strip.add_child(keep)
