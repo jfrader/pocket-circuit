@@ -219,12 +219,20 @@ func _run_test() -> void:
 	app.call("start_run_race", opening)
 	var race := (load(RACE_SCENE) as PackedScene).instantiate()
 	root.add_child(race)
+	race.call("_show_pause_menu")
+	var return_warning := race.find_child("PauseReturnWarning", true, false) as Label
+	if not _expect(return_warning != null and not return_warning.visible, "returning before the countdown marks the race shows no loss warning"):
+		return
 	var waited := 0
 	while quit_run.race_in_flight.is_empty() and waited < RACE_SCENE_FRAME_LIMIT:
 		waited += 1
 		await process_frame
 	if not _expect(String(quit_run.race_in_flight.get("node", "")) == opening, "the race scene's countdown marks the run race as running"):
 		return
+	race.call("_set_paused", true)
+	if not _expect(return_warning.is_visible_in_tree() and return_warning.text == "RETURNING COUNTS THIS RACE AS A LOSS", "pausing an in-flight run race warns that returning counts as a loss"):
+		return
+	race.call("_set_paused", false)
 	race.set("_results_finalized", true)
 	race.set("_save_error", "Injected display failure")
 	var continue_action := race.get("_continue_button") as Button

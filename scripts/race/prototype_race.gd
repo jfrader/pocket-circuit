@@ -107,6 +107,7 @@ var _pause_overlay: RacePauseOverlay
 var _pause_menu_panel: PanelContainer
 var _pause_settings_panel: PanelContainer
 var _pause_resume_button: Button
+var _pause_return_warning: Label
 var _pause_settings_first_control: Control
 var _pause_settings_status: Label
 var _session: Dictionary = {}
@@ -1306,6 +1307,13 @@ func _create_pause_overlay() -> void:
 	var mode := String(_session.get("mode", "quick"))
 	var return_label: String = PAUSE_RETURN_LABELS.get(mode, "Return to Championship")
 	_add_pause_button(menu_column, return_label, request_abandon)
+	if mode == "run":
+		_pause_return_warning = MENU_SKIN.style_label(Label.new(), 15, MENU_SKIN.INK_SOFT)
+		_pause_return_warning.name = "PauseReturnWarning"
+		_pause_return_warning.text = "RETURNING COUNTS THIS RACE AS A LOSS"
+		_pause_return_warning.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_pause_return_warning.visible = false
+		menu_column.add_child(_pause_return_warning)
 
 	_pause_settings_panel = PanelContainer.new()
 	_pause_settings_panel.name = "PauseSettingsPanel"
@@ -1364,6 +1372,10 @@ func _show_pause_menu() -> void:
 	_pause_menu_panel.visible = true
 	_pause_settings_panel.visible = false
 	_pause_overlay.settings_open = false
+	if is_instance_valid(_pause_return_warning):
+		var app := get_node_or_null("/root/App")
+		var run: RunSession = app.call("current_run_session") if app else null
+		_pause_return_warning.visible = run != null and not run.race_in_flight.is_empty()
 	if is_instance_valid(_pause_resume_button):
 		_pause_resume_button.grab_focus()
 
