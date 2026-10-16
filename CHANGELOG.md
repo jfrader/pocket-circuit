@@ -35,6 +35,12 @@
 - The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
+- Car comparison headings stay inside their offer and garage cards.
+- Unused run stops stay open after Back or a restart until you choose the next route.
+- Run-only parts no longer follow won cars into Quick Race after the night ends.
+- Run endings keep the night's outcome visible after saving, and race results distinguish saved progress from a failed write.
+- Invalid run saves are rejected before opening the board instead of leaving an unusable route.
+- Run stop cards state the actual finish/DNF wear penalty and full bench repair.
 - Controllers can be plugged in or unplugged at any time; disconnecting a pad no longer leaves throttle, steering, pause or menu actions held.
 - Quick Strip prepares civilian wheel animations, both rooms' graphics and the chaser's route caches during loading instead of hitching as traffic starts moving.
 - Quitting the game no longer prints Godot's audio playback leak warning (updated Gamestruments addon).

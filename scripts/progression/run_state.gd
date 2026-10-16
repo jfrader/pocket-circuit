@@ -239,28 +239,42 @@ static func serialize(rs: RunState) -> Dictionary:
 	}
 
 static func deserialize(data: Dictionary) -> RunState:
-	var rs := new()
-	var ver: Variant = data.get("schema_version", 0)
-	if (ver is int or ver is float) and int(ver) == SCHEMA_VERSION:
-		rs.run_seed = int(data.get("run_seed", 0))
-		var act_val: Variant = data.get("act")
-		rs.act = int(act_val) if (act_val is int or act_val is float) else null
-		var r: Variant = data.get("row")
-		rs.row = int(r) if (r is int or r is float) else null
-		var rolls_in: Dictionary = data.get("car_rolls", {}) as Dictionary
-		for vid: String in rolls_in:
-			var rdict: Dictionary = rolls_in[vid] as Dictionary
-			var clean := {}
-			for axis: String in AXES:
-				clean[axis] = float(rdict.get(axis, 0.0))
-			rs.car_rolls[vid] = clean
-		var wears_in: Dictionary = data.get("car_wear", {}) as Dictionary
-		for vid: String in wears_in:
-			var w := String(wears_in[vid])
-			if w in WEAR_LEVELS:
-				rs.car_wear[vid] = w
-	else:
+	if not RunMap.is_integer(data.get("schema_version"), SCHEMA_VERSION, SCHEMA_VERSION) or not RunMap.is_integer(data.get("run_seed"), 0, HASH_MASK):
 		return null
+	var act_value: Variant = data.get("act")
+	if act_value != null and not RunMap.is_integer(act_value, 1, RunMap.ACT_SPECS.size()):
+		return null
+	var last_row := 0
+	for spec: Dictionary in RunMap.ACT_SPECS.values():
+		last_row = maxi(last_row, int(spec["rows"]))
+	if act_value != null:
+		last_row = int(RunMap.ACT_SPECS[int(act_value)]["rows"])
+	if data.get("row") != null and not RunMap.is_integer(data["row"], 0, last_row):
+		return null
+	if data.get("car_rolls") is not Dictionary or data.get("car_wear") is not Dictionary:
+		return null
+	var rs := new()
+	rs.run_seed = int(data["run_seed"])
+	rs.act = int(data["act"]) if data.get("act") != null else null
+	rs.row = int(data["row"]) if data.get("row") != null else null
+	var limit: float = TIER_ENVELOPES.values().max()
+	for vid: Variant in data["car_rolls"]:
+		var value: Variant = data["car_rolls"][vid]
+		if vid is not String or vid.is_empty() or value is not Dictionary:
+			return null
+		var clean := {}
+		for axis: String in AXES:
+			var amount: Variant = value.get(axis)
+			if not (amount is int or amount is float) or not is_finite(float(amount)) or absf(float(amount)) > limit:
+				return null
+			clean[axis] = float(amount)
+		rs.car_rolls[vid] = clean
+	for vid: Variant in data["car_wear"]:
+		var wear: Variant = data["car_wear"][vid]
+		if vid is not String or vid.is_empty() or wear is not String:
+			return null
+		if wear in WEAR_LEVELS:
+			rs.car_wear[vid] = wear
 	return rs
 
 func _to_string() -> String:

@@ -353,25 +353,82 @@ static func serialize(rm: RunMap) -> Dictionary:
 	}
 
 static func deserialize(data: Dictionary) -> RunMap:
+	if not is_integer(data.get("schema_version"), SCHEMA_VERSION, SCHEMA_VERSION):
+		return null
+	if not is_integer(data.get("run_seed"), 0, HASH_MASK) or not is_integer(data.get("act"), 1, ACT_SPECS.size()):
+		return null
+	var spec: Dictionary = ACT_SPECS[int(data["act"])]
+	var rows: int = spec["rows"] + 1
+	var paths: int = spec["paths"]
+	if not is_integer(data.get("num_rows"), rows, rows) or not is_integer(data.get("num_paths"), paths, paths) or not is_integer(data.get("path_count"), paths, paths):
+		return null
+	for key: String in ["nodes", "parents", "children"]:
+		if data.get(key) is not Dictionary:
+			return null
+	var ndin: Dictionary = data["nodes"]
+	if ndin.is_empty() or ndin.size() > rows * NUM_COLUMNS:
+		return null
 	var rm := new()
-	var ver: Variant = data.get("schema_version", 0)
-	if (ver is int or ver is float) and int(ver) == SCHEMA_VERSION:
-		rm.run_seed = int(data.get("run_seed", 0))
-		rm.act = int(data.get("act", 1))
-		rm.num_rows = int(data.get("num_rows", 0))
-		rm.num_paths = int(data.get("num_paths", 0))
-		rm.path_count = int(data.get("path_count", 0))
-		var ndin: Dictionary = data.get("nodes", {}) as Dictionary
-		rm.nodes = {}
-		for nid: String in ndin:
-			var d: Dictionary = ndin[nid] as Dictionary
-			rm.nodes[nid] = {"id": nid, "row": int(d.get("row", 0)), "col": int(d.get("col", 0)), "type": String(d.get("type", "race"))}
-		rm.parents = (data.get("parents", {}) as Dictionary).duplicate(true)
-		rm.children = (data.get("children", {}) as Dictionary).duplicate(true)
-		rm._index_rows()
-	else:
+	rm.run_seed = int(data["run_seed"])
+	rm.act = int(data["act"])
+	rm.num_rows = rows
+	rm.num_paths = paths
+	rm.path_count = paths
+	for nid: Variant in ndin:
+		var value: Variant = ndin[nid]
+		if nid is not String or value is not Dictionary:
+			return null
+		var d: Dictionary = value
+		if not is_integer(d.get("row"), 0, rows - 1) or not is_integer(d.get("col"), 0, NUM_COLUMNS - 1):
+			return null
+		var row: int = int(d["row"])
+		var col: int = int(d["col"])
+		var kind: Variant = d.get("type")
+		if nid != "%d_%d" % [row, col] or kind is not String or (kind not in DEALT_TYPES and kind != "act_rival"):
+			return null
+		if (kind == "act_rival") != (row == rows - 1) or (row == 0 and kind != "race"):
+			return null
+		rm.nodes[nid] = {"id": nid, "row": row, "col": col, "type": kind}
+	rm.parents = data["parents"].duplicate(true)
+	rm.children = data["children"].duplicate(true)
+	if not rm._valid_edges(rm.children, rm.parents, 1) or not rm._valid_edges(rm.parents, rm.children, -1):
+		return null
+	rm._index_rows()
+	if rm.get_nodes_in_row(0).size() != 1 or rm.get_nodes_in_row(rows - 1).size() != 1:
+		return null
+	if int(rm.get_end_node()["col"]) != BOSS_COLUMN:
 		return null
 	return rm
+
+## JSON represents numbers as floats; only exact, finite integers may become indices.
+static func is_integer(value: Variant, minimum: int, maximum: int) -> bool:
+	if value is int:
+		return value >= minimum and value <= maximum
+	return value is float and is_finite(value) and value == floor(value) and value >= minimum and value <= maximum
+
+func _valid_edges(edges: Dictionary, reverse: Dictionary, direction: int) -> bool:
+	for source: Variant in edges:
+		if source is not String or not nodes.has(source) or edges[source] is not Array:
+			return false
+		var seen := {}
+		for target: Variant in edges[source]:
+			if target is not String or not nodes.has(target) or seen.has(target):
+				return false
+			if nodes[target]["row"] != nodes[source]["row"] + direction:
+				return false
+			if maxi(nodes[target]["row"], nodes[source]["row"]) < num_rows - 1 and absi(nodes[target]["col"] - nodes[source]["col"]) > 1:
+				return false
+			var back: Variant = reverse.get(target)
+			if back is not Array or not back.has(source):
+				return false
+			seen[target] = true
+	for nid: String in nodes:
+		var row: int = nodes[nid]["row"]
+		var endpoint := row == (num_rows - 1 if direction == 1 else 0)
+		var links: Array = edges.get(nid, [])
+		if links.is_empty() != endpoint:
+			return false
+	return true
 
 static func _maps_structurally_equal(a: RunMap, b: RunMap) -> bool:
 	if a.run_seed != b.run_seed or a.act != b.act or a.num_rows != b.num_rows or a.path_count != b.path_count: return false

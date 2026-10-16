@@ -13,6 +13,10 @@ const DASH := 5.0
 const RADIUS_RATIO := 0.33
 ## Seconds a shape takes to grow out of the one it is shown against.
 const MORPH_TIME := 0.45
+const HEADER_FONT_SIZE := 13
+const HEADER_TAPE_HEIGHT := 24.0
+const HEADER_TAPE_WIDTH_RATIO := 0.66
+const HEADER_TAPE_ANGLE := -0.03
 
 var shape: Dictionary = {}
 var compare_shape: Dictionary = {}
@@ -50,9 +54,9 @@ func _draw() -> void:
 ## car's real shape the deltas are read from.
 static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: Dictionary, compare: Dictionary, title: String) -> void:
 	SKIN.draw_plate(item, rect, SKIN.CREAM)
-	var tape_center := Vector2(rect.get_center().x, rect.position.y + 4.0)
-	SKIN.draw_tape(item, tape_center, Vector2(rect.size.x * 0.66, 24.0), -0.03)
-	SKIN.draw_text(item, Vector2(rect.position.x, tape_center.y + 5.0), title, 13, SKIN.INK, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var header := header_geometry(rect, title)
+	SKIN.draw_tape(item, header.tape_center, header.tape_size, HEADER_TAPE_ANGLE)
+	SKIN.draw_text(item, header.text_position, title, HEADER_FONT_SIZE, SKIN.INK, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	if shown.is_empty():
 		return
 	var center := rect.get_center() + Vector2(0.0, 12.0)
@@ -85,6 +89,27 @@ static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: 
 		var delta := roundi((float(target.get(axis, 0.0)) - float(compare.get(axis, 0.0))) * 100.0)
 		if delta != 0:
 			SKIN.draw_text(item, at + Vector2(-40.0, 18.0), "%+d" % delta, 12, SKIN.LIME if delta > 0 else SKIN.RED, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
+
+
+## Bounds include clearance around the tape's torn edges.
+static func header_geometry(rect: Rect2, title: String) -> Dictionary:
+	var font := SKIN.display_font()
+	var ascent := font.get_ascent(HEADER_FONT_SIZE)
+	var descent := font.get_descent(HEADER_FONT_SIZE)
+	var tape_size := Vector2(rect.size.x * HEADER_TAPE_WIDTH_RATIO, maxf(HEADER_TAPE_HEIGHT, ascent + descent + SKIN.LINE * 2.0))
+	var tape_bounds := (Transform2D(HEADER_TAPE_ANGLE, Vector2.ZERO) * Rect2(-tape_size * 0.5, tape_size)).grow(SKIN.LINE)
+	var tape_center := Vector2(rect.get_center().x, rect.position.y + SKIN.LINE - tape_bounds.position.y)
+	tape_bounds.position += tape_center
+	var text_position := Vector2(rect.position.x, tape_center.y + (ascent - descent) * 0.5)
+	var text_width := font.get_string_size(title, HORIZONTAL_ALIGNMENT_LEFT, -1, HEADER_FONT_SIZE).x
+	var text_bounds := Rect2(Vector2(rect.get_center().x - text_width * 0.5, text_position.y - ascent), Vector2(text_width, ascent + descent))
+	return {
+		"tape_center": tape_center,
+		"tape_size": tape_size,
+		"tape_bounds": tape_bounds,
+		"text_position": text_position,
+		"text_bounds": text_bounds,
+	}
 
 
 ## Hexagon corners clockwise from the top; each axis value pushes its corner out.

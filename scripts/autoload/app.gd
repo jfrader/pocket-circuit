@@ -35,6 +35,8 @@ signal joypad_connection_changed(connected: bool)
 var current_race_session: Dictionary = {}
 ## Active roguelike run, restored from the save on boot (null when there is none).
 var _current_run_session: RunSession = null
+## Presentation only: never resumed, persisted or used to transfer rewards.
+var _ended_run_board: RunSession = null
 var last_run_error: String = ""
 ## Why the run is not on disk yet ("" once a run save lands); the board shows it.
 var run_save_error := ""
@@ -1222,12 +1224,13 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 		return true
 	var event: Dictionary = current_race_session.get("event", {})
 	var racer_count := _field_size(event)
-	current_race_session["result"] = {
-		"position": clampi(player_position, 1, racer_count),
-		"time": maxf(0.0, total_time),
-		"results": results,
-		"dnf": player_dnf,
-	}
+	if String(current_race_session.get("mode", "")) != "run" or not current_race_session.has("result"):
+		current_race_session["result"] = {
+			"position": clampi(player_position, 1, racer_count),
+			"time": maxf(0.0, total_time),
+			"results": results,
+			"dnf": player_dnf,
+		}
 	var mode := String(current_race_session["mode"])
 	if mode in ["quick", "discovery"]:
 		current_race_session["result_committed"] = true
@@ -1239,13 +1242,23 @@ func report_race_result(player_position: int, total_time: float, results: Array,
 		var pos: int = int(res.get("position", 4))
 		var dnf_flag: bool = bool(res.get("dnf", false))
 		var node_id: String = String(current_race_session.get("run_node_id", ""))
-		_commit_run_result(node_id, pos, dnf_flag, racer_count)
+		# An act advance clears resolved_nodes; retain the pending result's
+		# application state until its save lands, including terminal results.
+		if not bool(current_race_session.get("run_result_applied", false)):
+			if not _commit_run_result(node_id, pos, dnf_flag, racer_count):
+				current_race_session["save_error"] = last_run_error
+				return false
+			current_race_session["run_result_applied"] = true
 		current_race_session["result_summary"] = {
 			"run": true,
 			"position": pos,
 			"node_id": node_id,
 		}
 		current_race_session["post_race_destination"] = "run_board"
+		persist_current_run()
+		if not run_save_error.is_empty():
+			current_race_session["save_error"] = run_save_error
+			return false
 		current_race_session["result_committed"] = true
 		current_race_session.erase("save_error")
 		return true
@@ -1444,6 +1457,10 @@ func current_run_session() -> RunSession:
 	return _current_run_session
 
 
+func run_board_session() -> RunSession:
+	return _current_run_session if _current_run_session != null else _ended_run_board
+
+
 ## Starts a fresh run for the seed and persists its opening state.
 func start_run(run_seed: int) -> RunSession:
 	if _current_run_session != null:
@@ -1452,6 +1469,7 @@ func start_run(run_seed: int) -> RunSession:
 			# The old night could not be saved; it stays until it can. A read-only
 			# save never will, so there the new night simply replaces it.
 			return null
+	_ended_run_board = null
 	_current_run_session = RUN_SESSION.create(run_seed)
 	steam_drops.clear()
 	persist_current_run()
@@ -1479,6 +1497,7 @@ func persist_current_run() -> void:
 			_save_data = candidate
 	run_save_error = last_run_error
 	if ended and last_run_error.is_empty():
+		_ended_run_board = _current_run_session
 		_current_run_session = null
 	_install_held_vehicles()
 
@@ -1510,6 +1529,13 @@ func _install_held_vehicles() -> void:
 	cars.append_array(_save_data.get("steam_cars", []))
 	if _current_run_session != null:
 		cars.append_array(_current_run_session.car_records())
+	elif _ended_run_board != null:
+		var held := {}
+		for car: Dictionary in cars:
+			held[String(car["id"])] = true
+		for car: Dictionary in _ended_run_board.car_records():
+			if not held.has(String(car["id"])):
+				cars.append(car)
 	VehicleDirectory.install(cars.map(func(car: Dictionary) -> Dictionary: return CATALOG.generated_vehicle(car)))
 
 
@@ -1687,11 +1713,16 @@ func _run_circuit(stop_id: String) -> Dictionary:
 ## The race scene calls this when its countdown begins: from here a run race
 ## counts, so it is marked (and saved) as running until its result lands.
 ## A race that never got this far (cancelled or failed loading) costs nothing.
-func race_started() -> void:
+func race_started() -> bool:
 	if String(current_race_session.get("mode", "")) != "run" or _current_run_session == null:
-		return
+		return true
 	if _current_run_session.start_race(String(current_race_session.get("run_node_id", "")), _field_size(current_race_session.get("event", {}))):
 		persist_current_run()
+		if not run_save_error.is_empty():
+			_current_run_session.race_in_flight = {}
+			return false
+		return true
+	return false
 
 
 ## A run race that started and was never reported (quit, abandoned, or the game
@@ -1705,27 +1736,31 @@ func _settle_race_in_flight() -> void:
 	_commit_run_result(String(flight.get("node", "")), field, true, field)
 	if _current_run_session != null and not _current_run_session.race_in_flight.is_empty():
 		_current_run_session.race_in_flight = {}
-		persist_current_run()
+	persist_current_run()
 
 
 ## Applies a run race outcome exactly once: rivals through resolve_rival (which
 ## owns its own loss penalty), races and the act rival through resolve_race plus
 ## the crash wear of a poor finish. A refused resolution applies nothing.
-func _commit_run_result(node_id: String, position: int, dnf: bool, field_size: int) -> void:
+func _commit_run_result(node_id: String, position: int, dnf: bool, field_size: int) -> bool:
 	if _current_run_session == null or node_id.is_empty():
-		return
+		last_run_error = "no active run race"
+		return false
 	if String(_current_run_session.current_node().get("type", "")) == "rival":
 		var duel: Dictionary = _current_run_session.resolve_rival(node_id, position == 1 and not dnf)
+		if duel.has("error"):
+			last_run_error = String(duel["error"])
+			return false
 		if not (duel.get("car", {}) as Dictionary).is_empty():
 			steam.trigger_car_drop()
 	else:
 		var outcome: Dictionary = _current_run_session.resolve_race(node_id, position, field_size)
 		if outcome.has("error"):
 			last_run_error = String(outcome["error"])
-			return
+			return false
 		if dnf or position >= RUN_CRASH_FINISH_POSITION:
 			_current_run_session.register_crash(RUN_CRASH_SEVERITY)
-	persist_current_run()
+	return true
 
 
 ## Run node outcome seams (non-race). Each validates the node, applies the
