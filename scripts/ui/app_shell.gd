@@ -8,6 +8,7 @@ const RUN_BENCH_SCENE := preload("res://scripts/ui/run_bench_scene.gd")
 const RUN_VAN_SCENE := preload("res://scripts/ui/run_van_scene.gd")
 const RUN_LOCKUP_SCENE := preload("res://scripts/ui/run_lockup_scene.gd")
 const RUN_ERRAND_SCENE := preload("res://scripts/ui/run_errand_scene.gd")
+const RUN_OFFER_SCENE := preload("res://scripts/ui/run_offer_scene.gd")
 const RUN_MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
@@ -23,12 +24,6 @@ const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
 const PAGE_MARGIN := 48
 const PAGE_TOP := 28
 const BACK_HINT := "ESC / B  BACK"
-const OFFER_CAR_ICON := 56.0
-const OFFER_SHAPE_SIZE := Vector2(420, 400)
-## The won car on the offer grows and turns in from this scale and angle.
-const OFFER_REVEAL_SCALE := 0.4
-const OFFER_REVEAL_TURN := -0.6
-const OFFER_REVEAL_TIME := 0.4
 const STEAM_DROP_MARGIN := 24.0
 const STEAM_DROP_GAP := 8.0
 
@@ -580,50 +575,56 @@ func show_run_offer() -> void:
 	var offered := CATALOG.get_vehicle(sess.pending_offer)
 	var current_name := RUN_UI.car_name(sess.current_car_id)
 	_run_surface()
+	var scene := RUN_OFFER_SCENE.new()
+	scene.name = "RunOfferScene"
+	scene.act = sess.current_map.act
+	scene.car_id = sess.pending_offer
+	scene.rival_car_id = sess.current_car_id
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 64)
+	columns.add_theme_constant_override("separation", 72)
 	_content.add_child(columns)
 	var detail := VBoxContainer.new()
 	detail.name = "RunOffer"
-	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.custom_minimum_size.x = 440
 	detail.add_theme_constant_override("separation", 6)
 	columns.add_child(detail)
-	RUN_UI.spacer(detail, 8)
-	detail.add_child(RUN_UI.label(RUN_UI.origin_line(offered), 11, RUN_UI.AMBER, true))
-	RUN_UI.spacer(detail, 8)
-	var title_row := HBoxContainer.new()
-	title_row.add_theme_constant_override("separation", 16)
-	var art := TextureRect.new()
-	art.texture = IDENTITIES.car_texture(sess.pending_offer)
-	art.custom_minimum_size = Vector2(OFFER_CAR_ICON, OFFER_CAR_ICON)
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	title_row.add_child(art)
-	title_row.add_child(RUN_UI.label(String(offered.get("name", "")), 48))
-	if not _reduced_motion_enabled():
-		art.pivot_offset = Vector2(OFFER_CAR_ICON, OFFER_CAR_ICON) * 0.5
-		art.scale = Vector2.ONE * OFFER_REVEAL_SCALE
-		art.rotation = OFFER_REVEAL_TURN
-		var reveal := art.create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		reveal.tween_property(art, "scale", Vector2.ONE, OFFER_REVEAL_TIME)
-		reveal.tween_property(art, "rotation", 0.0, OFFER_REVEAL_TIME)
-	detail.add_child(title_row)
-	detail.add_child(RUN_UI.label(String(offered.get("archetype", "")).to_upper(), 14, RUN_UI.AMBER, true))
-	var line := RUN_UI.label(String(offered.get("strength", "")), 20, RUN_UI.MUTED)
+	var header := PanelContainer.new()
+	header.name = "OfferChalkboard"
+	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	RUN_MATERIALS.finish_panel(header, true)
+	detail.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label(RUN_UI.origin_line(offered), 11, SKIN.CREAM, true))
+	var title := RUN_UI.label(String(offered.get("name", "")), 30, SKIN.CREAM)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(title)
+	heading.add_child(RUN_UI.label(String(offered.get("archetype", "")).to_upper(), 14, SKIN.CREAM, true))
+	var line := RUN_UI.label(String(offered.get("strength", "")), 16, SKIN.CREAM)
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	detail.add_child(line)
-	RUN_UI.spacer(detail, 6)
-	_run_stats(detail, sess)
-	RUN_UI.spacer(detail, 12)
-	_run_actions = detail
-	_run_action("DRIVE IT", Callable(self, "_on_offer_pressed").bind(true), true, false, "ActionTakeOffer")
-	_run_action("KEEP THE %s" % current_name.to_upper(), Callable(self, "_on_offer_pressed").bind(false), false, false, "ActionKeepCar")
+	heading.add_child(line)
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
 	var card := CarShapeView.new()
 	card.name = "OfferShape"
-	card.custom_minimum_size = OFFER_SHAPE_SIZE
+	card.plot_bottom_padding = RUN_OFFER_SCENE.SHAPE_BOTTOM_PADDING
+	card.custom_minimum_size = RUN_OFFER_SCENE.SHAPE_SIZE
 	card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	columns.add_child(card)
+	detail.add_child(card)
+	var right := VBoxContainer.new()
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_theme_constant_override("separation", 12)
+	columns.add_child(right)
+	RUN_UI.spacer(right, 485)
+	_run_actions = right
+	_run_action("DRIVE IT", Callable(self, "_on_offer_pressed").bind(true), true, false, "ActionTakeOffer")
+	scene.register_control(right.get_child(1) as Button, true)
+	_run_action("KEEP THE %s" % current_name.to_upper(), Callable(self, "_on_offer_pressed").bind(false), false, false, "ActionKeepCar")
+	scene.register_control(right.get_child(2) as Button)
 	var current_shape := CarProfile.shape(CATALOG.create_vehicle_stats(sess.current_car_id))
 	card.show_shape(
 		CarProfile.shape(CATALOG.create_vehicle_stats(sess.pending_offer)),
