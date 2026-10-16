@@ -1,0 +1,8 @@
+{
+  "name": "pocket-circuit-promo-edit",
+  "private": true,
+  "description": "Renders the promo's title cards and walls (see tools/promo/README.md)",
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}
