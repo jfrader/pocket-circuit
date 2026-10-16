@@ -12,6 +12,7 @@ signal stop_confirmed(stop_id: String)
 
 const UI := preload("res://scripts/ui/run_ui.gd")
 const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
+const BOARD_IDENTITY := preload("res://scripts/ui/run_board_identity.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const PADDING := 36.0
@@ -79,8 +80,10 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 		_header.add_theme_color_override("font_color", SKIN.CREAM)
 		if _interactive:
 			_header.name = "MapMetadata"
-			_header.text = "ACT %d · %s\nSEED %d" % [_map.act, String(UI.ROOMS[_map.act]).to_upper(), _map.run_seed]
-	_header.position = Vector2(22, 14 if tabletop and _interactive else 18)
+			_header.text = "NIGHT %d · ACT %d · %s" % [session.run_seed, _map.act, String(UI.ROOMS[_map.act]).to_upper()]
+			_header.add_theme_font_override("font", ThemeDB.fallback_font)
+			_header.add_theme_font_size_override("font_size", 20)
+	_header.position = Vector2(22, 10 if tabletop and _interactive else 18)
 	add_child(_header)
 	for entry: Dictionary in session.available_nodes():
 		_available.append(String(entry["id"]))
@@ -107,6 +110,9 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 				prop.name = "ToyToken"
 				prop.kind = kind
 				prop.reduced_motion = reduced_motion
+				prop.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
+				if interactive:
+					prop.car_look = BOARD_IDENTITY.look(session, id)
 				prop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 				button.add_child(prop)
 				prop.scale = Vector2.ONE * marker_scale
@@ -301,6 +307,7 @@ func _layout() -> void:
 	var extent := size.max(custom_minimum_size)
 	var side_padding := PADDING * marker_scale
 	var bottom_padding := BOTTOM * marker_scale + (ENLARGED_EDGE_CLEARANCE if marker_scale > 1.0 else 0.0)
+	var boss_y := BOSS_Y + (ENLARGED_EDGE_CLEARANCE if marker_scale > 1.0 else 0.0)
 	for id: String in _buttons:
 		var node: Dictionary = _map.get_node(id)
 		# The act rival row sits apart at the top; the walker rows fill the rest.
@@ -308,7 +315,7 @@ func _layout() -> void:
 		var boss_row := _map.num_rows - 1
 		var centre := Vector2(
 			side_padding + float(node["col"]) * (extent.x - side_padding * 2.0) / float(RunMap.NUM_COLUMNS - 1),
-			BOSS_Y if row == boss_row else lerpf(extent.y - bottom_padding, ROW_TOP, float(row) / float(maxi(1, boss_row - 1)))
+			boss_y if row == boss_row else lerpf(extent.y - bottom_padding, ROW_TOP, float(row) / float(maxi(1, boss_row - 1)))
 		)
 		if row == boss_row:
 			_boss_label.size = BOSS_LABEL_SIZE
@@ -328,10 +335,10 @@ func _draw() -> void:
 		draw_rect(Rect2(Vector2.ZERO, size), UI.PANEL)
 		draw_rect(Rect2(Vector2.ONE * 0.5, size - Vector2.ONE), UI.LINE, false, 1.0)
 	else:
-		SKIN.draw_tape(self, Vector2(size.x * 0.5, 25), Vector2(size.x - 20, 36), -0.012, Color("39463c"))
-		MATERIALS.grain(self, Rect2(12, 8, size.x - 24, 32), true)
-		draw_texture_rect_region(MATERIALS.TAPE_CORNER, Rect2(8, 9, 18, 32), Rect2(180, 110, 80, 50), Color("73836b"))
-		draw_texture_rect(MATERIALS.STICKY_CORNER, Rect2(size.x - 42, -2, 46, 46), false, Color("66795c"))
+		if _interactive:
+			draw_colored_polygon(PackedVector2Array([Vector2(12, 7), Vector2(size.x - 18, 4), Vector2(size.x - 12, 35), Vector2(size.x - 30, 39), Vector2(14, 42), Vector2(8, 25)]), Color("344a41"))
+			MATERIALS.grain(self, Rect2(15, 10, size.x - 40, 26), true)
+			draw_line(Vector2(18, 40), Vector2(size.x - 32, 37), Color(SKIN.CREAM, 0.24), 1, true)
 	if _map == null:
 		return
 	var rows := float(maxi(1, _map.num_rows - 1))
@@ -353,9 +360,13 @@ func _draw() -> void:
 				_draw_flow(from, to)
 			else:
 				if tabletop:
+					draw_line(from, to, Color(SKIN.INK, 0.23), 5, true)
 					MATERIALS.chalk_line(self, from, to, color.lightened(0.25))
 				else:
 					draw_line(from, to, color, 1.0, true)
+	if tabletop and _interactive:
+		for id: String in _centres:
+			BOARD_TOKEN.draw_place(self, _centres[id], String(_map.get_node(id)["type"]), marker_scale)
 	var pulse := 0.5 + 0.5 * sin(_clock * TAU / PULSE_PERIOD)
 	if _interactive:
 		for id: String in _available:

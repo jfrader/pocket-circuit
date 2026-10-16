@@ -1,13 +1,16 @@
 extends Control
 
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
-const STAGE := preload("res://scripts/ui/app_shell_stage.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const SHADOW := Color(0.025, 0.035, 0.06, 0.65)
 const ART_SCALE := 1.24
+const CAR_PAD := Rect2(-25, -33, 50, 66)
+const CAR_ANGLE := -0.35
+const PAD_OPACITY := 0.18
 var kind := "race"
 var selected := false
 var reduced_motion := false
+var car_look: Dictionary = {}
 var lift := 0.0:
 	set(value):
 		lift = value
@@ -39,7 +42,9 @@ func _draw() -> void:
 	draw_set_transform(center - Vector2(0, lift), 0, Vector2.ONE * ART_SCALE)
 	match kind:
 		"race", "rival", "act_rival":
-			STAGE.draw_car(self, center - Vector2(0, lift), 53, "rustbug" if kind == "race" else "pinbolt", -0.35)
+			if not car_look.is_empty():
+				draw_set_transform(center - Vector2(0, lift), CAR_ANGLE)
+				draw_texture_rect(car_look["texture"], Rect2(-24, -32, 48, 64), false)
 		"bench":
 			draw_set_transform(center - Vector2(0, lift), -0.6, Vector2.ONE * ART_SCALE)
 			draw_rect(Rect2(-4, -25, 8, 37), Color("dce5de"))
@@ -66,3 +71,23 @@ func _draw() -> void:
 	draw_set_transform(Vector2.ZERO)
 	if selected:
 		draw_arc(center, 25, 0, TAU, 48, SKIN.YELLOW, 2, true)
+
+
+static func draw_place(item: CanvasItem, center: Vector2, stop_kind: String, scale_factor: float) -> void:
+	var car_place := stop_kind in ["race", "rival", "act_rival"]
+	item.draw_set_transform(center if car_place else center + Vector2(0, 5), CAR_ANGLE if car_place else 0.0, Vector2.ONE * scale_factor)
+	var pad := CAR_PAD if car_place else Rect2(-29, -17, 58, 34)
+	var fills := {"race": Color("64796a"), "rival": Color("8b6a50"), "act_rival": Color("a08756"), "bench": Color("526e68"), "parts_van": Color("8b8465"), "lockup": Color("67736c"), "errand": Color("a89c7b")}
+	item.draw_texture_rect(MATERIALS.SHADOW_RECT, pad.grow(3), false, Color(fills.get(stop_kind, SKIN.CREAM), PAD_OPACITY))
+	if stop_kind == "act_rival":
+		item.draw_arc(Vector2.ZERO, 34, 0, TAU, 40, Color(SKIN.CREAM, 0.14), 1, true)
+	MATERIALS.grain(item, pad)
+	if stop_kind in ["race", "rival"]:
+		for side: float in [-1, 1]:
+			item.draw_line(Vector2(side * 23, 24), Vector2(side * 23, 31), Color(SKIN.CREAM, PAD_OPACITY), 1, true)
+	elif stop_kind in ["bench", "parts_van", "lockup"]:
+		for stripe in 3:
+			item.draw_line(Vector2(-26 + stripe * 7, 15), Vector2(-20 + stripe * 7, 8), Color(SKIN.YELLOW, PAD_OPACITY), 1, true)
+	else:
+		item.draw_line(Vector2(-23, 11), Vector2(22, 11), Color(SKIN.INK, 0.1), 1, true)
+	item.draw_set_transform(Vector2.ZERO)

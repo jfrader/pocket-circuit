@@ -4,6 +4,12 @@ const SCENE := preload("res://scripts/ui/run_board_scene.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
+const BOARD_IDENTITY := preload("res://scripts/ui/run_board_identity.gd")
+const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
+
+class EmptyAssignments extends RunSession:
+	func opponents_for_node(_node_id: String) -> Dictionary:
+		return {}
 
 
 func _initialize() -> void:
@@ -21,6 +27,7 @@ func _run() -> void:
 	if not _expect(bool(app.call("update_setting", "reduced_motion", false)), "material-motion fixture enables ambient motion"):
 		return
 	var session: RunSession = app.call("start_run", 2426001)
+	var session_snapshot := RunSession.serialize(session)
 	var surfaces: Array[String] = []
 	for act: int in SCENE.ROOM_NAMES:
 		session.current_map.act = act
@@ -59,7 +66,40 @@ func _run() -> void:
 		if not _expect(is_equal_approx(slot.get_global_rect().position.x, 944) and is_equal_approx(slot.size.x, 312) and is_equal_approx(active_detail.get_global_rect().position.x, 968) and is_equal_approx(active_detail.size.x, 264) and active_detail.get_global_rect().end.y < 648, "312px detail slot reserves 24px per side for the frame and shadow around 264px content"):
 			return
 		var metadata := shell.find_child("RunMetadata", true, false) as Label
-		if not _expect(metadata.get_line_count() == 2 and (board.get_node("MapMetadata") as Label).get_line_count() == 2, "act/room and map seed metadata use deliberate two-line layouts"):
+		var header := board.get_node("MapMetadata") as Label
+		if not _expect(metadata.get_line_count() == 2 and header.text == "NIGHT %d · ACT %d · %s" % [session.run_seed, act, String(SCENE.ROOM_NAMES[act]).to_upper()] and header.get_theme_font_size("font_size") == 20 and board.get_node_or_null("MapSeed") == null and header.text.count(str(session.run_seed)) == 1, "painted night/act/room header shows the night identifier once, with no residual seed label"):
+			return
+		if not _expect(BOARD_TOKEN.CAR_PAD.encloses(Rect2(-24, -32, 48, 64)) and BOARD_TOKEN.PAD_OPACITY <= 0.2, "quiet car ground wash covers the sprite footprint without competing with route contrast"):
+			return
+		if not _expect(bool((shell.find_child("RunChalkboard", true, false) as Control).get("refined_cards")), "active detail opts into finer layered chalkboard and paper edges"):
+			return
+		for id: String in session.current_map.nodes:
+			var kind := String(session.current_map.get_node(id)["type"])
+			if kind not in ["race", "rival", "act_rival"]:
+				continue
+			var look: Dictionary = ((board.call("marker", id) as Button).get_node("ToyToken") as Control).get("car_look")
+			if not _expect((look["texture"] as Texture2D).get_width() == 48 * MATERIALS.HERO_PIXEL_SCALE, "map car tokens use genuine hero-scale rasterization"):
+				return
+			var roster: Dictionary = app.call("run_stop_opponents", id)
+			var leader: Dictionary = roster["opponents"][0]
+			if not _expect(look["source"] == "opponent" and look["key"] == leader["vehicle_id"] and look["opponent_id"] == leader["id"] and look["texture"] == MATERIALS.hero_texture(String(leader["vehicle_id"])), "race, rival and act-rival markers render the actual assigned field leader's vehicle"):
+				return
+			var restored := RunSession.deserialize(session_snapshot)
+			restored.current_map.act = act
+			var again := BOARD_IDENTITY.look(restored, id)
+			if not _expect(look["key"] == again["key"] and look["opponent_id"] == again["opponent_id"], "node opponent appearance survives save reload"):
+				return
+			var empty := EmptyAssignments.new()
+			empty.current_map = session.current_map
+			empty.current_car_id = session.current_car_id
+			var fallback := BOARD_IDENTITY.look(empty, id)
+			if not _expect(fallback["source"] == "player" and fallback["key"] == session.current_car_id and fallback["texture"] == MATERIALS.hero_texture(session.current_car_id), "empty assignments fall back to the player's car for every race-type marker"):
+				return
+		var legacy_snapshot := session_snapshot.duplicate(true)
+		legacy_snapshot.erase("node_opponents")
+		var legacy := RunSession.deserialize(legacy_snapshot)
+		var legacy_look := BOARD_IDENTITY.look(legacy, legacy.current_node_id)
+		if not _expect(legacy_look["key"] == legacy.opponents_for_node(legacy.current_node_id)["opponents"][0]["vehicle_id"], "older saves use domain-backfilled assignments when available"):
 			return
 		var circuit_fact := shell.find_child("CircuitFact", true, false) as VBoxContainer
 		var circuit_value := circuit_fact.get_child(1) as Label

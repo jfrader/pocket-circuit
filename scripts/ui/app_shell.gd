@@ -344,6 +344,7 @@ func show_run_board() -> void:
 	var chalkboard := RUN_BOARD_SCENE.new()
 	chalkboard.name = "RunChalkboard"
 	chalkboard.chalkboard = true
+	chalkboard.refined_cards = not night_over
 	chalkboard.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	chalkboard.show_behind_parent = true
 	detail.add_child(chalkboard)
@@ -368,7 +369,7 @@ func show_run_board() -> void:
 	RUN_BOARD_SCENE.chalk_labels(chalk_content)
 	_run_stop_card = VBoxContainer.new()
 	_run_stop_card.name = "RunStop"
-	_run_stop_card.add_theme_constant_override("separation", 6)
+	_run_stop_card.add_theme_constant_override("separation", 6 if night_over else 8)
 	_run_stop_card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	detail.add_child(_run_stop_card)
 	_run_actions = detail
