@@ -114,6 +114,7 @@ var _pause_settings_first_control: Control
 var _pause_settings_status: Label
 var _session: Dictionary = {}
 var _save_error := ""
+var _night_consequences := "NIGHT UNCHANGED"
 var _results_finalized: bool = false
 var _player_took_lead := false
 var _race_won := false
@@ -1025,6 +1026,9 @@ func _update_results(results: Array) -> void:
 	var app := get_node_or_null("/root/App")
 	var live_session: Dictionary = app.call("get_current_race_session") if app and app.has_method("get_current_race_session") else {}
 	var summary: Dictionary = live_session.get("result_summary", {})
+	if mode == "run":
+		lines.append(_night_consequences)
+		_results_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if bool(summary.get("mastery", false)):
 		var record: Dictionary = summary.get("mastery_record", {})
 		var targets: Dictionary = summary.get("mastery_targets", {})
@@ -1573,7 +1577,14 @@ func _report_result_to_app(results: Array) -> bool:
 				"best_lap": 0.0 if is_inf(_best_lap) else _best_lap,
 				"ghost_samples": PERSONAL_GHOST_SCRIPT.finalize_samples(_ghost_samples, finish_time),
 			}
+			var run: RunSession = app.call("current_run_session") as RunSession if String(_session.get("mode", "")) == "run" else null
+			var before := _night_result_snapshot(run) if run != null else {}
+			var live: Dictionary = app.call("get_current_race_session")
+			var already_applied := bool(live.get("run_result_applied", false))
 			var committed := bool(app.call("report_race_result", int(result["position"]), finish_time, results, bool(result.get("dnf", false)), performance))
+			live = app.call("get_current_race_session")
+			if run != null and not already_applied and bool(live.get("run_result_applied", false)):
+				_night_consequences = _night_result_consequences(before, run, live.get("result", {}))
 			if not committed and app.has_method("get_last_save_error"):
 				_save_error = String(app.call("get_last_save_error"))
 				if app.has_method("get_current_race_session"):
@@ -1581,6 +1592,48 @@ func _report_result_to_app(results: Array) -> bool:
 					_save_error = String(pending.get("save_error", _save_error))
 			return committed
 	return true
+
+
+func _night_result_snapshot(run: RunSession) -> Dictionary:
+	var node_type := String(run.current_node().get("type", ""))
+	var opponents: Array = run.opponents_for_node(run.current_node_id).get("opponents", []) if node_type in ["rival", "act_rival"] else []
+	return {
+		"points": run.run_points,
+		"car_id": run.current_car_id,
+		"wear": run.run_state.get_car_wear(run.current_car_id),
+		"act": run.current_map.act,
+		"cars": run.owned_cars.keys(),
+		"pending_offer": run.pending_offer,
+		"completed": run.is_complete(),
+		"rival_car": String(opponents[0]["vehicle_id"]) if not opponents.is_empty() else "",
+		"node_type": node_type,
+	}
+
+
+func _night_result_consequences(before: Dictionary, run: RunSession, result: Dictionary) -> String:
+	var changes: Array[String] = []
+	var points := run.run_points - int(before["points"])
+	if points > 0:
+		changes.append("+%d POINTS" % points)
+	if String(before["node_type"]) == "rival" and (int(result.get("position", 1)) != 1 or bool(result.get("dnf", false))):
+		changes.append("RIVAL LOSS: -%d POINTS" % absi(points))
+	var wear := run.run_state.get_car_wear(String(before["car_id"]))
+	if wear != String(before["wear"]):
+		changes.append("WEAR: %s -> %s" % [String(before["wear"]).to_upper(), wear.to_upper()])
+	for car: Dictionary in run.won_cars():
+		var car_id := String(car["id"])
+		var offered := run.pending_offer == car_id and run.pending_offer != String(before["pending_offer"])
+		var final_reward := run.is_complete() and not bool(before["completed"]) and car_id == String(before["rival_car"])
+		if car_id not in (before["cars"] as Array) or offered or final_reward:
+			var vehicle := CATALOG.get_vehicle(car_id)
+			if vehicle.is_empty():
+				vehicle = CATALOG.generated_vehicle(car)
+			var decision := " - DECIDE AT THE BOARD" if run.pending_offer == car_id else " - BANKED"
+			changes.append("WON: " + String(vehicle["name"]).to_upper() + decision)
+	if run.current_map.act > int(before["act"]):
+		var nbsp := String.chr(0xA0)
+		changes.append("ACT%s%d%sUNLOCKED" % [nbsp, run.current_map.act, nbsp])
+	return " · ".join(changes) if not changes.is_empty() else "NIGHT UNCHANGED"
 
 
 func _format_time(total_seconds: float) -> String:

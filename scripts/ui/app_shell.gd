@@ -384,14 +384,37 @@ func show_run_board() -> void:
 	var unsaved := String(_app.get("run_save_error"))
 	if night_over:
 		_run_stop_card.add_child(RUN_UI.label("NIGHT OVER", 12, RUN_UI.AMBER, true))
-		var ending := RUN_UI.label("SUNRISE" if sess.is_complete() else "THE NIGHT ENDED", 20, RUN_UI.MUTED)
+		var verdict := "YOU LEFT THE NIGHT"
+		if sess.is_complete():
+			verdict = "ALL ACT RIVALS DEFEATED"
+		elif RunState.is_worn_out(sess.run_state.get_car_wear(sess.current_car_id)):
+			verdict = "THE CAR GAVE OUT"
+		elif sess.failed and String(sess.current_node().get("type", "")) == "act_rival" and sess.resolved_nodes.has(sess.current_node_id):
+			verdict = "DEFEATED BY THE ACT RIVAL"
+		var ending := RUN_UI.label(verdict, 20, RUN_UI.MUTED)
+		ending.name = "NightVerdict"
 		ending.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_run_stop_card.add_child(ending)
 		var safe := {}
 		for car: Dictionary in sess.collection_safe_cars():
 			safe[String(car["id"])] = true
+		var banked := safe.size()
+		var impounded := sess.impounded_cars.size()
+		var lost := sess.won_cars().size() - banked - impounded
+		var haul: Array[String] = []
+		if banked > 0:
+			haul.append("BANKED: %d %s" % [banked, "CAR" if banked == 1 else "CARS"])
+		if impounded > 0:
+			haul.append("IMPOUNDED: %d %s" % [impounded, "CAR" if impounded == 1 else "CARS"])
+		if lost > 0:
+			haul.append("LOST: %d %s" % [lost, "CAR" if lost == 1 else "CARS"])
+		var haul_summary := RUN_UI.label(" - ".join(haul) if not haul.is_empty() else "NO HAUL", 14, RUN_UI.MUTED)
+		haul_summary.name = "HaulSummary"
+		haul_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_run_stop_card.add_child(haul_summary)
 		for car: Dictionary in sess.won_cars():
-			var recap := RUN_UI.label(("BANKED · " if safe.has(String(car["id"])) else "LOST · ") + RUN_UI.car_name(String(car["id"])).to_upper(), 14, RUN_UI.MUTED)
+			var status := "BANKED · " if safe.has(String(car["id"])) else ("IMPOUNDED · " if sess.impounded_cars.has(String(car["id"])) else "LOST · ")
+			var recap := RUN_UI.label(status + RUN_UI.car_name(String(car["id"])).to_upper(), 14, RUN_UI.MUTED)
 			recap.name = "HaulRecap_" + String(car["id"])
 			recap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_run_stop_card.add_child(recap)
