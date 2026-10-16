@@ -320,9 +320,10 @@ func show_run_board() -> void:
 	board.reduced_motion = _reduced_motion_enabled()
 	left.add_child(board)
 	if not night_over:
-		var instructions := RUN_UI.label(RUN_UI.BOARD_CONTROLS, 10, SKIN.CREAM, true)
+		var instructions := RUN_UI.label(RUN_UI.BOARD_CONTROLS, 11, RUN_BOARD_SCENE.CHALK_CAPTION)
 		instructions.add_theme_stylebox_override("normal", RUN_BOARD_SCENE.label_tape())
 		left.add_child(instructions)
+		board.focus_changed.connect(tabletop.set_focus)
 	board.configure(sess, not night_over, IDENTITIES.car_texture(sess.current_car_id))
 	if night_over:
 		board.hide_route_visuals()
@@ -372,6 +373,8 @@ func show_run_board() -> void:
 	if not night_over:
 		RUN_BOARD_SCENE.compact_labels(chalk_content)
 	RUN_BOARD_SCENE.chalk_labels(chalk_content)
+	if not night_over:
+		RUN_BOARD_SCENE.quiet_captions(chalk_content, RUN_BOARD_SCENE.CHALK_CAPTION)
 	_run_stop_card = VBoxContainer.new()
 	_run_stop_card.name = "RunStop"
 	_run_stop_card.add_theme_constant_override("separation", 6 if night_over else 8)
@@ -488,6 +491,7 @@ func _show_run_stop(stop_id: String, sess: RunSession) -> void:
 	_wire_button_audio(go)
 	_run_stop_card.add_child(go)
 	RUN_BOARD_SCENE.ink_labels(_run_stop_card)
+	RUN_BOARD_SCENE.quiet_captions(_run_stop_card, RUN_BOARD_SCENE.PAPER_CAPTION)
 	RUN_BOARD_SCENE.compact_labels(_run_stop_card)
 	_link_board_focus(stop_id)
 	RUN_UI.stagger_in(_run_stop_card.get_children(), _reduced_motion_enabled())

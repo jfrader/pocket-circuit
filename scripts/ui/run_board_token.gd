@@ -6,11 +6,11 @@ extends Control
 const UI := preload("res://scripts/ui/run_ui.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
-const SHADOW := Color(0.025, 0.035, 0.06, 0.62)
 const CHIP_RADIUS := 18.0
 const BOSS_RADIUS := 20.0
-const EDGE_DEPTH := 3.0
+const EDGE_DEPTH := 3.5
 const ICON_EXTENT := 28.0
+const INNER_FACE := 0.62
 const FACE := Color("26332e")
 const EDGE := Color("111815")
 ## Each kind's rim, taken from its map icon so chip, icon and legend agree.
@@ -19,7 +19,19 @@ const RIMS := {
 	"lockup": Color("ffd23f"), "errand": Color("4da3e8"), "act_rival": Color("ff9d1f"),
 }
 const LIFT := 3.0
+## Rim alpha, rim width and lamp-highlight strength by tier: a stop the player
+## can go to (or stands on) leads; the rest of the act sits back a step, with a
+## thinner rim as well as a dimmer one so tone is not the only cue. Hover and
+## selection raise any chip to the lead rim.
+const RIM_TIERS := {
+	&"reachable": [0.95, 2.5, 1.0],
+	&"distant": [0.55, 1.5, 0.55],
+}
 var kind := "race"
+var reachable := false:
+	set(value):
+		reachable = value
+		queue_redraw()
 var selected := false
 var hovered := false:
 	set(value):
@@ -49,6 +61,10 @@ func radius() -> float:
 	return BOSS_RADIUS if kind == "act_rival" else CHIP_RADIUS
 
 
+func rim_tier() -> StringName:
+	return &"reachable" if reachable or hovered or selected else &"distant"
+
+
 func set_selected(value: bool) -> void:
 	selected = value
 	if _lift_tween != null:
@@ -65,21 +81,20 @@ func _draw() -> void:
 	var center := size * 0.5
 	var r := radius()
 	var rim: Color = RIMS.get(kind, SKIN.CREAM)
+	var tier: Array = RIM_TIERS[rim_tier()]
 	# The shadow stays on the table and softens as the chip lifts off it.
-	var spread := r * 1.25 + lift
-	draw_texture_rect(MATERIALS.SHADOW_CIRCLE, Rect2(center + Vector2(2, 4) - Vector2.ONE * spread, Vector2.ONE * spread * 2.0), false, Color(SHADOW, SHADOW.a - lift * 0.06))
-	var top := center - Vector2(0, lift)
-	draw_circle(top + Vector2(0, EDGE_DEPTH), r, EDGE)
-	draw_circle(top, r, FACE)
+	var top := MATERIALS.token(self, center, r, FACE, EDGE, Color(rim, tier[0]), EDGE_DEPTH, lift, tier[1], tier[2])
 	# Grain only: the panel grain's fibre and chalk strokes would spill off a chip.
 	draw_texture_rect(MATERIALS.GRAIN, Rect2(top - Vector2.ONE * r * 0.7, Vector2.ONE * r * 1.4), false, Color(0.9, 0.95, 0.85, 0.06))
-	draw_arc(top, r - 1.0, 0, TAU, 48, Color(rim, 0.95 if hovered or selected else 0.7), 2.0, true)
-	draw_arc(top, r - 4.0, PI * 1.1, PI * 1.9, 24, Color(SKIN.CREAM, 0.16), 1.0, true)
 	if kind == "act_rival":
 		draw_arc(top, r + 3.0, 0, TAU, 56, Color(rim, 0.35), 1.0, true)
 	var extent := ICON_EXTENT * (r / CHIP_RADIUS)
-	# A light inner face keeps the kind glyph as bright as its legend twin.
-	draw_circle(top, extent * 0.62, Color("ece6d2", 0.92))
+	# A light inner face keeps the kind glyph as bright as its legend twin; it is
+	# shaded like the chip, lit upper left, so the two read as one piece.
+	var inner := extent * INNER_FACE
+	draw_circle(top, inner, Color("ece6d2", 0.92))
+	draw_arc(top, inner - 1.5, PI * -0.1, PI * 0.8, 24, Color(0, 0, 0, 0.14), 3.0, true)
+	draw_arc(top, inner - 1.0, PI * 1.05, PI * 1.55, 20, Color(MATERIALS.TOKEN_HIGHLIGHT, 0.9), 1.5, true)
 	draw_texture_rect(icon(), Rect2(top - Vector2.ONE * extent * 0.5, Vector2.ONE * extent), false)
 	if done:
 		var badge := top + Vector2(r * 0.72, r * 0.62)

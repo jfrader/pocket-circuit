@@ -23,6 +23,17 @@ const DETAIL_WIDTH := 312.0
 const COLUMN_GAP := 24
 const MARKER_SCALE := 1.2
 const DETAIL_OUTSET := 24
+## The board's focus light: how many stops it can warm, the reach of the small
+## pool on the player and on each choice (in scene widths), and how much of the
+## night a pool lifts at its centre. Pools feather from their centre and stay
+## apart, so the table between them keeps its own lamp light and texture.
+const FOCUS_LIMIT := 8
+const FOCUS_PLAYER_REACH := 0.075
+const FOCUS_CHOICE_REACH := 0.055
+const FOCUS_PEAK := 0.6
+## Quieter caption tones on the chalkboard and on the paper slip.
+const CHALK_CAPTION := Color(SKIN.CREAM, 0.66)
+const PAPER_CAPTION := Color(SKIN.INK, 0.74)
 
 var act := 1
 var chalkboard := false
@@ -39,6 +50,8 @@ var lighting_tint: Color:
 var _hero: TextureRect
 var _hero_shadow: TextureRect
 var _tire_contacts: Control
+var _light: ShaderMaterial
+var _focus := PackedVector2Array()
 
 
 func _ready() -> void:
@@ -56,10 +69,24 @@ func _ready() -> void:
 		shader.code = "shader_type canvas_item;\n" + MATERIALS.sunlight_shader() + """
 		uniform int ending = 0;
 		uniform float lamp_warmth = 0.0;
+		uniform vec2 focus_points[%d];
+		uniform int focus_count = 0;
+		uniform float aspect = 0.5625;
 		void fragment() {
 			float distance_to_lamp = length((UV - vec2(0.18, 0.12)) * vec2(1.0, 0.7));
 			float night = smoothstep(0.13, 0.95, distance_to_lamp);
-			COLOR = vec4(mix(vec3(1.0, 0.77, 0.43), vec3(0.025, 0.065, 0.16), night), mix(0.10, 0.88, night));
+			if (ending == 0 && focus_count > 0) {
+				// Small feathered warm pools on the player and their choices; the
+				// rest of the table keeps the lamp's own falloff.
+				float pool = 0.0;
+				for (int i = 0; i < focus_count; i++) {
+					float reach = i == 0 ? %.3f : %.3f;
+					float d = length((UV - focus_points[i]) * vec2(1.0, aspect));
+					pool = max(pool, 1.0 - smoothstep(0.0, reach, d));
+				}
+				night *= 1.0 - pool * %.3f;
+			}
+			COLOR = vec4(mix(vec3(1.0, 0.77, 0.43), vec3(0.025, 0.065, 0.16), smoothstep(0.0, 0.7, night)), mix(0.10, 0.88, night));""" % [FOCUS_LIMIT, FOCUS_PLAYER_REACH, FOCUS_CHOICE_REACH, FOCUS_PEAK] + """
 			if (ending == 1) {
 				float beam = sun_beam(UV);
 				float intensity = beam * mix(0.28, 0.10, UV.y);
@@ -74,6 +101,9 @@ func _ready() -> void:
 		light_material.shader = shader
 		light_material.set_shader_parameter("ending", 1 if scene_mode == &"night_won" else 2 if scene_mode == &"night_lost" else 0)
 		shade.material = light_material
+		_light = light_material
+		resized.connect(_apply_focus)
+		_apply_focus()
 		add_child(shade)
 		if ambient_motion:
 			MATERIALS.add_beam_dust(self, size * beam_origin, reduced_motion, scene_mode == &"night_won")
@@ -84,6 +114,29 @@ func _ready() -> void:
 				_lamp_pulse.tween_method(warmth, 0.015, 0.0, 3.5)
 		if scene_mode != &"board":
 			_add_hero()
+
+
+## Warms the table around `points`, in map coordinates: the player's stop first,
+## then the stops they can go to. The rest of the table keeps the lamp's light.
+func set_focus(points: PackedVector2Array) -> void:
+	_focus = points.slice(0, FOCUS_LIMIT)
+	_apply_focus()
+
+
+func focus_points() -> PackedVector2Array:
+	return _focus
+
+
+func _apply_focus() -> void:
+	if _light == null or size.x <= 0.0 or size.y <= 0.0:
+		return
+	var uvs := PackedVector2Array()
+	uvs.resize(FOCUS_LIMIT)
+	for index in _focus.size():
+		uvs[index] = (PAGE_INSET + _focus[index]) / size
+	_light.set_shader_parameter("focus_points", uvs)
+	_light.set_shader_parameter("focus_count", _focus.size() if scene_mode == &"board" else 0)
+	_light.set_shader_parameter("aspect", size.y / size.x)
 
 
 func arrive() -> void:
@@ -342,6 +395,15 @@ static func chalk_labels(host: Node) -> void:
 		if child is Label:
 			(child as Label).add_theme_color_override("font_color", SKIN.CREAM)
 		chalk_labels(child)
+
+
+## Mono captions (keys, states, metadata) step back behind the values they
+## label: same words, a quieter tone of the surface's ink.
+static func quiet_captions(host: Node, ink: Color) -> void:
+	for child: Node in host.get_children():
+		if child is Label and (child as Label).get_theme_font("font") == UI.mono_font():
+			(child as Label).add_theme_color_override("font_color", ink)
+		quiet_captions(child, ink)
 
 
 static func label_tape() -> StyleBoxFlat:
