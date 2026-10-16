@@ -384,9 +384,23 @@ func show_run_board() -> void:
 	var unsaved := String(_app.get("run_save_error"))
 	if night_over:
 		_run_stop_card.add_child(RUN_UI.label("NIGHT OVER", 12, RUN_UI.AMBER, true))
-		var ending := RUN_UI.label(RUN_UI.NIGHT_WON if sess.is_complete() else RUN_UI.NIGHT_LOST, 20, RUN_UI.MUTED)
+		var ending := RUN_UI.label("SUNRISE" if sess.is_complete() else "THE NIGHT ENDED", 20, RUN_UI.MUTED)
 		ending.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_run_stop_card.add_child(ending)
+		var safe := {}
+		for car: Dictionary in sess.collection_safe_cars():
+			safe[String(car["id"])] = true
+		for car: Dictionary in sess.won_cars():
+			var recap := RUN_UI.label(("BANKED · " if safe.has(String(car["id"])) else "LOST · ") + RUN_UI.car_name(String(car["id"])).to_upper(), 14, RUN_UI.MUTED)
+			recap.name = "HaulRecap_" + String(car["id"])
+			recap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_run_stop_card.add_child(recap)
+	var haul_note := String(_app.get("run_haul_note"))
+	if not haul_note.is_empty():
+		var note := RUN_UI.label(haul_note, 14, RUN_UI.AMBER, true)
+		note.name = "HaulNote"
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.add_child(note)
 	if not unsaved.is_empty():
 		detail.add_child(RUN_UI.label("NOT SAVED · " + unsaved.to_upper(), 12, RUN_UI.AMBER, true))
 		if not bool(_app.call("is_save_read_only")):
@@ -522,6 +536,11 @@ func _go_to_run_stop(stop_id: String, play_confirm: bool) -> void:
 	_run_going = true
 	if play_confirm:
 		_play_ui_confirm()
+	var sess: RunSession = _app.call("current_run_session")
+	if sess != null and sess.pending_chaser != null:
+		_app.call("start_run_sprint", stop_id)
+		_run_going = false
+		return
 	var generation := _entrance_generation
 	var drive := _run_board.travel_to(stop_id)
 	if drive > 0.0:
@@ -685,12 +704,30 @@ func show_run_offer() -> void:
 	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	right.add_theme_constant_override("separation", 12)
 	columns.add_child(right)
-	RUN_UI.spacer(right, 485)
+	RUN_UI.spacer(right, 330)
 	_run_actions = right
-	_run_action("DRIVE IT", Callable(self, "_on_offer_pressed").bind(true), true, false, "ActionTakeOffer")
-	scene.register_control(right.get_child(1) as Button, true)
-	_run_action("KEEP THE %s" % current_name.to_upper(), Callable(self, "_on_offer_pressed").bind(false), false, false, "ActionKeepCar")
-	scene.register_control(right.get_child(2) as Button)
+	if sess.pending_offer_driver.is_empty() and sess.pending_offer_points == 0:
+		# Clean cars (lockups) keep the legacy choice: no chase, no cost.
+		_run_action("DRIVE IT", Callable(self, "_on_legacy_offer_pressed").bind(true), true, false, "ActionTakeOffer")
+		scene.register_control(right.get_child(1) as Button, true)
+		_run_action("SEND IT HOME", Callable(self, "_on_legacy_offer_pressed").bind(false), false, false, "ActionKeepCar")
+		scene.register_control(right.get_child(2) as Button)
+	else:
+		if not sess.pending_offer_driver.is_empty():
+			var driver := HBoxContainer.new()
+			driver.name = "OfferDriver"
+			var portrait := TextureRect.new()
+			portrait.custom_minimum_size = Vector2(48, 48)
+			portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			portrait.texture = IDENTITIES.avatar_texture(String(sess.pending_offer_driver.get("id", "")))
+			driver.add_child(portrait)
+			driver.add_child(RUN_UI.label(String(sess.pending_offer_driver.get("name", "")), 18, SKIN.CREAM))
+			right.add_child(driver)
+		if sess.can_race_hot(sess.pending_offer):
+			_offer_choice(scene, "RACE IT NOW", "The driver you took it from chases you on the next sprint", "run_race_it_now", "ActionTakeOffer", true)
+		_offer_choice(scene, "SEND IT AHEAD · %d POINTS" % sess.pending_offer_points, "Spend this win's points, nobody chases you", "run_send_it_ahead", "ActionSendAhead", not sess.can_race_hot(sess.pending_offer), sess.run_points < sess.pending_offer_points)
+		_offer_choice(scene, "SEND IT HOME", "In your collection next night, keep your points", "run_send_it_home", "ActionKeepCar")
 	var current_shape := CarProfile.shape(CATALOG.create_vehicle_stats(sess.current_car_id))
 	card.show_shape(
 		CarProfile.shape(CATALOG.create_vehicle_stats(sess.pending_offer)),
@@ -701,7 +738,21 @@ func show_run_offer() -> void:
 	_focus_first()
 
 
-func _on_offer_pressed(take: bool) -> void:
+func _offer_choice(scene: Control, title: String, copy: String, action: String, node_name: String, primary: bool = false, disabled: bool = false) -> void:
+	_run_action(title, Callable(self, "_on_offer_pressed").bind(action), primary, disabled, node_name)
+	scene.register_control(_run_actions.get_child(_run_actions.get_child_count() - 1) as Button, primary)
+	var label := RUN_UI.label(copy, 14, SKIN.CREAM)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_run_actions.add_child(label)
+
+
+func _on_offer_pressed(action: String) -> void:
+	_play_ui_confirm()
+	if bool(_app.call(action)):
+		show_run_board()
+
+
+func _on_legacy_offer_pressed(take: bool) -> void:
 	_play_ui_confirm()
 	_app.call("run_take_offer" if take else "run_decline_offer")
 	show_run_board()
@@ -788,6 +839,10 @@ func show_run_bench() -> void:
 		_add_run_button(card[1], fit, Callable(self, "_on_bench_fit_pressed").bind(index), "BenchFit_%d" % index)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	RUN_BENCH_SCENE.dress_button(actions.get_child(1) as Button)
+	if not sess.boot_cars.is_empty():
+		_run_actions = left
+		_run_action("BANK THE HAUL", Callable(self, "_on_bench_bank_pressed"), false, used, "BenchBankHaul")
+		RUN_BENCH_SCENE.dress_button(left.get_child(left.get_child_count() - 1) as Button)
 	var legend := RUN_UI.legend(sess.current_map)
 	RUN_BOARD_SCENE.chalk_labels(legend)
 	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
@@ -856,6 +911,9 @@ func show_run_parts_van() -> void:
 		var buy := RUN_UI.part_button(part, "%s · %d POINTS" % [RunParts.part_name(part).to_upper(), cost], bought or sess.run_points < cost)
 		scene.register_pack(buy, part)
 		_add_run_button(card[1], buy, Callable(self, "_on_van_buy_pressed").bind(String(part["part"])), "VanBuy_" + String(part["part"]))
+	for vehicle_id: String in sess.impounded_cars:
+		var ransom := RUN_UI.action("RANSOM %s · %d POINTS" % [RUN_UI.car_name(vehicle_id).to_upper(), RunSession.HAUL_RANSOM_POINTS], false, bought or sess.run_points < RunSession.HAUL_RANSOM_POINTS)
+		_add_run_button(card[1], ransom, Callable(self, "_on_van_ransom_pressed").bind(vehicle_id), "VanRansom_" + vehicle_id)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	RUN_BENCH_SCENE.dress_button(left.get_child(left.get_child_count() - 1) as Button)
 	var legend := RUN_UI.legend(sess.current_map)
@@ -1016,6 +1074,18 @@ func _on_bench_repair_pressed() -> void:
 	if sess != null:
 		_app.call("run_bench_repair", sess.current_car_id)
 	_finish_bench_confirmation(&"repair", "BenchRepair")
+
+
+func _on_bench_bank_pressed() -> void:
+	_play_ui_confirm()
+	if bool(_app.call("run_bench_bank_haul")):
+		show_run_board()
+
+
+func _on_van_ransom_pressed(vehicle_id: String) -> void:
+	_play_ui_confirm()
+	if bool(_app.call("run_ransom_car", vehicle_id)):
+		show_run_board()
 
 
 func _on_bench_fit_pressed(held_index: int) -> void:

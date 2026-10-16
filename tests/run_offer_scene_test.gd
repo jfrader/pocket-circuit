@@ -44,10 +44,11 @@ func _run() -> void:
 		await create_timer(SCENE.REVEAL_TIME + 0.2).timeout
 		var card := shell.find_child("OfferShape", true, false) as CarShapeView
 		var take := shell.find_child("ActionTakeOffer", true, false) as Button
+		var ahead := shell.find_child("ActionSendAhead", true, false) as Button
 		var keep := shell.find_child("ActionKeepCar", true, false) as Button
-		if not _expect(shell.find_child("RunOffer", true, false) != null and card.label == "VS " + UI.car_name(original).to_upper() and take.text == "DRIVE IT" and keep.text == "KEEP THE %s" % UI.car_name(original).to_upper(), "pinned offer nodes, exact actions and VS comparison survive"):
+		if not _expect(shell.find_child("RunOffer", true, false) != null and card.label == "VS " + UI.car_name(original).to_upper() and take.text.begins_with("RACE IT NOW") and ahead.text.begins_with("SEND IT AHEAD") and keep.text == "SEND IT HOME", "pinned offer nodes, three choices and VS comparison survive"):
 			return
-		if not _expect(root.gui_get_focus_owner() == take and take.get_node(take.focus_neighbor_bottom) == keep and keep.get_node(keep.focus_neighbor_top) == take, "original first and directional focus are preserved"):
+		if not _expect(root.gui_get_focus_owner() == take and take.get_node(take.focus_neighbor_bottom) == ahead and ahead.get_node(ahead.focus_neighbor_bottom) == keep and keep.get_node(keep.focus_neighbor_top) == ahead, "original first and directional focus are preserved across the three choices"):
 			return
 		var local := Rect2(Vector2.ZERO, card.size)
 		var geometry := CarShapeView.header_geometry(local, card.label)
