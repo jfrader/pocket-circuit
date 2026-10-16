@@ -12,7 +12,6 @@ signal stop_confirmed(stop_id: String)
 
 const UI := preload("res://scripts/ui/run_ui.gd")
 const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
-const BOARD_IDENTITY := preload("res://scripts/ui/run_board_identity.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const PADDING := 36.0
@@ -26,6 +25,8 @@ const SELECTED_SCALE := 1.25
 const LOCKED_ALPHA := 0.42
 const DONE_ALPHA := 0.6
 const UNDER_TOKEN_ALPHA := 0.3
+const CHIP_MIN_ALPHA := 0.55
+const CURRENT_RING_GROWTH := 1.2
 const TOKEN_SIZE := Vector2(30, 30)
 const ENLARGED_EDGE_CLEARANCE := 6.0
 ## Seconds: the routes drawing in, a marker popping in (staggered by row), the
@@ -107,12 +108,13 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 			add_child(button)
 			if tabletop:
 				var prop := BOARD_TOKEN.new()
-				prop.name = "ToyToken"
+				prop.name = "StopChip"
 				prop.kind = kind
+				prop.done = _done.has(id) and id != _current
 				prop.reduced_motion = reduced_motion
-				prop.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 				if interactive:
-					prop.car_look = BOARD_IDENTITY.look(session, id)
+					button.mouse_entered.connect(func() -> void: prop.hovered = true)
+					button.mouse_exited.connect(func() -> void: prop.hovered = false)
 				prop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 				button.add_child(prop)
 				prop.scale = Vector2.ONE * marker_scale
@@ -269,7 +271,8 @@ func _rest_markers() -> void:
 			alpha = DONE_ALPHA if _done.has(id) else LOCKED_ALPHA
 		button.self_modulate.a = alpha
 		if _props.has(id):
-			_props[id].modulate.a = maxf(alpha, 0.62)
+			# The current stop's chip is the base the car token stands on.
+			_props[id].modulate.a = 1.0 if id == _current else maxf(alpha, CHIP_MIN_ALPHA)
 			_props[id].set_selected(id == _selected)
 
 
@@ -364,22 +367,25 @@ func _draw() -> void:
 					MATERIALS.chalk_line(self, from, to, color.lightened(0.25))
 				else:
 					draw_line(from, to, color, 1.0, true)
-	if tabletop and _interactive:
-		for id: String in _centres:
-			BOARD_TOKEN.draw_place(self, _centres[id], String(_map.get_node(id)["type"]), marker_scale)
 	var pulse := 0.5 + 0.5 * sin(_clock * TAU / PULSE_PERIOD)
 	if _interactive:
 		for id: String in _available:
 			if id != _selected and _centres.has(id):
 				draw_circle(_centres[id] as Vector2, RING_RADIUS * marker_scale * (0.8 + 0.2 * pulse), Color(UI.AMBER, 0.06 + 0.1 * pulse))
+				if tabletop:
+					# The chip covers the glow; a thin ring breathes just outside its rim.
+					var rim := (BOARD_TOKEN.CHIP_RADIUS + 3.0 + 2.0 * pulse) * marker_scale
+					draw_arc(_centres[id] as Vector2, rim, 0.0, TAU, 40, Color(UI.AMBER, 0.45 + 0.4 * pulse), 2.0, true)
 	if _centres.has(_selected):
 		var ring := UI.AMBER if _selected in _available else UI.MUTED
 		draw_arc(_centres[_selected] as Vector2, RING_RADIUS * marker_scale * SELECTED_SCALE, 0.0, TAU, 40, ring, 2.0, true)
 	if _centres.has(_current):
 		var centre: Vector2 = _centres[_current]
-		draw_texture_rect(UI.CURRENT_RING, Rect2(centre - Vector2.ONE * 22, Vector2.ONE * 44), false)
+		# On the tabletop the ring sits just outside the current stop's chip.
+		var extent := 44.0 * (marker_scale * CURRENT_RING_GROWTH if tabletop else 1.0)
+		draw_texture_rect(UI.CURRENT_RING, Rect2(centre - Vector2.ONE * extent * 0.5, Vector2.ONE * extent), false)
 	for id: String in _done:
-		if _centres.has(id) and id != _current:
+		if _centres.has(id) and id != _current and not _props.has(id):
 			_draw_done(_centres[id] as Vector2)
 
 

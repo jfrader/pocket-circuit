@@ -1,16 +1,35 @@
 extends Control
 
+## A stop on the tabletop map: the stop kind's map icon set on a physical chip,
+## with a soft contact shadow. Selection lifts it; hover brightens its rim.
+
+const UI := preload("res://scripts/ui/run_ui.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
-const SHADOW := Color(0.025, 0.035, 0.06, 0.65)
-const ART_SCALE := 1.24
-const CAR_PAD := Rect2(-25, -33, 50, 66)
-const CAR_ANGLE := -0.35
-const PAD_OPACITY := 0.18
+const SHADOW := Color(0.025, 0.035, 0.06, 0.62)
+const CHIP_RADIUS := 18.0
+const BOSS_RADIUS := 20.0
+const EDGE_DEPTH := 3.0
+const ICON_EXTENT := 28.0
+const FACE := Color("26332e")
+const EDGE := Color("111815")
+## Each kind's rim, taken from its map icon so chip, icon and legend agree.
+const RIMS := {
+	"race": Color("8b95a5"), "rival": Color("d4574c"), "bench": Color("6fbf8f"), "parts_van": Color("f2a53c"),
+	"lockup": Color("efc94c"), "errand": Color("6aa8d8"), "act_rival": Color("f2a53c"),
+}
+const LIFT := 3.0
 var kind := "race"
 var selected := false
+var hovered := false:
+	set(value):
+		hovered = value
+		queue_redraw()
+var done := false:
+	set(value):
+		done = value
+		queue_redraw()
 var reduced_motion := false
-var car_look: Dictionary = {}
 var lift := 0.0:
 	set(value):
 		lift = value
@@ -22,6 +41,14 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 
+func icon() -> Texture2D:
+	return UI.TYPES[kind]["icon"] as Texture2D
+
+
+func radius() -> float:
+	return BOSS_RADIUS if kind == "act_rival" else CHIP_RADIUS
+
+
 func set_selected(value: bool) -> void:
 	selected = value
 	if _lift_tween != null:
@@ -30,64 +57,31 @@ func set_selected(value: bool) -> void:
 		lift = 0.0
 	else:
 		_lift_tween = create_tween().set_trans(Tween.TRANS_SINE)
-		_lift_tween.tween_property(self, "lift", 3.0 if value else 0.0, 0.16)
+		_lift_tween.tween_property(self, "lift", LIFT if value else 0.0, 0.16)
 	queue_redraw()
 
 
 func _draw() -> void:
 	var center := size * 0.5
-	draw_set_transform(center + Vector2(2, 3), 0, Vector2(1.0 - lift * 0.025, 0.48) * ART_SCALE)
-	draw_texture_rect(MATERIALS.SHADOW_CIRCLE, Rect2(-22, -22, 44, 44), false, Color(SHADOW, 0.4))
-	draw_texture_rect(MATERIALS.SHADOW_STRIP, Rect2(-16, 5, 32, 9), false, Color(SHADOW, 0.4))
-	draw_set_transform(center - Vector2(0, lift), 0, Vector2.ONE * ART_SCALE)
-	match kind:
-		"race", "rival", "act_rival":
-			if not car_look.is_empty():
-				draw_set_transform(center - Vector2(0, lift), CAR_ANGLE)
-				draw_texture_rect(car_look["texture"], Rect2(-24, -32, 48, 64), false)
-		"bench":
-			draw_set_transform(center - Vector2(0, lift), -0.6, Vector2.ONE * ART_SCALE)
-			draw_rect(Rect2(-4, -25, 8, 37), Color("dce5de"))
-			SKIN.draw_plate(self, Rect2(-9, 0, 18, 25), Color("e47741"), 4, 0)
-			draw_line(Vector2(-2, 4), Vector2(-2, 19), Color("ffb471"), 2)
-		"parts_van":
-			for x: float in [-15.0, 15.0]:
-				for y: float in [-10.0, 12.0]:
-					draw_rect(Rect2(x - 3, y - 4, 6, 8), SKIN.INK)
-			SKIN.draw_plate(self, Rect2(-16, -22, 32, 44), Color("d1ae62"), 5, 0)
-			draw_rect(Rect2(-12, -16, 24, 11), Color("344e5d"))
-			draw_rect(Rect2(-13, -2, 26, 18), Color("eee3bd"))
-			draw_circle(Vector2(7, 6), 5, Color("537475"))
-			draw_line(Vector2(0, 0), Vector2(0, 19), Color("8d713d"), 2)
-		"lockup":
-			draw_arc(Vector2(0, -9), 11, PI, TAU, 24, Color("c4c9c4"), 6, true)
-			SKIN.draw_plate(self, Rect2(-17, -8, 34, 30), Color("d9ac53"), 4, 0)
-			draw_circle(Vector2(0, 4), 4, SKIN.INK)
-			draw_line(Vector2(0, 4), Vector2(0, 14), SKIN.INK, 3)
-		"errand":
-			SKIN.draw_plate(self, Rect2(-21, -15, 42, 32), SKIN.CREAM, 2, 0)
-			draw_polyline(PackedVector2Array([Vector2(-21, -15), Vector2(0, 3), Vector2(21, -15)]), Color("ae9470"), 2, true)
-			draw_circle(Vector2(0, 3), 4, SKIN.RED)
-	draw_set_transform(Vector2.ZERO)
-	if selected:
-		draw_arc(center, 25, 0, TAU, 48, SKIN.YELLOW, 2, true)
-
-
-static func draw_place(item: CanvasItem, center: Vector2, stop_kind: String, scale_factor: float) -> void:
-	var car_place := stop_kind in ["race", "rival", "act_rival"]
-	item.draw_set_transform(center if car_place else center + Vector2(0, 5), CAR_ANGLE if car_place else 0.0, Vector2.ONE * scale_factor)
-	var pad := CAR_PAD if car_place else Rect2(-29, -17, 58, 34)
-	var fills := {"race": Color("64796a"), "rival": Color("8b6a50"), "act_rival": Color("a08756"), "bench": Color("526e68"), "parts_van": Color("8b8465"), "lockup": Color("67736c"), "errand": Color("a89c7b")}
-	item.draw_texture_rect(MATERIALS.SHADOW_RECT, pad.grow(3), false, Color(fills.get(stop_kind, SKIN.CREAM), PAD_OPACITY))
-	if stop_kind == "act_rival":
-		item.draw_arc(Vector2.ZERO, 34, 0, TAU, 40, Color(SKIN.CREAM, 0.14), 1, true)
-	MATERIALS.grain(item, pad)
-	if stop_kind in ["race", "rival"]:
-		for side: float in [-1, 1]:
-			item.draw_line(Vector2(side * 23, 24), Vector2(side * 23, 31), Color(SKIN.CREAM, PAD_OPACITY), 1, true)
-	elif stop_kind in ["bench", "parts_van", "lockup"]:
-		for stripe in 3:
-			item.draw_line(Vector2(-26 + stripe * 7, 15), Vector2(-20 + stripe * 7, 8), Color(SKIN.YELLOW, PAD_OPACITY), 1, true)
-	else:
-		item.draw_line(Vector2(-23, 11), Vector2(22, 11), Color(SKIN.INK, 0.1), 1, true)
-	item.draw_set_transform(Vector2.ZERO)
+	var r := radius()
+	var rim: Color = RIMS.get(kind, SKIN.CREAM)
+	# The shadow stays on the table and softens as the chip lifts off it.
+	var spread := r * 1.25 + lift
+	draw_texture_rect(MATERIALS.SHADOW_CIRCLE, Rect2(center + Vector2(2, 4) - Vector2.ONE * spread, Vector2.ONE * spread * 2.0), false, Color(SHADOW, SHADOW.a - lift * 0.06))
+	var top := center - Vector2(0, lift)
+	draw_circle(top + Vector2(0, EDGE_DEPTH), r, EDGE)
+	draw_circle(top, r, FACE)
+	# Grain only: the panel grain's fibre and chalk strokes would spill off a chip.
+	draw_texture_rect(MATERIALS.GRAIN, Rect2(top - Vector2.ONE * r * 0.7, Vector2.ONE * r * 1.4), false, Color(0.9, 0.95, 0.85, 0.06))
+	draw_arc(top, r - 1.0, 0, TAU, 48, Color(rim, 0.95 if hovered or selected else 0.7), 2.0, true)
+	draw_arc(top, r - 4.0, PI * 1.1, PI * 1.9, 24, Color(SKIN.CREAM, 0.16), 1.0, true)
+	if kind == "act_rival":
+		draw_arc(top, r + 3.0, 0, TAU, 56, Color(rim, 0.35), 1.0, true)
+	var extent := ICON_EXTENT * (r / CHIP_RADIUS)
+	# A light inner face keeps the kind glyph as bright as its legend twin.
+	draw_circle(top, extent * 0.62, Color("ece6d2", 0.92))
+	draw_texture_rect(icon(), Rect2(top - Vector2.ONE * extent * 0.5, Vector2.ONE * extent), false)
+	if done:
+		var badge := top + Vector2(r * 0.72, r * 0.62)
+		draw_circle(badge, 6.0, SKIN.CREAM)
+		draw_polyline(PackedVector2Array([badge + Vector2(-3, 0), badge + Vector2(-1, 2.5), badge + Vector2(3, -2.5)]), SKIN.INK, 1.6, true)
