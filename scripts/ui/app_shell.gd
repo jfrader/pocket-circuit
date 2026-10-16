@@ -285,6 +285,12 @@ func show_run_board() -> void:
 		return
 	_run_surface()
 	var night_over := sess.is_failed() or sess.is_complete()
+	if not night_over:
+		_page.add_theme_constant_override("margin_left", roundi(RUN_BOARD_SCENE.PAGE_INSET.x))
+		_page.add_theme_constant_override("margin_right", roundi(RUN_BOARD_SCENE.PAGE_INSET.x))
+		_page.add_theme_constant_override("margin_top", roundi(RUN_BOARD_SCENE.PAGE_INSET.y))
+		_page.add_theme_constant_override("margin_bottom", 8)
+		_content.add_theme_constant_override("separation", 8)
 	var tabletop := RUN_BOARD_SCENE.new()
 	tabletop.name = "RunTabletop"
 	tabletop.act = sess.current_map.act
@@ -295,7 +301,7 @@ func show_run_board() -> void:
 	_run_backdrop.add_child(tabletop)
 	tabletop.arrive()
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 76)
+	columns.add_theme_constant_override("separation", 76 if night_over else RUN_BOARD_SCENE.COLUMN_GAP)
 	_content.add_child(columns)
 	var left := VBoxContainer.new()
 	left.add_theme_constant_override("separation", 8)
@@ -303,6 +309,9 @@ func show_run_board() -> void:
 	var board := RUN_MAP_VIEW.new()
 	board.name = "RunBoard"
 	board.tabletop = true
+	if not night_over:
+		board.map_extent = RUN_BOARD_SCENE.MAP_SIZE
+		board.marker_scale = RUN_BOARD_SCENE.MARKER_SCALE
 	board.reduced_motion = _reduced_motion_enabled()
 	left.add_child(board)
 	if not night_over:
@@ -317,11 +326,21 @@ func show_run_board() -> void:
 		_app.call("prewarm_run_stops")
 	var detail := VBoxContainer.new()
 	detail.name = "RunDetail"
-	detail.custom_minimum_size.x = 420
+	detail.custom_minimum_size.x = 420 if night_over else RUN_BOARD_SCENE.DETAIL_WIDTH
 	detail.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
 	detail.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	detail.add_theme_constant_override("separation", 6)
-	columns.add_child(detail)
+	if night_over:
+		columns.add_child(detail)
+	else:
+		var slot := MarginContainer.new()
+		slot.name = "RunDetailSlot"
+		slot.custom_minimum_size.x = RUN_BOARD_SCENE.DETAIL_WIDTH
+		for edge: String in ["left", "right"]:
+			slot.add_theme_constant_override("margin_" + edge, RUN_BOARD_SCENE.DETAIL_OUTSET)
+		columns.add_child(slot)
+		detail.custom_minimum_size.x = RUN_BOARD_SCENE.DETAIL_WIDTH - RUN_BOARD_SCENE.DETAIL_OUTSET * 2
+		slot.add_child(detail)
 	var chalkboard := RUN_BOARD_SCENE.new()
 	chalkboard.name = "RunChalkboard"
 	chalkboard.chalkboard = true
@@ -337,10 +356,15 @@ func show_run_board() -> void:
 	chalk_content.add_theme_constant_override("separation", 6)
 	chalk_inset.add_child(chalk_content)
 	var act_label := RUN_UI.label("THE RUN · ACT %d / %d · %s" % [sess.current_map.act, RunSession.FINAL_ACT, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 12, SKIN.CREAM, true)
+	if not night_over:
+		act_label.name = "RunMetadata"
+		act_label.text = "THE RUN · ACT %d / %d\n%s" % [sess.current_map.act, RunSession.FINAL_ACT, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()]
 	act_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	act_label.visible = not night_over
 	chalk_content.add_child(act_label)
 	_run_stats(chalk_content, sess)
+	if not night_over:
+		RUN_BOARD_SCENE.compact_labels(chalk_content)
 	RUN_BOARD_SCENE.chalk_labels(chalk_content)
 	_run_stop_card = VBoxContainer.new()
 	_run_stop_card.name = "RunStop"
@@ -368,9 +392,8 @@ func show_run_board() -> void:
 		_run_action("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
 	_run_action("BACK", Callable(self, "show_title"), false, false, "ActionBack")
 	_run_actions = detail
-	RUN_UI.spacer(_content, 10)
-	if not night_over:
-		RUN_UI.divider(_content)
+	if night_over:
+		RUN_UI.spacer(_content, 10)
 	var legend := RUN_UI.legend(sess.current_map)
 	legend.visible = not night_over
 	RUN_BOARD_SCENE.chalk_labels(legend)
@@ -419,7 +442,7 @@ func _show_run_stop(stop_id: String, sess: RunSession) -> void:
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_run_stop_card.add_child(line)
 	var circuit: Dictionary = _app.call("run_stop_circuit", stop_id) if kind in RunSession.RACE_NODE_TYPES else {}
-	_run_stop_card.add_child(RUN_UI.facts(RUN_UI.stop_facts(kind, sess, circuit)))
+	_run_stop_card.add_child(RUN_BOARD_SCENE.facts(RUN_UI.stop_facts(kind, sess, circuit)))
 	RUN_UI.spacer(_run_stop_card, 4)
 	var go := RUN_UI.action(String(RUN_UI.GO_LABELS[kind]), true, not reachable)
 	go.name = "RunGo"
@@ -427,6 +450,7 @@ func _show_run_stop(stop_id: String, sess: RunSession) -> void:
 	_wire_button_audio(go)
 	_run_stop_card.add_child(go)
 	RUN_BOARD_SCENE.ink_labels(_run_stop_card)
+	RUN_BOARD_SCENE.compact_labels(_run_stop_card)
 	_link_board_focus(stop_id)
 	RUN_UI.stagger_in(_run_stop_card.get_children(), _reduced_motion_enabled())
 
@@ -1458,6 +1482,10 @@ func _apply_compact_button_art(button: Button) -> void:
 
 
 func _clear_content() -> void:
+	_page.add_theme_constant_override("margin_left", PAGE_MARGIN)
+	_page.add_theme_constant_override("margin_right", PAGE_MARGIN)
+	_page.add_theme_constant_override("margin_top", PAGE_TOP)
+	_page.add_theme_constant_override("margin_bottom", roundi(SKIN.BENCH_LIP) + 6)
 	_run_going = false
 	_page.show()
 	_run_backdrop.hide()

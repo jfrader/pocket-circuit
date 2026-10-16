@@ -26,6 +26,7 @@ const LOCKED_ALPHA := 0.42
 const DONE_ALPHA := 0.6
 const UNDER_TOKEN_ALPHA := 0.3
 const TOKEN_SIZE := Vector2(30, 30)
+const ENLARGED_EDGE_CLEARANCE := 6.0
 ## Seconds: the routes drawing in, a marker popping in (staggered by row), the
 ## token's drive to a stop, and the reachable stops' pulse period.
 const REVEAL_TIME := 0.55
@@ -39,6 +40,8 @@ const DASH_SPEED := 22.0
 
 var reduced_motion := false
 var tabletop := false
+var map_extent := UI.CARD_SIZE
+var marker_scale := 1.0
 var route_visuals_visible := true
 var _props: Dictionary = {}
 
@@ -69,12 +72,15 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 	_current = session.current_node_id
 	_interactive = interactive
 	_done = session.resolved_nodes.duplicate()
-	custom_minimum_size = UI.CARD_SIZE
+	custom_minimum_size = map_extent
 	mouse_filter = Control.MOUSE_FILTER_PASS
 	_header = UI.label("ACT %d · %s · SEED %d" % [_map.act, String(UI.ROOMS[_map.act]).to_upper(), _map.run_seed], 10, UI.MUTED, true)
 	if tabletop:
 		_header.add_theme_color_override("font_color", SKIN.CREAM)
-	_header.position = Vector2(22, 18)
+		if _interactive:
+			_header.name = "MapMetadata"
+			_header.text = "ACT %d · %s\nSEED %d" % [_map.act, String(UI.ROOMS[_map.act]).to_upper(), _map.run_seed]
+	_header.position = Vector2(22, 14 if tabletop and _interactive else 18)
 	add_child(_header)
 	for entry: Dictionary in session.available_nodes():
 		_available.append(String(entry["id"]))
@@ -84,6 +90,8 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 			var id := String(node["id"])
 			var kind := String(node["type"])
 			var button := UI.marker(kind, id == _current, interactive)
+			button.custom_minimum_size *= marker_scale
+			button.size = button.custom_minimum_size
 			button.name = "Node_" + id.replace("_", "-")
 			button.set_meta("stop_id", id)
 			button.set_meta("reachable", id in _available)
@@ -101,6 +109,9 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 				prop.reduced_motion = reduced_motion
 				prop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 				button.add_child(prop)
+				prop.scale = Vector2.ONE * marker_scale
+				prop.resized.connect(func() -> void: prop.pivot_offset = prop.size * 0.5)
+				prop.pivot_offset = prop.size * 0.5
 				_props[id] = prop
 				for state: String in ["normal", "hover", "pressed", "focus"]:
 					button.add_theme_stylebox_override(state, StyleBoxEmpty.new())
@@ -121,9 +132,9 @@ func configure(session: RunSession, interactive: bool, token: Texture2D = null) 
 		_token.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		_token.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 		_token.texture = token
-		_token.custom_minimum_size = TOKEN_SIZE
-		_token.size = TOKEN_SIZE
-		_token.pivot_offset = TOKEN_SIZE * 0.5
+		_token.custom_minimum_size = TOKEN_SIZE * marker_scale
+		_token.size = TOKEN_SIZE * marker_scale
+		_token.pivot_offset = _token.size * 0.5
 		_token.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 		_token.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		_token.z_index = 3 if tabletop else 0
@@ -207,10 +218,10 @@ func travel_to(stop_id: String) -> float:
 	_token.rotation = (to - (_centres[_current] as Vector2)).angle() + PI * 0.5
 	_travelling = true
 	if reduced_motion:
-		_token.position = to - TOKEN_SIZE * 0.5
+		_token.position = to - _token.size * 0.5
 		return 0.0
 	var tween := create_tween().set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(_token, "position", to - TOKEN_SIZE * 0.5, TRAVEL_TIME)
+	tween.tween_property(_token, "position", to - _token.size * 0.5, TRAVEL_TIME)
 	return TRAVEL_TIME
 
 
@@ -288,14 +299,16 @@ func _layout() -> void:
 	if _map == null:
 		return
 	var extent := size.max(custom_minimum_size)
+	var side_padding := PADDING * marker_scale
+	var bottom_padding := BOTTOM * marker_scale + (ENLARGED_EDGE_CLEARANCE if marker_scale > 1.0 else 0.0)
 	for id: String in _buttons:
 		var node: Dictionary = _map.get_node(id)
 		# The act rival row sits apart at the top; the walker rows fill the rest.
 		var row := int(node["row"])
 		var boss_row := _map.num_rows - 1
 		var centre := Vector2(
-			PADDING + float(node["col"]) * (extent.x - PADDING * 2.0) / float(RunMap.NUM_COLUMNS - 1),
-			BOSS_Y if row == boss_row else lerpf(extent.y - BOTTOM, ROW_TOP, float(row) / float(maxi(1, boss_row - 1)))
+			side_padding + float(node["col"]) * (extent.x - side_padding * 2.0) / float(RunMap.NUM_COLUMNS - 1),
+			BOSS_Y if row == boss_row else lerpf(extent.y - bottom_padding, ROW_TOP, float(row) / float(maxi(1, boss_row - 1)))
 		)
 		if row == boss_row:
 			_boss_label.size = BOSS_LABEL_SIZE
@@ -304,7 +317,7 @@ func _layout() -> void:
 		var button := _buttons[id] as Button
 		button.position = centre - button.size * 0.5
 	if _token != null and not _travelling and _centres.has(_current):
-		_token.position = (_centres[_current] as Vector2) - TOKEN_SIZE * 0.5
+		_token.position = (_centres[_current] as Vector2) - _token.size * 0.5
 	queue_redraw()
 
 
@@ -347,10 +360,10 @@ func _draw() -> void:
 	if _interactive:
 		for id: String in _available:
 			if id != _selected and _centres.has(id):
-				draw_circle(_centres[id] as Vector2, RING_RADIUS * (0.8 + 0.2 * pulse), Color(UI.AMBER, 0.06 + 0.1 * pulse))
+				draw_circle(_centres[id] as Vector2, RING_RADIUS * marker_scale * (0.8 + 0.2 * pulse), Color(UI.AMBER, 0.06 + 0.1 * pulse))
 	if _centres.has(_selected):
 		var ring := UI.AMBER if _selected in _available else UI.MUTED
-		draw_arc(_centres[_selected] as Vector2, RING_RADIUS * SELECTED_SCALE, 0.0, TAU, 40, ring, 2.0, true)
+		draw_arc(_centres[_selected] as Vector2, RING_RADIUS * marker_scale * SELECTED_SCALE, 0.0, TAU, 40, ring, 2.0, true)
 	if _centres.has(_current):
 		var centre: Vector2 = _centres[_current]
 		draw_texture_rect(UI.CURRENT_RING, Rect2(centre - Vector2.ONE * 22, Vector2.ONE * 44), false)
