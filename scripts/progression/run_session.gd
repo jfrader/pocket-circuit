@@ -10,6 +10,8 @@ const RUN_MAP := preload("res://scripts/progression/run_map.gd")
 const RUN_STATE := preload("res://scripts/progression/run_state.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
+const HAUL := preload("res://scripts/progression/run_haul.gd")
+const HAUL_RANSOM_POINTS := HAUL.RANSOM_POINTS
 const FIELD_OPPONENTS := 3
 
 const INITIAL_POINTS := 0
@@ -87,6 +89,16 @@ var race_in_flight: Dictionary = {}
 var pending_offer: String = ""
 ## Act string -> node id -> DriverRoster payload. Slot zero is the field leader.
 var node_opponents: Dictionary = {}
+## Unbanked car id -> robbed driver's roster identity ({} for a lockup car).
+var boot_cars: Dictionary = {}
+## Retained in owned_cars, but excluded from collection-safe rewards.
+var impounded_cars: Array[String] = []
+## Driver identity plus haul_vehicle_id and chase_vehicle_id; null when cold.
+var pending_chaser: Variant = null
+var pending_offer_driver: Dictionary = {}
+var pending_offer_points: int = 0
+var tow_count: int = 0
+var nitro_count: int = 0
 
 static func create(p_run_seed: int) -> RunSession:
 	var sess: RunSession = new()
@@ -173,7 +185,14 @@ func van_stock() -> Array[Dictionary]:
 
 ## A car of the night's physics as the race builds it: its roll, then its parts.
 func car_stats(vehicle_id: String) -> VehicleStats:
-	return CATALOG.build_vehicle_stats(CATALOG.generated_vehicle(car_record(vehicle_id)))
+	var car := car_record(vehicle_id)
+	var vehicle := CATALOG.get_vehicle(vehicle_id)
+	if vehicle.is_empty():
+		vehicle = CATALOG.generated_vehicle(car)
+	else:
+		vehicle["roll"] = car["roll"]
+		vehicle["fitted_parts"] = car["fitted_parts"]
+	return CATALOG.build_vehicle_stats(vehicle)
 
 func _stop_roll(stream: String, stop_id: String) -> int:
 	return ("pocket-circuit|run-circuit|%s|%d|act%d|%s" % [stream, run_seed, current_map.act, stop_id]).hash() & 0x7FFFFFFF
@@ -250,11 +269,15 @@ func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dic
 	}
 	if ntype == "act_rival":
 		if pos == 1:
+			outcome["car"] = _win_car(node_id, CAR_ORIGIN_RIVAL, ProceduralCarGenerator.SUPPORTED_TYPES)
+			pending_offer_points = pts
+			bank_haul()
 			if current_map.act < FINAL_ACT:
 				_advance_to_act(current_map.act + 1)
 				outcome["act_advanced"] = true
 			else:
 				completed = true
+				HAUL.clear_offer(self)
 		else:
 			failed = true
 			outcome["run_failed"] = true
@@ -281,6 +304,8 @@ func _advance_to_act(new_act: int) -> void:
 	run_state.row = 0
 
 func resolve_rival(node_id: String, won: bool) -> Dictionary:
+	if not pending_offer.is_empty():
+		return {"error": "pending offer"}
 	if not (current_node_id == node_id and _is_current_node_type("rival")):
 		return {"error": "not current rival node"}
 	if resolved_nodes.has(node_id):
@@ -290,6 +315,9 @@ func resolve_rival(node_id: String, won: bool) -> Dictionary:
 	var outcome: Dictionary = {"won": won}
 	if won:
 		outcome["car"] = _win_car(node_id, CAR_ORIGIN_RIVAL, ProceduralCarGenerator.SUPPORTED_TYPES)
+		pending_offer_points = RUN_POINTS_BY_FINISH[1]
+		run_points += pending_offer_points
+		outcome["points_gained"] = pending_offer_points
 	else:
 		var over: bool = run_points < RIVAL_LOSS_POINTS_COST
 		run_points = maxi(0, run_points - RIVAL_LOSS_POINTS_COST)
@@ -320,7 +348,28 @@ func _add_car(stop_id: String, origin: String, types: Array[String]) -> String:
 ## A car won at this stop is offered to drive; the current car is kept until
 ## the offer is taken.
 func _win_car(stop_id: String, origin: String, types: Array[String]) -> Dictionary:
-	var vid := _add_car(stop_id, origin, types)
+	if not pending_offer.is_empty():
+		return {}
+	pending_offer_driver = {}
+	pending_offer_points = 0
+	var vid: String
+	if origin == CAR_ORIGIN_RIVAL:
+		var roster := opponents_for_node(stop_id)
+		if not roster.is_empty():
+			pending_offer_driver = roster["opponents"][0].duplicate(true)
+			vid = pending_offer_driver["vehicle_id"]
+			var vehicle := CATALOG.get_vehicle(vid)
+			var art: Dictionary = vehicle["car_art"]
+			if not owned_cars.has(vid):
+				owned_cars[vid] = {"type": art["type"], "seed": art["seed"], "won_from": origin, "act": current_map.act}
+				run_state.car_rolls[vid] = vehicle.get("roll", NO_ROLL).duplicate(true)
+				run_state.set_car_wear(vid, RUN_STATE.WEAR_LEVELS[0])
+			else:
+				owned_cars[vid]["won_from"] = origin
+			boot_cars.erase(vid)
+			impounded_cars.erase(vid)
+	else:
+		vid = _add_car(stop_id, origin, types)
 	pending_offer = vid
 	return won_car(vid)
 
@@ -330,7 +379,7 @@ func take_offer() -> bool:
 	if pending_offer.is_empty() or failed or completed:
 		return false
 	current_car_id = pending_offer
-	pending_offer = ""
+	HAUL.clear_offer(self)
 	return true
 
 
@@ -338,8 +387,66 @@ func take_offer() -> bool:
 func decline_offer() -> bool:
 	if pending_offer.is_empty():
 		return false
-	pending_offer = ""
+	HAUL.clear_offer(self)
 	return true
+
+func can_race_hot(vehicle_id: String) -> bool:
+	return hot_choice_reason(vehicle_id).is_empty()
+
+func hot_choice_reason(vehicle_id: String) -> String:
+	return HAUL.hot_choice_reason(self, vehicle_id)
+
+func race_it_now() -> bool:
+	return HAUL.choose_offer(self, "hot")
+
+func send_it_ahead() -> bool:
+	return HAUL.choose_offer(self, "ahead")
+
+func send_it_home() -> bool:
+	return HAUL.choose_offer(self, "home")
+
+func bank_haul() -> Array[String]:
+	return HAUL.bank(self)
+
+func bench_bank_haul() -> bool:
+	if not _can_do_bench_action(current_car_id) or boot_cars.is_empty():
+		return false
+	bank_haul()
+	bench_action_done = true
+	return true
+
+func impound_haul() -> Array[String]:
+	return HAUL.impound(self)
+
+## Escaping a chase clears the pursuer, not the unbanked haul.
+func clear_pending_chaser() -> bool:
+	if pending_chaser == null:
+		return false
+	pending_chaser = null
+	return true
+
+func ransom_car(vehicle_id: String) -> bool:
+	return HAUL.ransom(self, vehicle_id)
+
+func add_tow(count: int = 1) -> bool:
+	return HAUL.add_consumable(self, "tow_count", count)
+
+func spend_tow() -> bool:
+	return HAUL.spend_consumable(self, "tow_count")
+
+func add_nitro(count: int = 1) -> bool:
+	return HAUL.add_consumable(self, "nitro_count", count)
+
+func spend_nitro() -> bool:
+	return HAUL.spend_consumable(self, "nitro_count")
+
+## The collection must use this, not the legacy all-wins view won_cars().
+func collection_safe_cars() -> Array[Dictionary]:
+	var safe: Array[Dictionary] = []
+	for car: Dictionary in won_cars():
+		if not boot_cars.has(car["id"]) and not impounded_cars.has(car["id"]) and car["id"] != pending_offer:
+			safe.append(car)
+	return safe
 
 
 ## Any car of the night as a record {id, seed, type, roll, won_from, act, fitted_parts}.
@@ -453,8 +560,14 @@ static func salvage_won_cars(data: Dictionary) -> Array[Dictionary]:
 	var rolls: Variant = (state as Dictionary).get("car_rolls", {}) if state is Dictionary else {}
 	if owned is not Dictionary or rolls is not Dictionary:
 		return out
+	var boot: Variant = data.get("boot_cars", {})
+	var impounded: Variant = data.get("impounded_cars", [])
+	if boot is not Dictionary or impounded is not Array:
+		return out
 	for vehicle_id: Variant in owned as Dictionary:
 		if vehicle_id is not String or vehicle_id.is_empty():
+			continue
+		if boot.has(vehicle_id) or impounded.has(vehicle_id):
 			continue
 		var record: Variant = (owned as Dictionary)[vehicle_id]
 		if record is not Dictionary:
@@ -528,7 +641,7 @@ func buy_part(part_id: String) -> bool:
 	return false
 
 func open_lockup() -> Dictionary:
-	if failed or completed or lockup_used or not _is_current_node_type("lockup"):
+	if failed or completed or not pending_offer.is_empty() or lockup_used or not _is_current_node_type("lockup"):
 		return {}
 	if resolved_nodes.has(current_node_id):
 		return {}
@@ -589,7 +702,7 @@ static func serialize(sess: RunSession) -> Dictionary:
 	var map_snap: Dictionary = RUN_MAP.serialize(sess.current_map)
 	var own: Dictionary = sess.owned_cars.duplicate(true)
 	var inst: Dictionary = sess.installed_parts.duplicate(true)
-	return {
+	var snapshot := {
 		"schema_version": SCHEMA_VERSION,
 		"run_seed": sess.run_seed,
 		"run_state": state_snap,
@@ -610,6 +723,8 @@ static func serialize(sess: RunSession) -> Dictionary:
 		"pending_offer": sess.pending_offer,
 		"node_opponents": sess.node_opponents.duplicate(true),
 	}
+	snapshot.merge(HAUL.serialize(sess))
+	return snapshot
 
 static func deserialize(data: Dictionary) -> RunSession:
 	if not RUN_MAP.is_integer(data.get("schema_version"), SCHEMA_VERSION, SCHEMA_VERSION):
@@ -690,9 +805,13 @@ static func deserialize(data: Dictionary) -> RunSession:
 	var offer: String = data.get("pending_offer", "")
 	if not offer.is_empty():
 		var offered_from: Variant = sess.owned_cars.get(offer, {}).get("won_from")
-		if offered_from not in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] or offer == sess.current_car_id:
+		var driver: Variant = data.get("pending_offer_driver", {})
+		var rival_reaward: bool = offered_from == CAR_ORIGIN_RIVAL and driver is Dictionary and driver.get("vehicle_id") == offer
+		if offered_from not in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] or (offer == sess.current_car_id and not rival_reaward):
 			offer = ""
 	sess.pending_offer = offer
+	if not HAUL.deserialize(sess, data):
+		return null
 	if sess.completed and not sess.resolved_nodes.has(sess.current_node_id):
 		return null
 	return sess
