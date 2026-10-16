@@ -830,7 +830,8 @@ func show_run_bench() -> void:
 	RUN_MATERIALS.finish_panel(card[0] as PanelContainer)
 	RUN_BOARD_SCENE.ink_labels(card[0])
 	columns.add_child(card[0])
-	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, used, "BenchRepair")
+	var car_clean := sess.run_state.get_car_wear(sess.current_car_id) == RunState.WEAR_LEVELS[0]
+	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, used or car_clean, "BenchRepair")
 	RUN_BENCH_SCENE.dress_button(actions.get_child(0) as Button, true)
 	for index: int in sess.parts_held.size():
 		var part: Dictionary = sess.parts_held[index]
@@ -2223,5 +2224,36 @@ func _on_save_run_again() -> void:
 
 
 func _on_abandon_run() -> void:
+	var abandon := _content.find_child("ActionAbandon", true, false) as Button
+	if abandon == null or _content.find_child("AbandonConfirm", true, false) != null:
+		return
+	var secondary := abandon.get_parent() as Control
+	secondary.hide()
+	var strip := VBoxContainer.new()
+	strip.name = "AbandonConfirm"
+	strip.add_theme_constant_override("separation", 8)
+	secondary.get_parent().add_child(strip)
+	var warning := RUN_UI.label("THE NIGHT ENDS - CARS NOT BANKED ARE LOST", 12, RUN_UI.AMBER, true)
+	warning.name = "AbandonWarning"
+	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	strip.add_child(warning)
+	var confirm := RUN_UI.action("ABANDON THE NIGHT")
+	confirm.name = "ActionConfirmAbandon"
+	confirm.pressed.connect(_confirm_abandon_run)
+	_wire_button_audio(confirm)
+	strip.add_child(confirm)
+	var keep := RUN_UI.action("KEEP DRIVING", true)
+	keep.name = "ActionKeepDriving"
+	keep.pressed.connect(func() -> void:
+		strip.get_parent().remove_child(strip)
+		strip.queue_free()
+		secondary.show()
+		abandon.grab_focus())
+	_wire_button_audio(keep)
+	strip.add_child(keep)
+	keep.grab_focus()
+
+
+func _confirm_abandon_run() -> void:
 	_app.call("abandon_run")
 	show_title()
