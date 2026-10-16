@@ -82,6 +82,8 @@ static func _roster_ids(roster: Dictionary) -> Array:
 ## event is built; screen syncs can use the session's own mode.
 func _install_roster_for(mode: String) -> void:
 	var roster := _quick_roster if mode == "quick" else _championship_roster()
+	if mode == "run":
+		roster = current_race_session.get("driver_roster", {})
 	DRIVER_DIRECTORY.install_opponents(roster.get("opponents", []))
 
 
@@ -1661,11 +1663,9 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 	var node_type := String(node.get("type", ""))
 	var duel := node_type == "rival"
 	var vehicle_id: String = _current_run_session.current_car_id
-	_roll_quick_roster()
-	_install_roster_for("quick")
-	var opponents: Array = _roster_ids(_quick_roster)
-	if duel:
-		opponents = opponents.slice(0, 1)
+	var roster := _current_run_session.opponents_for_node(target_id)
+	DRIVER_DIRECTORY.install_opponents(roster.get("opponents", []))
+	var opponents: Array = _roster_ids(roster)
 	var event_id: String = "run_%s" % target_id
 	var event := _event_with_generated_identity({"opponents": opponents}, circuit)
 	if event.is_empty():
@@ -1684,6 +1684,7 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 		"difficulty": RUN_ACT_RIVAL_DIFFICULTY if node_type == "act_rival" else String(_save_data.get("difficulty", "club_circuit")),
 		"result_committed": false,
 		"run_node_id": target_id,
+		"driver_roster": roster,
 	}
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
@@ -1693,6 +1694,10 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 ## The circuit a run stop races on, for the board to show before it is raced.
 func run_stop_circuit(stop_id: String) -> Dictionary:
 	return _run_circuit(stop_id) if _current_run_session != null else {}
+
+## Assigned drivers (id, name, vehicle_id, avatar_art, ai_style); slot 0 leads.
+func run_stop_opponents(stop_id: String) -> Dictionary:
+	return _current_run_session.opponents_for_node(stop_id) if _current_run_session != null else {}
 
 
 ## The circuit a run stop races on: drawn from the run seed, the act and the

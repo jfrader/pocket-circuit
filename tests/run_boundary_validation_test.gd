@@ -47,7 +47,15 @@ func _test_valid_runs() -> void:
 	var early_snapshot := SESSION.serialize(SESSION.create(4242))
 	early_snapshot.erase("race_in_flight")
 	early_snapshot.erase("pending_offer")
+	early_snapshot.erase("node_opponents")
 	_expect(SESSION.deserialize(early_snapshot) != null, "optional fields absent in early current-schema saves remain supported")
+	var legacy := SESSION.deserialize(early_snapshot)
+	_expect(legacy.node_opponents.is_empty(), "old saves load with empty assignments")
+	_expect(legacy.opponents_for_node(legacy.current_node_id) == SESSION.create(4242).opponents_for_node(legacy.current_node_id), "old saves fill a deterministic playable field on demand")
+	for bad: Variant in [[], false, {"4": {}}, {"1": {"missing": {}}}, {"1": {legacy.current_node_id: {}}}]:
+		var malformed := early_snapshot.duplicate(true)
+		malformed["node_opponents"] = bad
+		_expect(SESSION.deserialize(malformed) == null, "malformed assignment container, node or payload is rejected")
 	var normalized := SESSION.serialize(SESSION.create(4242))
 	var car_id: String = normalized["current_car_id"]
 	var part: Dictionary = RunParts.deal(9, racing.car_stats(racing.current_car_id))[0]

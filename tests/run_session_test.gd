@@ -24,6 +24,32 @@ func _run_test() -> void:
 
 func _check_opening() -> void:
 	var sess = RUN_SESSION.create(424242)
+	if not _expect(sess.get("node_opponents") is Dictionary and not sess.get("node_opponents").is_empty(), "run creation assigns opponents before any race launches"):
+		return
+	var twin = RUN_SESSION.create(424242)
+	if not _expect(sess.node_opponents == twin.node_opponents and sess.node_opponents.size() == 3, "all three acts get deterministic assignments at creation"):
+		return
+	var restored = RUN_SESSION.deserialize(JSON.parse_string(JSON.stringify(RUN_SESSION.serialize(sess))))
+	if not _expect(restored != null and restored.node_opponents == sess.node_opponents, "all opponent payloads survive JSON roundtrip"):
+		return
+	var seeds := {}
+	for nid: String in sess.current_map.nodes:
+		var roster: Dictionary = sess.opponents_for_node(nid)
+		if not roster.is_empty():
+			seeds[roster["seed"]] = true
+	if not _expect(seeds.size() == sess.node_opponents["1"].size(), "each stop has its own opponent seed"):
+		return
+	for act_key: String in ["2", "3"]:
+		for nid: String in sess.node_opponents[act_key]:
+			if sess.node_opponents["1"].has(nid):
+				if not _expect(sess.node_opponents["1"][nid]["seed"] != sess.node_opponents[act_key][nid]["seed"], "same node id in another act has a distinct assignment"):
+					return
+	if not _expect(sess.opponents_for_node("missing").is_empty(), "unknown stops have no opponents"):
+		return
+	var preview: Dictionary = sess.opponents_for_node(sess.current_node_id)
+	preview["opponents"].clear()
+	if not _expect(not sess.opponents_for_node(sess.current_node_id)["opponents"].is_empty(), "preview cannot mutate assigned opponents"):
+		return
 	if not _expect(sess != null and sess.run_seed == 424242 and sess.run_points == RUN_SESSION.INITIAL_POINTS, "a run starts on its seed with the starting points"):
 		return
 	var starter: Dictionary = sess.car_record(sess.current_car_id)

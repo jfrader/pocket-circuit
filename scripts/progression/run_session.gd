@@ -9,6 +9,8 @@ const RACE_NODE_TYPES: Array[String] = ["race", "rival", "act_rival"]
 const RUN_MAP := preload("res://scripts/progression/run_map.gd")
 const RUN_STATE := preload("res://scripts/progression/run_state.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
+const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
+const FIELD_OPPONENTS := 3
 
 const INITIAL_POINTS := 0
 const RIVAL_LOSS_POINTS_COST := 10
@@ -83,6 +85,8 @@ var resolved_nodes: Dictionary = {}
 var race_in_flight: Dictionary = {}
 ## The car just won and offered to drive instead of the current one ("" when none).
 var pending_offer: String = ""
+## Act string -> node id -> DriverRoster payload. Slot zero is the field leader.
+var node_opponents: Dictionary = {}
 
 static func create(p_run_seed: int) -> RunSession:
 	var sess: RunSession = new()
@@ -103,7 +107,30 @@ static func create(p_run_seed: int) -> RunSession:
 	sess.current_car_id = sess._add_car("start", CAR_ORIGIN_START, STARTER_TYPES)
 	sess.run_state.act = 1
 	sess.run_state.row = 0
+	for act: int in range(1, FINAL_ACT + 1):
+		var map := sess.current_map if act == 1 else RUN_MAP.generate(sess.run_seed, act)
+		for node_id: String in map.nodes:
+			if map.nodes[node_id]["type"] in RACE_NODE_TYPES:
+				sess._assign_opponents(map, node_id)
 	return sess
+
+## A defensive roster copy for any race stop in the current act. Old saves
+## without assignments deterministically fill the requested stop on demand.
+func opponents_for_node(node_id: String) -> Dictionary:
+	if current_map == null or current_map.get_node(node_id).get("type", "") not in RACE_NODE_TYPES:
+		return {}
+	_assign_opponents(current_map, node_id)
+	return (node_opponents[str(current_map.act)][node_id] as Dictionary).duplicate(true)
+
+func _assign_opponents(map: RunMap, node_id: String) -> void:
+	var act_key := str(map.act)
+	if not node_opponents.has(act_key):
+		node_opponents[act_key] = {}
+	if node_opponents[act_key].has(node_id):
+		return
+	var seed := ("pocket-circuit|run-opponents|%d|act%d|%s" % [run_seed, map.act, node_id]).hash() & RUN_MAP.HASH_MASK
+	var count := 1 if map.nodes[node_id]["type"] == "rival" else FIELD_OPPONENTS
+	node_opponents[act_key][node_id] = DRIVER_ROSTER.create(seed, CATALOG.quick_race_vehicle_ids(), count)
 
 ## Races must be finished first. Optional stops stay open alongside their
 ## child routes until their action is used or the player takes a child.
@@ -581,6 +608,7 @@ static func serialize(sess: RunSession) -> Dictionary:
 		"resolved_nodes": sess.resolved_nodes.duplicate(true),
 		"race_in_flight": sess.race_in_flight.duplicate(true),
 		"pending_offer": sess.pending_offer,
+		"node_opponents": sess.node_opponents.duplicate(true),
 	}
 
 static func deserialize(data: Dictionary) -> RunSession:
@@ -611,6 +639,23 @@ static func deserialize(data: Dictionary) -> RunSession:
 		return null
 	if sess.run_state.run_seed != sess.run_seed or sess.current_map.run_seed != sess.run_seed:
 		return null
+	var assignments: Variant = data.get("node_opponents", {})
+	if assignments is not Dictionary:
+		return null
+	for act_key: Variant in assignments:
+		if act_key is not String or act_key not in ["1", "2", "3"] or assignments[act_key] is not Dictionary:
+			return null
+		var map := sess.current_map if int(act_key) == sess.current_map.act else RUN_MAP.generate(sess.run_seed, int(act_key))
+		var nodes: Dictionary = assignments[act_key]
+		sess.node_opponents[act_key] = {}
+		for nid: Variant in nodes:
+			if nid is not String or map.get_node(nid).get("type", "") not in RACE_NODE_TYPES:
+				return null
+			var count := 1 if map.nodes[nid]["type"] == "rival" else FIELD_OPPONENTS
+			var roster := DRIVER_ROSTER.normalize(nodes[nid], CATALOG.quick_race_vehicle_ids(), count)
+			if roster.is_empty():
+				return null
+			sess.node_opponents[act_key][nid] = roster
 	sess.run_points = int(data["run_points"])
 	sess.current_car_id = data["current_car_id"]
 	sess.owned_cars = _normalize_owned(data["owned_cars"])

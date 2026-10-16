@@ -98,6 +98,8 @@ func _run_test() -> void:
 	RUN_WALK.settle(app, walk_run)
 	if not _expect(int(walk_run.current_map.act) == 2 and walk_run.is_race_pending(), "beating the act rival must open act 2 on its opening race"):
 		return
+	if not _expect(app.call("run_stop_opponents", walk_run.current_node_id) == walk_run.node_opponents["2"][walk_run.current_node_id], "act advance keeps the field assigned at run creation"):
+		return
 
 	app.call("abandon_run")
 	if _failed:
