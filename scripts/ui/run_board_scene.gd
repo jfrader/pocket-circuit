@@ -26,6 +26,7 @@ const DETAIL_OUTSET := 24
 
 var act := 1
 var chalkboard := false
+var refined_cards := false
 var scene_mode: StringName = &"board"
 var car_id := "rustbug"
 var reduced_motion := false
@@ -246,6 +247,9 @@ func _draw_chalkboard() -> void:
 	var inset := get_parent().get_node("ChalkboardInset") as Control
 	var paper_y := inset.position.y + inset.size.y + 4.0
 	var rect := Rect2(Vector2(-8, -8), Vector2(extent.x + 16, paper_y - 4.0))
+	if refined_cards:
+		_draw_refined_cards(rect, Rect2(Vector2(-8, paper_y), Vector2(extent.x + 16, maxf(92.0, extent.y - paper_y + 10.0))))
+		return
 	MATERIALS.plate(self, rect, Color("71563c"), 5)
 	var face := rect.grow(-7)
 	draw_rect(face, Color("26362f"))
@@ -265,6 +269,32 @@ func _draw_chalkboard() -> void:
 			break
 		draw_line(Vector2(paper.position.x + 14, y), Vector2(paper.end.x - 14, y), Color(SKIN.INK, 0.08), 1)
 	SKIN.draw_tape(self, Vector2(extent.x * 0.76, paper_y), Vector2(84, 24), -0.09)
+
+
+func _draw_refined_cards(chalk: Rect2, paper: Rect2) -> void:
+	MATERIALS.shadow(self, Rect2(chalk.position + Vector2(-5, -2), chalk.size + Vector2(12, 12)), false, 0.5)
+	draw_rect(chalk, Color("80694c"))
+	draw_rect(chalk.grow(-2), Color("213b33"))
+	draw_rect(chalk.grow(-4), Color("849383"), false, 1)
+	draw_line(chalk.position + Vector2(2, 1), Vector2(chalk.end.x - 2, chalk.position.y + 1), Color("cab68d"), 1, true)
+	MATERIALS.grain(self, chalk.grow(-5), true)
+	MATERIALS.paint_wear(self, Rect2(chalk.position + Vector2(2, 5), Vector2(5, chalk.size.y - 10)), 24411)
+	MATERIALS.shadow(self, Rect2(paper.position + Vector2(-4, 0), paper.size + Vector2(12, 12)), false, 0.55)
+	draw_rect(Rect2(paper.position + Vector2(3, 4), paper.size), Color("b9ac8f"))
+	draw_rect(Rect2(paper.position + Vector2(1, 2), paper.size), Color("f4e7ca"))
+	draw_rect(paper, Color("e9dfc4"))
+	draw_rect(paper, Color(SKIN.INK, 0.6), false, 1)
+	draw_line(paper.position + Vector2(3, 2), Vector2(paper.end.x - 3, paper.position.y + 2), Color("fff5dc"), 1, true)
+	MATERIALS.grain(self, paper.grow(-4))
+	for line in 10:
+		var y := paper.position.y + 28 + line * 27
+		if y < paper.end.y - 12:
+			draw_line(Vector2(paper.position.x + 12, y), Vector2(paper.end.x - 12, y), Color(SKIN.INK, 0.045), 1)
+	for at: Vector2 in [chalk.position + Vector2(9, -4), Vector2(paper.end.x - 38, paper.position.y - 7)]:
+		SKIN.draw_tape(self, at + Vector2(17, 8), Vector2(35, 17), -0.09, Color("d9bf81"))
+		draw_texture_rect_region(MATERIALS.TAPE_CORNER, Rect2(at, Vector2(35, 17)), Rect2(180, 110, 80, 50), Color(1, 0.9, 0.7, 0.16))
+	draw_colored_polygon(PackedVector2Array([paper.end - Vector2(19, 0), paper.end - Vector2(0, 19), paper.end]), Color("cbbd9c"))
+	draw_line(paper.end - Vector2(19, 0), paper.end - Vector2(0, 19), Color("fff0d2"), 1, true)
 
 
 static func compact_labels(host: Node) -> void:
