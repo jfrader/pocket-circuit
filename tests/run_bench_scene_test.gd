@@ -27,6 +27,7 @@ func _run() -> void:
 		var session := _find_bench(app)
 		if not _expect(session != null, "fixture reaches an unused bench"):
 			return
+		session.run_state.set_car_wear(session.current_car_id, "rusty")
 		session.parts_held = RunParts.deal(session.run_seed, session.car_stats(session.current_car_id))
 		var held_count := session.parts_held.size()
 		shell.call("show_run_bench")

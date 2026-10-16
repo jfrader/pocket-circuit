@@ -599,6 +599,8 @@ func bench_repair(car_key: String) -> bool:
 	if not hask and not iscurk:
 		return false
 	var cur_w: String = run_state.get_car_wear(car_key)
+	if cur_w == RUN_STATE.WEAR_LEVELS[0]:
+		return false
 	var restored: String = RUN_STATE.restore_at_bench(cur_w)
 	run_state.set_car_wear(car_key, restored)
 	bench_action_done = true

@@ -29,10 +29,13 @@ func _run_test() -> void:
 	if not _expect(bench_run != null and RUN_WALK.walk_to(app, bench_run, "bench"), "a bench must be reachable"):
 		return
 	var car: String = bench_run.current_car_id
+	bench_run.run_state.set_car_wear(car, "clean")
+	if not _expect(not bool(app.call("run_bench_repair", car)) and not bench_run.bench_action_done and bench_run.run_state.get_car_wear(car) == "clean", "a clean repair must be refused without consuming the visit"):
+		return
 	bench_run.run_state.set_car_wear(car, "dusty")
 	if not _expect(bool(app.call("run_bench_repair", car)), "repair must succeed at the bench"):
 		return
-	if not _expect(bench_run.run_state.get_car_wear(car) == "clean", "repair must restore the car"):
+	if not _expect(bench_run.run_state.get_car_wear(car) == "clean" and bench_run.bench_action_done, "repair must restore the worn car and consume the visit"):
 		return
 	bench_run.parts_held.append(RunParts.deal(3, bench_run.car_stats(car))[0])
 	if not _expect(not bool(app.call("run_bench_fit", 0)) and bench_run.parts_held.size() == 1, "fitting after repairing in the same visit must be refused"):
