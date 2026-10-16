@@ -32,6 +32,11 @@ func _run() -> void:
 		if not _expect(scene != null and scene.get_node_or_null("VanDoor") != null and scene.get_node_or_null("WorkLamp") != null and scene.get_node("VanTabletop").get("act") == session.current_map.act, "van stages its open rear door and work lamp on the act surface"):
 			return
 		var blisters: Array = scene.get("blisters")
+		var table := scene.get_node("VanTabletop")
+		if not _expect(table.get_node("BeamDust").get_child_count() == (0 if reduced else 3), "van motes are beam-local and absent with reduced motion"):
+			return
+		if not _expect((table.get("_lamp_pulse") == null) == reduced, "lamp warmth pulse respects reduced motion"):
+			return
 		if not _expect(blisters.size() == 3, "van hangs exactly three rolled blister packs"):
 			return
 		var part_ids: Array[String] = []
@@ -40,6 +45,9 @@ func _run() -> void:
 			var part_id := String(part["part"])
 			var buy := shell.find_child("VanBuy_" + part_id, true, false) as Button
 			if not _expect(buy != null and buy.get_child(0).get_child(0).text == "%s · %d POINTS" % [RunParts.part_name(part).to_upper(), RunParts.cost(part)], "buy action ids and price copy are unchanged"):
+				return
+			var printed := buy.find_child("PrintedPrice", true, false) as RichTextLabel
+			if not _expect(printed != null and printed.get_parsed_text() == buy.get_child(0).get_child(0).text, "proportional pack title and monospace price retain the exact printed copy"):
 				return
 			if not _expect(_has_label(buy, "+ " + RunParts.upside_copy(part)) and _has_label(buy, "− " + RunParts.downside_copy(part)), "each hanging pack keeps its signed give/take copy"):
 				return

@@ -1,9 +1,9 @@
 extends Control
 
 const TABLETOP := preload("res://scripts/ui/run_board_scene.gd")
-const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const PART_PROP := preload("res://scripts/ui/run_bench_part.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
+const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const REFERENCE_SIZE := Vector2(1280, 720)
 const CAR_CENTER := Vector2(318, 421)
 const CAR_LENGTH := 240.0
@@ -19,6 +19,8 @@ var stamp_depth := 0.0
 var _car: TextureRect
 var _moving_part: Control
 var _mat: Control
+var _car_shadow: TextureRect
+var _wrench: TextureRect
 
 
 func _ready() -> void:
@@ -26,6 +28,8 @@ func _ready() -> void:
 	var table := TABLETOP.new()
 	table.name = "BenchTabletop"
 	table.act = act
+	table.reduced_motion = reduced_motion
+	table.ambient_motion = false
 	table.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	add_child(table)
 	_mat = Control.new()
@@ -33,15 +37,32 @@ func _ready() -> void:
 	_mat.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_mat.draw.connect(_draw_mat)
 	add_child(_mat)
+	_car_shadow = TextureRect.new()
+	_car_shadow.name = "BenchCarShadow"
+	_car_shadow.texture = MATERIALS.SHADOW_CIRCLE
+	_car_shadow.modulate = MATERIALS.SHADOW_TINT
+	_car_shadow.modulate.a = 0.4
+	_car_shadow.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_car_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_car_shadow.rotation = -0.2
+	add_child(_car_shadow)
 	_car = TextureRect.new()
 	_car.name = "BenchCar"
-	_car.texture = IDENTITIES.car_texture(car_id)
+	_car.texture = MATERIALS.hero_texture(car_id)
 	_car.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_car.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_car.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
 	_car.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_car.rotation = -0.2
 	add_child(_car)
+	_wrench = TextureRect.new()
+	_wrench.name = "PaintedWrench"
+	_wrench.texture = MATERIALS.WRENCH
+	_wrench.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	_wrench.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_wrench.rotation = -1.05
+	_wrench.modulate = Color("d4c7a5")
+	add_child(_wrench)
 	for index in mini(held_parts.size(), 3):
 		var pack := PART_PROP.new()
 		pack.name = "HeldBlister%d" % index
@@ -68,26 +89,32 @@ func _layout() -> void:
 	_car.size = Vector2(CAR_LENGTH * 0.75, CAR_LENGTH) * ratio
 	_car.pivot_offset = _car.size * 0.5
 	_car.position = CAR_CENTER * ratio - _car.size * 0.5
+	_car_shadow.size = _car.size * Vector2(1.25, 1.05)
+	_car_shadow.pivot_offset = _car_shadow.size * 0.5
+	_car_shadow.position = CAR_CENTER * ratio + Vector2(9, 14) - _car_shadow.size * 0.5
+	_wrench.size = Vector2(250, 250) * ratio
+	_wrench.pivot_offset = _wrench.size * 0.5
+	_wrench.position = Vector2(475, 421) * ratio - _wrench.size * 0.5
 	_mat.queue_redraw()
 
 
 func _draw_mat() -> void:
 	_mat.draw_set_transform(Vector2.ZERO, 0, size / REFERENCE_SIZE)
 	var mat := Rect2(72, 302, 492, 246)
-	SKIN.draw_plate(_mat, mat, Color("294343"), 18, 9)
+	MATERIALS.plate(_mat, mat, Color("294343"), 18)
+	_mat.draw_texture_rect(MATERIALS.MAT_GRAIN, mat.grow(-8), false, Color(0.65, 0.75, 0.68, 0.16))
+	MATERIALS.grain(_mat, mat.grow(-10))
 	_mat.draw_rect(mat.grow(-12), Color("7c9990"), false, 2)
 	for rib in 22:
 		var x := mat.position.x + 25 + rib * 21
 		_mat.draw_line(Vector2(x, mat.position.y + 20), Vector2(x, mat.end.y - 20), Color(0.02, 0.09, 0.1, 0.24), 2)
 	_mat.draw_set_transform(CAR_CENTER + Vector2(9, 14), -0.2, Vector2(0.65, 1))
-	_mat.draw_circle(Vector2.ZERO, CAR_LENGTH * 0.41, Color(0.01, 0.025, 0.04, 0.35))
-	_mat.draw_set_transform(Vector2(475, 421), 0.5)
-	_mat.draw_line(Vector2(4, -56), Vector2(4, 56), Color(0.01, 0.02, 0.03, 0.45), 17, true)
-	_mat.draw_line(Vector2(0, -56), Vector2(0, 56), Color("9caaa2"), 14, true)
-	_mat.draw_line(Vector2(-3, -51), Vector2(-3, 49), Color("e3e5d4"), 3, true)
-	for y: float in [-58.0, 58.0]:
-		_mat.draw_arc(Vector2(0, y), 16, -0.5 if y < 0 else PI - 0.5, PI + 0.5 if y < 0 else TAU + 0.5, 24, Color("b7c5bc"), 10, true)
+	for x: float in [-42.0, 42.0]:
+		for y: float in [-54.0, 54.0]:
+			MATERIALS.shadow(_mat, Rect2(Vector2(x, y) - Vector2(18, 10), Vector2(36, 20)), true, 0.75)
 	_mat.draw_set_transform(Vector2.ZERO)
+	_mat.draw_set_transform(Vector2(477, 424) * size / REFERENCE_SIZE, -1.05, size / REFERENCE_SIZE)
+	MATERIALS.shadow(_mat, Rect2(-120, -40, 240, 80), false, 0.3)
 
 
 func confirm(button: Button, kind: StringName, part_id: String = "") -> float:
@@ -147,6 +174,7 @@ static func dress_button(button: Button, primary: bool = false) -> void:
 		button.add_theme_color_override(state, SKIN.INK)
 	if button.disabled:
 		button.modulate.a = 0.6
+	MATERIALS.finish_button(button)
 
 
 static func dress_part(button: Button, part: Dictionary) -> void:
@@ -158,7 +186,28 @@ static func dress_part(button: Button, part: Dictionary) -> void:
 	for index in lines.get_child_count():
 		var label := lines.get_child(index) as Label
 		label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		label.add_theme_font_override("font", ThemeDB.fallback_font)
+		label.add_theme_font_size_override("font_size", 15 if index == 0 else 14)
 		label.add_theme_color_override("font_color", SKIN.INK if index == 0 else Color("245342") if index == 1 else Color("8d322a"))
+	var title := lines.get_child(0) as Label
+	var price_at := title.text.find(" · ")
+	if price_at >= 0:
+		var printed := RichTextLabel.new()
+		printed.name = "PrintedPrice"
+		printed.fit_content = true
+		printed.scroll_active = false
+		printed.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		printed.add_theme_font_size_override("normal_font_size", 15)
+		printed.add_theme_color_override("default_color", SKIN.INK)
+		printed.push_font(ThemeDB.fallback_font)
+		printed.add_text(title.text.substr(0, price_at))
+		printed.pop()
+		printed.push_font(preload("res://scripts/ui/run_ui.gd").mono_font())
+		printed.add_text(title.text.substr(price_at))
+		printed.pop()
+		title.hide()
+		lines.add_child(printed)
+		lines.move_child(printed, 1)
 	var blister := PART_PROP.new()
 	blister.part_id = String(part["part"])
 	blister.size = Vector2(54, 72)

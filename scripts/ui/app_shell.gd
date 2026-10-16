@@ -6,6 +6,7 @@ const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
 const RUN_BOARD_SCENE := preload("res://scripts/ui/run_board_scene.gd")
 const RUN_BENCH_SCENE := preload("res://scripts/ui/run_bench_scene.gd")
 const RUN_VAN_SCENE := preload("res://scripts/ui/run_van_scene.gd")
+const RUN_MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
@@ -676,6 +677,7 @@ func show_run_bench() -> void:
 	chalk.shadow_size = 4
 	chalk.shadow_offset = Vector2(5, 7)
 	header.add_theme_stylebox_override("panel", chalk)
+	RUN_MATERIALS.finish_panel(header, true)
 	left.add_child(header)
 	var heading := VBoxContainer.new()
 	heading.add_theme_constant_override("separation", 4)
@@ -705,6 +707,7 @@ func show_run_bench() -> void:
 	paper.shadow_size = 4
 	paper.shadow_offset = Vector2(6, 8)
 	card[0].add_theme_stylebox_override("panel", paper)
+	RUN_MATERIALS.finish_panel(card[0] as PanelContainer)
 	RUN_BOARD_SCENE.ink_labels(card[0])
 	columns.add_child(card[0])
 	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, used, "BenchRepair")
@@ -752,6 +755,7 @@ func show_run_parts_van() -> void:
 	var header := PanelContainer.new()
 	header.name = "VanChalkboard"
 	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	RUN_MATERIALS.finish_panel(header, true)
 	left.add_child(header)
 	var heading := VBoxContainer.new()
 	heading.add_theme_constant_override("separation", 4)
