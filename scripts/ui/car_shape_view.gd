@@ -17,10 +17,14 @@ const HEADER_FONT_SIZE := 13
 const HEADER_TAPE_HEIGHT := 24.0
 const HEADER_TAPE_WIDTH_RATIO := 0.66
 const HEADER_TAPE_ANGLE := -0.03
+const AXIS_LABEL_GAP := 22.0
+const AXIS_FONT_SIZE := 12
+const DELTA_BASELINE := 18.0
 
 var shape: Dictionary = {}
 var compare_shape: Dictionary = {}
 var label := ""
+var plot_bottom_padding := 0.0
 var _morph_from: Dictionary = {}
 var _morph := 1.0
 
@@ -47,20 +51,21 @@ func _draw() -> void:
 		shown = {}
 		for axis: Variant in shape:
 			shown[axis] = lerpf(float(_morph_from.get(axis, shape[axis])), float(shape[axis]), _morph)
-	draw_card(self, Rect2(Vector2.ZERO, size), shown, shape, compare_shape, label)
+	draw_card(self, Rect2(Vector2.ZERO, size), shown, shape, compare_shape, label, plot_bottom_padding)
 
 
 ## `shown` is what the polygon draws (it may be mid-morph); `target` is the
 ## car's real shape the deltas are read from.
-static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: Dictionary, compare: Dictionary, title: String) -> void:
+static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: Dictionary, compare: Dictionary, title: String, bottom_padding: float = 0.0) -> void:
 	SKIN.draw_plate(item, rect, SKIN.CREAM)
 	var header := header_geometry(rect, title)
 	SKIN.draw_tape(item, header.tape_center, header.tape_size, HEADER_TAPE_ANGLE)
 	SKIN.draw_text(item, header.text_position, title, HEADER_FONT_SIZE, SKIN.INK, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
 	if shown.is_empty():
 		return
-	var center := rect.get_center() + Vector2(0.0, 12.0)
-	var radius := minf(rect.size.x, rect.size.y) * RADIUS_RATIO
+	var plot := plot_geometry(rect, bottom_padding)
+	var center: Vector2 = plot["center"]
+	var radius: float = plot["radius"]
 	for ring in range(1, RINGS + 1):
 		var ring_points := _points(center, radius * float(ring) / float(RINGS), {}, 1.0)
 		ring_points.append(ring_points[0])
@@ -79,16 +84,27 @@ static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: 
 		var compared := _points(center, radius, compare)
 		for index in compared.size():
 			item.draw_dashed_line(compared[index], compared[(index + 1) % compared.size()], SKIN.BLUE, 2.5, DASH, true)
-	var label_points := _points(center, radius + 22.0, {}, 1.0)
+	var label_points := _points(center, radius + AXIS_LABEL_GAP, {}, 1.0)
 	for index in CarProfile.AXES.size():
 		var axis := CarProfile.AXES[index]
 		var at := label_points[index]
-		SKIN.draw_text(item, at + Vector2(-40.0, 4.0), axis.to_upper(), 12, SKIN.INK, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
+		SKIN.draw_text(item, at + Vector2(-40.0, 4.0), axis.to_upper(), AXIS_FONT_SIZE, SKIN.INK, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
 		if compare.is_empty():
 			continue
 		var delta := roundi((float(target.get(axis, 0.0)) - float(compare.get(axis, 0.0))) * 100.0)
 		if delta != 0:
-			SKIN.draw_text(item, at + Vector2(-40.0, 18.0), "%+d" % delta, 12, SKIN.LIME if delta > 0 else SKIN.RED, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
+			SKIN.draw_text(item, at + Vector2(-40.0, DELTA_BASELINE), "%+d" % delta, AXIS_FONT_SIZE, SKIN.LIME if delta > 0 else SKIN.RED, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
+
+
+static func plot_geometry(rect: Rect2, bottom_padding: float = 0.0) -> Dictionary:
+	var center := rect.get_center() + Vector2(0.0, 12.0)
+	var radius := minf(rect.size.x, rect.size.y) * RADIUS_RATIO
+	if bottom_padding > 0.0:
+		var lowest := center.y + radius + AXIS_LABEL_GAP + DELTA_BASELINE + ThemeDB.fallback_font.get_descent(AXIS_FONT_SIZE)
+		var inset := minf(radius, maxf(0.0, lowest - (rect.end.y - bottom_padding)) * 0.5)
+		center.y -= inset
+		radius -= inset
+	return {"center": center, "radius": radius}
 
 
 ## Bounds include clearance around the tape's torn edges.
