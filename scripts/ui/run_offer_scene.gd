@@ -6,9 +6,9 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const CONTROLS := preload("res://scripts/ui/run_bench_scene.gd")
 const REFERENCE_SIZE := Vector2(1280, 720)
-const HERO_RECT := Rect2(748, 207, 204, 272)
+const HERO_RECT := Rect2(748, 47, 204, 272)
 const RIVAL_RECT := Rect2(1045, 132, 108, 144)
-const TURNTABLE_CENTER := Vector2(850, 412)
+const TURNTABLE_CENTER := Vector2(850, 252)
 const SHAPE_SIZE := Vector2(420, 300)
 const SHAPE_BOTTOM_PADDING := 16.0
 const REVEAL_SCALE := 0.4
@@ -93,7 +93,7 @@ func _layout() -> void:
 
 func _draw_turntable() -> void:
 	_table.draw_set_transform(Vector2.ZERO, 0, size / REFERENCE_SIZE)
-	MATERIALS.shadow(_table, Rect2(648, 337, 410, 194), true, 0.6)
+	MATERIALS.shadow(_table, Rect2(TURNTABLE_CENTER + Vector2(-202, -75), Vector2(410, 194)), true, 0.6)
 	MATERIALS.shadow(_table, Rect2(1053, 150, 88, 122), true, 0.4)
 	_table.draw_set_transform(TURNTABLE_CENTER * size / REFERENCE_SIZE, 0, size / REFERENCE_SIZE * Vector2(1, 0.43))
 	_table.draw_circle(Vector2(0, 22), 195, Color("273e40"))
@@ -107,7 +107,7 @@ func _draw_turntable() -> void:
 		var direction := Vector2.from_angle(TAU * float(angle) / 12.0)
 		_table.draw_line(direction * 173, direction * 181, Color("d8d3ac"), 2, true)
 	_table.draw_set_transform(Vector2.ZERO, 0, size / REFERENCE_SIZE)
-	MATERIALS.shadow(_table, Rect2(783, 262, 140, 187), true, 0.35)
+	MATERIALS.shadow(_table, Rect2(HERO_RECT.position + Vector2(35, 55), Vector2(140, 187)), true, 0.35)
 
 
 func _draw_lamp() -> void:
