@@ -15,8 +15,8 @@ const FACE := Color("26332e")
 const EDGE := Color("111815")
 ## Each kind's rim, taken from its map icon so chip, icon and legend agree.
 const RIMS := {
-	"race": Color("8b95a5"), "rival": Color("d4574c"), "bench": Color("6fbf8f"), "parts_van": Color("f2a53c"),
-	"lockup": Color("efc94c"), "errand": Color("6aa8d8"), "act_rival": Color("f2a53c"),
+	"race": Color("94a7bf"), "rival": Color("e04a3c"), "bench": Color("3fbf82"), "parts_van": Color("ff9d1f"),
+	"lockup": Color("ffd23f"), "errand": Color("4da3e8"), "act_rival": Color("ff9d1f"),
 }
 const LIFT := 3.0
 var kind := "race"
