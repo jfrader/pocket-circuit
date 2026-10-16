@@ -2,6 +2,7 @@ extends Control
 
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
+const UI := preload("res://scripts/ui/run_ui.gd")
 const SURFACES := {
 	1: preload("res://assets/textures/world_materials/kitchen_counter.png"),
 	2: preload("res://assets/textures/world_materials/workshop_bench.png"),
@@ -16,6 +17,12 @@ const SUNRISE := Color("ffd39a")
 const MOONLIGHT := Color("344f80")
 const HERO_LENGTH := {&"night_won": 280.0, &"night_lost": 228.0}
 const CHALK_PADDING := 14
+const MAP_SIZE := Vector2(896, 624)
+const PAGE_INSET := Vector2(24, 16)
+const DETAIL_WIDTH := 312.0
+const COLUMN_GAP := 24
+const MARKER_SCALE := 1.2
+const DETAIL_OUTSET := 24
 
 var act := 1
 var chalkboard := false
@@ -258,6 +265,39 @@ func _draw_chalkboard() -> void:
 			break
 		draw_line(Vector2(paper.position.x + 14, y), Vector2(paper.end.x - 14, y), Color(SKIN.INK, 0.08), 1)
 	SKIN.draw_tape(self, Vector2(extent.x * 0.76, paper_y), Vector2(84, 24), -0.09)
+
+
+static func compact_labels(host: Node) -> void:
+	for child: Node in host.get_children():
+		if child is Label:
+			var label := child as Label
+			var font_size := label.get_theme_font_size("font_size")
+			label.add_theme_font_size_override("font_size", 28 if font_size >= 30 else 24 if font_size >= 24 else 16 if font_size >= 16 else font_size)
+			if label.get_parent() is VBoxContainer and not label.get_parent().get_parent() is HBoxContainer:
+				label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		if child is GridContainer:
+			(child as GridContainer).add_theme_constant_override("h_separation", 10)
+		compact_labels(child)
+
+
+static func facts(rows: Array) -> VBoxContainer:
+	var list := VBoxContainer.new()
+	list.add_theme_constant_override("separation", 6)
+	var short_rows: Array = []
+	for row: Array in rows:
+		if String(row[0]) == "CIRCUIT":
+			var stacked := VBoxContainer.new()
+			stacked.name = "CircuitFact"
+			stacked.add_theme_constant_override("separation", 3)
+			stacked.add_child(UI.label(String(row[0]), 11, UI.MUTED, true))
+			var value := UI.label(String(row[1]), 15)
+			value.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			stacked.add_child(value)
+			list.add_child(stacked)
+		else:
+			short_rows.append(row)
+	list.add_child(UI.facts(short_rows))
+	return list
 
 
 static func ink_labels(host: Node) -> void:

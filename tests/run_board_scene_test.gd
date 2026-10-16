@@ -27,6 +27,7 @@ func _run() -> void:
 		shell.call("show_run_board")
 		await process_frame
 		await process_frame
+		await create_timer(0.3).timeout
 		var table := shell.find_child("RunTabletop", true, false) as Control
 		if not _expect(table != null and table.get("act") == act, "the tabletop follows the act"):
 			return
@@ -50,7 +51,32 @@ func _run() -> void:
 			return
 		surfaces.append(surface.resource_path)
 		var board := shell.find_child("RunBoard", true, false) as Control
+		var expected_map := Rect2(24, 16, 896, 624)
+		if not _expect(board.get_global_rect().is_equal_approx(expected_map), "active map occupies the intended hero rect (24,16,896,624)"):
+			return
+		var active_detail := shell.find_child("RunDetail", true, false) as Control
+		var slot := shell.find_child("RunDetailSlot", true, false) as Control
+		if not _expect(is_equal_approx(slot.get_global_rect().position.x, 944) and is_equal_approx(slot.size.x, 312) and is_equal_approx(active_detail.get_global_rect().position.x, 968) and is_equal_approx(active_detail.size.x, 264) and active_detail.get_global_rect().end.y < 648, "312px detail slot reserves 24px per side for the frame and shadow around 264px content"):
+			return
+		var metadata := shell.find_child("RunMetadata", true, false) as Label
+		if not _expect(metadata.get_line_count() == 2 and (board.get_node("MapMetadata") as Label).get_line_count() == 2, "act/room and map seed metadata use deliberate two-line layouts"):
+			return
+		var circuit_fact := shell.find_child("CircuitFact", true, false) as VBoxContainer
+		var circuit_value := circuit_fact.get_child(1) as Label
+		var circuit_key := circuit_fact.get_child(0) as Label
+		if not _expect(circuit_value.autowrap_mode == TextServer.AUTOWRAP_WORD_SMART and circuit_value.get_global_rect().position.y >= circuit_key.get_global_rect().end.y, "CIRCUIT value wraps below its label rather than sharing the narrow facts row"):
+			return
+		var go_button := shell.find_child("RunGo", true, false) as Control
+		var inset_left := go_button.get_global_rect().position.x - (active_detail.get_global_rect().position.x - 8)
+		var inset_right := active_detail.get_global_rect().end.x + 8 - go_button.get_global_rect().end.x
+		if not _expect(inset_left >= 8 and is_equal_approx(inset_left, inset_right) and active_detail.get_global_rect().end.x + 22 <= slot.get_global_rect().end.x, "GO has matching frame insets and the complete right frame/shadow fits its slot"):
+			return
+		var active_legend := shell.find_child("RunLegend", true, false) as Control
+		if not _expect(active_legend.get_global_rect().position.y >= 668 and active_legend.get_global_rect().end.y <= 720, "legend occupies the bottom strip below the enlarged map and instructions"):
+			return
 		var token := board.get_node("CarToken") as TextureRect
+		if not _expect(token.size == Vector2(36, 36), "player car token grows with the 1.2x marker presentation"):
+			return
 		if not _expect(token.texture == IDENTITIES.car_texture(session.current_car_id), "the parked player car uses the identity library"):
 			return
 		var marker: Button = board.call("marker", session.current_node_id)
@@ -60,6 +86,8 @@ func _run() -> void:
 			if not _expect(inset.get_theme_constant("margin_" + edge) == SCENE.CHALK_PADDING, "chalkboard content has consistent inner padding"):
 				return
 		var toy := marker.get_node_or_null("ToyToken") as Control
+		if not _expect(marker.custom_minimum_size.is_equal_approx(Vector2(45.6, 45.6)) and toy.scale.is_equal_approx(Vector2.ONE * 1.2), "hit targets and physical token artwork grow by twenty percent"):
+			return
 		if not _expect(toy != null and toy.mouse_filter == Control.MOUSE_FILTER_IGNORE, "physical toys leave input on the existing marker"):
 			return
 		if not _expect(board.call("selected_id") == session.current_node_id and bool(toy.get("selected")), "opening preview retains its selected ring and physical token highlight"):
@@ -75,6 +103,18 @@ func _run() -> void:
 			return
 		if not _expect(shell.find_children("RunTabletop", "Control", true, false).size() == 1, "reopening replaces rather than stacks scenery"):
 			return
+		var checked_kinds: Array[String] = []
+		for id: String in session.current_map.nodes:
+			var kind := String(session.current_map.get_node(id)["type"])
+			if checked_kinds.has(kind):
+				continue
+			checked_kinds.append(kind)
+			board.call("select", id)
+			await process_frame
+			await process_frame
+			var go := shell.find_child("RunGo", true, false) as Control
+			if not _expect(detail.get_global_rect().end.y < active_legend.get_global_rect().position.y and detail.get_global_rect().encloses(go.get_global_rect()), "each stop kind retains readable facts and GO above the bottom legend"):
+				return
 		shell.call("show_title")
 		await process_frame
 		if not _expect(shell.find_child("RunTabletop", true, false) == null, "tabletop scenery does not leak onto other screens"):
