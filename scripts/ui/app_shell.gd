@@ -10,6 +10,8 @@ const RUN_VAN_SCENE := preload("res://scripts/ui/run_van_scene.gd")
 const RUN_LOCKUP_SCENE := preload("res://scripts/ui/run_lockup_scene.gd")
 const RUN_ERRAND_SCENE := preload("res://scripts/ui/run_errand_scene.gd")
 const RUN_OFFER_SCENE := preload("res://scripts/ui/run_offer_scene.gd")
+const RUN_BOARD_IDENTITY := preload("res://scripts/ui/run_board_identity.gd")
+const RUN_STOP_CAR := preload("res://scripts/ui/run_stop_car.gd")
 const RUN_MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
@@ -466,7 +468,13 @@ func _show_run_stop(stop_id: String, sess: RunSession) -> void:
 	var title := HBoxContainer.new()
 	title.add_theme_constant_override("separation", 14)
 	title.add_child(RUN_UI.icon(kind, 34))
-	title.add_child(RUN_UI.label(String(RUN_UI.TYPES[kind]["name"]), 38))
+	var title_name := RUN_UI.label(String(RUN_UI.TYPES[kind]["name"]), 38)
+	title_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_child(title_name)
+	# Race-type stops show the car they put against you, beside the stop's name.
+	var car_look := RUN_BOARD_IDENTITY.look(sess, stop_id)
+	if not car_look.is_empty():
+		title.add_child(RUN_STOP_CAR.new(car_look))
 	_run_stop_card.add_child(title)
 	var line := RUN_UI.label(String(RUN_UI.TYPES[kind]["copy"]), 18, RUN_UI.MUTED)
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

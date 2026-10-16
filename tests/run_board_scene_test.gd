@@ -5,7 +5,8 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const BOARD_IDENTITY := preload("res://scripts/ui/run_board_identity.gd")
-const BOARD_TOKEN := preload("res://scripts/ui/run_board_token.gd")
+const RUN_UI := preload("res://scripts/ui/run_ui.gd")
+const STOP_CAR := preload("res://scripts/ui/run_stop_car.gd")
 const INTRO := preload("res://scripts/ui/run_board_intro.gd")
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
 
@@ -73,32 +74,20 @@ func _run() -> void:
 		var header := board.get_node("MapMetadata") as Label
 		if not _expect(metadata.get_line_count() == 2 and header.text == "NIGHT %d · ACT %d · %s" % [session.run_seed, act, String(SCENE.ROOM_NAMES[act]).to_upper()] and header.get_theme_font_size("font_size") == 20 and board.get_node_or_null("MapSeed") == null and header.text.count(str(session.run_seed)) == 1, "painted night/act/room header shows the night identifier once, with no residual seed label"):
 			return
-		if not _expect(BOARD_TOKEN.CAR_PAD.encloses(Rect2(-24, -32, 48, 64)) and BOARD_TOKEN.PAD_OPACITY <= 0.2, "quiet car ground wash covers the sprite footprint without competing with route contrast"):
-			return
 		if not _expect(bool((shell.find_child("RunChalkboard", true, false) as Control).get("refined_cards")), "active detail opts into finer layered chalkboard and paper edges"):
 			return
+		var chip_icons: Dictionary = {}
 		for id: String in session.current_map.nodes:
 			var kind := String(session.current_map.get_node(id)["type"])
-			if kind not in ["race", "rival", "act_rival"]:
-				continue
-			var look: Dictionary = ((board.call("marker", id) as Button).get_node("ToyToken") as Control).get("car_look")
-			if not _expect((look["texture"] as Texture2D).get_width() == 48 * MATERIALS.HERO_PIXEL_SCALE, "map car tokens use genuine hero-scale rasterization"):
+			var chip := (board.call("marker", id) as Button).get_node_or_null("StopChip") as Control
+			if not _expect(chip != null and chip.get("kind") == kind and chip.call("icon") == RUN_UI.TYPES[kind]["icon"] and chip.get("car_look") == null and chip.find_children("*", "TextureRect", true, false).is_empty(), "every map stop is an abstract chip carrying its kind's map icon, never a car sprite"):
 				return
-			var roster: Dictionary = app.call("run_stop_opponents", id)
-			var leader: Dictionary = roster["opponents"][0]
-			if not _expect(look["source"] == "opponent" and look["key"] == leader["vehicle_id"] and look["opponent_id"] == leader["id"] and look["texture"] == MATERIALS.hero_texture(String(leader["vehicle_id"])), "race, rival and act-rival markers render the actual assigned field leader's vehicle"):
-				return
-			var restored := RunSession.deserialize(session_snapshot)
-			restored.current_map.act = act
-			var again := BOARD_IDENTITY.look(restored, id)
-			if not _expect(look["key"] == again["key"] and look["opponent_id"] == again["opponent_id"], "node opponent appearance survives save reload"):
-				return
-			var empty := EmptyAssignments.new()
-			empty.current_map = session.current_map
-			empty.current_car_id = session.current_car_id
-			var fallback := BOARD_IDENTITY.look(empty, id)
-			if not _expect(fallback["source"] == "player" and fallback["key"] == session.current_car_id and fallback["texture"] == MATERIALS.hero_texture(session.current_car_id), "empty assignments fall back to the player's car for every race-type marker"):
-				return
+			chip_icons[chip.call("icon")] = true
+		var legend_icons: Dictionary = {}
+		for icon: Node in shell.find_child("RunLegend", true, false).find_children("*", "TextureRect", true, false):
+			legend_icons[(icon as TextureRect).texture] = true
+		if not _expect(legend_icons.size() == chip_icons.size() and legend_icons.keys().all(func(texture: Texture2D) -> bool: return chip_icons.has(texture)), "legend icons are exactly the icons on the map's chips"):
+			return
 		var legacy_snapshot := session_snapshot.duplicate(true)
 		legacy_snapshot.erase("node_opponents")
 		var legacy := RunSession.deserialize(legacy_snapshot)
@@ -129,22 +118,50 @@ func _run() -> void:
 		for edge: String in ["left", "right", "top", "bottom"]:
 			if not _expect(inset.get_theme_constant("margin_" + edge) == SCENE.CHALK_PADDING, "chalkboard content has consistent inner padding"):
 				return
-		var toy := marker.get_node_or_null("ToyToken") as Control
-		if not _expect(marker.custom_minimum_size.is_equal_approx(Vector2(45.6, 45.6)) and toy.scale.is_equal_approx(Vector2.ONE * 1.2), "hit targets and physical token artwork grow by twenty percent"):
+		var toy := marker.get_node_or_null("StopChip") as Control
+		if not _expect(marker.custom_minimum_size.is_equal_approx(Vector2(45.6, 45.6)) and toy.scale.is_equal_approx(Vector2.ONE * 1.2), "hit targets and physical chip artwork grow by twenty percent"):
 			return
-		if not _expect(toy != null and toy.mouse_filter == Control.MOUSE_FILTER_IGNORE, "physical toys leave input on the existing marker"):
+		if not _expect(toy != null and toy.mouse_filter == Control.MOUSE_FILTER_IGNORE, "physical chips leave input on the existing marker"):
 			return
-		if not _expect(board.call("selected_id") == session.current_node_id and bool(toy.get("selected")), "opening preview retains its selected ring and physical token highlight"):
+		if not _expect(board.call("selected_id") == session.current_node_id and bool(toy.get("selected")), "opening preview retains its selected ring and physical chip highlight"):
 			return
 		toy.set("reduced_motion", true)
 		toy.call("set_selected", true)
-		if not _expect(is_zero_approx(float(toy.get("lift"))), "reduced motion selects without token lift"):
+		if not _expect(is_zero_approx(float(toy.get("lift"))), "reduced motion selects without chip lift"):
 			return
 		toy.set("reduced_motion", false)
 		toy.call("set_selected", true)
 		await create_timer(0.4).timeout
-		if not _expect(float(toy.get("lift")) > 2.9 and table.modulate.a > 0.99, "arrival fades in and selection lifts the toy"):
+		if not _expect(float(toy.get("lift")) > 2.9 and table.modulate.a > 0.99, "arrival fades in and selection lifts the chip"):
 			return
+		for id: String in session.current_map.nodes:
+			var kind := String(session.current_map.get_node(id)["type"])
+			board.call("select", id)
+			await process_frame
+			var stop_car := shell.find_child("RunStop", true, false).find_child("StopCar", true, false) as Control
+			if kind not in RunSession.RACE_NODE_TYPES:
+				if not _expect(stop_car == null, "only race, rival and act-rival stops show a car in the detail slip"):
+					return
+				continue
+			var roster: Dictionary = app.call("run_stop_opponents", id)
+			var leader: Dictionary = roster["opponents"][0]
+			if not _expect(stop_car != null and stop_car.get_meta("vehicle_id") == leader["vehicle_id"] and stop_car.get_meta("source") == "opponent" and stop_car.call("texture") == MATERIALS.hero_texture(String(leader["vehicle_id"])), "the detail slip shows the stop's assigned field leader or rival car"):
+				return
+			if not _expect((stop_car.call("texture") as Texture2D).get_width() == 48 * MATERIALS.HERO_PIXEL_SCALE and is_equal_approx(detail.size.x, 264), "the slip car uses hero-scale rasterization without widening the 264px slip"):
+				return
+			var restored := RunSession.deserialize(session_snapshot)
+			restored.current_map.act = act
+			var again := BOARD_IDENTITY.look(restored, id)
+			if not _expect(again["key"] == leader["vehicle_id"] and again["opponent_id"] == leader["id"], "node opponent appearance survives save reload"):
+				return
+			var empty := EmptyAssignments.new()
+			empty.current_map = session.current_map
+			empty.current_car_id = session.current_car_id
+			var fallback_card := STOP_CAR.new(BOARD_IDENTITY.look(empty, id))
+			if not _expect(fallback_card.get_meta("source") == "player" and fallback_card.get_meta("vehicle_id") == session.current_car_id and fallback_card.call("texture") == MATERIALS.hero_texture(session.current_car_id), "empty assignments fall back to the player's car in the detail slip"):
+				return
+			fallback_card.free()
+		board.call("preview", session.current_node_id)
 		if not _expect(shell.find_children("RunTabletop", "Control", true, false).size() == 1, "reopening replaces rather than stacks scenery"):
 			return
 		var checked_kinds: Array[String] = []
@@ -157,7 +174,7 @@ func _run() -> void:
 			await process_frame
 			await process_frame
 			var go := shell.find_child("RunGo", true, false) as Control
-			if not _expect(detail.get_global_rect().end.y < active_legend.get_global_rect().position.y and detail.get_global_rect().encloses(go.get_global_rect()), "each stop kind retains readable facts and GO above the bottom legend"):
+			if not _expect(detail.get_global_rect().end.y < active_legend.get_global_rect().position.y and detail.get_global_rect().encloses(go.get_global_rect()) and is_equal_approx(detail.size.x, 264), "each stop kind retains readable facts and GO above the bottom legend within the 264px slip"):
 				return
 		shell.call("show_title")
 		await process_frame
