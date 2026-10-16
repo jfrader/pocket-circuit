@@ -65,6 +65,8 @@ func _run_test() -> void:
 	await process_frame
 	if not _expect(_has_label(shell, "NIGHT OVER") and not _has_label(shell, "NO ACTIVE RUN"), "a saved lost night still shows its terminal board"):
 		return
+	if not _expect(_has_label(shell, "DEFEATED BY THE ACT RIVAL") and _has_label(shell, "BANKED: 1 CAR"), "the lost night names its cause and banked haul"):
+		return
 	app.call("persist_current_run")
 	var saved: Dictionary = SAVE_STORE.new(path).load_data()
 	var garage: Array = saved.get("garage_cars", [])
@@ -162,6 +164,8 @@ func _run_test() -> void:
 	await process_frame
 	if not _expect(victory.is_complete() and app.call("current_run_session") == null and _has_label(shell, "NIGHT OVER"), "a saved winning night retains its terminal board"):
 		return
+	if not _expect(_has_label(shell, "ALL ACT RIVALS DEFEATED"), "a completed night names its victory"):
+		return
 	var worn: RunSession = app.call("start_run", 72727) as RunSession
 	for crash in 8:
 		worn.register_crash(1.0)
@@ -169,6 +173,8 @@ func _run_test() -> void:
 	shell.call("show_run_board")
 	await process_frame
 	if not _expect(worn.is_failed() and app.call("current_run_session") == null and _has_label(shell, "NIGHT OVER"), "a saved wear ending retains its terminal board"):
+		return
+	if not _expect(_has_label(shell, "THE CAR GAVE OUT"), "a worn-out night names the car failure"):
 		return
 	if not _expect((SAVE_STORE.new(path).load_data()["current_run"] as Dictionary).is_empty(), "a reboot has no ended run to resume or transfer again"):
 		return
