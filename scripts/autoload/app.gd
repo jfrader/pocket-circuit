@@ -1905,6 +1905,14 @@ func run_buy_part(part_id: String, node_id: String = "") -> bool:
 	return _run_seam(node_id, "parts_van", func() -> bool: return _current_run_session.buy_part(part_id))
 
 
+func run_buy_tow() -> bool:
+	return _run_seam("", "parts_van", func() -> bool: return _current_run_session.buy_tow())
+
+
+func run_buy_nitro() -> bool:
+	return _run_seam("", "parts_van", func() -> bool: return _current_run_session.buy_nitro())
+
+
 func run_open_lockup(node_id: String = "") -> bool:
 	var opened := _run_seam(node_id, "lockup", func() -> bool: return not _current_run_session.open_lockup().is_empty())
 	if opened:

@@ -999,7 +999,11 @@ func show_run_parts_van() -> void:
 	heading.add_child(copy)
 	_run_stats(heading, sess)
 	RUN_BOARD_SCENE.chalk_labels(heading)
-	RUN_UI.spacer(left, 240)
+	left.custom_minimum_size.y = RUN_UI.CARD_SIZE.y
+	var action_space := Control.new()
+	action_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(action_space)
 	_run_actions = left
 	var rack := VBoxContainer.new()
 	rack.add_theme_constant_override("separation", 0)
@@ -1022,6 +1026,14 @@ func show_run_parts_van() -> void:
 	for vehicle_id: String in sess.impounded_cars:
 		var ransom := RUN_UI.action("RANSOM %s · %d POINTS" % [RUN_UI.car_name(vehicle_id).to_upper(), RunSession.HAUL_RANSOM_POINTS], false, bought or sess.run_points < RunSession.HAUL_RANSOM_POINTS)
 		_add_run_button(card[1], ransom, Callable(self, "_on_van_ransom_pressed").bind(vehicle_id), "VanRansom_" + vehicle_id)
+	var consumables := HBoxContainer.new()
+	consumables.add_theme_constant_override("separation", 12)
+	left.add_child(consumables)
+	for offer: Dictionary in sess.van_offer_consumables():
+		var item := String(offer["item"])
+		var buy := RUN_UI.action("%s · %d POINTS" % [item.to_upper(), int(offer["price"])], false, sess.run_points < int(offer["price"]))
+		RUN_BENCH_SCENE.dress_button(buy)
+		_add_run_button(consumables, buy, Callable(self, "_on_van_consumable_pressed").bind(item), "VanBuy_" + item)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	RUN_BENCH_SCENE.dress_button(left.get_child(left.get_child_count() - 1) as Button)
 	var legend := RUN_UI.legend(sess.current_map)
@@ -1237,6 +1249,12 @@ func _on_van_buy_pressed(part_id: String) -> void:
 	_play_ui_confirm()
 	_app.call("run_buy_part", part_id)
 	_finish_van_confirmation(part_id)
+
+
+func _on_van_consumable_pressed(item: String) -> void:
+	_play_ui_confirm()
+	if bool(_app.call("run_buy_" + item)):
+		show_run_board()
 
 
 func _finish_van_confirmation(part_id: String) -> void:
@@ -1720,6 +1738,10 @@ func _apply_compact_button_art(button: Button) -> void:
 
 
 func _clear_content() -> void:
+	var confirmation := _root.get_node_or_null("AbandonConfirm")
+	if confirmation != null:
+		_root.remove_child(confirmation)
+		confirmation.queue_free()
 	if is_instance_valid(_driving_intro):
 		_close_driving_intro()
 	_dismiss_run_intro()
@@ -2359,33 +2381,55 @@ func _on_save_run_again() -> void:
 
 func _on_abandon_run() -> void:
 	var abandon := _content.find_child("ActionAbandon", true, false) as Button
-	if abandon == null or _content.find_child("AbandonConfirm", true, false) != null:
+	if abandon == null or _root.find_child("AbandonConfirm", true, false) != null:
 		return
-	var secondary := abandon.get_parent() as Control
-	abandon.hide()
-	var strip := HBoxContainer.new()
+	var strip := CenterContainer.new()
 	strip.name = "AbandonConfirm"
-	strip.add_theme_constant_override("separation", 8)
-	secondary.add_child(strip)
+	strip.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	strip.mouse_filter = Control.MOUSE_FILTER_STOP
+	_root.add_child(strip)
+	strip.draw.connect(func() -> void: strip.draw_rect(Rect2(Vector2.ZERO, strip.size), Color(0.02, 0.03, 0.04, 0.8)))
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size.x = 620
+	panel.add_theme_stylebox_override("panel", SKIN.card_style(SKIN.CREAM, 0.0))
+	strip.add_child(panel)
+	var inset := MarginContainer.new()
+	for edge: String in ["left", "right", "top", "bottom"]:
+		inset.add_theme_constant_override("margin_" + edge, 24)
+	panel.add_child(inset)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 16)
+	inset.add_child(content)
 	var warning := RUN_UI.label("THE NIGHT ENDS - CARS NOT BANKED ARE LOST", 13, Color("8d322a"), true)
 	warning.name = "AbandonWarning"
 	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	warning.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	strip.add_child(warning)
+	content.add_child(warning)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 16)
+	content.add_child(actions)
 	var confirm := RUN_UI.action("ABANDON THE NIGHT")
 	confirm.name = "ActionConfirmAbandon"
 	confirm.pressed.connect(_confirm_abandon_run)
 	_wire_button_audio(confirm)
-	strip.add_child(confirm)
+	actions.add_child(confirm)
 	var keep := RUN_UI.action("KEEP DRIVING", true)
 	keep.name = "ActionKeepDriving"
 	keep.pressed.connect(func() -> void:
 		strip.get_parent().remove_child(strip)
 		strip.queue_free()
-		abandon.show()
 		abandon.grab_focus())
 	_wire_button_audio(keep)
-	strip.add_child(keep)
+	actions.add_child(keep)
+	for button: Button in [confirm, keep]:
+		var other := keep if button == confirm else confirm
+		button.focus_next = button.get_path_to(other)
+		button.focus_previous = button.get_path_to(other)
+		button.focus_neighbor_left = button.get_path_to(other)
+		button.focus_neighbor_right = button.get_path_to(other)
+		button.focus_neighbor_top = button.get_path_to(other)
+		button.focus_neighbor_bottom = button.get_path_to(other)
 	keep.grab_focus()
 
 

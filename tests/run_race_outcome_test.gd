@@ -251,7 +251,7 @@ func _run_test() -> void:
 		return
 	continue_action.disabled = false
 	race.call("_update_results", [])
-	if not _expect((race.get("_results_label") as Label).text.to_upper().contains("CONTINUE"), "unsaved results may name continue when it is enabled"):
+	if not _expect((race.get("_results_label") as Label).text.to_upper().contains("NOT SAVED") and not (race.get("_results_label") as Label).text.to_upper().contains("CONTINUE"), "unsaved results retain save status without duplicating the continue button"):
 		return
 	var copy_run: RunSession = app.call("start_run", 51515) as RunSession
 	app.call("start_run_race", copy_run.current_node_id)
