@@ -40,6 +40,7 @@ var _footer: Label
 var _run_backdrop: ColorRect
 var _run_intro: Control
 var _run_intro_pending := false
+var _driving_intro: Control
 var _run_actions: BoxContainer
 ## The board's map, the picked stop's card, and whether the car is driving to a stop.
 var _run_board: RUN_MAP_VIEW
@@ -171,14 +172,16 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 
 
 func show_quick_race(_requested_act: int = 0) -> void:
+	var preserve_route := _quick_race and not _quick_strip
 	_screen = "quick_race"
 	_event_id = ""
 	_quick_race = true
 	_quick_strip = false
-	_quick_race_reverse = false
-	_roll_quick_race()
-	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
-	_quick_race_entry_count += 1
+	if not preserve_route:
+		_quick_race_reverse = false
+		_roll_quick_race()
+		_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
+		_quick_race_entry_count += 1
 	_clear_content()
 	_content.add_theme_constant_override("separation", 4)
 	var progress: Dictionary = _app.call("get_save_data")
@@ -212,14 +215,16 @@ func show_quick_race(_requested_act: int = 0) -> void:
 
 
 func show_quick_strip(_requested_act: int = 0) -> void:
+	var preserve_route := _quick_strip
 	_screen = "quick_strip"
 	_event_id = ""
 	_quick_strip = true
 	_quick_race = false
-	_quick_race_reverse = false
-	_roll_quick_race()
-	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
-	_quick_race_entry_count += 1
+	if not preserve_route:
+		_quick_race_reverse = false
+		_roll_quick_race()
+		_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
+		_quick_race_entry_count += 1
 	_clear_content()
 	_content.add_theme_constant_override("separation", 4)
 	var progress: Dictionary = _app.call("get_save_data")
@@ -472,8 +477,7 @@ func _show_run_intro(tabletop: Control, board: Control) -> void:
 		note.anchor_position.x = RUN_BOARD_SCENE.PAGE_INSET.x + RUN_BOARD_SCENE.MAP_SIZE.x - RUN_BOARD_INTRO.NOTE_RECT.size.x - RUN_BOARD_INTRO.EDGE_MARGIN
 	_run_intro = note
 	note.dismissed.connect(func() -> void:
-		_run_intro = null
-		_app.call("dismiss_run_intro"))
+		_run_intro = null)
 	tabletop.add_child(note)
 	board.connect("stop_selected", note.dismiss.unbind(1))
 	for node: Node in _content.find_children("*", "Button", true, false):
@@ -556,6 +560,12 @@ func _link_board_focus(stop_id: String) -> void:
 func _go_to_run_stop(stop_id: String, play_confirm: bool) -> void:
 	if _run_going or not is_instance_valid(_run_board) or not _run_board.is_reachable(stop_id):
 		return
+	if is_instance_valid(_driving_intro):
+		return
+	var session: RunSession = _app.call("current_run_session")
+	if session != null and String(session.current_map.get_node(stop_id).get("type", "")) in ["race", "rival", "act_rival"] and not bool((_app.call("get_save_data") as Dictionary).get("run_intro_seen", true)):
+		_show_driving_intro(stop_id, play_confirm)
+		return
 	_run_going = true
 	if play_confirm:
 		_play_ui_confirm()
@@ -574,6 +584,31 @@ func _go_to_run_stop(stop_id: String, play_confirm: bool) -> void:
 	_on_run_node_pressed(stop_id)
 	if generation == _entrance_generation and is_instance_valid(_run_board):
 		_run_board.reset_token()
+
+
+func _show_driving_intro(stop_id: String, play_confirm: bool) -> void:
+	_dismiss_run_intro()
+	_screen = "run_driving_intro"
+	var screen := RUN_BOARD_INTRO.build_driving_screen(_reduced_motion_enabled())
+	_driving_intro = screen
+	screen.ready_to_race.connect(func() -> void:
+		_app.call("dismiss_run_intro")
+		_close_driving_intro()
+		_screen = "run_board"
+		_go_to_run_stop(stop_id, play_confirm))
+	screen.back_requested.connect(func() -> void:
+		_close_driving_intro()
+		_screen = "run_board"
+		if is_instance_valid(_run_board):
+			_run_board.marker(stop_id).grab_focus())
+	_root.add_child(screen)
+
+
+func _close_driving_intro() -> void:
+	if is_instance_valid(_driving_intro):
+		_driving_intro.get_parent().remove_child(_driving_intro)
+		_driving_intro.queue_free()
+	_driving_intro = null
 
 
 func _run_surface() -> void:
@@ -1498,6 +1533,8 @@ func _leave_save_error() -> void:
 
 func go_back() -> void:
 	match _screen:
+		"run_driving_intro":
+			_driving_intro.call("cancel")
 		"title":
 			return
 		"map", "settings", "credits", "reset_confirmation", "quick_race", "quick_strip":
@@ -1619,6 +1656,8 @@ func _apply_compact_button_art(button: Button) -> void:
 
 
 func _clear_content() -> void:
+	if is_instance_valid(_driving_intro):
+		_close_driving_intro()
 	_dismiss_run_intro()
 	_page.add_theme_constant_override("margin_left", PAGE_MARGIN)
 	_page.add_theme_constant_override("margin_right", PAGE_MARGIN)
@@ -1682,7 +1721,6 @@ func _on_art_action(action: StringName) -> void:
 		&"new_run":
 			_on_new_run_pressed()
 		&"your_run":
-			_app.call("dismiss_run_intro")
 			show_run_board()
 		&"quick_race":
 			_app.call("open_quick_race")
