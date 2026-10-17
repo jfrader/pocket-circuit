@@ -68,10 +68,15 @@ func _test_valid_runs() -> void:
 func _test_haul_validation() -> void:
 	var session := SESSION.create(33333)
 	var base := SESSION.serialize(session)
-	var fields := ["boot_cars", "impounded_cars", "pending_chaser", "pending_offer_driver", "pending_offer_points", "tow_count", "nitro_count"]
+	var fields := ["boot_cars", "impounded_cars", "pending_chaser", "pending_offer_driver", "pending_offer_points", "tow_count", "nitro_count", "towed_to_bench"]
 	for key: String in fields:
 		base.erase(key)
 	var legacy := SESSION.deserialize(base)
+	_expect(legacy != null and not legacy.towed_to_bench, "legacy saves have no reserved tow bench")
+	for bad: Variant in [1, "true", null, {}, []]:
+		var broken := base.duplicate(true)
+		broken["towed_to_bench"] = bad
+		_expect(SESSION.deserialize(broken) == null, "tow rescue flag must be boolean")
 	_expect(legacy != null and legacy.boot_cars.is_empty() and legacy.impounded_cars.is_empty() and legacy.pending_chaser == null and legacy.tow_count == 0 and legacy.nitro_count == 0, "legacy haul fields normalize cold and empty")
 	for key: String in ["tow_count", "nitro_count", "pending_offer_points"]:
 		for bad: Variant in [-1, 0.5, true, "1", {}, INF, 0x80000000]:

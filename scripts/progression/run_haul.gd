@@ -115,6 +115,15 @@ static func spend_consumable(sess, field: String) -> bool:
 	sess.set(field, current - 1)
 	return true
 
+static func buy_consumable(sess, field: String, price: int) -> bool:
+	if sess.van_offer_consumables().is_empty() or sess.run_points < price:
+		return false
+	if not add_consumable(sess, field, 1):
+		return false
+	sess.run_points -= price
+	sess.resolved_nodes[sess.current_node_id] = true
+	return true
+
 static func serialize(sess) -> Dictionary:
 	return {
 		"boot_cars": sess.boot_cars.duplicate(true),
@@ -124,6 +133,7 @@ static func serialize(sess) -> Dictionary:
 		"pending_offer_points": sess.pending_offer_points,
 		"tow_count": sess.tow_count,
 		"nitro_count": sess.nitro_count,
+		"towed_to_bench": sess.towed_to_bench,
 	}
 
 ## Assign only after the entire new block passes. Missing fields are legacy cold state.
@@ -133,6 +143,8 @@ static func deserialize(sess, data: Dictionary) -> bool:
 	var offer_driver: Variant = data.get("pending_offer_driver", {})
 	var chaser: Variant = data.get("pending_chaser")
 	if boot is not Dictionary or impounded is not Array or offer_driver is not Dictionary:
+		return false
+	if data.get("towed_to_bench", false) is not bool:
 		return false
 	for key: String in ["tow_count", "nitro_count"]:
 		if not MAP.is_integer(data.get(key, 0), 0, MAX_CONSUMABLES):
@@ -187,6 +199,7 @@ static func deserialize(sess, data: Dictionary) -> bool:
 	sess.pending_chaser = chaser.duplicate(true) if chaser != null else null
 	sess.tow_count = int(data.get("tow_count", 0))
 	sess.nitro_count = int(data.get("nitro_count", 0))
+	sess.towed_to_bench = data.get("towed_to_bench", false)
 	return true
 
 static func _is_won(sess, vid: Variant) -> bool:

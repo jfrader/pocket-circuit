@@ -14,7 +14,7 @@ const LIVE_EDGE := Color("657587")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const ROOMS := {1: "Kitchen Counter", 2: "Workshop Bench", 3: "Office Desk"}
 const TYPES := {
-	"race": {"name": "Race", "cost": "wear", "copy": "Four cars on a rolled circuit.", "icon": preload("res://assets/ui/run_map/node_race.svg")},
+	"race": {"name": "Race", "cost": "wear", "copy": "Six cars on a rolled circuit.", "icon": preload("res://assets/ui/run_map/node_race.svg")},
 	"rival": {"name": "Rival", "cost": "points or wear", "copy": "One on one, with contact. Win and their car is yours.", "icon": preload("res://assets/ui/run_map/node_rival.svg")},
 	"bench": {"name": "Bench", "cost": "the visit", "copy": "Repair, fit a part, bank the haul or swap cars. One per visit.", "icon": preload("res://assets/ui/run_map/node_bench.svg")},
 	"parts_van": {"name": "Parts van", "cost": "points", "copy": "Buy one part. Every part has a downside.", "icon": preload("res://assets/ui/run_map/node_parts_van.svg")},
