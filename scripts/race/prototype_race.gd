@@ -253,7 +253,7 @@ func _prepare_race_async() -> void:
 	add_child(preparation)
 	app.call("set_loading_section", 1)
 	await _loading_step("Generating a legal circuit")
-	if String(event.get("circuit", "")) == "generated":
+	if String(event.get("circuit", "")) in ["generated", "authored"]:
 		var key := _circuit_cache_key(event)
 		var prepared: Dictionary = {}
 		var used_cached_prepared := false
@@ -808,7 +808,7 @@ func _configure_track_variant() -> bool:
 	var requested_theme := StringName(event.get("theme", "kitchen"))
 	var scene_path := ""
 	var packed: PackedScene = null
-	if String(event.get("circuit", "")) == "generated":
+	if String(event.get("circuit", "")) in ["generated", "authored"]:
 		var circuit_room := StringName(event.get("room", "classic"))
 		var circuit_seed := int(event.get("seed", 0))
 		var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed, _track_generation_options(event))
