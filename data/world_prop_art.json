@@ -6868,5 +6868,360 @@
       256
     ],
     "average_color": "#40372d"
+  },
+  {
+    "id": "basement_boiler",
+    "themes": [
+      "basement"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 650,
+    "outputs": [
+      "giant_props/basement_boiler.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 3,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 1,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "rusted boiler tank from authorized basement sheet",
+    "source": {
+      "path": "basement/boiler_keyed.png",
+      "columns": 1,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      582.0896,
+      650.0
+    ],
+    "width_mm": 582.0896,
+    "content_bounds_px": [
+      166,
+      155,
+      180,
+      201
+    ],
+    "average_color": "#6d4f41",
+    "scenery": true
+  },
+  {
+    "id": "basement_pipes",
+    "themes": [
+      "basement"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 320,
+    "outputs": [
+      "giant_props/basement_pipes.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 3,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "coiled copper pipe; sheet has no straight pipe section",
+    "source": {
+      "path": "basement/pipes_keyed.png",
+      "columns": 1,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      320.0,
+      311.5789
+    ],
+    "width_mm": 311.5789,
+    "content_bounds_px": [
+      161,
+      163,
+      190,
+      185
+    ],
+    "average_color": "#714938",
+    "scenery": true
+  },
+  {
+    "id": "basement_boxes",
+    "themes": [
+      "basement"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "support"
+    ],
+    "length_mm": 400,
+    "outputs": [
+      "giant_props/basement_boxes.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 3,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "stack of cardboard storage boxes",
+    "source": {
+      "path": "basement/boxes_keyed.png",
+      "columns": 1,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      376.3547,
+      400.0
+    ],
+    "width_mm": 376.3547,
+    "content_bounds_px": [
+      160,
+      154,
+      191,
+      203
+    ],
+    "average_color": "#6b4731",
+    "scenery": true
+  },
+  {
+    "id": "basement_bulb",
+    "themes": [
+      "basement"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "micro"
+    ],
+    "length_mm": 90,
+    "outputs": [
+      "edge_dressing/basement_bulb.png"
+    ],
+    "scale_tier": "micro",
+    "visual_weight": 1,
+    "detail_tier": "silhouette",
+    "zones": [
+      "island",
+      "apron"
+    ],
+    "clearance_mm": 36,
+    "max_repeats": 3,
+    "collision": "alpha",
+    "shadow": "contact",
+    "description": "lit inspection bulb with coiled electrical lead",
+    "source": {
+      "path": "basement/bulb_keyed.png",
+      "columns": 1,
+      "cell": 0
+    },
+    "dimensions_mm": [
+      67.1053,
+      90.0
+    ],
+    "width_mm": 67.1053,
+    "content_bounds_px": [
+      171,
+      142,
+      170,
+      228
+    ],
+    "average_color": "#705a40",
+    "scenery": true
+  },
+  {
+    "id": "basement_puddle",
+    "themes": [
+      "basement"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 350,
+    "outputs": [
+      "ground_dressing/basement_puddle.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 3,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "dark violet basement puddle",
+    "source": {
+      "prepared": "ground_dressing/basement_puddle.png",
+      "generator": "basement/prepare_source.py"
+    },
+    "dimensions_mm": [
+      350.0,
+      253.4483
+    ],
+    "width_mm": 253.4483,
+    "content_bounds_px": [
+      153,
+      182,
+      203,
+      147
+    ],
+    "average_color": "#241b2b",
+    "scenery": true
+  },
+  {
+    "id": "basement_oil_stain",
+    "themes": [
+      "basement"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 300,
+    "outputs": [
+      "ground_dressing/basement_oil_stain.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 2,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 3,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "iridescent oil stain",
+    "source": {
+      "prepared": "ground_dressing/basement_oil_stain.png",
+      "generator": "basement/prepare_source.py"
+    },
+    "dimensions_mm": [
+      300.0,
+      188.8325
+    ],
+    "width_mm": 188.8325,
+    "content_bounds_px": [
+      158,
+      193,
+      197,
+      124
+    ],
+    "average_color": "#1f1813",
+    "scenery": true
+  },
+  {
+    "id": "basement_cobweb",
+    "themes": [
+      "basement"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "roles": [
+      "ground"
+    ],
+    "length_mm": 280,
+    "outputs": [
+      "ground_dressing/basement_cobweb.png"
+    ],
+    "scale_tier": "hero",
+    "visual_weight": 1,
+    "detail_tier": "broad",
+    "zones": [
+      "island",
+      "room"
+    ],
+    "clearance_mm": 18,
+    "max_repeats": 3,
+    "collision": "flat",
+    "shadow": "flat",
+    "description": "fine cobweb strands extracted from the sheet's textured matte",
+    "source": {
+      "prepared": "ground_dressing/basement_cobweb.png"
+    },
+    "dimensions_mm": [
+      241.8182,
+      280.0
+    ],
+    "width_mm": 241.8182,
+    "content_bounds_px": [
+      142,
+      124,
+      228,
+      264
+    ],
+    "average_color": "#9b9291",
+    "scenery": true
+  },
+  {
+    "id": "basement_floor_grain",
+    "themes": [
+      "basement"
+    ],
+    "style": "overhead_gouache_v1",
+    "perspective": "orthographic_overhead",
+    "kind": "material",
+    "roles": [
+      "surface"
+    ],
+    "length_mm": 700,
+    "zones": [
+      "floor",
+      "island"
+    ],
+    "visual_weight": 0,
+    "detail_tier": "quiet",
+    "scale_tier": "surface",
+    "collision": "flat",
+    "shadow": "none",
+    "max_repeats": 1,
+    "clearance_mm": 0,
+    "scenery": false,
+    "source": {
+      "prepared": "world_materials/basement_concrete.png",
+      "generator": "basement/prepare_source.py"
+    },
+    "outputs": [
+      "world_materials/basement_concrete.png"
+    ],
+    "dimensions_mm": [
+      700.0,
+      700.0
+    ],
+    "width_mm": 700.0,
+    "content_bounds_px": [
+      0,
+      0,
+      512,
+      512
+    ],
+    "average_color": "#90968e"
   }
 ]
