@@ -31,12 +31,12 @@ const CAR_ORIGIN_LOCKUP := "lockup"
 const NO_ROLL := {"speed": 0.0, "accel": 0.0, "grip": 0.0, "drift": 0.0, "boost": 0.0, "tough": 0.0}
 
 const RUN_POINTS_BY_FINISH: Dictionary = {
-	1: 10,
-	2: 7,
-	3: 5,
-	4: 3,
-	5: 2,
-	6: 1,
+	1: 6,
+	2: 4,
+	3: 3,
+	4: 2,
+	5: 1,
+	6: 0,
 }
 
 ## Run session layer: pure logic over the run map + run state. No UI, no
