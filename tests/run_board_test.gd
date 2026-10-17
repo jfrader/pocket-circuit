@@ -103,6 +103,11 @@ func _run_test() -> void:
 	# Leaving the board while the car drives drops that go, and going still works after.
 	go.pressed.emit()
 	await process_frame
+	var ready := shell.find_child("DrivingReady", true, false) as Button
+	if not _expect(ready != null and (app.get("current_race_session") as Dictionary).is_empty(), "first confirmed travel waits for driving READY before starting"):
+		return
+	ready.pressed.emit()
+	await process_frame
 	shell.call("show_title")
 	await _settle_travel()
 	if not _expect(String((app.get("current_race_session") as Dictionary).get("run_node_id", "")).is_empty() and not bool(shell.get("_run_going")), "leaving the board on the way drops the go"):

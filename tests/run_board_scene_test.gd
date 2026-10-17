@@ -297,7 +297,7 @@ func _test_intro(app: Node, shell: CanvasLayer) -> bool:
 		return false
 	var store: SaveStore = app.get("_save_store")
 	var loaded := SAVE_STORE.new(store.save_path).load_data()
-	if not _expect(bool(loaded.get("run_intro_seen", false)), "dismissal is written to the profile save"):
+	if not _expect(not bool(loaded.get("run_intro_seen", true)), "dismissing the board note leaves driving controls unseen on disk"):
 		return false
 	app.set("_save_data", loaded)
 	app.set("_current_run_session", RunSession.deserialize(loaded["current_run"]))
@@ -305,6 +305,18 @@ func _test_intro(app: Node, shell: CanvasLayer) -> bool:
 	await process_frame
 	if not _expect(shell.find_child("RunIntro", true, false) == null, "save/load never reopens the dismissed note"):
 		return false
+	session = app.call("current_run_session")
+	shell.call("_go_to_run_stop", session.current_node_id, false)
+	await process_frame
+	var ready := shell.find_child("DrivingReady", true, false) as Button
+	if not _expect(ready != null, "unseen driving controls appear when the opening race is confirmed"):
+		return false
+	ready.pressed.emit()
+	await create_timer(MAP_VIEW.TRAVEL_TIME + 0.3).timeout
+	loaded = SAVE_STORE.new(store.save_path).load_data()
+	if not _expect(bool(loaded.get("run_intro_seen", false)), "READY writes the intro flag to the profile save"):
+		return false
+	app.call("report_race_result", 1, 1.0, [], false, {})
 	if not _expect(bool(app.call("confirm_new_championship")) and bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", false)), "championship reset preserves the additive intro flag"):
 		return false
 	shell.call("_on_art_action", &"new_run")
@@ -328,7 +340,7 @@ func _test_intro(app: Node, shell: CanvasLayer) -> bool:
 			(board.call("marker", id) as Button).grab_focus()
 			break
 	await process_frame
-	if not _expect(shell.find_child("RunIntro", true, false) == null and bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", false)), "focus travel dismisses the static intro and marks it seen"):
+	if not _expect(shell.find_child("RunIntro", true, false) == null and not bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", true)), "focus travel dismisses the static board note without marking driving controls seen"):
 		return false
 	fresh = (app.call("get_save_data") as Dictionary).duplicate(true)
 	fresh["run_intro_seen"] = false
@@ -346,14 +358,14 @@ func _test_intro(app: Node, shell: CanvasLayer) -> bool:
 		move.pressed = down
 		Input.parse_input_event(move)
 		await process_frame
-	if not _expect(shell.find_child("RunIntro", true, false) == null and board.call("selected_id") != preview and bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", false)), "first directional input dismisses without consuming the board's focus movement"):
+	if not _expect(shell.find_child("RunIntro", true, false) == null and board.call("selected_id") != preview and not bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", true)), "first directional input dismisses without consuming focus movement or marking controls seen"):
 		return false
 	fresh = (app.call("get_save_data") as Dictionary).duplicate(true)
 	fresh["run_intro_seen"] = false
 	app.set("_save_data", fresh)
 	shell.call("_on_art_action", &"your_run")
 	await process_frame
-	return _expect(shell.find_child("RunIntro", true, false) == null and bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", false)), "resuming an existing run skips and retires an unseen intro")
+	return _expect(shell.find_child("RunIntro", true, false) == null and not bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", true)), "resuming skips the board note but preserves unseen driving controls")
 
 
 func _expect_ending(shell: CanvasLayer, mode: StringName, hero_name: String, tint: Color) -> bool:
