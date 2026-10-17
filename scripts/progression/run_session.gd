@@ -590,6 +590,14 @@ func won_cars() -> Array[Dictionary]:
 			out.append(car)
 	return out
 
+func bench_swap(car_key: String) -> bool:
+	if not _can_do_bench_action(car_key) or car_key == current_car_id or not owned_cars.has(car_key):
+		return false
+	current_car_id = car_key
+	bench_action_done = true
+	return true
+
+
 func bench_repair(car_key: String) -> bool:
 	var can: bool = _can_do_bench_action(car_key)
 	if not can:
