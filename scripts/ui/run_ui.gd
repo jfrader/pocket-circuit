@@ -215,6 +215,8 @@ static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -
 	var rows: Array = []
 	if not circuit.is_empty():
 		rows.append(["CIRCUIT", "%s · %s" % [String(circuit.get("display_name", "")), "reverse" if bool(circuit.get("reverse", false)) else "forward"]])
+		if circuit.has("authored_route"):
+			rows.append(["LENGTH", String(circuit.get("length_tier", "standard"))])
 	var pays := PackedStringArray()
 	for place: int in RunSession.RUN_POINTS_BY_FINISH:
 		pays.append(str(RunSession.RUN_POINTS_BY_FINISH[place]))

@@ -22,6 +22,7 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
 const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
 const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
+const RUN_FINALE := preload("res://scripts/race/run_finale_circuit.gd")
 ## Every race fields the player plus three opponents.
 const ROSTER_SIZE := 3
 const RUN_ACT_RIVAL_DIFFICULTY := "clockwork"
@@ -1743,7 +1744,8 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 	DRIVER_DIRECTORY.install_opponents(roster.get("opponents", []))
 	var opponents: Array = _roster_ids(roster)
 	var event_id: String = "run_%s" % target_id
-	var event := _event_with_generated_identity({"opponents": opponents}, circuit)
+	var finale := RUN_FINALE.is_finale(_current_run_session.current_map.act, node)
+	var event := RUN_FINALE.event() if finale else _event_with_generated_identity({"opponents": opponents}, circuit)
 	if event.is_empty():
 		last_run_error = "circuit could not be drawn"
 		return false
@@ -1781,6 +1783,8 @@ func run_stop_opponents(stop_id: String) -> Dictionary:
 ## same circuit; different stops and acts get different ones.
 func _run_circuit(stop_id: String) -> Dictionary:
 	var act := _current_run_session.current_map.act
+	if RUN_FINALE.is_finale(act, _current_run_session.current_map.get_node(stop_id)):
+		return RUN_FINALE.identity()
 	var seed := _current_run_session.circuit_seed(stop_id)
 	return GENERATED_CIRCUITS.create(
 		StringName(CATALOG.get_act(act)["id"]),
