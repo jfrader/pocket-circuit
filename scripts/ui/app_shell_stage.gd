@@ -339,7 +339,7 @@ func _draw_turntable(center: Vector2, radius: float) -> void:
 
 
 func _draw_shape_card(rect: Rect2) -> void:
-	CarShapeView.draw_card(self, rect, _blended_shape(), shape, compare_shape, compare_label)
+	CarShapeView.draw_card(self, rect, _blended_shape(), shape, compare_shape, compare_label, 0.0, mode == &"vehicle")
 
 
 func _draw_track_card(rect: Rect2, room: String) -> void:

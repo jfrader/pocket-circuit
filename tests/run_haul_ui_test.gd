@@ -30,9 +30,13 @@ func _run() -> void:
 	_button("ActionTakeOffer").pressed.emit()
 	_expect(sess.pending_chaser != null and sess.boot_cars.has(won), "hot button invokes domain")
 	var destination := String(sess.available_nodes()[0]["id"])
+	var board := _shell.get("_run_board") as Control
+	var token := board.get_node("CarToken") as Control
+	var token_position := token.position
 	_shell.call("_go_to_run_stop", destination, false)
 	var contract: Dictionary = _app.get("current_race_session")
-	_expect(contract.get("mode") == "chase_sprint" and contract.get("vehicle_id") == won and contract.get("event", {}).get("race_format") == "strip", "hot travel starts strip sprint instead of tween")
+	_expect(contract.get("mode") == "chase_sprint" and contract.get("vehicle_id") == won and contract.get("event", {}).get("race_format") == "strip", "hot edge starts strip sprint immediately instead of waiting for travel")
+	_expect(not bool(board.get("_travelling")) and token.position == token_position, "hot sprint is the connector, without a map travel tween")
 	_expect(contract.get("chaser", {}).get("vehicle_id") == sess.pending_chaser["chase_vehicle_id"], "sprint uses robbed driver's spare")
 	_app.call("resolve_run_sprint", "RESCUED", {"terminal": false})
 	_expect(sess.boot_cars.has(won) and sess.pending_chaser != null, "rescue keeps driving")

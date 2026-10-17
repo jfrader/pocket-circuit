@@ -77,6 +77,8 @@ func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustb
 	_label("CIRCUIT", Rect2(COLUMN_X - 4, 124, 580, 116), 100, SKIN.YELLOW)
 	_tape("GRAND HOUSEHOLD CIRCUIT", Vector2(COLUMN_X + 6, 246), SKIN.ORANGE, 17)
 	var status := "CONTINUE YOUR RUN" if has_run else "TINY RACING. BIG STAKES."
+	if has_progress and not has_run:
+		status = "CONTINUE YOUR CHAMPIONSHIP"
 	if not recovery_message.is_empty():
 		status = recovery_message
 	elif read_only:
@@ -218,10 +220,11 @@ func _choose_vehicle(id: String) -> void:
 	_stage.configure(&"vehicle", id, "rae", "kitchen", "", _unlocked)
 	_vehicle_name.text = String(vehicle["name"]).to_upper()
 	_archetype.text = String(vehicle["archetype"]).to_upper()
-	var origin := String(vehicle.get("won_from", ""))
-	_origin.visible = RUN_UI.ORIGIN_COPY.has(origin)
+	var collected := VehicleDirectory.get_vehicle(id)
+	var origin := String(collected.get("won_from", vehicle.get("won_from", "")))
+	_origin.visible = id != _holding_id and RUN_UI.ORIGIN_COPY.has(origin)
 	if _origin.visible:
-		_origin.text = RUN_UI.origin_line(vehicle)
+		_origin.text = RUN_UI.origin_line(collected if not collected.is_empty() else vehicle)
 		_origin.reset_size()
 	_profile.position.y = PROFILE_TOP + (ORIGIN_DROP if _origin.visible else 0.0)
 	var tradeoff := String(vehicle.get("tradeoff", ""))

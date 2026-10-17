@@ -1560,6 +1560,10 @@ func quick_race_roster() -> Array[String]:
 	ids.append_array(garage_car_ids())
 	for car: Dictionary in _save_data.get("steam_cars", []):
 		ids.append(String(car["id"]))
+	var held := {}
+	for id: String in ids:
+		held[id] = true
+	ids.assign(held.keys())
 	return CATALOG.garage_order(ids)
 
 
