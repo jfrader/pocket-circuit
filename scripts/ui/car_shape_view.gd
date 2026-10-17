@@ -20,6 +20,9 @@ const HEADER_TAPE_ANGLE := -0.03
 const AXIS_LABEL_GAP := 22.0
 const AXIS_FONT_SIZE := 12
 const DELTA_BASELINE := 18.0
+const DELTA_CAPTION := "SHAPE DELTAS, NOT PERCENTAGES"
+const CAPTION_FONT_SIZE := 10
+const CAPTION_GAP := 4.0
 
 var shape: Dictionary = {}
 var compare_shape: Dictionary = {}
@@ -61,6 +64,8 @@ static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: 
 	var header := header_geometry(rect, title)
 	SKIN.draw_tape(item, header.tape_center, header.tape_size, HEADER_TAPE_ANGLE)
 	SKIN.draw_text(item, header.text_position, title, HEADER_FONT_SIZE, SKIN.INK, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
+	var caption := caption_geometry(rect)
+	SKIN.draw_text(item, caption.text_position, caption.text, CAPTION_FONT_SIZE, SKIN.CREAM_DIM, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER, false)
 	if shown.is_empty():
 		return
 	var plot := plot_geometry(rect, bottom_padding)
@@ -94,6 +99,18 @@ static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: 
 		var delta := roundi((float(target.get(axis, 0.0)) - float(compare.get(axis, 0.0))) * 100.0)
 		if delta != 0:
 			SKIN.draw_text(item, at + Vector2(-40.0, DELTA_BASELINE), "%+d" % delta, AXIS_FONT_SIZE, SKIN.LIME if delta > 0 else SKIN.RED, 80.0, HORIZONTAL_ALIGNMENT_CENTER, false)
+
+
+static func caption_geometry(rect: Rect2) -> Dictionary:
+	var font := ThemeDB.fallback_font
+	var ascent := font.get_ascent(CAPTION_FONT_SIZE)
+	var descent := font.get_descent(CAPTION_FONT_SIZE)
+	var width := font.get_string_size(DELTA_CAPTION, HORIZONTAL_ALIGNMENT_LEFT, -1, CAPTION_FONT_SIZE).x
+	return {
+		"text": DELTA_CAPTION,
+		"text_position": Vector2(rect.position.x, rect.end.y + CAPTION_GAP + ascent),
+		"bounds": Rect2(Vector2(rect.get_center().x - width * 0.5, rect.end.y + CAPTION_GAP), Vector2(width, ascent + descent)),
+	}
 
 
 static func plot_geometry(rect: Rect2, bottom_padding: float = 0.0) -> Dictionary:
