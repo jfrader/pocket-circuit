@@ -187,7 +187,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_race_vehicle_id.is_empty():
 		_quick_race_vehicle_id = _selected_vehicle(progress)
-	_configure_stage(&"map", _quick_race_vehicle_id, "rae", String(_quick_race_theme))
+	_stage.hide()
 	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
 	if _app.has_method("prewarm_generated_circuit"):
@@ -195,7 +195,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
 	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
 	_content.add_child(_quick_identity_heading)
-	_quick_identity_summary = _label(String(quick_identity.get("summary", "")), 13, SKIN.CREAM_DIM)
+	_quick_identity_summary = _label(_quick_preview_summary(quick_identity), 13, SKIN.CREAM_DIM)
 	_quick_identity_summary.name = "QuickCircuitSummary"
 	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
 	_content.add_child(_quick_identity_summary)
@@ -203,7 +203,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	var play_button := _add_big_play_button(Callable(self, "_start_quick_race"), false)
 	var seed_controls: Array[Control] = []
 	if OS.is_debug_build():
-		var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
+		var seed_status := _add_section("DEVELOPER SEED", "SEED %d" % _quick_race_seed)
 		seed_controls = _add_quick_race_seed_controls(seed_status)
 	_add_button("CHANGE CAR · %s" % String(CATALOG.get_vehicle(_quick_race_vehicle_id).get("name", "Rustbug")).to_upper(), Callable(self, "show_vehicle_select").bind("", true))
 	_add_button("BACK TO TITLE", Callable(self, "show_title"))
@@ -230,13 +230,13 @@ func show_quick_strip(_requested_act: int = 0) -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_strip_vehicle_id.is_empty():
 		_quick_strip_vehicle_id = _selected_vehicle(progress)
-	_configure_stage(&"map", _quick_strip_vehicle_id, "rae", String(_quick_race_theme))
+	_stage.hide()
 	_add_kicker("QUICK STRIP · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
 	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
 	_content.add_child(_quick_identity_heading)
-	_quick_identity_summary = _label(String(quick_identity.get("summary", "")), 13, SKIN.CREAM_DIM)
+	_quick_identity_summary = _label(_quick_preview_summary(quick_identity), 13, SKIN.CREAM_DIM)
 	_quick_identity_summary.name = "QuickCircuitSummary"
 	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
 	_content.add_child(_quick_identity_summary)
@@ -244,7 +244,7 @@ func show_quick_strip(_requested_act: int = 0) -> void:
 	var play_button := _add_big_play_button(Callable(self, "_start_quick_strip"), false)
 	var seed_controls: Array[Control] = []
 	if OS.is_debug_build():
-		var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
+		var seed_status := _add_section("DEVELOPER SEED", "SEED %d" % _quick_race_seed)
 		seed_controls = _add_quick_race_seed_controls(seed_status)
 	_add_button("CHANGE CAR · %s" % String(CATALOG.get_vehicle(_quick_strip_vehicle_id).get("name", "Rustbug")).to_upper(), Callable(self, "show_vehicle_select").bind("", true))
 	_add_button("BACK TO TITLE", Callable(self, "show_title"))
@@ -2195,8 +2195,7 @@ func _commit_quick_race_seed_text(text: String, seed_edit: LineEdit, seed_status
 func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 	_quick_race_room = StringName(_app.call("circuit_room_for_seed", _quick_race_seed))
 	seed_edit.text = str(_quick_race_seed)
-	seed_status.text = "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()]
-	_configure_stage(&"map", _quick_race_vehicle_id, "rae", String(_quick_race_theme))
+	seed_status.text = "SEED %d" % _quick_race_seed
 	_refresh_quick_identity_labels()
 
 
@@ -2228,7 +2227,14 @@ func _refresh_quick_identity_labels() -> void:
 	if is_instance_valid(_quick_identity_heading):
 		_quick_identity_heading.text = String(identity.get("display_name", "Build a circuit"))
 	if is_instance_valid(_quick_identity_summary):
-		_quick_identity_summary.text = String(identity.get("summary", ""))
+		_quick_identity_summary.text = _quick_preview_summary(identity)
+
+
+func _quick_preview_summary(identity: Dictionary) -> String:
+	var rooms := String(identity.get("theme", _quick_race_theme)).capitalize()
+	if String(identity.get("route_shape", "circuit")) == "strip":
+		rooms += " → " + String(identity.get("theme_b", "")).capitalize()
+	return "%s · %s" % [rooms, String(identity.get("length_tier", _quick_race_length_tier)).capitalize()]
 
 
 func _roll_quick_race() -> void:
