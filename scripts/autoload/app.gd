@@ -1855,6 +1855,10 @@ func run_bench_bank_haul() -> bool:
 	return _run_seam("", "bench", func() -> bool: return _current_run_session.bench_bank_haul())
 
 
+func run_bench_swap(car_key: String) -> bool:
+	return _run_seam("", "bench", func() -> bool: return _current_run_session.bench_swap(car_key))
+
+
 func run_ransom_car(vehicle_id: String) -> bool:
 	return _run_seam("", "parts_van", func() -> bool: return _current_run_session.ransom_car(vehicle_id))
 

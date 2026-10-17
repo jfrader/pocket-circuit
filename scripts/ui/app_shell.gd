@@ -862,7 +862,7 @@ func show_run_bench() -> void:
 	header.add_child(heading)
 	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
 	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["bench"]["name"]), 30, SKIN.CREAM))
-	var copy := RUN_UI.label(String(RUN_UI.TYPES["bench"]["copy"]), 16, SKIN.CREAM)
+	var copy := RUN_UI.label("One action per visit.", 16, SKIN.CREAM)
 	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	heading.add_child(copy)
 	_run_stats(heading, sess)
@@ -898,10 +898,41 @@ func show_run_bench() -> void:
 		_add_run_button(card[1], fit, Callable(self, "_on_bench_fit_pressed").bind(index), "BenchFit_%d" % index)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	RUN_BENCH_SCENE.dress_button(actions.get_child(1) as Button)
+	var extra_actions := HBoxContainer.new()
+	extra_actions.add_theme_constant_override("separation", 12)
+	extra_actions.visible = not sess.boot_cars.is_empty() or (not used and sess.owned_cars.size() > 1)
+	left.add_child(extra_actions)
+	_run_actions = extra_actions
 	if not sess.boot_cars.is_empty():
-		_run_actions = left
 		_run_action("BANK THE HAUL", Callable(self, "_on_bench_bank_pressed"), false, used, "BenchBankHaul")
-		RUN_BENCH_SCENE.dress_button(left.get_child(left.get_child_count() - 1) as Button)
+		RUN_BENCH_SCENE.dress_button(extra_actions.get_child(extra_actions.get_child_count() - 1) as Button)
+	if not used and sess.owned_cars.size() > 1:
+		var spares := RUN_UI.parts_card("SWAP CAR")
+		spares[0].name = "BenchSwapCars"
+		spares[0].custom_minimum_size = card[0].custom_minimum_size
+		spares[0].size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		spares[0].add_theme_stylebox_override("panel", paper.duplicate())
+		RUN_MATERIALS.finish_panel(spares[0] as PanelContainer)
+		RUN_BOARD_SCENE.ink_labels(spares[0])
+		columns.add_child(spares[0])
+		spares[0].hide()
+		for vehicle_id: String in sess.owned_cars:
+			if vehicle_id == sess.current_car_id:
+				continue
+			var choice := RUN_UI.action(RUN_UI.car_name(vehicle_id))
+			choice.icon = IDENTITIES.car_texture(vehicle_id)
+			choice.expand_icon = true
+			choice.add_theme_constant_override("icon_max_width", 64)
+			choice.custom_minimum_size = Vector2(340, 80)
+			RUN_BENCH_SCENE.dress_button(choice)
+			_add_run_button(spares[1], choice, Callable(self, "_on_bench_swap_pressed").bind(vehicle_id), "BenchSwapCar_%d" % spares[1].get_child_count())
+		_run_action("SWAP CAR", func() -> void:
+			card[0].visible = not card[0].visible
+			spares[0].visible = not card[0].visible
+			if spares[0].visible:
+				(spares[1].get_child(0) as Button).grab_focus()
+		, false, false, "BenchSwap")
+		RUN_BENCH_SCENE.dress_button(extra_actions.get_child(extra_actions.get_child_count() - 1) as Button)
 	var legend := RUN_UI.legend(sess.current_map)
 	RUN_BOARD_SCENE.chalk_labels(legend)
 	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
@@ -1138,6 +1169,12 @@ func _on_bench_repair_pressed() -> void:
 func _on_bench_bank_pressed() -> void:
 	_play_ui_confirm()
 	if bool(_app.call("run_bench_bank_haul")):
+		show_run_board()
+
+
+func _on_bench_swap_pressed(vehicle_id: String) -> void:
+	_play_ui_confirm()
+	if bool(_app.call("run_bench_swap", vehicle_id)):
 		show_run_board()
 
 

@@ -130,6 +130,7 @@ func _check_bench_and_van() -> void:
 	if not _expect(_walk_to(sess, "bench"), "a route reaches a bench"):
 		return
 	var car: String = sess.current_car_id
+	sess.run_state.set_car_wear(car, "rusty")
 	if not _expect(sess.bench_repair(car), "repair at the bench"):
 		return
 	sess.parts_held.append(RunParts.deal(1, sess.car_stats(car))[0])
