@@ -42,6 +42,9 @@
 - The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
+- Abandoning a run presents reachable confirmation choices; KEEP DRIVING restores focus to ABANDON RUN.
+- Six-car race results keep the save status and points above CONTINUE without overlapping or repeating the action.
+- Parts vans expose tow and nitro purchases and save the inventory change.
 - Car comparison headings stay inside their offer and garage cards.
 - Unused run stops stay open after Back or a restart until you choose the next route.
 - Run-only parts no longer follow won cars into Quick Race after the night ends.

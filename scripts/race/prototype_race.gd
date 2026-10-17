@@ -147,7 +147,7 @@ var _countdown_label: Label
 var _race_flash_label: Label
 var _race_hud: RaceHUD
 var _position_label: Label
-var _results_panel: Panel
+var _results_panel: PanelContainer
 var _results_label: Label
 var _retry_button: Button
 var _mastery_button: Button
@@ -697,7 +697,6 @@ func _on_sprint_outcome(value: String, data: Dictionary) -> void:
 	if bool(data.get("terminal", false)):
 		_on_strip_outcome(value, float(data["elapsed"]))
 		_retry_button.visible = false
-		_layout_result_actions(false)
 		_results_label.text = "%s\n\n%s" % [value, _format_time(float(data["elapsed"]))]
 		_continue_button.grab_focus()
 	sprint_resolved.emit(value, data)
@@ -721,7 +720,7 @@ func _on_strip_outcome(headline: String, elapsed: float) -> void:
 	_race_hud.visible = false
 	_pause_overlay.enabled = false
 	_results_panel.visible = true
-	_results_label.text = "%s\n\n%s\n\nCONTINUE · RETRY TO RUN IT AGAIN" % [headline, _format_time(elapsed) if headline == "STRIP WON" else ""]
+	_results_label.text = "%s\n\n%s" % [headline, _format_time(elapsed) if headline == "STRIP WON" else ""]
 	_retry_button.text = "RETRY"
 	_retry_button.disabled = false
 	_continue_button.disabled = false
@@ -1160,7 +1159,7 @@ func _update_results(results: Array) -> void:
 		])
 	lines.append("")
 	var mode := String(_session.get("mode", "quick"))
-	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if mode in ["quick", "discovery"] else ("RESULT SAVED · CONTINUE" if mode == "run" else "RESULT SAVED · CONTINUE OR RETRY")
+	var final_prompt := "" if mode in ["quick", "discovery"] else "RESULT SAVED"
 	var app := get_node_or_null("/root/App")
 	var live_session: Dictionary = app.call("get_current_race_session") if app and app.has_method("get_current_race_session") else {}
 	var summary: Dictionary = live_session.get("result_summary", {})
@@ -1177,10 +1176,9 @@ func _update_results(results: Array) -> void:
 			lines.append("TARGETS  G %s · S %s · B %s" % [_format_time(float(targets["gold"])), _format_time(float(targets["silver"])), _format_time(float(targets["bronze"]))])
 		if bool(summary.get("ghost_saved", false)):
 			lines.append("PERSONAL BEST GHOST SAVED")
-		final_prompt = "NO TIME SAVED · CONTINUE OR RETRY" if bool(summary.get("mastery_dnf", false)) else "TIME TRIAL SAVED · CONTINUE OR RETRY"
+		final_prompt = "NO TIME SAVED" if bool(summary.get("mastery_dnf", false)) else "TIME TRIAL SAVED"
 	if not _save_error.is_empty():
-		var actions := "RETRY SAVE" if _continue_button.disabled else "RETRY SAVE OR CONTINUE"
-		final_prompt = "NOT SAVED · " + actions
+		final_prompt = "NOT SAVED · RETRY SAVE"
 	lines.append("FINALIZING..." if not _results_finalized else final_prompt)
 	_results_label.text = "\n".join(lines)
 
@@ -1409,53 +1407,60 @@ func _create_phase_one_ui() -> void:
 	_position_label.visible = false
 	hud.add_child(_position_label)
 
-	_results_panel = Panel.new()
+	var results_center := CenterContainer.new()
+	results_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	results_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(results_center)
+	_results_panel = PanelContainer.new()
 	_results_panel.name = "ResultsPanel"
-	_results_panel.offset_left = 330.0
-	_results_panel.offset_top = 150.0
-	_results_panel.offset_right = 950.0
-	_results_panel.offset_bottom = 565.0
+	_results_panel.custom_minimum_size.x = 620.0
 	_results_panel.visible = false
 	_results_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.96), Color("f4c65a")))
-	hud.add_child(_results_panel)
+	results_center.add_child(_results_panel)
+	var results_margin := MarginContainer.new()
+	for edge: String in ["left", "right", "top", "bottom"]:
+		results_margin.add_theme_constant_override("margin_" + edge, 24)
+	_results_panel.add_child(results_margin)
+	var results_column := VBoxContainer.new()
+	results_column.add_theme_constant_override("separation", 20)
+	results_margin.add_child(results_column)
 	_results_label = Label.new()
-	_results_label.offset_left = 28.0
-	_results_label.offset_top = 24.0
-	_results_label.offset_right = 592.0
-	_results_label.offset_bottom = 325.0
+	_results_label.custom_minimum_size.x = 564.0
+	_results_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_results_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_results_label.add_theme_font_size_override("font_size", 20)
 	_results_label.add_theme_color_override("font_color", Color(0.96, 0.94, 0.89))
-	_results_panel.add_child(_results_label)
+	results_column.add_child(_results_label)
+	var results_actions := HBoxContainer.new()
+	results_actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	results_actions.add_theme_constant_override("separation", 24)
+	results_column.add_child(results_actions)
 
 	_retry_button = MENU_BUTTON_SCRIPT.new() as Button
 	_retry_button.text = "RETRY"
-	_retry_button.position = Vector2(126.0, 340.0)
-	_retry_button.size = Vector2(170.0, 48.0)
+	_retry_button.custom_minimum_size = Vector2(170.0, 48.0)
 	_retry_button.disabled = true
 	_apply_menu_button_art(_retry_button)
 	_retry_button.add_theme_font_size_override("font_size", 16)
 	_retry_button.pressed.connect(_on_retry_pressed)
-	_results_panel.add_child(_retry_button)
+	results_actions.add_child(_retry_button)
 	_mastery_button = MENU_BUTTON_SCRIPT.new() as Button
 	_mastery_button.text = "SOLO TIME TRIAL"
-	_mastery_button.position = Vector2(225.0, 340.0)
-	_mastery_button.size = Vector2(170.0, 48.0)
+	_mastery_button.custom_minimum_size = Vector2(170.0, 48.0)
 	_mastery_button.disabled = true
 	_mastery_button.visible = false
 	_apply_menu_button_art(_mastery_button)
 	_mastery_button.add_theme_font_size_override("font_size", 16)
 	_mastery_button.pressed.connect(_on_mastery_pressed)
-	_results_panel.add_child(_mastery_button)
+	results_actions.add_child(_mastery_button)
 	_continue_button = MENU_BUTTON_SCRIPT.new() as Button
 	_continue_button.text = "CONTINUE"
-	_continue_button.position = Vector2(324.0, 340.0)
-	_continue_button.size = Vector2(170.0, 48.0)
+	_continue_button.custom_minimum_size = Vector2(170.0, 48.0)
 	_continue_button.disabled = true
 	_apply_menu_button_art(_continue_button, true)
 	_continue_button.add_theme_font_size_override("font_size", 16)
 	_continue_button.pressed.connect(request_return)
-	_results_panel.add_child(_continue_button)
+	results_actions.add_child(_continue_button)
 
 
 func _create_pause_overlay() -> void:
@@ -1684,7 +1689,6 @@ func _attempt_result_commit(results: Array) -> void:
 	var mastery_available := committed and app and app.has_method("can_start_mastery_rematch") and bool(app.call("can_start_mastery_rematch"))
 	_mastery_button.visible = mastery_available
 	_mastery_button.disabled = not mastery_available
-	_layout_result_actions(mastery_available)
 	_retry_button.focus_neighbor_right = _retry_button.get_path_to(_mastery_button if mastery_available else _continue_button)
 	_continue_button.focus_neighbor_left = _continue_button.get_path_to(_mastery_button if mastery_available else (_retry_button if _retry_button.visible else _continue_button))
 	if mastery_available:
@@ -1698,18 +1702,6 @@ func _attempt_result_commit(results: Array) -> void:
 		_continue_button.grab_focus()
 	else:
 		_retry_button.grab_focus()
-
-
-func _layout_result_actions(mastery_available: bool) -> void:
-	if mastery_available:
-		_retry_button.position.x = 26.0
-		_mastery_button.position.x = 225.0
-		_continue_button.position.x = 424.0
-	elif not _retry_button.visible:
-		_continue_button.position.x = 225.0
-	else:
-		_retry_button.position.x = 126.0
-		_continue_button.position.x = 324.0
 
 
 func _set_wear_out_beat(beat: String) -> void:
