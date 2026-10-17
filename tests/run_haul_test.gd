@@ -7,6 +7,7 @@ func _initialize() -> void:
 	call_deferred("_run_test")
 
 func _run_test() -> void:
+	_test_consumable_sources_and_tow()
 	var hot := _offer()
 	var vid := hot.pending_offer
 	_expect(hot.can_race_hot(vid), "assigned run roster supplies a same-band spare")
@@ -57,7 +58,7 @@ func _run_test() -> void:
 	_expect(items.add_tow(2) and items.add_tow(1) and items.add_nitro(3), "consumables stack")
 	_expect(not items.add_tow(-1) and not items.add_nitro(0), "invalid additions do not mutate")
 	_expect(items.spend_tow() and items.tow_count == 2 and items.spend_nitro() and items.nitro_count == 2, "spend uses exactly one")
-	var item_load := SESSION.deserialize(SESSION.serialize(items))
+	var item_load := SESSION.deserialize(JSON.parse_string(JSON.stringify(SESSION.serialize(items))))
 	_expect(item_load != null and item_load.tow_count == 2 and item_load.nitro_count == 2, "consumables persist")
 	_expect(not items.can_race_hot("unknown") and not items.hot_choice_reason("unknown").is_empty(), "unavailable hot choice explains why")
 	var no_spare := _offer()
@@ -76,6 +77,57 @@ func _run_test() -> void:
 		return
 	print("RUN_HAUL_TEST PASS")
 	quit(0)
+
+func _test_consumable_sources_and_tow() -> void:
+	var nitro := SESSION.create(33333)
+	var roll: Dictionary = nitro.run_state.car_rolls[nitro.current_car_id]
+	roll["boost"] = -0.09
+	var low := nitro.nitro_power()
+	roll["boost"] = 0.09
+	_expect(nitro.nitro_power() > low and low > 0.0, "nitro power scales with boost axis")
+	for item: String in ["tow", "nitro"]:
+		var shop := SESSION.create(33333)
+		_expect(not shop.call("buy_" + item), "consumables only sell at vans")
+		_move_to(shop, "parts_van")
+		var stock := shop.van_offer_consumables()
+		_expect(stock == [{"item": "tow", "count": 1, "price": 10}, {"item": "nitro", "count": 1, "price": 10}], "van offers one tow and one nitro at ten points each")
+		shop.run_points = 9
+		_expect(not shop.call("buy_" + item) and shop.is_stop_pending(), "insufficient payment preserves visit")
+		shop.run_points = 10
+		_expect(shop.call("buy_" + item) and shop.run_points == 0 and shop.get(item + "_count") == 1, "purchase debits ten and adds one")
+		_expect(not shop.buy_tow() and not shop.buy_nitro() and not shop.buy_part(String(shop.van_stock()[0]["part"])), "one purchase consumes van visit")
+		_expect(shop.van_offer_consumables().is_empty(), "used van has no remaining consumable stock")
+	var errand := SESSION.create(33333)
+	_move_to(errand, "errand")
+	_expect(errand.resolve_errand(99).has("error") and errand.is_stop_pending(), "invalid errand choice preserves visit")
+	_expect(errand.resolve_errand(2) == {"effect": "tow", "amount": 1} and errand.tow_count == 1, "errand rewards one tow")
+	_expect(errand.resolve_errand(2).has("error"), "tow errand resolves once")
+	var rescued := SESSION.create(33333)
+	rescued.resolve_race(rescued.current_node_id, 1, 6)
+	rescued.add_tow()
+	rescued.run_state.set_car_wear(rescued.current_car_id, "dented")
+	rescued.register_crash(1.0)
+	_expect(not rescued.is_failed() and rescued.tow_count == 0 and rescued.towed_to_bench, "tow intercepts wear-out once")
+	_expect(rescued.run_state.get_car_wear(rescued.current_car_id) == "clean", "rescue restores the disabled car")
+	_expect(not rescued.available_nodes().is_empty(), "towed route stays navigable")
+	var loaded := SESSION.deserialize(JSON.parse_string(JSON.stringify(SESSION.serialize(rescued))))
+	_expect(loaded != null and loaded.towed_to_bench, "pending tow persists")
+	if loaded == null:
+		return
+	rescued = loaded
+	# Enter a real bench through one of its map edges.
+	for parent: Dictionary in rescued.current_map.nodes.values():
+		for child: Dictionary in rescued.current_map.get_children(parent["id"]):
+			if child["type"] == "bench":
+				rescued.current_node_id = parent["id"]
+				rescued.resolved_nodes[parent["id"]] = true
+				_expect(rescued.enter_node(child["id"]) and rescued.bench_action_done and not rescued.towed_to_bench, "next bench action consumed by tow")
+				_expect(not rescued.bench_repair(rescued.current_car_id) and not rescued.is_stop_pending(), "tow bench cannot grant another action")
+				rescued.run_state.set_car_wear(rescued.current_car_id, "dented")
+				rescued.register_crash(1.0)
+				_expect(rescued.is_failed(), "no second rescue without another tow")
+				return
+	_expect(false, "tow fixture has a reachable bench")
 
 func _offer() -> RunSession:
 	var sess := SESSION.create(33333)

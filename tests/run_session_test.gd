@@ -73,9 +73,9 @@ func _check_opening() -> void:
 	if not _expect(not sess.enter_node(child_id), "the run cannot move past an unraced race"):
 		return
 	var out: Dictionary = sess.resolve_race(String(start["id"]), 1, 4)
-	if not _expect(int(out.get("points_gained", -1)) == 6 and sess.run_points == 6, "a win pays 6 points"):
+	if not _expect(int(out.get("points_gained", -1)) == RUN_SESSION.RUN_POINTS_BY_FINISH[1] and sess.run_points == RUN_SESSION.RUN_POINTS_BY_FINISH[1], "a win pays the first-place reward"):
 		return
-	if not _expect(sess.resolve_race(String(start["id"]), 1, 4).has("error") and sess.run_points == 6, "a race pays once"):
+	if not _expect(sess.resolve_race(String(start["id"]), 1, 4).has("error") and sess.run_points == RUN_SESSION.RUN_POINTS_BY_FINISH[1], "a race pays once"):
 		return
 	if not _expect(not sess.is_race_pending() and sess.available_nodes().size() >= 1 and sess.enter_node(child_id), "after racing, the children open"):
 		return

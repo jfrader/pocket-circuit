@@ -12,11 +12,14 @@ const CATALOG := preload("res://data/championship/catalog.gd")
 const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
 const HAUL := preload("res://scripts/progression/run_haul.gd")
 const HAUL_RANSOM_POINTS := HAUL.RANSOM_POINTS
-const FIELD_OPPONENTS := 3
+const FIELD_OPPONENTS := 5
 
 const INITIAL_POINTS := 0
 const RIVAL_LOSS_POINTS_COST := 10
 const ERRAND_PAY_POINTS := 6
+const TOW_PRICE := 10
+const NITRO_PRICE := 10
+enum ErrandChoice { PAY, TUNE_UP, TOW }
 const RIVAL_LOSS_SEVERITY := 0.6
 const LOCKUP_CAR_TYPE := "compact"
 ## The starter-tier types a night's starter car is dealt from.
@@ -28,10 +31,12 @@ const CAR_ORIGIN_LOCKUP := "lockup"
 const NO_ROLL := {"speed": 0.0, "accel": 0.0, "grip": 0.0, "drift": 0.0, "boost": 0.0, "tough": 0.0}
 
 const RUN_POINTS_BY_FINISH: Dictionary = {
-	1: 6,
-	2: 4,
-	3: 2,
-	4: 0,
+	1: 10,
+	2: 7,
+	3: 5,
+	4: 3,
+	5: 2,
+	6: 1,
 }
 
 ## Run session layer: pure logic over the run map + run state. No UI, no
@@ -58,10 +63,10 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##     parts_held; one purchase per van.
 ##   start_race(id, field): marks a race as running; it resolves exactly once.
 ##   open_lockup(): the act's one free car.
-##   resolve_errand(choice): 0 takes ERRAND_PAY_POINTS, 1 steps the current
-##     car's wear back one level.
+##   resolve_errand(choice): PAY takes ERRAND_PAY_POINTS, TUNE_UP steps wear
+##     back one level, TOW adds one rescue.
 ##
-## register_crash(severity) advances wear; worn out fails the run.
+## register_crash(severity) advances wear; worn out spends a tow or fails.
 ## serialize()/deserialize() round-trip the whole session; a schema mismatch
 ## or an unreadable inner block deserializes to null.
 
@@ -99,6 +104,8 @@ var pending_offer_driver: Dictionary = {}
 var pending_offer_points: int = 0
 var tow_count: int = 0
 var nitro_count: int = 0
+## A rescue reserves the next bench's action, even across an act boundary.
+var towed_to_bench: bool = false
 
 static func create(p_run_seed: int) -> RunSession:
 	var sess: RunSession = new()
@@ -183,6 +190,17 @@ func van_stock() -> Array[Dictionary]:
 		return []
 	return RunParts.deal(_stop_roll("van", current_node_id), car_stats(current_car_id))
 
+func van_offer_consumables() -> Array[Dictionary]:
+	if failed or completed or not _is_current_node_type("parts_van") or resolved_nodes.has(current_node_id):
+		return []
+	return [{"item": "tow", "count": 1, "price": TOW_PRICE}, {"item": "nitro", "count": 1, "price": NITRO_PRICE}]
+
+func buy_tow() -> bool:
+	return HAUL.buy_consumable(self, "tow_count", TOW_PRICE)
+
+func buy_nitro() -> bool:
+	return HAUL.buy_consumable(self, "nitro_count", NITRO_PRICE)
+
 ## A car of the night's physics as the race builds it: its roll, then its parts.
 func car_stats(vehicle_id: String) -> VehicleStats:
 	var car := car_record(vehicle_id)
@@ -244,7 +262,8 @@ func enter_node(node_id: String) -> bool:
 	var ntype: String = String(n.get("type", "race"))
 	if ntype == "bench":
 		last_bench_visited = node_id
-		bench_action_done = false
+		bench_action_done = towed_to_bench
+		towed_to_bench = false
 	return true
 
 func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dictionary:
@@ -439,6 +458,11 @@ func add_nitro(count: int = 1) -> bool:
 
 func spend_nitro() -> bool:
 	return HAUL.spend_consumable(self, "nitro_count")
+
+## Multiplier for a nitro burst; the race owns its force and duration.
+func nitro_power() -> float:
+	var car := car_record(current_car_id)
+	return 1.0 + float(car.get("roll", {}).get("boost", 0.0))
 
 ## The collection must use this, not the legacy all-wins view won_cars().
 func collection_safe_cars() -> Array[Dictionary]:
@@ -660,24 +684,33 @@ func open_lockup() -> Dictionary:
 	return _win_car("lockup", CAR_ORIGIN_LOCKUP, [LOCKUP_CAR_TYPE] as Array[String])
 
 func resolve_errand(choice: int) -> Dictionary:
+	if failed or completed:
+		return {"error": "night ended"}
 	if not _is_current_node_type("errand"):
 		return {"error": "not current errand node"}
 	if resolved_nodes.has(current_node_id):
 		return {"error": "already resolved"}
+	if choice not in ErrandChoice.values():
+		return {"error": "invalid errand choice"}
+	if choice == ErrandChoice.TOW and not add_tow():
+		return {"error": "tow inventory full"}
 	resolved_nodes[current_node_id] = true
 	var eff: String = ""
 	var amt: int = 0
-	if choice == 0:
+	if choice == ErrandChoice.PAY:
 		run_points += ERRAND_PAY_POINTS
 		eff = "points"
 		amt = ERRAND_PAY_POINTS
-	else:
+	elif choice == ErrandChoice.TUNE_UP:
 		var cw: String = run_state.get_car_wear(current_car_id)
 		var prev: String = _previous_wear_level(cw)
 		if prev != cw:
 			run_state.set_car_wear(current_car_id, prev)
 			amt = 1
 		eff = "restore"
+	else:
+		eff = "tow"
+		amt = 1
 	return {"effect": eff, "amount": amt}
 
 func _previous_wear_level(w: String) -> String:
@@ -693,7 +726,11 @@ func register_crash(severity: float) -> void:
 	var nw: String = RUN_STATE.advance_wear(cw, severity)
 	run_state.set_car_wear(current_car_id, nw)
 	if RUN_STATE.is_worn_out(nw):
-		failed = true
+		if spend_tow():
+			run_state.set_car_wear(current_car_id, RUN_STATE.restore_at_bench(nw))
+			towed_to_bench = true
+		else:
+			failed = true
 
 func is_failed() -> bool:
 	if failed:
@@ -779,6 +816,11 @@ static func deserialize(data: Dictionary) -> RunSession:
 			var count := 1 if map.nodes[nid]["type"] == "rival" else FIELD_OPPONENTS
 			var roster := DRIVER_ROSTER.normalize(nodes[nid], CATALOG.quick_race_vehicle_ids(), count)
 			if roster.is_empty():
+				# Legacy saves stored the old three-opponent field; drop the stale
+				# assignment so the race regenerates it at the current size.
+				var stored: Variant = nodes[nid].get("opponents") if nodes[nid] is Dictionary else null
+				if stored is Array and (stored as Array).size() == 3 and map.nodes[nid]["type"] != "rival":
+					continue
 				return null
 			sess.node_opponents[act_key][nid] = roster
 	sess.run_points = int(data["run_points"])
