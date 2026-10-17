@@ -74,7 +74,14 @@ func _run_test() -> void:
 	# Drive the real report seam: third place scores points and wears the car.
 	var points_before: int = sess.run_points
 	var wear_before: String = sess.run_state.get_car_wear(sess.current_car_id)
+	var results_presenter := (load("res://scripts/race/prototype_race.gd") as Script).new() as Node2D
+	var night_before: Dictionary = results_presenter.call("_night_result_snapshot", sess)
 	if not _expect(bool(app.call("report_race_result", 3, 42.0, [], false, {})), "reporting a run race result must succeed"):
+		return
+	var consequences := String(results_presenter.call("_night_result_consequences", night_before, sess, (app.get("current_race_session") as Dictionary)["result"]))
+	results_presenter.free()
+	var expected_third := int(RunSession.RUN_POINTS_BY_FINISH[3])
+	if not _expect(consequences == "+%d POINTS · WEAR: CLEAN -> DUSTY" % expected_third, "results name the actual points and wear from the report seam"):
 		return
 	if not _expect(sess.run_points > points_before, "the finish position must score run points"):
 		return
@@ -171,12 +178,13 @@ func _run_test() -> void:
 	var duel_event: Dictionary = (app.get("current_race_session") as Dictionary).get("event", {})
 	if not _expect(String(duel_event.get("race_format", "")) == "rival_duel" and int(duel_event.get("opponent_count", 0)) == 1 and duel_event.has("generated_circuit_identity"), "a duel stays one on one on its generated circuit"):
 		return
+	var cars_before_duel := duel_run.won_cars().size()
 	app.set("_save_store", FailingSaveStore.new(path))
 	if not _expect(not bool(app.call("report_race_result", 1, 2.0, [], false, {})), "an unsaved rival reward reports failure"):
 		return
 	var duel_applied := RunSession.serialize(duel_run)
 	app.set("_save_store", live_store)
-	if not _expect(bool(app.call("report_race_result", 1, 2.0, [], false, {})) and RunSession.serialize(duel_run) == duel_applied and duel_run.won_cars().size() == 1, "retrying a rival reward does not deal another car"):
+	if not _expect(bool(app.call("report_race_result", 1, 2.0, [], false, {})) and RunSession.serialize(duel_run) == duel_applied and duel_run.won_cars().size() == cars_before_duel + 1, "retrying a rival reward does not deal another car"):
 		return
 	duel_run = app.call("start_run", 74747) as RunSession
 	if not _expect(RUN_WALK.walk_to(app, duel_run, "act_rival"), "the next run reaches the act rival"):
@@ -219,12 +227,20 @@ func _run_test() -> void:
 	app.call("start_run_race", opening)
 	var race := (load(RACE_SCENE) as PackedScene).instantiate()
 	root.add_child(race)
+	race.call("_show_pause_menu")
+	var return_warning := race.find_child("PauseReturnWarning", true, false) as Label
+	if not _expect(return_warning != null and not return_warning.visible, "returning before the countdown marks the race shows no loss warning"):
+		return
 	var waited := 0
 	while quit_run.race_in_flight.is_empty() and waited < RACE_SCENE_FRAME_LIMIT:
 		waited += 1
 		await process_frame
 	if not _expect(String(quit_run.race_in_flight.get("node", "")) == opening, "the race scene's countdown marks the run race as running"):
 		return
+	race.call("_set_paused", true)
+	if not _expect(return_warning.is_visible_in_tree() and return_warning.text == "RETURNING COUNTS THIS RACE AS A LOSS", "pausing an in-flight run race warns that returning counts as a loss"):
+		return
+	race.call("_set_paused", false)
 	race.set("_results_finalized", true)
 	race.set("_save_error", "Injected display failure")
 	var continue_action := race.get("_continue_button") as Button
@@ -235,10 +251,23 @@ func _run_test() -> void:
 		return
 	continue_action.disabled = false
 	race.call("_update_results", [])
-	if not _expect((race.get("_results_label") as Label).text.to_upper().contains("CONTINUE"), "unsaved results may name continue when it is enabled"):
+	if not _expect((race.get("_results_label") as Label).text.to_upper().contains("NOT SAVED") and not (race.get("_results_label") as Label).text.to_upper().contains("CONTINUE"), "unsaved results retain save status without duplicating the continue button"):
+		return
+	var copy_run: RunSession = app.call("start_run", 51515) as RunSession
+	app.call("start_run_race", copy_run.current_node_id)
+	var scripted_results: Array = [{"vehicle": race.get("_player_vehicle"), "position": 1, "time": 42.0, "dnf": false}]
+	if not _expect(bool(race.call("_report_result_to_app", scripted_results)), "the results presenter commits a scripted win"):
+		return
+	race.call("_update_results", [])
+	var win_award := 6 if String(copy_run.current_node().get("type", "")) == "rival" else int(RunSession.RUN_POINTS_BY_FINISH[1])
+	if not _expect((race.get("_results_label") as Label).text.split("\n").has("+%d POINTS" % win_award), "the results panel displays the exact night consequences line"):
+		return
+	var copy_applied := RunSession.serialize(copy_run)
+	if not _expect(bool(race.call("_report_result_to_app", scripted_results)) and RunSession.serialize(copy_run) == copy_applied and String(race.get("_night_consequences")) == "+%d POINTS" % win_award, "repeated reports retain the first consequences without applying twice"):
 		return
 	race.queue_free()
 	await process_frame
+	quit_run = app.call("start_run", 52525) as RunSession
 	quit_run.race_in_flight = {}
 	if not _expect(bool(app.call("start_run_race", opening)), "the opening race starts"):
 		return

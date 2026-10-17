@@ -22,6 +22,7 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
 const DRIVER_DIRECTORY := preload("res://scripts/progression/driver_directory.gd")
 const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
+const RUN_FINALE := preload("res://scripts/race/run_finale_circuit.gd")
 ## Every race fields the player plus three opponents.
 const ROSTER_SIZE := 3
 const RUN_ACT_RIVAL_DIFFICULTY := "clockwork"
@@ -40,6 +41,8 @@ var _ended_run_board: RunSession = null
 var last_run_error: String = ""
 ## Why the run is not on disk yet ("" once a run save lands); the board shows it.
 var run_save_error := ""
+var run_haul_note := ""
+var _run_sprint_destination := ""
 var _quick_roster: Dictionary = {}
 
 
@@ -82,6 +85,8 @@ static func _roster_ids(roster: Dictionary) -> Array:
 ## event is built; screen syncs can use the session's own mode.
 func _install_roster_for(mode: String) -> void:
 	var roster := _quick_roster if mode == "quick" else _championship_roster()
+	if mode == "run":
+		roster = current_race_session.get("driver_roster", {})
 	DRIVER_DIRECTORY.install_opponents(roster.get("opponents", []))
 
 
@@ -351,6 +356,7 @@ func confirm_new_championship() -> bool:
 		"reduced_motion": _save_data["reduced_motion"],
 		"player_avatar_seed": get_player_avatar_seed(),
 		"first_run": false,
+		"run_intro_seen": bool(_save_data.get("run_intro_seen", true)),
 		"mastery_records": _save_data.get("mastery_records", []).duplicate(true),
 		"personal_ghosts": _save_data.get("personal_ghosts", []).duplicate(true),
 		"circuit_history": _save_data.get("circuit_history", []).duplicate(true),
@@ -1374,7 +1380,7 @@ func continue_after_race(transition_scene: bool = true) -> void:
 ## from a saved roster, but the event always states how many cars it fields.
 static func _field_size(event: Dictionary) -> int:
 	var declared := maxi((event.get("opponents", []) as Array).size(), int(event.get("opponent_count", 0)))
-	return clampi(declared + 1, 1, 4)
+	return clampi(declared + 1, 1, 6)
 
 
 ## A run race is raced once: no restart mid-race and no retry after it.
@@ -1444,6 +1450,9 @@ func abandon_race() -> void:
 	if current_race_session.is_empty() or current_race_session.has("result"):
 		return
 	var mode := String(current_race_session.get("mode", "quick"))
+	if mode == "chase_sprint":
+		resolve_run_sprint("CAUGHT", {"terminal": true})
+		return
 	if mode == "run":
 		_settle_race_in_flight()
 	_destination = "run_board" if mode == "run" else ("discovery" if mode == "discovery" else ("title" if mode in ["quick", "strip"] else "map"))
@@ -1459,6 +1468,13 @@ func current_run_session() -> RunSession:
 
 func run_board_session() -> RunSession:
 	return _current_run_session if _current_run_session != null else _ended_run_board
+
+
+func dismiss_run_intro() -> bool:
+	if bool(_save_data.get("run_intro_seen", true)):
+		return true
+	_save_data["run_intro_seen"] = true
+	return _save_candidate(_save_data)
 
 
 ## Starts a fresh run for the seed and persists its opening state.
@@ -1484,7 +1500,7 @@ func persist_current_run() -> void:
 	var ended := _current_run_session != null and (_current_run_session.is_complete() or _current_run_session.is_failed())
 	var candidate := _save_data.duplicate(true)
 	if ended:
-		candidate["garage_cars"] = _garage_with(_current_run_session.won_cars())
+		candidate["garage_cars"] = _garage_with(_current_run_session.collection_safe_cars())
 		candidate["current_run"] = {}
 	else:
 		candidate["current_run"] = RUN_SESSION.serialize(_current_run_session) if _current_run_session != null else {}
@@ -1545,6 +1561,10 @@ func quick_race_roster() -> Array[String]:
 	ids.append_array(garage_car_ids())
 	for car: Dictionary in _save_data.get("steam_cars", []):
 		ids.append(String(car["id"]))
+	var held := {}
+	for id: String in ids:
+		held[id] = true
+	ids.assign(held.keys())
 	return CATALOG.garage_order(ids)
 
 
@@ -1635,6 +1655,65 @@ func start_run_rival(node_id: String = "") -> bool:
 	return _start_run_event(node_id, ["rival"])
 
 
+func start_run_sprint(node_id: String) -> bool:
+	var sess := _current_run_session
+	if sess == null or sess.pending_chaser == null or _transitioning_to_race or not _run_sprint_destination.is_empty():
+		return false
+	var available := false
+	for node: Dictionary in sess.available_nodes():
+		if String(node["id"]) == node_id:
+			available = true
+	if not available:
+		return false
+	var seed := sess.circuit_seed(node_id)
+	var identity := GENERATED_CIRCUITS.create(StringName(CATALOG.get_act(sess.current_map.act)["id"]), GENERATED_CIRCUITS.room_for_route_seed(seed), seed, false, sess.current_map.act, "", "", {}, "standard", GENERATED_CIRCUITS.DEFAULT_ROAD_WIDTH, "strip")
+	var chaser: Dictionary = sess.pending_chaser.duplicate(true)
+	chaser["vehicle_id"] = chaser["chase_vehicle_id"]
+	DRIVER_DIRECTORY.install_opponents([chaser])
+	var event := GENERATED_CIRCUITS.apply_to_event(identity, [chaser["id"]])
+	if event.is_empty():
+		return false
+	event["race_format"] = "strip"
+	event["opponent_count"] = 1
+	_run_sprint_destination = node_id
+	current_race_session = {"mode": "chase_sprint", "vehicle_id": sess.current_car_id, "chaser": chaser, "event": event, "difficulty": String(_save_data.get("difficulty", "club_circuit"))}
+	if not _test_mode:
+		_begin_race_transition(sess.current_car_id)
+	return true
+
+
+func resolve_run_sprint(outcome: String, _data: Dictionary = {}) -> void:
+	if outcome not in ["ARRIVED", "CAUGHT"] or _current_run_session == null or _run_sprint_destination.is_empty():
+		return
+	var stop_id := _run_sprint_destination
+	_run_sprint_destination = ""
+	if outcome == "ARRIVED":
+		_current_run_session.bank_haul()
+	else:
+		var captured := _current_run_session.impound_haul()
+		var names: Array[String] = []
+		for vid: String in captured:
+			names.append(String(CATALOG.get_vehicle(vid).get("name", vid)))
+		run_haul_note = "IMPOUNDED · " + ", ".join(names)
+	persist_current_run()
+	current_race_session.clear()
+	_destination = "run_arrival" if outcome == "ARRIVED" else "run_board"
+	if outcome == "ARRIVED":
+		_run_sprint_destination = stop_id
+	if _test_mode:
+		_open_run_sprint_return()
+	else:
+		get_tree().call_deferred("change_scene_to_file", BOOT_SCENE)
+
+
+func _open_run_sprint_return() -> void:
+	_shell.call("show_run_board")
+	if not _run_sprint_destination.is_empty():
+		var stop_id := _run_sprint_destination
+		_run_sprint_destination = ""
+		_shell.call("_on_run_node_pressed", stop_id)
+
+
 ## Enters (or re-checks) a race-type run node and builds its race session: a
 ## full field for races, the hardest difficulty for the act rival, a one-on-one
 ## duel for rivals.
@@ -1661,13 +1740,12 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 	var node_type := String(node.get("type", ""))
 	var duel := node_type == "rival"
 	var vehicle_id: String = _current_run_session.current_car_id
-	_roll_quick_roster()
-	_install_roster_for("quick")
-	var opponents: Array = _roster_ids(_quick_roster)
-	if duel:
-		opponents = opponents.slice(0, 1)
+	var roster := _current_run_session.opponents_for_node(target_id)
+	DRIVER_DIRECTORY.install_opponents(roster.get("opponents", []))
+	var opponents: Array = _roster_ids(roster)
 	var event_id: String = "run_%s" % target_id
-	var event := _event_with_generated_identity({"opponents": opponents}, circuit)
+	var finale := RUN_FINALE.is_finale(_current_run_session.current_map.act, node)
+	var event := RUN_FINALE.event() if finale else _event_with_generated_identity({"opponents": opponents}, circuit)
 	if event.is_empty():
 		last_run_error = "circuit could not be drawn"
 		return false
@@ -1684,6 +1762,7 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 		"difficulty": RUN_ACT_RIVAL_DIFFICULTY if node_type == "act_rival" else String(_save_data.get("difficulty", "club_circuit")),
 		"result_committed": false,
 		"run_node_id": target_id,
+		"driver_roster": roster,
 	}
 	if not _test_mode:
 		_begin_race_transition(vehicle_id)
@@ -1694,12 +1773,18 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 func run_stop_circuit(stop_id: String) -> Dictionary:
 	return _run_circuit(stop_id) if _current_run_session != null else {}
 
+## Assigned drivers (id, name, vehicle_id, avatar_art, ai_style); slot 0 leads.
+func run_stop_opponents(stop_id: String) -> Dictionary:
+	return _current_run_session.opponents_for_node(stop_id) if _current_run_session != null else {}
+
 
 ## The circuit a run stop races on: drawn from the run seed, the act and the
 ## stop like a Quick Race draw, in the act's room. The same stop always gets the
 ## same circuit; different stops and acts get different ones.
 func _run_circuit(stop_id: String) -> Dictionary:
 	var act := _current_run_session.current_map.act
+	if RUN_FINALE.is_finale(act, _current_run_session.current_map.get_node(stop_id)):
+		return RUN_FINALE.identity()
 	var seed := _current_run_session.circuit_seed(stop_id)
 	return GENERATED_CIRCUITS.create(
 		StringName(CATALOG.get_act(act)["id"]),
@@ -1774,6 +1859,30 @@ func run_bench_fit(held_index: int, node_id: String = "") -> bool:
 	return _run_seam(node_id, "bench", func() -> bool: return _current_run_session.bench_fit(_current_run_session.current_car_id, held_index))
 
 
+func run_bench_bank_haul() -> bool:
+	return _run_seam("", "bench", func() -> bool: return _current_run_session.bench_bank_haul())
+
+
+func run_bench_swap(car_key: String) -> bool:
+	return _run_seam("", "bench", func() -> bool: return _current_run_session.bench_swap(car_key))
+
+
+func run_ransom_car(vehicle_id: String) -> bool:
+	return _run_seam("", "parts_van", func() -> bool: return _current_run_session.ransom_car(vehicle_id))
+
+
+func run_race_it_now() -> bool:
+	return _resolve_offer(func() -> bool: return _current_run_session.race_it_now())
+
+
+func run_send_it_ahead() -> bool:
+	return _resolve_offer(func() -> bool: return _current_run_session.send_it_ahead())
+
+
+func run_send_it_home() -> bool:
+	return _resolve_offer(func() -> bool: return _current_run_session.send_it_home())
+
+
 ## Drives the car just won from now on; the offer closes.
 func run_take_offer() -> bool:
 	return _resolve_offer(func() -> bool: return _current_run_session.take_offer())
@@ -1794,6 +1903,14 @@ func _resolve_offer(action: Callable) -> bool:
 
 func run_buy_part(part_id: String, node_id: String = "") -> bool:
 	return _run_seam(node_id, "parts_van", func() -> bool: return _current_run_session.buy_part(part_id))
+
+
+func run_buy_tow() -> bool:
+	return _run_seam("", "parts_van", func() -> bool: return _current_run_session.buy_tow())
+
+
+func run_buy_nitro() -> bool:
+	return _run_seam("", "parts_van", func() -> bool: return _current_run_session.buy_nitro())
 
 
 func run_open_lockup(node_id: String = "") -> bool:
@@ -1899,6 +2016,8 @@ func _sync_current_scene() -> void:
 				_shell.call("show_discovery")
 			"run_board":
 				_shell.call("show_run_board")
+			"run_arrival":
+				_open_run_sprint_return()
 			"ending":
 				_shell.call("show_ending")
 			_:
@@ -1909,6 +2028,8 @@ func _sync_current_scene() -> void:
 		_last_result_summary = {}
 		_destination = "title"
 	else:
+		if scene.has_signal("sprint_resolved") and not scene.is_connected("sprint_resolved", resolve_run_sprint):
+			scene.connect("sprint_resolved", resolve_run_sprint)
 		if scene.scene_file_path == RACE_SCENE and is_instance_valid(audio_director) and not _transitioning_to_race:
 			audio_director.play_race_music()
 		if _shell:

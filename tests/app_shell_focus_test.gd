@@ -5,6 +5,7 @@ const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identi
 
 class TestApp extends Node:
 	var save_read_only := false
+	var championship_progress := true
 	var launched_vehicle := ""
 	var mastery_event := ""
 	var mastery_vehicle := ""
@@ -58,7 +59,7 @@ class TestApp extends Node:
 		return ""
 
 	func has_championship_progress() -> bool:
-		return true
+		return championship_progress
 
 	func current_run_session() -> RunSession:
 		return null
@@ -189,8 +190,15 @@ func _run_test() -> void:
 		return
 	await _tap_action(&"ui_down")
 	focus_owner = root.get_viewport().gui_get_focus_owner()
-	if focus_owner == null or focus_owner.get("text") != "NEW RUN":
+	if focus_owner == null or focus_owner.get("text") != "CHAMPIONSHIP":
 		push_error("APP_SHELL_FOCUS_TEST FAIL: Down from the primary action should enter the first action row")
+		quit(1)
+		return
+	var championship := focus_owner as Button
+	var quick := championship.get_node(championship.focus_neighbor_right) as Button
+	var strip := quick.get_node(quick.focus_neighbor_right) as Button
+	if quick.text != "QUICK RACE" or strip.text != "QUICK STRIP" or strip.get_global_rect().end.x > 582:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: CHAMPIONSHIP, QUICK RACE, QUICK STRIP must stay ordered inside the title column ending at x582")
 		quit(1)
 		return
 	await _tap_action(&"ui_down")
@@ -199,6 +207,18 @@ func _run_test() -> void:
 		push_error("APP_SHELL_FOCUS_TEST FAIL: Down should move between rows instead of snaking across siblings")
 		quit(1)
 		return
+	app.save_read_only = true
+	app.championship_progress = false
+	shell.call("show_title")
+	await process_frame
+	await process_frame
+	focus_owner = root.get_viewport().gui_get_focus_owner()
+	if focus_owner == null or focus_owner.get("text") != "PLAY" or (focus_owner as Button).disabled or (focus_owner.get_node((focus_owner as Button).focus_neighbor_bottom) as Button).text != "QUICK RACE":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: read-only title keeps run PLAY focused while skipping unavailable championship in row navigation")
+		quit(1)
+		return
+	app.save_read_only = false
+	app.championship_progress = true
 	shell.call("show_quick_race")
 	await process_frame
 	await process_frame

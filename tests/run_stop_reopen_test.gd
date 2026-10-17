@@ -130,6 +130,8 @@ func _board_can_open(shell: CanvasLayer, stop_id: String) -> bool:
 func _use_stop(app: Object, session: RunSession, kind: String) -> bool:
 	match kind:
 		"bench":
+			if not session.bench_action_done and session.run_state.get_car_wear(session.current_car_id) == RunState.WEAR_LEVELS[0]:
+				session.run_state.set_car_wear(session.current_car_id, "rusty")
 			return bool(app.call("run_bench_repair", session.current_car_id))
 		"parts_van":
 			return bool(app.call("run_buy_part", String(session.van_stock()[0]["part"])))

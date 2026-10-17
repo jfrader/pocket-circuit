@@ -33,6 +33,12 @@ func _run_test() -> void:
 			RUN_WALK.settle(app, night)
 			if won_id.is_empty():
 				won_id = String(night.won_cars()[0]["id"])
+			app.call("run_send_it_home")
+		# Rivals now drive shipped cars; lockups still add distinct generated cars
+		# so the shelf overflow assertions exercise more than one visible page.
+		if RUN_WALK.walk_to(app, night, "lockup"):
+			app.call("run_open_lockup")
+			app.call("run_send_it_home")
 		app.call("abandon_run")
 	if not _expect(not won_id.is_empty() and won_id in (app.call("garage_car_ids") as Array), "an abandoned night still banks its won car"):
 		return
@@ -43,6 +49,8 @@ func _run_test() -> void:
 	var menu := shell.get("_art_menu") as Control
 	var buttons: Dictionary = menu.get("_vehicle_buttons")
 	var roster: Array = app.call("quick_race_roster")
+	if not _expect(roster.size() == CATALOG.quick_race_vehicle_ids().size() + (app.call("garage_car_ids") as Array).filter(func(id: String) -> bool: return id not in CATALOG.quick_race_vehicle_ids()).size(), "the roster lists each shipped or collected car exactly once"):
+		return
 	if not _expect(buttons.size() == roster.size() and buttons.has(won_id) and not (buttons[won_id] as Button).disabled, "the shelf holds every shipped and won car, the won one enabled"):
 		return
 	var last_type := -1

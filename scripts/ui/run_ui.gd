@@ -14,9 +14,9 @@ const LIVE_EDGE := Color("657587")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const ROOMS := {1: "Kitchen Counter", 2: "Workshop Bench", 3: "Office Desk"}
 const TYPES := {
-	"race": {"name": "Race", "cost": "wear", "copy": "Four cars on a rolled circuit.", "icon": preload("res://assets/ui/run_map/node_race.svg")},
+	"race": {"name": "Race", "cost": "wear", "copy": "Six cars on a rolled circuit.", "icon": preload("res://assets/ui/run_map/node_race.svg")},
 	"rival": {"name": "Rival", "cost": "points or wear", "copy": "One on one, with contact. Win and their car is yours.", "icon": preload("res://assets/ui/run_map/node_rival.svg")},
-	"bench": {"name": "Bench", "cost": "the visit", "copy": "Repair the car, or fit one part. Not both.", "icon": preload("res://assets/ui/run_map/node_bench.svg")},
+	"bench": {"name": "Bench", "cost": "the visit", "copy": "Repair, fit a part, bank the haul or swap cars. One per visit.", "icon": preload("res://assets/ui/run_map/node_bench.svg")},
 	"parts_van": {"name": "Parts van", "cost": "points", "copy": "Buy one part. Every part has a downside.", "icon": preload("res://assets/ui/run_map/node_parts_van.svg")},
 	"lockup": {"name": "Lockup", "cost": "free", "copy": "A free car. No race.", "icon": preload("res://assets/ui/run_map/node_lockup.svg")},
 	"errand": {"name": "Errand", "cost": "varies", "copy": "Someone wants a favour. Take the pay or a tune-up.", "icon": preload("res://assets/ui/run_map/node_errand.svg")},
@@ -215,6 +215,8 @@ static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -
 	var rows: Array = []
 	if not circuit.is_empty():
 		rows.append(["CIRCUIT", "%s · %s" % [String(circuit.get("display_name", "")), "reverse" if bool(circuit.get("reverse", false)) else "forward"]])
+		if circuit.has("authored_route"):
+			rows.append(["LENGTH", String(circuit.get("length_tier", "standard"))])
 	var pays := PackedStringArray()
 	for place: int in RunSession.RUN_POINTS_BY_FINISH:
 		pays.append(str(RunSession.RUN_POINTS_BY_FINISH[place]))

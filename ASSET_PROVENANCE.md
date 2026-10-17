@@ -30,9 +30,10 @@ licensed commercial font.
 Specific rows take precedence over catch-all groups; pending assets are not release-cleared by a broader row.
 
 The explicit output paths in `data/world_prop_art.json` supersede older
-environment group provenance below. Its 151 contracts cover 223 prepared
-outputs, including props, decals, materials and utility masks, for GURI-1262
-(Unify track artwork and realistic household prop scale).
+environment group provenance below. Its 159 contracts cover 231 prepared
+outputs, including the original 151 contracts / 223 outputs for GURI-1262
+(Unify track artwork and realistic household prop scale) and eight basement
+contracts / outputs listed separately below.
 
 The active painted sources were generated with operator-authorized, text-only
 xAI Grok Imagine (`grok-imagine-image-2.0`). They are original household artwork,
@@ -70,6 +71,9 @@ HUD artwork are unchanged.
 
 | Paths or content | Production method | Release status |
 |---|---|---|
+| `assets/source/basement/basement_props_sheet.jpg`, `assets/source/basement/*_keyed.png` | Operator-authorized, text-only Grok Imagine source of original fictional basement household props; no third-party images or protected designs supplied. `prepare_source.py` traces six silhouettes into magenta-keyed crops without repainting; unused crate and paint-can cells are not integrated. Source material remains excluded from exports. | Authorized source; prepared-art operator review pending, not release-cleared |
+| `assets/textures/giant_props/basement_boiler.png`, `basement_pipes.png`, `basement_boxes.png`; `assets/textures/edge_dressing/basement_bulb.png`; `assets/textures/ground_dressing/basement_puddle.png`, `basement_oil_stain.png`, `basement_cobweb.png` | Original authorized sheet above, prepared locally with Pillow/NumPy/SciPy and `tools/prepare_environment_library.py --theme basement`: traced matte removal, transparent 512px normalization and physical-bound measurement. Box/pipe silhouettes remove the baked violet shadow before normalization. Puddle/oil borders replace raised rim paint with nearest interior paint and use an inset, feathered, translucent alpha perimeter. Cobweb strands use local contrast extraction because their beige textured matte is not chroma-keyable. Coiled copper pipe is the closest available pipe object; no straight pipe asset is claimed. Boiler, boxes and bulb retain the source's tilted painted perspective, not a newly generated overhead replacement. No third-party attribution required; commercial release remains subject to publisher review of the generated output and provider terms. | Integrated candidate; exact-build/operator review pending, not covered by earlier environment approval |
+| `assets/textures/world_materials/basement_concrete.png` | An unstretched square from the empty concrete margin of the same authorized sheet, desaturated/darkened and mirrored into a wrap-continuous tile by `assets/source/basement/prepare_source.py` using the existing `repeating_material` utility. Local household surface shaders add seeded concrete/slab profiles; puddle and oil textures supply separate floor stains. No new generated source or third-party material. | Integrated candidate; exact-build/operator review pending |
 | `data/world_prop_art.json` output paths | Original text-only Grok Imagine 2.0 sources and explicit approved pilot-source reuse, prepared by `tools/prepare_environment_library.py`. The manifest declares theme, overhead style, role, dimensions, zones, clearances, repetition, collision and shadow behavior. | Native environment result approved; publication not performed |
 | `assets/textures/world_materials/*.png` | New painted grain sources from the approved pilot, prepared as wrap-continuous tiles. `data/household_material_patterns.json` and `household_surface.gdshader` generate the distinct room patterns and seeded variations locally. | Native environment result approved |
 | `assets/textures/kitchen_hero/*.png`, `assets/textures/workshop_hero/*.png`, `assets/textures/office_hero/*.png` | Fresh overhead source cells and approved-source reuse identified per output in the manifest. No rejected front-facing alternatives or old cel filtering are used. | Native environment result approved |

@@ -76,22 +76,22 @@ func show_title(has_progress: bool, read_only: bool, vehicle_id: String = "rustb
 	_label("POCKET", Rect2(COLUMN_X - 4, 40, 560, 104), 88, SKIN.CREAM)
 	_label("CIRCUIT", Rect2(COLUMN_X - 4, 124, 580, 116), 100, SKIN.YELLOW)
 	_tape("GRAND HOUSEHOLD CIRCUIT", Vector2(COLUMN_X + 6, 246), SKIN.ORANGE, 17)
-	var status := "CONTINUE YOUR CHAMPIONSHIP" if has_progress else "TINY RACING. BIG STAKES."
+	var status := "CONTINUE YOUR RUN" if has_run else "TINY RACING. BIG STAKES."
+	if has_progress and not has_run:
+		status = "CONTINUE YOUR CHAMPIONSHIP"
 	if not recovery_message.is_empty():
 		status = recovery_message
 	elif read_only:
 		status = "SAVE READ-ONLY · QUICK RACE AVAILABLE"
 	_label(status, Rect2(COLUMN_X + 4, 290, COLUMN_WIDTH, 30), 18, SKIN.CREAM_DIM)
-	var play := _button("PLAY", Rect2(COLUMN_X, 336, COLUMN_WIDTH, 82), &"championship", true)
-	play.disabled = read_only and not has_progress
-	# The run (roguelike) is a mode from the start: it seeds its own starter car,
-	# so it must not wait for championship progress.
-	var second_actions := [&"your_run" if has_run else &"new_run", &"quick_race", &"quick_strip"]
-	var second_row := _button_row(second_actions, Rect2(COLUMN_X, 436, COLUMN_WIDTH, 54), 20)
+	var play := _button("PLAY", Rect2(COLUMN_X, 336, COLUMN_WIDTH, 82), &"your_run" if has_run else &"new_run", true)
+	var second_actions := [&"championship", &"quick_race", &"quick_strip"]
+	var second_row := _button_row(second_actions, Rect2(COLUMN_X, 436, COLUMN_WIDTH, 54), 16)
+	second_row[0].disabled = read_only and not has_progress
 	var last_row := _button_row([&"options", &"discovery", &"credits", &"quit"], Rect2(COLUMN_X, 504, COLUMN_WIDTH, 48), 16)
 	_wire_rows([[play], second_row, last_row])
 	_label("ARROWS / STICK  MOVE   ·   ENTER / A  SELECT", Rect2(COLUMN_X + 4, 646, 640, 26), 14, SKIN.CREAM_DIM)
-	_focus_later(play if not play.disabled else second_row.back(), _generation)
+	_focus_later(play, _generation)
 
 
 func show_garage(selected: String, unlocked: Array, context: String, next_text: String, roster: Array = [], title: String = "SELECT YOUR CAR") -> void:
@@ -220,10 +220,11 @@ func _choose_vehicle(id: String) -> void:
 	_stage.configure(&"vehicle", id, "rae", "kitchen", "", _unlocked)
 	_vehicle_name.text = String(vehicle["name"]).to_upper()
 	_archetype.text = String(vehicle["archetype"]).to_upper()
-	var origin := String(vehicle.get("won_from", ""))
-	_origin.visible = RUN_UI.ORIGIN_COPY.has(origin)
+	var collected := VehicleDirectory.get_vehicle(id)
+	var origin := String(collected.get("won_from", vehicle.get("won_from", "")))
+	_origin.visible = id != _holding_id and RUN_UI.ORIGIN_COPY.has(origin)
 	if _origin.visible:
-		_origin.text = RUN_UI.origin_line(vehicle)
+		_origin.text = RUN_UI.origin_line(collected if not collected.is_empty() else vehicle)
 		_origin.reset_size()
 	_profile.position.y = PROFILE_TOP + (ORIGIN_DROP if _origin.visible else 0.0)
 	var tradeoff := String(vehicle.get("tradeoff", ""))

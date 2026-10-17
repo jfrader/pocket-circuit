@@ -5,6 +5,7 @@ class_name ProceduralCarSprites
 
 const IMAGE_WIDTH := 48
 const IMAGE_HEIGHT := 64
+const MAX_PIXEL_SCALE := 6
 const NativeArt = preload("res://scripts/vendor/procedural_2d/procedural_car_art.gd")
 const TYPES := ["compact", "coupe", "muscle", "buggy"]
 const PALETTE_IDS := [
@@ -253,10 +254,10 @@ static func _render_car(payload: Dictionary, wheel_rotation: int, steer: int = 0
 	if not error.is_empty():
 		push_error("ProceduralCarSprites rejected payload: %s." % error)
 		return null
-	if pixel_scale == 2:
-		return NativeArt.new().render(payload, wheel_rotation, steer * 12.0)["car"]
+	if pixel_scale >= 2 and pixel_scale <= MAX_PIXEL_SCALE:
+		return NativeArt.new().render(payload, wheel_rotation, steer * 12.0, pixel_scale)["car"]
 	if pixel_scale != 1:
-		push_error("pixel_scale must be 1 (48x64) or 2 (native 96x128)")
+		push_error("pixel_scale must be between 1 and %d" % MAX_PIXEL_SCALE)
 		return null
 	var image := Image.create(IMAGE_WIDTH, IMAGE_HEIGHT, false, Image.FORMAT_RGBA8)
 	image.fill(Color(0, 0, 0, 0))

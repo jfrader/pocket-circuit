@@ -212,6 +212,34 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	# Racing line the AI follows (curvature-offset ideal path, stored invisibly).
 	# Generated AI stays on the safe side of the optional risk shortcut.
 	TrackBuilderCore._build_racing_line(root, centerline, generated_moments, half_widths)
+	var signature_surfaces: Array[Dictionary] = []
+	for hazard: Dictionary in spec.get("signature_hazards", []):
+		# Physics uses the same data-driven surface presenter as generated tracks.
+		# This container only supplies the authored puddle and approach warning.
+		signature_surfaces.append(hazard.duplicate(true))
+		var visual := Node2D.new()
+		visual.name = String(hazard["id"])
+		TrackBuilderCore._add_polygon(visual, "SurfaceVisual", hazard["points"], hazard["color"], -5)
+		var warning := Label.new()
+		warning.name = "SurfaceLabel"
+		warning.text = String(hazard["label"])
+		warning.position = hazard["warning_position"]
+		warning.add_theme_font_size_override("font_size", 18)
+		warning.add_theme_color_override("font_color", Color("fff0a3"))
+		warning.add_theme_color_override("font_outline_color", Color("172033"))
+		warning.add_theme_constant_override("outline_size", 4)
+		visual.add_child(warning)
+		var decal := Sprite2D.new()
+		decal.name = "Puddle"
+		decal.texture = TrackBuilderCore.asset_texture(String(hazard["decal"]))
+		var bounds := TrackBuilderCore._polygon_bounds_rect(hazard["points"])
+		decal.position = bounds.get_center()
+		decal.scale = bounds.size / decal.texture.get_size()
+		decal.z_index = -4
+		visual.add_child(decal)
+		root.add_child(visual)
+	if not signature_surfaces.is_empty():
+		root.set_meta("generated_surfaces", signature_surfaces)
 	if stage.is_valid():
 		await stage.call("Building trackside scenery")
 

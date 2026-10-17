@@ -1,6 +1,45 @@
 extends Node2D
 
 signal return_requested
+signal sprint_resolved(outcome: String, data: Dictionary)
+signal wear_out_beat_changed(beat: String)
+
+class TowPickup extends Node2D:
+	var hook_target := Vector2(0, 85)
+	var bench := false
+
+	func _draw() -> void:
+		if bench:
+			draw_rect(Rect2(-110, -28, 220, 56), Color("9b623d"))
+			draw_rect(Rect2(-94, 20, 18, 70), Color("453329"))
+			draw_rect(Rect2(76, 20, 18, 70), Color("453329"))
+			return
+		for x in [-28, 20]:
+			for y in [-39, 22]:
+				draw_rect(Rect2(x, y, 8, 18), Color("171c23"))
+		draw_rect(Rect2(-23, -50, 46, 104), Color("e4a544"))
+		draw_rect(Rect2(-19, -43, 38, 32), Color("e9bd68"))
+		draw_rect(Rect2(-17, -35, 34, 14), Color("294455"))
+		draw_rect(Rect2(-18, 0, 36, 44), Color("79553b"))
+		draw_line(Vector2(0, 14), Vector2(0, 61), Color("313e47"), 6)
+		draw_line(Vector2(0, 61), hook_target, Color("abb7b6"), 3)
+		draw_arc(hook_target, 5, 0, PI, 8, Color("abb7b6"), 3)
+
+
+class PassengerFrame extends Control:
+	func _ready() -> void:
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		var dark := Color("18242b")
+		draw_rect(Rect2(0, 0, size.x, 28), dark)
+		draw_rect(Rect2(0, size.y - 120, size.x, 120), dark)
+		draw_line(Vector2(0, size.y), Vector2(size.x * 0.18, 0), dark, 42)
+		draw_line(Vector2(size.x, size.y), Vector2(size.x * 0.86, 0), dark, 42)
+		draw_arc(Vector2(size.x * 0.24, size.y - 22), 80, PI, TAU, 24, Color("45515a"), 14)
+		draw_rect(Rect2(size.x * 0.62, size.y - 86, size.x * 0.22, 8), Color("bb8c52"))
 
 class RacePauseOverlay extends Control:
 	signal cancel_pressed(requested_pause: bool)
@@ -32,7 +71,7 @@ class RacePauseOverlay extends Control:
 			get_viewport().set_input_as_handled()
 
 
-const PAUSE_RETURN_LABELS := {"discovery": "Return to Discovery", "quick": "Return to Title", "strip": "Return to Title", "run": "Return to the Board"}
+const PAUSE_RETURN_LABELS := {"discovery": "Return to Discovery", "quick": "Return to Title", "strip": "Return to Title", "chase_sprint": "Return to the Board", "run": "Return to the Board"}
 const RUSTBUG_SCENE := preload("res://scenes/vehicles/rustbug.tscn")
 const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
@@ -48,10 +87,18 @@ const IDENTITIES := preload("res://scripts/presentation/procedural_identity_libr
 const PERSONAL_GHOST_SCRIPT := preload("res://scripts/race/personal_ghost.gd")
 const RACE_MUSIC_PLAN := preload("res://scripts/audio/race_music_plan.gd")
 const STRIP_CONTROLLER := preload("res://scripts/race/strip_controller.gd")
+const CHASE_SPRINT_CONTROLLER := preload("res://scripts/race/chase_sprint_controller.gd")
 const STRIP_MARKER := preload("res://scripts/presentation/strip_destination_marker.gd")
 const STRIP_TRAFFIC := preload("res://scripts/race/strip/strip_traffic.gd")
 const STRIP_START_WARMUP := preload("res://scripts/race/strip/strip_start_warmup.gd")
 const STARTING_GRID_SYNC_FRAMES := 2
+const NITRO_ACTION := &"nitro"
+const NITRO_SPEED_FRACTION := 0.2
+const WEAR_HOLD_SECONDS := 1.2
+const TOW_PICKUP_SECONDS := 1.4
+const TOW_RIDE_SECONDS := 2.6
+const REDUCED_BEAT_SECONDS := 0.25
+const GRID_ROW_SPACING := 120.0
 const COUNTDOWN_STEP_SECONDS := 0.65
 const PAUSE_STRIP_HEIGHT := 12.0
 ## The victory/defeat outro is a four-bar phrase. Hold the menu phase off it for
@@ -75,8 +122,10 @@ const RACER_MARKER_COLORS: Array[Color] = [
 	Color("71b7ff"),
 	Color("82d49b"),
 	Color("ca78ff"),
+	Color("ffc271"),
+	Color("ed83a8"),
 ]
-const AI_LANE_OFFSETS: Array[float] = [-42.0, 38.0, 6.0]
+const AI_LANE_OFFSETS: Array[float] = [-42.0, 38.0, 6.0, -22.0, 22.0]
 const TRACK_SCENES: Dictionary = {
 	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
 	&"office": "res://scenes/tracks/office_desk.tscn",
@@ -98,7 +147,7 @@ var _countdown_label: Label
 var _race_flash_label: Label
 var _race_hud: RaceHUD
 var _position_label: Label
-var _results_panel: Panel
+var _results_panel: PanelContainer
 var _results_label: Label
 var _retry_button: Button
 var _mastery_button: Button
@@ -107,10 +156,12 @@ var _pause_overlay: RacePauseOverlay
 var _pause_menu_panel: PanelContainer
 var _pause_settings_panel: PanelContainer
 var _pause_resume_button: Button
+var _pause_return_warning: Label
 var _pause_settings_first_control: Control
 var _pause_settings_status: Label
 var _session: Dictionary = {}
 var _save_error := ""
+var _night_consequences := "NIGHT UNCHANGED"
 var _results_finalized: bool = false
 var _player_took_lead := false
 var _race_won := false
@@ -131,6 +182,14 @@ var _best_lap := INF
 var _strip_spawns: Dictionary = {}
 var _strip_prepared: Dictionary = {}
 var _strip_controller: Node2D
+var _run: RunSession
+var _player_wear_texture: Texture2D
+var _player_wear_overlay: Sprite2D
+var _wear_out_pending := false
+var _wear_out_towed := false
+var _wear_out_active := false
+var _wear_out_presented := false
+var wear_out_beat := ""
 
 
 func _ready() -> void:
@@ -155,7 +214,7 @@ func _complete_race_setup(start_countdown: bool = true) -> void:
 	_create_pause_overlay()
 	_pause_overlay.enabled = start_countdown
 	_configure_racers()
-	if String(_session.get("mode", "")) == "strip" and not _setup_strip():
+	if _is_strip_route() and not _setup_strip():
 		call_deferred("_abort_failed_race")
 		return
 	_configure_personal_ghost()
@@ -194,7 +253,7 @@ func _prepare_race_async() -> void:
 	add_child(preparation)
 	app.call("set_loading_section", 1)
 	await _loading_step("Generating a legal circuit")
-	if String(event.get("circuit", "")) == "generated":
+	if String(event.get("circuit", "")) in ["generated", "authored"]:
 		var key := _circuit_cache_key(event)
 		var prepared: Dictionary = {}
 		var used_cached_prepared := false
@@ -212,7 +271,7 @@ func _prepare_race_async() -> void:
 		if prepared.is_empty():
 			app.call("fail_race_loading", "Circuit generation failed")
 			return
-		if String(_session.get("mode", "")) == "strip":
+		if _is_strip_route():
 			_strip_prepared = prepared
 		if app.has_method("record_prepared_mastery_metrics"):
 			app.call("record_prepared_mastery_metrics", event, prepared.get("racing_line_metrics", {}))
@@ -319,10 +378,10 @@ func _prepare_race_async() -> void:
 	app.call("set_loading_section", 3)
 	await _loading_step("Setting the starting grid")
 	_complete_race_setup(false)
-	if String(_session.get("mode", "")) == "strip" and _strip_controller == null:
+	if _is_strip_route() and _strip_controller == null:
 		preparation.queue_free()
 		return
-	if String(_session.get("mode", "")) == "strip":
+	if _is_strip_route():
 		var traffic := get_node("StripTraffic") as StripTraffic
 		if not await traffic.prepare_visuals(preparation, _loading_step.bind("Preparing traffic animation"), Callable(app, "is_race_loading_cancelled")):
 			preparation.queue_free()
@@ -347,7 +406,7 @@ func _prepare_race_async() -> void:
 		for entry: Dictionary in _build_field_racers_for_preparation():
 			await director.call("warm_vehicle_audio", String(entry.get("vehicle_id", "")), _loading_step.bind("Preparing race audio"))
 			await _loading_step("Preparing race audio")
-	if String(_session.get("mode", "")) == "strip":
+	if _is_strip_route():
 		var warmed: Dictionary = await STRIP_START_WARMUP.draw_runner(camera, _strip_prepared["room_polygon"], get_node("StripTraffic"), _loading_step.bind("Warming strip graphics"), Callable(app, "is_race_loading_cancelled"))
 		set_meta("strip_start_warmup", warmed)
 	for frame in 3:
@@ -374,6 +433,9 @@ func _exit_tree() -> void:
 
 
 func _process(_delta: float) -> void:
+	if is_instance_valid(_player_wear_overlay):
+		var sprite := _player_wear_overlay.get_parent() as Sprite2D
+		_player_wear_overlay.visible = sprite.texture != _player_wear_texture
 	_update_race_hud()
 	_update_personal_ghost()
 
@@ -438,9 +500,14 @@ func _build_field_racers_for_preparation() -> Array[Dictionary]:
 	var entries: Array[Dictionary] = []
 	var pvid := String(_session.get("vehicle_id", "rustbug"))
 	entries.append({"vehicle_id": pvid, "driver_id": "rae", "slot": 0})
+	if _is_chase_sprint():
+		var chaser := _chase_driver()
+		if not chaser.is_empty():
+			entries.append({"vehicle_id": chaser["vehicle_id"], "driver_id": chaser["id"], "slot": 1})
+		return entries
 	var ev: Dictionary = _session.get("event", {})
 	var oids: Array = ev.get("opponents", FALLBACK_OPPONENTS) if not ev.is_empty() else FALLBACK_OPPONENTS
-	var ocnt := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(ev.get("opponent_count", oids.size())), 0, 3)
+	var ocnt := _opponent_count(ev, oids)
 	for i in mini(oids.size(), ocnt):
 		var did := String(oids[i])
 		var d := CATALOG.get_driver(did)
@@ -452,6 +519,64 @@ func _build_field_racers_for_preparation() -> Array[Dictionary]:
 func _resolve_field_visual_keys() -> Dictionary:
 	var racers := _build_field_racers_for_preparation()
 	return IDENTITIES.resolve_field_visual_keys(racers)
+
+
+func _opponent_count(event: Dictionary, opponents: Array) -> int:
+	var mode := String(_session.get("mode", ""))
+	if mode == "mastery":
+		return 0
+	var maximum := RunSession.FIELD_OPPONENTS if mode == "run" else FALLBACK_OPPONENTS.size()
+	if String(event.get("race_format", "")) == "rival_duel":
+		maximum = 1
+	return clampi(int(event.get("opponent_count", opponents.size())), 0, maximum)
+
+
+func _configure_player_wear(vehicle: VehicleController, visual_key: String) -> void:
+	var sprite := vehicle.get_node("VisualRoot/CarSprite") as Sprite2D
+	var wear := _run.run_state.get_car_wear(_run.current_car_id)
+	var display_height := roundi(sprite.texture.get_height() * sprite.scale.y)
+	_player_wear_texture = IDENTITIES.car_texture_with_wear_for_key(visual_key, wear, IDENTITIES.NATIVE_PIXEL_SCALE, display_height)
+	if _player_wear_texture == null:
+		return
+	sprite.texture = _player_wear_texture
+	_player_wear_overlay = Sprite2D.new()
+	_player_wear_overlay.name = "CarWear"
+	_player_wear_overlay.texture = IDENTITIES.car_wear_overlay_for_key(visual_key, wear, IDENTITIES.NATIVE_PIXEL_SCALE, display_height)
+	_player_wear_overlay.visible = false
+	sprite.add_child(_player_wear_overlay)
+
+
+func _ensure_nitro_action() -> void:
+	if InputMap.has_action(NITRO_ACTION):
+		return
+	InputMap.add_action(NITRO_ACTION)
+	var key := InputEventKey.new()
+	key.keycode = KEY_N
+	InputMap.action_add_event(NITRO_ACTION, key)
+	var button := InputEventJoypadButton.new()
+	button.button_index = JOY_BUTTON_X
+	InputMap.action_add_event(NITRO_ACTION, button)
+
+
+func fire_nitro() -> bool:
+	if _run == null or _finished or _countdown_active or not _starting_collision_states.is_empty() or not race_manager.is_running or get_tree().paused or not is_instance_valid(_player_vehicle):
+		return false
+	if not _run.spend_nitro():
+		return false
+	var app := get_node_or_null("/root/App")
+	if app and app.has_method("persist_current_run"):
+		app.call("persist_current_run")
+		if not String(app.get("run_save_error")).is_empty():
+			_run.add_nitro()
+			return false
+	var power := _run.nitro_power()
+	# Bottled nitro is a one-shot reserve, not drift recharge. Its kick applies
+	# immediately even when the player isn't holding the ordinary boost input.
+	_player_vehicle.boost_amount = minf(_player_vehicle.get_boost_capacity(), _player_vehicle.boost_amount + _player_vehicle.get_boost_capacity() * power)
+	var forward := Vector2.UP.rotated(_player_vehicle.rotation)
+	_player_vehicle.apply_central_impulse(forward * _player_vehicle.mass * _player_vehicle.get_effective_max_speed() * NITRO_SPEED_FRACTION * power)
+	_update_race_hud()
+	return true
 
 
 func _configure_racers() -> void:
@@ -470,10 +595,14 @@ func _configure_racers() -> void:
 
 	var event: Dictionary = _session.get("event", {})
 	var opponent_ids: Array = event.get("opponents", FALLBACK_OPPONENTS) if not event.is_empty() else FALLBACK_OPPONENTS
-	var opponent_count := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
+	var opponent_count := _opponent_count(event, opponent_ids)
+	if _is_chase_sprint():
+		var chaser := _chase_driver()
+		opponent_ids = [] if chaser.is_empty() else [chaser["id"]]
+		opponent_count = opponent_ids.size()
 	var difficulty := String(_session.get("difficulty", "club_circuit"))
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
-	if String(_session.get("mode", "")) == "strip":
+	if _is_strip_route():
 		_strip_spawns = _strip_prepared.get("strip_grid", {})
 		if not _strip_spawns.is_empty():
 			grid = grid.duplicate()
@@ -481,7 +610,7 @@ func _configure_racers() -> void:
 	var positional_vehicles: Array[Node] = []
 	for ai_index in mini(opponent_ids.size(), opponent_count):
 		var driver_id := String(opponent_ids[ai_index])
-		var driver := CATALOG.get_driver(driver_id)
+		var driver := _chase_driver() if _is_chase_sprint() else CATALOG.get_driver(driver_id)
 		var ai_vehicle_id := String(driver.get("vehicle_id", "rustbug"))
 		var ai_visual_key := String(field_visuals.get(ai_index + 1, ai_vehicle_id))
 		var ai_vehicle := RUSTBUG_SCENE.instantiate() as VehicleController
@@ -502,11 +631,11 @@ func _configure_racers() -> void:
 		ai_controller.configure(
 			ai_vehicle,
 			race_manager,
-			0.0 if String(_session.get("mode", "")) == "strip" else AI_LANE_OFFSETS[ai_index],
+			0.0 if _is_strip_route() else AI_LANE_OFFSETS[ai_index],
 			difficulty,
 			driver_id,
 			driver.get("ai_style", {}) as Dictionary,
-			_player_vehicle if String(_session.get("mode", "")) == "strip" else null
+			_player_vehicle if _is_strip_route() else null
 		)
 		positional_vehicles.append(ai_vehicle)
 	var director := _audio_director()
@@ -527,18 +656,50 @@ func _setup_strip() -> bool:
 			break
 	if chaser == null:
 		return false
-	_strip_controller = STRIP_CONTROLLER.new() as Node2D
+	_strip_controller = (CHASE_SPRINT_CONTROLLER.new() if _is_chase_sprint() else STRIP_CONTROLLER.new()) as Node2D
 	_strip_controller.name = "StripController"
 	add_child(_strip_controller)
-	_strip_controller.configure(race_manager, _player_vehicle, chaser, float(_strip_prepared["strip_time_limit"]))
-	_strip_controller.outcome_resolved.connect(_on_strip_outcome)
+	var limit := CHASE_SPRINT_CONTROLLER.LIMIT_SECONDS if _is_chase_sprint() else float(_strip_prepared["strip_time_limit"])
+	if _is_chase_sprint():
+		_strip_controller.configure(race_manager, _player_vehicle, chaser, _reduced_motion_enabled())
+		_strip_controller.sprint_resolved.connect(_on_sprint_outcome)
+		camera.rotation = 0.0
+	else:
+		_strip_controller.configure(race_manager, _player_vehicle, chaser, limit)
+		_strip_controller.outcome_resolved.connect(_on_strip_outcome)
 	race_manager.configure_strip_route(1, int(gates[-1]["index"]), Callable(_strip_controller, "may_finish"))
 	_setup_strip_traffic()
 	var marker := STRIP_MARKER.new() as Control
 	marker.name = "StripDestination"
 	$HUD.add_child(marker)
-	marker.configure(gates[-1]["position"], camera, race_manager, float(_strip_prepared["strip_time_limit"]))
+	# Rescue is not a finish deadline; keep only the destination arrow in a haul.
+	marker.configure(gates[-1]["position"], camera, race_manager, INF if _is_chase_sprint() else limit)
 	return true
+
+
+func _is_chase_sprint() -> bool:
+	return String(_session.get("mode", "")) == "chase_sprint"
+
+
+func _is_strip_route() -> bool:
+	return String(_session.get("mode", "")) in ["strip", "chase_sprint"]
+
+
+func _chase_driver() -> Dictionary:
+	return (_session.get("chaser", {}) as Dictionary).duplicate(true)
+
+
+func get_sprint_result() -> Dictionary:
+	return _strip_controller.result() if _is_chase_sprint() and is_instance_valid(_strip_controller) else {}
+
+
+func _on_sprint_outcome(value: String, data: Dictionary) -> void:
+	if bool(data.get("terminal", false)):
+		_on_strip_outcome(value, float(data["elapsed"]))
+		_retry_button.visible = false
+		_results_label.text = "%s\n\n%s" % [value, _format_time(float(data["elapsed"]))]
+		_continue_button.grab_focus()
+	sprint_resolved.emit(value, data)
 
 
 func _setup_strip_traffic() -> void:
@@ -559,7 +720,7 @@ func _on_strip_outcome(headline: String, elapsed: float) -> void:
 	_race_hud.visible = false
 	_pause_overlay.enabled = false
 	_results_panel.visible = true
-	_results_label.text = "%s\n\n%s\n\nCONTINUE · RETRY TO RUN IT AGAIN" % [headline, _format_time(elapsed) if headline == "STRIP WON" else ""]
+	_results_label.text = "%s\n\n%s" % [headline, _format_time(elapsed) if headline == "STRIP WON" else ""]
 	_retry_button.text = "RETRY"
 	_retry_button.disabled = false
 	_continue_button.disabled = false
@@ -576,7 +737,7 @@ func _configure_vehicle(
 		visual_key: String = ""
 ) -> void:
 	var grid := _grid_transforms(race_manager.is_reverse_direction())
-	if String(_session.get("mode", "")) == "strip" and not _strip_spawns.is_empty():
+	if _is_strip_route() and not _strip_spawns.is_empty():
 		grid = grid.duplicate()
 		grid[racer_index] = _strip_spawns["player" if is_player else "chaser"]
 	vehicle.freeze = true
@@ -593,6 +754,8 @@ func _configure_vehicle(
 	var vehicle_name := String(vehicle_data.get("name", "Rustbug"))
 	var use_visual := visual_key if not visual_key.is_empty() else vehicle_id
 	vehicle.configure_identity(driver_name, vehicle_name, use_visual)
+	if is_player and _run != null:
+		_configure_player_wear(vehicle, use_visual)
 	vehicle.configure_racer_marker(RACER_MARKER_COLORS[racer_index], racer_index)
 	race_manager.register_racer(vehicle, driver_name, vehicle_name, is_player)
 
@@ -625,12 +788,15 @@ func _configure_session() -> void:
 		var session: Variant = app.call("get_current_race_session")
 		if session is Dictionary and not (session as Dictionary).is_empty():
 			_session = session
+	if String(_session.get("mode", "")) == "run" and app and app.has_method("current_run_session"):
+		_run = app.call("current_run_session") as RunSession
+		_ensure_nitro_action()
 	var event: Dictionary = _session.get("event", {})
 	if not event.is_empty():
 		race_manager.laps_to_finish = clampi(int(event.get("laps", 3)), 1, 99)
-		race_manager.set_reverse_direction(bool(event.get("reverse", false)) and String(_session.get("mode", "")) != "strip")
+		race_manager.set_reverse_direction(bool(event.get("reverse", false)) and not _is_strip_route())
 		if is_instance_valid(_race_hud):
-			if String(_session.get("mode", "")) == "strip":
+			if _is_strip_route():
 				_race_hud.set_strip_mode(true)
 			var vehicle := CATALOG.get_vehicle(String(_session.get("vehicle_id", "rustbug")))
 			_race_hud.set_context(String(event.get("name", "Household Circuit")), String(vehicle.get("name", "Rustbug")))
@@ -641,11 +807,11 @@ func _configure_track_variant() -> bool:
 	var requested_theme := StringName(event.get("theme", "kitchen"))
 	var scene_path := ""
 	var packed: PackedScene = null
-	if String(event.get("circuit", "")) == "generated":
+	if String(event.get("circuit", "")) in ["generated", "authored"]:
 		var circuit_room := StringName(event.get("room", "classic"))
 		var circuit_seed := int(event.get("seed", 0))
 		var built := TRACK_BUILDER.build_packed(requested_theme, circuit_room, circuit_seed, _track_generation_options(event))
-		if String(_session.get("mode", "")) == "strip":
+		if _is_strip_route():
 			_strip_prepared = built.get("strip_prepared", {})
 		packed = built.get("scene") as PackedScene
 		var app := get_node_or_null("/root/App")
@@ -676,7 +842,7 @@ func _configure_track_variant() -> bool:
 
 func _track_generation_options(event: Dictionary) -> Dictionary:
 	var options := TRACK_BUILDER.generated_circuit_options(event)
-	if String(event.get("race_format", "")) == "strip":
+	if _is_strip_route() or String(event.get("race_format", "")) == "strip":
 		options["route_shape"] = "strip"
 	return options
 
@@ -744,7 +910,7 @@ func _configure_route_reference() -> void:
 			for tile: Node in tiles.get_children():
 				if tile is Node2D:
 					route.append((tile as Node2D).global_position)
-	race_manager.configure_route_reference(route, float(track_root.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)), String(_session.get("mode", "")) == "strip")
+	race_manager.configure_route_reference(route, float(track_root.get_meta("corridor_max_half_width", TrackBuilderCore.HALF_WIDTH)), _is_strip_route())
 
 
 func _abort_failed_race() -> void:
@@ -778,9 +944,25 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 							var tangent := (end - start) * (-1.0 if reverse else 1.0)
 							heading = tangent.angle() + PI * 0.5
 				transforms.append(Transform2D(heading, marker.position))
-	if transforms.size() == 4:
-		return transforms
-	return REVERSE_GRID_TRANSFORMS if reverse else GRID_TRANSFORMS
+	if transforms.size() < 4:
+		transforms = (REVERSE_GRID_TRANSFORMS if reverse else GRID_TRANSFORMS).duplicate()
+	var required := _build_field_racers_for_preparation().size()
+	while transforms.size() < required:
+		var left := transforms[transforms.size() - 2]
+		var right := transforms[transforms.size() - 1]
+		var center := (left.origin + right.origin) * 0.5
+		var first_center := (transforms[0].origin + transforms[1].origin) * 0.5
+		# Generated grids reserve two rows 120 units apart. Fit the added pair
+		# between those safe rows, rather than extending into unreserved scenery.
+		if first_center.distance_to(center) >= GRID_ROW_SPACING * 0.85:
+			transforms.append(Transform2D(lerp_angle(transforms[0].get_rotation(), left.get_rotation(), 0.5), transforms[0].origin.lerp(left.origin, 0.5)))
+			transforms.append(Transform2D(lerp_angle(transforms[1].get_rotation(), right.get_rotation(), 0.5), transforms[1].origin.lerp(right.origin, 0.5)))
+			continue
+		var next := Transform2D(left.get_rotation(), center + Vector2.UP.rotated(left.get_rotation()) * GRID_ROW_SPACING)
+		var side := Vector2.RIGHT.rotated(next.get_rotation()) * TRACK_BUILDER.GRID_LANE_OFFSET
+		transforms.append(Transform2D(next.get_rotation(), next.origin - side))
+		transforms.append(Transform2D(next.get_rotation(), next.origin + side))
+	return transforms
 
 
 func _run_countdown() -> void:
@@ -817,6 +999,7 @@ func _update_race_hud() -> void:
 	if not is_instance_valid(_race_hud) or not is_instance_valid(_player_vehicle):
 		return
 	var shown_lap := mini(race_manager.lap_count + 1, race_manager.laps_to_finish)
+	_race_hud.set_nitro_count(_run.nitro_count if _run != null else -1)
 	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.get_boost_capacity(), 0.001), 0.0, 1.0)
 	var speed_ratio := clampf(_player_vehicle.speed / maxf(_player_vehicle.get_effective_max_speed(), 0.001), 0.0, 1.2)
 	_race_hud.set_telemetry(
@@ -832,7 +1015,7 @@ func _update_race_hud() -> void:
 	var progress := PackedFloat32Array()
 	var total_gates := maxf(1.0, race_manager.laps_to_finish * race_manager.get_checkpoint_count())
 	for racer: Node2D in racers:
-		if String(_session.get("mode", "")) == "strip":
+		if _is_strip_route():
 			var gates: Array = _strip_prepared.get("strip_gates", [])
 			progress.append(clampf(race_manager.get_racer_progress(racer) / maxf(1.0, float(gates.size() - 1)), 0.0, 1.0))
 		else:
@@ -841,7 +1024,7 @@ func _update_race_hud() -> void:
 
 
 func _on_race_finished(_total_time: float) -> void:
-	if String(_session.get("mode", "")) == "strip":
+	if _is_strip_route():
 		_strip_controller.call("win", _total_time)
 		return
 	_finished = true
@@ -873,7 +1056,7 @@ func _queue_menu_phase() -> void:
 
 
 func _on_position_changed(racer: Node2D, _position: int, _racer_count: int) -> void:
-	if String(_session.get("mode", "")) == "strip":
+	if _is_strip_route():
 		return
 	if racer != _player_vehicle:
 		return
@@ -951,7 +1134,7 @@ func _on_racer_finished(racer: Node2D, _position: int, total_time: float) -> voi
 
 
 func _on_results_ready(results: Array) -> void:
-	if String(_session.get("mode", "")) == "strip":
+	if _is_strip_route():
 		return
 	_set_paused(false)
 	if _results_finalized:
@@ -976,10 +1159,13 @@ func _update_results(results: Array) -> void:
 		])
 	lines.append("")
 	var mode := String(_session.get("mode", "quick"))
-	var final_prompt := "CONTINUE · RETRY TO RUN IT AGAIN" if mode in ["quick", "discovery"] else ("RESULT SAVED · CONTINUE" if mode == "run" else "RESULT SAVED · CONTINUE OR RETRY")
+	var final_prompt := "" if mode in ["quick", "discovery"] else "RESULT SAVED"
 	var app := get_node_or_null("/root/App")
 	var live_session: Dictionary = app.call("get_current_race_session") if app and app.has_method("get_current_race_session") else {}
 	var summary: Dictionary = live_session.get("result_summary", {})
+	if mode == "run":
+		lines.append(_night_consequences)
+		_results_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	if bool(summary.get("mastery", false)):
 		var record: Dictionary = summary.get("mastery_record", {})
 		var targets: Dictionary = summary.get("mastery_targets", {})
@@ -990,15 +1176,16 @@ func _update_results(results: Array) -> void:
 			lines.append("TARGETS  G %s · S %s · B %s" % [_format_time(float(targets["gold"])), _format_time(float(targets["silver"])), _format_time(float(targets["bronze"]))])
 		if bool(summary.get("ghost_saved", false)):
 			lines.append("PERSONAL BEST GHOST SAVED")
-		final_prompt = "NO TIME SAVED · CONTINUE OR RETRY" if bool(summary.get("mastery_dnf", false)) else "TIME TRIAL SAVED · CONTINUE OR RETRY"
+		final_prompt = "NO TIME SAVED" if bool(summary.get("mastery_dnf", false)) else "TIME TRIAL SAVED"
 	if not _save_error.is_empty():
-		var actions := "RETRY SAVE" if _continue_button.disabled else "RETRY SAVE OR CONTINUE"
-		final_prompt = "NOT SAVED · " + actions
+		final_prompt = "NOT SAVED · RETRY SAVE"
 	lines.append("FINALIZING..." if not _results_finalized else final_prompt)
 	_results_label.text = "\n".join(lines)
 
 
 func restart_race() -> void:
+	if _is_chase_sprint():
+		return
 	_left_results = true
 	_set_paused(false)
 	var app := get_node_or_null("/root/App")
@@ -1009,6 +1196,8 @@ func restart_race() -> void:
 
 
 func request_return() -> void:
+	if _wear_out_active:
+		return
 	_left_results = true
 	_set_paused(false)
 	return_requested.emit()
@@ -1033,6 +1222,12 @@ func request_abandon() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if InputMap.has_action(NITRO_ACTION) and event.is_action_pressed(NITRO_ACTION) and not event.is_echo():
+		if fire_nitro():
+			get_viewport().set_input_as_handled()
+		return
+	if _wear_out_active:
+		return
 	if not _results_finalized:
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
@@ -1212,53 +1407,60 @@ func _create_phase_one_ui() -> void:
 	_position_label.visible = false
 	hud.add_child(_position_label)
 
-	_results_panel = Panel.new()
+	var results_center := CenterContainer.new()
+	results_center.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	results_center.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hud.add_child(results_center)
+	_results_panel = PanelContainer.new()
 	_results_panel.name = "ResultsPanel"
-	_results_panel.offset_left = 330.0
-	_results_panel.offset_top = 150.0
-	_results_panel.offset_right = 950.0
-	_results_panel.offset_bottom = 565.0
+	_results_panel.custom_minimum_size.x = 620.0
 	_results_panel.visible = false
 	_results_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.96), Color("f4c65a")))
-	hud.add_child(_results_panel)
+	results_center.add_child(_results_panel)
+	var results_margin := MarginContainer.new()
+	for edge: String in ["left", "right", "top", "bottom"]:
+		results_margin.add_theme_constant_override("margin_" + edge, 24)
+	_results_panel.add_child(results_margin)
+	var results_column := VBoxContainer.new()
+	results_column.add_theme_constant_override("separation", 20)
+	results_margin.add_child(results_column)
 	_results_label = Label.new()
-	_results_label.offset_left = 28.0
-	_results_label.offset_top = 24.0
-	_results_label.offset_right = 592.0
-	_results_label.offset_bottom = 325.0
+	_results_label.custom_minimum_size.x = 564.0
+	_results_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_results_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_results_label.add_theme_font_size_override("font_size", 20)
 	_results_label.add_theme_color_override("font_color", Color(0.96, 0.94, 0.89))
-	_results_panel.add_child(_results_label)
+	results_column.add_child(_results_label)
+	var results_actions := HBoxContainer.new()
+	results_actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	results_actions.add_theme_constant_override("separation", 24)
+	results_column.add_child(results_actions)
 
 	_retry_button = MENU_BUTTON_SCRIPT.new() as Button
 	_retry_button.text = "RETRY"
-	_retry_button.position = Vector2(126.0, 340.0)
-	_retry_button.size = Vector2(170.0, 48.0)
+	_retry_button.custom_minimum_size = Vector2(170.0, 48.0)
 	_retry_button.disabled = true
 	_apply_menu_button_art(_retry_button)
 	_retry_button.add_theme_font_size_override("font_size", 16)
 	_retry_button.pressed.connect(_on_retry_pressed)
-	_results_panel.add_child(_retry_button)
+	results_actions.add_child(_retry_button)
 	_mastery_button = MENU_BUTTON_SCRIPT.new() as Button
 	_mastery_button.text = "SOLO TIME TRIAL"
-	_mastery_button.position = Vector2(225.0, 340.0)
-	_mastery_button.size = Vector2(170.0, 48.0)
+	_mastery_button.custom_minimum_size = Vector2(170.0, 48.0)
 	_mastery_button.disabled = true
 	_mastery_button.visible = false
 	_apply_menu_button_art(_mastery_button)
 	_mastery_button.add_theme_font_size_override("font_size", 16)
 	_mastery_button.pressed.connect(_on_mastery_pressed)
-	_results_panel.add_child(_mastery_button)
+	results_actions.add_child(_mastery_button)
 	_continue_button = MENU_BUTTON_SCRIPT.new() as Button
 	_continue_button.text = "CONTINUE"
-	_continue_button.position = Vector2(324.0, 340.0)
-	_continue_button.size = Vector2(170.0, 48.0)
+	_continue_button.custom_minimum_size = Vector2(170.0, 48.0)
 	_continue_button.disabled = true
 	_apply_menu_button_art(_continue_button, true)
 	_continue_button.add_theme_font_size_override("font_size", 16)
 	_continue_button.pressed.connect(request_return)
-	_results_panel.add_child(_continue_button)
+	results_actions.add_child(_continue_button)
 
 
 func _create_pause_overlay() -> void:
@@ -1306,6 +1508,13 @@ func _create_pause_overlay() -> void:
 	var mode := String(_session.get("mode", "quick"))
 	var return_label: String = PAUSE_RETURN_LABELS.get(mode, "Return to Championship")
 	_add_pause_button(menu_column, return_label, request_abandon)
+	if mode == "run":
+		_pause_return_warning = MENU_SKIN.style_label(Label.new(), 15, MENU_SKIN.INK_SOFT)
+		_pause_return_warning.name = "PauseReturnWarning"
+		_pause_return_warning.text = "RETURNING COUNTS THIS RACE AS A LOSS"
+		_pause_return_warning.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_pause_return_warning.visible = false
+		menu_column.add_child(_pause_return_warning)
 
 	_pause_settings_panel = PanelContainer.new()
 	_pause_settings_panel.name = "PauseSettingsPanel"
@@ -1364,6 +1573,10 @@ func _show_pause_menu() -> void:
 	_pause_menu_panel.visible = true
 	_pause_settings_panel.visible = false
 	_pause_overlay.settings_open = false
+	if is_instance_valid(_pause_return_warning):
+		var app := get_node_or_null("/root/App")
+		var run: RunSession = app.call("current_run_session") if app else null
+		_pause_return_warning.visible = run != null and not run.race_in_flight.is_empty()
 	if is_instance_valid(_pause_resume_button):
 		_pause_resume_button.grab_focus()
 
@@ -1476,33 +1689,98 @@ func _attempt_result_commit(results: Array) -> void:
 	var mastery_available := committed and app and app.has_method("can_start_mastery_rematch") and bool(app.call("can_start_mastery_rematch"))
 	_mastery_button.visible = mastery_available
 	_mastery_button.disabled = not mastery_available
-	_layout_result_actions(mastery_available)
 	_retry_button.focus_neighbor_right = _retry_button.get_path_to(_mastery_button if mastery_available else _continue_button)
 	_continue_button.focus_neighbor_left = _continue_button.get_path_to(_mastery_button if mastery_available else (_retry_button if _retry_button.visible else _continue_button))
 	if mastery_available:
 		_mastery_button.focus_neighbor_left = _mastery_button.get_path_to(_retry_button)
 		_mastery_button.focus_neighbor_right = _mastery_button.get_path_to(_continue_button)
 	_update_results(results)
+	if committed and _wear_out_pending and not _wear_out_presented:
+		_present_wear_out()
+		return
 	if committed:
 		_continue_button.grab_focus()
 	else:
 		_retry_button.grab_focus()
 
 
-func _layout_result_actions(mastery_available: bool) -> void:
-	if mastery_available:
-		_retry_button.position.x = 26.0
-		_mastery_button.position.x = 225.0
-		_continue_button.position.x = 424.0
-	elif not _retry_button.visible:
-		_continue_button.position.x = 225.0
+func _set_wear_out_beat(beat: String) -> void:
+	wear_out_beat = beat
+	wear_out_beat_changed.emit(beat)
+
+
+func _present_wear_out() -> void:
+	_wear_out_presented = true
+	_wear_out_active = true
+	_results_panel.hide()
+	_race_hud.hide()
+	_countdown_label.hide()
+	_pause_overlay.enabled = false
+	race_manager.is_running = false
+	for racer: Node2D in race_manager.get_rankings():
+		if racer is VehicleController:
+			(racer as VehicleController).set_controls_locked(true)
+			(racer as VehicleController).linear_velocity = Vector2.ZERO
+			(racer as VehicleController).angular_velocity = 0.0
+			(racer as VehicleController).freeze = true
+	camera.set_physics_process(false)
+	camera.global_position = _player_vehicle.global_position
+	camera.reset_smoothing()
+	_set_wear_out_beat("wreck")
+	var reduced := _reduced_motion_enabled()
+	await get_tree().create_timer(REDUCED_BEAT_SECONDS if reduced else WEAR_HOLD_SECONDS).timeout
+	if not _wear_out_towed:
+		_set_wear_out_beat("run_over")
+		_race_flash_label.text = "RUN OVER"
+		_race_flash_label.modulate.a = 1.0
+		_race_flash_label.show()
+		await get_tree().create_timer(REDUCED_BEAT_SECONDS if reduced else WEAR_HOLD_SECONDS).timeout
 	else:
-		_retry_button.position.x = 126.0
-		_continue_button.position.x = 324.0
+		var pickup := TowPickup.new()
+		pickup.name = "TowPickup"
+		pickup.rotation = _player_vehicle.rotation
+		var forward := Vector2.UP.rotated(pickup.rotation)
+		var hooked := _player_vehicle.global_position + forward * pickup.hook_target.y
+		add_child(pickup)
+		pickup.global_position = hooked if reduced else hooked + forward * 180.0
+		_set_wear_out_beat("pickup")
+		var backing := create_tween()
+		backing.tween_property(pickup, "global_position", hooked, REDUCED_BEAT_SECONDS if reduced else TOW_PICKUP_SECONDS)
+		await backing.finished
+		_player_vehicle.reparent(pickup, true)
+		_set_wear_out_beat("passenger")
+		var frame := PassengerFrame.new()
+		frame.name = "TowPassengerView"
+		$HUD.add_child(frame)
+		# The driver stays out of control: the right-seat framing rides past the
+		# oversized room while the frozen car follows the pickup's hook.
+		var ride_offset := forward * 480.0
+		camera.global_position = pickup.global_position + Vector2.RIGHT.rotated(pickup.rotation) * 70.0
+		var ride := create_tween().set_parallel(true)
+		if not reduced:
+			ride.tween_property(pickup, "global_position", pickup.global_position + ride_offset, TOW_RIDE_SECONDS)
+			ride.tween_property(camera, "global_position", camera.global_position + ride_offset, TOW_RIDE_SECONDS)
+		else:
+			ride.tween_interval(REDUCED_BEAT_SECONDS)
+		await ride.finished
+		frame.queue_free()
+		var bench := TowPickup.new()
+		bench.name = "TowDestinationBench"
+		bench.bench = true
+		add_child(bench)
+		bench.global_position = pickup.global_position + forward * 170.0
+		camera.global_position = bench.global_position
+		_set_wear_out_beat("bench")
+		_race_flash_label.text = "THE NEXT BENCH"
+		_race_flash_label.modulate.a = 1.0
+		_race_flash_label.show()
+		await get_tree().create_timer(REDUCED_BEAT_SECONDS if reduced else WEAR_HOLD_SECONDS).timeout
+	_wear_out_active = false
+	request_return()
 
 
 func _report_result_to_app(results: Array) -> bool:
-	if String(_session.get("mode", "")) == "strip":
+	if _is_strip_route():
 		return true
 	_save_error = ""
 	var app := get_node_or_null("/root/App")
@@ -1515,7 +1793,17 @@ func _report_result_to_app(results: Array) -> bool:
 				"best_lap": 0.0 if is_inf(_best_lap) else _best_lap,
 				"ghost_samples": PERSONAL_GHOST_SCRIPT.finalize_samples(_ghost_samples, finish_time),
 			}
+			var run: RunSession = app.call("current_run_session") as RunSession if String(_session.get("mode", "")) == "run" else null
+			var before := _night_result_snapshot(run) if run != null else {}
+			var live: Dictionary = app.call("get_current_race_session")
+			var already_applied := bool(live.get("run_result_applied", false))
 			var committed := bool(app.call("report_race_result", int(result["position"]), finish_time, results, bool(result.get("dnf", false)), performance))
+			live = app.call("get_current_race_session")
+			if run != null and not already_applied and bool(live.get("run_result_applied", false)):
+				_night_consequences = _night_result_consequences(before, run, live.get("result", {}))
+				var worn_out := RunSession.RUN_STATE.is_worn_out(run.run_state.get_car_wear(String(before["car_id"])))
+				_wear_out_towed = run.towed_to_bench and run.tow_count < int(before["tow_count"])
+				_wear_out_pending = worn_out or _wear_out_towed
 			if not committed and app.has_method("get_last_save_error"):
 				_save_error = String(app.call("get_last_save_error"))
 				if app.has_method("get_current_race_session"):
@@ -1523,6 +1811,49 @@ func _report_result_to_app(results: Array) -> bool:
 					_save_error = String(pending.get("save_error", _save_error))
 			return committed
 	return true
+
+
+func _night_result_snapshot(run: RunSession) -> Dictionary:
+	var node_type := String(run.current_node().get("type", ""))
+	var opponents: Array = run.opponents_for_node(run.current_node_id).get("opponents", []) if node_type in ["rival", "act_rival"] else []
+	return {
+		"points": run.run_points,
+		"car_id": run.current_car_id,
+		"wear": run.run_state.get_car_wear(run.current_car_id),
+		"act": run.current_map.act,
+		"cars": run.owned_cars.keys(),
+		"pending_offer": run.pending_offer,
+		"completed": run.is_complete(),
+		"rival_car": String(opponents[0]["vehicle_id"]) if not opponents.is_empty() else "",
+		"node_type": node_type,
+		"tow_count": run.tow_count,
+	}
+
+
+func _night_result_consequences(before: Dictionary, run: RunSession, result: Dictionary) -> String:
+	var changes: Array[String] = []
+	var points := run.run_points - int(before["points"])
+	if points > 0:
+		changes.append("+%d POINTS" % points)
+	if String(before["node_type"]) == "rival" and (int(result.get("position", 1)) != 1 or bool(result.get("dnf", false))):
+		changes.append("RIVAL LOSS: -%d POINTS" % absi(points))
+	var wear := run.run_state.get_car_wear(String(before["car_id"]))
+	if wear != String(before["wear"]):
+		changes.append("WEAR: %s -> %s" % [String(before["wear"]).to_upper(), wear.to_upper()])
+	for car: Dictionary in run.won_cars():
+		var car_id := String(car["id"])
+		var offered := run.pending_offer == car_id and run.pending_offer != String(before["pending_offer"])
+		var final_reward := run.is_complete() and not bool(before["completed"]) and car_id == String(before["rival_car"])
+		if car_id not in (before["cars"] as Array) or offered or final_reward:
+			var vehicle := CATALOG.get_vehicle(car_id)
+			if vehicle.is_empty():
+				vehicle = CATALOG.generated_vehicle(car)
+			var decision := " - DECIDE AT THE BOARD" if run.pending_offer == car_id else " - BANKED"
+			changes.append("WON: " + String(vehicle["name"]).to_upper() + decision)
+	if run.current_map.act > int(before["act"]):
+		var nbsp := String.chr(0xA0)
+		changes.append("ACT%s%d%sUNLOCKED" % [nbsp, run.current_map.act, nbsp])
+	return " · ".join(changes) if not changes.is_empty() else "NIGHT UNCHANGED"
 
 
 func _format_time(total_seconds: float) -> String:

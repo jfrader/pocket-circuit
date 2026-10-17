@@ -6,7 +6,8 @@ extends SceneTree
 ##     xvfb-run -a godot --path . --script res://tools/capture_ui.gd
 ## Screens: title, garage, garage_won, offer, board, bench, van, lockup, errand,
 ## discovery, quick_race, quick_strip, settings, driver, map, briefing, ending,
-## save_error, loading, hud, results, results_unsaved, night_won, night_lost.
+## save_error, loading, hud, results, results_unsaved, night_won, night_lost,
+## driving_intro.
 ## Optional PC_SHOT_CROP="x,y,w,h" crops the capture for close review.
 
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
@@ -106,9 +107,25 @@ func _run() -> void:
 		var menu := shell.get("_art_menu") as Control
 		var focus_id := OS.get_environment("PC_SHOT_CAR")
 		((menu.get("_vehicle_buttons") as Dictionary)[focus_id if not focus_id.is_empty() else won[won.size() - 1]] as Button).grab_focus()
+	elif shot == "driving_intro":
+		if bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", true)):
+			_fail("driving_intro requires a new profile")
+			return
+		shell.call("_on_art_action", &"new_run")
+		var night: RunSession = app.call("current_run_session")
+		shell.call("_go_to_run_stop", night.current_node_id, false)
+		if shell.find_child("RunDrivingIntro", true, false) == null:
+			_fail("driving controls screen did not open")
+			return
 	elif shot == "board":
-		app.call("start_run", 424242)
-		shell.call("show_run_board")
+		if OS.get_environment("PC_SHOT_FRESH") == "1":
+			if bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", true)) or app.call("current_run_session") != null:
+				_fail("PC_SHOT_FRESH requires a new profile without an active run")
+				return
+			shell.call("_on_art_action", &"new_run")
+		else:
+			app.call("start_run", 424242)
+			shell.call("show_run_board")
 	elif WALK.has(shot):
 		var target := String(WALK[shot])
 		var found := false

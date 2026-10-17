@@ -55,6 +55,7 @@ func default_data() -> Dictionary:
 		"reduced_camera_shake": false,
 		"reduced_motion": false,
 		"first_run": true,
+		"run_intro_seen": false,
 		"current_run": {},
 		"garage_cars": [],
 		"steam_cars": [],
@@ -184,6 +185,8 @@ func _canonicalize_for_disk(raw: Dictionary) -> Dictionary:
 
 func _normalize(raw: Dictionary) -> Dictionary:
 	var normalized := default_data()
+	var intro_seen: Variant = raw.get("run_intro_seen")
+	normalized["run_intro_seen"] = intro_seen if intro_seen is bool else true
 	var raw_finishes: Dictionary = {}
 	var supplied_finishes: Variant = raw.get("best_event_finishes")
 	if supplied_finishes is Dictionary:
@@ -329,6 +332,7 @@ func _future_version_defaults(version: int, source: String) -> Dictionary:
 	last_load_error = "Unsupported future save version %d in %s; save was left unchanged" % [version, source]
 	var fallback := default_data()
 	fallback["first_run"] = false
+	fallback["run_intro_seen"] = true
 	return fallback
 
 
