@@ -14,6 +14,12 @@ const FADE_TIME := 0.18
 const NOTE_ORIGIN := Vector2(255, 430)
 const NOTE_ANGLE := -0.1
 const DISABLED_INK := Color("807b68")
+const TASKS: Array[String] = [
+	"DELIVER A PART TO THE NEXT ROOM",
+	"RECOVER A CAR FROM THE SILL",
+	"TOW A STRANDED CAR TO THE VAN",
+	"FETCH TOOLS FROM THE WORKSHOP",
+]
 
 var act := 1
 var reduced_motion := false
@@ -25,6 +31,20 @@ var _cup: Control
 var _paper_art: AtlasTexture
 var _envelope_art: AtlasTexture
 var _message: Label
+
+
+static func request_for_node(session: RunSession, node_id: String) -> Dictionary:
+	var request_seed := ("pocket-circuit|errand|%d|act%d|%s" % [session.run_seed, session.current_map.act, node_id]).hash() & 0x7FFFFFFF
+	var rng := RandomNumberGenerator.new()
+	rng.seed = request_seed
+	var node_ids := session.current_map.nodes.keys()
+	node_ids.sort()
+	for race_id: String in node_ids:
+		var opponents: Array = session.opponents_for_node(race_id).get("opponents", [])
+		if not opponents.is_empty():
+			var driver: Dictionary = opponents[rng.randi_range(0, opponents.size() - 1)]
+			return {"requester": driver, "task": TASKS[rng.randi_range(0, TASKS.size() - 1)]}
+	return {}
 
 
 func _ready() -> void:

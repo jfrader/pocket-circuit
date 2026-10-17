@@ -46,6 +46,10 @@ func _run() -> void:
 		var pay := shell.find_child("ErrandPay", true, false) as Button
 		var tune := shell.find_child("ErrandTuneUp", true, false) as Button
 		var back := shell.find_child("ActionBack", true, false) as Button
+		var requester := shell.find_child("ErrandRequester", true, false) as Label
+		var task := shell.find_child("ErrandTask", true, false) as Label
+		if not _expect(requester != null and task != null and requester.get_global_rect().end.y <= task.get_global_rect().position.y and task.get_global_rect().end.y <= pay.get_global_rect().position.y, "requester and task sit above both reward choices"):
+			return
 		if not _expect(pay.text == "TAKE THE PAY · %d" % RunSession.ERRAND_PAY_POINTS and tune.text == "TAKE A TUNE-UP" and back.text == "BACK" and _has_label(scene.get_node("ErrandNote"), String(UI.TYPES["errand"]["copy"])), "physical slips retain action ids/copy and the note carries the original errand description"):
 			return
 		if not _expect(root.gui_get_focus_owner() == pay and tune.disabled == (wear == "clean"), "pay remains first focus and clean cars cannot select a tune-up"):

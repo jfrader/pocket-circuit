@@ -67,6 +67,8 @@ func _run_test() -> void:
 		return
 	if not _expect(_has_label(shell, "DEFEATED BY THE ACT RIVAL") and _has_label(shell, "BANKED: 1 CAR"), "the lost night names its cause and banked haul"):
 		return
+	if not await _test_terminal_garage(shell):
+		return
 	app.call("persist_current_run")
 	var saved: Dictionary = SAVE_STORE.new(path).load_data()
 	var garage: Array = saved.get("garage_cars", [])
@@ -166,6 +168,8 @@ func _run_test() -> void:
 		return
 	if not _expect(_has_label(shell, "ALL ACT RIVALS DEFEATED"), "a completed night names its victory"):
 		return
+	if not await _test_terminal_garage(shell):
+		return
 	var worn: RunSession = app.call("start_run", 72727) as RunSession
 	for crash in 8:
 		worn.register_crash(1.0)
@@ -207,6 +211,19 @@ func _run_to_rival(app: Object) -> RunSession:
 		if RUN_WALK.walk_to(app, sess, "rival"):
 			return sess
 	return null
+
+
+func _test_terminal_garage(shell: CanvasLayer) -> bool:
+	var garage := shell.find_child("ActionViewGarage", true, false) as Button
+	if not _expect(garage != null and garage.text == "VIEW GARAGE", "terminal board offers VIEW GARAGE"):
+		return false
+	garage.pressed.emit()
+	await process_frame
+	if not _expect(shell.get("_screen") == "vehicle_select" and bool(shell.get("_quick_race")) and _has_label(shell, "THE GARAGE"), "VIEW GARAGE opens the Quick Race car selection route"):
+		return false
+	shell.call("show_run_board")
+	await process_frame
+	return _expect(_has_label(shell, "NIGHT OVER"), "garage visit preserves the terminal recap")
 
 
 func _has_label(node: Node, text: String) -> bool:
