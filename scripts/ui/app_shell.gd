@@ -435,12 +435,14 @@ func show_run_board() -> void:
 			_run_action("SAVE AGAIN", Callable(self, "_on_save_run_again"), night_over, false, "ActionSaveAgain")
 	if night_over:
 		_run_action("NEW RUN", Callable(self, "_on_new_run_pressed"), unsaved.is_empty(), false, "ActionNewRun")
+		_run_action("VIEW GARAGE", Callable(self, "show_vehicle_select").bind("", true), false, false, "ActionViewGarage")
 	var secondary := HBoxContainer.new()
 	secondary.add_theme_constant_override("separation", 8)
 	detail.add_child(secondary)
 	_run_actions = secondary
 	if not night_over:
 		_run_action("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
+		_run_action("?", Callable(self, "_show_run_intro").bind(tabletop, board), false, false, "ActionHelp")
 	_run_action("BACK", Callable(self, "show_title"), false, false, "ActionBack")
 	_run_actions = detail
 	if night_over:
@@ -469,6 +471,8 @@ func show_run_board() -> void:
 
 
 func _show_run_intro(tabletop: Control, board: Control) -> void:
+	if is_instance_valid(_run_intro):
+		return
 	var note := RUN_BOARD_INTRO.new()
 	note.name = "RunIntro"
 	note.reduced_motion = _reduced_motion_enabled()
@@ -481,7 +485,8 @@ func _show_run_intro(tabletop: Control, board: Control) -> void:
 	tabletop.add_child(note)
 	board.connect("stop_selected", note.dismiss.unbind(1))
 	for node: Node in _content.find_children("*", "Button", true, false):
-		(node as Button).pressed.connect(note.dismiss)
+		if node.name != "ActionHelp":
+			(node as Button).pressed.connect(note.dismiss)
 
 
 func _dismiss_run_intro() -> void:
@@ -862,7 +867,7 @@ func show_run_bench() -> void:
 	header.add_child(heading)
 	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
 	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["bench"]["name"]), 30, SKIN.CREAM))
-	var copy := RUN_UI.label("One action per visit.", 16, SKIN.CREAM)
+	var copy := RUN_UI.label(String(RUN_UI.TYPES["bench"]["copy"]), 16, SKIN.CREAM)
 	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	heading.add_child(copy)
 	_run_stats(heading, sess)
@@ -1131,21 +1136,30 @@ func show_run_errand() -> void:
 	columns.add_child(context)
 	context.configure(sess, false)
 	context.hide_route_visuals()
+	var request := RUN_ERRAND_SCENE.request_for_node(sess, sess.current_node_id)
 	var slips := VBoxContainer.new()
 	slips.name = "ErrandSlips"
-	slips.add_theme_constant_override("separation", 22)
+	slips.add_theme_constant_override("separation", 12)
 	slips.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	slips.offset_left = 24
 	slips.offset_right = -24
 	slips.offset_top = 128
 	slips.offset_bottom = -100
 	context.add_child(slips)
+	var requester := RUN_UI.label("FROM: " + String(request["requester"]["name"]).to_upper(), 16, SKIN.INK, true)
+	requester.name = "ErrandRequester"
+	requester.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	slips.add_child(requester)
+	var task := RUN_UI.label(String(request["task"]), 16, SKIN.INK)
+	task.name = "ErrandTask"
+	task.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	slips.add_child(task)
 	_run_actions = slips
 	var car_clean := sess.run_state.get_car_wear(sess.current_car_id) == RunState.WEAR_LEVELS[0]
 	_run_action("TAKE THE PAY · %d" % RunSession.ERRAND_PAY_POINTS, Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandPay")
-	scene.register_choice(slips.get_child(0) as Button, 0)
+	scene.register_choice(slips.get_node("ErrandPay") as Button, 0)
 	_run_action("TAKE A TUNE-UP", Callable(self, "_on_errand_choice_pressed").bind(1), false, car_clean, "ErrandTuneUp")
-	scene.register_choice(slips.get_child(1) as Button, 1)
+	scene.register_choice(slips.get_node("ErrandTuneUp") as Button, 1)
 	_run_actions = back_row
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	RUN_BENCH_SCENE.dress_button(back_row.get_child(0) as Button)
