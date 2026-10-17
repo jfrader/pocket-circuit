@@ -1379,7 +1379,7 @@ func continue_after_race(transition_scene: bool = true) -> void:
 ## from a saved roster, but the event always states how many cars it fields.
 static func _field_size(event: Dictionary) -> int:
 	var declared := maxi((event.get("opponents", []) as Array).size(), int(event.get("opponent_count", 0)))
-	return clampi(declared + 1, 1, 4)
+	return clampi(declared + 1, 1, 6)
 
 
 ## A run race is raced once: no restart mid-race and no retry after it.

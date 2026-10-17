@@ -8,7 +8,7 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	var session := SESSION.create(33333)
-	_expect(SESSION.RUN_POINTS_BY_FINISH == {1: 10, 2: 7, 3: 5, 4: 3, 5: 2, 6: 1}, "six places pay 10/7/5/3/2/1")
+	_expect(SESSION.RUN_POINTS_BY_FINISH == {1: 6, 2: 4, 3: 3, 4: 2, 5: 1, 6: 0}, "six places pay 6/4/3/2/1/0")
 	for position: int in range(1, 7):
 		var race := SESSION.create(33333)
 		var outcome := race.resolve_race(race.current_node_id, position, 6)

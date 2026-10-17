@@ -2,6 +2,44 @@ extends Node2D
 
 signal return_requested
 signal sprint_resolved(outcome: String, data: Dictionary)
+signal wear_out_beat_changed(beat: String)
+
+class TowPickup extends Node2D:
+	var hook_target := Vector2(0, 85)
+	var bench := false
+
+	func _draw() -> void:
+		if bench:
+			draw_rect(Rect2(-110, -28, 220, 56), Color("9b623d"))
+			draw_rect(Rect2(-94, 20, 18, 70), Color("453329"))
+			draw_rect(Rect2(76, 20, 18, 70), Color("453329"))
+			return
+		for x in [-28, 20]:
+			for y in [-39, 22]:
+				draw_rect(Rect2(x, y, 8, 18), Color("171c23"))
+		draw_rect(Rect2(-23, -50, 46, 104), Color("e4a544"))
+		draw_rect(Rect2(-19, -43, 38, 32), Color("e9bd68"))
+		draw_rect(Rect2(-17, -35, 34, 14), Color("294455"))
+		draw_rect(Rect2(-18, 0, 36, 44), Color("79553b"))
+		draw_line(Vector2(0, 14), Vector2(0, 61), Color("313e47"), 6)
+		draw_line(Vector2(0, 61), hook_target, Color("abb7b6"), 3)
+		draw_arc(hook_target, 5, 0, PI, 8, Color("abb7b6"), 3)
+
+
+class PassengerFrame extends Control:
+	func _ready() -> void:
+		set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
+		resized.connect(queue_redraw)
+
+	func _draw() -> void:
+		var dark := Color("18242b")
+		draw_rect(Rect2(0, 0, size.x, 28), dark)
+		draw_rect(Rect2(0, size.y - 120, size.x, 120), dark)
+		draw_line(Vector2(0, size.y), Vector2(size.x * 0.18, 0), dark, 42)
+		draw_line(Vector2(size.x, size.y), Vector2(size.x * 0.86, 0), dark, 42)
+		draw_arc(Vector2(size.x * 0.24, size.y - 22), 80, PI, TAU, 24, Color("45515a"), 14)
+		draw_rect(Rect2(size.x * 0.62, size.y - 86, size.x * 0.22, 8), Color("bb8c52"))
 
 class RacePauseOverlay extends Control:
 	signal cancel_pressed(requested_pause: bool)
@@ -54,6 +92,13 @@ const STRIP_MARKER := preload("res://scripts/presentation/strip_destination_mark
 const STRIP_TRAFFIC := preload("res://scripts/race/strip/strip_traffic.gd")
 const STRIP_START_WARMUP := preload("res://scripts/race/strip/strip_start_warmup.gd")
 const STARTING_GRID_SYNC_FRAMES := 2
+const NITRO_ACTION := &"nitro"
+const NITRO_SPEED_FRACTION := 0.2
+const WEAR_HOLD_SECONDS := 1.2
+const TOW_PICKUP_SECONDS := 1.4
+const TOW_RIDE_SECONDS := 2.6
+const REDUCED_BEAT_SECONDS := 0.25
+const GRID_ROW_SPACING := 120.0
 const COUNTDOWN_STEP_SECONDS := 0.65
 const PAUSE_STRIP_HEIGHT := 12.0
 ## The victory/defeat outro is a four-bar phrase. Hold the menu phase off it for
@@ -77,8 +122,10 @@ const RACER_MARKER_COLORS: Array[Color] = [
 	Color("71b7ff"),
 	Color("82d49b"),
 	Color("ca78ff"),
+	Color("ffc271"),
+	Color("ed83a8"),
 ]
-const AI_LANE_OFFSETS: Array[float] = [-42.0, 38.0, 6.0]
+const AI_LANE_OFFSETS: Array[float] = [-42.0, 38.0, 6.0, -22.0, 22.0]
 const TRACK_SCENES: Dictionary = {
 	&"workshop": "res://scenes/tracks/workshop_workbench.tscn",
 	&"office": "res://scenes/tracks/office_desk.tscn",
@@ -135,6 +182,14 @@ var _best_lap := INF
 var _strip_spawns: Dictionary = {}
 var _strip_prepared: Dictionary = {}
 var _strip_controller: Node2D
+var _run: RunSession
+var _player_wear_texture: Texture2D
+var _player_wear_overlay: Sprite2D
+var _wear_out_pending := false
+var _wear_out_towed := false
+var _wear_out_active := false
+var _wear_out_presented := false
+var wear_out_beat := ""
 
 
 func _ready() -> void:
@@ -378,6 +433,9 @@ func _exit_tree() -> void:
 
 
 func _process(_delta: float) -> void:
+	if is_instance_valid(_player_wear_overlay):
+		var sprite := _player_wear_overlay.get_parent() as Sprite2D
+		_player_wear_overlay.visible = sprite.texture != _player_wear_texture
 	_update_race_hud()
 	_update_personal_ghost()
 
@@ -449,7 +507,7 @@ func _build_field_racers_for_preparation() -> Array[Dictionary]:
 		return entries
 	var ev: Dictionary = _session.get("event", {})
 	var oids: Array = ev.get("opponents", FALLBACK_OPPONENTS) if not ev.is_empty() else FALLBACK_OPPONENTS
-	var ocnt := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(ev.get("opponent_count", oids.size())), 0, 3)
+	var ocnt := _opponent_count(ev, oids)
 	for i in mini(oids.size(), ocnt):
 		var did := String(oids[i])
 		var d := CATALOG.get_driver(did)
@@ -461,6 +519,64 @@ func _build_field_racers_for_preparation() -> Array[Dictionary]:
 func _resolve_field_visual_keys() -> Dictionary:
 	var racers := _build_field_racers_for_preparation()
 	return IDENTITIES.resolve_field_visual_keys(racers)
+
+
+func _opponent_count(event: Dictionary, opponents: Array) -> int:
+	var mode := String(_session.get("mode", ""))
+	if mode == "mastery":
+		return 0
+	var maximum := RunSession.FIELD_OPPONENTS if mode == "run" else FALLBACK_OPPONENTS.size()
+	if String(event.get("race_format", "")) == "rival_duel":
+		maximum = 1
+	return clampi(int(event.get("opponent_count", opponents.size())), 0, maximum)
+
+
+func _configure_player_wear(vehicle: VehicleController, visual_key: String) -> void:
+	var sprite := vehicle.get_node("VisualRoot/CarSprite") as Sprite2D
+	var wear := _run.run_state.get_car_wear(_run.current_car_id)
+	var display_height := roundi(sprite.texture.get_height() * sprite.scale.y)
+	_player_wear_texture = IDENTITIES.car_texture_with_wear_for_key(visual_key, wear, IDENTITIES.NATIVE_PIXEL_SCALE, display_height)
+	if _player_wear_texture == null:
+		return
+	sprite.texture = _player_wear_texture
+	_player_wear_overlay = Sprite2D.new()
+	_player_wear_overlay.name = "CarWear"
+	_player_wear_overlay.texture = IDENTITIES.car_wear_overlay_for_key(visual_key, wear, IDENTITIES.NATIVE_PIXEL_SCALE, display_height)
+	_player_wear_overlay.visible = false
+	sprite.add_child(_player_wear_overlay)
+
+
+func _ensure_nitro_action() -> void:
+	if InputMap.has_action(NITRO_ACTION):
+		return
+	InputMap.add_action(NITRO_ACTION)
+	var key := InputEventKey.new()
+	key.keycode = KEY_N
+	InputMap.action_add_event(NITRO_ACTION, key)
+	var button := InputEventJoypadButton.new()
+	button.button_index = JOY_BUTTON_X
+	InputMap.action_add_event(NITRO_ACTION, button)
+
+
+func fire_nitro() -> bool:
+	if _run == null or _finished or _countdown_active or not _starting_collision_states.is_empty() or not race_manager.is_running or get_tree().paused or not is_instance_valid(_player_vehicle):
+		return false
+	if not _run.spend_nitro():
+		return false
+	var app := get_node_or_null("/root/App")
+	if app and app.has_method("persist_current_run"):
+		app.call("persist_current_run")
+		if not String(app.get("run_save_error")).is_empty():
+			_run.add_nitro()
+			return false
+	var power := _run.nitro_power()
+	# Bottled nitro is a one-shot reserve, not drift recharge. Its kick applies
+	# immediately even when the player isn't holding the ordinary boost input.
+	_player_vehicle.boost_amount = minf(_player_vehicle.get_boost_capacity(), _player_vehicle.boost_amount + _player_vehicle.get_boost_capacity() * power)
+	var forward := Vector2.UP.rotated(_player_vehicle.rotation)
+	_player_vehicle.apply_central_impulse(forward * _player_vehicle.mass * _player_vehicle.get_effective_max_speed() * NITRO_SPEED_FRACTION * power)
+	_update_race_hud()
+	return true
 
 
 func _configure_racers() -> void:
@@ -479,7 +595,7 @@ func _configure_racers() -> void:
 
 	var event: Dictionary = _session.get("event", {})
 	var opponent_ids: Array = event.get("opponents", FALLBACK_OPPONENTS) if not event.is_empty() else FALLBACK_OPPONENTS
-	var opponent_count := 0 if String(_session.get("mode", "")) == "mastery" else clampi(int(event.get("opponent_count", opponent_ids.size())), 0, 3)
+	var opponent_count := _opponent_count(event, opponent_ids)
 	if _is_chase_sprint():
 		var chaser := _chase_driver()
 		opponent_ids = [] if chaser.is_empty() else [chaser["id"]]
@@ -639,6 +755,8 @@ func _configure_vehicle(
 	var vehicle_name := String(vehicle_data.get("name", "Rustbug"))
 	var use_visual := visual_key if not visual_key.is_empty() else vehicle_id
 	vehicle.configure_identity(driver_name, vehicle_name, use_visual)
+	if is_player and _run != null:
+		_configure_player_wear(vehicle, use_visual)
 	vehicle.configure_racer_marker(RACER_MARKER_COLORS[racer_index], racer_index)
 	race_manager.register_racer(vehicle, driver_name, vehicle_name, is_player)
 
@@ -671,6 +789,9 @@ func _configure_session() -> void:
 		var session: Variant = app.call("get_current_race_session")
 		if session is Dictionary and not (session as Dictionary).is_empty():
 			_session = session
+	if String(_session.get("mode", "")) == "run" and app and app.has_method("current_run_session"):
+		_run = app.call("current_run_session") as RunSession
+		_ensure_nitro_action()
 	var event: Dictionary = _session.get("event", {})
 	if not event.is_empty():
 		race_manager.laps_to_finish = clampi(int(event.get("laps", 3)), 1, 99)
@@ -824,9 +945,25 @@ func _grid_transforms(reverse: bool) -> Array[Transform2D]:
 							var tangent := (end - start) * (-1.0 if reverse else 1.0)
 							heading = tangent.angle() + PI * 0.5
 				transforms.append(Transform2D(heading, marker.position))
-	if transforms.size() == 4:
-		return transforms
-	return REVERSE_GRID_TRANSFORMS if reverse else GRID_TRANSFORMS
+	if transforms.size() < 4:
+		transforms = (REVERSE_GRID_TRANSFORMS if reverse else GRID_TRANSFORMS).duplicate()
+	var required := _build_field_racers_for_preparation().size()
+	while transforms.size() < required:
+		var left := transforms[transforms.size() - 2]
+		var right := transforms[transforms.size() - 1]
+		var center := (left.origin + right.origin) * 0.5
+		var first_center := (transforms[0].origin + transforms[1].origin) * 0.5
+		# Generated grids reserve two rows 120 units apart. Fit the added pair
+		# between those safe rows, rather than extending into unreserved scenery.
+		if first_center.distance_to(center) >= GRID_ROW_SPACING * 0.85:
+			transforms.append(Transform2D(lerp_angle(transforms[0].get_rotation(), left.get_rotation(), 0.5), transforms[0].origin.lerp(left.origin, 0.5)))
+			transforms.append(Transform2D(lerp_angle(transforms[1].get_rotation(), right.get_rotation(), 0.5), transforms[1].origin.lerp(right.origin, 0.5)))
+			continue
+		var next := Transform2D(left.get_rotation(), center + Vector2.UP.rotated(left.get_rotation()) * GRID_ROW_SPACING)
+		var side := Vector2.RIGHT.rotated(next.get_rotation()) * TRACK_BUILDER.GRID_LANE_OFFSET
+		transforms.append(Transform2D(next.get_rotation(), next.origin - side))
+		transforms.append(Transform2D(next.get_rotation(), next.origin + side))
+	return transforms
 
 
 func _run_countdown() -> void:
@@ -863,6 +1000,7 @@ func _update_race_hud() -> void:
 	if not is_instance_valid(_race_hud) or not is_instance_valid(_player_vehicle):
 		return
 	var shown_lap := mini(race_manager.lap_count + 1, race_manager.laps_to_finish)
+	_race_hud.set_nitro_count(_run.nitro_count if _run != null else -1)
 	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.get_boost_capacity(), 0.001), 0.0, 1.0)
 	var speed_ratio := clampf(_player_vehicle.speed / maxf(_player_vehicle.get_effective_max_speed(), 0.001), 0.0, 1.2)
 	_race_hud.set_telemetry(
@@ -1060,6 +1198,8 @@ func restart_race() -> void:
 
 
 func request_return() -> void:
+	if _wear_out_active:
+		return
 	_left_results = true
 	_set_paused(false)
 	return_requested.emit()
@@ -1084,6 +1224,12 @@ func request_abandon() -> void:
 
 
 func _unhandled_input(event: InputEvent) -> void:
+	if InputMap.has_action(NITRO_ACTION) and event.is_action_pressed(NITRO_ACTION) and not event.is_echo():
+		if fire_nitro():
+			get_viewport().set_input_as_handled()
+		return
+	if _wear_out_active:
+		return
 	if not _results_finalized:
 		return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_R:
@@ -1545,6 +1691,9 @@ func _attempt_result_commit(results: Array) -> void:
 		_mastery_button.focus_neighbor_left = _mastery_button.get_path_to(_retry_button)
 		_mastery_button.focus_neighbor_right = _mastery_button.get_path_to(_continue_button)
 	_update_results(results)
+	if committed and _wear_out_pending and not _wear_out_presented:
+		_present_wear_out()
+		return
 	if committed:
 		_continue_button.grab_focus()
 	else:
@@ -1561,6 +1710,81 @@ func _layout_result_actions(mastery_available: bool) -> void:
 	else:
 		_retry_button.position.x = 126.0
 		_continue_button.position.x = 324.0
+
+
+func _set_wear_out_beat(beat: String) -> void:
+	wear_out_beat = beat
+	wear_out_beat_changed.emit(beat)
+
+
+func _present_wear_out() -> void:
+	_wear_out_presented = true
+	_wear_out_active = true
+	_results_panel.hide()
+	_race_hud.hide()
+	_countdown_label.hide()
+	_pause_overlay.enabled = false
+	race_manager.is_running = false
+	for racer: Node2D in race_manager.get_rankings():
+		if racer is VehicleController:
+			(racer as VehicleController).set_controls_locked(true)
+			(racer as VehicleController).linear_velocity = Vector2.ZERO
+			(racer as VehicleController).angular_velocity = 0.0
+			(racer as VehicleController).freeze = true
+	camera.set_physics_process(false)
+	camera.global_position = _player_vehicle.global_position
+	camera.reset_smoothing()
+	_set_wear_out_beat("wreck")
+	var reduced := _reduced_motion_enabled()
+	await get_tree().create_timer(REDUCED_BEAT_SECONDS if reduced else WEAR_HOLD_SECONDS).timeout
+	if not _wear_out_towed:
+		_set_wear_out_beat("run_over")
+		_race_flash_label.text = "RUN OVER"
+		_race_flash_label.modulate.a = 1.0
+		_race_flash_label.show()
+		await get_tree().create_timer(REDUCED_BEAT_SECONDS if reduced else WEAR_HOLD_SECONDS).timeout
+	else:
+		var pickup := TowPickup.new()
+		pickup.name = "TowPickup"
+		pickup.rotation = _player_vehicle.rotation
+		var forward := Vector2.UP.rotated(pickup.rotation)
+		var hooked := _player_vehicle.global_position + forward * pickup.hook_target.y
+		add_child(pickup)
+		pickup.global_position = hooked if reduced else hooked + forward * 180.0
+		_set_wear_out_beat("pickup")
+		var backing := create_tween()
+		backing.tween_property(pickup, "global_position", hooked, REDUCED_BEAT_SECONDS if reduced else TOW_PICKUP_SECONDS)
+		await backing.finished
+		_player_vehicle.reparent(pickup, true)
+		_set_wear_out_beat("passenger")
+		var frame := PassengerFrame.new()
+		frame.name = "TowPassengerView"
+		$HUD.add_child(frame)
+		# The driver stays out of control: the right-seat framing rides past the
+		# oversized room while the frozen car follows the pickup's hook.
+		var ride_offset := forward * 480.0
+		camera.global_position = pickup.global_position + Vector2.RIGHT.rotated(pickup.rotation) * 70.0
+		var ride := create_tween().set_parallel(true)
+		if not reduced:
+			ride.tween_property(pickup, "global_position", pickup.global_position + ride_offset, TOW_RIDE_SECONDS)
+			ride.tween_property(camera, "global_position", camera.global_position + ride_offset, TOW_RIDE_SECONDS)
+		else:
+			ride.tween_interval(REDUCED_BEAT_SECONDS)
+		await ride.finished
+		frame.queue_free()
+		var bench := TowPickup.new()
+		bench.name = "TowDestinationBench"
+		bench.bench = true
+		add_child(bench)
+		bench.global_position = pickup.global_position + forward * 170.0
+		camera.global_position = bench.global_position
+		_set_wear_out_beat("bench")
+		_race_flash_label.text = "THE NEXT BENCH"
+		_race_flash_label.modulate.a = 1.0
+		_race_flash_label.show()
+		await get_tree().create_timer(REDUCED_BEAT_SECONDS if reduced else WEAR_HOLD_SECONDS).timeout
+	_wear_out_active = false
+	request_return()
 
 
 func _report_result_to_app(results: Array) -> bool:
@@ -1585,6 +1809,9 @@ func _report_result_to_app(results: Array) -> bool:
 			live = app.call("get_current_race_session")
 			if run != null and not already_applied and bool(live.get("run_result_applied", false)):
 				_night_consequences = _night_result_consequences(before, run, live.get("result", {}))
+				var worn_out := RunSession.RUN_STATE.is_worn_out(run.run_state.get_car_wear(String(before["car_id"])))
+				_wear_out_towed = run.towed_to_bench and run.tow_count < int(before["tow_count"])
+				_wear_out_pending = worn_out or _wear_out_towed
 			if not committed and app.has_method("get_last_save_error"):
 				_save_error = String(app.call("get_last_save_error"))
 				if app.has_method("get_current_race_session"):
@@ -1607,6 +1834,7 @@ func _night_result_snapshot(run: RunSession) -> Dictionary:
 		"completed": run.is_complete(),
 		"rival_car": String(opponents[0]["vehicle_id"]) if not opponents.is_empty() else "",
 		"node_type": node_type,
+		"tow_count": run.tow_count,
 	}
 
 

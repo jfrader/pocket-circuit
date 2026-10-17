@@ -80,7 +80,8 @@ func _run_test() -> void:
 		return
 	var consequences := String(results_presenter.call("_night_result_consequences", night_before, sess, (app.get("current_race_session") as Dictionary)["result"]))
 	results_presenter.free()
-	if not _expect(consequences == "+2 POINTS · WEAR: CLEAN -> DUSTY", "results name the actual points and wear from the report seam"):
+	var expected_third := int(RunSession.RUN_POINTS_BY_FINISH[3])
+	if not _expect(consequences == "+%d POINTS · WEAR: CLEAN -> DUSTY" % expected_third, "results name the actual points and wear from the report seam"):
 		return
 	if not _expect(sess.run_points > points_before, "the finish position must score run points"):
 		return
@@ -258,10 +259,11 @@ func _run_test() -> void:
 	if not _expect(bool(race.call("_report_result_to_app", scripted_results)), "the results presenter commits a scripted win"):
 		return
 	race.call("_update_results", [])
-	if not _expect((race.get("_results_label") as Label).text.split("\n").has("+6 POINTS"), "the results panel displays the exact night consequences line"):
+	var win_award := 6 if String(copy_run.current_node().get("type", "")) == "rival" else int(RunSession.RUN_POINTS_BY_FINISH[1])
+	if not _expect((race.get("_results_label") as Label).text.split("\n").has("+%d POINTS" % win_award), "the results panel displays the exact night consequences line"):
 		return
 	var copy_applied := RunSession.serialize(copy_run)
-	if not _expect(bool(race.call("_report_result_to_app", scripted_results)) and RunSession.serialize(copy_run) == copy_applied and String(race.get("_night_consequences")) == "+6 POINTS", "repeated reports retain the first consequences without applying twice"):
+	if not _expect(bool(race.call("_report_result_to_app", scripted_results)) and RunSession.serialize(copy_run) == copy_applied and String(race.get("_night_consequences")) == "+%d POINTS" % win_award, "repeated reports retain the first consequences without applying twice"):
 		return
 	race.queue_free()
 	await process_frame
