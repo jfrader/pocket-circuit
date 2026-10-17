@@ -172,7 +172,7 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 
 
 func show_quick_race(_requested_act: int = 0) -> void:
-	var preserve_route := _quick_race and not _quick_strip
+	var preserve_route := _screen == "vehicle_select" and _quick_race and not _quick_strip
 	_screen = "quick_race"
 	_event_id = ""
 	_quick_race = true
@@ -187,6 +187,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_race_vehicle_id.is_empty():
 		_quick_race_vehicle_id = _selected_vehicle(progress)
+	_configure_stage(&"map", _quick_race_vehicle_id, "rae", String(_quick_race_theme))
 	_stage.hide()
 	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
@@ -194,9 +195,14 @@ func show_quick_race(_requested_act: int = 0) -> void:
 		_app.call("prewarm_generated_circuit", GENERATED_CIRCUITS.apply_to_event(quick_identity))
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
 	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
+	_quick_identity_heading.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_quick_identity_heading.clip_text = true
 	_content.add_child(_quick_identity_heading)
 	_quick_identity_summary = _label(_quick_preview_summary(quick_identity), 13, SKIN.CREAM_DIM)
 	_quick_identity_summary.name = "QuickCircuitSummary"
+	_quick_identity_summary.max_lines_visible = 3
+	_quick_identity_summary.clip_text = true
+	_quick_identity_summary.size.x = _content.custom_minimum_size.x
 	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
 	_content.add_child(_quick_identity_summary)
 	_register_button_focus(_add_difficulty_picker())
@@ -215,7 +221,7 @@ func show_quick_race(_requested_act: int = 0) -> void:
 
 
 func show_quick_strip(_requested_act: int = 0) -> void:
-	var preserve_route := _quick_strip
+	var preserve_route := _screen == "vehicle_select" and _quick_strip
 	_screen = "quick_strip"
 	_event_id = ""
 	_quick_strip = true
@@ -230,14 +236,20 @@ func show_quick_strip(_requested_act: int = 0) -> void:
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_strip_vehicle_id.is_empty():
 		_quick_strip_vehicle_id = _selected_vehicle(progress)
+	_configure_stage(&"map", _quick_strip_vehicle_id, "rae", String(_quick_race_theme))
 	_stage.hide()
 	_add_kicker("QUICK STRIP · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
 	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
+	_quick_identity_heading.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_quick_identity_heading.clip_text = true
 	_content.add_child(_quick_identity_heading)
 	_quick_identity_summary = _label(_quick_preview_summary(quick_identity), 13, SKIN.CREAM_DIM)
 	_quick_identity_summary.name = "QuickCircuitSummary"
+	_quick_identity_summary.max_lines_visible = 3
+	_quick_identity_summary.clip_text = true
+	_quick_identity_summary.size.x = _content.custom_minimum_size.x
 	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
 	_content.add_child(_quick_identity_summary)
 	_register_button_focus(_add_difficulty_picker())
@@ -568,7 +580,7 @@ func _go_to_run_stop(stop_id: String, play_confirm: bool) -> void:
 	if is_instance_valid(_driving_intro):
 		return
 	var session: RunSession = _app.call("current_run_session")
-	if session != null and String(session.current_map.get_node(stop_id).get("type", "")) in ["race", "rival", "act_rival"] and not bool((_app.call("get_save_data") as Dictionary).get("run_intro_seen", true)):
+	if session != null and session.pending_chaser == null and String(session.current_map.get_node(stop_id).get("type", "")) in ["race", "rival", "act_rival"] and not bool((_app.call("get_save_data") as Dictionary).get("run_intro_seen", true)):
 		_show_driving_intro(stop_id, play_confirm)
 		return
 	_run_going = true
@@ -760,6 +772,7 @@ func show_run_offer() -> void:
 	var card := CarShapeView.new()
 	card.name = "OfferShape"
 	card.plot_bottom_padding = RUN_OFFER_SCENE.SHAPE_BOTTOM_PADDING
+	card.show_delta_caption = true
 	card.custom_minimum_size = RUN_OFFER_SCENE.SHAPE_SIZE
 	card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	detail.add_child(card)
@@ -1843,6 +1856,8 @@ func _add_section(left: String, right: String) -> Label:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	var left_label := _label(left, 19, SKIN.CREAM, true)
+	left_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	left_label.clip_text = true
 	left_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left_label)
 	var right_label := _label(right, 14, SKIN.CREAM_DIM, true)
@@ -2196,6 +2211,7 @@ func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 	_quick_race_room = StringName(_app.call("circuit_room_for_seed", _quick_race_seed))
 	seed_edit.text = str(_quick_race_seed)
 	seed_status.text = "SEED %d" % _quick_race_seed
+	_stage.configure(&"map", _quick_strip_vehicle_id if _quick_strip else _quick_race_vehicle_id, "rae", String(_quick_race_theme))
 	_refresh_quick_identity_labels()
 
 

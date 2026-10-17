@@ -20,6 +20,7 @@ func _run() -> void:
 	for strip: bool in [false, true]:
 		for theme: String in ["kitchen", "workshop", "office"]:
 			for tier: String in RULES.LENGTH_TIERS:
+				shell.set("_screen", "vehicle_select")
 				shell.set("_quick_race", not strip)
 				shell.set("_quick_strip", strip)
 				shell.set("_quick_race_theme", StringName(theme))

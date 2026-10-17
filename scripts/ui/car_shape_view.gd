@@ -28,6 +28,7 @@ var shape: Dictionary = {}
 var compare_shape: Dictionary = {}
 var label := ""
 var plot_bottom_padding := 0.0
+var show_delta_caption := false
 var _morph_from: Dictionary = {}
 var _morph := 1.0
 
@@ -54,18 +55,19 @@ func _draw() -> void:
 		shown = {}
 		for axis: Variant in shape:
 			shown[axis] = lerpf(float(_morph_from.get(axis, shape[axis])), float(shape[axis]), _morph)
-	draw_card(self, Rect2(Vector2.ZERO, size), shown, shape, compare_shape, label, plot_bottom_padding)
+	draw_card(self, Rect2(Vector2.ZERO, size), shown, shape, compare_shape, label, plot_bottom_padding, show_delta_caption)
 
 
 ## `shown` is what the polygon draws (it may be mid-morph); `target` is the
 ## car's real shape the deltas are read from.
-static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: Dictionary, compare: Dictionary, title: String, bottom_padding: float = 0.0) -> void:
+static func draw_card(item: CanvasItem, rect: Rect2, shown: Dictionary, target: Dictionary, compare: Dictionary, title: String, bottom_padding: float = 0.0, show_caption: bool = false) -> void:
 	SKIN.draw_plate(item, rect, SKIN.CREAM)
 	var header := header_geometry(rect, title)
 	SKIN.draw_tape(item, header.tape_center, header.tape_size, HEADER_TAPE_ANGLE)
 	SKIN.draw_text(item, header.text_position, title, HEADER_FONT_SIZE, SKIN.INK, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER)
-	var caption := caption_geometry(rect)
-	SKIN.draw_text(item, caption.text_position, caption.text, CAPTION_FONT_SIZE, SKIN.CREAM_DIM, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER, false)
+	if show_caption:
+		var caption := caption_geometry(rect)
+		SKIN.draw_text(item, caption.text_position, caption.text, CAPTION_FONT_SIZE, SKIN.CREAM_DIM, rect.size.x, HORIZONTAL_ALIGNMENT_CENTER, false)
 	if shown.is_empty():
 		return
 	var plot := plot_geometry(rect, bottom_padding)
