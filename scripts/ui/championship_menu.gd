@@ -136,6 +136,15 @@ func show_garage(selected: String, unlocked: Array, context: String, next_text: 
 	var rows := _grid_rows.duplicate()
 	rows.append([back, driver, next])
 	_wire_rows(rows)
+	# Leaving the collection goes straight to its primary action.
+	for row_index in range(_grid_rows.size() - 1, -1, -1):
+		var has_available := false
+		for button: Button in _grid_rows[row_index]:
+			if not button.disabled:
+				button.focus_neighbor_bottom = button.get_path_to(next)
+				has_available = true
+		if has_available:
+			break
 	_label("LB / RB · PGUP / PGDN  PAGE", Rect2(524, 582, 680, 24), 13, SKIN.CREAM_DIM).name = "GaragePagingHint"
 	_label("ENTER / A  CONFIRM", Rect2(630, 632, 238, 26), 14, SKIN.CREAM_DIM).horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	var initial := selected if selected in unlocked and _vehicle_buttons.has(selected) else "rustbug"
@@ -162,24 +171,25 @@ func _grid_cards(display_ids: Array[String], unlocked: Array) -> void:
 	var y := GRID_BLEED
 	var section_y := y
 	var group := ""
+	var single_row := display_ids.size() <= GRID_COLUMNS
 	for id in display_ids:
 		var vehicle: Dictionary = CATALOG.get_vehicle(id)
 		var car_type := String((vehicle.get("car_art", {}) as Dictionary).get("type", ""))
 		if car_type != group:
-			if not row.is_empty():
+			if not row.is_empty() and not single_row:
 				_grid_rows.append(row)
 				row = []
 				y += GRID_CARD.y + GRID_GAP
 			group = car_type
-			section_y = y
+			section_y = GRID_BLEED if single_row else y
 			var tape := Label.new()
 			tape.text = car_type.to_upper()
-			tape.position = Vector2(GRID_BLEED + 4.0, y)
+			tape.position = Vector2(GRID_BLEED + 4.0 + (row.size() * (GRID_CARD.x + GRID_GAP) if single_row else 0.0), section_y)
 			tape.mouse_filter = Control.MOUSE_FILTER_IGNORE
 			SKIN.style_tape(tape, SKIN.YELLOW, 12)
 			content.add_child(tape)
 			_grid_sections.append(tape)
-			y += GRID_HEADER_HEIGHT
+			y = section_y + GRID_HEADER_HEIGHT
 		var available := id in unlocked
 		var button := _make_button("", &"")
 		button.name = "Vehicle_" + id

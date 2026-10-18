@@ -159,6 +159,40 @@ func _run_test() -> void:
 		push_error("APP_SHELL_FOCUS_TEST FAIL: garage must pin the vertically scrolling five-column collection beside the identity stage")
 		quit(1)
 		return
+	var garage := shell.get("_art_menu") as Control
+	var garage_stage := garage.get("_stage") as Control
+	await _tap_action(&"ui_right")
+	if (
+		root.gui_get_focus_owner() == null
+		or root.gui_get_focus_owner().name != "Vehicle_scrapjaw"
+		or String(shell.get("_current_vehicle_select_id")) != "scrapjaw"
+		or String(garage_stage.get("vehicle_id")) != "scrapjaw"
+	):
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Right across small-collection type groups must focus and display Scrapjaw")
+		quit(1)
+		return
+	await _tap_action(&"ui_down")
+	if root.gui_get_focus_owner() != shell.find_child("GaragePrimaryAction", true, false):
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Down from the final collection row must reach PLAY")
+		quit(1)
+		return
+	await _tap_action(&"ui_left")
+	await _tap_action(&"ui_left")
+	if root.gui_get_focus_owner() == null or (root.gui_get_focus_owner() as Button).text != "BACK":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: the garage action chain must retain BACK")
+		quit(1)
+		return
+	await _tap_action(&"ui_up")
+	if root.gui_get_focus_owner() == null or root.gui_get_focus_owner().name != "Vehicle_scrapjaw":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: Up from BACK must restore the selected car")
+		quit(1)
+		return
+	(shell.find_child("Vehicle_rustbug", true, false) as Button).pressed.emit()
+	if String(shell.get("_current_vehicle_select_id")) != "rustbug" or String(garage_stage.get("vehicle_id")) != "rustbug":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: clicking a car must still select and display it")
+		quit(1)
+		return
+	(shell.find_child("Vehicle_pinbolt", true, false) as Button).grab_focus()
 	(shell.find_child("GaragePrimaryAction", true, false) as Button).pressed.emit()
 	if app.launched_vehicle != "pinbolt":
 		push_error("APP_SHELL_FOCUS_TEST FAIL: garage PLAY must launch the selected championship car")
