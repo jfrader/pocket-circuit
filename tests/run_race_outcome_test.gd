@@ -265,6 +265,8 @@ func _run_test() -> void:
 	var copy_applied := RunSession.serialize(copy_run)
 	if not _expect(bool(race.call("_report_result_to_app", scripted_results)) and RunSession.serialize(copy_run) == copy_applied and String(race.get("_night_consequences")) == "+%d POINTS" % win_award, "repeated reports retain the first consequences without applying twice"):
 		return
+	if not _expect(String(copy_run.get_meta("night_result_consequences", "")) == String(race.get("_night_consequences")), "the board receives the race's exact consequence breakdown"):
+		return
 	race.queue_free()
 	await process_frame
 	quit_run = app.call("start_run", 52525) as RunSession

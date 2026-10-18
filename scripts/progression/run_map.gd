@@ -184,6 +184,27 @@ static func _try_build(map_seed: int, run_seed: int, act: int) -> Dictionary:
 							crosses = true
 				if not crosses:
 					_link(chlds, prnts, pid, "%d_%d" % [r + 1, next_col])
+	# The forced bench row has no alternative type to deal. Keep one exit per
+	# parent there rather than presenting identical repair choices.
+	for c: int in rows_cols[walker_rows - 2]:
+		var pid := "%d_%d" % [walker_rows - 2, c]
+		var exits: Array = chlds[pid]
+		var kept: String = exits[0]
+		for cid: String in exits:
+			if absi(int(nds[cid]["col"]) - c) < absi(int(nds[kept]["col"]) - c):
+				kept = cid
+		for cid: String in exits.duplicate():
+			if cid != kept:
+				exits.erase(cid)
+				(prnts[cid] as Array).erase(pid)
+	for c: int in (rows_cols[walker_rows - 1] as Array).duplicate():
+		var nid := "%d_%d" % [walker_rows - 1, c]
+		if (prnts.get(nid, []) as Array).is_empty():
+			nds.erase(nid)
+			prnts.erase(nid)
+			(rows_cols[walker_rows - 1] as Array).erase(c)
+	if (rows_cols[walker_rows - 1] as Array).size() < 2:
+		return {}
 	var boss_row: int = walker_rows
 	var boss_id: String = "%d_%d" % [boss_row, BOSS_COLUMN]
 	nds[boss_id] = {"id": boss_id, "row": boss_row, "col": BOSS_COLUMN, "type": "act_rival"}

@@ -17,6 +17,14 @@ func _run_test() -> void:
 		return
 	app.set("_save_store", SAVE_STORE.new(SAVE_PATH))
 	var session := RunSession.create(1806)
+	if not _expect(_fact("race", "STOP", session) == "OPENING RACE", "the compulsory opener is labelled"):
+		return
+	for node: Dictionary in session.current_map.nodes.values():
+		if node["type"] == "race" and int(node["row"]) > 0:
+			for fact: Array in RUN_UI.stop_facts("race", session, {}, node["id"]):
+				if not _expect(fact != ["STOP", "OPENING RACE"], "previewing a later race must not label it as the opening race"):
+					return
+			break
 	if not _expect(_fact("race", "FIELD", session) == "6 cars" and _fact("act_rival", "FIELD", session) == "6 cars, hardest drivers" and _fact("rival", "FIELD", session) == "one on one, contact", "field facts match six-car races and two-car duels"):
 		return
 	var costs := _fact("race", "COSTS", session)

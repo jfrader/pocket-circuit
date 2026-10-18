@@ -211,8 +211,11 @@ static func _tick(value: Label, row: HBoxContainer, from: int, to: int) -> void:
 
 ## What a stop pays and costs, as label/value rows; race-type stops name their
 ## circuit.
-static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -> Array:
+static func stop_facts(kind: String, session: RunSession, circuit: Dictionary, stop_id: String = "") -> Array:
 	var rows: Array = []
+	var stop := session.current_map.get_node(stop_id) if not stop_id.is_empty() else session.current_node()
+	if kind == "race" and int(stop.get("row", -1)) == 0:
+		rows.append(["STOP", "OPENING RACE"])
 	if not circuit.is_empty():
 		rows.append(["CIRCUIT", "%s · %s" % [String(circuit.get("display_name", "")), "reverse" if bool(circuit.get("reverse", false)) else "forward"]])
 		if circuit.has("authored_route"):
@@ -229,6 +232,9 @@ static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -
 			rows.append(["FIELD", "one on one, contact"])
 			rows.append(["WIN", "their car"])
 			rows.append(["LOSE", "%d points; pay what you have, plus wear if short" % RunSession.RIVAL_LOSS_POINTS_COST])
+			var wear := session.run_state.get_car_wear(session.current_car_id)
+			if session.tow_count == 0 and session.run_points < RunSession.RIVAL_LOSS_POINTS_COST and RunState.is_worn_out(RunState.advance_wear(wear, RunSession.RIVAL_LOSS_SEVERITY)):
+				rows.append(["RISK", "A LOSS CAN END THE NIGHT"])
 		"act_rival":
 			rows.append(["FIELD", "%d cars, hardest drivers" % RunSession.RUN_POINTS_BY_FINISH.size()])
 			rows.append(["WIN", "act %d" % (session.current_map.act + 1) if session.current_map.act < RunSession.FINAL_ACT else "the night"])

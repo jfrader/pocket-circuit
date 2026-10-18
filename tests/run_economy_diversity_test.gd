@@ -20,11 +20,16 @@ func _run_test() -> void:
 				if not _expect(map.get_nodes_in_row(row).size() >= 2, "non-boss rows keep a choice seed %d act %d row %d" % [seed_value, act, row]):
 					return
 			for node: Dictionary in map.nodes.values():
+				var sibling_types := {}
+				for child: Dictionary in map.get_children(node["id"]):
+					if not _expect(not sibling_types.has(child["type"]), "siblings offer distinct stop types seed %d act %d parent %s" % [seed_value, act, node["id"]]):
+						return
+					sibling_types[child["type"]] = true
 				if node["type"] == "parts_van":
 					vans += 1
 					if not _expect(node["row"] > 0 and node["row"] < map.num_rows - 2, "van follows opening earnings and precedes final bench/rival"):
 						return
-				if node["row"] >= map.num_rows - 2:
+				if node["row"] >= map.num_rows - 3:
 					continue
 				# A single-child node must not leave an unused legal fork.
 				if map.get_children(node["id"]).size() < 2:
