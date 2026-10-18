@@ -1,5 +1,7 @@
 extends Node2D
 
+const NIGHT_TRANSITION := preload("res://scripts/ui/night_transition.gd")
+
 signal return_requested
 signal sprint_resolved(outcome: String, data: Dictionary)
 signal wear_out_beat_changed(beat: String)
@@ -148,6 +150,7 @@ var _race_flash_label: Label
 var _race_hud: RaceHUD
 var _position_label: Label
 var _results_panel: PanelContainer
+var _results_entrance: Tween
 var _results_label: Label
 var _retry_button: Button
 var _mastery_button: Button
@@ -719,7 +722,7 @@ func _on_strip_outcome(headline: String, elapsed: float) -> void:
 	_results_finalized = true
 	_race_hud.visible = false
 	_pause_overlay.enabled = false
-	_results_panel.visible = true
+	_present_results_panel()
 	_results_label.text = "%s\n\n%s" % [headline, _format_time(elapsed) if headline == "STRIP WON" else ""]
 	_retry_button.text = "RETRY"
 	_retry_button.disabled = false
@@ -1038,7 +1041,7 @@ func _on_race_finished(_total_time: float) -> void:
 	# the incoming target immediately during transition, which used to cut it).
 	# Grid arrives during results if the player lingers.
 	_cue_live_section("victory" if _race_won else "defeat")
-	_results_panel.visible = true
+	_present_results_panel()
 	_retry_button.disabled = true
 	_continue_button.disabled = true
 	_update_results(race_manager.get_results())
@@ -1143,8 +1146,16 @@ func _on_results_ready(results: Array) -> void:
 	_results_finalized = true
 	_pause_overlay.enabled = false
 	_race_hud.visible = false
-	_results_panel.visible = true
+	_present_results_panel()
 	_attempt_result_commit(results)
+
+
+func _present_results_panel() -> void:
+	if _results_panel.visible:
+		return
+	_results_entrance = NIGHT_TRANSITION.results_entrance(
+		_results_panel, NIGHT_TRANSITION.instant_for(get_node_or_null("/root/App")), _reduced_motion_enabled()
+	)
 
 
 func _update_results(results: Array) -> void:
@@ -1415,7 +1426,7 @@ func _create_phase_one_ui() -> void:
 	_results_panel.name = "ResultsPanel"
 	_results_panel.custom_minimum_size.x = 620.0
 	_results_panel.visible = false
-	_results_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c", 0.96), Color("f4c65a")))
+	_results_panel.add_theme_stylebox_override("panel", _pause_panel_style(Color("0c121c"), Color("f4c65a")))
 	results_center.add_child(_results_panel)
 	var results_margin := MarginContainer.new()
 	for edge: String in ["left", "right", "top", "bottom"]:
