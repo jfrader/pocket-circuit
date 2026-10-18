@@ -355,8 +355,7 @@ func _prepare_race_async() -> void:
 		app.call("complete_race_loading")
 		return
 	app.call("set_loading_section", 2)
-	var field_racers: Array[Dictionary] = _build_field_racers_for_preparation()
-	var resolved_keys: Dictionary = IDENTITIES.resolve_field_visual_keys(field_racers)
+	var resolved_keys := _resolve_field_visual_keys()
 	var keys_to_prepare: Array[String] = []
 	for k in resolved_keys.values():
 		var sk := String(k)
@@ -502,7 +501,7 @@ func _configure_personal_ghost() -> void:
 func _build_field_racers_for_preparation() -> Array[Dictionary]:
 	var entries: Array[Dictionary] = []
 	var pvid := String(_session.get("vehicle_id", "rustbug"))
-	entries.append({"vehicle_id": pvid, "driver_id": "rae", "slot": 0})
+	entries.append({"vehicle_id": pvid, "driver_id": "" if _session.has("player_visual_key") else "rae", "slot": 0})
 	if _is_chase_sprint():
 		var chaser := _chase_driver()
 		if not chaser.is_empty():
@@ -521,7 +520,10 @@ func _build_field_racers_for_preparation() -> Array[Dictionary]:
 
 func _resolve_field_visual_keys() -> Dictionary:
 	var racers := _build_field_racers_for_preparation()
-	return IDENTITIES.resolve_field_visual_keys(racers)
+	var keys := IDENTITIES.resolve_field_visual_keys(racers)
+	if _session.has("player_visual_key"):
+		keys[0] = String(_session["player_visual_key"])
+	return keys
 
 
 func _opponent_count(event: Dictionary, opponents: Array) -> int:
@@ -1160,6 +1162,10 @@ func _present_results_panel() -> void:
 
 func _update_results(results: Array) -> void:
 	var lines: Array[String] = ["RACE RESULTS", ""]
+	var explanation := _player_dnf_explanation(results)
+	if not explanation.is_empty():
+		lines.append(explanation)
+		lines.append("")
 	for result: Dictionary in results:
 		var status := "DNF" if bool(result.get("dnf", false)) else (_format_time(float(result["time"])) if bool(result["finished"]) else "RACING")
 		lines.append("%d. %s  ·  %s  ·  %s" % [
@@ -1192,6 +1198,26 @@ func _update_results(results: Array) -> void:
 		final_prompt = "NOT SAVED · RETRY SAVE"
 	lines.append("FINALIZING..." if not _results_finalized else final_prompt)
 	_results_label.text = "\n".join(lines)
+
+
+func _player_dnf_explanation(results: Array) -> String:
+	var player_dnf := false
+	var deadline := INF
+	for result: Dictionary in results:
+		if result.get("vehicle") == _player_vehicle:
+			player_dnf = bool(result.get("dnf", false))
+		elif bool(result.get("finished", false)) and not bool(result.get("dnf", false)):
+			deadline = minf(deadline, float(result["time"]) + race_manager.finish_grace_seconds)
+	if not player_dnf:
+		return ""
+	var limit := "" if is_inf(deadline) else "%d:%02d" % [int(deadline) / 60, int(deadline) % 60]
+	if not is_instance_valid(_player_vehicle):
+		return "CAR WRECKED" if limit.is_empty() else "CAR WRECKED · LIMIT %s" % limit
+	if not limit.is_empty():
+		if race_manager.race_time >= deadline:
+			return "TIME UP (LIMIT %s)" % limit
+		return "DID NOT FINISH · LIMIT %s" % limit
+	return "DID NOT FINISH"
 
 
 func restart_race() -> void:
