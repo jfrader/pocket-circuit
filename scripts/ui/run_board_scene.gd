@@ -365,7 +365,7 @@ static func compact_labels(host: Node) -> void:
 
 static func facts(rows: Array) -> VBoxContainer:
 	var list := VBoxContainer.new()
-	list.add_theme_constant_override("separation", 6)
+	list.add_theme_constant_override("separation", 2)
 	var short_rows: Array = []
 	for row: Array in rows:
 		if String(row[0]) == "CIRCUIT":

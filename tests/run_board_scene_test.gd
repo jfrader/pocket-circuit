@@ -183,6 +183,16 @@ func _run() -> void:
 				return
 			if not _expect((stop_car.call("texture") as Texture2D).get_width() == 48 * MATERIALS.HERO_PIXEL_SCALE and is_equal_approx(detail.size.x, 264), "the slip car uses hero-scale rasterization without widening the 264px slip"):
 				return
+			if kind == "rival":
+				var wear_before := session.run_state.get_car_wear(session.current_car_id)
+				session.run_state.set_car_wear(session.current_car_id, "rusty")
+				shell.call("_show_run_stop", id, session)
+				for frame in 2:
+					await process_frame
+				var risk_facts := RUN_UI.stop_facts(kind, session, {}, id)
+				if not _expect(risk_facts.has(["RISK", "A LOSS CAN END THE NIGHT"]) and is_equal_approx(detail.get_global_rect().position.x, 968) and is_equal_approx(detail.size.x, 264) and detail.get_global_rect().end.y < 648 and is_equal_approx(slot.size.x, 312), "fatal-loss warning stays inside the same 264px content and 312px frame slot"):
+					return
+				session.run_state.set_car_wear(session.current_car_id, wear_before)
 			var restored := RunSession.deserialize(session_snapshot)
 			restored.current_map.act = act
 			var again := BOARD_IDENTITY.look(restored, id)

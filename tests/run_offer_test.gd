@@ -45,7 +45,9 @@ func _run_test() -> void:
 		return
 	if not _expect(not sess.pending_chaser.is_empty() and String(sess.pending_chaser.get("haul_vehicle_id", "")) == won, "racing it now marks the robbed driver as the next chase"):
 		return
-	var next_race := _first_race(sess)
+	if not _expect(RUN_WALK.walk_to(app, sess, "race"), "accepted offer can cross service stops to the next race"):
+		return
+	var next_race := sess.current_node_id
 	if not _expect(not next_race.is_empty() and bool(app.call("start_run_race", next_race)), "the next race starts"):
 		return
 	if not _expect(String((app.get("current_race_session") as Dictionary).get("vehicle_id", "")) == won, "the next race is driven in the won car"):
@@ -101,13 +103,6 @@ func _run_to_rival(app: Object) -> RunSession:
 		if RUN_WALK.walk_to(app, sess, "rival"):
 			return sess
 	return null
-
-
-func _first_race(sess: RunSession) -> String:
-	for stop: Dictionary in sess.available_nodes():
-		if String(stop["type"]) in ["race", "act_rival"]:
-			return String(stop["id"])
-	return ""
 
 
 func _expect(condition: bool, message: String) -> bool:
