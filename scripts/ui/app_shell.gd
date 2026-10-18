@@ -1159,7 +1159,7 @@ func show_run_lockup() -> void:
 	columns.add_child(context)
 	context.configure(sess, false)
 	context.hide_route_visuals()
-	_run_action("OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
+	_run_action("LOCKUP OPEN" if sess.lockup_used else "OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
 	RUN_BENCH_SCENE.dress_button(actions.get_child(0) as Button, true)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	RUN_BENCH_SCENE.dress_button(actions.get_child(1) as Button)
@@ -1342,6 +1342,10 @@ func _finish_van_confirmation(part_id: String) -> void:
 
 
 func _on_lockup_open_pressed() -> void:
+	var button := _content.find_child("LockupOpen", true, false) as Button
+	if button == null or button.disabled:
+		return
+	button.disabled = true
 	_play_ui_confirm()
 	var opened := bool(_app.call("run_open_lockup"))
 	_finish_lockup_confirmation(opened)
@@ -1354,6 +1358,7 @@ func _finish_lockup_confirmation(opened: bool) -> void:
 	var sess: RunSession = _app.call("current_run_session") as RunSession
 	if opened and scene != null and button != null and sess != null and not sess.pending_offer.is_empty():
 		button.disabled = true
+		button.text = "OPENING LOCKUP"
 		var duration := scene.confirm(button, sess.pending_offer)
 		if duration > 0.0:
 			await get_tree().create_timer(duration).timeout
@@ -1379,6 +1384,36 @@ func _finish_errand_confirmation(choice: int, resolved: bool) -> void:
 			await get_tree().create_timer(duration).timeout
 	if generation == _entrance_generation and _screen == "run_errand":
 		show_run_board()
+		if resolved and _screen == "run_board":
+			_show_errand_acknowledgement(choice)
+
+
+func _show_errand_acknowledgement(choice: int) -> void:
+	var resolutions := {
+		RunSession.ErrandChoice.PAY: "+%d POINTS" % RunSession.ERRAND_PAY_POINTS,
+		RunSession.ErrandChoice.TUNE_UP: "TUNE-UP",
+		RunSession.ErrandChoice.TOW: "TOW",
+	}
+	var state_labels := _run_board.get_node_or_null("RunStateLabels") as VBoxContainer
+	if state_labels == null:
+		state_labels = VBoxContainer.new()
+		state_labels.name = "RunStateLabels"
+		state_labels.position = RUN_STATE_POSITION
+		state_labels.custom_minimum_size.x = RUN_STATE_WIDTH
+		state_labels.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_run_board.add_child(state_labels)
+	var acknowledgement := RUN_UI.label("ERRAND DONE - " + String(resolutions[choice]), 12, SKIN.CREAM)
+	acknowledgement.name = "ErrandAcknowledgement"
+	acknowledgement.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	acknowledgement.add_theme_stylebox_override("normal", RUN_BOARD_SCENE.label_tape())
+	state_labels.add_child(acknowledgement)
+	var dismiss := func() -> void:
+		if is_instance_valid(acknowledgement):
+			acknowledgement.hide()
+			acknowledgement.queue_free()
+	_run_board.stop_selected.connect(dismiss.unbind(1), CONNECT_ONE_SHOT)
+	for action: Node in _content.find_children("*", "Button", true, false):
+		(action as Button).pressed.connect(dismiss, CONNECT_ONE_SHOT)
 
 
 func show_briefing(event_id: String) -> void:
