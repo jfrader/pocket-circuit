@@ -133,8 +133,12 @@ func _check_bench_and_van() -> void:
 	sess.run_state.set_car_wear(car, "rusty")
 	if not _expect(sess.bench_repair(car), "repair at the bench"):
 		return
+	# The walk may have bought a part at a van on the way; only the refused
+	# action must leave the pile untouched.
+	var held_before: int = sess.parts_held.size()
 	sess.parts_held.append(RunParts.deal(1, sess.car_stats(car))[0])
-	if not _expect(not sess.bench_fit(car, 0) and not sess.bench_repair(car) and sess.parts_held.size() == 1, "one bench action per visit"):
+	var expected_held: int = held_before + 1
+	if not _expect(not sess.bench_fit(car, 0) and not sess.bench_repair(car) and sess.parts_held.size() == expected_held, "one bench action per visit"):
 		return
 	if not _expect(sess.open_lockup().is_empty() and sess.lockup_used == false, "a lockup opens only at a lockup"):
 		return

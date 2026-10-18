@@ -13,6 +13,7 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	_test_valid_runs()
+	_test_seeded_errand_roundtrip()
 	_test_route_roundtrips()
 	_test_invalid_runs()
 	_test_haul_validation()
@@ -64,6 +65,24 @@ func _test_valid_runs() -> void:
 	normalized["installed_parts"] = {car_id: [part, false], "unowned-car": [part]}
 	var restored := SESSION.deserialize(normalized)
 	_expect(restored != null and restored.parts_held == [part] and restored.fitted_parts(car_id) == [part] and not restored.installed_parts.has("unowned-car"), "optional part entries retain existing drop-invalid normalization")
+
+func _test_seeded_errand_roundtrip() -> void:
+	for seed_value: int in [0, 1, 42]:
+		var session := SESSION.create(seed_value)
+		for node: Dictionary in session.current_map.nodes.values():
+			if node["type"] != "errand":
+				continue
+			session.current_node_id = node["id"]
+			session.run_state.row = node["row"]
+			session.run_state.set_car_wear(session.current_car_id, "rusty")
+			var snapshot: Dictionary = JSON.parse_string(JSON.stringify(SESSION.serialize(session)))
+			var restored := SESSION.deserialize(snapshot)
+			if not _expect(restored != null, "seeded errand survives JSON save"):
+				return
+			_expect(restored.errand_tune_steps() == session.errand_tune_steps(), "seeded repair strength survives resume")
+			_expect(restored.resolve_errand(SESSION.ErrandChoice.TUNE_UP) == session.resolve_errand(SESSION.ErrandChoice.TUNE_UP), "resumed errand applies the same reward")
+			_expect(SESSION.deserialize(SESSION.serialize(restored)) != null, "seeded repair outcome remains valid")
+			break
 
 func _test_haul_validation() -> void:
 	var session := SESSION.create(33333)
