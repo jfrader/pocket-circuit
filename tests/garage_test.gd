@@ -1,15 +1,12 @@
 extends SceneTree
 
 ## GURI-1741 (Run rewards and Quick Race as the garage): Quick Race shows the
-## shipped cars and every won car on one shelf grouped by type; a won car tells
+## shipped cars and every won car in type sections; a won car tells
 ## where it came from and its six-axis shape is drawn against the car the
 ## player came in with.
 
 const CATALOG := preload("res://data/championship/catalog.gd")
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
-
-## More cars than the shelf shows at once (eight shipped cars fit).
-const SHELF_FITS := 9
 
 var _failed := false
 
@@ -54,14 +51,14 @@ func _run_test() -> void:
 	if not _expect(buttons.size() == roster.size() and buttons.has(won_id) and not (buttons[won_id] as Button).disabled, "the shelf holds every shipped and won car, the won one enabled"):
 		return
 	var last_type := -1
-	var last_x := -INF
+	var last_position := Vector2(-INF, -INF)
 	for id: String in roster:
 		var button := buttons[id] as Button
 		var type_index := ProceduralCarGenerator.SUPPORTED_TYPES.find(String(CATALOG.get_vehicle(id)["car_art"]["type"]))
-		if not _expect(type_index >= last_type and button.position.x > last_x, "the shelf runs left to right grouped by type"):
+		if not _expect(type_index >= last_type and (button.position.y > last_position.y or (button.position.y == last_position.y and button.position.x > last_position.x)), "the grid reads left to right and top to bottom, grouped by type"):
 			return
 		last_type = type_index
-		last_x = button.position.x
+		last_position = button.position
 
 	var stage := menu.get("_stage") as Control
 	var origin := menu.find_child("GarageOrigin", true, false) as Label
@@ -85,17 +82,16 @@ func _run_test() -> void:
 	if not _expect(not origin.visible and String(stage.get("compare_label")) == "YOUR CAR" and (stage.get("compare_shape") as Dictionary).is_empty(), "the car the player holds is drawn alone"):
 		return
 
-	var after := menu.find_child("ShelfMoreAfter", true, false) as Control
-	var before := menu.find_child("ShelfMoreBefore", true, false) as Control
+	var scroll := menu.find_child("GridScroll", true, false) as ScrollContainer
 	(buttons[roster[0]] as Button).grab_focus()
 	for frame in 3:
 		await process_frame
-	if not _expect(roster.size() > SHELF_FITS and after.visible and not before.visible, "at the first car a full shelf shows MORE to the right only (cars %d)" % roster.size()):
+	if not _expect(scroll.scroll_vertical == 0 and scroll.horizontal_scroll_mode == ScrollContainer.SCROLL_MODE_DISABLED, "the first car starts at the top of a vertical-only collection"):
 		return
 	(buttons[roster[roster.size() - 1]] as Button).grab_focus()
 	for frame in 3:
 		await process_frame
-	if not _expect(not after.visible and before.visible, "at the last car the shelf shows MORE to the left only"):
+	if not _expect(scroll.scroll_vertical > 0 and scroll.get_global_rect().encloses((buttons[roster[-1]] as Button).get_global_rect()), "focus follows the last car fully into the vertical viewport"):
 		return
 
 	if _failed:

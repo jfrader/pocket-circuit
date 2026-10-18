@@ -20,7 +20,7 @@ const RACE_WHEEL_ROLL_DISTANCE := 64.0
 ## only evaluated when a new one is added, never on a hit, so the hot paths stay
 ## allocation free.
 const MAX_AVATAR_ENTRIES := 24
-const MAX_CAR_ENTRIES := 48
+const MAX_CAR_ENTRIES := 200
 static var _avatar_entry_order: Array[String] = []
 static var _car_entry_order: Array[String] = []
 

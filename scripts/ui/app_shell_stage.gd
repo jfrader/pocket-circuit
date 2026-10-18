@@ -203,12 +203,12 @@ func _blended_shape() -> Dictionary:
 
 
 func _draw_vehicle_stage() -> void:
-	var table_radius := minf(size.x * 0.27, size.y * 0.44)
-	var table_center := Vector2(size.x * 0.29, size.y * 0.5)
+	var table_radius := minf(size.x * 0.21, size.y * 0.42)
+	var table_center := Vector2(size.x * 0.23, size.y * 0.5)
 	_draw_turntable(table_center, table_radius)
 	draw_car(self, table_center, table_radius * 1.45, vehicle_id, -0.35)
-	var card_height := minf(size.y * 0.8, SHAPE_CARD_MAX_HEIGHT)
-	_draw_shape_card(Rect2(size.x * 0.6, (size.y - card_height) * 0.5, size.x * 0.38, card_height))
+	var card_height := minf(size.y, SHAPE_CARD_MAX_HEIGHT)
+	_draw_shape_card(Rect2(size.x * 0.47, (size.y - card_height) * 0.5, size.x * 0.53, card_height))
 
 
 func _draw_briefing_stage() -> void:
@@ -339,7 +339,7 @@ func _draw_turntable(center: Vector2, radius: float) -> void:
 
 
 func _draw_shape_card(rect: Rect2) -> void:
-	CarShapeView.draw_card(self, rect, _blended_shape(), shape, compare_shape, compare_label, 0.0, mode == &"vehicle")
+	CarShapeView.draw_card(self, rect, _blended_shape(), shape, compare_shape, compare_label, 26.0, mode == &"vehicle")
 
 
 func _draw_track_card(rect: Rect2, room: String) -> void:
