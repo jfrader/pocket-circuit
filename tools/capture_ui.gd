@@ -106,11 +106,15 @@ func _run() -> void:
 	elif shot == "garage":
 		shell.call("show_vehicle_select", "", true)
 	elif shot == "garage_won":
-		# Win a duel on a few nights and abandon each, so the garage holds won cars.
+		# Bank duels and lockups to exercise multiple collection sections.
 		for attempt in 12:
 			var night: RunSession = app.call("start_run", 1741000 + attempt * 31) as RunSession
 			if RUN_WALK.walk_to(app, night, "rival"):
 				RUN_WALK.settle(app, night)
+				app.call("run_send_it_home")
+			if RUN_WALK.walk_to(app, night, "lockup"):
+				app.call("run_open_lockup")
+				app.call("run_send_it_home")
 			app.call("abandon_run")
 		shell.call("show_vehicle_select", "", true)
 		for i in 4:

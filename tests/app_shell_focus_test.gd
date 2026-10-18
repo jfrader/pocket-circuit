@@ -154,6 +154,28 @@ func _run_test() -> void:
 		push_error("APP_SHELL_FOCUS_TEST FAIL: persisted selected vehicle should receive focus")
 		quit(1)
 		return
+	var garage_scroll := shell.find_child("GridScroll", true, false) as ScrollContainer
+	if garage_scroll == null or garage_scroll.position != Vector2(514, 112) or garage_scroll.size != Vector2(704, 466) or not garage_scroll.follow_focus:
+		push_error("APP_SHELL_FOCUS_TEST FAIL: garage must pin the vertically scrolling five-column collection beside the identity stage")
+		quit(1)
+		return
+	(shell.find_child("GaragePrimaryAction", true, false) as Button).pressed.emit()
+	if app.launched_vehicle != "pinbolt":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: garage PLAY must launch the selected championship car")
+		quit(1)
+		return
+	shell.call("show_vehicle_select", "kitchen_crumb_rush", false)
+	shell.call("go_back")
+	if String(shell.get("_screen")) != "briefing":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: garage BACK must leave for the event briefing")
+		quit(1)
+		return
+	shell.call("show_vehicle_select", "", true)
+	(shell.find_child("GaragePrimaryAction", true, false) as Button).pressed.emit()
+	if String(shell.get("_screen")) != "quick_race":
+		push_error("APP_SHELL_FOCUS_TEST FAIL: garage NEXT: TRACK must return to Quick Race")
+		quit(1)
+		return
 	app.mastery_calibrating = true
 	shell.call("show_briefing", "kitchen_crumb_rush")
 	await process_frame
