@@ -137,6 +137,13 @@ static func _try_build(map_seed: int, run_seed: int, act: int) -> Dictionary:
 				cand += 1
 			nxt.append(cand)
 			prev_c = cand
+		# Merging walkers must not collapse a whole choice row into one stop.
+		if _unique_sorted(nxt).size() == 1:
+			var merged: int = nxt[0]
+			if merged > 0 and absi(cur[0] - (merged - 1)) <= 1:
+				nxt[0] = merged - 1
+			else:
+				nxt[n_paths - 1] = merged + 1
 		cur = nxt
 		walker_pos.append(cur.duplicate())
 	var traj_set: Dictionary = {}
@@ -160,6 +167,23 @@ static func _try_build(map_seed: int, run_seed: int, act: int) -> Dictionary:
 	for r: int in range(walker_rows - 1):
 		for p: int in range(n_paths):
 			_link(chlds, prnts, "%d_%d" % [r, walker_pos[r][p]], "%d_%d" % [r + 1, walker_pos[r + 1][p]])
+	# Add local forks only where they do not cross an existing route. Outer
+	# lanes can still have one exit when a second would cross another lane.
+	for r: int in range(walker_rows - 1):
+		for c: int in rows_cols[r]:
+			var pid := "%d_%d" % [r, c]
+			if (chlds.get(pid, []) as Array).size() >= 2:
+				continue
+			for next_col: int in rows_cols[r + 1]:
+				if absi(c - next_col) > 1:
+					continue
+				var crosses := false
+				for peer_col: int in rows_cols[r]:
+					for child_id: String in chlds.get("%d_%d" % [r, peer_col], []):
+						if (c - peer_col) * (next_col - int(nds[child_id]["col"])) < 0:
+							crosses = true
+				if not crosses:
+					_link(chlds, prnts, pid, "%d_%d" % [r + 1, next_col])
 	var boss_row: int = walker_rows
 	var boss_id: String = "%d_%d" % [boss_row, BOSS_COLUMN]
 	nds[boss_id] = {"id": boss_id, "row": boss_row, "col": BOSS_COLUMN, "type": "act_rival"}
@@ -205,6 +229,13 @@ static func _assign_types(base_nodes: Dictionary, prnts: Dictionary, rows_cols: 
 	var target: Dictionary = {}
 	for t: String in QUOTAS:
 		target[t] = int(round(QUOTAS[t] * float(dealt_total)))
+	target["parts_van"] = maxi(1, int(target["parts_van"]))
+	# Each act has a middle-row van after the opening payout and before the
+	# final bench/rival. Points earned earlier therefore have a spending route;
+	# taking that route is optional, not an automatic purchase or forced visit.
+	var van_row := walker_rows / 2
+	var van_cols: Array = rows_cols[van_row]
+	var van_col: int = van_cols[_derive(map_seed, van_row, "van") % van_cols.size()]
 	var cur_count: Dictionary = {}
 	var min_spec_row: int = int(float(walker_rows) * 0.333)
 	for r: int in range(1, bench_row):
@@ -221,6 +252,7 @@ static func _assign_types(base_nodes: Dictionary, prnts: Dictionary, rows_cols: 
 			var allowed: Array = []
 			for t: String in DEALT_TYPES:
 				if forbid.has(t): continue
+				if t == "parts_van" and (r < van_row or (r == van_row and c != van_col)): continue
 				if r < min_spec_row and t in LATE_TYPES: continue
 				if t == "bench" and r == bench_row - 1: continue
 				allowed.append(t)
@@ -246,6 +278,10 @@ static func _assign_types(base_nodes: Dictionary, prnts: Dictionary, rows_cols: 
 			var pu: float = _roll(map_seed, r, "pick_c%d" % c, TYPE_SALT)
 			var idx: int = 0 if (pu < 0.55 and float(defic.get(cands[0], 0.0)) > 0.0) else int(pu * float(cands.size()))
 			var chosen: String = String(cands[clampi(idx, 0, cands.size() - 1)])
+			if r == van_row and c == van_col:
+				if not allowed.has("parts_van"):
+					return {}
+				chosen = "parts_van"
 			typed[nid]["type"] = chosen
 			cur_count[chosen] = int(cur_count.get(chosen, 0)) + 1
 			for pid: String in pars:
