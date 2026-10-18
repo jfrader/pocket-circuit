@@ -32,7 +32,10 @@ var _tween: Tween
 
 
 static func instant_for(app: Node) -> bool:
-	return bool(app.get("_test_mode")) if app != null else "--script" in OS.get_cmdline_args()
+	if app == null:
+		return "--script" in OS.get_cmdline_args()
+	var mode: Variant = app.get("_test_mode")
+	return mode is bool and mode == true
 
 
 func _ready() -> void:
