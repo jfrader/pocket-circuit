@@ -8,7 +8,9 @@ extends SceneTree
 ## discovery, quick_race, quick_strip, settings, driver, map, briefing, ending,
 ## save_error, loading, hud, results, results_unsaved, night_won, night_lost,
 ## driving_intro.
+## State fixtures: offer_no_spare, board_hauling, board_towed.
 ## Optional PC_SHOT_CROP="x,y,w,h" crops the capture for close review.
+## PC_SHOT_TRANSITION=1 freezes the screen wipe or results stamp at its midpoint.
 
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
@@ -78,7 +80,7 @@ func _run() -> void:
 		shell.call("show_run_board")
 	elif shot == "discovery":
 		shell.call("show_discovery")
-	elif shot == "offer":
+	elif shot in ["offer", "offer_no_spare", "board_hauling"]:
 		var offered := false
 		for attempt in 12:
 			var night: RunSession = app.call("start_run", 1827000 + attempt * 31) as RunSession
@@ -90,6 +92,16 @@ func _run() -> void:
 			push_error("no duel win to offer")
 			quit(1)
 			return
+		var night: RunSession = app.call("current_run_session")
+		if shot == "offer_no_spare":
+			for act: Dictionary in night.node_opponents.values():
+				for roster: Dictionary in act.values():
+					for opponent: Dictionary in roster["opponents"]:
+						opponent["vehicle_id"] = night.pending_offer_driver["vehicle_id"]
+		elif shot == "board_hauling":
+			if not bool(app.call("run_race_it_now")):
+				_fail("hot offer refused")
+				return
 		shell.call("show_run_board")
 	elif shot == "garage":
 		shell.call("show_vehicle_select", "", true)
@@ -117,14 +129,19 @@ func _run() -> void:
 		if shell.find_child("RunDrivingIntro", true, false) == null:
 			_fail("driving controls screen did not open")
 			return
-	elif shot == "board":
+	elif shot in ["board", "board_towed"]:
 		if OS.get_environment("PC_SHOT_FRESH") == "1":
 			if bool((app.call("get_save_data") as Dictionary).get("run_intro_seen", true)) or app.call("current_run_session") != null:
 				_fail("PC_SHOT_FRESH requires a new profile without an active run")
 				return
 			shell.call("_on_art_action", &"new_run")
 		else:
-			app.call("start_run", 424242)
+			var night: RunSession = app.call("start_run", 424242)
+			if shot == "board_towed":
+				night.resolve_race(night.current_node_id, 1, 6)
+				night.add_tow()
+				night.run_state.set_car_wear(night.current_car_id, "dented")
+				night.register_crash(1.0)
 			shell.call("show_run_board")
 	elif WALK.has(shot):
 		var target := String(WALK[shot])
@@ -149,6 +166,22 @@ func _run() -> void:
 		return
 	# Let entrance motion finish before the shot.
 	await create_timer(1.0).timeout
+	if OS.get_environment("PC_SHOT_TRANSITION") == "1":
+		app.set("_test_mode", false)
+		var tween: Tween
+		if shot in ["results", "results_unsaved"]:
+			var race := current_scene
+			(race.get("_results_panel") as Control).hide()
+			race.call("_present_results_panel")
+			tween = race.get("_results_entrance")
+		else:
+			shell.set("_last_transition_destination", "")
+			shell.call("_present_screen_transition")
+			tween = (shell.get("_night_transition") as Node).get("_tween")
+		if tween != null:
+			tween.pause()
+			tween.custom_step(0.16 if shot not in RACE_SCREENS else 0.1)
+		await process_frame
 	var img := root.get_texture().get_image()
 	var crop := OS.get_environment("PC_SHOT_CROP")
 	if not crop.is_empty():

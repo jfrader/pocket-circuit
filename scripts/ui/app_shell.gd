@@ -23,12 +23,22 @@ const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
 const RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
 const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
+const NIGHT_TRANSITION := preload("res://scripts/ui/night_transition.gd")
 
 const PAGE_MARGIN := 48
 const PAGE_TOP := 28
 const BACK_HINT := "ESC / B  BACK"
 const STEAM_DROP_MARGIN := 24.0
 const STEAM_DROP_GAP := 8.0
+const RUN_STATE_POSITION := Vector2(24, 58)
+const RUN_STATE_WIDTH := 380.0
+const TRANSITION_KICKERS := {
+	"title": "POCKET CIRCUIT", "vehicle_select": "THE GARAGE",
+	"run_bench": "THE BENCH", "run_parts_van": "PARTS VAN",
+	"run_lockup": "THE LOCKUP", "run_errand": "THE ERRAND",
+	"run_offer": "THE OFFER", "ending": "CHAMPIONSHIP COMPLETE",
+	"run_driving_intro": "DRIVING CONTROLS",
+}
 
 var _app: Node
 var _root: Control
@@ -49,7 +59,11 @@ var _run_going := false
 ## The run stats last shown, so the next screen animates what changed.
 var _run_stats_seen: Dictionary = {}
 var _button_focus_chain: Array[Button] = []
-var _screen := "title"
+var _screen := "title":
+	set(value):
+		_screen = value
+		if is_instance_valid(_root):
+			_present_screen_transition.call_deferred()
 var _event_id := ""
 var _quick_race := false
 var _quick_strip := false
@@ -74,6 +88,8 @@ var _driver_return: Callable
 var _page: MarginContainer
 var _art_menu: Control
 var _discovery_panel: CircuitDiscoveryPanel
+var _night_transition: CanvasLayer
+var _last_transition_destination := "title"
 
 static var _quick_race_entry_count := 0
 static var _quick_race_theme_cursor := -1
@@ -388,6 +404,25 @@ func show_run_board() -> void:
 	chalk_content.add_child(act_label)
 	_run_stats(chalk_content, sess)
 	if not night_over:
+		var state_lines := {}
+		if sess.pending_chaser != null:
+			var hauled_car := String(sess.pending_chaser.get("haul_vehicle_id", sess.current_car_id))
+			state_lines["RunHaulStatus"] = "HAULING %s - CHASED ON THE NEXT CONNECTOR" % RUN_UI.car_name(hauled_car).to_upper()
+		if sess.towed_to_bench:
+			state_lines["RunTowStatus"] = "TOWED - THE NEXT BENCH VISIT IS SPENT"
+		if not state_lines.is_empty():
+			var state_labels := VBoxContainer.new()
+			state_labels.name = "RunStateLabels"
+			state_labels.position = RUN_STATE_POSITION
+			state_labels.custom_minimum_size.x = RUN_STATE_WIDTH
+			state_labels.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			board.add_child(state_labels)
+			for node_name: String in state_lines:
+				var status := RUN_UI.label(state_lines[node_name], 12, SKIN.CREAM)
+				status.name = node_name
+				status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				status.add_theme_stylebox_override("normal", RUN_BOARD_SCENE.label_tape())
+				state_labels.add_child(status)
 		RUN_BOARD_SCENE.compact_labels(chalk_content)
 	RUN_BOARD_SCENE.chalk_labels(chalk_content)
 	if not night_over:
@@ -800,9 +835,10 @@ func show_run_offer() -> void:
 			driver.add_child(portrait)
 			driver.add_child(RUN_UI.label(String(sess.pending_offer_driver.get("name", "")), 18, SKIN.CREAM))
 			right.add_child(driver)
-		if sess.can_race_hot(sess.pending_offer):
-			_offer_choice(scene, "RACE IT NOW", "The driver you took it from chases you on the next sprint", "run_race_it_now", "ActionTakeOffer", true)
-		_offer_choice(scene, "SEND IT AHEAD · %d POINTS" % sess.pending_offer_points, "Spend this win's points, nobody chases you", "run_send_it_ahead", "ActionSendAhead", not sess.can_race_hot(sess.pending_offer), sess.run_points < sess.pending_offer_points)
+		var can_race_hot := sess.can_race_hot(sess.pending_offer)
+		var hot_copy := "The driver you took it from chases you on the next sprint" if can_race_hot else "NO SPARE CAR FOR THE CHASE"
+		_offer_choice(scene, "RACE IT NOW", hot_copy, "run_race_it_now", "ActionTakeOffer", can_race_hot, not can_race_hot)
+		_offer_choice(scene, "SEND IT AHEAD · %d POINTS" % sess.pending_offer_points, "Spend this win's points, nobody chases you", "run_send_it_ahead", "ActionSendAhead", not can_race_hot, sess.run_points < sess.pending_offer_points)
 		_offer_choice(scene, "SEND IT HOME", "In your collection next night, keep your points", "run_send_it_home", "ActionKeepCar")
 	var current_shape := CarProfile.shape(CATALOG.create_vehicle_stats(sess.current_car_id))
 	card.show_shape(
@@ -1776,6 +1812,25 @@ func _clear_content() -> void:
 	for child: Node in _content.get_children():
 		_content.remove_child(child)
 		child.queue_free()
+
+
+func _present_screen_transition() -> void:
+	var destination := _screen
+	var kicker: String = TRANSITION_KICKERS.get(_screen, _screen.replace("_", " ").to_upper())
+	if _screen == "run_board":
+		var sess: RunSession = _app.call("run_board_session") as RunSession
+		if sess != null and sess.current_map != null:
+			var room: String = RUN_BOARD_SCENE.ROOM_NAMES.get(sess.current_map.act, "Kitchen Counter")
+			kicker = "NIGHT OVER" if sess.is_failed() or sess.is_complete() else "%s - ACT %d" % [room.to_upper(), sess.current_map.act]
+			destination += ":" + kicker
+	if destination == _last_transition_destination:
+		return
+	_last_transition_destination = destination
+	if not is_instance_valid(_night_transition):
+		_night_transition = NIGHT_TRANSITION.new()
+		_night_transition.name = "NightTransition"
+		add_child(_night_transition)
+	_night_transition.call("play", kicker, NIGHT_TRANSITION.instant_for(_app), _reduced_motion_enabled())
 
 
 func _configure_stage(
