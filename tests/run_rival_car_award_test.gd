@@ -29,18 +29,20 @@ func _run_test() -> void:
 	_expect(lockup.pending_offer_driver.is_empty() and lockup.run_state.get_car_wear(fresh["id"]) == "clean", "lockup car is clean with no robbed driver")
 	_expect(sess.send_it_ahead(), "duplicate fixture drives the won car")
 	var existing_id := sess.current_car_id
-	var existing_roll := RunState.roll_from_pairs(0.04, -0.03, 0.02)
-	sess.run_state.car_rolls[existing_id] = existing_roll.duplicate(true)
+	var existing_car := sess.won_car(existing_id)
+	var existing_vehicle := CATALOG.get_vehicle(existing_id)
 	sess.run_state.set_car_wear(existing_id, "dusty")
 	sess.resolved_nodes.erase(sess.current_node_id)
 	outcome = sess.resolve_rival(sess.current_node_id, true)
 	_expect(outcome.get("car", {}).get("id") == existing_id, "already owned opponent is still awarded")
-	_expect(sess.won_car(existing_id)["roll"] == existing_roll and sess.run_state.get_car_wear(existing_id) == "dusty", "already owned car retains rolls and wear")
+	_expect(sess.won_car(existing_id) == existing_car and sess.run_state.get_car_wear(existing_id) == "dusty", "already owned shipped car retains authored identity, empty roll and wear")
+	_check_stats(sess, existing_id, existing_vehicle)
 	_expect(not sess.boot_cars.has(existing_id) and not sess.impounded_cars.has(existing_id), "duplicate award has one consistent pending custody")
 	var loaded := SESSION.deserialize(JSON.parse_string(JSON.stringify(SESSION.serialize(sess))))
 	_expect(loaded != null and loaded.pending_offer == existing_id and loaded.pending_offer_driver == sess.pending_offer_driver, "already driven rival award survives persistence")
 	if loaded != null:
-		_expect(loaded.won_car(existing_id)["roll"] == existing_roll and loaded.run_state.get_car_wear(existing_id) == "dusty", "persistence keeps existing rival rolls and wear")
+		_expect(loaded.won_car(existing_id) == existing_car and loaded.run_state.get_car_wear(existing_id) == "dusty", "persistence keeps existing shipped rival identity, empty roll and wear")
+		_check_stats(loaded, existing_id, existing_vehicle)
 	var final_boss := SESSION.create(33333)
 	final_boss._advance_to_act(3)
 	_move_to(final_boss, "act_rival")
@@ -61,17 +63,20 @@ func _check_award(sess: RunSession, driver: Dictionary, vehicle: Dictionary) -> 
 	_expect(sess.pending_offer == vid and sess.pending_offer_driver == driver, "offer pairs the awarded car with its driver")
 	var car := sess.won_car(vid)
 	_expect(car.get("seed") == vehicle["car_art"]["seed"] and car.get("type") == vehicle["car_art"]["type"], "award retains vehicle identity")
-	_expect(car.get("roll") == vehicle.get("roll", SESSION.NO_ROLL), "award retains opponent's roll without rerolling")
-	if not car.is_empty():
-		var expected := CATALOG.build_vehicle_stats(vehicle)
-		var actual := sess.car_stats(vid)
-		for property: Dictionary in expected.get_property_list():
-			if property["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE:
-				_expect(actual.get(property["name"]) == expected.get(property["name"]), "award drives like rival: " + property["name"])
+	_expect(CATALOG.is_shipped(vid) and not vehicle.has("roll") and car.get("roll") == {} and sess.run_state.car_rolls.get(vid) == {}, "shipped opponent and award retain authored stats without generating a roll")
+	_check_stats(sess, vid, vehicle)
 	var restored := SESSION.deserialize(JSON.parse_string(JSON.stringify(SESSION.serialize(sess))))
 	_expect(restored != null, "award survives persistence")
 	if restored != null:
 		_expect(restored.pending_offer == vid and restored.pending_offer_driver == driver and restored.won_car(vid) == car, "persistence retains car and driver")
+		_check_stats(restored, vid, vehicle)
+
+func _check_stats(sess: RunSession, vid: String, vehicle: Dictionary) -> void:
+	var expected := CATALOG.build_vehicle_stats(vehicle)
+	var actual := sess.car_stats(vid)
+	for property: Dictionary in expected.get_property_list():
+		if property["usage"] & PROPERTY_USAGE_SCRIPT_VARIABLE:
+			_expect(actual.get(property["name"]) == expected.get(property["name"]), "award drives like rival: " + property["name"])
 
 func _move_to(sess: RunSession, kind: String) -> void:
 	for node: Dictionary in sess.current_map.nodes.values():

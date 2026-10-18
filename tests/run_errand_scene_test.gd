@@ -34,6 +34,8 @@ func _run() -> void:
 			return
 		session.run_state.set_car_wear(session.current_car_id, wear)
 		var points_before := session.run_points
+		if not _expect(session.errand_tune_steps() == 2, "seeded errand offers a two-level tune-up"):
+			return
 		shell.call("show_run_errand")
 		for frame in 4:
 			await process_frame
@@ -67,7 +69,7 @@ func _run() -> void:
 		var button := pay if choice == 0 else tune
 		button.pressed.emit()
 		var expected_points := points_before + RunSession.ERRAND_PAY_POINTS if choice == 0 else points_before
-		var expected_wear := wear if choice == 0 else "dusty"
+		var expected_wear := wear if choice == 0 else "clean"
 		if not _expect(session.resolved_nodes.has(session.current_node_id) and session.run_points == expected_points and session.run_state.get_car_wear(session.current_car_id) == expected_wear, "selected reward resolves immediately before its stamp"):
 			return
 		if not _expect(pay.disabled and tune.disabled and not bool(app.call("run_resolve_errand", 1 - choice)) and session.run_points == expected_points and session.run_state.get_car_wear(session.current_car_id) == expected_wear, "one errand cannot resolve both choices or repeat its reward"):
@@ -76,6 +78,8 @@ func _run() -> void:
 			return
 		var expected_state: StringName = &"crossfade" if reduced else &"pay" if choice == 0 else &"tune_up"
 		if not _expect(scene.get("confirmation_state") == expected_state, "choice selects the matching confirmation path"):
+			return
+		if not _expect(shell.get("_screen") == "run_errand" and shell.find_child("ErrandAcknowledgement", true, false) == null, "reward resolves on confirmation while the stamp precedes the acknowledgement"):
 			return
 		await create_timer(0.06).timeout
 		if reduced:
@@ -87,6 +91,10 @@ func _run() -> void:
 				return
 		await create_timer(SCENE.STAMP_TIME + 0.1).timeout
 		if not _expect(shell.get("_screen") == "run_board", "confirmation returns to the board"):
+			return
+		var acknowledgement := shell.find_child("ErrandAcknowledgement", true, false) as Label
+		var expected_ack := "ERRAND DONE - " + ("+%d POINTS" % RunSession.ERRAND_PAY_POINTS if choice == 0 else "TUNE-UP")
+		if not _expect(acknowledgement != null and acknowledgement.text == expected_ack and session.run_points == expected_points and session.run_state.get_car_wear(session.current_car_id) == expected_wear, "acknowledgement follows the stamp without resolving the reward again"):
 			return
 	print("RUN_ERRAND_SCENE_TEST PASS note=painted clipboard=present coin_cup=present choices=once focus=preserved reduced_motion=fade_only")
 	quit(0)
