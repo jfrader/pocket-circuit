@@ -6,6 +6,38 @@ signal return_requested
 signal sprint_resolved(outcome: String, data: Dictionary)
 signal wear_out_beat_changed(beat: String)
 
+class DeadlineHUD extends RaceHUD:
+	const NEAR_LIMIT_SECONDS := 30.0
+	var deadline_seconds := INF
+
+	func clock_copy() -> String:
+		if is_inf(deadline_seconds):
+			return _format_time(elapsed_seconds)
+		return "%02d:%02d / %02d:%02d" % [int(elapsed_seconds) / 60, int(elapsed_seconds) % 60, int(deadline_seconds) / 60, int(deadline_seconds) % 60]
+
+	func deadline_warning() -> String:
+		var remaining := deadline_seconds - elapsed_seconds
+		return "%ds LEFT" % ceili(remaining) if remaining > 0.0 and remaining <= NEAR_LIMIT_SECONDS else ""
+
+	func get_layout_rects() -> Dictionary:
+		var rects := super.get_layout_rects()
+		if not is_inf(deadline_seconds):
+			rects["clock"] = Rect2(size.x - 284, 24, 260, 64)
+		return rects
+
+	func _draw_clock(rect: Rect2) -> void:
+		if is_inf(deadline_seconds):
+			super._draw_clock(rect)
+			return
+		SKIN.draw_plate(self, rect, SKIN.CREAM)
+		_caption(rect.position + Vector2(16, 22), "TIME")
+		SKIN.draw_text(self, rect.position + Vector2(16, 52), clock_copy(), 26, SKIN.INK, rect.size.x - 32 - SKIN.SHADOW, HORIZONTAL_ALIGNMENT_RIGHT)
+		var warning := deadline_warning()
+		if not warning.is_empty():
+			var warning_rect := Rect2(rect.position + Vector2(0, rect.size.y + 6), Vector2(rect.size.x, 32))
+			SKIN.draw_plate(self, warning_rect, SKIN.YELLOW)
+			SKIN.draw_text(self, warning_rect.position + Vector2(12, 23), warning, 18, SKIN.INK, warning_rect.size.x - 24, HORIZONTAL_ALIGNMENT_CENTER)
+
 class TowPickup extends Node2D:
 	var hook_target := Vector2(0, 85)
 	var bench := false
@@ -79,7 +111,6 @@ const AI_CONTROLLER_SCRIPT := preload("res://scripts/vehicle/ai_vehicle_controll
 const TRACK_VARIANT_SCRIPT := preload("res://scripts/presentation/track_variant_presenter.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
 const TRACK_BUILDER := preload("res://scripts/race/track_builder_core.gd")
-const RACE_HUD_SCRIPT := preload("res://scripts/ui/race_hud.gd")
 const MENU_BUTTON_SCRIPT := preload("res://scripts/ui/motorsport_button.gd")
 const MENU_SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const PREPARATION_SCRIPT := preload("res://scripts/race/race_preparation.gd")
@@ -1003,6 +1034,7 @@ func _run_countdown() -> void:
 func _update_race_hud() -> void:
 	if not is_instance_valid(_race_hud) or not is_instance_valid(_player_vehicle):
 		return
+	(_race_hud as DeadlineHUD).deadline_seconds = _race_deadline()
 	var shown_lap := mini(race_manager.lap_count + 1, race_manager.laps_to_finish)
 	_race_hud.set_nitro_count(_run.nitro_count if _run != null else -1)
 	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.get_boost_capacity(), 0.001), 0.0, 1.0)
@@ -1200,16 +1232,35 @@ func _update_results(results: Array) -> void:
 	_results_label.text = "\n".join(lines)
 
 
+func _race_deadline() -> float:
+	if _is_chase_sprint():
+		return INF
+	if _is_strip_route():
+		return float(_strip_prepared.get("strip_time_limit", INF))
+	var deadline := INF
+	for racer: Node2D in race_manager.get_rankings():
+		var state := race_manager.get_racer_state_ref(racer)
+		if racer != _player_vehicle and bool(state.get("finished", false)) and not bool(state.get("dnf", false)):
+			deadline = minf(deadline, float(state["finish_time"]) + race_manager.finish_grace_seconds)
+	return deadline
+
+
+func _finish_deadline(results: Array) -> float:
+	var deadline := INF
+	for result: Dictionary in results:
+		if result.get("vehicle") != _player_vehicle and bool(result.get("finished", false)) and not bool(result.get("dnf", false)):
+			deadline = minf(deadline, float(result["time"]) + race_manager.finish_grace_seconds)
+	return deadline
+
+
 func _player_dnf_explanation(results: Array) -> String:
 	var player_dnf := false
-	var deadline := INF
 	for result: Dictionary in results:
 		if result.get("vehicle") == _player_vehicle:
 			player_dnf = bool(result.get("dnf", false))
-		elif bool(result.get("finished", false)) and not bool(result.get("dnf", false)):
-			deadline = minf(deadline, float(result["time"]) + race_manager.finish_grace_seconds)
 	if not player_dnf:
 		return ""
+	var deadline := _finish_deadline(results)
 	var limit := "" if is_inf(deadline) else "%d:%02d" % [int(deadline) / 60, int(deadline) % 60]
 	if not is_instance_valid(_player_vehicle):
 		return "CAR WRECKED" if limit.is_empty() else "CAR WRECKED · LIMIT %s" % limit
@@ -1399,7 +1450,7 @@ func _create_phase_one_ui() -> void:
 	var hud := $HUD as CanvasLayer
 	hud_label.visible = false
 	controls_label.visible = false
-	_race_hud = RACE_HUD_SCRIPT.new() as RaceHUD
+	_race_hud = DeadlineHUD.new()
 	_race_hud.name = "RaceHUD"
 	hud.add_child(_race_hud)
 
@@ -1838,6 +1889,7 @@ func _report_result_to_app(results: Array) -> bool:
 			live = app.call("get_current_race_session")
 			if run != null and not already_applied and bool(live.get("run_result_applied", false)):
 				_night_consequences = _night_result_consequences(before, run, live.get("result", {}))
+				run.set_meta("night_result_consequences", _night_consequences)
 				var worn_out := RunSession.RUN_STATE.is_worn_out(run.run_state.get_car_wear(String(before["car_id"])))
 				_wear_out_towed = run.towed_to_bench and run.tow_count < int(before["tow_count"])
 				_wear_out_pending = worn_out or _wear_out_towed
@@ -1877,6 +1929,8 @@ func _night_result_consequences(before: Dictionary, run: RunSession, result: Dic
 	var wear := run.run_state.get_car_wear(String(before["car_id"]))
 	if wear != String(before["wear"]):
 		changes.append("WEAR: %s -> %s" % [String(before["wear"]).to_upper(), wear.to_upper()])
+	if RunState.is_worn_out(wear) and int(before["tow_count"]) == 0:
+		changes.append("NO TOW")
 	for car: Dictionary in run.won_cars():
 		var car_id := String(car["id"])
 		var offered := run.pending_offer == car_id and run.pending_offer != String(before["pending_offer"])

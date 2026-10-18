@@ -450,6 +450,12 @@ func show_run_board() -> void:
 		ending.name = "NightVerdict"
 		ending.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_run_stop_card.add_child(ending)
+		var consequences := String(sess.get_meta("night_result_consequences", ""))
+		if not consequences.is_empty() and RunState.is_worn_out(sess.run_state.get_car_wear(sess.current_car_id)):
+			var breakdown := RUN_UI.label(consequences.replace(" · ", "\n"), 14, RUN_UI.MUTED)
+			breakdown.name = "NightBreakdown"
+			breakdown.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_run_stop_card.add_child(breakdown)
 		var safe := {}
 		for car: Dictionary in sess.collection_safe_cars():
 			safe[String(car["id"])] = true
@@ -602,7 +608,7 @@ func _show_run_stop(stop_id: String, sess: RunSession) -> void:
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_run_stop_card.add_child(line)
 	var circuit: Dictionary = _app.call("run_stop_circuit", stop_id) if kind in RunSession.RACE_NODE_TYPES else {}
-	_run_stop_card.add_child(RUN_BOARD_SCENE.facts(RUN_UI.stop_facts(kind, sess, circuit)))
+	_run_stop_card.add_child(RUN_BOARD_SCENE.facts(RUN_UI.stop_facts(kind, sess, circuit, stop_id)))
 	RUN_UI.spacer(_run_stop_card, 4)
 	var go := RUN_UI.action(String(RUN_UI.GO_LABELS[kind]), true, not reachable)
 	go.name = "RunGo"
