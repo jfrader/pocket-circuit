@@ -243,6 +243,8 @@ static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -
 			rows.append(["GIVES", "a free car"])
 		"errand":
 			rows.append(["CHOICE", "%d points or a tune-up" % RunSession.ERRAND_PAY_POINTS])
+			var steps := session.errand_tune_steps()
+			rows.append(["TUNE-UP", String(TranslationServer.translate_plural("repair up to %d wear level", "repair up to %d wear levels", steps)) % steps])
 	return rows
 
 

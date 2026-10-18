@@ -467,9 +467,32 @@ func show_run_board() -> void:
 		haul_summary.name = "HaulSummary"
 		haul_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_run_stop_card.add_child(haul_summary)
+		var starter_shape := {}
+		for record: Dictionary in sess.car_records():
+			if record["won_from"] == RunSession.CAR_ORIGIN_START:
+				record.erase("fitted_parts")
+				starter_shape = CarProfile.shape(CATALOG.build_vehicle_stats(CATALOG.generated_vehicle(record)))
+				break
 		for car: Dictionary in sess.won_cars():
 			var status := "BANKED · " if safe.has(String(car["id"])) else ("IMPOUNDED · " if sess.impounded_cars.has(String(car["id"])) else "LOST · ")
-			var recap := RUN_UI.label(status + RUN_UI.car_name(String(car["id"])).to_upper(), 14, RUN_UI.MUTED)
+			var comparison := ""
+			if safe.has(String(car["id"])) and not starter_shape.is_empty():
+				var banked_vehicle := CATALOG.get_vehicle(String(car["id"]))
+				if banked_vehicle.is_empty():
+					banked_vehicle = CATALOG.generated_vehicle(car)
+				banked_vehicle["fitted_parts"] = []
+				var shape := CarProfile.shape(CATALOG.build_vehicle_stats(banked_vehicle))
+				var axes := CarProfile.AXES.duplicate()
+				axes.sort_custom(func(a: String, b: String) -> bool:
+					return float(shape[a]) - float(starter_shape[a]) > float(shape[b]) - float(starter_shape[b])
+				)
+				var deltas: Array[String] = []
+				for axis: String in [axes.front(), axes.back()]:
+					var delta := roundi((float(shape[axis]) - float(starter_shape[axis])) * 100.0)
+					if delta != 0:
+						deltas.append("%+d %s" % [delta, axis.to_upper()])
+				comparison = ": " + (", ".join(deltas) if not deltas.is_empty() else "SAME SHAPE") + " VS STARTER"
+			var recap := RUN_UI.label(status + RUN_UI.car_name(String(car["id"])).to_upper() + comparison, 14, RUN_UI.MUTED)
 			recap.name = "HaulRecap_" + String(car["id"])
 			recap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 			_run_stop_card.add_child(recap)

@@ -18,7 +18,8 @@ const INITIAL_POINTS := 0
 const RIVAL_LOSS_POINTS_COST := 10
 const ERRAND_PAY_POINTS := 6
 const TOW_PRICE := 10
-const NITRO_PRICE := 10
+const NITRO_PRICE := 5
+const ERRAND_TUNE_STEPS := 2
 enum ErrandChoice { PAY, TUNE_UP, TOW }
 const RIVAL_LOSS_SEVERITY := 0.6
 const LOCKUP_CAR_TYPE := "compact"
@@ -64,7 +65,7 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##   start_race(id, field): marks a race as running; it resolves exactly once.
 ##   open_lockup(): the act's one free car.
 ##   resolve_errand(choice): PAY takes ERRAND_PAY_POINTS, TUNE_UP steps wear
-##     back one level, TOW adds one rescue.
+##     back by the act's seeded repair strength, TOW adds one rescue.
 ##
 ## register_crash(severity) advances wear; worn out spends a tow or fails.
 ## serialize()/deserialize() round-trip the whole session; a schema mismatch
@@ -298,6 +299,8 @@ func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dic
 				completed = true
 				HAUL.clear_offer(self)
 		else:
+			# Reaching the act rival banks the haul you carried in, win or lose.
+			bank_haul()
 			failed = true
 			outcome["run_failed"] = true
 	return outcome
@@ -381,7 +384,7 @@ func _win_car(stop_id: String, origin: String, types: Array[String]) -> Dictiona
 			var art: Dictionary = vehicle["car_art"]
 			if not owned_cars.has(vid):
 				owned_cars[vid] = {"type": art["type"], "seed": art["seed"], "won_from": origin, "act": current_map.act}
-				run_state.car_rolls[vid] = vehicle.get("roll", NO_ROLL).duplicate(true)
+				run_state.car_rolls[vid] = (vehicle.get("roll", {}) as Dictionary).duplicate(true)
 				run_state.set_car_wear(vid, RUN_STATE.WEAR_LEVELS[0])
 			else:
 				owned_cars[vid]["won_from"] = origin
@@ -480,7 +483,8 @@ func car_record(vehicle_id: String) -> Dictionary:
 		return {}
 	var out := record.duplicate(true)
 	out["id"] = vehicle_id
-	out["roll"] = run_state.get_or_create_car_roll(vehicle_id, String(record["type"]))
+	# A shipped car keeps its authored physics; only generated cars roll.
+	out["roll"] = {} if CATALOG.is_shipped(vehicle_id) else run_state.get_or_create_car_roll(vehicle_id, String(record["type"]))
 	out["fitted_parts"] = fitted_parts(vehicle_id)
 	return out
 
@@ -523,9 +527,13 @@ static func normalize_car(value: Variant, origins: Array) -> Dictionary:
 		return {}
 	if not RUN_MAP.is_integer(car.get("seed", 0), 0, RUN_MAP.HASH_MASK) or not RUN_MAP.is_integer(car.get("act", 1), 1, FINAL_ACT):
 		return {}
+	if (roll as Dictionary).is_empty() and not CATALOG.is_shipped(String(car_id)):
+		return {}
 	var limit: float = RUN_STATE.TIER_ENVELOPES.values().max()
 	var clean_roll := {}
 	for axis: String in CarProfile.AXES:
+		if (roll as Dictionary).is_empty():
+			break
 		var amount: Variant = (roll as Dictionary).get(axis)
 		if not (amount is float or amount is int) or not is_finite(float(amount)):
 			return {}
@@ -683,6 +691,9 @@ func open_lockup() -> Dictionary:
 	lockup_used = true
 	return _win_car("lockup", CAR_ORIGIN_LOCKUP, [LOCKUP_CAR_TYPE] as Array[String])
 
+func errand_tune_steps() -> int:
+	return 1 + _stop_roll("tune", "errands") % ERRAND_TUNE_STEPS
+
 func resolve_errand(choice: int) -> Dictionary:
 	if failed or completed:
 		return {"error": "night ended"}
@@ -703,10 +714,12 @@ func resolve_errand(choice: int) -> Dictionary:
 		amt = ERRAND_PAY_POINTS
 	elif choice == ErrandChoice.TUNE_UP:
 		var cw: String = run_state.get_car_wear(current_car_id)
-		var prev: String = _previous_wear_level(cw)
+		var prev := cw
+		for step in errand_tune_steps():
+			prev = _previous_wear_level(prev)
 		if prev != cw:
 			run_state.set_car_wear(current_car_id, prev)
-			amt = 1
+			amt = RUN_STATE.WEAR_LEVELS.find(cw) - RUN_STATE.WEAR_LEVELS.find(prev)
 		eff = "restore"
 	else:
 		eff = "tow"
@@ -807,11 +820,16 @@ static func deserialize(data: Dictionary) -> RunSession:
 	for act_key: Variant in assignments:
 		if act_key is not String or act_key not in ["1", "2", "3"] or assignments[act_key] is not Dictionary:
 			return null
-		var map := sess.current_map if int(act_key) == sess.current_map.act else RUN_MAP.generate(sess.run_seed, int(act_key))
+		var current_act := int(act_key) == sess.current_map.act
+		var map := sess.current_map if current_act else RUN_MAP.generate(sess.run_seed, int(act_key))
 		var nodes: Dictionary = assignments[act_key]
 		sess.node_opponents[act_key] = {}
 		for nid: Variant in nodes:
 			if nid is not String or map.get_node(nid).get("type", "") not in RACE_NODE_TYPES:
+				if not current_act:
+					# A regenerated future act may not contain a saved assignment's
+					# node; drop it and let the race assign on demand.
+					continue
 				return null
 			var count := 1 if map.nodes[nid]["type"] == "rival" else FIELD_OPPONENTS
 			var roster := DRIVER_ROSTER.normalize(nodes[nid], CATALOG.quick_race_vehicle_ids(), count)

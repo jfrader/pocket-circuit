@@ -89,7 +89,8 @@ func _run_test() -> void:
 	var tune_run: RunSession = app.call("start_run", 900004) as RunSession
 	RUN_WALK.walk_to(app, tune_run, "errand")
 	tune_run.run_state.set_car_wear(tune_run.current_car_id, "rusty")
-	if not _expect(bool(app.call("run_resolve_errand", 1)) and tune_run.run_state.get_car_wear(tune_run.current_car_id) == "dusty", "the tune-up must step wear back one level"):
+	var restored_wear: String = RunState.WEAR_LEVELS[maxi(0, RunState.WEAR_LEVELS.find("rusty") - tune_run.errand_tune_steps())]
+	if not _expect(bool(app.call("run_resolve_errand", 1)) and tune_run.run_state.get_car_wear(tune_run.current_car_id) == restored_wear, "the tune-up must apply its seeded repair strength"):
 		return
 
 	# --- The act ends on the act rival: beating it opens the next act ---
