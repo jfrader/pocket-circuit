@@ -99,11 +99,12 @@ func _test_consumable_sources_and_tow() -> void:
 		_expect(not shop.call("buy_" + item), "consumables only sell at vans")
 		_move_to(shop, "parts_van")
 		var stock := shop.van_offer_consumables()
-		_expect(stock == [{"item": "tow", "count": 1, "price": 10}, {"item": "nitro", "count": 1, "price": 10}], "van offers one tow and one nitro at ten points each")
-		shop.run_points = 9
+		_expect(stock == [{"item": "tow", "count": 1, "price": SESSION.TOW_PRICE}, {"item": "nitro", "count": 1, "price": SESSION.NITRO_PRICE}], "van offers one tow and one nitro at their catalog prices")
+		var price: int = SESSION.TOW_PRICE if item == "tow" else SESSION.NITRO_PRICE
+		shop.run_points = price - 1
 		_expect(not shop.call("buy_" + item) and shop.is_stop_pending(), "insufficient payment preserves visit")
-		shop.run_points = 10
-		_expect(shop.call("buy_" + item) and shop.run_points == 0 and shop.get(item + "_count") == 1, "purchase debits ten and adds one")
+		shop.run_points = price
+		_expect(shop.call("buy_" + item) and shop.run_points == 0 and shop.get(item + "_count") == 1, "purchase debits its listed price and adds one")
 		_expect(not shop.buy_tow() and not shop.buy_nitro() and not shop.buy_part(String(shop.van_stock()[0]["part"])), "one purchase consumes van visit")
 		_expect(shop.van_offer_consumables().is_empty(), "used van has no remaining consumable stock")
 	var errand := SESSION.create(33333)
