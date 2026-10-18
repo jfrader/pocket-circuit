@@ -37,7 +37,7 @@ func _run() -> void:
 		if not _expect(scene != null and scene.get_node_or_null("RepairMat") != null and scene.get_node_or_null("BenchTabletop") != null, "bench stages a rubber mat on the act tabletop"):
 			return
 		var car := scene.get_node("BenchCar") as TextureRect
-		if not _expect(car.texture == MATERIALS.hero_texture(session.current_car_id), "bench car reuses the hero cache for its identity payload"):
+		if not _expect(car.texture == IDENTITIES.car_texture_with_wear(session.current_car_id, "rusty", MATERIALS.HERO_PIXEL_SCALE, int(BENCH.CAR_LENGTH)), "bench car renders its current identity and wear at hero resolution"):
 			return
 		if not _expect(MATERIALS.HERO_PIXEL_SCALE > 2 and car.texture.get_width() == 48 * MATERIALS.HERO_PIXEL_SCALE and IDENTITIES.car_texture(session.current_car_id).get_width() == 96, "hero uses native high-resolution rasterization while small car sprites stay unchanged"):
 			return
@@ -75,6 +75,10 @@ func _run() -> void:
 		await create_timer(BENCH.CONFIRM_TIME + 0.1).timeout
 		if not _expect(shell.get("_screen") == "run_board", "confirmation returns to the board"):
 			return
+		if kind != &"fit":
+			var acknowledgement := shell.find_child("BenchRepairAcknowledgement", true, false) as Label
+			if not _expect(acknowledgement != null and acknowledgement.text == "REPAIRED - RUSTY -> CLEAN", "repair names the exact wear transition on the board in both motion modes"):
+				return
 	print("RUN_BENCH_SCENE_TEST PASS mat=present car=identity repair=stamp fit=slide reduced_motion=fade_only")
 	quit(0)
 

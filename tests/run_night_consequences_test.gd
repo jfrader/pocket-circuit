@@ -47,11 +47,17 @@ func _run_test() -> void:
 
 	var defeat: RunSession = app.call("start_run", 33333)
 	_move_to(defeat, "act_rival")
-	_report_copy(app, defeat, 2)
+	var defeat_copy := _report_copy(app, defeat, 2)
+	_expect(defeat.is_failed() and defeat_copy == "+4 POINTS · THE NIGHT IS OVER", "act-rival loss retains its payout and names the ended night")
+	_expect(not defeat_copy.contains("NIGHT UNCHANGED"), "act-rival defeat cannot claim the night is unchanged")
 	shell.call("show_run_board")
 	_expect(_label(shell, "NightVerdict") == "DEFEATED BY THE ACT RIVAL", "resolved act rival defeat has its own verdict")
 	_expect(_label(shell, "HaulSummary") == "NO HAUL", "empty haul has no zero-count segments")
 	_expect(shell.find_child("ActionNewRun", true, false) != null and shell.find_child("ActionBack", true, false) != null, "terminal actions retain their names")
+	var scoreless_defeat: RunSession = app.call("start_run", 33333)
+	_move_to(scoreless_defeat, "act_rival")
+	var scoreless_copy := _report_copy(app, scoreless_defeat, RunSession.RUN_POINTS_BY_FINISH.size())
+	_expect(scoreless_defeat.is_failed() and scoreless_copy == "THE NIGHT IS OVER", "a scoreless act-rival defeat names the ending instead of claiming nothing changed")
 
 	var worn: RunSession = app.call("start_run", 33333)
 	for crash in 8:
@@ -84,7 +90,7 @@ func _run_test() -> void:
 	complete._advance_to_act(RunSession.FINAL_ACT)
 	_move_to(complete, "act_rival")
 	var final_copy := _report_copy(app, complete, 1)
-	_expect(final_copy.begins_with("+6 POINTS · WON: ") and final_copy.ends_with(" - BANKED"), "final win never offers a decision the ended night cannot take")
+	_expect(final_copy.begins_with("+6 POINTS · WON: ") and final_copy.ends_with(" - BANKED · THE NIGHT IS OVER"), "final win names the ended night without offering a decision it cannot take")
 	shell.call("show_run_board")
 	_expect(_label(shell, "NightVerdict") == "ALL ACT RIVALS DEFEATED", "completed flag gives a victory verdict")
 	_expect(_label(shell, "HaulSummary") == "BANKED: 1 CAR", "final rival reward is banked")
@@ -94,7 +100,7 @@ func _run_test() -> void:
 	var reward: Dictionary = repeated._win_car(repeated.current_node_id, RunSession.CAR_ORIGIN_RIVAL, ProceduralCarGenerator.SUPPORTED_TYPES)
 	_expect(repeated.send_it_home(), "fixture already owns the final rival car")
 	var repeat_copy := _report_copy(app, repeated, 1)
-	_expect(repeat_copy == "+6 POINTS · WON: %s - BANKED" % String(CATALOG.get_vehicle(String(reward["id"]))["name"]).to_upper(), "winning the same final car again still reports its real award")
+	_expect(repeat_copy == "+6 POINTS · WON: %s - BANKED · THE NIGHT IS OVER" % String(CATALOG.get_vehicle(String(reward["id"]))["name"]).to_upper(), "winning the same final car again still reports its real award and night ending")
 	_presenter.free()
 	if _failed:
 		quit(1)

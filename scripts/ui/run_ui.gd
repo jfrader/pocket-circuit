@@ -228,7 +228,7 @@ static func stop_facts(kind: String, session: RunSession, circuit: Dictionary) -
 		"rival":
 			rows.append(["FIELD", "one on one, contact"])
 			rows.append(["WIN", "their car"])
-			rows.append(["LOSE", "%d points, or wear without them" % RunSession.RIVAL_LOSS_POINTS_COST])
+			rows.append(["LOSE", "%d points; pay what you have, plus wear if short" % RunSession.RIVAL_LOSS_POINTS_COST])
 		"act_rival":
 			rows.append(["FIELD", "%d cars, hardest drivers" % RunSession.RUN_POINTS_BY_FINISH.size()])
 			rows.append(["WIN", "act %d" % (session.current_map.act + 1) if session.current_map.act < RunSession.FINAL_ACT else "the night"])
