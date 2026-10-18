@@ -43,6 +43,21 @@ func _run_test() -> void:
 			if not _expect(session.run_state.get_car_wear(session.current_car_id) == expected, "displayed race cost must match finish %d, DNF %s" % [position, dnf]):
 				return
 	var repair := _fact("bench", "REPAIR", session)
+	if not _expect(_fact("rival", "LOSE", session) == "%d points; pay what you have, plus wear if short" % RunSession.RIVAL_LOSS_POINTS_COST, "duel fact names the full charge and partial-payment wear"):
+		return
+	for points: int in [0, RunSession.RIVAL_LOSS_POINTS_COST - 1, RunSession.RIVAL_LOSS_POINTS_COST]:
+		var duel := RunSession.create(33333)
+		for node: Dictionary in duel.current_map.nodes.values():
+			if String(node["type"]) == "rival":
+				duel.current_node_id = String(node["id"])
+				break
+		duel.run_points = points
+		var outcome := duel.resolve_rival(duel.current_node_id, false)
+		if not _expect(not outcome.has("error") and duel.run_points == maxi(0, points - RunSession.RIVAL_LOSS_POINTS_COST), "duel loss takes all available points up to its charge"):
+			return
+		var expected_wear := RunState.advance_wear(clean, RunSession.RIVAL_LOSS_SEVERITY) if points < RunSession.RIVAL_LOSS_POINTS_COST else clean
+		if not _expect(duel.run_state.get_car_wear(duel.current_car_id) == expected_wear, "duel loss adds wear only when the full charge cannot be paid"):
+			return
 	for wear: String in RunState.WEAR_LEVELS:
 		var restored := RunState.restore_at_bench(wear)
 		if not _expect(restored == clean and repair == "restore to " + restored, "bench fact must match full repair from " + wear):

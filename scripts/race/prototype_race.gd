@@ -1864,6 +1864,8 @@ func _night_result_consequences(before: Dictionary, run: RunSession, result: Dic
 	if run.current_map.act > int(before["act"]):
 		var nbsp := String.chr(0xA0)
 		changes.append("ACT%s%d%sUNLOCKED" % [nbsp, run.current_map.act, nbsp])
+	if run.is_failed() or run.is_complete():
+		changes.append("THE NIGHT IS OVER")
 	return " · ".join(changes) if not changes.is_empty() else "NIGHT UNCHANGED"
 
 

@@ -4,6 +4,7 @@ const TABLETOP := preload("res://scripts/ui/run_board_scene.gd")
 const PART_PROP := preload("res://scripts/ui/run_bench_part.gd")
 const SKIN := preload("res://scripts/ui/motorsport_skin.gd")
 const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
+const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const REFERENCE_SIZE := Vector2(1280, 720)
 const CAR_CENTER := Vector2(318, 421)
 const CAR_LENGTH := 240.0
@@ -12,6 +13,7 @@ const FADE_TIME := 0.18
 
 var act := 1
 var car_id := "rustbug"
+var car_wear := "clean"
 var held_parts: Array[Dictionary] = []
 var reduced_motion := false
 var confirmation_state: StringName = &"idle"
@@ -48,7 +50,7 @@ func _ready() -> void:
 	add_child(_car_shadow)
 	_car = TextureRect.new()
 	_car.name = "BenchCar"
-	_car.texture = MATERIALS.hero_texture(car_id)
+	_car.texture = IDENTITIES.car_texture_with_wear(car_id, car_wear, MATERIALS.HERO_PIXEL_SCALE, int(CAR_LENGTH))
 	_car.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	_car.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
 	_car.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST

@@ -337,6 +337,9 @@ func show_run_board() -> void:
 	tabletop.reduced_motion = _reduced_motion_enabled()
 	tabletop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	_run_backdrop.add_child(tabletop)
+	if night_over:
+		var hero := tabletop.get_node("WinnerCar" if sess.is_complete() else "SolitaryCar") as TextureRect
+		hero.texture = IDENTITIES.car_texture_with_wear(sess.current_car_id, sess.run_state.get_car_wear(sess.current_car_id), RUN_MATERIALS.HERO_PIXEL_SCALE, int(RUN_BOARD_SCENE.HERO_LENGTH[tabletop.scene_mode]))
 	tabletop.arrive()
 	var columns := HBoxContainer.new()
 	columns.add_theme_constant_override("separation", 76 if night_over else RUN_BOARD_SCENE.COLUMN_GAP)
@@ -887,6 +890,7 @@ func show_run_bench() -> void:
 	scene.name = "RunBenchScene"
 	scene.act = sess.current_map.act
 	scene.car_id = sess.current_car_id
+	scene.car_wear = sess.run_state.get_car_wear(sess.current_car_id)
 	scene.held_parts = sess.parts_held.duplicate(true)
 	scene.reduced_motion = _reduced_motion_enabled()
 	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
@@ -922,13 +926,14 @@ func show_run_bench() -> void:
 	_run_stats(heading, sess)
 	RUN_BOARD_SCENE.chalk_labels(heading)
 	RUN_UI.spacer(left, 228)
-	var actions := HBoxContainer.new()
+	var empty_parts := sess.parts_held.is_empty()
+	var actions: BoxContainer = VBoxContainer.new() if empty_parts else HBoxContainer.new()
 	actions.add_theme_constant_override("separation", 12)
 	left.add_child(actions)
 	_run_actions = actions
-	var card := RUN_UI.parts_card("YOUR PARTS · FIT ONE" if not sess.parts_held.is_empty() else "NO PARTS HELD")
+	var card := RUN_UI.parts_card("YOUR PARTS · FIT ONE" if not empty_parts else "NO PARTS HELD - A PARTS VAN SELLS THEM")
 	card[0].name = "BenchParts"
-	card[0].custom_minimum_size = Vector2(420, 516)
+	card[0].custom_minimum_size = Vector2(420, 0 if empty_parts else 516)
 	card[0].size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	var paper := StyleBoxFlat.new()
 	paper.bg_color = Color("d8c89f")
@@ -941,7 +946,14 @@ func show_run_bench() -> void:
 	card[0].add_theme_stylebox_override("panel", paper)
 	RUN_MATERIALS.finish_panel(card[0] as PanelContainer)
 	RUN_BOARD_SCENE.ink_labels(card[0])
-	columns.add_child(card[0])
+	var parts_column := VBoxContainer.new()
+	if empty_parts:
+		parts_column.add_theme_constant_override("separation", 12)
+		columns.add_child(parts_column)
+		parts_column.add_child(card[0])
+	else:
+		columns.add_child(card[0])
+		parts_column.free()
 	var car_clean := sess.run_state.get_car_wear(sess.current_car_id) == RunState.WEAR_LEVELS[0]
 	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, used or car_clean, "BenchRepair")
 	RUN_BENCH_SCENE.dress_button(actions.get_child(0) as Button, true)
@@ -952,7 +964,7 @@ func show_run_bench() -> void:
 		_add_run_button(card[1], fit, Callable(self, "_on_bench_fit_pressed").bind(index), "BenchFit_%d" % index)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
 	RUN_BENCH_SCENE.dress_button(actions.get_child(1) as Button)
-	var extra_actions := HBoxContainer.new()
+	var extra_actions: BoxContainer = VBoxContainer.new() if empty_parts else HBoxContainer.new()
 	extra_actions.add_theme_constant_override("separation", 12)
 	extra_actions.visible = not sess.boot_cars.is_empty() or (not used and sess.owned_cars.size() > 1)
 	left.add_child(extra_actions)
@@ -963,12 +975,15 @@ func show_run_bench() -> void:
 	if not used and sess.owned_cars.size() > 1:
 		var spares := RUN_UI.parts_card("SWAP CAR")
 		spares[0].name = "BenchSwapCars"
-		spares[0].custom_minimum_size = card[0].custom_minimum_size
+		spares[0].custom_minimum_size = Vector2(420, 240 if empty_parts else 516)
 		spares[0].size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 		spares[0].add_theme_stylebox_override("panel", paper.duplicate())
 		RUN_MATERIALS.finish_panel(spares[0] as PanelContainer)
 		RUN_BOARD_SCENE.ink_labels(spares[0])
-		columns.add_child(spares[0])
+		if empty_parts:
+			parts_column.add_child(spares[0])
+		else:
+			columns.add_child(spares[0])
 		spares[0].hide()
 		for vehicle_id: String in sess.owned_cars:
 			if vehicle_id == sess.current_car_id:
@@ -987,6 +1002,14 @@ func show_run_bench() -> void:
 				(spares[1].get_child(0) as Button).grab_focus()
 		, false, false, "BenchSwap")
 		RUN_BENCH_SCENE.dress_button(extra_actions.get_child(extra_actions.get_child_count() - 1) as Button)
+	if empty_parts:
+		actions.reparent(parts_column)
+		extra_actions.reparent(parts_column)
+		for row: BoxContainer in [actions, extra_actions]:
+			for action: Node in row.get_children():
+				var button := action as Button
+				button.custom_minimum_size.y = 64
+				button.add_theme_font_size_override("font_size", 20)
 	var legend := RUN_UI.legend(sess.current_map)
 	RUN_BOARD_SCENE.chalk_labels(legend)
 	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
@@ -1236,9 +1259,18 @@ func _on_bench_repair_pressed() -> void:
 	_play_ui_confirm()
 	var sess_var: Variant = _app.call("current_run_session")
 	var sess: RunSession = sess_var as RunSession
-	if sess != null:
-		_app.call("run_bench_repair", sess.current_car_id)
-	_finish_bench_confirmation(&"repair", "BenchRepair")
+	if sess == null:
+		return
+	var old_wear := sess.run_state.get_car_wear(sess.current_car_id)
+	if not bool(_app.call("run_bench_repair", sess.current_car_id)):
+		return
+	var new_wear := sess.run_state.get_car_wear(sess.current_car_id)
+	if await _finish_bench_confirmation(&"repair", "BenchRepair"):
+		var acknowledgement := RUN_UI.label("REPAIRED - %s -> %s" % [old_wear.to_upper(), new_wear.to_upper()], 16, SKIN.CREAM, true)
+		acknowledgement.name = "BenchRepairAcknowledgement"
+		acknowledgement.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_run_stop_card.add_child(acknowledgement)
+		_run_stop_card.move_child(acknowledgement, 0)
 
 
 func _on_bench_bank_pressed() -> void:
@@ -1267,7 +1299,7 @@ func _on_bench_fit_pressed(held_index: int) -> void:
 	_finish_bench_confirmation(&"fit", "BenchFit_%d" % held_index, part_id)
 
 
-func _finish_bench_confirmation(kind: StringName, button_name: String, part_id: String = "") -> void:
+func _finish_bench_confirmation(kind: StringName, button_name: String, part_id: String = "") -> bool:
 	var generation := _entrance_generation
 	var scene := _run_backdrop.get_node_or_null("RunBenchScene") as RUN_BENCH_SCENE
 	var button := _content.find_child(button_name, true, false) as Button
@@ -1279,6 +1311,8 @@ func _finish_bench_confirmation(kind: StringName, button_name: String, part_id: 
 			await get_tree().create_timer(duration).timeout
 	if generation == _entrance_generation and _screen == "run_bench":
 		show_run_board()
+		return true
+	return false
 
 
 func _on_van_buy_pressed(part_id: String) -> void:
