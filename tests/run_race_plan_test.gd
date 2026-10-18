@@ -51,6 +51,11 @@ func _run() -> void:
 		await process_frame
 	live.call("_set_paused", false)
 	var player := live.get("_player_vehicle") as VehicleController
+	var owned_key := IDENTITIES.resolve_visual_key(String(run.car_record(run.current_car_id)["id"]))
+	if not _expect(owned_key != IDENTITIES.resolve_visual_key(run.current_car_id, "rae"), "seeded owned car and driver have different liveries"):
+		return
+	if not _expect(String((app.call("get_current_race_session") as Dictionary)["player_visual_key"]) == owned_key and String(player.get("_visual_key")) == owned_key, "run race uses the owned car record look, not the driver livery"):
+		return
 	player.boost_amount = 0.0
 	if not _expect(bool(live.call("fire_nitro")) and run.nitro_count == 0 and player.boost_amount > 0.0, "nitro spends one bottle and supplies boost"):
 		return

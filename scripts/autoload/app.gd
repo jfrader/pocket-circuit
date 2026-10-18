@@ -1676,7 +1676,7 @@ func start_run_sprint(node_id: String) -> bool:
 	event["race_format"] = "strip"
 	event["opponent_count"] = 1
 	_run_sprint_destination = node_id
-	current_race_session = {"mode": "chase_sprint", "vehicle_id": sess.current_car_id, "chaser": chaser, "event": event, "difficulty": String(_save_data.get("difficulty", "club_circuit"))}
+	current_race_session = {"mode": "chase_sprint", "vehicle_id": sess.current_car_id, "player_visual_key": IDENTITIES.resolve_visual_key(String(sess.car_record(sess.current_car_id)["id"])), "chaser": chaser, "event": event, "difficulty": String(_save_data.get("difficulty", "club_circuit"))}
 	if not _test_mode:
 		_begin_race_transition(sess.current_car_id)
 	return true
@@ -1759,6 +1759,7 @@ func _start_run_event(node_id: String, allowed_types: Array) -> bool:
 		"event_id": event_id,
 		"event": event,
 		"vehicle_id": vehicle_id,
+		"player_visual_key": IDENTITIES.resolve_visual_key(String(_current_run_session.car_record(vehicle_id)["id"])),
 		"difficulty": RUN_ACT_RIVAL_DIFFICULTY if node_type == "act_rival" else String(_save_data.get("difficulty", "club_circuit")),
 		"result_committed": false,
 		"run_node_id": target_id,
