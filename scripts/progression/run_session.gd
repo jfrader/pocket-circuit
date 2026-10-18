@@ -288,9 +288,9 @@ func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dic
 	}
 	if ntype == "act_rival":
 		if pos == 1:
+			bank_haul()
 			outcome["car"] = _win_car(node_id, CAR_ORIGIN_RIVAL, ProceduralCarGenerator.SUPPORTED_TYPES)
 			pending_offer_points = pts
-			bank_haul()
 			if current_map.act < FINAL_ACT:
 				_advance_to_act(current_map.act + 1)
 				outcome["act_advanced"] = true

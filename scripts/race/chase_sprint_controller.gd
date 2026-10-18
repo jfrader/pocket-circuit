@@ -9,6 +9,7 @@ const CAPTURE_SECONDS := 1.5
 const LIMIT_SECONDS := 180.0
 const ARC_RADIUS := 43.0
 const ARC_WIDTH := 8.0
+const SCENERY_COLLISION_MASK := 2 | 4 | 16
 
 var manager: RaceManager
 var player: VehicleController
@@ -46,7 +47,15 @@ func _sample_once(delta: float) -> void:
 func advance_pursuit(delta: float) -> void:
 	if not manager.is_running or not outcome.is_empty() or rescued:
 		return
-	if player.freeze or chaser.freeze or player.global_position.distance_to(chaser.global_position) > CAPTURE_RANGE:
+	var suspended := player.freeze or chaser.freeze
+	var same_section := manager.get_expected_checkpoint(player) == manager.get_expected_checkpoint(chaser)
+	var clear_sight := false
+	if not suspended and same_section and player.global_position.distance_to(chaser.global_position) <= CAPTURE_RANGE:
+		var query := PhysicsRayQueryParameters2D.create(player.global_position, chaser.global_position)
+		query.exclude = [player.get_rid(), chaser.get_rid()]
+		query.collision_mask = SCENERY_COLLISION_MASK
+		clear_sight = get_world_2d().direct_space_state.intersect_ray(query).is_empty()
+	if not clear_sight:
 		exposure = 0.0
 	else:
 		exposure += maxf(0.0, delta)

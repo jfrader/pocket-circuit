@@ -43,10 +43,19 @@ func _run_test() -> void:
 	_expect(home.send_it_home() and home.current_car_id == starter and home.run_points == points, "home retains current car and points")
 	_expect(home.boot_cars.is_empty() and home.collection_safe_cars().size() == 1, "home is collection safe immediately")
 	var boss := _offer()
+	var previous_haul := boss.pending_offer
 	_expect(boss.send_it_ahead(), "boss fixture carries haul")
 	_move_to(boss, "act_rival")
-	boss.resolve_race(boss.current_node_id, 1, 4)
+	var boss_outcome := boss.resolve_race(boss.current_node_id, 1, 4)
 	_expect(boss.current_map.act == 2 and boss.boot_cars.is_empty(), "act rival victory banks before advancing")
+	_expect(boss_outcome.get("act_advanced", false) and not boss.pending_offer.is_empty() and boss.pending_offer_points == SESSION.RUN_POINTS_BY_FINISH[1], "act advance retains the fresh rival offer and its payout")
+	var safe_ids: Array[String] = []
+	for car: Dictionary in boss.collection_safe_cars():
+		safe_ids.append(car["id"])
+	_expect(safe_ids.has(previous_haul) and not safe_ids.has(boss.pending_offer), "only the previous haul is banked, never the fresh rival offer")
+	var boss_loaded := SESSION.deserialize(JSON.parse_string(JSON.stringify(SESSION.serialize(boss))))
+	_expect(boss_loaded != null and boss_loaded.pending_offer == boss.pending_offer and boss_loaded.pending_offer_driver == boss.pending_offer_driver, "act-rival offer and robbed driver survive saving in the next act")
+	_expect(boss.can_race_hot(boss.pending_offer) and boss.race_it_now() and boss.pending_chaser != null, "new act still allows the fresh rival car to be raced hot")
 	var final_boss := _offer()
 	final_boss.send_it_ahead()
 	final_boss._advance_to_act(3)
