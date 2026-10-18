@@ -31,6 +31,7 @@ func _run() -> void:
 	controller.configure(manager, player, chaser)
 	controller.set_physics_process(false)
 	controller.sprint_resolved.connect(func(outcome: String, data: Dictionary) -> void: reports.append({"outcome": outcome, "data": data}))
+	await process_frame
 	manager.is_running = true
 	player.freeze = false
 	chaser.freeze = false
@@ -38,6 +39,43 @@ func _run() -> void:
 	controller.advance_pursuit(0.1)
 	if not _check(reports.is_empty() and controller.capture_fraction() > 0.0, "Tap captures or arc does not fill"):
 		return
+	var wall := StaticBody2D.new()
+	wall.collision_layer = 2
+	wall.collision_mask = 0
+	wall.position = chaser.position * 0.5
+	var collision := CollisionShape2D.new()
+	var shape := RectangleShape2D.new()
+	shape.size = Vector2(12, 200)
+	collision.shape = shape
+	wall.add_child(collision)
+	root.add_child(wall)
+	await physics_frame
+	await physics_frame
+	controller.advance_pursuit(1.5)
+	if not _check(reports.is_empty() and controller.capture_fraction() == 0.0, "A wall between nearby cars must prevent capture and reset exposure"):
+		return
+	wall.free()
+	await physics_frame
+	var first_gate := preload("res://scripts/race/checkpoint.gd").new()
+	first_gate.checkpoint_index = 1
+	var finish_gate := preload("res://scripts/race/checkpoint.gd").new()
+	finish_gate.checkpoint_index = 2
+	finish_gate.position.y = -1000.0
+	root.add_child(first_gate)
+	root.add_child(finish_gate)
+	manager.configure_strip_route(1, 2)
+	manager.configure_checkpoints([first_gate, finish_gate])
+	manager.register_racer(player, "Player", "Rustbug", true)
+	manager.register_racer(chaser, "Chaser", "Pinbolt")
+	controller.advance_pursuit(0.1)
+	if not _check(manager.report_checkpoint(first_gate, player), "Player should enter the next strip section"):
+		return
+	controller.advance_pursuit(1.5)
+	if not _check(reports.is_empty() and controller.capture_fraction() == 0.0, "Nearby cars on different strip sections must not capture"):
+		return
+	if not _check(manager.report_checkpoint(first_gate, chaser), "Chaser should rejoin the player's strip section"):
+		return
+	controller.advance_pursuit(0.1)
 	controller.advance_pursuit(1.39)
 	chaser.position.x += 0.1
 	controller.advance_pursuit(0.01)
@@ -92,6 +130,8 @@ func _run() -> void:
 	player.free()
 	chaser.free()
 	manager.free()
+	first_gate.free()
+	finish_gate.free()
 	if not _scene_contract():
 		return
 	if not await _traffic_clip():
