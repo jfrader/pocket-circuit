@@ -339,8 +339,13 @@ run_release_gate "$@" || gate_status=$?
         return self.finish(root, self.launch(root, fake_godot, parallelism, tests, serial, env))
 
     def assert_owned_state_released(self, root):
-        # Checked the moment the gate returns: nothing it started may still run
-        # (and so later recreate a result or scratch file), and no scratch stays.
+        # The caller is the first thing a group TERM kills, so the subreaper may
+        # still be finishing its reap-and-exit for a moment after the gate
+        # returns. Give that bounded grace, then require nothing to survive:
+        # a surviving process could later recreate a result or scratch file.
+        deadline = time.monotonic() + 3.0
+        while fixture_processes(root) and time.monotonic() < deadline:
+            time.sleep(0.05)
         self.assertEqual(fixture_processes(root), [], "the gate returned while test processes were still running")
         self.assertEqual(sorted(os.listdir(root / "tmp")), [], "the gate left scratch files behind")
 

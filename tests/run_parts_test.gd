@@ -107,6 +107,8 @@ func _check_session() -> void:
 	sess.current_node_id = String(bench["id"])
 	sess.run_state.row = int(bench["row"])
 	sess.last_bench_visited = sess.current_node_id
+	if not _expect(not sess.bench_repair(starter) and not sess.bench_action_done and sess.run_state.get_car_wear(starter) == RUN_STATE.WEAR_LEVELS[0], "repairing a clean car is refused without using the bench visit"):
+		return
 	if not _expect(not sess.bench_fit(starter, 1) and sess.bench_fit(starter, 0), "a bench fits a held part by its place in the pile"):
 		return
 	if not _expect(sess.parts_held.is_empty() and sess.fitted_parts(starter) == [part] and sess.car_record(starter)["fitted_parts"] == [part], "the fitted part leaves the pile and rides on the car"):
@@ -177,9 +179,22 @@ func _check_screens() -> void:
 	var car: String = sess.current_car_id
 	var before := CATALOG.create_vehicle_stats(car)
 	sess.parts_held.append(stock[1])
+	sess.run_state.set_car_wear(car, RUN_STATE.WEAR_LEVELS[0])
 	shell.call("show_run_bench")
 	for frame in 4:
 		await process_frame
+	var repair := shell.find_child("BenchRepair", true, false) as Button
+	if not _expect(repair != null and repair.disabled and not sess.bench_action_done, "the bench disables repair for a clean car without using the visit"):
+		return
+	sess.run_state.set_car_wear(car, "dusty")
+	shell.call("show_run_bench")
+	await process_frame
+	repair = shell.find_child("BenchRepair", true, false) as Button
+	if not _expect(repair != null and not repair.disabled, "the bench enables repair for a worn car"):
+		return
+	sess.run_state.set_car_wear(car, RUN_STATE.WEAR_LEVELS[0])
+	shell.call("show_run_bench")
+	await process_frame
 	var fit := shell.find_child("BenchFit_0", true, false) as Button
 	if not _expect(fit != null and not fit.disabled and _has_label(shell, "− " + RunParts.downside_copy(stock[0])), "the bench offers the held part with its downside"):
 		return

@@ -8,6 +8,7 @@ const AVATAR_GENERATOR := preload("res://scripts/vendor/procedural_2d/procedural
 const AVATAR_SPRITES := preload("res://scripts/vendor/procedural_2d/procedural_avatar_sprites.gd")
 const CAR_GENERATOR := preload("res://scripts/vendor/procedural_2d/procedural_car_generator.gd")
 const CAR_SPRITES := preload("res://scripts/vendor/procedural_2d/procedural_car_sprites.gd")
+const CAR_WEAR := preload("res://scripts/presentation/car_wear_presenter.gd")
 
 const REST_STEER_POSE := 2
 const RACE_WHEEL_ROLL_DISTANCE := 64.0
@@ -19,7 +20,7 @@ const RACE_WHEEL_ROLL_DISTANCE := 64.0
 ## only evaluated when a new one is added, never on a hit, so the hot paths stay
 ## allocation free.
 const MAX_AVATAR_ENTRIES := 24
-const MAX_CAR_ENTRIES := 48
+const MAX_CAR_ENTRIES := 200
 static var _avatar_entry_order: Array[String] = []
 static var _car_entry_order: Array[String] = []
 
@@ -29,8 +30,10 @@ static var _avatar_seed_overrides: Dictionary = {}
 static var _car_payload_cache: Dictionary = {}
 static var _car_texture_cache: Dictionary = {}
 static var _car_spin_cache: Dictionary = {}
+static var _car_wear_cache: Dictionary = {}
 static var _visual_resolutions: Dictionary = {}
 static var motion_image_generations := 0
+static var _car_icon_placeholder: Texture2D
 
 
 ## The player's portrait seed lives in the save file, so the presentation layer
@@ -70,6 +73,7 @@ static func _note_car_entry(visual_key: String) -> void:
 		_car_payload_cache.erase(oldest)
 		_car_texture_cache.erase(oldest)
 		_car_spin_cache.erase(oldest)
+		_car_wear_cache.erase(oldest)
 		_visual_resolutions.erase(oldest)
 
 
@@ -86,8 +90,8 @@ static func avatar_payload(driver_id: String) -> Dictionary:
 	var driver := CATALOG.get_driver(driver_id)
 	var art: Dictionary = driver.get("avatar_art", {})
 	if art.is_empty():
-		push_error("No procedural avatar art is configured for driver '%s'." % driver_id)
-		return {}
+		# Generated opponents keep the same face after roster changes or cache eviction.
+		art = {"seed": driver_id.hash(), "options": {"facing": "right"}}
 	var seed := int(_avatar_seed_overrides.get(driver_id, art["seed"]))
 	var options: Dictionary = (art.get("options", {}) as Dictionary).duplicate(true)
 	if seed != int(art["seed"]):
@@ -138,6 +142,19 @@ static func car_payload(vehicle_id: String) -> Dictionary:
 	return payload.duplicate(true)
 
 
+## Shared neutral silhouette reserves the icon's space without generating an identity.
+static func car_icon_placeholder() -> Texture2D:
+	if _car_icon_placeholder == null:
+		var image := Image.create(CAR_SPRITES.IMAGE_WIDTH, CAR_SPRITES.IMAGE_HEIGHT, false, Image.FORMAT_RGBA8)
+		var ink := Color("777c82")
+		image.fill_rect(Rect2i(14, 12, 20, 40), ink)
+		for y in [18, 40]:
+			image.fill_rect(Rect2i(10, y, 28, 8), ink)
+		image.resize(CAR_SPRITES.IMAGE_WIDTH * NATIVE_PIXEL_SCALE, CAR_SPRITES.IMAGE_HEIGHT * NATIVE_PIXEL_SCALE, Image.INTERPOLATE_NEAREST)
+		_car_icon_placeholder = ImageTexture.create_from_image(image)
+	return _car_icon_placeholder
+
+
 static func car_texture(vehicle_id: String) -> Texture2D:
 	var key := vehicle_id
 	if _car_texture_cache.has(key):
@@ -153,6 +170,64 @@ static func car_texture(vehicle_id: String) -> Texture2D:
 
 static func car_motion_texture(vehicle_id: String, travel: float, steer: float) -> Texture2D:
 	return car_motion_texture_for_key(vehicle_id, travel, steer)
+
+
+static func car_texture_with_wear(vehicle_id: String, wear_level: String, pixel_scale: int = NATIVE_PIXEL_SCALE, display_height: int = 32) -> Texture2D:
+	return car_texture_with_wear_for_key(vehicle_id, wear_level, pixel_scale, display_height)
+
+
+static func car_texture_with_wear_for_key(visual_key: String, wear_level: String, pixel_scale: int = NATIVE_PIXEL_SCALE, display_height: int = 32) -> Texture2D:
+	var overlay := car_wear_overlay_for_key(visual_key, wear_level, pixel_scale, display_height)
+	if overlay == null:
+		return null
+	var entry: Dictionary = _car_wear_cache[visual_key][_wear_variant_key(wear_level, pixel_scale, display_height)]
+	if not entry.has("car"):
+		var base: Texture2D
+		if pixel_scale == NATIVE_PIXEL_SCALE:
+			base = car_texture_for_key(visual_key)
+		elif wear_level == "clean":
+			base = CAR_SPRITES.car_texture(car_payload_for_key(visual_key), pixel_scale)
+		else:
+			base = car_texture_with_wear_for_key(visual_key, "clean", pixel_scale, display_height)
+		if wear_level == "clean":
+			entry["car"] = base
+		else:
+			var image := base.get_image().duplicate() as Image
+			image.blend_rect(overlay.get_image(), Rect2i(Vector2i.ZERO, image.get_size()), Vector2i.ZERO)
+			entry["car"] = ImageTexture.create_from_image(image)
+	return entry["car"]
+
+
+## Race sprites can keep their wheel/steer animation and draw this body-only
+## layer above it, with the same transform, dimensions and white modulation.
+## display_height is the drawn canvas height, not the source texture resolution.
+static func car_wear_overlay_for_key(visual_key: String, wear_level: String, pixel_scale: int = NATIVE_PIXEL_SCALE, display_height: int = 32) -> Texture2D:
+	var variant_key := _wear_variant_key(wear_level, pixel_scale, display_height)
+	var variants: Dictionary = _car_wear_cache.get(visual_key, {})
+	if variants.has(variant_key):
+		return variants[variant_key]["overlay"]
+	var payload := car_payload_for_key(visual_key)
+	if payload.is_empty():
+		return null
+	if not CAR_WEAR.supports_request(wear_level, pixel_scale):
+		push_error("Unsupported car wear level or pixel scale: %s / %d" % [wear_level, pixel_scale])
+		return null
+	var mask_key := "mask:%d" % pixel_scale
+	if wear_level != "clean" and not variants.has(mask_key):
+		variants[mask_key] = CAR_WEAR.make_paint_mask(payload, pixel_scale)
+	var image := CAR_WEAR.overlay_image(payload, wear_level, pixel_scale, display_height, variants.get(mask_key))
+	if image == null:
+		return null
+	variants[variant_key] = {"overlay": ImageTexture.create_from_image(image)}
+	_car_wear_cache[visual_key] = variants
+	return variants[variant_key]["overlay"]
+
+
+static func _wear_variant_key(wear_level: String, pixel_scale: int, display_height: int) -> String:
+	if wear_level != "clean" and display_height <= CAR_WEAR.MINIMUM_MARK_HEIGHT:
+		return "%s:%d:minimum" % [wear_level, pixel_scale]
+	var detailed := wear_level == "dented" and display_height > CAR_WEAR.DETAIL_HEIGHT
+	return "%s:%d:%s" % [wear_level, pixel_scale, "detail" if detailed else "token"]
 
 
 static func _texture_for_spin_pose(key: String, spin: int, pose: int) -> Texture2D:
