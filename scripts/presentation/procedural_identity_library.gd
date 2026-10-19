@@ -90,8 +90,8 @@ static func avatar_payload(driver_id: String) -> Dictionary:
 	var driver := CATALOG.get_driver(driver_id)
 	var art: Dictionary = driver.get("avatar_art", {})
 	if art.is_empty():
-		push_error("No procedural avatar art is configured for driver '%s'." % driver_id)
-		return {}
+		# Generated opponents keep the same face after roster changes or cache eviction.
+		art = {"seed": driver_id.hash(), "options": {"facing": "right"}}
 	var seed := int(_avatar_seed_overrides.get(driver_id, art["seed"]))
 	var options: Dictionary = (art.get("options", {}) as Dictionary).duplicate(true)
 	if seed != int(art["seed"]):
