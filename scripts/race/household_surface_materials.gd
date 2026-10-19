@@ -45,7 +45,7 @@ static func apply(track: Node2D, resolved: Dictionary) -> ImageTexture:
 	var floor_material := _material(resolved["floor"])
 	var island_material := _material(resolved["island"])
 	for node: Node in track.find_children("*", "CanvasItem", true, false):
-		if node.name in ["RoomSurface", "Floor"]:
+		if node.name == "RoomSurface":
 			_paint(node, resolved["floor"], floor_material)
 		elif node.name in ["IslandProp", "RaisedPad"]:
 			_paint(node, resolved["island"], island_material)
