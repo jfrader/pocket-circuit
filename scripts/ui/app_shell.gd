@@ -1295,9 +1295,8 @@ func _on_bench_repair_pressed() -> void:
 		return
 	var new_wear := sess.run_state.get_car_wear(sess.current_car_id)
 	if await _finish_bench_confirmation(&"repair", "BenchRepair"):
-		var acknowledgement := RUN_UI.label("REPAIRED - %s -> %s" % [old_wear.to_upper(), new_wear.to_upper()], 16, SKIN.CREAM, true)
+		var acknowledgement := SKIN.style_tape(RUN_UI.label("REPAIRED - %s -> %s" % [old_wear.to_upper(), new_wear.to_upper()]), SKIN.CREAM, 12)
 		acknowledgement.name = "BenchRepairAcknowledgement"
-		acknowledgement.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		_run_stop_card.add_child(acknowledgement)
 		_run_stop_card.move_child(acknowledgement, 0)
 
@@ -1436,10 +1435,7 @@ func _show_errand_acknowledgement(choice: int) -> void:
 	acknowledgement.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	acknowledgement.add_theme_stylebox_override("normal", RUN_BOARD_SCENE.label_tape())
 	state_labels.add_child(acknowledgement)
-	var dismiss := func() -> void:
-		if is_instance_valid(acknowledgement):
-			acknowledgement.hide()
-			acknowledgement.queue_free()
+	var dismiss := acknowledgement.queue_free
 	_run_board.stop_selected.connect(dismiss.unbind(1), CONNECT_ONE_SHOT)
 	for action: Node in _content.find_children("*", "Button", true, false):
 		(action as Button).pressed.connect(dismiss, CONNECT_ONE_SHOT)
