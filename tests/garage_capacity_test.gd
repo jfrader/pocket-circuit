@@ -43,11 +43,15 @@ func _run_test() -> void:
 		return
 	if not _expect((buttons[ids[14]] as Button).modulate.a == 1.0 and (buttons[ids[15]] as Button).modulate.a == 0.0, "three complete rows show; the cropped fourth row and its origin marks are masked"):
 		return
+	if not _expect(IDENTITIES._car_texture_cache.size() == 15 and (buttons[ids[15]] as Button).icon == IDENTITIES.car_icon_placeholder(), "only the first three rows rasterize before collection navigation"):
+		return
 	for index in ids.size():
 		var button := buttons[ids[index]] as Button
 		if not _expect(button.position == Vector2(8 + (index % 5) * 136, 38 + (index / 5) * 112) and button.size == Vector2(124, 100), "five-column geometry at card %d" % index):
 			return
 		button.grab_focus()
+		if not _expect(button.icon == IDENTITIES.car_texture(ids[index]), "focus resolves each card immediately"):
+			return
 		for frame in 2:
 			await process_frame
 		if not _expect(menu.selected_vehicle_id == ids[index] and menu.get("_stage").vehicle_id == ids[index] and scroll.get_global_rect().encloses(button.get_global_rect()), "selection and focus-follow at card %d" % index):

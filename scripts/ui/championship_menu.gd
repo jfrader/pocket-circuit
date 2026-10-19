@@ -200,7 +200,8 @@ func _grid_cards(display_ids: Array[String], unlocked: Array) -> void:
 		button.text = String(vehicle.get("name", id)).to_upper() + ("" if available else "\n" + String(vehicle.get("unlock", "")).to_upper())
 		button.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		button.add_theme_font_size_override("font_size", 13)
-		button.icon = IDENTITIES.car_texture(id)
+		button.icon = IDENTITIES.car_icon_placeholder()
+		button.set_meta("pending_icon", id)
 		button.expand_icon = true
 		button.icon_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		button.vertical_icon_alignment = VERTICAL_ALIGNMENT_TOP
@@ -251,6 +252,7 @@ func _grid_cards(display_ids: Array[String], unlocked: Array) -> void:
 	SKIN.style_label(cue, 12, SKIN.CREAM)
 	fade.add_child(cue)
 	scroll.get_v_scroll_bar().value_changed.connect(func(_value: float): _queue_grid_scroll())
+	_refresh_grid_visibility(scroll)
 	_queue_grid_scroll()
 
 
@@ -302,23 +304,36 @@ func _settle_grid_scroll(generation: int) -> void:
 	scroll.scroll_vertical = target
 	_grid_last_scroll = scroll.scroll_vertical
 	_grid_focus_reveal = ""
+	_refresh_grid_visibility(scroll)
+	_grid_scroll_queued = false
+
+
+func _resolve_grid_icon(button: Button) -> void:
+	if button.has_meta("pending_icon"):
+		button.icon = IDENTITIES.car_texture(String(button.get_meta("pending_icon")))
+		button.remove_meta("pending_icon")
+
+
+func _refresh_grid_visibility(scroll: ScrollContainer) -> void:
+	var usable_height := scroll.size.y - GRID_FADE_HEIGHT
 	var has_after := false
 	for row: Array in _grid_rows:
 		var first := row[0] as Button
-		var top := first.position.y - GRID_BLEED - _grid_last_scroll
-		var bottom := first.position.y + GRID_CARD.y + GRID_BLEED - _grid_last_scroll
+		var top := first.position.y - GRID_BLEED - scroll.scroll_vertical
+		var bottom := first.position.y + GRID_CARD.y + GRID_BLEED - scroll.scroll_vertical
 		var complete := top >= 0.0 and bottom <= usable_height
 		for button: Button in row:
+			if complete:
+				_resolve_grid_icon(button)
 			button.modulate.a = 1.0 if complete else 0.0
 			button.mouse_filter = Control.MOUSE_FILTER_STOP if complete else Control.MOUSE_FILTER_IGNORE
 		has_after = has_after or bottom > usable_height
 	for section: Label in _grid_sections:
-		var card_top := section.position.y + GRID_HEADER_HEIGHT - _grid_last_scroll
+		var card_top := section.position.y + GRID_HEADER_HEIGHT - scroll.scroll_vertical
 		section.visible = card_top - GRID_BLEED >= 0.0 and card_top + GRID_CARD.y + GRID_BLEED <= usable_height
 	var fade := _canvas.get_node("GridContinuation") as TextureRect
 	fade.visible = has_after
 	fade.position = COLLECTION.position + Vector2(GRID_BLEED, usable_height)
-	_grid_scroll_queued = false
 
 
 func _input(event: InputEvent) -> void:
@@ -360,6 +375,7 @@ func page_collection(direction: int) -> bool:
 func _choose_vehicle(id: String) -> void:
 	if not id in _unlocked:
 		return
+	_resolve_grid_icon(_vehicle_buttons[id] as Button)
 	if _vehicle_buttons.has(selected_vehicle_id):
 		(_vehicle_buttons[selected_vehicle_id] as Button).set("selected", false)
 	selected_vehicle_id = id
