@@ -7,6 +7,7 @@ extends SceneTree
 ## Do not use --script: App intentionally suppresses race transitions in test mode.
 
 const DIRECTOR := preload("res://tools/qa/qa_director.gd")
+const CIRCUIT_CACHE := preload("res://scripts/race/circuit_cache.gd")
 const DEFAULT_OUT := "/tmp/opencode/pocket-circuit-qa/play"
 const WALL_BUDGET_MSEC := 840000
 const STEP_TIMEOUT := 45.0
@@ -23,6 +24,10 @@ var _failed := false
 var _visited: Dictionary = {}
 var _rng := RandomNumberGenerator.new()
 var _race_count := 0
+var _mode := "autopilot"
+var _haul_won := false
+var _caught := false
+var _lockup_seen := false
 
 
 func _initialize() -> void:
@@ -31,6 +36,8 @@ func _initialize() -> void:
 
 func _run() -> void:
 	_started = Time.get_ticks_msec()
+	if not OS.get_environment("PC_QA_MODE").is_empty():
+		_mode = OS.get_environment("PC_QA_MODE")
 	if not OS.get_environment("PC_QA_OUT").is_empty():
 		_out = OS.get_environment("PC_QA_OUT")
 	_rng.seed = int(OS.get_environment("PC_QA_SEED")) if not OS.get_environment("PC_QA_SEED").is_empty() else 2426
@@ -60,11 +67,24 @@ func _run() -> void:
 		await _fail("App did not boot")
 		return
 	await _capture("boot", "boot.tscn", "Route policy seed %d; PLAY chooses an independent random night seed; fixed FPS does not make worker completion deterministic" % _rng.seed)
+	if _mode not in ["autopilot", "coverage", "resume_a", "resume_b"]:
+		await _fail("unknown PC_QA_MODE " + _mode)
+		return
+	if _mode == "coverage" and not await _title_extras():
+		return
 	if not await _press_text("PLAY"):
 		return
 	if not await _wait_screen_change("title"):
 		return
 	await _capture("first_board", "PLAY", "First-run board and route instructions")
+	if _mode == "resume_b":
+		var expected: Variant = JSON.parse_string(FileAccess.get_file_as_string(OS.get_environment("PC_QA_RESUME_FILE")))
+		var actual := _night_identity()
+		var matches: bool = expected is Dictionary and int(expected.get("seed", -1)) == int(actual.get("seed", -2)) and int(expected.get("act", -1)) == int(actual.get("act", -2)) and expected.get("node") == actual.get("node")
+		if not await _expect(matches, "resume_same_night_seed_act_node", {"expected": expected, "actual": actual}):
+			return
+	if _mode == "coverage" and not await _board_extras():
+		return
 	var steps := 0
 	while not _failed and steps < 100:
 		steps += 1
@@ -77,7 +97,17 @@ func _run() -> void:
 				if not await _wait_screen_change("run_board"):
 					return
 				continue
+			if _mode in ["resume_a", "resume_b"] and _race_count == 1:
+				await _finish_resume()
+				return
+			if _mode == "coverage" and _caught and _visited.has("ransom"):
+				_record(screen, "lockup coverage", "visited" if _lockup_seen else "not-present on reachable selected route", "Optional lockup branch; no fabricated lockup")
+				_finish("COVERAGE COMPLETE")
+				return
 			if _visible_text().contains("NIGHT OVER"):
+				if _mode != "autopilot":
+					await _fail("required coverage branch not reached before night ended: " + _mode)
+					return
 				if _race_count == 0:
 					await _fail("night ended without an observed race outcome")
 					return
@@ -117,6 +147,14 @@ func _run() -> void:
 			if not await _press_text("CONTINUE") or not await _wait_screen_change(screen):
 				return
 		elif screen == "run_offer":
+			if _mode == "coverage" and _visible_text().contains("RACE IT NOW"):
+				await _capture("haul_three_way_offer", "SCRIPTED duel win", "Expect RACE IT NOW / SEND IT AHEAD / SEND IT HOME; not an autopilot win")
+				if not await _expect(_visible_text().contains("SEND IT AHEAD") and _visible_text().contains("SEND IT HOME"), "three_way_offer", {}):
+					return
+				_haul_won = true
+				if not await _press_name("ActionTakeOffer") or not await _wait_screen_change(screen):
+					return
+				continue
 			await _capture("offer", "open won-car offer", "Bank the offered car without adding a chase")
 			if not await _press_name("ActionKeepCar") or not await _wait_screen_change(screen):
 				return
@@ -148,6 +186,14 @@ func _board() -> bool:
 		if score > best:
 			best = score
 			chosen = stop
+	if _mode == "coverage":
+		var target := "parts_van" if _caught else "rival" if not _haul_won else "lockup"
+		var distance := INF
+		for option: Dictionary in choices:
+			var candidate := _distance_to(night, option, target)
+			if candidate < distance:
+				distance = candidate
+				chosen = option
 	var stop_id := String(chosen["id"])
 	var kind := String(chosen["type"])
 	var marker: Button = null
@@ -195,6 +241,16 @@ func _route_score(night: RunSession, stop: Dictionary, seen: Dictionary, memo: D
 
 
 func _stop(screen: String) -> bool:
+	if screen == "run_lockup":
+		_lockup_seen = true
+	if _mode == "coverage" and _caught and screen == "run_parts_van":
+		await _capture("van_ransom", "SCRIPTED caught haul", "Impounded car ransom must be visible")
+		var found := false
+		for button: Button in _buttons():
+			found = found or String(button.name).begins_with("VanRansom_")
+		if not await _expect(found, "van_ransom_ui", {}):
+			return false
+		_visited["ransom"] = true
 	var action: Button = null
 	var prefixes: Dictionary = {"run_bench": ["BenchRepair", "BenchFit_", "BenchBankHaul"], "run_parts_van": ["VanBuy_"], "run_lockup": ["LockupOpen"], "run_errand": ["ErrandTuneUp", "ErrandPay"]}
 	for prefix: String in prefixes[screen]:
@@ -247,8 +303,16 @@ func _race() -> bool:
 				root.add_child(_driver)
 				_driver.call("watch", player, manager)
 			if watched != null and not captured:
+				var metrics: Dictionary = _app.get("loading_metrics")
+				_record("race", "load phases", JSON.stringify(metrics), "App.loading_metrics; phase durations in milliseconds, not screenshot gaps")
+				print("QA LOAD PHASES ", _mode, " ", JSON.stringify(metrics))
+				print("QA DISK CACHE ", _mode, " hits=", CIRCUIT_CACHE.hits, " misses=", CIRCUIT_CACHE.misses)
+				if _mode == "resume_b" and not await _expect(CIRCUIT_CACHE.hits > 0, "warm_process_disk_cache_hit", {"hits": CIRCUIT_CACHE.hits, "misses": CIRCUIT_CACHE.misses}):
+					return false
 				await _capture("race_go", "accelerate / steer / brake / drift / boost via input events", "Player control remains enabled; no AI assists or private recovery")
 				captured = true
+				if _mode == "coverage":
+					return await _scripted_race(scene)
 			if elapsed >= next_shot and is_instance_valid(player) and is_instance_valid(manager) and current_scene == scene:
 				await _capture("race_progress", "autopilot inputs", "P%d; progress %.1f; race time %.1f; R recoveries %d" % [manager.get_racer_position(player), manager.get_racer_progress(player), manager.race_time, int(_driver.get("reset_count"))])
 				next_shot += 30.0
@@ -264,6 +328,147 @@ func _race() -> bool:
 		return false
 	await _wait(1.0)
 	return true
+
+
+func _expect(passed: bool, expectation: String, details: Dictionary) -> bool:
+	_journal.store_line(JSON.stringify({"expectation": expectation, "passed": passed, "details": details, "mode": _mode}))
+	_journal.flush()
+	if not passed:
+		await _fail("expectation failed: " + expectation + " " + JSON.stringify(details))
+	return passed
+
+
+func _finish(marker: String) -> void:
+	_driver.call("release_inputs")
+	_journal.close()
+	print(marker, ": ", _out)
+	quit(0)
+
+
+func _night_identity() -> Dictionary:
+	var night: RunSession = _app.call("current_run_session")
+	return {} if night == null else {"seed": night.run_seed, "act": night.current_map.act, "node": night.current_node_id}
+
+
+func _finish_resume() -> void:
+	if not await _expect(not _night_identity().is_empty(), "resume_night_still_active", _night_identity()):
+		return
+	await _capture("resume_board", "one honest autopilot race completed", JSON.stringify(_night_identity()))
+	if _mode == "resume_a":
+		var file := FileAccess.open(OS.get_environment("PC_QA_RESUME_FILE"), FileAccess.WRITE)
+		if file == null:
+			await _fail("cannot write resume identity")
+			return
+		file.store_string(JSON.stringify(_night_identity()))
+		file.close()
+	if not await _press_name("ActionBack"):
+		return
+	if not await _expect(_screen() == "title", "resume_quit_to_title", {}):
+		return
+	await _capture("resume_title", "BACK then exit process", "Night retained; same XDG profile required on process B")
+	# Let the board's background preparation finish before tearing down its workers.
+	var deadline := Time.get_ticks_msec() + int(STEP_TIMEOUT * 1000.0)
+	while bool(_app.get("_prewarm_running")) and Time.get_ticks_msec() < deadline:
+		await process_frame
+	if not await _expect(not bool(_app.get("_prewarm_running")), "resume_background_preparation_settled", {}):
+		return
+	_finish("RESUME " + _mode + " COMPLETE")
+
+
+func _key_input(code: Key) -> void:
+	for pressed in [true, false]:
+		var event := InputEventKey.new()
+		event.keycode = code
+		event.pressed = pressed
+		Input.parse_input_event(event)
+		await process_frame
+	await _wait(0.4)
+
+
+func _title_extras() -> bool:
+	if not await _press_text("QUICK RACE"):
+		return false
+	await _capture("quick_race_preview", "QUICK RACE", "Preview before selecting a car")
+	var change: Button = null
+	for button: Button in _buttons():
+		if button.text.begins_with("CHANGE CAR"):
+			change = button
+	if not await _expect(change != null and _screen() == "quick_race", "quick_race_preview", {}):
+		return false
+	await _click(change)
+	await _capture("garage_grid", "CHANGE CAR", "Quick Race garage; fresh profile stock roster, not a 45-car save")
+	var first := root.gui_get_focus_owner()
+	await _key_input(KEY_DOWN)
+	await _key_input(KEY_RIGHT)
+	await _capture("garage_focus_rows", "DOWN / RIGHT", "Focus crosses garage rows via player keyboard input")
+	if not await _expect(_screen() == "vehicle_select" and root.gui_get_focus_owner() != first, "garage_focus_moved", {}):
+		return false
+	if not await _press_text("BACK"):
+		return false
+	if not await _expect(_screen() == "quick_race", "garage_back_preserves_quick_race", {}):
+		return false
+	if not await _press_text("BACK TO TITLE") or not await _press_text("QUICK STRIP"):
+		return false
+	await _capture("quick_strip_preview", "QUICK STRIP", "Strip preview; no exhibition race started")
+	if not await _expect(_screen() == "quick_strip", "quick_strip_preview", {}):
+		return false
+	return await _press_text("BACK TO TITLE")
+
+
+func _board_extras() -> bool:
+	if not await _press_name("ActionHelp"):
+		return false
+	await _capture("board_help", "?", "Expect run instruction slip")
+	if not await _expect(_visible_text().contains("SURVIVE THE NIGHT"), "board_help_open", {}):
+		return false
+	await _key_input(KEY_SHIFT)
+	if not await _expect(not _visible_text().contains("SURVIVE THE NIGHT"), "board_help_dismissed", {}):
+		return false
+	var before := RunSession.serialize(_app.call("current_run_session"))
+	if not await _press_name("ActionAbandon"):
+		return false
+	await _capture("abandon_confirm", "ABANDON RUN", "Confirm strip; do not abandon")
+	if not await _press_name("ActionKeepDriving"):
+		return false
+	await _capture("keep_driving", "KEEP DRIVING", "Same live night after cancel")
+	return await _expect(before == RunSession.serialize(_app.call("current_run_session")), "keep_driving_preserves_night", {})
+
+
+func _distance_to(night: RunSession, stop: Dictionary, kind: String) -> float:
+	if String(stop["type"]) == kind:
+		return 0.0
+	var result := INF
+	for child: Dictionary in night.current_map.get_children(String(stop["id"])):
+		result = minf(result, 1.0 + _distance_to(night, child, kind))
+	return result
+
+
+func _scripted_race(scene: Node) -> bool:
+	_driver.set_physics_process(false)
+	_driver.call("release_inputs")
+	var session: Dictionary = _app.call("get_current_race_session")
+	if String(session.get("mode", "")) == "chase_sprint":
+		await _capture("chase_start", "SCRIPTED coverage, no autopilot claim", "First seconds of haul chase")
+		await _wait(2.0)
+		if current_scene != scene:
+			await _fail("chase ended before capture")
+			return false
+		var controller := scene.get("_strip_controller") as Node
+		if not await _expect(controller != null, "chase_controller_present", {}):
+			return false
+		await _capture("chase_capture_arc", "observe pursuit", "capture_fraction=" + str(controller.call("capture_fraction")) + "; arc is conditional on exposure")
+		_record("race", "SCRIPTED force CAUGHT", "resolve_run_sprint(CAUGHT)", "Explicit coverage seam, not an earned gameplay outcome")
+		_app.call("resolve_run_sprint", "CAUGHT", {})
+		if not await _wait_screen_change("race"):
+			return false
+		_caught = true
+		await _capture("haul_impounded", "SCRIPTED CAUGHT", "Impound note after forced chase outcome")
+		return await _expect(_visible_text().contains("IMPOUNDED"), "haul_impounded", {})
+	_record("race", "SCRIPTED report_race_result win", "position=1 time=30.0", "Test win seam; never counted as honest autopilot coverage")
+	if not await _expect(bool(_app.call("report_race_result", 1, 30.0, [], false, {})), "scripted_result_saved", {}):
+		return false
+	_app.call("continue_after_race")
+	return await _wait_screen_change("race")
 
 
 func _screen() -> String:
