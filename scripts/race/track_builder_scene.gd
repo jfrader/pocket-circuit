@@ -3,13 +3,14 @@ class_name TrackBuilderScene
 
 const STRIP_DRESSING := preload("res://scripts/race/strip_dressing.gd")
 const STRIP_ROAD_ART := preload("res://scripts/race/strip_road_art.gd")
+const BACKDROP_OVERSCAN := 760.0
 
 
 static func build_strip(root: Node2D, prepared: Dictionary) -> void:
 	var centerline: PackedVector2Array = prepared["centerline"]
 	var room: PackedVector2Array = prepared["room_polygon"]
 	var bounds := TrackBuilderCore._polygon_bounds_rect(room)
-	TrackBuilderCore._add_polygon(root, "Floor", TrackBuilderCore._rect_points(bounds.get_center(), bounds.size + Vector2.ONE * 1520.0), Color("111316"), -22)
+	var backdrop := bounds.grow(BACKDROP_OVERSCAN)
 	var regions: Array = prepared["strip_regions"]
 	var surfaces: Array = []
 	for index in regions.size():
@@ -21,6 +22,15 @@ static func build_strip(root: Node2D, prepared: Dictionary) -> void:
 		container.set_meta("start_arc", region["start_arc"])
 		container.set_meta("end_arc", region["end_arc"])
 		root.add_child(container)
+		var region_backdrop := backdrop
+		var seam_y := float(prepared["strip_theme_switch"]["position"].y)
+		var region_bounds := TrackBuilderCore._polygon_bounds_rect(region["room_polygon"])
+		if region_bounds.get_center().y < seam_y:
+			region_backdrop.end.y = seam_y
+		else:
+			region_backdrop.position.y = seam_y
+			region_backdrop.end = backdrop.end
+		TrackBuilderCore._add_textured_polygon(container, "Floor", TrackBuilderCore._rect_points(region_backdrop.get_center(), region_backdrop.size), String(spec["floor_texture"]), spec["highlight"], -22, spec.get("floor_tile_world_size", TrackBuilderCore.DEFAULT_FLOOR_TILE_WORLD_SIZE), spec.get("floor_modulate", Color.WHITE))
 		TrackBuilderCore._add_textured_polygon(container, "RoomSurface", region["room_polygon"], String(spec["floor_texture"]), spec["highlight"], -20, spec.get("floor_tile_world_size", TrackBuilderCore.DEFAULT_FLOOR_TILE_WORLD_SIZE), Color.WHITE)
 		TrackBuilderCore._add_centerline_tiles(container, region["centerline"], String(spec["track_texture"]))
 		var surface := container.get_node("TrackSurface") as Line2D
@@ -67,14 +77,10 @@ static func build(root: Node2D, spec: Dictionary, centerline: PackedVector2Array
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 
-	# The room is a raised household surface surrounded by a deliberately dark
-	# overscan void. Floor texture is clipped to the room polygon below instead
-	# of continuing across the 760-unit camera safety ring.
 	var floor_texture := String(spec.get("floor_texture", ""))
 	var room_bounds := TrackBuilderCore._polygon_bounds_rect(room_polygon)
-	var backdrop := room_bounds.grow(760.0)
-	TrackBuilderCore._add_polygon(root, "Floor", TrackBuilderCore._rect_points(backdrop.get_center(), backdrop.size), Color("111316"), -22)
-	TrackBuilderCore._mark_flat_visual(root.get_node("Floor") as Polygon2D, "", &"void_backdrop")
+	var backdrop := room_bounds.grow(BACKDROP_OVERSCAN)
+	TrackBuilderCore._add_textured_polygon(root, "Floor", TrackBuilderCore._rect_points(backdrop.get_center(), backdrop.size), floor_texture, spec["highlight"], -22, spec.get("floor_tile_world_size", TrackBuilderCore.DEFAULT_FLOOR_TILE_WORLD_SIZE), spec.get("floor_modulate", Color.WHITE))
 	var room_surface := TrackBuilderCore._expand_loop(room_polygon, 26.0)
 	TrackBuilderCore._add_textured_polygon(root, "RoomSurface", room_surface, floor_texture, spec["highlight"], -20, spec.get("floor_tile_world_size", TrackBuilderCore.DEFAULT_FLOOR_TILE_WORLD_SIZE), spec.get("floor_modulate", Color.WHITE))
 	if stage.is_valid():
