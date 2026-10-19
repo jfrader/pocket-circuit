@@ -8,26 +8,40 @@ signal wear_out_beat_changed(beat: String)
 
 class DeadlineHUD extends RaceHUD:
 	const NEAR_LIMIT_SECONDS := 30.0
+	const GRACE_WARNING_SECONDS := 3.0
 	var deadline_seconds := INF
+	var finish_grace_countdown := false
 
 	func clock_copy() -> String:
-		if is_inf(deadline_seconds):
+		if is_inf(deadline_seconds) or finish_grace_countdown:
 			return _format_time(elapsed_seconds)
 		return "%02d:%02d / %02d:%02d" % [int(elapsed_seconds) / 60, int(elapsed_seconds) % 60, int(deadline_seconds) / 60, int(deadline_seconds) % 60]
 
 	func deadline_warning() -> String:
 		var remaining := deadline_seconds - elapsed_seconds
-		return "%ds LEFT" % ceili(remaining) if remaining > 0.0 and remaining <= NEAR_LIMIT_SECONDS else ""
+		var warning_seconds := GRACE_WARNING_SECONDS if finish_grace_countdown else NEAR_LIMIT_SECONDS
+		return "%ds LEFT" % ceili(remaining) if remaining > 0.0 and remaining <= warning_seconds else ""
+
+	func finish_countdown_copy() -> String:
+		if not finish_grace_countdown or is_inf(deadline_seconds):
+			return ""
+		return "FINISH IN %ds" % ceili(maxf(0.0, deadline_seconds - elapsed_seconds))
 
 	func get_layout_rects() -> Dictionary:
 		var rects := super.get_layout_rects()
-		if not is_inf(deadline_seconds):
+		if not is_inf(deadline_seconds) and not finish_grace_countdown:
 			rects["clock"] = Rect2(size.x - 284, 24, 260, 64)
 		return rects
 
 	func _draw_clock(rect: Rect2) -> void:
-		if is_inf(deadline_seconds):
+		if is_inf(deadline_seconds) or finish_grace_countdown:
 			super._draw_clock(rect)
+			var countdown := finish_countdown_copy()
+			if not countdown.is_empty():
+				var countdown_rect := Rect2(rect.position + Vector2(0, rect.size.y + 6), Vector2(rect.size.x, 32))
+				var near_limit := not deadline_warning().is_empty()
+				SKIN.draw_plate(self, countdown_rect, SKIN.YELLOW if near_limit else SKIN.CREAM)
+				SKIN.draw_text(self, countdown_rect.position + Vector2(12, 23), countdown, 18, SKIN.INK, countdown_rect.size.x - 24, HORIZONTAL_ALIGNMENT_CENTER)
 			return
 		SKIN.draw_plate(self, rect, SKIN.CREAM)
 		_caption(rect.position + Vector2(16, 22), "TIME")
@@ -1035,6 +1049,7 @@ func _update_race_hud() -> void:
 	if not is_instance_valid(_race_hud) or not is_instance_valid(_player_vehicle):
 		return
 	(_race_hud as DeadlineHUD).deadline_seconds = _race_deadline()
+	(_race_hud as DeadlineHUD).finish_grace_countdown = not _is_strip_route()
 	var shown_lap := mini(race_manager.lap_count + 1, race_manager.laps_to_finish)
 	_race_hud.set_nitro_count(_run.nitro_count if _run != null else -1)
 	var boost_ratio := clampf(_player_vehicle.boost_amount / maxf(_player_vehicle.get_boost_capacity(), 0.001), 0.0, 1.0)
