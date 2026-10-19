@@ -16,6 +16,7 @@ const TRACK_BUILDER_PLANNER := preload("res://scripts/race/track_builder_planner
 const RUN_FINALE := preload("res://scripts/race/run_finale_circuit.gd")
 const TRACK_BUILDER_SCENE := preload("res://scripts/race/track_builder_scene.gd")
 const STRIP_LAYOUT := preload("res://scripts/race/strip_layout.gd")
+const CIRCUIT_CACHE := preload("res://scripts/race/circuit_cache.gd")
 const TRACK_BUILDER_ISLAND := preload("res://scripts/race/track_builder_island.gd")
 const TRACK_BUILDER_STORY := preload("res://scripts/race/track_builder_story.gd")
 const TRACK_BUILDER_DRESSING := preload("res://scripts/race/track_builder_dressing.gd")
@@ -141,6 +142,7 @@ static var _texture_footprint_order: Array[String] = []
 static var _asset_texture_order: Array[String] = []
 
 static var _generated_prepared_cache: Dictionary = {}
+static var prepared_layout_generations := 0
 static var _generated_prepared_order: Array[String] = []
 static var _generated_room_cache: Dictionary = {}
 static var _generated_room_order: Array[String] = []
@@ -344,6 +346,18 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 
 
 static func prepare_layout(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
+	var identity := CIRCUIT_CACHE.key(theme, room_shape, seed, generation_options)
+	var cached := CIRCUIT_CACHE.load_layout(identity)
+	if not cached.is_empty():
+		return cached
+	var prepared := _prepare_layout_uncached(theme, room_shape, seed, generation_options)
+	if not prepared.is_empty():
+		CIRCUIT_CACHE.store_layout(identity, prepared)
+	return prepared
+
+
+static func _prepare_layout_uncached(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary) -> Dictionary:
+	prepared_layout_generations += 1
 	var prepared := prepare_route(theme, room_shape, seed, generation_options)
 	if prepared.is_empty():
 		return {}
@@ -1444,9 +1458,10 @@ static func generated_circuit_cache_key(event: Dictionary) -> String:
 ## cache key or calling prepare_layout, so pre-warm and race use identical inputs.
 static func generated_circuit_options(event: Dictionary) -> Dictionary:
 	if event.has("authored_route"):
-		return {"authored_route": event["authored_route"]}
+		return {"authored_route": event["authored_route"], "reverse": bool(event.get("reverse", false))}
 	var options := {
 		"act": int(event.get("act", 0)),
+		"reverse": bool(event.get("reverse", false)),
 		"obstacles_enabled": bool(event.get("obstacles_enabled", true)),
 		"length_tier": StringName(event.get("length_tier", &"standard")),
 	}
