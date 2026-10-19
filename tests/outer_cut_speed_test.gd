@@ -201,7 +201,8 @@ func _run() -> void:
 					if not _install(source):
 						_fail("could not install comparison implementation", original)
 						return
-					var prepared := CORE.prepare_layout(theme, &"long", seed_value, {"length_tier": tier})
+					# Bypass the disk cache: this test compares two implementations on the same identity.
+					var prepared := CORE._prepare_layout_uncached(theme, &"long", seed_value, {"length_tier": tier})
 					if prepared.is_empty() or cut_map.decisions.size() != 1:
 						_fail("empty fixture or missing scan", original)
 						return
