@@ -11,6 +11,7 @@ const CIRCUIT_CACHE := preload("res://scripts/race/circuit_cache.gd")
 const DEFAULT_OUT := "/tmp/opencode/pocket-circuit-qa/play"
 const WALL_BUDGET_MSEC := 840000
 const STEP_TIMEOUT := 45.0
+const PREWARM_DRAIN_TIMEOUT_MSEC := 180000
 const RACE_TIMEOUT := 240.0
 const UNSEEN_STOP_SCORE := 100.0
 const ROUTE_STEP_COST := 1.0
@@ -28,6 +29,8 @@ var _mode := "autopilot"
 var _haul_won := false
 var _caught := false
 var _lockup_seen := false
+var _prewarm_drain_started := 0
+var _prewarm_drained_msec := -1
 
 
 func _initialize() -> void:
@@ -36,6 +39,7 @@ func _initialize() -> void:
 
 func _run() -> void:
 	_started = Time.get_ticks_msec()
+	print("QA DISPLAY driver=", DisplayServer.get_name(), " adapter=", RenderingServer.get_video_adapter_name())
 	if not OS.get_environment("PC_QA_MODE").is_empty():
 		_mode = OS.get_environment("PC_QA_MODE")
 	if not OS.get_environment("PC_QA_OUT").is_empty():
@@ -244,13 +248,47 @@ func _stop(screen: String) -> bool:
 	if screen == "run_lockup":
 		_lockup_seen = true
 	if _mode == "coverage" and _caught and screen == "run_parts_van":
-		await _capture("van_ransom", "SCRIPTED caught haul", "Impounded car ransom must be visible")
-		var found := false
+		var ransom: Button = null
 		for button: Button in _buttons():
-			found = found or String(button.name).begins_with("VanRansom_")
-		if not await _expect(found, "van_ransom_ui", {}):
+			if String(button.name).begins_with("VanRansom_"):
+				ransom = button
+				break
+		if not await _expect(ransom != null and not ransom.disabled, "van_ransom_available", {}):
+			return false
+		ransom.grab_focus()
+		var ancestor := ransom.get_parent()
+		while ancestor != null:
+			if ancestor is ScrollContainer:
+				(ancestor as ScrollContainer).ensure_control_visible(ransom)
+			ancestor = ancestor.get_parent()
+		await _wait(0.5)
+		var visible_rect := root.get_visible_rect()
+		ancestor = ransom.get_parent()
+		while ancestor is Control:
+			if (ancestor as Control).clip_contents:
+				visible_rect = visible_rect.intersection((ancestor as Control).get_global_rect())
+			ancestor = ancestor.get_parent()
+		var rect := ransom.get_global_rect()
+		if not await _expect(visible_rect.encloses(rect), "van_ransom_visible_in_viewport", {"button_rect": str(rect), "unclipped_viewport": str(visible_rect)}):
+			return false
+		await _capture("van_ransom_before", "focus and scroll ransom into view", "Entire ransom control is inside its unclipped viewport; scripted haul/capture setup")
+		var night: RunSession = _app.call("current_run_session")
+		var vehicle_id := String(ransom.name).trim_prefix("VanRansom_")
+		var points_before := night.run_points
+		var current_before := night.current_car_id
+		if not await _expect(night.impounded_cars.has(vehicle_id), "van_ransom_previously_impounded", {"vehicle_id": vehicle_id}):
+			return false
+		await _click(ransom)
+		await _capture("van_ransom_after", "pay ransom via visible button", "Verify exact points debit and return to safe collection; ransom does not switch current car")
+		var returned := false
+		for car: Dictionary in night.collection_safe_cars():
+			returned = returned or String(car["id"]) == vehicle_id
+		if not await _expect(night.run_points == points_before - RunSession.HAUL_RANSOM_POINTS and not night.impounded_cars.has(vehicle_id) and returned and night.current_car_id == current_before, "van_ransom_paid_and_car_returned", {"vehicle_id": vehicle_id, "points_before": points_before, "points_after": night.run_points, "impounded": night.impounded_cars, "returned_to_safe_collection": returned, "current_car_before": current_before, "current_car_after": night.current_car_id}):
 			return false
 		_visited["ransom"] = true
+		if _screen() == screen and not await _press_name("ActionBack"):
+			return false
+		return await _wait_screen_change(screen)
 	var action: Button = null
 	var prefixes: Dictionary = {"run_bench": ["BenchRepair", "BenchFit_", "BenchBankHaul"], "run_parts_van": ["VanBuy_"], "run_lockup": ["LockupOpen"], "run_errand": ["ErrandTuneUp", "ErrandPay"]}
 	for prefix: String in prefixes[screen]:
@@ -366,13 +404,37 @@ func _finish_resume() -> void:
 	if not await _expect(_screen() == "title", "resume_quit_to_title", {}):
 		return
 	await _capture("resume_title", "BACK then exit process", "Night retained; same XDG profile required on process B")
-	# Let the board's background preparation finish before tearing down its workers.
-	var deadline := Time.get_ticks_msec() + int(STEP_TIMEOUT * 1000.0)
+	var identity := _night_identity()
+	_prewarm_drain_started = Time.get_ticks_msec()
+	var running_at_title := bool(_app.get("_prewarm_running"))
+	_prewarm_drained_msec = -1 if running_at_title else 0
+	process_frame.connect(_observe_prewarm_drain)
+	if not await _expect(_visible_text().contains("CONTINUE YOUR RUN"), "resume_continue_visible", {"prewarm_running": running_at_title}):
+		return
+	# PLAY is the title action; CONTINUE YOUR RUN is its saved-night status label.
+	if not await _press_text("PLAY") or not await _wait_screen_change("title"):
+		return
+	if not await _expect(_screen() == "run_board" and _night_identity() == identity, "resume_title_interactive_same_night", {"expected": identity, "actual": _night_identity(), "prewarm_running_at_title": running_at_title, "prewarm_running_after_press": bool(_app.get("_prewarm_running"))}):
+		return
+	await _capture("resume_continue_board", "PLAY with CONTINUE YOUR RUN", "Title action resumes the same night without waiting for background preparation")
+	if not await _press_name("ActionBack"):
+		return
+	var deadline := _prewarm_drain_started + PREWARM_DRAIN_TIMEOUT_MSEC
 	while bool(_app.get("_prewarm_running")) and Time.get_ticks_msec() < deadline:
 		await process_frame
-	if not await _expect(not bool(_app.get("_prewarm_running")), "resume_background_preparation_settled", {}):
+	_observe_prewarm_drain()
+	process_frame.disconnect(_observe_prewarm_drain)
+	var drain := {"elapsed_msec": _prewarm_drained_msec, "observation_window_msec": Time.get_ticks_msec() - _prewarm_drain_started, "bound_msec": PREWARM_DRAIN_TIMEOUT_MSEC, "running_at_title": running_at_title, "settled": not bool(_app.get("_prewarm_running"))}
+	_record("title", "resume prewarm drain", JSON.stringify(drain), "Frame-observed wall-clock drain since first return to title; -1 means still pending at bound, 0 means already settled; a pending worker is not a frozen title")
+	print("QA PREWARM DRAIN ", _mode, " ", JSON.stringify(drain))
+	if not await _expect(_screen() == "title" and _visible_text().contains("CONTINUE YOUR RUN") and _night_identity() == identity, "resume_title_usable_night_retained", {"identity": _night_identity(), "drain": drain}):
 		return
 	_finish("RESUME " + _mode + " COMPLETE")
+
+
+func _observe_prewarm_drain() -> void:
+	if _prewarm_drained_msec < 0 and not bool(_app.get("_prewarm_running")):
+		_prewarm_drained_msec = Time.get_ticks_msec() - _prewarm_drain_started
 
 
 func _key_input(code: Key) -> void:
