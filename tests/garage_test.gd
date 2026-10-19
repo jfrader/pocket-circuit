@@ -66,6 +66,8 @@ func _run_test() -> void:
 	await process_frame
 	if not _expect(String(menu.get("selected_vehicle_id")) == won_id, "focusing a won car selects it"):
 		return
+	if not _expect((buttons[won_id] as Button).icon == ProceduralIdentityLibrary.car_texture(won_id), "focusing a won car resolves its real icon within one frame"):
+		return
 	if not _expect(origin.visible and origin.text.begins_with("WON IN A DUEL"), "a won car says where it came from"):
 		return
 	if not _expect(String(stage.get("compare_label")) == "VS RUSTBUG" and not (stage.get("compare_shape") as Dictionary).is_empty(), "a won car is drawn against the car the player came in with"):

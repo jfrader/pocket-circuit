@@ -33,6 +33,7 @@ static var _car_spin_cache: Dictionary = {}
 static var _car_wear_cache: Dictionary = {}
 static var _visual_resolutions: Dictionary = {}
 static var motion_image_generations := 0
+static var _car_icon_placeholder: Texture2D
 
 
 ## The player's portrait seed lives in the save file, so the presentation layer
@@ -139,6 +140,19 @@ static func car_payload(vehicle_id: String) -> Dictionary:
 	if not _visual_resolutions.has(key):
 		_visual_resolutions[key] = {"vehicle_id": vehicle_id, "cosmetic": {}}
 	return payload.duplicate(true)
+
+
+## Shared neutral silhouette reserves the icon's space without generating an identity.
+static func car_icon_placeholder() -> Texture2D:
+	if _car_icon_placeholder == null:
+		var image := Image.create(CAR_SPRITES.IMAGE_WIDTH, CAR_SPRITES.IMAGE_HEIGHT, false, Image.FORMAT_RGBA8)
+		var ink := Color("777c82")
+		image.fill_rect(Rect2i(14, 12, 20, 40), ink)
+		for y in [18, 40]:
+			image.fill_rect(Rect2i(10, y, 28, 8), ink)
+		image.resize(CAR_SPRITES.IMAGE_WIDTH * NATIVE_PIXEL_SCALE, CAR_SPRITES.IMAGE_HEIGHT * NATIVE_PIXEL_SCALE, Image.INTERPOLATE_NEAREST)
+		_car_icon_placeholder = ImageTexture.create_from_image(image)
+	return _car_icon_placeholder
 
 
 static func car_texture(vehicle_id: String) -> Texture2D:
