@@ -62,11 +62,21 @@ func _run() -> void:
 	_app.call("resolve_run_sprint", "CAUGHT", {"terminal": true})
 	_expect(sess.impounded_cars.has(won) and sess.boot_cars.is_empty() and _shell.get("_screen") == "run_board", "capture impounds and returns board")
 	_expect(_shell.find_child("HaulNote", true, false) != null, "capture has impound note")
+	var impound_note := _shell.find_child("HaulNote", true, false) as Label
+	var ink := impound_note.get_theme_color("font_color").srgb_to_linear().get_luminance()
+	var paper := Color("ded6bc").srgb_to_linear().get_luminance()
+	_expect(impound_note.text.begins_with("IMPOUNDED · ") and (paper + 0.05) / (ink + 0.05) >= 4.5, "impound status keeps its copy with readable ink against the paper strip")
 	_move_to(sess, "parts_van")
 	sess.run_points = SESSION.HAUL_RANSOM_POINTS
 	_shell.call("show_run_parts_van")
 	var ransom := _button("VanRansom_" + won)
 	_expect(ransom != null and str(SESSION.HAUL_RANSOM_POINTS) in ransom.text, "van displays ransom price")
+	await create_timer(0.6).timeout
+	var van_list := ransom.get_parent() as Control
+	var van_scroll := van_list.get_parent() as ScrollContainer
+	_expect(van_list.get_child(0) == ransom, "ransom is first, above parts")
+	_expect(van_scroll.scroll_vertical == 0 and ransom.is_visible_in_tree() and van_scroll.get_global_rect().encloses(ransom.get_global_rect()) and root.get_visible_rect().encloses(ransom.get_global_rect()), "ransom is fully visible in the initial viewport without scrolling")
+	_expect(root.gui_get_focus_owner() == ransom, "affordable rescue receives initial focus")
 	ransom.pressed.emit()
 	_expect(sess.impounded_cars.is_empty() and sess.run_points == 0 and sess.resolved_nodes.has(sess.current_node_id), "ransom debits points and consumes visit")
 	_shell.call("show_run_parts_van")

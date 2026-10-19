@@ -504,7 +504,7 @@ func show_run_board() -> void:
 			_run_stop_card.add_child(recap)
 	var haul_note := String(_app.get("run_haul_note"))
 	if not haul_note.is_empty():
-		var note := RUN_UI.label(haul_note, 14, RUN_UI.AMBER, true)
+		var note := RUN_UI.label(haul_note, 14, SKIN.INK, true)
 		note.name = "HaulNote"
 		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		detail.add_child(note)
@@ -860,6 +860,7 @@ func show_run_offer() -> void:
 			var driver := HBoxContainer.new()
 			driver.name = "OfferDriver"
 			var portrait := TextureRect.new()
+			portrait.name = "OfferPortrait"
 			portrait.custom_minimum_size = Vector2(48, 48)
 			portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 			portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
@@ -1106,14 +1107,14 @@ func show_run_parts_van() -> void:
 	card[0].add_theme_stylebox_override("panel", rail)
 	RUN_BOARD_SCENE.chalk_labels(card[0])
 	rack.add_child(card[0])
+	for vehicle_id: String in sess.impounded_cars:
+		var ransom := RUN_UI.action("RANSOM %s · %d POINTS" % [RUN_UI.car_name(vehicle_id).to_upper(), RunSession.HAUL_RANSOM_POINTS], false, bought or sess.run_points < RunSession.HAUL_RANSOM_POINTS)
+		_add_run_button(card[1], ransom, Callable(self, "_on_van_ransom_pressed").bind(vehicle_id), "VanRansom_" + vehicle_id)
 	for part: Dictionary in sess.van_stock():
 		var cost := RunParts.cost(part)
 		var buy := RUN_UI.part_button(part, "%s · %d POINTS" % [RunParts.part_name(part).to_upper(), cost], bought or sess.run_points < cost)
 		scene.register_pack(buy, part)
 		_add_run_button(card[1], buy, Callable(self, "_on_van_buy_pressed").bind(String(part["part"])), "VanBuy_" + String(part["part"]))
-	for vehicle_id: String in sess.impounded_cars:
-		var ransom := RUN_UI.action("RANSOM %s · %d POINTS" % [RUN_UI.car_name(vehicle_id).to_upper(), RunSession.HAUL_RANSOM_POINTS], false, bought or sess.run_points < RunSession.HAUL_RANSOM_POINTS)
-		_add_run_button(card[1], ransom, Callable(self, "_on_van_ransom_pressed").bind(vehicle_id), "VanRansom_" + vehicle_id)
 	var consumables := HBoxContainer.new()
 	consumables.add_theme_constant_override("separation", 12)
 	left.add_child(consumables)
@@ -1128,7 +1129,7 @@ func show_run_parts_van() -> void:
 	RUN_BOARD_SCENE.chalk_labels(legend)
 	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
 	_content.add_child(legend)
-	# The first part the points can buy takes focus, not BACK on the left.
+	# Rescue takes priority over parts; BACK stays last in the focus order.
 	_queue_content_entrance()
 	_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
 
