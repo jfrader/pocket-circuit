@@ -51,7 +51,7 @@ func _run_test() -> void:
 		return
 	var part: Dictionary = RunParts.deal(1806, sess.car_stats(car_id))[0]
 	sess.parts_held.append(part)
-	if not _expect(bool(app.call("run_bench_fit", 0)) and not (CATALOG.get_vehicle(car_id).get("fitted_parts", []) as Array).is_empty(), "fitting a real held part changes the live won car"):
+	if not _expect(bool(app.call("run_bench_fit", 0)) and not (sess.car_record(car_id).get("fitted_parts", []) as Array).is_empty(), "fitting a real held part changes the live won car"):
 		return
 
 	# Lose the night on the act rival: the car still goes to the garage.
@@ -64,6 +64,10 @@ func _run_test() -> void:
 	shell.call("show_run_board")
 	await process_frame
 	if not _expect(_has_label(shell, "NIGHT OVER") and not _has_label(shell, "NO ACTIVE RUN"), "a saved lost night still shows its terminal board"):
+		return
+	if not _expect(_has_label(shell, "DEFEATED BY THE ACT RIVAL") and _has_label(shell, "BANKED: 1 CAR"), "the lost night names its cause and banked haul"):
+		return
+	if not await _test_terminal_garage(shell):
 		return
 	app.call("persist_current_run")
 	var saved: Dictionary = SAVE_STORE.new(path).load_data()
@@ -85,12 +89,11 @@ func _run_test() -> void:
 		return
 
 	var vehicle: Dictionary = CATALOG.get_vehicle(car_id)
-	var base: Dictionary = CATALOG.base_vehicle_for_type(String(garage[0]["type"]))
-	if not _expect(String(vehicle.get("name", "")) != String(base["name"]), "a won car has its own generated name"):
+	if not _expect(not String(vehicle.get("name", "")).is_empty(), "the won car keeps the rival vehicle's real name"):
 		return
 	var rolled := CATALOG.create_vehicle_stats(car_id)
-	var shipped := CATALOG.create_vehicle_stats(String(base["id"]))
-	if not _expect(not is_equal_approx(rolled.max_speed, shipped.max_speed) or not is_equal_approx(rolled.engine_force, shipped.engine_force), "a won car drives on its roll, not on its base car"):
+	var shipped := CATALOG.create_vehicle_stats(car_id)
+	if not _expect(is_equal_approx(rolled.max_speed, shipped.max_speed) and is_equal_approx(rolled.engine_force, shipped.engine_force), "the won car drives exactly like the car the rival drove"):
 		return
 	if not _expect(car_id in (app.call("quick_race_roster") as Array), "Quick Race offers the won car"):
 		return
@@ -126,6 +129,8 @@ func _run_test() -> void:
 	if not _expect(not blocked.won_cars().is_empty(), "the third duel wins a car"):
 		return
 	var blocked_car := String(blocked.won_cars()[0]["id"])
+	if not _expect(blocked.send_it_home(), "sending the haul home makes it collection-safe before the block"):
+		return
 	var store: Object = app.get("_save_store")
 	app.set("_save_store", FailingSaveStore.new(path))
 	app.call("abandon_run")
@@ -161,6 +166,10 @@ func _run_test() -> void:
 	await process_frame
 	if not _expect(victory.is_complete() and app.call("current_run_session") == null and _has_label(shell, "NIGHT OVER"), "a saved winning night retains its terminal board"):
 		return
+	if not _expect(_has_label(shell, "ALL ACT RIVALS DEFEATED"), "a completed night names its victory"):
+		return
+	if not await _test_terminal_garage(shell):
+		return
 	var worn: RunSession = app.call("start_run", 72727) as RunSession
 	for crash in 8:
 		worn.register_crash(1.0)
@@ -168,6 +177,8 @@ func _run_test() -> void:
 	shell.call("show_run_board")
 	await process_frame
 	if not _expect(worn.is_failed() and app.call("current_run_session") == null and _has_label(shell, "NIGHT OVER"), "a saved wear ending retains its terminal board"):
+		return
+	if not _expect(_has_label(shell, "THE CAR GAVE OUT"), "a worn-out night names the car failure"):
 		return
 	if not _expect((SAVE_STORE.new(path).load_data()["current_run"] as Dictionary).is_empty(), "a reboot has no ended run to resume or transfer again"):
 		return
@@ -200,6 +211,19 @@ func _run_to_rival(app: Object) -> RunSession:
 		if RUN_WALK.walk_to(app, sess, "rival"):
 			return sess
 	return null
+
+
+func _test_terminal_garage(shell: CanvasLayer) -> bool:
+	var garage := shell.find_child("ActionViewGarage", true, false) as Button
+	if not _expect(garage != null and garage.text == "VIEW GARAGE", "terminal board offers VIEW GARAGE"):
+		return false
+	garage.pressed.emit()
+	await process_frame
+	if not _expect(shell.get("_screen") == "vehicle_select" and bool(shell.get("_quick_race")) and _has_label(shell, "THE GARAGE"), "VIEW GARAGE opens the Quick Race car selection route"):
+		return false
+	shell.call("show_run_board")
+	await process_frame
+	return _expect(_has_label(shell, "NIGHT OVER"), "garage visit preserves the terminal recap")
 
 
 func _has_label(node: Node, text: String) -> bool:

@@ -2,6 +2,9 @@ extends SceneTree
 
 const SAVE_STORE := preload("res://scripts/persistence/save_store.gd")
 const RUN_WALK := preload("res://tests/support/run_walk.gd")
+const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
+const BENCH := preload("res://scripts/ui/run_bench_scene.gd")
+const MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const STOP_TYPES: Array[String] = ["bench", "parts_van", "lockup", "errand"]
 const SAVE_PATH := "user://tests/run_stop_reopen_test.json"
 
@@ -71,6 +74,10 @@ func _run_test() -> void:
 		await process_frame
 		if not _expect(String(shell.get("_screen")) == "run_" + kind, kind + " reopens through App/UI after loading"):
 			return
+		if kind == "bench":
+			var car := shell.find_child("BenchCar", true, false) as TextureRect
+			if not _expect(car != null and car.texture == IDENTITIES.car_texture_with_wear(loaded.current_car_id, loaded.run_state.get_car_wear(loaded.current_car_id), MATERIALS.HERO_PIXEL_SCALE, int(BENCH.CAR_LENGTH)), "reopened bench renders the loaded current car and wear"):
+				return
 		if not _expect(_use_stop(app, loaded, kind), kind + " action succeeds once"):
 			return
 		if not loaded.pending_offer.is_empty():
@@ -130,6 +137,8 @@ func _board_can_open(shell: CanvasLayer, stop_id: String) -> bool:
 func _use_stop(app: Object, session: RunSession, kind: String) -> bool:
 	match kind:
 		"bench":
+			if not session.bench_action_done and session.run_state.get_car_wear(session.current_car_id) == RunState.WEAR_LEVELS[0]:
+				session.run_state.set_car_wear(session.current_car_id, "rusty")
 			return bool(app.call("run_bench_repair", session.current_car_id))
 		"parts_van":
 			return bool(app.call("run_buy_part", String(session.van_stock()[0]["part"])))

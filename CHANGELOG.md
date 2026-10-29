@@ -3,11 +3,18 @@
 ## [Unreleased]
 
 ### Added
+- The haul: win a rival's car and choose RACE IT NOW (the robbed driver chases you on the next sprint; caught means impounded, ransom it back at a parts van), SEND IT AHEAD (pay this win's points, nobody chases) or SEND IT HOME (collection next night, keep your points). A bench or the act rival banks the haul for good; unbanked cars are lost when the night ends.
+- Chase sprints: the hot connector is a strip run to the finish with slow traffic, a capture arc when the chaser closes within two car widths, and a rescue if the pursuit stalls. Cold connectors stay quick map travel.
+- Six-car races: run fields carry six cars; rival duels stay one-on-one.
+- Tow and nitro: stackable consumables from a parts van or an errand. A tow drags a worn-out wreck to the next bench in four beats instead of ending the night; a nitro bottle is a one-use boost that scales with the car.
+- Visible car wear: clean, dusty, rusty and dented cars now show their state on the sprite.
+- The basement: the run's finale is the only hand-built circuit, in a new fourth room theme with its own floor, props and a boiler-leak hazard.
 - Steam car drops: winning a car in a run can drop a car into your Steam inventory, which you can trade. Steam cars race in Quick Race with a STEAM tape and stay listed offline. Without Steam the game plays the same.
 - Run parts: each parts van stocks three parts rolled for that van, each printing what it gives and what it takes. Bought parts are held; a bench fits one to the car you are driving instead of repairing it. A fitted part changes how that car drives for the rest of the night. Won cars go to the garage without parts.
 - Quick Strip: a one-off strip battle from the title screen. Sweepers and chicanes run north along a four-lane printed fabric runner between two household rooms. Civilian toy cars share the northbound lanes; sparser oncoming cars and delivery trucks approach on the left, with headlights and amber truck markers. Traffic yields before merging and recovers after bumps. One rival chases from behind, with a capture arc when it closes in. Reach the finish to win; get caught or run past the time limit and the attempt ends. Results do not save.
 
 ### Changed
+- Run screens are now illustrated toy-world scenes. The run board is a tabletop route drawn in chalk and tape, with each stop a physical toy token and the act's room visible in the surface. The bench parks your car on a repair mat, the parts van opens its rear door over the counter, the lockup's padlock springs and its garage door slides up to roll out the car, errands live on a desk with a folded note and clipboard, and won-car offers turn on a lit turntable. Night endings are their own scenes: a sunrise victory or a moonlit, solitary defeat. Textured surfaces, painted props, soft shadows and higher-resolution car art finish the set, and reduced motion keeps every screen readable at rest.
 - The run board picks a stop before going: clicking or focusing a stop shows what it is, what it pays and costs, and the circuit it races on. A second click, ENTER or the go button drives your car to it. The map draws in, reachable stops pulse, and the run's counts tick when they change. Menu buttons fade in one after another, and a won car turns in on its offer. Reduced motion shows all of it at rest.
 - Run maps use distinct coloured markers, thin route connections, a current-stop halo and a node-cost legend. Benches, parts vans, lockups and errands share the map's dark, compact presentation.
 - The title screen now states when a save was recovered from a backup or comes from a newer version, instead of looking normal while running on defaults or read-only.
@@ -35,6 +42,9 @@
 - The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
+- Abandoning a run presents reachable confirmation choices; KEEP DRIVING restores focus to ABANDON RUN.
+- Six-car race results keep the save status and points above CONTINUE without overlapping or repeating the action.
+- Parts vans expose tow and nitro purchases and save the inventory change.
 - Car comparison headings stay inside their offer and garage cards.
 - Unused run stops stay open after Back or a restart until you choose the next route.
 - Run-only parts no longer follow won cars into Quick Race after the night ends.

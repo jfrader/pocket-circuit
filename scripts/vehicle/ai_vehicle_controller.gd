@@ -279,6 +279,16 @@ var _reference_cumulative := PackedFloat32Array()
 var _reference_total := 0.0
 var _racing_line_nearest_index := -1
 var _reference_nearest_index := -1
+
+# Prepared immediately before each synchronous envelope scan/call, never reused
+# across scans or ticks (grip, vehicle stats, difficulty and personality can change).
+var _envelope_maximum := 0.0
+var _envelope_lateral_accel := 0.0
+var _envelope_corner_margin := 0.0
+var _envelope_corner_pace := 0.0
+var _envelope_reaction_distance := 0.0
+var _envelope_braking_accel := 0.0
+
 # Scratch results are owned by this controller. Callers must consume them before
 # calling the same helper again; none may be retained across physics ticks.
 var _reference_goal_result := {"goal": Vector2.ZERO, "lookahead": 0.0}
@@ -728,7 +738,7 @@ func _physics_process(delta: float) -> void:
 	if vehicle.stats.physics_model_version != 0:
 		var upcoming_radius := float(curvature_hazard["radius"])
 		hazard_distance = float(curvature_hazard["distance"])
-		corner_speed = float(curvature_hazard.get("speed_limit", _v1_speed_envelope(upcoming_radius, hazard_distance)))
+		corner_speed = float(curvature_hazard["speed_limit"]) if curvature_hazard.has("speed_limit") else _v1_speed_envelope(upcoming_radius, hazard_distance)
 	elif line_radius > 40.0:
 		var floor_base := float(tuning["corner_floor_base"])
 		var floor_adj := clampf(
@@ -2317,18 +2327,18 @@ func _racing_line_curvature_hazard() -> Dictionary:
 	var count := _racing_line.size()
 	var direction := -1 if race_manager.is_reverse_direction() else 1
 	var index := _nearest_line_index(vehicle.global_position)
-	var effective_max_speed := vehicle.get_effective_max_speed()
+	_prepare_v1_speed_envelope()
 	var horizon := 900.0
 	var walked := 0.0
 	var hazard_radius := MAX_RACING_LINE_RADIUS
 	var hazard_distance := INF
-	var speed_limit := effective_max_speed
+	var speed_limit := _envelope_maximum
 	for _step in count:
 		if walked > horizon:
 			break
 		var radius := _radius_at_line_index(index)
 		if radius > 0.0:
-			var allowed := _v1_speed_envelope(radius, walked)
+			var allowed := _prepared_v1_speed_envelope(radius, walked)
 			if allowed < speed_limit:
 				speed_limit = allowed
 				hazard_distance = walked
@@ -2345,26 +2355,35 @@ func _racing_line_curvature_hazard() -> Dictionary:
 
 
 func _v1_speed_envelope(radius: float, distance: float) -> float:
-	var maximum := vehicle.get_effective_max_speed()
 	if radius <= 0.0 or is_inf(distance):
-		return maximum
+		return vehicle.get_effective_max_speed()
+	_prepare_v1_speed_envelope()
+	return _prepared_v1_speed_envelope(radius, distance)
+
+
+func _prepare_v1_speed_envelope() -> void:
+	_envelope_maximum = vehicle.get_effective_max_speed()
 	# Grip anticipation belongs in corner capacity, not a blanket straight-
 	# line speed penalty. The previous frame's short horizon is conservative
 	# on entry while actual surface grip always takes precedence when lower.
 	var grip := minf(vehicle.surface_grip_multiplier, _anticipated_grip)
 	# Reserve some tire capacity for braking and tracking corrections instead
 	# of planning every corner at the theoretical steady-state grip peak.
-	var lateral_accel := minf(vehicle.stats.front_grip, vehicle.stats.rear_grip) * grip * DYNAMICS.REFERENCE_GRAVITY * _tracking_grip_utilization
+	_envelope_lateral_accel = minf(vehicle.stats.front_grip, vehicle.stats.rear_grip) * grip * DYNAMICS.REFERENCE_GRAVITY * _tracking_grip_utilization
 	var tuning := _difficulty_tuning()
-	var margin := float(tuning["corner_margin"])
-	var corner := minf(maximum, sqrt(lateral_accel * radius) * margin * float(personality["corner_pace"]))
-	var rack := DYNAMICS.calculate_target_steer_angle(1.0, vehicle.stats.max_steer_angle_deg, corner, maximum, vehicle.stats.high_speed_steer_ratio, vehicle.stats.steer_fade_start_ratio)
+	_envelope_corner_margin = float(tuning["corner_margin"])
+	_envelope_corner_pace = float(personality["corner_pace"])
+	_envelope_reaction_distance = vehicle.speed * float(tuning["reaction_seconds"]) * float(personality["brake_timing"])
+	_envelope_braking_accel = DYNAMICS.get_effective_brake_accel(vehicle.stats, grip, _brake_prediction, _brake_prediction_loads)
+
+
+func _prepared_v1_speed_envelope(radius: float, distance: float) -> float:
+	var corner := minf(_envelope_maximum, sqrt(_envelope_lateral_accel * radius) * _envelope_corner_margin * _envelope_corner_pace)
+	var rack := DYNAMICS.calculate_target_steer_angle(1.0, vehicle.stats.max_steer_angle_deg, corner, _envelope_maximum, vehicle.stats.high_speed_steer_ratio, vehicle.stats.steer_fade_start_ratio)
 	var minimum_radius := vehicle.stats.wheelbase / maxf(tan(rack), 0.001)
 	corner *= minf(1.0, radius / minimum_radius)
-	var reaction_seconds := float(tuning["reaction_seconds"])
-	var braking_distance := maxf(0.0, distance - vehicle.speed * reaction_seconds * float(personality["brake_timing"]))
-	var braking_accel := DYNAMICS.get_effective_brake_accel(vehicle.stats, grip, _brake_prediction, _brake_prediction_loads)
-	return minf(maximum, sqrt(corner * corner + 2.0 * braking_accel * braking_distance))
+	var braking_distance := maxf(0.0, distance - _envelope_reaction_distance)
+	return minf(_envelope_maximum, sqrt(corner * corner + 2.0 * _envelope_braking_accel * braking_distance))
 
 
 func _checkpoint_curvature_hazard(expected_index: int) -> Dictionary:

@@ -13,8 +13,10 @@ const PROP_SCALE := preload("res://scripts/race/world_prop_scale.gd")
 const TRACK_BUILDER_CATALOG := preload("res://scripts/race/track_builder_catalog.gd")
 const TRACK_BUILDER_GEOMETRY := preload("res://scripts/race/track_builder_geometry.gd")
 const TRACK_BUILDER_PLANNER := preload("res://scripts/race/track_builder_planner.gd")
+const RUN_FINALE := preload("res://scripts/race/run_finale_circuit.gd")
 const TRACK_BUILDER_SCENE := preload("res://scripts/race/track_builder_scene.gd")
 const STRIP_LAYOUT := preload("res://scripts/race/strip_layout.gd")
+const CIRCUIT_CACHE := preload("res://scripts/race/circuit_cache.gd")
 const TRACK_BUILDER_ISLAND := preload("res://scripts/race/track_builder_island.gd")
 const TRACK_BUILDER_STORY := preload("res://scripts/race/track_builder_story.gd")
 const TRACK_BUILDER_DRESSING := preload("res://scripts/race/track_builder_dressing.gd")
@@ -140,6 +142,7 @@ static var _texture_footprint_order: Array[String] = []
 static var _asset_texture_order: Array[String] = []
 
 static var _generated_prepared_cache: Dictionary = {}
+static var prepared_layout_generations := 0
 static var _generated_prepared_order: Array[String] = []
 static var _generated_room_cache: Dictionary = {}
 static var _generated_room_order: Array[String] = []
@@ -208,6 +211,16 @@ static func build_packed(theme: StringName, room_shape: StringName, seed: int, g
 
 
 static func prepare_route(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
+	var authored_id := String(generation_options.get("authored_route", ""))
+	if not authored_id.is_empty():
+		if authored_id != RUN_FINALE.ROUTE_ID or theme != RUN_FINALE.THEME:
+			return {}
+		var authored_spec := RUN_FINALE.spec(LAYOUTS[&"kitchen"])
+		var authored_line := _sample_centerline(authored_spec["controls"])
+		var authored_room := _rect_points(RUN_FINALE.ROOM.get_center(), RUN_FINALE.ROOM.size)
+		var authored := {"spec": authored_spec, "centerline": authored_line, "edges": _corridor_edges(authored_line), "room_polygon": authored_room, "theme": theme, "room_shape": room_shape, "seed": RUN_FINALE.MATERIAL_SEED}
+		authored["racing_line_metrics"] = racing_line_metrics_from_prepared(authored)
+		return authored
 	if not LAYOUTS.has(theme) or not ROOM_SHAPES.has(room_shape):
 		return {}
 	if String(generation_options.get("route_shape", "circuit")) == "strip":
@@ -333,6 +346,18 @@ static func prepare_route(theme: StringName, room_shape: StringName, seed: int, 
 
 
 static func prepare_layout(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary = {}) -> Dictionary:
+	var identity := CIRCUIT_CACHE.key(theme, room_shape, seed, generation_options)
+	var cached := CIRCUIT_CACHE.load_layout(identity)
+	if not cached.is_empty():
+		return cached
+	var prepared := _prepare_layout_uncached(theme, room_shape, seed, generation_options)
+	if not prepared.is_empty():
+		CIRCUIT_CACHE.store_layout(identity, prepared)
+	return prepared
+
+
+static func _prepare_layout_uncached(theme: StringName, room_shape: StringName, seed: int, generation_options: Dictionary) -> Dictionary:
+	prepared_layout_generations += 1
 	var prepared := prepare_route(theme, room_shape, seed, generation_options)
 	if prepared.is_empty():
 		return {}
@@ -346,7 +371,7 @@ static func prepare_layout(theme: StringName, room_shape: StringName, seed: int,
 	var left: PackedVector2Array = edges["left"]
 	var right: PackedVector2Array = edges["right"]
 	var inner: PackedVector2Array = edges["inner_boundary"] if edges.has("inner_boundary") else _simple_inner_boundary_loop(left if absf(_polygon_area(left)) < absf(_polygon_area(right)) else right, centerline)
-	var story: Dictionary = spec.get("story_kit", STORY_KITS[theme][0]).duplicate(true)
+	var story: Dictionary = spec.get("story_kit", STORY_KITS.get(theme, [{}])[0]).duplicate(true)
 	spec["story_kit"] = story
 	spec["environment_theme"] = theme
 	spec["environment_room_polygon"] = room_polygon
@@ -439,6 +464,13 @@ static func create_layout_root(prepared: Dictionary) -> Node2D:
 	var root := Node2D.new()
 	root.name = String(spec["root_name"])
 	root.add_to_group("track", true)
+	if spec.has("authored_route"):
+		root.set_meta("authored_route", spec["authored_route"])
+		root.set_meta("theme", prepared["theme"])
+		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
+		root.set_meta("room_polygon", room_polygon)
+		root.set_meta("loop_length", _arc_lengths(prepared["centerline"])[-1])
+		root.set_meta("length_tier", spec["length_tier"])
 	if String(prepared.get("route_shape", "circuit")) == "strip":
 		root.set_meta("generated_track", true)
 		root.set_meta("room_bounds", _polygon_bounds_rect(room_polygon))
@@ -1425,8 +1457,11 @@ static func generated_circuit_cache_key(event: Dictionary) -> String:
 ## Replicates the option assembly that prototype_race used when building the
 ## cache key or calling prepare_layout, so pre-warm and race use identical inputs.
 static func generated_circuit_options(event: Dictionary) -> Dictionary:
+	if event.has("authored_route"):
+		return {"authored_route": event["authored_route"], "reverse": bool(event.get("reverse", false))}
 	var options := {
 		"act": int(event.get("act", 0)),
+		"reverse": bool(event.get("reverse", false)),
 		"obstacles_enabled": bool(event.get("obstacles_enabled", true)),
 		"length_tier": StringName(event.get("length_tier", &"standard")),
 	}
