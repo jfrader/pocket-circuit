@@ -41,9 +41,13 @@ func _run_test() -> void:
 		return
 	(shell.find_child("ActionTakeOffer", true, false) as Button).pressed.emit()
 	await process_frame
-	if not _expect(sess.current_car_id == won and shell.find_child("RunBoard", true, false) != null, "taking the offer drives the won car and returns to the board"):
+	if not _expect(sess.current_car_id == won and shell.find_child("RunBoard", true, false) != null, "racing it now drives the won car and returns to the board"):
 		return
-	var next_race := _first_race(sess)
+	if not _expect(not sess.pending_chaser.is_empty() and String(sess.pending_chaser.get("haul_vehicle_id", "")) == won, "racing it now marks the robbed driver as the next chase"):
+		return
+	if not _expect(RUN_WALK.walk_to(app, sess, "race"), "accepted offer can cross service stops to the next race"):
+		return
+	var next_race := sess.current_node_id
 	if not _expect(not next_race.is_empty() and bool(app.call("start_run_race", next_race)), "the next race starts"):
 		return
 	if not _expect(String((app.get("current_race_session") as Dictionary).get("vehicle_id", "")) == won, "the next race is driven in the won car"):
@@ -77,7 +81,10 @@ func _run_test() -> void:
 	keep_button.pressed.emit()
 	await process_frame
 	var saved_run: Dictionary = SAVE_STORE.new(path).load_data().get("current_run", {}) as Dictionary
-	if not _expect(reloaded.current_car_id == kept and String(saved_run.get("pending_offer", "x")).is_empty() and String(saved_run.get("current_car_id", "")) == kept, "KEEP keeps the car and the save records it"):
+	if not _expect(reloaded.current_car_id == kept and String(saved_run.get("pending_offer", "x")).is_empty() and String(saved_run.get("current_car_id", "")) == kept, "SEND IT HOME keeps the current car and the save records it"):
+		return
+	var safe: Array = reloaded.collection_safe_cars()
+	if not _expect(not safe.is_empty() and safe.any(func(entry: Dictionary) -> bool: return String(entry.get("id", "")) == keep_run.pending_offer), "SEND IT HOME makes the won car collection-safe without a chase"):
 		return
 
 	app.call("abandon_run")
@@ -96,13 +103,6 @@ func _run_to_rival(app: Object) -> RunSession:
 		if RUN_WALK.walk_to(app, sess, "rival"):
 			return sess
 	return null
-
-
-func _first_race(sess: RunSession) -> String:
-	for stop: Dictionary in sess.available_nodes():
-		if String(stop["type"]) in ["race", "act_rival"]:
-			return String(stop["id"])
-	return ""
 
 
 func _expect(condition: bool, message: String) -> bool:

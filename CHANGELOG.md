@@ -3,13 +3,24 @@
 ## [Unreleased]
 
 ### Added
+- Run points pay 6 / 4 / 3 / 2 / 1 / 0 for first through sixth. Parts vans sell one part, a 10-point tow, a 5-point nitro or a 10-point ransom per visit. Errands offer 6 points, a tune-up or a tow.
+- Run benches offer one repair, part fitting, car swap or haul bank per visit. Clean cars cannot spend the visit on a repair.
+- The first Run has a board intro and driving controls; controls can be reopened. Night endings include VIEW GARAGE and show which cars were secured or lost.
+- The haul: win a rival's car and choose RACE IT NOW (the robbed driver chases you on the next sprint; caught means impounded, ransom it back at a parts van), SEND IT AHEAD (pay this win's points, nobody chases) or SEND IT HOME (collection next night, keep your points). A bench or the act rival banks the haul for good; unbanked cars are lost when the night ends.
+- Chase sprints: the hot connector is a strip run to the finish with traffic. Capture takes 1.5 seconds within two car widths, in the same route section with clear sight. After 180 seconds rescue stops the pursuer; you still drive to the finish. Cold connectors stay quick map travel.
+- Six-car races: run fields carry six cars; rival duels stay one-on-one.
+- Tow and nitro: stackable consumables bought at parts vans; errands can award a tow. A tow rescues and repairs a worn-out wreck in four beats, consuming the next bench visit without changing the map stop. Without a tow, wearing out ends the night. A nitro bottle is a one-use boost that scales with the car.
+- Persistent per-car wear: clean, dusty, rusty and dented states show on the sprite. Third place or worse and DNF add wear in ordinary Run races; a bench fully repairs the car instead of fitting a part.
+- The basement: the Run ends with a six-car, three-lap authored circuit in a fourth room theme with its own floor, props and stationary boiler-leak surface.
 - Steam car drops: winning a car in a run can drop a car into your Steam inventory, which you can trade. Steam cars race in Quick Race with a STEAM tape and stay listed offline. Without Steam the game plays the same.
 - Run parts: each parts van stocks three parts rolled for that van, each printing what it gives and what it takes. Bought parts are held; a bench fits one to the car you are driving instead of repairing it. A fitted part changes how that car drives for the rest of the night. Won cars go to the garage without parts.
 - Quick Strip: a one-off strip battle from the title screen. Sweepers and chicanes run north along a four-lane printed fabric runner between two household rooms. Civilian toy cars share the northbound lanes; sparser oncoming cars and delivery trucks approach on the left, with headlights and amber truck markers. Traffic yields before merging and recovers after bumps. One rival chases from behind, with a capture arc when it closes in. Reach the finish to win; get caught or run past the time limit and the attempt ends. Results do not save.
 
 ### Changed
+- PLAY now starts or resumes the Run. Championship is a secondary title action beside Quick Race and Quick Strip.
+- Run races resolve once, with no retry. Quitting after countdown counts as a last-place DNF. Optional rival losses cost points and can add wear; losing a mandatory act rival ends the night.
+- Run screens are now illustrated toy-world scenes. The run board is a tabletop route drawn in chalk and tape, with each stop a physical toy token and the act's room visible in the surface. The bench parks your car on a repair mat, the parts van opens its rear door over the counter, the lockup's padlock springs and its garage door slides up to roll out the car, errands live on a desk with a folded note and clipboard, and won-car offers turn on a lit turntable. Night endings are their own scenes: a sunrise victory or a moonlit, solitary defeat. Textured surfaces, painted props, soft shadows and higher-resolution car art finish the set, and reduced motion keeps every screen readable at rest.
 - The run board picks a stop before going: clicking or focusing a stop shows what it is, what it pays and costs, and the circuit it races on. A second click, ENTER or the go button drives your car to it. The map draws in, reachable stops pulse, and the run's counts tick when they change. Menu buttons fade in one after another, and a won car turns in on its offer. Reduced motion shows all of it at rest.
-- Run maps use distinct coloured markers, thin route connections, a current-stop halo and a node-cost legend. Benches, parts vans, lockups and errands share the map's dark, compact presentation.
 - The title screen now states when a save was recovered from a backup or comes from a newer version, instead of looking normal while running on defaults or read-only.
 - Loose debris varies in number, size and position across generated circuits, including tracks with none. Patches remain on calm stretches. This debris and outer-corner layout update advances the generator version; older circuit codes and lap/ghost records no longer match.
 - Every new championship fields its own generated rivals, and each Quick Race brings a new lineup driving different cars. Rival names follow the roster into briefings, the route board and the race.
@@ -24,7 +35,7 @@
 - Racing routes now use muted, translucent paint with subtle brushwork and painted edge markings. Countertop tiles and wood grain continue beneath the course instead of forming a separate cut-out surface. The surrounding tabletop remains drivable; vehicle handling and grip zones are unchanged.
 - Kitchen, Workshop, and Office have a regenerated painted overhead environment library. Household objects keep believable relative sizes, with one focal arrangement, supporting groups and clearer space around the racing line. Cars are unchanged.
 - Room surfaces vary procedurally by seed: Kitchen ceramics and preparation boards, Workshop timber and cutting mats, and Office desktops and woven or leather-like pads. Pattern layout, spacing, orientation and material combinations vary independently of track geometry; the same seed rebuilds the same room.
-- Menus, the loading screen, the pause menu, and the race HUD now sit on a lamp-lit midnight workbench: cream plates with ink outlines, masking-tape labels, and the cast, their cars, and the four-car garage on the right of every screen. The garage shows speed, grip, mass, and drift for the focused car, and locked cars appear as padlocked silhouettes.
+- The championship shell, loading screen, pause menu and race HUD use cream plates, ink outlines and masking-tape labels on a lamp-lit midnight workbench. The garage shows focused-car stats and padlocked campaign unlocks; the collection uses a paged grid.
 - The title and settings boards are cream, so the cars and portraits no longer sink into the wood. The race speed number sits beside the boost tube.
 - The championship is the route board. Each race is a stop on the road. Focus follows the road.
 - Quick Race opens on a new circuit each visit. The title music is a new piece each launch.
@@ -35,6 +46,9 @@
 - The rolling fruit, sliding socket and parked cable that crossed the road are gone. Cars drove through them and were shoved sideways on a fixed timer with no warning.
 
 ### Fixed
+- Abandoning a run presents reachable confirmation choices; KEEP DRIVING restores focus to ABANDON RUN.
+- Six-car race results keep the save status and points above CONTINUE without overlapping or repeating the action.
+- Parts vans expose tow and nitro purchases and save the inventory change.
 - Car comparison headings stay inside their offer and garage cards.
 - Unused run stops stay open after Back or a restart until you choose the next route.
 - Run-only parts no longer follow won cars into Quick Race after the night ends.
@@ -87,7 +101,7 @@
 - The complete nine-event Grand Household Circuit, with three story acts,
   recurring rivals, persistent standings, vehicle and event unlocks,
   replayable races, and a championship ending.
-- Four distinct machines and four-racer fields with legal lap validation,
+- Four championship machines and four-racer championship fields with legal lap validation,
   starting grids, countdowns, race position, finish order, results, and
   championship points.
 - Four new Quick Race / exhibition-only machines (Thimble, Spindle, Anvil,
@@ -95,23 +109,24 @@
   procedural car_art (seeds 92005–92008, palettes, parts) and retuned
   VehicleStats (light agile, technical grip, heavy bruiser, loose off-road).
   Championship acts, unlocks, and progression are unchanged.
-- Live generated household circuits for every Quick Race reroll and
-  championship event. Players can choose a theme and seed, while seeded circuit
+- Live generated household circuits for Quick Race entries and
+  championship events. Circuit Discovery offers route selection and share codes;
+  Quick Race seed editing is debug-only. Seeded circuit
   plans and six room canvases produce reproducible layouts without a
   curated circuit list.
 - Designed track moments on generated circuits: an iconic opening, an early
-  crossing hazard in either race direction, a technical surface section, a
+  on-course obstacle, a technical surface section, a
   faster low-grip shortcut beside a safe lane, a speed straight, and a clear
   checker run to the finish.
 - Kitchen, Workshop, and Office environments with coherent household story
-  scenes, toy-scale props, distinct material behavior, moving hazards, and
+  scenes, toy-scale props, distinct material behavior, permanent obstacles, and
   readable object-delimited courses.
 - Main menu, new and continue flow, championship map, event briefing, machine
   selection, Quick Race, pause settings, credits, results, and ending screens
   designed for keyboard and controller use at 1280 x 720.
 - Versioned local saves with atomic replacement, validated backup recovery,
   corrupt-save fallback, and protection from overwriting newer save formats.
-- Original music, licensed sound effects, persistent volume controls, reduced
+- Generated original music and sound effects, persistent volume controls, reduced
   camera shake, reduced motion, and pause-aware race audio.
 - Native Windows x86_64 and Linux x86_64 offline release exports with Steam
   Deck-compatible controls.
@@ -147,7 +162,7 @@
 - Cars keep a readable toy-scale top speed. Pushing too hard at speed can
   start a recoverable slide; counter-steer saves it, and handbrake drifts
   still award boost.
-- Quick Race and Circuit Discovery now offer Compact, Standard, Long and
+- Circuit Discovery offers Compact, Standard, Long and
   Endurance sizes. Larger circuits use expanded rooms and distance-aware curve
   sampling; shared codes and favorites preserve the selected size.
 - A new Marathon size joins the tier list: a 4.5x room and a dedicated folded
@@ -177,9 +192,9 @@
   Championship seeds, rooms, and story progress are kept.
 - Live race music now cycles through extended cruise and high-pressure sections, with grid reprises and a victory sting, replacing the previous repetitive loops.
 
-- Quick Race is now a one-click exhibition: a fixed Kitchen/Classic circuit
-  (seed 875, standard length, forward direction) with just PLAY, CHANGE CAR,
-  and BACK TO TITLE. Theme, size, and direction selectors are gone.
+- Quick Race cycles themes and length tiers with a new circuit on each entry.
+  It offers difficulty, PLAY, CHANGE CAR and BACK TO TITLE; returning from car
+  selection preserves the chosen circuit.
 - Cars now receive distinct procedural liveries per driver. Rae, Inez, Tess,
   Cass and rivals sharing a chassis get different palette/livery/wheel/spoiler
   cosmetics; the same race field always produces the same looks via deterministic
@@ -197,9 +212,8 @@
 - Generated finish lines now span the full racing corridor and use symmetric
   household landmarks that read clearly in forward and reverse races. Moving
   hazard artwork is no longer reused as static scenery.
-- Generated circuits now add progression-scaled permanent obstacles with
-  AI-validated passing space. Kitchen and workshop hazards roll onto the course
-  without a countdown overlay; the office coiled cable stays put.
+- Generated circuits add progression-scaled permanent obstacles with
+  AI-validated passing space.
 - Generated circuits now compose different straight extents, headings and turn
   sections within each route program, with broader minimum corner radii.
 - Scenery collision footprints are prepared off the main thread before race
@@ -256,7 +270,7 @@
 - Starting-grid physics no longer displaces rivals into the island before
   they launch. Following cars now respect the leader's speed and distance
   rather than accelerating into a slow queue.
-- Quick Race now accepts arbitrary seeds, while each new championship keeps a
+- Debug builds allow Quick Race seed editing, while each new championship keeps a
   versioned circuit identity for every event so retries, replays, reverse races,
   saves, and resumes retain the same generated route and room canvas.
 - Generated circuits now use larger 1.75x room canvases, longer absolute laps,
@@ -288,9 +302,6 @@
   horizontal racer labels readable without covering the circuit.
 - Vehicle contact separates along the physics normal and restores steering as
   cars split, reducing prolonged collision lockups.
-- Quick Race now uses a single fixed household circuit (Kitchen, Classic canvas,
-  seed 875) instead of rerolling a fresh track each visit, and the title screen
-  preloads its route preview. The seed picker is reserved for debug builds.
 
 ### Fixed
 

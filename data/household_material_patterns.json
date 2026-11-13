@@ -11,9 +11,30 @@
   "families": {
     "kitchen_warm_tile":["ivory_ceramic","terracotta_inlay"],"kitchen_sage_tile":["sage_tiles"],"kitchen_ceramic":["ivory_ceramic","sage_tiles"],"kitchen_stone":["cream_laminate"],
     "workshop_plywood":["plywood_sheet","bench_boards"],"workshop_honey":["bench_boards","slatted_bench"],"workshop_oiled":["oiled_bench"],"workshop_paint":["plywood_sheet","slatted_bench"],
-    "office_ash":["ash_veneer"],"office_laminate":["ivory_desktop","cool_laminate"],"office_walnut":["walnut_herringbone"],"office_deskmat":["ivory_desktop","ash_veneer"]
+    "office_ash":["ash_veneer"],"office_laminate":["ivory_desktop","cool_laminate"],"office_walnut":["walnut_herringbone"],"office_deskmat":["ivory_desktop","ash_veneer"],
+    "basement_concrete":["stained_concrete","cold_concrete"],"basement_slab":["expansion_slabs","worn_slabs"]
   },
   "themes": {
+    "basement": {
+      "course":{"kind":"painted_surface","palettes":[
+        {"id":"basement_paint_chalk","pigment":"eeeee2","edge":"72776f"},
+        {"id":"basement_paint_limestone","pigment":"e5e8dd","edge":"686e69"},
+        {"id":"basement_paint_silver","pigment":"dae2df","edge":"626c68"}
+      ]},
+      "grain_floor":"res://assets/textures/world_materials/basement_concrete.png",
+      "grain_island":"res://assets/textures/world_materials/basement_concrete.png",
+      "floor":[
+        {"id":"stained_concrete","pattern":"plain","colors":["414643","363b38","292f2d"],"cell_mm":[[350,600],[350,600]],"line_mm":[0.8,1.2],"contrast":[0.06,0.12],"angles":[0,90]},
+        {"id":"cold_concrete","pattern":"plain","colors":["454b50","3b4147","2b3137"],"cell_mm":[[350,650],[350,650]],"line_mm":[0.8,1.2],"contrast":[0.04,0.10],"angles":[0,90]},
+        {"id":"expansion_slabs","pattern":"ceramic","colors":["4b4d46","41453f","2e332d"],"cell_mm":[[550,800],[450,650]],"line_mm":[2.0,3.0],"contrast":[0.08,0.16],"angles":[0,90]},
+        {"id":"worn_slabs","pattern":"ceramic","colors":["4e4941","444038","302d29"],"cell_mm":[[400,650],[350,550]],"line_mm":[1.5,2.5],"contrast":[0.08,0.14],"angles":[0,90]}
+      ],
+      "island":[
+        {"id":"basement_utility_pad","pattern":"ribbed_rubber","colors":["383c39","444b44","272d29"],"cell_mm":[[12,20],[120,180]],"line_mm":[1.0,1.6],"contrast":[0.08,0.14],"angles":[0,90]},
+        {"id":"basement_foundation","pattern":"plain","colors":["555147","49473f","34352f"],"cell_mm":[[250,450],[250,450]],"line_mm":[0.8,1.2],"contrast":[0.04,0.09],"angles":[0,90]},
+        {"id":"basement_foundation_blocks","pattern":"ceramic","colors":["505650","454c45","303931"],"cell_mm":[[280,400],[150,250]],"line_mm":[1.5,2.5],"contrast":[0.08,0.14],"angles":[0,90]}
+      ]
+    },
     "kitchen": {
       "course":{
         "kind":"painted_surface",

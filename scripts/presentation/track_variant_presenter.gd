@@ -17,13 +17,15 @@ var _track: Node2D
 
 func configure(track_root: Node2D, requested_theme: StringName) -> void:
 	_track = track_root
-	theme = requested_theme if requested_theme in [&"kitchen", &"workshop", &"office"] else &"kitchen"
+	theme = requested_theme if requested_theme in [&"kitchen", &"workshop", &"office", &"basement"] else &"kitchen"
 	name = "TrackVariantPresenter"
 	match theme:
 		&"workshop":
 			base_surface_name = &"workbench"
 		&"office":
 			base_surface_name = &"desktop"
+		&"basement":
+			base_surface_name = &"concrete floor"
 		_:
 			base_surface_name = &"polished counter"
 			_build_kitchen_presentation()

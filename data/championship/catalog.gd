@@ -470,7 +470,21 @@ static func base_vehicle_for_type(car_type: String) -> Dictionary:
 ## catalog's vehicle shape: its name, look and handling line come from the
 ## procedural generator, its physics from its type's base car moved by its roll
 ## and then by the run parts fitted to it.
+static func is_shipped(vehicle_id: String) -> bool:
+	for vehicle: Dictionary in VEHICLES:
+		if String(vehicle["id"]) == vehicle_id:
+			return true
+	return false
+
+
 static func generated_vehicle(car: Dictionary) -> Dictionary:
+	if is_shipped(String(car.get("id", ""))):
+		# A rival's shipped car keeps its authored name, art and physics.
+		var shipped := get_vehicle(String(car["id"]))
+		shipped["fitted_parts"] = RunParts.normalize_list(car.get("fitted_parts", []))
+		shipped["won_from"] = String(car.get("won_from", ""))
+		shipped["act"] = int(car.get("act", 0))
+		return shipped
 	var car_type := String(car.get("type", ""))
 	var base := base_vehicle_for_type(car_type)
 	var generated := ProceduralCarGenerator.generate(int(car.get("seed", 0)), car_type)

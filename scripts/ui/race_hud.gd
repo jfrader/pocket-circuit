@@ -25,6 +25,13 @@ var route_progress := PackedFloat32Array()
 var player_progress_index := 0
 var next_checkpoint := 0
 var strip_mode := false
+var nitro_count := -1
+
+
+func set_nitro_count(count: int) -> void:
+	if nitro_count != count:
+		nitro_count = count
+		queue_redraw()
 
 
 func set_strip_mode(enabled: bool) -> void:
@@ -78,6 +85,10 @@ func _draw() -> void:
 	_draw_clock(layout["clock"])
 	_draw_speed(layout["speed"])
 	_draw_route_progress(layout["progress"])
+	if nitro_count >= 0:
+		var bottle := Rect2(size.x - 204, size.y - 150, 180, 32)
+		SKIN.draw_plate(self, bottle, SKIN.INK, 4, 0.0)
+		SKIN.draw_text(self, bottle.position + Vector2(12, 22), "N / X  NITRO  ×%d" % nitro_count, 14, SKIN.CREAM, bottle.size.x - 24)
 	if elapsed_seconds < HINT_SECONDS:
 		var hint_rect: Rect2 = layout["controls_hint"]
 		SKIN.draw_plate(self, hint_rect, SKIN.INK, 4, 0.0)

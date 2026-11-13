@@ -13,8 +13,10 @@ func _initialize() -> void:
 
 func _run_test() -> void:
 	_test_valid_runs()
+	_test_seeded_errand_roundtrip()
 	_test_route_roundtrips()
 	_test_invalid_runs()
+	_test_haul_validation()
 	_test_save_recovery()
 	if _failed:
 		quit(1)
@@ -47,7 +49,15 @@ func _test_valid_runs() -> void:
 	var early_snapshot := SESSION.serialize(SESSION.create(4242))
 	early_snapshot.erase("race_in_flight")
 	early_snapshot.erase("pending_offer")
+	early_snapshot.erase("node_opponents")
 	_expect(SESSION.deserialize(early_snapshot) != null, "optional fields absent in early current-schema saves remain supported")
+	var legacy := SESSION.deserialize(early_snapshot)
+	_expect(legacy.node_opponents.is_empty(), "old saves load with empty assignments")
+	_expect(legacy.opponents_for_node(legacy.current_node_id) == SESSION.create(4242).opponents_for_node(legacy.current_node_id), "old saves fill a deterministic playable field on demand")
+	for bad: Variant in [[], false, {"4": {}}, {"1": {"missing": {}}}, {"1": {legacy.current_node_id: {}}}]:
+		var malformed := early_snapshot.duplicate(true)
+		malformed["node_opponents"] = bad
+		_expect(SESSION.deserialize(malformed) == null, "malformed assignment container, node or payload is rejected")
 	var normalized := SESSION.serialize(SESSION.create(4242))
 	var car_id: String = normalized["current_car_id"]
 	var part: Dictionary = RunParts.deal(9, racing.car_stats(racing.current_car_id))[0]
@@ -55,6 +65,71 @@ func _test_valid_runs() -> void:
 	normalized["installed_parts"] = {car_id: [part, false], "unowned-car": [part]}
 	var restored := SESSION.deserialize(normalized)
 	_expect(restored != null and restored.parts_held == [part] and restored.fitted_parts(car_id) == [part] and not restored.installed_parts.has("unowned-car"), "optional part entries retain existing drop-invalid normalization")
+
+func _test_seeded_errand_roundtrip() -> void:
+	for seed_value: int in [0, 1, 42]:
+		var session := SESSION.create(seed_value)
+		for node: Dictionary in session.current_map.nodes.values():
+			if node["type"] != "errand":
+				continue
+			session.current_node_id = node["id"]
+			session.run_state.row = node["row"]
+			session.run_state.set_car_wear(session.current_car_id, "rusty")
+			var snapshot: Dictionary = JSON.parse_string(JSON.stringify(SESSION.serialize(session)))
+			var restored := SESSION.deserialize(snapshot)
+			if not _expect(restored != null, "seeded errand survives JSON save"):
+				return
+			_expect(restored.errand_tune_steps() == session.errand_tune_steps(), "seeded repair strength survives resume")
+			_expect(restored.resolve_errand(SESSION.ErrandChoice.TUNE_UP) == session.resolve_errand(SESSION.ErrandChoice.TUNE_UP), "resumed errand applies the same reward")
+			_expect(SESSION.deserialize(SESSION.serialize(restored)) != null, "seeded repair outcome remains valid")
+			break
+
+func _test_haul_validation() -> void:
+	var session := SESSION.create(33333)
+	var base := SESSION.serialize(session)
+	var fields := ["boot_cars", "impounded_cars", "pending_chaser", "pending_offer_driver", "pending_offer_points", "tow_count", "nitro_count", "towed_to_bench"]
+	for key: String in fields:
+		base.erase(key)
+	var legacy := SESSION.deserialize(base)
+	_expect(legacy != null and not legacy.towed_to_bench, "legacy saves have no reserved tow bench")
+	for bad: Variant in [1, "true", null, {}, []]:
+		var broken := base.duplicate(true)
+		broken["towed_to_bench"] = bad
+		_expect(SESSION.deserialize(broken) == null, "tow rescue flag must be boolean")
+	_expect(legacy != null and legacy.boot_cars.is_empty() and legacy.impounded_cars.is_empty() and legacy.pending_chaser == null and legacy.tow_count == 0 and legacy.nitro_count == 0, "legacy haul fields normalize cold and empty")
+	for key: String in ["tow_count", "nitro_count", "pending_offer_points"]:
+		for bad: Variant in [-1, 0.5, true, "1", {}, INF, 0x80000000]:
+			var broken := base.duplicate(true)
+			broken[key] = bad
+			_expect(SESSION.deserialize(broken) == null, "malformed haul number rejected: " + key)
+	for key: String in ["boot_cars", "impounded_cars", "pending_offer_driver", "pending_chaser"]:
+		for bad: Variant in [false, 1, "junk"]:
+			var broken := base.duplicate(true)
+			broken[key] = bad
+			_expect(SESSION.deserialize(broken) == null, "malformed haul container rejected: " + key)
+	var offer := session._win_car(session.current_node_id, SESSION.CAR_ORIGIN_RIVAL, SESSION.STARTER_TYPES)
+	var vid: String = offer["id"]
+	_expect(session.race_it_now(), "boundary fixture hot choice")
+	var hot := SESSION.serialize(session)
+	_expect(SESSION.deserialize(hot) != null, "valid haul state loads")
+	for bad: Variant in [{"unknown": {}}, {session.current_car_id: "junk"}, {vid: {"id": "fake"}}]:
+		var broken := hot.duplicate(true)
+		broken["boot_cars"] = bad
+		_expect(SESSION.deserialize(broken) == null, "boot must contain owned won cars and roster identities")
+	for bad: Variant in [[vid], ["unknown"], [session.owned_cars.keys()[0]], [false]]:
+		var broken := hot.duplicate(true)
+		broken["impounded_cars"] = bad
+		_expect(SESSION.deserialize(broken) == null, "impound rejects boot overlap, missing cars and starter")
+	for key: String in ["id", "name", "vehicle_id", "avatar_art", "ai_style", "haul_vehicle_id", "chase_vehicle_id"]:
+		var broken := hot.duplicate(true)
+		broken["pending_chaser"][key] = "junk"
+		_expect(SESSION.deserialize(broken) == null, "malformed chaser field rejected: " + key)
+	_expect(SESSION.salvage_won_cars(hot).is_empty(), "recovery never banks boot cars")
+	session.impound_haul()
+	var captured := SESSION.serialize(session)
+	_expect(SESSION.deserialize(captured) != null and SESSION.salvage_won_cars(captured).is_empty(), "impound persists and is excluded from recovery rewards")
+	captured["impounded_cars"].append(vid)
+	_expect(SESSION.deserialize(captured) == null, "duplicate impound is rejected")
 
 func _test_invalid_runs() -> void:
 	var base := SESSION.serialize(SESSION.create(4242))

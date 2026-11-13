@@ -269,6 +269,16 @@ Races
 → Prestige
 ```
 
+## 5.1 Primary single-player mode: the Run
+
+The run is a night-by-night roguelike and the first thing a player meets:
+from the title, PLAY starts a night on a tabletop route through household
+rooms. The player picks stops — races, duels, a parts van, a bench, a lockup,
+an errand — spends points, fits parts, wins cars, and reaches a sunrise
+victory or ends the night defeated. Won cars persist in the garage. The
+championship campaign is the structured story path and remains secondary on
+the title.
+
 ---
 
 # 6. Session Structure

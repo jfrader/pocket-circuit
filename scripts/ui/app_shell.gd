@@ -3,6 +3,16 @@ extends CanvasLayer
 const CATALOG := preload("res://data/championship/catalog.gd")
 const STAGE_SCRIPT := preload("res://scripts/ui/app_shell_stage.gd")
 const RUN_MAP_VIEW := preload("res://scripts/ui/run_map_view.gd")
+const RUN_BOARD_SCENE := preload("res://scripts/ui/run_board_scene.gd")
+const RUN_BOARD_INTRO := preload("res://scripts/ui/run_board_intro.gd")
+const RUN_BENCH_SCENE := preload("res://scripts/ui/run_bench_scene.gd")
+const RUN_VAN_SCENE := preload("res://scripts/ui/run_van_scene.gd")
+const RUN_LOCKUP_SCENE := preload("res://scripts/ui/run_lockup_scene.gd")
+const RUN_ERRAND_SCENE := preload("res://scripts/ui/run_errand_scene.gd")
+const RUN_OFFER_SCENE := preload("res://scripts/ui/run_offer_scene.gd")
+const RUN_BOARD_IDENTITY := preload("res://scripts/ui/run_board_identity.gd")
+const RUN_STOP_CAR := preload("res://scripts/ui/run_stop_car.gd")
+const RUN_MATERIALS := preload("res://scripts/ui/run_scene_materials.gd")
 const RUN_UI := preload("res://scripts/ui/run_ui.gd")
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const MENU_SCRIPT := preload("res://scripts/ui/championship_menu.gd")
@@ -13,18 +23,22 @@ const DISCOVERY_PANEL := preload("res://scripts/ui/circuit_discovery_panel.gd")
 const RULES := preload("res://scripts/race/generated_circuit_rules.gd")
 const GENERATED_CIRCUITS := preload("res://scripts/race/generated_circuit_identity.gd")
 const RUN_SESSION := preload("res://scripts/progression/run_session.gd")
+const NIGHT_TRANSITION := preload("res://scripts/ui/night_transition.gd")
 
 const PAGE_MARGIN := 48
 const PAGE_TOP := 28
 const BACK_HINT := "ESC / B  BACK"
-const OFFER_CAR_ICON := 56.0
-const OFFER_SHAPE_SIZE := Vector2(420, 400)
-## The won car on the offer grows and turns in from this scale and angle.
-const OFFER_REVEAL_SCALE := 0.4
-const OFFER_REVEAL_TURN := -0.6
-const OFFER_REVEAL_TIME := 0.4
 const STEAM_DROP_MARGIN := 24.0
 const STEAM_DROP_GAP := 8.0
+const RUN_STATE_POSITION := Vector2(24, 58)
+const RUN_STATE_WIDTH := 380.0
+const TRANSITION_KICKERS := {
+	"title": "POCKET CIRCUIT", "vehicle_select": "THE GARAGE",
+	"run_bench": "THE BENCH", "run_parts_van": "PARTS VAN",
+	"run_lockup": "THE LOCKUP", "run_errand": "THE ERRAND",
+	"run_offer": "THE OFFER", "ending": "CHAMPIONSHIP COMPLETE",
+	"run_driving_intro": "DRIVING CONTROLS",
+}
 
 var _app: Node
 var _root: Control
@@ -34,6 +48,9 @@ var _stage: AppShellStage
 var _route: Control
 var _footer: Label
 var _run_backdrop: ColorRect
+var _run_intro: Control
+var _run_intro_pending := false
+var _driving_intro: Control
 var _run_actions: BoxContainer
 ## The board's map, the picked stop's card, and whether the car is driving to a stop.
 var _run_board: RUN_MAP_VIEW
@@ -42,7 +59,11 @@ var _run_going := false
 ## The run stats last shown, so the next screen animates what changed.
 var _run_stats_seen: Dictionary = {}
 var _button_focus_chain: Array[Button] = []
-var _screen := "title"
+var _screen := "title":
+	set(value):
+		_screen = value
+		if is_instance_valid(_root):
+			_present_screen_transition.call_deferred()
 var _event_id := ""
 var _quick_race := false
 var _quick_strip := false
@@ -67,6 +88,8 @@ var _driver_return: Callable
 var _page: MarginContainer
 var _art_menu: Control
 var _discovery_panel: CircuitDiscoveryPanel
+var _night_transition: CanvasLayer
+var _last_transition_destination := "title"
 
 static var _quick_race_entry_count := 0
 static var _quick_race_theme_cursor := -1
@@ -165,36 +188,44 @@ func show_map(result_summary: Dictionary = {}, requested_act: int = 0) -> void:
 
 
 func show_quick_race(_requested_act: int = 0) -> void:
+	var preserve_route := _screen == "vehicle_select" and _quick_race and not _quick_strip
 	_screen = "quick_race"
 	_event_id = ""
 	_quick_race = true
 	_quick_strip = false
-	_quick_race_reverse = false
-	_roll_quick_race()
-	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
-	_quick_race_entry_count += 1
+	if not preserve_route:
+		_quick_race_reverse = false
+		_roll_quick_race()
+		_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
+		_quick_race_entry_count += 1
 	_clear_content()
 	_content.add_theme_constant_override("separation", 4)
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_race_vehicle_id.is_empty():
 		_quick_race_vehicle_id = _selected_vehicle(progress)
 	_configure_stage(&"map", _quick_race_vehicle_id, "rae", String(_quick_race_theme))
+	_stage.hide()
 	_add_kicker("QUICK RACE · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
 	if _app.has_method("prewarm_generated_circuit"):
 		_app.call("prewarm_generated_circuit", GENERATED_CIRCUITS.apply_to_event(quick_identity))
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
 	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
+	_quick_identity_heading.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_quick_identity_heading.clip_text = true
 	_content.add_child(_quick_identity_heading)
-	_quick_identity_summary = _label(String(quick_identity.get("summary", "")), 13, SKIN.CREAM_DIM)
+	_quick_identity_summary = _label(_quick_preview_summary(quick_identity), 13, SKIN.CREAM_DIM)
 	_quick_identity_summary.name = "QuickCircuitSummary"
+	_quick_identity_summary.max_lines_visible = 3
+	_quick_identity_summary.clip_text = true
+	_quick_identity_summary.size.x = _content.custom_minimum_size.x
 	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
 	_content.add_child(_quick_identity_summary)
 	_register_button_focus(_add_difficulty_picker())
 	var play_button := _add_big_play_button(Callable(self, "_start_quick_race"), false)
 	var seed_controls: Array[Control] = []
 	if OS.is_debug_build():
-		var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
+		var seed_status := _add_section("DEVELOPER SEED", "SEED %d" % _quick_race_seed)
 		seed_controls = _add_quick_race_seed_controls(seed_status)
 	_add_button("CHANGE CAR · %s" % String(CATALOG.get_vehicle(_quick_race_vehicle_id).get("name", "Rustbug")).to_upper(), Callable(self, "show_vehicle_select").bind("", true))
 	_add_button("BACK TO TITLE", Callable(self, "show_title"))
@@ -206,34 +237,42 @@ func show_quick_race(_requested_act: int = 0) -> void:
 
 
 func show_quick_strip(_requested_act: int = 0) -> void:
+	var preserve_route := _screen == "vehicle_select" and _quick_strip
 	_screen = "quick_strip"
 	_event_id = ""
 	_quick_strip = true
 	_quick_race = false
-	_quick_race_reverse = false
-	_roll_quick_race()
-	_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
-	_quick_race_entry_count += 1
+	if not preserve_route:
+		_quick_race_reverse = false
+		_roll_quick_race()
+		_quick_race_length_tier = String(RULES.LENGTH_TIERS[_quick_race_entry_count % RULES.LENGTH_TIERS.size()])
+		_quick_race_entry_count += 1
 	_clear_content()
 	_content.add_theme_constant_override("separation", 4)
 	var progress: Dictionary = _app.call("get_save_data")
 	if _quick_strip_vehicle_id.is_empty():
 		_quick_strip_vehicle_id = _selected_vehicle(progress)
 	_configure_stage(&"map", _quick_strip_vehicle_id, "rae", String(_quick_race_theme))
+	_stage.hide()
 	_add_kicker("QUICK STRIP · RESULTS DO NOT SAVE")
 	var quick_identity: Dictionary = _current_quick_identity()
 	_quick_identity_heading = _label(String(quick_identity.get("display_name", "Build a circuit")), 32, SKIN.CREAM, true)
 	_quick_identity_heading.custom_minimum_size = Vector2(0.0, 44.0)
+	_quick_identity_heading.autowrap_mode = TextServer.AUTOWRAP_OFF
+	_quick_identity_heading.clip_text = true
 	_content.add_child(_quick_identity_heading)
-	_quick_identity_summary = _label(String(quick_identity.get("summary", "")), 13, SKIN.CREAM_DIM)
+	_quick_identity_summary = _label(_quick_preview_summary(quick_identity), 13, SKIN.CREAM_DIM)
 	_quick_identity_summary.name = "QuickCircuitSummary"
+	_quick_identity_summary.max_lines_visible = 3
+	_quick_identity_summary.clip_text = true
+	_quick_identity_summary.size.x = _content.custom_minimum_size.x
 	_quick_identity_summary.custom_minimum_size = Vector2(0.0, 76.0)
 	_content.add_child(_quick_identity_summary)
 	_register_button_focus(_add_difficulty_picker())
 	var play_button := _add_big_play_button(Callable(self, "_start_quick_strip"), false)
 	var seed_controls: Array[Control] = []
 	if OS.is_debug_build():
-		var seed_status := _add_section("CIRCUIT SEED", "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()])
+		var seed_status := _add_section("DEVELOPER SEED", "SEED %d" % _quick_race_seed)
 		seed_controls = _add_quick_race_seed_controls(seed_status)
 	_add_button("CHANGE CAR · %s" % String(CATALOG.get_vehicle(_quick_strip_vehicle_id).get("name", "Rustbug")).to_upper(), Callable(self, "show_vehicle_select").bind("", true))
 	_add_button("BACK TO TITLE", Callable(self, "show_title"))
@@ -284,56 +323,216 @@ func show_run_board() -> void:
 		return
 	_run_surface()
 	var night_over := sess.is_failed() or sess.is_complete()
+	if not night_over:
+		_page.add_theme_constant_override("margin_left", roundi(RUN_BOARD_SCENE.PAGE_INSET.x))
+		_page.add_theme_constant_override("margin_right", roundi(RUN_BOARD_SCENE.PAGE_INSET.x))
+		_page.add_theme_constant_override("margin_top", roundi(RUN_BOARD_SCENE.PAGE_INSET.y))
+		_page.add_theme_constant_override("margin_bottom", 8)
+		_content.add_theme_constant_override("separation", 8)
+	var tabletop := RUN_BOARD_SCENE.new()
+	tabletop.name = "RunTabletop"
+	tabletop.act = sess.current_map.act
+	tabletop.scene_mode = &"night_won" if sess.is_complete() else &"night_lost" if sess.is_failed() else &"board"
+	tabletop.car_id = sess.current_car_id
+	tabletop.reduced_motion = _reduced_motion_enabled()
+	tabletop.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(tabletop)
+	if night_over:
+		var hero := tabletop.get_node("WinnerCar" if sess.is_complete() else "SolitaryCar") as TextureRect
+		hero.texture = IDENTITIES.car_texture_with_wear(sess.current_car_id, sess.run_state.get_car_wear(sess.current_car_id), RUN_MATERIALS.HERO_PIXEL_SCALE, int(RUN_BOARD_SCENE.HERO_LENGTH[tabletop.scene_mode]))
+	tabletop.arrive()
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 64)
+	columns.add_theme_constant_override("separation", 76 if night_over else RUN_BOARD_SCENE.COLUMN_GAP)
 	_content.add_child(columns)
 	var left := VBoxContainer.new()
 	left.add_theme_constant_override("separation", 8)
 	columns.add_child(left)
 	var board := RUN_MAP_VIEW.new()
 	board.name = "RunBoard"
+	board.tabletop = true
+	if not night_over:
+		board.map_extent = RUN_BOARD_SCENE.MAP_SIZE
+		board.marker_scale = RUN_BOARD_SCENE.MARKER_SCALE
 	board.reduced_motion = _reduced_motion_enabled()
 	left.add_child(board)
 	if not night_over:
-		left.add_child(RUN_UI.label(RUN_UI.BOARD_CONTROLS, 10, RUN_UI.MUTED, true))
+		var instructions := RUN_UI.label(RUN_UI.BOARD_CONTROLS, 11, RUN_BOARD_SCENE.CHALK_CAPTION)
+		instructions.add_theme_stylebox_override("normal", RUN_BOARD_SCENE.label_tape())
+		left.add_child(instructions)
+		board.focus_changed.connect(tabletop.set_focus)
 	board.configure(sess, not night_over, IDENTITIES.car_texture(sess.current_car_id))
+	if night_over:
+		board.hide_route_visuals()
 	_run_board = board
 	if _app.has_method("prewarm_run_stops"):
 		_app.call("prewarm_run_stops")
 	var detail := VBoxContainer.new()
 	detail.name = "RunDetail"
-	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.custom_minimum_size.x = 420 if night_over else RUN_BOARD_SCENE.DETAIL_WIDTH
+	detail.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	detail.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	detail.add_theme_constant_override("separation", 6)
-	columns.add_child(detail)
-	detail.add_child(RUN_UI.label("THE RUN · ACT %d / %d · %s" % [sess.current_map.act, RunSession.FINAL_ACT, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 12, RUN_UI.AMBER, true))
-	_run_stats(detail, sess)
+	if night_over:
+		columns.add_child(detail)
+	else:
+		var slot := MarginContainer.new()
+		slot.name = "RunDetailSlot"
+		slot.custom_minimum_size.x = RUN_BOARD_SCENE.DETAIL_WIDTH
+		for edge: String in ["left", "right"]:
+			slot.add_theme_constant_override("margin_" + edge, RUN_BOARD_SCENE.DETAIL_OUTSET)
+		columns.add_child(slot)
+		detail.custom_minimum_size.x = RUN_BOARD_SCENE.DETAIL_WIDTH - RUN_BOARD_SCENE.DETAIL_OUTSET * 2
+		slot.add_child(detail)
+	var chalkboard := RUN_BOARD_SCENE.new()
+	chalkboard.name = "RunChalkboard"
+	chalkboard.chalkboard = true
+	chalkboard.refined_cards = not night_over
+	chalkboard.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	chalkboard.show_behind_parent = true
+	detail.add_child(chalkboard)
+	var chalk_inset := MarginContainer.new()
+	chalk_inset.name = "ChalkboardInset"
+	for edge: String in ["left", "right", "top", "bottom"]:
+		chalk_inset.add_theme_constant_override("margin_" + edge, RUN_BOARD_SCENE.CHALK_PADDING)
+	detail.add_child(chalk_inset)
+	var chalk_content := VBoxContainer.new()
+	chalk_content.add_theme_constant_override("separation", 6)
+	chalk_inset.add_child(chalk_content)
+	var act_label := RUN_UI.label("THE RUN · ACT %d / %d · %s" % [sess.current_map.act, RunSession.FINAL_ACT, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 12, SKIN.CREAM, true)
+	if not night_over:
+		act_label.name = "RunMetadata"
+		act_label.text = "THE RUN · ACT %d / %d\n%s" % [sess.current_map.act, RunSession.FINAL_ACT, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()]
+	act_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	act_label.visible = not night_over
+	chalk_content.add_child(act_label)
+	_run_stats(chalk_content, sess)
+	if not night_over:
+		var state_lines := {}
+		if sess.pending_chaser != null:
+			var hauled_car := String(sess.pending_chaser.get("haul_vehicle_id", sess.current_car_id))
+			state_lines["RunHaulStatus"] = "HAULING %s - CHASED ON THE NEXT CONNECTOR" % RUN_UI.car_name(hauled_car).to_upper()
+		if sess.towed_to_bench:
+			state_lines["RunTowStatus"] = "TOWED - THE NEXT BENCH VISIT IS SPENT"
+		if not state_lines.is_empty():
+			var state_labels := VBoxContainer.new()
+			state_labels.name = "RunStateLabels"
+			state_labels.position = RUN_STATE_POSITION
+			state_labels.custom_minimum_size.x = RUN_STATE_WIDTH
+			state_labels.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			board.add_child(state_labels)
+			for node_name: String in state_lines:
+				var status := RUN_UI.label(state_lines[node_name], 12, SKIN.CREAM)
+				status.name = node_name
+				status.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+				status.add_theme_stylebox_override("normal", RUN_BOARD_SCENE.label_tape())
+				state_labels.add_child(status)
+		RUN_BOARD_SCENE.compact_labels(chalk_content)
+	RUN_BOARD_SCENE.chalk_labels(chalk_content)
+	if not night_over:
+		RUN_BOARD_SCENE.quiet_captions(chalk_content, RUN_BOARD_SCENE.CHALK_CAPTION)
 	_run_stop_card = VBoxContainer.new()
 	_run_stop_card.name = "RunStop"
-	_run_stop_card.add_theme_constant_override("separation", 6)
-	_run_stop_card.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	_run_stop_card.add_theme_constant_override("separation", 6 if night_over else 4)
+	_run_stop_card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
 	detail.add_child(_run_stop_card)
 	_run_actions = detail
 	var unsaved := String(_app.get("run_save_error"))
 	if night_over:
 		_run_stop_card.add_child(RUN_UI.label("NIGHT OVER", 12, RUN_UI.AMBER, true))
-		_run_stop_card.add_child(RUN_UI.label(RUN_UI.NIGHT_WON if sess.is_complete() else RUN_UI.NIGHT_LOST, 20, RUN_UI.MUTED))
+		var verdict := "YOU LEFT THE NIGHT"
+		if sess.is_complete():
+			verdict = "ALL ACT RIVALS DEFEATED"
+		elif RunState.is_worn_out(sess.run_state.get_car_wear(sess.current_car_id)):
+			verdict = "THE CAR GAVE OUT"
+		elif sess.failed and String(sess.current_node().get("type", "")) == "act_rival" and sess.resolved_nodes.has(sess.current_node_id):
+			verdict = "DEFEATED BY THE ACT RIVAL"
+		var ending := RUN_UI.label(verdict, 20, RUN_UI.MUTED)
+		ending.name = "NightVerdict"
+		ending.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_run_stop_card.add_child(ending)
+		var consequences := String(sess.get_meta("night_result_consequences", ""))
+		if not consequences.is_empty() and RunState.is_worn_out(sess.run_state.get_car_wear(sess.current_car_id)):
+			var breakdown := RUN_UI.label(consequences.replace(" · ", "\n"), 14, RUN_UI.MUTED)
+			breakdown.name = "NightBreakdown"
+			breakdown.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_run_stop_card.add_child(breakdown)
+		var safe := {}
+		for car: Dictionary in sess.collection_safe_cars():
+			safe[String(car["id"])] = true
+		var banked := safe.size()
+		var impounded := sess.impounded_cars.size()
+		var lost := sess.won_cars().size() - banked - impounded
+		var haul: Array[String] = []
+		if banked > 0:
+			haul.append("BANKED: %d %s" % [banked, "CAR" if banked == 1 else "CARS"])
+		if impounded > 0:
+			haul.append("IMPOUNDED: %d %s" % [impounded, "CAR" if impounded == 1 else "CARS"])
+		if lost > 0:
+			haul.append("LOST: %d %s" % [lost, "CAR" if lost == 1 else "CARS"])
+		var haul_summary := RUN_UI.label(" - ".join(haul) if not haul.is_empty() else "NO HAUL", 14, RUN_UI.MUTED)
+		haul_summary.name = "HaulSummary"
+		haul_summary.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		_run_stop_card.add_child(haul_summary)
+		var starter_shape := {}
+		for record: Dictionary in sess.car_records():
+			if record["won_from"] == RunSession.CAR_ORIGIN_START:
+				record.erase("fitted_parts")
+				starter_shape = CarProfile.shape(CATALOG.build_vehicle_stats(CATALOG.generated_vehicle(record)))
+				break
+		for car: Dictionary in sess.won_cars():
+			var status := "BANKED · " if safe.has(String(car["id"])) else ("IMPOUNDED · " if sess.impounded_cars.has(String(car["id"])) else "LOST · ")
+			var comparison := ""
+			if safe.has(String(car["id"])) and not starter_shape.is_empty():
+				var banked_vehicle := CATALOG.get_vehicle(String(car["id"]))
+				if banked_vehicle.is_empty():
+					banked_vehicle = CATALOG.generated_vehicle(car)
+				banked_vehicle["fitted_parts"] = []
+				var shape := CarProfile.shape(CATALOG.build_vehicle_stats(banked_vehicle))
+				var axes := CarProfile.AXES.duplicate()
+				axes.sort_custom(func(a: String, b: String) -> bool:
+					return float(shape[a]) - float(starter_shape[a]) > float(shape[b]) - float(starter_shape[b])
+				)
+				var deltas: Array[String] = []
+				for axis: String in [axes.front(), axes.back()]:
+					var delta := roundi((float(shape[axis]) - float(starter_shape[axis])) * 100.0)
+					if delta != 0:
+						deltas.append("%+d %s" % [delta, axis.to_upper()])
+				comparison = ": " + (", ".join(deltas) if not deltas.is_empty() else "SAME SHAPE") + " VS STARTER"
+			var recap := RUN_UI.label(status + RUN_UI.car_name(String(car["id"])).to_upper() + comparison, 14, RUN_UI.MUTED)
+			recap.name = "HaulRecap_" + String(car["id"])
+			recap.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+			_run_stop_card.add_child(recap)
+	var haul_note := String(_app.get("run_haul_note"))
+	if not haul_note.is_empty():
+		var note := RUN_UI.label(haul_note, 14, SKIN.INK, true)
+		note.name = "HaulNote"
+		note.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		detail.add_child(note)
 	if not unsaved.is_empty():
 		detail.add_child(RUN_UI.label("NOT SAVED · " + unsaved.to_upper(), 12, RUN_UI.AMBER, true))
 		if not bool(_app.call("is_save_read_only")):
 			_run_action("SAVE AGAIN", Callable(self, "_on_save_run_again"), night_over, false, "ActionSaveAgain")
 	if night_over:
 		_run_action("NEW RUN", Callable(self, "_on_new_run_pressed"), unsaved.is_empty(), false, "ActionNewRun")
+		_run_action("VIEW GARAGE", Callable(self, "show_vehicle_select").bind("", true), false, false, "ActionViewGarage")
 	var secondary := HBoxContainer.new()
 	secondary.add_theme_constant_override("separation", 8)
 	detail.add_child(secondary)
 	_run_actions = secondary
 	if not night_over:
 		_run_action("ABANDON RUN", Callable(self, "_on_abandon_run"), false, false, "ActionAbandon")
+		_run_action("?", Callable(self, "_show_run_intro").bind(tabletop, board), false, false, "ActionHelp")
 	_run_action("BACK", Callable(self, "show_title"), false, false, "ActionBack")
 	_run_actions = detail
-	RUN_UI.spacer(_content, 10)
-	RUN_UI.divider(_content)
-	_content.add_child(RUN_UI.legend(sess.current_map))
+	if night_over:
+		RUN_UI.spacer(_content, 10)
+	var legend := RUN_UI.legend(sess.current_map)
+	legend.visible = not night_over
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
+	if night_over:
+		RUN_BOARD_SCENE.ink_labels(_run_stop_card)
 	_queue_content_entrance()
 	if night_over:
 		_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
@@ -342,8 +541,36 @@ func show_run_board() -> void:
 	board.stop_selected.connect(func(_stop_id: String) -> void: _play_ui_move())
 	board.stop_confirmed.connect(_go_to_run_stop.bind(true))
 	var first := sess.current_node_id if sess.is_stop_pending() else String(sess.available_nodes()[0]["id"]) if not sess.available_nodes().is_empty() else sess.current_node_id
-	board.select(first)
+	board.preview(first)
 	_grab_button_focus_after_layout(board.marker(first), _entrance_generation)
+	if _run_intro_pending:
+		_run_intro_pending = false
+		if not bool((_app.call("get_save_data") as Dictionary).get("run_intro_seen", true)):
+			_show_run_intro(tabletop, board)
+
+
+func _show_run_intro(tabletop: Control, board: Control) -> void:
+	if is_instance_valid(_run_intro):
+		return
+	var note := RUN_BOARD_INTRO.new()
+	note.name = "RunIntro"
+	note.reduced_motion = _reduced_motion_enabled()
+	var marker: Button = board.call("marker", board.call("selected_id"))
+	if marker.position.x + marker.size.x * 0.5 < RUN_BOARD_SCENE.MAP_SIZE.x * 0.5:
+		note.anchor_position.x = RUN_BOARD_SCENE.PAGE_INSET.x + RUN_BOARD_SCENE.MAP_SIZE.x - RUN_BOARD_INTRO.NOTE_RECT.size.x - RUN_BOARD_INTRO.EDGE_MARGIN
+	_run_intro = note
+	note.dismissed.connect(func() -> void:
+		_run_intro = null)
+	tabletop.add_child(note)
+	board.connect("stop_selected", note.dismiss.unbind(1))
+	for node: Node in _content.find_children("*", "Button", true, false):
+		if node.name != "ActionHelp":
+			(node as Button).pressed.connect(note.dismiss)
+
+
+func _dismiss_run_intro() -> void:
+	if is_instance_valid(_run_intro):
+		_run_intro.call("dismiss")
 
 
 ## The run's stats, animating what changed since they were last shown.
@@ -369,19 +596,28 @@ func _show_run_stop(stop_id: String, sess: RunSession) -> void:
 	var title := HBoxContainer.new()
 	title.add_theme_constant_override("separation", 14)
 	title.add_child(RUN_UI.icon(kind, 34))
-	title.add_child(RUN_UI.label(String(RUN_UI.TYPES[kind]["name"]), 38))
+	var title_name := RUN_UI.label(String(RUN_UI.TYPES[kind]["name"]), 38)
+	title_name.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	title.add_child(title_name)
+	# Race-type stops show the car they put against you, beside the stop's name.
+	var car_look := RUN_BOARD_IDENTITY.look(sess, stop_id)
+	if not car_look.is_empty():
+		title.add_child(RUN_STOP_CAR.new(car_look))
 	_run_stop_card.add_child(title)
 	var line := RUN_UI.label(String(RUN_UI.TYPES[kind]["copy"]), 18, RUN_UI.MUTED)
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	_run_stop_card.add_child(line)
 	var circuit: Dictionary = _app.call("run_stop_circuit", stop_id) if kind in RunSession.RACE_NODE_TYPES else {}
-	_run_stop_card.add_child(RUN_UI.facts(RUN_UI.stop_facts(kind, sess, circuit)))
+	_run_stop_card.add_child(RUN_BOARD_SCENE.facts(RUN_UI.stop_facts(kind, sess, circuit, stop_id)))
 	RUN_UI.spacer(_run_stop_card, 4)
 	var go := RUN_UI.action(String(RUN_UI.GO_LABELS[kind]), true, not reachable)
 	go.name = "RunGo"
 	go.pressed.connect(_go_to_run_stop.bind(stop_id, false))
 	_wire_button_audio(go)
 	_run_stop_card.add_child(go)
+	RUN_BOARD_SCENE.ink_labels(_run_stop_card)
+	RUN_BOARD_SCENE.quiet_captions(_run_stop_card, RUN_BOARD_SCENE.PAPER_CAPTION)
+	RUN_BOARD_SCENE.compact_labels(_run_stop_card)
 	_link_board_focus(stop_id)
 	RUN_UI.stagger_in(_run_stop_card.get_children(), _reduced_motion_enabled())
 
@@ -408,9 +644,20 @@ func _link_board_focus(stop_id: String) -> void:
 func _go_to_run_stop(stop_id: String, play_confirm: bool) -> void:
 	if _run_going or not is_instance_valid(_run_board) or not _run_board.is_reachable(stop_id):
 		return
+	if is_instance_valid(_driving_intro):
+		return
+	var session: RunSession = _app.call("current_run_session")
+	if session != null and session.pending_chaser == null and String(session.current_map.get_node(stop_id).get("type", "")) in ["race", "rival", "act_rival"] and not bool((_app.call("get_save_data") as Dictionary).get("run_intro_seen", true)):
+		_show_driving_intro(stop_id, play_confirm)
+		return
 	_run_going = true
 	if play_confirm:
 		_play_ui_confirm()
+	var sess: RunSession = _app.call("current_run_session")
+	if sess != null and sess.pending_chaser != null:
+		_app.call("start_run_sprint", stop_id)
+		_run_going = false
+		return
 	var generation := _entrance_generation
 	var drive := _run_board.travel_to(stop_id)
 	if drive > 0.0:
@@ -421,6 +668,31 @@ func _go_to_run_stop(stop_id: String, play_confirm: bool) -> void:
 	_on_run_node_pressed(stop_id)
 	if generation == _entrance_generation and is_instance_valid(_run_board):
 		_run_board.reset_token()
+
+
+func _show_driving_intro(stop_id: String, play_confirm: bool) -> void:
+	_dismiss_run_intro()
+	_screen = "run_driving_intro"
+	var screen := RUN_BOARD_INTRO.build_driving_screen(_reduced_motion_enabled())
+	_driving_intro = screen
+	screen.ready_to_race.connect(func() -> void:
+		_app.call("dismiss_run_intro")
+		_close_driving_intro()
+		_screen = "run_board"
+		_go_to_run_stop(stop_id, play_confirm))
+	screen.back_requested.connect(func() -> void:
+		_close_driving_intro()
+		_screen = "run_board"
+		if is_instance_valid(_run_board):
+			_run_board.marker(stop_id).grab_focus())
+	_root.add_child(screen)
+
+
+func _close_driving_intro() -> void:
+	if is_instance_valid(_driving_intro):
+		_driving_intro.get_parent().remove_child(_driving_intro)
+		_driving_intro.queue_free()
+	_driving_intro = null
 
 
 func _run_surface() -> void:
@@ -530,50 +802,77 @@ func show_run_offer() -> void:
 	var offered := CATALOG.get_vehicle(sess.pending_offer)
 	var current_name := RUN_UI.car_name(sess.current_car_id)
 	_run_surface()
+	var scene := RUN_OFFER_SCENE.new()
+	scene.name = "RunOfferScene"
+	scene.act = sess.current_map.act
+	scene.car_id = sess.pending_offer
+	scene.rival_car_id = sess.current_car_id
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
 	var columns := HBoxContainer.new()
-	columns.add_theme_constant_override("separation", 64)
+	columns.add_theme_constant_override("separation", 72)
 	_content.add_child(columns)
 	var detail := VBoxContainer.new()
 	detail.name = "RunOffer"
-	detail.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	detail.custom_minimum_size.x = 440
 	detail.add_theme_constant_override("separation", 6)
 	columns.add_child(detail)
-	RUN_UI.spacer(detail, 8)
-	detail.add_child(RUN_UI.label(RUN_UI.origin_line(offered), 11, RUN_UI.AMBER, true))
-	RUN_UI.spacer(detail, 8)
-	var title_row := HBoxContainer.new()
-	title_row.add_theme_constant_override("separation", 16)
-	var art := TextureRect.new()
-	art.texture = IDENTITIES.car_texture(sess.pending_offer)
-	art.custom_minimum_size = Vector2(OFFER_CAR_ICON, OFFER_CAR_ICON)
-	art.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	art.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-	art.texture_filter = CanvasItem.TEXTURE_FILTER_NEAREST
-	title_row.add_child(art)
-	title_row.add_child(RUN_UI.label(String(offered.get("name", "")), 48))
-	if not _reduced_motion_enabled():
-		art.pivot_offset = Vector2(OFFER_CAR_ICON, OFFER_CAR_ICON) * 0.5
-		art.scale = Vector2.ONE * OFFER_REVEAL_SCALE
-		art.rotation = OFFER_REVEAL_TURN
-		var reveal := art.create_tween().set_parallel(true).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-		reveal.tween_property(art, "scale", Vector2.ONE, OFFER_REVEAL_TIME)
-		reveal.tween_property(art, "rotation", 0.0, OFFER_REVEAL_TIME)
-	detail.add_child(title_row)
-	detail.add_child(RUN_UI.label(String(offered.get("archetype", "")).to_upper(), 14, RUN_UI.AMBER, true))
-	var line := RUN_UI.label(String(offered.get("strength", "")), 20, RUN_UI.MUTED)
+	var header := PanelContainer.new()
+	header.name = "OfferChalkboard"
+	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	RUN_MATERIALS.finish_panel(header, true)
+	detail.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label(RUN_UI.origin_line(offered), 11, SKIN.CREAM, true))
+	var title := RUN_UI.label(String(offered.get("name", "")), 30, SKIN.CREAM)
+	title.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(title)
+	heading.add_child(RUN_UI.label(String(offered.get("archetype", "")).to_upper(), 14, SKIN.CREAM, true))
+	var line := RUN_UI.label(String(offered.get("strength", "")), 16, SKIN.CREAM)
 	line.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	detail.add_child(line)
-	RUN_UI.spacer(detail, 6)
-	_run_stats(detail, sess)
-	RUN_UI.spacer(detail, 12)
-	_run_actions = detail
-	_run_action("DRIVE IT", Callable(self, "_on_offer_pressed").bind(true), true, false, "ActionTakeOffer")
-	_run_action("KEEP THE %s" % current_name.to_upper(), Callable(self, "_on_offer_pressed").bind(false), false, false, "ActionKeepCar")
+	heading.add_child(line)
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
 	var card := CarShapeView.new()
 	card.name = "OfferShape"
-	card.custom_minimum_size = OFFER_SHAPE_SIZE
+	card.plot_bottom_padding = RUN_OFFER_SCENE.SHAPE_BOTTOM_PADDING
+	card.show_delta_caption = true
+	card.custom_minimum_size = RUN_OFFER_SCENE.SHAPE_SIZE
 	card.size_flags_vertical = Control.SIZE_SHRINK_BEGIN
-	columns.add_child(card)
+	detail.add_child(card)
+	var right := VBoxContainer.new()
+	right.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	right.add_theme_constant_override("separation", 12)
+	columns.add_child(right)
+	RUN_UI.spacer(right, 330)
+	_run_actions = right
+	if sess.pending_offer_driver.is_empty() and sess.pending_offer_points == 0:
+		# Clean cars (lockups) keep the legacy choice: no chase, no cost.
+		_run_action("DRIVE IT", Callable(self, "_on_legacy_offer_pressed").bind(true), true, false, "ActionTakeOffer")
+		scene.register_control(right.get_child(1) as Button, true)
+		_run_action("SEND IT HOME", Callable(self, "_on_legacy_offer_pressed").bind(false), false, false, "ActionKeepCar")
+		scene.register_control(right.get_child(2) as Button)
+	else:
+		if not sess.pending_offer_driver.is_empty():
+			var driver := HBoxContainer.new()
+			driver.name = "OfferDriver"
+			var portrait := TextureRect.new()
+			portrait.name = "OfferPortrait"
+			portrait.custom_minimum_size = Vector2(48, 48)
+			portrait.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+			portrait.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+			portrait.texture = IDENTITIES.avatar_texture(String(sess.pending_offer_driver.get("id", "")))
+			driver.add_child(portrait)
+			driver.add_child(RUN_UI.label(String(sess.pending_offer_driver.get("name", "")), 18, SKIN.CREAM))
+			right.add_child(driver)
+		var can_race_hot := sess.can_race_hot(sess.pending_offer)
+		var hot_copy := "The driver you took it from chases you on the next sprint" if can_race_hot else "NO SPARE CAR FOR THE CHASE"
+		_offer_choice(scene, "RACE IT NOW", hot_copy, "run_race_it_now", "ActionTakeOffer", can_race_hot, not can_race_hot)
+		_offer_choice(scene, "SEND IT AHEAD · %d POINTS" % sess.pending_offer_points, "Spend this win's points, nobody chases you", "run_send_it_ahead", "ActionSendAhead", not can_race_hot, sess.run_points < sess.pending_offer_points)
+		_offer_choice(scene, "SEND IT HOME", "In your collection next night, keep your points", "run_send_it_home", "ActionKeepCar")
 	var current_shape := CarProfile.shape(CATALOG.create_vehicle_stats(sess.current_car_id))
 	card.show_shape(
 		CarProfile.shape(CATALOG.create_vehicle_stats(sess.pending_offer)),
@@ -584,7 +883,21 @@ func show_run_offer() -> void:
 	_focus_first()
 
 
-func _on_offer_pressed(take: bool) -> void:
+func _offer_choice(scene: Control, title: String, copy: String, action: String, node_name: String, primary: bool = false, disabled: bool = false) -> void:
+	_run_action(title, Callable(self, "_on_offer_pressed").bind(action), primary, disabled, node_name)
+	scene.register_control(_run_actions.get_child(_run_actions.get_child_count() - 1) as Button, primary)
+	var label := RUN_UI.label(copy, 14, SKIN.CREAM)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	_run_actions.add_child(label)
+
+
+func _on_offer_pressed(action: String) -> void:
+	_play_ui_confirm()
+	if bool(_app.call(action)):
+		show_run_board()
+
+
+func _on_legacy_offer_pressed(take: bool) -> void:
 	_play_ui_confirm()
 	_app.call("run_take_offer" if take else "run_decline_offer")
 	show_run_board()
@@ -602,14 +915,135 @@ func show_run_bench() -> void:
 		show_run_board()
 		return
 	var used := sess.bench_action_done
-	var card := RUN_UI.parts_card("YOUR PARTS · FIT ONE" if not sess.parts_held.is_empty() else "NO PARTS HELD")
+	_run_surface()
+	var scene := RUN_BENCH_SCENE.new()
+	scene.name = "RunBenchScene"
+	scene.act = sess.current_map.act
+	scene.car_id = sess.current_car_id
+	scene.car_wear = sess.run_state.get_car_wear(sess.current_car_id)
+	scene.held_parts = sess.parts_held.duplicate(true)
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 76)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size.x = 520
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
+	var header := PanelContainer.new()
+	header.name = "BenchChalkboard"
+	var chalk := StyleBoxFlat.new()
+	chalk.bg_color = Color("26362f")
+	chalk.border_color = Color("806446")
+	chalk.set_border_width_all(5)
+	chalk.set_content_margin_all(14)
+	chalk.shadow_color = Color(0.01, 0.02, 0.04, 0.55)
+	chalk.shadow_size = 4
+	chalk.shadow_offset = Vector2(5, 7)
+	header.add_theme_stylebox_override("panel", chalk)
+	RUN_MATERIALS.finish_panel(header, true)
+	left.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
+	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["bench"]["name"]), 30, SKIN.CREAM))
+	var copy := RUN_UI.label(String(RUN_UI.TYPES["bench"]["copy"]), 16, SKIN.CREAM)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(copy)
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
+	RUN_UI.spacer(left, 228)
+	var empty_parts := sess.parts_held.is_empty()
+	var actions: BoxContainer = VBoxContainer.new() if empty_parts else HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 12)
+	left.add_child(actions)
+	_run_actions = actions
+	var card := RUN_UI.parts_card("YOUR PARTS · FIT ONE" if not empty_parts else "NO PARTS HELD - A PARTS VAN SELLS THEM")
 	card[0].name = "BenchParts"
-	_run_node_intro(sess, "bench", card[0])
-	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, used, "BenchRepair")
+	card[0].custom_minimum_size = Vector2(420, 0 if empty_parts else 516)
+	card[0].size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+	var paper := StyleBoxFlat.new()
+	paper.bg_color = Color("d8c89f")
+	paper.border_color = SKIN.INK
+	paper.set_border_width_all(2)
+	paper.set_content_margin_all(14)
+	paper.shadow_color = Color(0.01, 0.02, 0.04, 0.5)
+	paper.shadow_size = 4
+	paper.shadow_offset = Vector2(6, 8)
+	card[0].add_theme_stylebox_override("panel", paper)
+	RUN_MATERIALS.finish_panel(card[0] as PanelContainer)
+	RUN_BOARD_SCENE.ink_labels(card[0])
+	var parts_column := VBoxContainer.new()
+	if empty_parts:
+		parts_column.add_theme_constant_override("separation", 12)
+		columns.add_child(parts_column)
+		parts_column.add_child(card[0])
+	else:
+		columns.add_child(card[0])
+		parts_column.free()
+	var car_clean := sess.run_state.get_car_wear(sess.current_car_id) == RunState.WEAR_LEVELS[0]
+	_run_action("REPAIR", Callable(self, "_on_bench_repair_pressed"), true, used or car_clean, "BenchRepair")
+	RUN_BENCH_SCENE.dress_button(actions.get_child(0) as Button, true)
 	for index: int in sess.parts_held.size():
 		var part: Dictionary = sess.parts_held[index]
-		_add_run_button(card[1], RUN_UI.part_button(part, "FIT %s" % RunParts.part_name(part).to_upper(), used), Callable(self, "_on_bench_fit_pressed").bind(index), "BenchFit_%d" % index)
+		var fit := RUN_UI.part_button(part, "FIT %s" % RunParts.part_name(part).to_upper(), used)
+		RUN_BENCH_SCENE.dress_part(fit, part)
+		_add_run_button(card[1], fit, Callable(self, "_on_bench_fit_pressed").bind(index), "BenchFit_%d" % index)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	RUN_BENCH_SCENE.dress_button(actions.get_child(1) as Button)
+	var extra_actions: BoxContainer = VBoxContainer.new() if empty_parts else HBoxContainer.new()
+	extra_actions.add_theme_constant_override("separation", 12)
+	extra_actions.visible = not sess.boot_cars.is_empty() or (not used and sess.owned_cars.size() > 1)
+	left.add_child(extra_actions)
+	_run_actions = extra_actions
+	if not sess.boot_cars.is_empty():
+		_run_action("BANK THE HAUL", Callable(self, "_on_bench_bank_pressed"), false, used, "BenchBankHaul")
+		RUN_BENCH_SCENE.dress_button(extra_actions.get_child(extra_actions.get_child_count() - 1) as Button)
+	if not used and sess.owned_cars.size() > 1:
+		var spares := RUN_UI.parts_card("SWAP CAR")
+		spares[0].name = "BenchSwapCars"
+		spares[0].custom_minimum_size = Vector2(420, 240 if empty_parts else 516)
+		spares[0].size_flags_vertical = Control.SIZE_SHRINK_BEGIN
+		spares[0].add_theme_stylebox_override("panel", paper.duplicate())
+		RUN_MATERIALS.finish_panel(spares[0] as PanelContainer)
+		RUN_BOARD_SCENE.ink_labels(spares[0])
+		if empty_parts:
+			parts_column.add_child(spares[0])
+		else:
+			columns.add_child(spares[0])
+		spares[0].hide()
+		for vehicle_id: String in sess.owned_cars:
+			if vehicle_id == sess.current_car_id:
+				continue
+			var choice := RUN_UI.action(RUN_UI.car_name(vehicle_id))
+			choice.icon = IDENTITIES.car_texture(vehicle_id)
+			choice.expand_icon = true
+			choice.add_theme_constant_override("icon_max_width", 64)
+			choice.custom_minimum_size = Vector2(340, 80)
+			RUN_BENCH_SCENE.dress_button(choice)
+			_add_run_button(spares[1], choice, Callable(self, "_on_bench_swap_pressed").bind(vehicle_id), "BenchSwapCar_%d" % spares[1].get_child_count())
+		_run_action("SWAP CAR", func() -> void:
+			card[0].visible = not card[0].visible
+			spares[0].visible = not card[0].visible
+			if spares[0].visible:
+				(spares[1].get_child(0) as Button).grab_focus()
+		, false, false, "BenchSwap")
+		RUN_BENCH_SCENE.dress_button(extra_actions.get_child(extra_actions.get_child_count() - 1) as Button)
+	if empty_parts:
+		actions.reparent(parts_column)
+		extra_actions.reparent(parts_column)
+		for row: BoxContainer in [actions, extra_actions]:
+			for action: Node in row.get_children():
+				var button := action as Button
+				button.custom_minimum_size.y = 64
+				button.add_theme_font_size_override("font_size", 20)
+	var legend := RUN_UI.legend(sess.current_map)
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
 	_focus_first()
 
 
@@ -625,14 +1059,77 @@ func show_run_parts_van() -> void:
 		show_run_board()
 		return
 	var bought := sess.resolved_nodes.has(sess.current_node_id)
+	_run_surface()
+	var scene := RUN_VAN_SCENE.new()
+	scene.name = "RunVanScene"
+	scene.act = sess.current_map.act
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 110)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size.x = 420
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
+	var header := PanelContainer.new()
+	header.name = "VanChalkboard"
+	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	RUN_MATERIALS.finish_panel(header, true)
+	left.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
+	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["parts_van"]["name"]), 30, SKIN.CREAM))
+	var copy := RUN_UI.label(String(RUN_UI.TYPES["parts_van"]["copy"]), 16, SKIN.CREAM)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(copy)
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
+	left.custom_minimum_size.y = RUN_UI.CARD_SIZE.y
+	var action_space := Control.new()
+	action_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(action_space)
+	_run_actions = left
+	var rack := VBoxContainer.new()
+	rack.add_theme_constant_override("separation", 0)
+	columns.add_child(rack)
+	RUN_UI.spacer(rack, 64)
 	var card := RUN_UI.parts_card("IN THE VAN · ONE PER VISIT")
 	card[0].name = "VanParts"
-	_run_node_intro(sess, "parts_van", card[0])
+	card[0].custom_minimum_size = Vector2(520, 456)
+	var rail := StyleBoxFlat.new()
+	rail.bg_color = Color.TRANSPARENT
+	rail.set_content_margin_all(14)
+	card[0].add_theme_stylebox_override("panel", rail)
+	RUN_BOARD_SCENE.chalk_labels(card[0])
+	rack.add_child(card[0])
+	for vehicle_id: String in sess.impounded_cars:
+		var ransom := RUN_UI.action("RANSOM %s · %d POINTS" % [RUN_UI.car_name(vehicle_id).to_upper(), RunSession.HAUL_RANSOM_POINTS], false, bought or sess.run_points < RunSession.HAUL_RANSOM_POINTS)
+		_add_run_button(card[1], ransom, Callable(self, "_on_van_ransom_pressed").bind(vehicle_id), "VanRansom_" + vehicle_id)
 	for part: Dictionary in sess.van_stock():
 		var cost := RunParts.cost(part)
-		_add_run_button(card[1], RUN_UI.part_button(part, "%s · %d POINTS" % [RunParts.part_name(part).to_upper(), cost], bought or sess.run_points < cost), Callable(self, "_on_van_buy_pressed").bind(String(part["part"])), "VanBuy_" + String(part["part"]))
+		var buy := RUN_UI.part_button(part, "%s · %d POINTS" % [RunParts.part_name(part).to_upper(), cost], bought or sess.run_points < cost)
+		scene.register_pack(buy, part)
+		_add_run_button(card[1], buy, Callable(self, "_on_van_buy_pressed").bind(String(part["part"])), "VanBuy_" + String(part["part"]))
+	var consumables := HBoxContainer.new()
+	consumables.add_theme_constant_override("separation", 12)
+	left.add_child(consumables)
+	for offer: Dictionary in sess.van_offer_consumables():
+		var item := String(offer["item"])
+		var buy := RUN_UI.action("%s · %d POINTS" % [item.to_upper(), int(offer["price"])], false, sess.run_points < int(offer["price"]))
+		RUN_BENCH_SCENE.dress_button(buy)
+		_add_run_button(consumables, buy, Callable(self, "_on_van_consumable_pressed").bind(item), "VanBuy_" + item)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	# The first part the points can buy takes focus, not BACK on the left.
+	RUN_BENCH_SCENE.dress_button(left.get_child(left.get_child_count() - 1) as Button)
+	var legend := RUN_UI.legend(sess.current_map)
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
+	# Rescue takes priority over parts; BACK stays last in the focus order.
 	_queue_content_entrance()
 	_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
 
@@ -648,9 +1145,59 @@ func show_run_lockup() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_run_node_intro(sess, "lockup")
-	_run_action("OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
+	_run_surface()
+	var scene := RUN_LOCKUP_SCENE.new()
+	scene.name = "RunLockupScene"
+	scene.act = sess.current_map.act
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.already_open = sess.lockup_used
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 110)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size = Vector2(420, RUN_LOCKUP_SCENE.UI_COLUMN_HEIGHT)
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
+	var header := PanelContainer.new()
+	header.name = "LockupChalkboard"
+	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	RUN_MATERIALS.finish_panel(header, true)
+	left.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
+	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["lockup"]["name"]), 30, SKIN.CREAM))
+	var copy := RUN_UI.label(String(RUN_UI.TYPES["lockup"]["copy"]), 16, SKIN.CREAM)
+	copy.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	heading.add_child(copy)
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
+	var action_space := Control.new()
+	action_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(action_space)
+	var actions := HBoxContainer.new()
+	actions.add_theme_constant_override("separation", 12)
+	left.add_child(actions)
+	_run_actions = actions
+	var context := RUN_MAP_VIEW.new()
+	context.name = "RunContextMap"
+	context.reduced_motion = _reduced_motion_enabled()
+	columns.add_child(context)
+	context.configure(sess, false)
+	context.hide_route_visuals()
+	_run_action("LOCKUP OPEN" if sess.lockup_used else "OPEN LOCKUP", Callable(self, "_on_lockup_open_pressed"), true, sess.lockup_used, "LockupOpen")
+	RUN_BENCH_SCENE.dress_button(actions.get_child(0) as Button, true)
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
+	RUN_BENCH_SCENE.dress_button(actions.get_child(1) as Button)
+	RUN_UI.spacer(_content, RUN_LOCKUP_SCENE.LEGEND_SPACER)
+	var legend := RUN_UI.legend(sess.current_map)
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
 	_focus_first()
 
 
@@ -665,45 +1212,234 @@ func show_run_errand() -> void:
 	if sess == null or sess.current_map == null:
 		show_run_board()
 		return
-	_run_node_intro(sess, "errand")
+	_run_surface()
+	var scene := RUN_ERRAND_SCENE.new()
+	scene.name = "RunErrandScene"
+	scene.act = sess.current_map.act
+	scene.reduced_motion = _reduced_motion_enabled()
+	scene.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	_run_backdrop.add_child(scene)
+	var columns := HBoxContainer.new()
+	columns.add_theme_constant_override("separation", 110)
+	_content.add_child(columns)
+	var left := VBoxContainer.new()
+	left.custom_minimum_size = Vector2(420, RUN_ERRAND_SCENE.UI_COLUMN_HEIGHT)
+	left.add_theme_constant_override("separation", 10)
+	columns.add_child(left)
+	var header := PanelContainer.new()
+	header.name = "ErrandChalkboard"
+	header.add_theme_stylebox_override("panel", RUN_VAN_SCENE.header_style())
+	RUN_MATERIALS.finish_panel(header, true)
+	left.add_child(header)
+	var heading := VBoxContainer.new()
+	heading.add_theme_constant_override("separation", 4)
+	header.add_child(heading)
+	heading.add_child(RUN_UI.label("RUN · ACT %d · %s" % [sess.current_map.act, String(RUN_UI.ROOMS[sess.current_map.act]).to_upper()], 11, SKIN.CREAM, true))
+	heading.add_child(RUN_UI.label(String(RUN_UI.TYPES["errand"]["name"]), 30, SKIN.CREAM))
+	_run_stats(heading, sess)
+	RUN_BOARD_SCENE.chalk_labels(heading)
+	var action_space := Control.new()
+	action_space.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	action_space.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	left.add_child(action_space)
+	var back_row := HBoxContainer.new()
+	left.add_child(back_row)
+	var context := RUN_MAP_VIEW.new()
+	context.name = "RunContextMap"
+	context.reduced_motion = _reduced_motion_enabled()
+	columns.add_child(context)
+	context.configure(sess, false)
+	context.hide_route_visuals()
+	var request := RUN_ERRAND_SCENE.request_for_node(sess, sess.current_node_id)
+	var slips := VBoxContainer.new()
+	slips.name = "ErrandSlips"
+	slips.add_theme_constant_override("separation", 12)
+	slips.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	slips.offset_left = 24
+	slips.offset_right = -24
+	slips.offset_top = 128
+	slips.offset_bottom = -100
+	context.add_child(slips)
+	var requester := RUN_UI.label("FROM: " + String(request["requester"]["name"]).to_upper(), 16, SKIN.INK, true)
+	requester.name = "ErrandRequester"
+	requester.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	slips.add_child(requester)
+	var task := RUN_UI.label(String(request["task"]), 16, SKIN.INK)
+	task.name = "ErrandTask"
+	task.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	slips.add_child(task)
+	_run_actions = slips
 	var car_clean := sess.run_state.get_car_wear(sess.current_car_id) == RunState.WEAR_LEVELS[0]
 	_run_action("TAKE THE PAY · %d" % RunSession.ERRAND_PAY_POINTS, Callable(self, "_on_errand_choice_pressed").bind(0), true, false, "ErrandPay")
+	scene.register_choice(slips.get_node("ErrandPay") as Button, 0)
 	_run_action("TAKE A TUNE-UP", Callable(self, "_on_errand_choice_pressed").bind(1), false, car_clean, "ErrandTuneUp")
+	scene.register_choice(slips.get_node("ErrandTuneUp") as Button, 1)
+	_run_actions = back_row
 	_run_action("BACK", Callable(self, "show_run_board"), false, false, "ActionBack")
-	_focus_first()
+	RUN_BENCH_SCENE.dress_button(back_row.get_child(0) as Button)
+	var legend := RUN_UI.legend(sess.current_map)
+	RUN_BOARD_SCENE.chalk_labels(legend)
+	legend.draw.connect(func() -> void: SKIN.draw_tape(legend, legend.size * 0.5, legend.size + Vector2(8, 8), 0.0, Color("27332f")))
+	_content.add_child(legend)
+	_queue_content_entrance()
+	_grab_button_focus_after_layout(_button_focus_chain[0], _entrance_generation)
 
 
 func _on_bench_repair_pressed() -> void:
 	_play_ui_confirm()
 	var sess_var: Variant = _app.call("current_run_session")
 	var sess: RunSession = sess_var as RunSession
-	if sess != null:
-		_app.call("run_bench_repair", sess.current_car_id)
-	show_run_board()
+	if sess == null:
+		return
+	var old_wear := sess.run_state.get_car_wear(sess.current_car_id)
+	if not bool(_app.call("run_bench_repair", sess.current_car_id)):
+		return
+	var new_wear := sess.run_state.get_car_wear(sess.current_car_id)
+	if await _finish_bench_confirmation(&"repair", "BenchRepair"):
+		var acknowledgement := SKIN.style_tape(RUN_UI.label("REPAIRED - %s -> %s" % [old_wear.to_upper(), new_wear.to_upper()]), SKIN.CREAM, 12)
+		acknowledgement.name = "BenchRepairAcknowledgement"
+		_run_stop_card.add_child(acknowledgement)
+		_run_stop_card.move_child(acknowledgement, 0)
+
+
+func _on_bench_bank_pressed() -> void:
+	_play_ui_confirm()
+	if bool(_app.call("run_bench_bank_haul")):
+		show_run_board()
+
+
+func _on_bench_swap_pressed(vehicle_id: String) -> void:
+	_play_ui_confirm()
+	if bool(_app.call("run_bench_swap", vehicle_id)):
+		show_run_board()
+
+
+func _on_van_ransom_pressed(vehicle_id: String) -> void:
+	_play_ui_confirm()
+	if bool(_app.call("run_ransom_car", vehicle_id)):
+		show_run_board()
 
 
 func _on_bench_fit_pressed(held_index: int) -> void:
 	_play_ui_confirm()
+	var scene := _run_backdrop.get_node_or_null("RunBenchScene") as RUN_BENCH_SCENE
+	var part_id := String(scene.held_parts[held_index]["part"]) if scene != null and held_index >= 0 and held_index < scene.held_parts.size() else ""
 	_app.call("run_bench_fit", held_index)
-	show_run_board()
+	_finish_bench_confirmation(&"fit", "BenchFit_%d" % held_index, part_id)
+
+
+func _finish_bench_confirmation(kind: StringName, button_name: String, part_id: String = "") -> bool:
+	var generation := _entrance_generation
+	var scene := _run_backdrop.get_node_or_null("RunBenchScene") as RUN_BENCH_SCENE
+	var button := _content.find_child(button_name, true, false) as Button
+	if scene != null and button != null:
+		for action: Node in _content.find_children("Bench*", "Button", true, false):
+			(action as Button).disabled = true
+		var duration := scene.confirm(button, kind, part_id)
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	if generation == _entrance_generation and _screen == "run_bench":
+		show_run_board()
+		return true
+	return false
 
 
 func _on_van_buy_pressed(part_id: String) -> void:
 	_play_ui_confirm()
 	_app.call("run_buy_part", part_id)
-	show_run_board()
+	_finish_van_confirmation(part_id)
+
+
+func _on_van_consumable_pressed(item: String) -> void:
+	_play_ui_confirm()
+	if bool(_app.call("run_buy_" + item)):
+		show_run_board()
+
+
+func _finish_van_confirmation(part_id: String) -> void:
+	var generation := _entrance_generation
+	var scene := _run_backdrop.get_node_or_null("RunVanScene") as RUN_VAN_SCENE
+	var button := _content.find_child("VanBuy_" + part_id, true, false) as Button
+	if scene != null and button != null:
+		for action: Node in _content.find_children("VanBuy_*", "Button", true, false):
+			(action as Button).disabled = true
+		var duration := scene.confirm(button)
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	if generation == _entrance_generation and _screen == "run_parts_van":
+		show_run_board()
 
 
 func _on_lockup_open_pressed() -> void:
+	var button := _content.find_child("LockupOpen", true, false) as Button
+	if button == null or button.disabled:
+		return
+	button.disabled = true
 	_play_ui_confirm()
-	_app.call("run_open_lockup")
-	show_run_board()
+	var opened := bool(_app.call("run_open_lockup"))
+	_finish_lockup_confirmation(opened)
+
+
+func _finish_lockup_confirmation(opened: bool) -> void:
+	var generation := _entrance_generation
+	var scene := _run_backdrop.get_node_or_null("RunLockupScene") as RUN_LOCKUP_SCENE
+	var button := _content.find_child("LockupOpen", true, false) as Button
+	var sess: RunSession = _app.call("current_run_session") as RunSession
+	if opened and scene != null and button != null and sess != null and not sess.pending_offer.is_empty():
+		button.disabled = true
+		button.text = "OPENING LOCKUP"
+		var duration := scene.confirm(button, sess.pending_offer)
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	if generation == _entrance_generation and _screen == "run_lockup":
+		show_run_board()
 
 
 func _on_errand_choice_pressed(choice: int) -> void:
 	_play_ui_confirm()
-	_app.call("run_resolve_errand", choice)
-	show_run_board()
+	var resolved := bool(_app.call("run_resolve_errand", choice))
+	_finish_errand_confirmation(choice, resolved)
+
+
+func _finish_errand_confirmation(choice: int, resolved: bool) -> void:
+	var generation := _entrance_generation
+	var scene := _run_backdrop.get_node_or_null("RunErrandScene") as RUN_ERRAND_SCENE
+	var button := _content.find_child("ErrandPay" if choice == 0 else "ErrandTuneUp", true, false) as Button
+	if resolved and scene != null and button != null:
+		for action: Node in _content.find_children("Errand*", "Button", true, false):
+			(action as Button).disabled = true
+		var duration := scene.confirm(button, choice)
+		if duration > 0.0:
+			await get_tree().create_timer(duration).timeout
+	if generation == _entrance_generation and _screen == "run_errand":
+		show_run_board()
+		if resolved and _screen == "run_board":
+			_show_errand_acknowledgement(choice)
+
+
+func _show_errand_acknowledgement(choice: int) -> void:
+	var resolutions := {
+		RunSession.ErrandChoice.PAY: "+%d POINTS" % RunSession.ERRAND_PAY_POINTS,
+		RunSession.ErrandChoice.TUNE_UP: "TUNE-UP",
+		RunSession.ErrandChoice.TOW: "TOW",
+	}
+	var state_labels := _run_board.get_node_or_null("RunStateLabels") as VBoxContainer
+	if state_labels == null:
+		state_labels = VBoxContainer.new()
+		state_labels.name = "RunStateLabels"
+		state_labels.position = RUN_STATE_POSITION
+		state_labels.custom_minimum_size.x = RUN_STATE_WIDTH
+		state_labels.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_run_board.add_child(state_labels)
+	var acknowledgement := RUN_UI.label("ERRAND DONE - " + String(resolutions[choice]), 12, SKIN.CREAM)
+	acknowledgement.name = "ErrandAcknowledgement"
+	acknowledgement.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	acknowledgement.add_theme_stylebox_override("normal", RUN_BOARD_SCENE.label_tape())
+	state_labels.add_child(acknowledgement)
+	var dismiss := acknowledgement.queue_free
+	_run_board.stop_selected.connect(dismiss.unbind(1), CONNECT_ONE_SHOT)
+	for action: Node in _content.find_children("*", "Button", true, false):
+		(action as Button).pressed.connect(dismiss, CONNECT_ONE_SHOT)
 
 
 func show_briefing(event_id: String) -> void:
@@ -1010,6 +1746,8 @@ func _leave_save_error() -> void:
 
 func go_back() -> void:
 	match _screen:
+		"run_driving_intro":
+			_driving_intro.call("cancel")
 		"title":
 			return
 		"map", "settings", "credits", "reset_confirmation", "quick_race", "quick_strip":
@@ -1060,6 +1798,7 @@ func _build_base() -> void:
 	margin.add_theme_constant_override("margin_right", PAGE_MARGIN)
 	margin.add_theme_constant_override("margin_bottom", roundi(SKIN.BENCH_LIP) + 6)
 	_root.add_child(margin)
+	margin.minimum_size_changed.connect(func() -> void: margin.set_deferred("size", _root.size))
 	var page := VBoxContainer.new()
 	page.add_theme_constant_override("separation", 8)
 	margin.add_child(page)
@@ -1130,9 +1869,23 @@ func _apply_compact_button_art(button: Button) -> void:
 
 
 func _clear_content() -> void:
+	var confirmation := _root.get_node_or_null("AbandonConfirm")
+	if confirmation != null:
+		_root.remove_child(confirmation)
+		confirmation.queue_free()
+	if is_instance_valid(_driving_intro):
+		_close_driving_intro()
+	_dismiss_run_intro()
+	_page.add_theme_constant_override("margin_left", PAGE_MARGIN)
+	_page.add_theme_constant_override("margin_right", PAGE_MARGIN)
+	_page.add_theme_constant_override("margin_top", PAGE_TOP)
+	_page.add_theme_constant_override("margin_bottom", roundi(SKIN.BENCH_LIP) + 6)
 	_run_going = false
 	_page.show()
 	_run_backdrop.hide()
+	for dressing: Node in _run_backdrop.get_children():
+		_run_backdrop.remove_child(dressing)
+		dressing.queue_free()
 	_footer.get_parent().show()
 	_run_actions = null
 	if is_instance_valid(_route):
@@ -1154,6 +1907,25 @@ func _clear_content() -> void:
 	for child: Node in _content.get_children():
 		_content.remove_child(child)
 		child.queue_free()
+
+
+func _present_screen_transition() -> void:
+	var destination := _screen
+	var kicker: String = TRANSITION_KICKERS.get(_screen, _screen.replace("_", " ").to_upper())
+	if _screen == "run_board":
+		var sess: RunSession = _app.call("run_board_session") as RunSession
+		if sess != null and sess.current_map != null:
+			var room: String = RUN_BOARD_SCENE.ROOM_NAMES.get(sess.current_map.act, "Kitchen Counter")
+			kicker = "NIGHT OVER" if sess.is_failed() or sess.is_complete() else "%s - ACT %d" % [room.to_upper(), sess.current_map.act]
+			destination += ":" + kicker
+	if destination == _last_transition_destination:
+		return
+	_last_transition_destination = destination
+	if not is_instance_valid(_night_transition):
+		_night_transition = NIGHT_TRANSITION.new()
+		_night_transition.name = "NightTransition"
+		add_child(_night_transition)
+	_night_transition.call("play", kicker, NIGHT_TRANSITION.instant_for(_app), _reduced_motion_enabled())
 
 
 func _configure_stage(
@@ -1183,8 +1955,7 @@ func _on_art_action(action: StringName) -> void:
 		&"championship":
 			_app.call("continue_championship" if _app.call("has_championship_progress") else "request_new_championship")
 		&"new_run":
-			_app.call("start_new_run")
-			show_run_board()
+			_on_new_run_pressed()
 		&"your_run":
 			show_run_board()
 		&"quick_race":
@@ -1257,6 +2028,8 @@ func _add_section(left: String, right: String) -> Label:
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 16)
 	var left_label := _label(left, 19, SKIN.CREAM, true)
+	left_label.autowrap_mode = TextServer.AUTOWRAP_OFF
+	left_label.clip_text = true
 	left_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	row.add_child(left_label)
 	var right_label := _label(right, 14, SKIN.CREAM_DIM, true)
@@ -1609,8 +2382,8 @@ func _commit_quick_race_seed_text(text: String, seed_edit: LineEdit, seed_status
 func _refresh_quick_race_seed(seed_edit: LineEdit, seed_status: Label) -> void:
 	_quick_race_room = StringName(_app.call("circuit_room_for_seed", _quick_race_seed))
 	seed_edit.text = str(_quick_race_seed)
-	seed_status.text = "SEED %d · %s CANVAS" % [_quick_race_seed, String(_quick_race_room).to_upper()]
-	_configure_stage(&"map", _quick_race_vehicle_id, "rae", String(_quick_race_theme))
+	seed_status.text = "SEED %d" % _quick_race_seed
+	_stage.configure(&"map", _quick_strip_vehicle_id if _quick_strip else _quick_race_vehicle_id, "rae", String(_quick_race_theme))
 	_refresh_quick_identity_labels()
 
 
@@ -1642,7 +2415,14 @@ func _refresh_quick_identity_labels() -> void:
 	if is_instance_valid(_quick_identity_heading):
 		_quick_identity_heading.text = String(identity.get("display_name", "Build a circuit"))
 	if is_instance_valid(_quick_identity_summary):
-		_quick_identity_summary.text = String(identity.get("summary", ""))
+		_quick_identity_summary.text = _quick_preview_summary(identity)
+
+
+func _quick_preview_summary(identity: Dictionary) -> String:
+	var rooms := String(identity.get("theme", _quick_race_theme)).capitalize()
+	if String(identity.get("route_shape", "circuit")) == "strip":
+		rooms += " → " + String(identity.get("theme_b", "")).capitalize()
+	return "%s · %s" % [rooms, String(identity.get("length_tier", _quick_race_length_tier)).capitalize()]
 
 
 func _roll_quick_race() -> void:
@@ -1737,7 +2517,9 @@ func _on_run_node_pressed(node_id: String) -> void:
 
 
 func _on_new_run_pressed() -> void:
-	_app.call("start_new_run")
+	var session: RunSession = _app.call("start_new_run")
+	var progress: Dictionary = _app.call("get_save_data")
+	_run_intro_pending = session != null and not bool(progress.get("run_intro_seen", true))
 	show_run_board()
 
 
@@ -1748,5 +2530,59 @@ func _on_save_run_again() -> void:
 
 
 func _on_abandon_run() -> void:
+	var abandon := _content.find_child("ActionAbandon", true, false) as Button
+	if abandon == null or _root.find_child("AbandonConfirm", true, false) != null:
+		return
+	var strip := CenterContainer.new()
+	strip.name = "AbandonConfirm"
+	strip.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+	strip.mouse_filter = Control.MOUSE_FILTER_STOP
+	_root.add_child(strip)
+	strip.draw.connect(func() -> void: strip.draw_rect(Rect2(Vector2.ZERO, strip.size), Color(0.02, 0.03, 0.04, 0.8)))
+	var panel := PanelContainer.new()
+	panel.custom_minimum_size.x = 620
+	panel.add_theme_stylebox_override("panel", SKIN.card_style(SKIN.CREAM, 0.0))
+	strip.add_child(panel)
+	var inset := MarginContainer.new()
+	for edge: String in ["left", "right", "top", "bottom"]:
+		inset.add_theme_constant_override("margin_" + edge, 24)
+	panel.add_child(inset)
+	var content := VBoxContainer.new()
+	content.add_theme_constant_override("separation", 16)
+	inset.add_child(content)
+	var warning := RUN_UI.label("THE NIGHT ENDS - CARS NOT BANKED ARE LOST", 13, Color("8d322a"), true)
+	warning.name = "AbandonWarning"
+	warning.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	warning.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_child(warning)
+	var actions := HBoxContainer.new()
+	actions.alignment = BoxContainer.ALIGNMENT_CENTER
+	actions.add_theme_constant_override("separation", 16)
+	content.add_child(actions)
+	var confirm := RUN_UI.action("ABANDON THE NIGHT")
+	confirm.name = "ActionConfirmAbandon"
+	confirm.pressed.connect(_confirm_abandon_run)
+	_wire_button_audio(confirm)
+	actions.add_child(confirm)
+	var keep := RUN_UI.action("KEEP DRIVING", true)
+	keep.name = "ActionKeepDriving"
+	keep.pressed.connect(func() -> void:
+		strip.get_parent().remove_child(strip)
+		strip.queue_free()
+		abandon.grab_focus())
+	_wire_button_audio(keep)
+	actions.add_child(keep)
+	for button: Button in [confirm, keep]:
+		var other := keep if button == confirm else confirm
+		button.focus_next = button.get_path_to(other)
+		button.focus_previous = button.get_path_to(other)
+		button.focus_neighbor_left = button.get_path_to(other)
+		button.focus_neighbor_right = button.get_path_to(other)
+		button.focus_neighbor_top = button.get_path_to(other)
+		button.focus_neighbor_bottom = button.get_path_to(other)
+	keep.grab_focus()
+
+
+func _confirm_abandon_run() -> void:
 	_app.call("abandon_run")
 	show_title()

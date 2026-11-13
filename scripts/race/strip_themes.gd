@@ -9,6 +9,8 @@ static func second_theme(theme: StringName, requested: String = "") -> StringNam
 	var themes: Array = SURFACES.catalog()["themes"].keys()
 	if not requested.is_empty():
 		return StringName(requested) if requested in themes else &""
+	# Hand-built-only rooms have materials but no procedural story roster.
+	themes = themes.filter(func(id: String) -> bool: return RULES.STORY_IDS.has(id))
 	var index := themes.find(String(theme))
 	return StringName(themes[(index + 1) % themes.size()]) if index >= 0 else &""
 

@@ -76,9 +76,14 @@ def install_plan(path):
     return entries
 
 
-def prepare(entries):
+def prepare(entries, theme=None):
     outputs = set()
     for entry in entries:
+        if theme is not None and theme not in entry['themes']:
+            for output in entry['outputs']:
+                if output in outputs: raise ValueError(f'Duplicate asset output {output}')
+                outputs.add(output)
+            continue
         if entry.get('kind') == 'utility': image = utility_image(entry['source']['generator'])
         else: image = source_image(entry)
         alpha = np.asarray(image.getchannel('A'))
@@ -105,5 +110,6 @@ def prepare(entries):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--install-plan')
+    parser.add_argument('--theme', help='Prepare only this theme, preserving other manifest entries and textures')
     args = parser.parse_args()
-    prepare(install_plan(args.install_plan) if args.install_plan else json.loads(MANIFEST.read_text()))
+    prepare(install_plan(args.install_plan) if args.install_plan else json.loads(MANIFEST.read_text()), args.theme)

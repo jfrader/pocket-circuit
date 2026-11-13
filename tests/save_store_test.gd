@@ -17,6 +17,17 @@ func _run_test() -> void:
 	var store := SAVE_STORE_SCRIPT.new(TEST_PATH) as SaveStore
 	store.remove_save()
 	var data := store.default_data()
+	if not _expect(data.get("run_intro_seen", true) == false, "brand-new profiles have not seen the run intro"):
+		return
+	if not _expect(store.save_data(data), "intro migration fixture creates its save directory"):
+		return
+	var legacy_intro := data.duplicate(true)
+	legacy_intro.erase("run_intro_seen")
+	_write_raw(TEST_PATH, JSON.stringify(legacy_intro))
+	if not _expect(not _read_json(TEST_PATH).has("run_intro_seen") and bool(store.load_data().get("run_intro_seen", false)), "existing saves without the additive intro flag normalize to seen"):
+		return
+	if not _expect(store.save_data(data) and store.load_data().get("run_intro_seen", true) == false, "an explicitly unseen intro flag survives saving before dismissal"):
+		return
 	if not _expect(not bool(data["championship_started"]), "new saves should not start a championship implicitly"):
 		return
 	if not _expect(int(data["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(data["championship_circuit"]["seed"]) == 665001 and data["championship_circuit"]["events"].size() == CATALOG.EVENTS.size() and (data["mastery_circuit_metrics"] as Dictionary).is_empty() and data["circuit_history"].is_empty() and data["favorite_circuits"].is_empty(), "new saves should carry complete circuit identity and empty mastery/discovery collections"):
@@ -277,6 +288,39 @@ func _test_current_run_migration(store: SaveStore) -> bool:
 		return false
 	loaded = store.load_data()
 	if not _expect(int(loaded["version"]) == int(SAVE_STORE_SCRIPT.CURRENT_VERSION) and int(loaded["current_run"].get("run_seed",0)) == 424242 and int(loaded["current_run"].get("run_points",0)) == 12, "supported current_run data roundtrips via normalize"):
+		return false
+	var restored := RUN_SESSION.deserialize(loaded["current_run"])
+	if not _expect(restored != null and restored.node_opponents == run.node_opponents, "save store preserves every node's assigned drivers"):
+		return false
+	with_run["current_run"].erase("node_opponents")
+	if not _expect(store.save_data(with_run), "save legacy run without assigned drivers"):
+		return false
+	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
+	if not _expect(restored != null and not restored.opponents_for_node(restored.current_node_id).is_empty(), "legacy run loads and supplies a race field"):
+		return false
+	for key: String in ["boot_cars", "impounded_cars", "pending_chaser", "pending_offer_driver", "pending_offer_points", "tow_count", "nitro_count"]:
+		with_run["current_run"].erase(key)
+	if not _expect(store.save_data(with_run), "save legacy run without haul state"):
+		return false
+	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
+	if not _expect(restored != null and restored.boot_cars.is_empty() and restored.pending_chaser == null and restored.tow_count == 0, "legacy haul state normalizes cold through SaveStore"):
+		return false
+	var haul := RUN_SESSION.create(33333)
+	var offered := haul._win_car(haul.current_node_id, RUN_SESSION.CAR_ORIGIN_RIVAL, RUN_SESSION.STARTER_TYPES)
+	if not _expect(haul.race_it_now() and haul.add_tow(2) and haul.add_nitro(3), "haul save fixture"):
+		return false
+	with_run["current_run"] = RUN_SESSION.serialize(haul)
+	if not _expect(store.save_data(with_run), "save hot haul"):
+		return false
+	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
+	if not _expect(restored != null and restored.boot_cars == haul.boot_cars and restored.pending_chaser == haul.pending_chaser and restored.tow_count == 2 and restored.nitro_count == 3, "haul identities, counts and chaser survive SaveStore normalization"):
+		return false
+	haul.impound_haul()
+	with_run["current_run"] = RUN_SESSION.serialize(haul)
+	if not _expect(store.save_data(with_run), "save impounded haul"):
+		return false
+	restored = RUN_SESSION.deserialize(store.load_data()["current_run"])
+	if not _expect(restored != null and restored.impounded_cars == [offered["id"]] and restored.collection_safe_cars().is_empty(), "impounded cars survive SaveStore without becoming collection rewards"):
 		return false
 
 	# garage: a v5 save has none; stored won cars are validated and deduplicated

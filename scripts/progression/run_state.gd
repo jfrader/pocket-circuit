@@ -262,6 +262,10 @@ static func deserialize(data: Dictionary) -> RunState:
 		var value: Variant = data["car_rolls"][vid]
 		if vid is not String or vid.is_empty() or value is not Dictionary:
 			return null
+		if (value as Dictionary).is_empty():
+			# A shipped car keeps its authored physics; an empty roll is valid.
+			rs.car_rolls[vid] = {}
+			continue
 		var clean := {}
 		for axis: String in AXES:
 			var amount: Variant = value.get(axis)

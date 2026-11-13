@@ -21,7 +21,22 @@ func _run_test() -> void:
 	if not _expect(shell != null and String(shell.get("_screen")) == "title", "boot should focus the controller-safe title screen"):
 		return
 	await _tap_joypad_button(0)
-	if not _expect(String(shell.get("_screen")) == "map", "gamepad A should activate the focused New Championship button"):
+	var title_run: RunSession = app.call("current_run_session")
+	if not _expect(String(shell.get("_screen")) == "run_board" and title_run != null, "gamepad A on primary PLAY starts a run and opens its board"):
+		return
+	await _tap_joypad_button(1)
+	if not _expect(String(shell.get("_screen")) == "title", "gamepad B should return from the run board to title"):
+		return
+	await _tap_joypad_button(0)
+	if not _expect(String(shell.get("_screen")) == "run_board" and app.call("current_run_session") == title_run, "PLAY resumes the existing run without replacing it"):
+		return
+	await _tap_joypad_button(1)
+	await _tap_joypad_button(12)
+	var championship := root.get_viewport().gui_get_focus_owner() as Button
+	if not _expect(championship != null and championship.text == "CHAMPIONSHIP", "Down from PLAY focuses secondary CHAMPIONSHIP"):
+		return
+	await _tap_joypad_button(0)
+	if not _expect(String(shell.get("_screen")) == "map" and app.call("current_run_session") == title_run, "CHAMPIONSHIP opens its map without replacing the run"):
 		return
 	await _tap_joypad_button(1)
 	if not _expect(String(shell.get("_screen")) == "title", "gamepad B should navigate back from the championship map"):

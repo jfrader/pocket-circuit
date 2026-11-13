@@ -200,6 +200,13 @@ func _run_test() -> void:
 		"v1 should report no finite curvature hazard on a true straight"
 	):
 		return
+	var dry_envelope := float(controller.call("_v1_speed_envelope", 120.0, 160.0))
+	vehicle.surface_grip_multiplier = 0.4
+	var slippery_envelope := float(controller.call("_v1_speed_envelope", 120.0, 160.0))
+	vehicle.surface_grip_multiplier = 1.0
+	var restored_envelope := float(controller.call("_v1_speed_envelope", 120.0, 160.0))
+	if not _expect(slippery_envelope < dry_envelope and restored_envelope == dry_envelope, "standalone envelope calls must refresh grip/braking inputs even within the same physics tick"):
+		return
 	controller.call("_physics_process", 1.0 / 60.0)
 	if not _expect(is_zero_approx(float(vehicle.get("_external_brake"))), "v1 AI should not brake on a true straight at near-top speed"):
 		return

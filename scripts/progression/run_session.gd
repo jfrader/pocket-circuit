@@ -9,10 +9,18 @@ const RACE_NODE_TYPES: Array[String] = ["race", "rival", "act_rival"]
 const RUN_MAP := preload("res://scripts/progression/run_map.gd")
 const RUN_STATE := preload("res://scripts/progression/run_state.gd")
 const CATALOG := preload("res://data/championship/catalog.gd")
+const DRIVER_ROSTER := preload("res://scripts/progression/driver_roster.gd")
+const HAUL := preload("res://scripts/progression/run_haul.gd")
+const HAUL_RANSOM_POINTS := HAUL.RANSOM_POINTS
+const FIELD_OPPONENTS := 5
 
 const INITIAL_POINTS := 0
 const RIVAL_LOSS_POINTS_COST := 10
 const ERRAND_PAY_POINTS := 6
+const TOW_PRICE := 10
+const NITRO_PRICE := 5
+const ERRAND_TUNE_STEPS := 2
+enum ErrandChoice { PAY, TUNE_UP, TOW }
 const RIVAL_LOSS_SEVERITY := 0.6
 const LOCKUP_CAR_TYPE := "compact"
 ## The starter-tier types a night's starter car is dealt from.
@@ -26,8 +34,10 @@ const NO_ROLL := {"speed": 0.0, "accel": 0.0, "grip": 0.0, "drift": 0.0, "boost"
 const RUN_POINTS_BY_FINISH: Dictionary = {
 	1: 6,
 	2: 4,
-	3: 2,
-	4: 0,
+	3: 3,
+	4: 2,
+	5: 1,
+	6: 0,
 }
 
 ## Run session layer: pure logic over the run map + run state. No UI, no
@@ -54,10 +64,10 @@ const RUN_POINTS_BY_FINISH: Dictionary = {
 ##     parts_held; one purchase per van.
 ##   start_race(id, field): marks a race as running; it resolves exactly once.
 ##   open_lockup(): the act's one free car.
-##   resolve_errand(choice): 0 takes ERRAND_PAY_POINTS, 1 steps the current
-##     car's wear back one level.
+##   resolve_errand(choice): PAY takes ERRAND_PAY_POINTS, TUNE_UP steps wear
+##     back by the act's seeded repair strength, TOW adds one rescue.
 ##
-## register_crash(severity) advances wear; worn out fails the run.
+## register_crash(severity) advances wear; worn out spends a tow or fails.
 ## serialize()/deserialize() round-trip the whole session; a schema mismatch
 ## or an unreadable inner block deserializes to null.
 
@@ -83,6 +93,20 @@ var resolved_nodes: Dictionary = {}
 var race_in_flight: Dictionary = {}
 ## The car just won and offered to drive instead of the current one ("" when none).
 var pending_offer: String = ""
+## Act string -> node id -> DriverRoster payload. Slot zero is the field leader.
+var node_opponents: Dictionary = {}
+## Unbanked car id -> robbed driver's roster identity ({} for a lockup car).
+var boot_cars: Dictionary = {}
+## Retained in owned_cars, but excluded from collection-safe rewards.
+var impounded_cars: Array[String] = []
+## Driver identity plus haul_vehicle_id and chase_vehicle_id; null when cold.
+var pending_chaser: Variant = null
+var pending_offer_driver: Dictionary = {}
+var pending_offer_points: int = 0
+var tow_count: int = 0
+var nitro_count: int = 0
+## A rescue reserves the next bench's action, even across an act boundary.
+var towed_to_bench: bool = false
 
 static func create(p_run_seed: int) -> RunSession:
 	var sess: RunSession = new()
@@ -103,7 +127,30 @@ static func create(p_run_seed: int) -> RunSession:
 	sess.current_car_id = sess._add_car("start", CAR_ORIGIN_START, STARTER_TYPES)
 	sess.run_state.act = 1
 	sess.run_state.row = 0
+	for act: int in range(1, FINAL_ACT + 1):
+		var map := sess.current_map if act == 1 else RUN_MAP.generate(sess.run_seed, act)
+		for node_id: String in map.nodes:
+			if map.nodes[node_id]["type"] in RACE_NODE_TYPES:
+				sess._assign_opponents(map, node_id)
 	return sess
+
+## A defensive roster copy for any race stop in the current act. Old saves
+## without assignments deterministically fill the requested stop on demand.
+func opponents_for_node(node_id: String) -> Dictionary:
+	if current_map == null or current_map.get_node(node_id).get("type", "") not in RACE_NODE_TYPES:
+		return {}
+	_assign_opponents(current_map, node_id)
+	return (node_opponents[str(current_map.act)][node_id] as Dictionary).duplicate(true)
+
+func _assign_opponents(map: RunMap, node_id: String) -> void:
+	var act_key := str(map.act)
+	if not node_opponents.has(act_key):
+		node_opponents[act_key] = {}
+	if node_opponents[act_key].has(node_id):
+		return
+	var seed := ("pocket-circuit|run-opponents|%d|act%d|%s" % [run_seed, map.act, node_id]).hash() & RUN_MAP.HASH_MASK
+	var count := 1 if map.nodes[node_id]["type"] == "rival" else FIELD_OPPONENTS
+	node_opponents[act_key][node_id] = DRIVER_ROSTER.create(seed, CATALOG.quick_race_vehicle_ids(), count)
 
 ## Races must be finished first. Optional stops stay open alongside their
 ## child routes until their action is used or the player takes a child.
@@ -144,9 +191,27 @@ func van_stock() -> Array[Dictionary]:
 		return []
 	return RunParts.deal(_stop_roll("van", current_node_id), car_stats(current_car_id))
 
+func van_offer_consumables() -> Array[Dictionary]:
+	if failed or completed or not _is_current_node_type("parts_van") or resolved_nodes.has(current_node_id):
+		return []
+	return [{"item": "tow", "count": 1, "price": TOW_PRICE}, {"item": "nitro", "count": 1, "price": NITRO_PRICE}]
+
+func buy_tow() -> bool:
+	return HAUL.buy_consumable(self, "tow_count", TOW_PRICE)
+
+func buy_nitro() -> bool:
+	return HAUL.buy_consumable(self, "nitro_count", NITRO_PRICE)
+
 ## A car of the night's physics as the race builds it: its roll, then its parts.
 func car_stats(vehicle_id: String) -> VehicleStats:
-	return CATALOG.build_vehicle_stats(CATALOG.generated_vehicle(car_record(vehicle_id)))
+	var car := car_record(vehicle_id)
+	var vehicle := CATALOG.get_vehicle(vehicle_id)
+	if vehicle.is_empty():
+		vehicle = CATALOG.generated_vehicle(car)
+	else:
+		vehicle["roll"] = car["roll"]
+		vehicle["fitted_parts"] = car["fitted_parts"]
+	return CATALOG.build_vehicle_stats(vehicle)
 
 func _stop_roll(stream: String, stop_id: String) -> int:
 	return ("pocket-circuit|run-circuit|%s|%d|act%d|%s" % [stream, run_seed, current_map.act, stop_id]).hash() & 0x7FFFFFFF
@@ -198,7 +263,8 @@ func enter_node(node_id: String) -> bool:
 	var ntype: String = String(n.get("type", "race"))
 	if ntype == "bench":
 		last_bench_visited = node_id
-		bench_action_done = false
+		bench_action_done = towed_to_bench
+		towed_to_bench = false
 	return true
 
 func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dictionary:
@@ -223,12 +289,18 @@ func resolve_race(node_id: String, finish_position: int, field_size: int) -> Dic
 	}
 	if ntype == "act_rival":
 		if pos == 1:
+			bank_haul()
+			outcome["car"] = _win_car(node_id, CAR_ORIGIN_RIVAL, ProceduralCarGenerator.SUPPORTED_TYPES)
+			pending_offer_points = pts
 			if current_map.act < FINAL_ACT:
 				_advance_to_act(current_map.act + 1)
 				outcome["act_advanced"] = true
 			else:
 				completed = true
+				HAUL.clear_offer(self)
 		else:
+			# Reaching the act rival banks the haul you carried in, win or lose.
+			bank_haul()
 			failed = true
 			outcome["run_failed"] = true
 	return outcome
@@ -254,6 +326,8 @@ func _advance_to_act(new_act: int) -> void:
 	run_state.row = 0
 
 func resolve_rival(node_id: String, won: bool) -> Dictionary:
+	if not pending_offer.is_empty():
+		return {"error": "pending offer"}
 	if not (current_node_id == node_id and _is_current_node_type("rival")):
 		return {"error": "not current rival node"}
 	if resolved_nodes.has(node_id):
@@ -263,6 +337,9 @@ func resolve_rival(node_id: String, won: bool) -> Dictionary:
 	var outcome: Dictionary = {"won": won}
 	if won:
 		outcome["car"] = _win_car(node_id, CAR_ORIGIN_RIVAL, ProceduralCarGenerator.SUPPORTED_TYPES)
+		pending_offer_points = RUN_POINTS_BY_FINISH[1]
+		run_points += pending_offer_points
+		outcome["points_gained"] = pending_offer_points
 	else:
 		var over: bool = run_points < RIVAL_LOSS_POINTS_COST
 		run_points = maxi(0, run_points - RIVAL_LOSS_POINTS_COST)
@@ -293,7 +370,28 @@ func _add_car(stop_id: String, origin: String, types: Array[String]) -> String:
 ## A car won at this stop is offered to drive; the current car is kept until
 ## the offer is taken.
 func _win_car(stop_id: String, origin: String, types: Array[String]) -> Dictionary:
-	var vid := _add_car(stop_id, origin, types)
+	if not pending_offer.is_empty():
+		return {}
+	pending_offer_driver = {}
+	pending_offer_points = 0
+	var vid: String
+	if origin == CAR_ORIGIN_RIVAL:
+		var roster := opponents_for_node(stop_id)
+		if not roster.is_empty():
+			pending_offer_driver = roster["opponents"][0].duplicate(true)
+			vid = pending_offer_driver["vehicle_id"]
+			var vehicle := CATALOG.get_vehicle(vid)
+			var art: Dictionary = vehicle["car_art"]
+			if not owned_cars.has(vid):
+				owned_cars[vid] = {"type": art["type"], "seed": art["seed"], "won_from": origin, "act": current_map.act}
+				run_state.car_rolls[vid] = (vehicle.get("roll", {}) as Dictionary).duplicate(true)
+				run_state.set_car_wear(vid, RUN_STATE.WEAR_LEVELS[0])
+			else:
+				owned_cars[vid]["won_from"] = origin
+			boot_cars.erase(vid)
+			impounded_cars.erase(vid)
+	else:
+		vid = _add_car(stop_id, origin, types)
 	pending_offer = vid
 	return won_car(vid)
 
@@ -303,7 +401,7 @@ func take_offer() -> bool:
 	if pending_offer.is_empty() or failed or completed:
 		return false
 	current_car_id = pending_offer
-	pending_offer = ""
+	HAUL.clear_offer(self)
 	return true
 
 
@@ -311,8 +409,71 @@ func take_offer() -> bool:
 func decline_offer() -> bool:
 	if pending_offer.is_empty():
 		return false
-	pending_offer = ""
+	HAUL.clear_offer(self)
 	return true
+
+func can_race_hot(vehicle_id: String) -> bool:
+	return hot_choice_reason(vehicle_id).is_empty()
+
+func hot_choice_reason(vehicle_id: String) -> String:
+	return HAUL.hot_choice_reason(self, vehicle_id)
+
+func race_it_now() -> bool:
+	return HAUL.choose_offer(self, "hot")
+
+func send_it_ahead() -> bool:
+	return HAUL.choose_offer(self, "ahead")
+
+func send_it_home() -> bool:
+	return HAUL.choose_offer(self, "home")
+
+func bank_haul() -> Array[String]:
+	return HAUL.bank(self)
+
+func bench_bank_haul() -> bool:
+	if not _can_do_bench_action(current_car_id) or boot_cars.is_empty():
+		return false
+	bank_haul()
+	bench_action_done = true
+	return true
+
+func impound_haul() -> Array[String]:
+	return HAUL.impound(self)
+
+## Escaping a chase clears the pursuer, not the unbanked haul.
+func clear_pending_chaser() -> bool:
+	if pending_chaser == null:
+		return false
+	pending_chaser = null
+	return true
+
+func ransom_car(vehicle_id: String) -> bool:
+	return HAUL.ransom(self, vehicle_id)
+
+func add_tow(count: int = 1) -> bool:
+	return HAUL.add_consumable(self, "tow_count", count)
+
+func spend_tow() -> bool:
+	return HAUL.spend_consumable(self, "tow_count")
+
+func add_nitro(count: int = 1) -> bool:
+	return HAUL.add_consumable(self, "nitro_count", count)
+
+func spend_nitro() -> bool:
+	return HAUL.spend_consumable(self, "nitro_count")
+
+## Multiplier for a nitro burst; the race owns its force and duration.
+func nitro_power() -> float:
+	var car := car_record(current_car_id)
+	return 1.0 + float(car.get("roll", {}).get("boost", 0.0))
+
+## The collection must use this, not the legacy all-wins view won_cars().
+func collection_safe_cars() -> Array[Dictionary]:
+	var safe: Array[Dictionary] = []
+	for car: Dictionary in won_cars():
+		if not boot_cars.has(car["id"]) and not impounded_cars.has(car["id"]) and car["id"] != pending_offer:
+			safe.append(car)
+	return safe
 
 
 ## Any car of the night as a record {id, seed, type, roll, won_from, act, fitted_parts}.
@@ -322,7 +483,8 @@ func car_record(vehicle_id: String) -> Dictionary:
 		return {}
 	var out := record.duplicate(true)
 	out["id"] = vehicle_id
-	out["roll"] = run_state.get_or_create_car_roll(vehicle_id, String(record["type"]))
+	# A shipped car keeps its authored physics; only generated cars roll.
+	out["roll"] = {} if CATALOG.is_shipped(vehicle_id) else run_state.get_or_create_car_roll(vehicle_id, String(record["type"]))
 	out["fitted_parts"] = fitted_parts(vehicle_id)
 	return out
 
@@ -365,9 +527,13 @@ static func normalize_car(value: Variant, origins: Array) -> Dictionary:
 		return {}
 	if not RUN_MAP.is_integer(car.get("seed", 0), 0, RUN_MAP.HASH_MASK) or not RUN_MAP.is_integer(car.get("act", 1), 1, FINAL_ACT):
 		return {}
+	if (roll as Dictionary).is_empty() and not CATALOG.is_shipped(String(car_id)):
+		return {}
 	var limit: float = RUN_STATE.TIER_ENVELOPES.values().max()
 	var clean_roll := {}
 	for axis: String in CarProfile.AXES:
+		if (roll as Dictionary).is_empty():
+			break
 		var amount: Variant = (roll as Dictionary).get(axis)
 		if not (amount is float or amount is int) or not is_finite(float(amount)):
 			return {}
@@ -426,8 +592,14 @@ static func salvage_won_cars(data: Dictionary) -> Array[Dictionary]:
 	var rolls: Variant = (state as Dictionary).get("car_rolls", {}) if state is Dictionary else {}
 	if owned is not Dictionary or rolls is not Dictionary:
 		return out
+	var boot: Variant = data.get("boot_cars", {})
+	var impounded: Variant = data.get("impounded_cars", [])
+	if boot is not Dictionary or impounded is not Array:
+		return out
 	for vehicle_id: Variant in owned as Dictionary:
 		if vehicle_id is not String or vehicle_id.is_empty():
+			continue
+		if boot.has(vehicle_id) or impounded.has(vehicle_id):
 			continue
 		var record: Variant = (owned as Dictionary)[vehicle_id]
 		if record is not Dictionary:
@@ -450,6 +622,14 @@ func won_cars() -> Array[Dictionary]:
 			out.append(car)
 	return out
 
+func bench_swap(car_key: String) -> bool:
+	if not _can_do_bench_action(car_key) or car_key == current_car_id or not owned_cars.has(car_key):
+		return false
+	current_car_id = car_key
+	bench_action_done = true
+	return true
+
+
 func bench_repair(car_key: String) -> bool:
 	var can: bool = _can_do_bench_action(car_key)
 	if not can:
@@ -459,6 +639,8 @@ func bench_repair(car_key: String) -> bool:
 	if not hask and not iscurk:
 		return false
 	var cur_w: String = run_state.get_car_wear(car_key)
+	if cur_w == RUN_STATE.WEAR_LEVELS[0]:
+		return false
 	var restored: String = RUN_STATE.restore_at_bench(cur_w)
 	run_state.set_car_wear(car_key, restored)
 	bench_action_done = true
@@ -501,7 +683,7 @@ func buy_part(part_id: String) -> bool:
 	return false
 
 func open_lockup() -> Dictionary:
-	if failed or completed or lockup_used or not _is_current_node_type("lockup"):
+	if failed or completed or not pending_offer.is_empty() or lockup_used or not _is_current_node_type("lockup"):
 		return {}
 	if resolved_nodes.has(current_node_id):
 		return {}
@@ -509,25 +691,39 @@ func open_lockup() -> Dictionary:
 	lockup_used = true
 	return _win_car("lockup", CAR_ORIGIN_LOCKUP, [LOCKUP_CAR_TYPE] as Array[String])
 
+func errand_tune_steps() -> int:
+	return 1 + _stop_roll("tune", "errands") % ERRAND_TUNE_STEPS
+
 func resolve_errand(choice: int) -> Dictionary:
+	if failed or completed:
+		return {"error": "night ended"}
 	if not _is_current_node_type("errand"):
 		return {"error": "not current errand node"}
 	if resolved_nodes.has(current_node_id):
 		return {"error": "already resolved"}
+	if choice not in ErrandChoice.values():
+		return {"error": "invalid errand choice"}
+	if choice == ErrandChoice.TOW and not add_tow():
+		return {"error": "tow inventory full"}
 	resolved_nodes[current_node_id] = true
 	var eff: String = ""
 	var amt: int = 0
-	if choice == 0:
+	if choice == ErrandChoice.PAY:
 		run_points += ERRAND_PAY_POINTS
 		eff = "points"
 		amt = ERRAND_PAY_POINTS
-	else:
+	elif choice == ErrandChoice.TUNE_UP:
 		var cw: String = run_state.get_car_wear(current_car_id)
-		var prev: String = _previous_wear_level(cw)
+		var prev := cw
+		for step in errand_tune_steps():
+			prev = _previous_wear_level(prev)
 		if prev != cw:
 			run_state.set_car_wear(current_car_id, prev)
-			amt = 1
+			amt = RUN_STATE.WEAR_LEVELS.find(cw) - RUN_STATE.WEAR_LEVELS.find(prev)
 		eff = "restore"
+	else:
+		eff = "tow"
+		amt = 1
 	return {"effect": eff, "amount": amt}
 
 func _previous_wear_level(w: String) -> String:
@@ -543,7 +739,11 @@ func register_crash(severity: float) -> void:
 	var nw: String = RUN_STATE.advance_wear(cw, severity)
 	run_state.set_car_wear(current_car_id, nw)
 	if RUN_STATE.is_worn_out(nw):
-		failed = true
+		if spend_tow():
+			run_state.set_car_wear(current_car_id, RUN_STATE.restore_at_bench(nw))
+			towed_to_bench = true
+		else:
+			failed = true
 
 func is_failed() -> bool:
 	if failed:
@@ -562,7 +762,7 @@ static func serialize(sess: RunSession) -> Dictionary:
 	var map_snap: Dictionary = RUN_MAP.serialize(sess.current_map)
 	var own: Dictionary = sess.owned_cars.duplicate(true)
 	var inst: Dictionary = sess.installed_parts.duplicate(true)
-	return {
+	var snapshot := {
 		"schema_version": SCHEMA_VERSION,
 		"run_seed": sess.run_seed,
 		"run_state": state_snap,
@@ -581,7 +781,10 @@ static func serialize(sess: RunSession) -> Dictionary:
 		"resolved_nodes": sess.resolved_nodes.duplicate(true),
 		"race_in_flight": sess.race_in_flight.duplicate(true),
 		"pending_offer": sess.pending_offer,
+		"node_opponents": sess.node_opponents.duplicate(true),
 	}
+	snapshot.merge(HAUL.serialize(sess))
+	return snapshot
 
 static func deserialize(data: Dictionary) -> RunSession:
 	if not RUN_MAP.is_integer(data.get("schema_version"), SCHEMA_VERSION, SCHEMA_VERSION):
@@ -611,6 +814,33 @@ static func deserialize(data: Dictionary) -> RunSession:
 		return null
 	if sess.run_state.run_seed != sess.run_seed or sess.current_map.run_seed != sess.run_seed:
 		return null
+	var assignments: Variant = data.get("node_opponents", {})
+	if assignments is not Dictionary:
+		return null
+	for act_key: Variant in assignments:
+		if act_key is not String or act_key not in ["1", "2", "3"] or assignments[act_key] is not Dictionary:
+			return null
+		var current_act := int(act_key) == sess.current_map.act
+		var map := sess.current_map if current_act else RUN_MAP.generate(sess.run_seed, int(act_key))
+		var nodes: Dictionary = assignments[act_key]
+		sess.node_opponents[act_key] = {}
+		for nid: Variant in nodes:
+			if nid is not String or map.get_node(nid).get("type", "") not in RACE_NODE_TYPES:
+				if not current_act:
+					# A regenerated future act may not contain a saved assignment's
+					# node; drop it and let the race assign on demand.
+					continue
+				return null
+			var count := 1 if map.nodes[nid]["type"] == "rival" else FIELD_OPPONENTS
+			var roster := DRIVER_ROSTER.normalize(nodes[nid], CATALOG.quick_race_vehicle_ids(), count)
+			if roster.is_empty():
+				# Legacy saves stored the old three-opponent field; drop the stale
+				# assignment so the race regenerates it at the current size.
+				var stored: Variant = nodes[nid].get("opponents") if nodes[nid] is Dictionary else null
+				if stored is Array and (stored as Array).size() == 3 and map.nodes[nid]["type"] != "rival":
+					continue
+				return null
+			sess.node_opponents[act_key][nid] = roster
 	sess.run_points = int(data["run_points"])
 	sess.current_car_id = data["current_car_id"]
 	sess.owned_cars = _normalize_owned(data["owned_cars"])
@@ -645,9 +875,13 @@ static func deserialize(data: Dictionary) -> RunSession:
 	var offer: String = data.get("pending_offer", "")
 	if not offer.is_empty():
 		var offered_from: Variant = sess.owned_cars.get(offer, {}).get("won_from")
-		if offered_from not in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] or offer == sess.current_car_id:
+		var driver: Variant = data.get("pending_offer_driver", {})
+		var rival_reaward: bool = offered_from == CAR_ORIGIN_RIVAL and driver is Dictionary and driver.get("vehicle_id") == offer
+		if offered_from not in [CAR_ORIGIN_RIVAL, CAR_ORIGIN_LOCKUP] or (offer == sess.current_car_id and not rival_reaward):
 			offer = ""
 	sess.pending_offer = offer
+	if not HAUL.deserialize(sess, data):
+		return null
 	if sess.completed and not sess.resolved_nodes.has(sess.current_node_id):
 		return null
 	return sess

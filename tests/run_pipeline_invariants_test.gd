@@ -18,6 +18,8 @@ func _initialize() -> void:
 	call_deferred("_run_test")
 
 func _run_test() -> void:
+	_test_assigned_races()
+	if _failed: quit(1); return
 	_test_map_invariants()
 	if _failed: quit(1); return
 	
@@ -32,6 +34,34 @@ func _run_test() -> void:
 	
 	print("RUN_PIPELINE_INVARIANTS_TEST PASS")
 	quit(0)
+
+func _test_assigned_races() -> void:
+	var app = APP.new()
+	app._test_mode = true
+	for legacy: bool in [false, true]:
+		var session := RUN_SESSION.create(900001)
+		if legacy:
+			var snapshot := RUN_SESSION.serialize(session)
+			snapshot.erase("node_opponents")
+			session = RUN_SESSION.deserialize(snapshot)
+		app._current_run_session = session
+		for kind: String in ["race", "rival", "act_rival"]:
+			_move_to_type(session, kind)
+			var assigned: Dictionary = app.run_stop_opponents(session.current_node_id)
+			var expected: Array = APP._roster_ids(assigned)
+			var launched: bool = app.start_run_rival() if kind == "rival" else app.start_run_race()
+			_expect(launched and app.current_race_session["event"]["opponents"] == expected, "launch consumes board's assigned " + kind)
+			if kind == "act_rival":
+				session.resolve_race(session.current_node_id, 1, expected.size() + 1)
+			app._install_active_roster()
+			var race := preload("res://scripts/race/prototype_race.gd").new()
+			race._session = app.current_race_session
+			var field: Array[Dictionary] = race._build_field_racers_for_preparation()
+			_expect(field.size() == expected.size() + 1, "race prepares the assigned field size")
+			for index: int in expected.size():
+				_expect(field[index + 1]["driver_id"] == expected[index] and field[index + 1]["vehicle_id"] == assigned["opponents"][index]["vehicle_id"], "race driver and car match assigned payload")
+			race.free()
+	app.free()
 
 ## Every stop of every act leads to the act rival: no dead ends, no way around it.
 func _test_map_invariants() -> void:

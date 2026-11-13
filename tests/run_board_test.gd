@@ -57,7 +57,7 @@ func _run_test() -> void:
 		return
 	if not _expect(available.size() == 1 and available[0] == sess.current_node_id, "a fresh run offers only its opening race"):
 		return
-	# The board opens on the opening race, picked, with its card and a live RACE.
+	# The board opens on the opening race as a preview, with its card and live GO.
 	var go := shell.find_child("RunGo", true, false) as Button
 	if not _expect(board.call("selected_id") == sess.current_node_id and go != null and not go.disabled and go.text == String(RUN_UI.GO_LABELS["race"]), "the board opens on the opening race with RACE ready"):
 		return
@@ -103,6 +103,11 @@ func _run_test() -> void:
 	# Leaving the board while the car drives drops that go, and going still works after.
 	go.pressed.emit()
 	await process_frame
+	var ready := shell.find_child("DrivingReady", true, false) as Button
+	if not _expect(ready != null and (app.get("current_race_session") as Dictionary).is_empty(), "first confirmed travel waits for driving READY before starting"):
+		return
+	ready.pressed.emit()
+	await process_frame
 	shell.call("show_title")
 	await _settle_travel()
 	if not _expect(String((app.get("current_race_session") as Dictionary).get("run_node_id", "")).is_empty() and not bool(shell.get("_run_going")), "leaving the board on the way drops the go"):
@@ -110,12 +115,17 @@ func _run_test() -> void:
 	shell.call("show_run_board")
 	await process_frame
 	board = shell.find_child("RunBoard", true, false) as Control
-	# Pressing the picked opening race goes: the car drives there and it starts.
+	# Initial focus and preview must not arm the opening marker for travel.
+	await create_timer(1.0).timeout
 	var opening := board.get_node_or_null("Node_" + sess.current_node_id.replace("_", "-")) as Button
+	await _click_marker(opening)
+	await _settle_travel()
+	if not _expect(shell.find_child("RunBoard", true, false) == board and board.call("selected_id") == sess.current_node_id and not bool(shell.get("_run_going")) and String((app.get("current_race_session") as Dictionary).get("run_node_id", "")).is_empty(), "first press on the previewed opening only picks it; no travel or race starts"):
+		return
 	opening.pressed.emit()
 	await _settle_travel()
 	var race_session: Dictionary = app.get("current_race_session")
-	if not _expect(String(race_session.get("run_node_id", "")) == sess.current_node_id, "pressing the picked opening race must start it"):
+	if not _expect(String(race_session.get("run_node_id", "")) == sess.current_node_id, "second press on the picked opening race starts it"):
 		return
 	app.call("report_race_result", RUN_WALK.WIN, 1.0, [], false, {})
 	shell.call("show_run_board")
@@ -131,7 +141,7 @@ func _run_test() -> void:
 	for node_id: String in sess.current_map.nodes:
 		if node_id != standing and not sess.available_nodes().any(func(n: Dictionary) -> bool: return n["id"] == node_id):
 			far_id = node_id
-	(board.get_node_or_null("Node_" + far_id.replace("_", "-")) as Button).pressed.emit()
+	await _click_marker(board.get_node_or_null("Node_" + far_id.replace("_", "-")) as Button)
 	await process_frame
 	go = shell.find_child("RunGo", true, false) as Button
 	if not _expect(sess.current_node_id == standing and board.call("selected_id") == far_id and go.disabled and go.focus_mode == Control.FOCUS_NONE and _has_label(shell, "OUT OF REACH"), "picking an out-of-reach stop shows it and offers no way there"):
@@ -143,6 +153,27 @@ func _run_test() -> void:
 	var target_kind := String(sess.current_map.get_node(target_id)["type"])
 	if not _expect(sess.current_node_id == standing and board.call("selected_id") == target_id and _has_label(shell, String(RUN_UI.TYPES[target_kind]["name"])), "picking a reachable stop shows it without going"):
 		return
+	# Focus travel is an explicit pick; the next activation may confirm it.
+	var confirmed: Array[String] = []
+	var focus_map := RUN_MAP_VIEW.new()
+	focus_map.reduced_motion = true
+	focus_map.position = Vector2(1400, 0)
+	root.add_child(focus_map)
+	focus_map.configure(sess, true)
+	focus_map.stop_confirmed.connect(func(id: String) -> void: confirmed.append(id))
+	focus_map.preview(standing)
+	await _click_marker(focus_map.marker(target_id))
+	if not _expect(focus_map.selected_id() == target_id and confirmed.is_empty(), "mouse focus before a first press picks the different marker without confirming"):
+		return
+	focus_map.preview(standing)
+	(focus_map.marker(target_id) as Button).grab_focus()
+	if not _expect(focus_map.selected_id() == target_id and confirmed.is_empty(), "controller focus travel picks without confirming"):
+		return
+	(focus_map.marker(target_id) as Button).pressed.emit()
+	if not _expect(confirmed == [target_id], "A on the focus-picked stop confirms it"):
+		return
+	root.remove_child(focus_map)
+	focus_map.queue_free()
 	(shell.find_child("RunGo", true, false) as Button).pressed.emit()
 	await _settle_travel()
 	if not _expect(String(sess.current_node_id) == target_id, "the go button must enter the picked stop"):
@@ -203,17 +234,17 @@ func _run_test() -> void:
 	# With a run in progress the title offers to continue it, not to replace it.
 	shell.call("show_title")
 	await process_frame
-	var continue_button := _button_with_text(shell, "YOUR RUN")
-	if not _expect(continue_button != null and _button_with_text(shell, "NEW RUN") == null, "the title offers YOUR RUN while a run is on"):
+	var continue_button := _button_with_text(shell, "PLAY")
+	if not _expect(continue_button != null and _button_with_text(shell, "NEW RUN") == null and _button_with_text(shell, "YOUR RUN") == null, "primary PLAY replaces separate NEW RUN/YOUR RUN labels"):
 		return
 	continue_button.pressed.emit()
 	await process_frame
-	if not _expect(shell.find_child("RunBoard", true, false) != null and app.call("current_run_session") == sess, "YOUR RUN returns to the same run"):
+	if not _expect(shell.find_child("RunBoard", true, false) != null and app.call("current_run_session") == sess, "PLAY returns to the same existing run"):
 		return
 	app.call("abandon_run")
 	shell.call("show_title")
 	await process_frame
-	if not _expect(_button_with_text(shell, "NEW RUN") != null, "with no run the title offers NEW RUN"):
+	if not _expect(_button_with_text(shell, "PLAY") != null, "with no run the title offers primary PLAY"):
 		return
 	if not _expect((shell.get("_run_backdrop") as ColorRect).visible == false, "leaving a run screen must restore the title backdrop"):
 		return
@@ -236,6 +267,23 @@ func _button_with_text(node: Node, text: String) -> Button:
 ## Waits out the car's drive along the map.
 func _settle_travel() -> void:
 	await create_timer(RUN_MAP_VIEW.TRAVEL_TIME + 0.3).timeout
+
+
+func _click_marker(button: Button) -> void:
+	for down: bool in [true, false]:
+		var click := InputEventMouseButton.new()
+		click.button_index = MOUSE_BUTTON_LEFT
+		click.pressed = down
+		click.position = button.get_global_rect().get_center()
+		click.global_position = click.position
+		Input.parse_input_event(click)
+		await process_frame
+		if down:
+			# Headless runs have no hovered window: exercise the GUI focus-before-press order.
+			if not _expect(Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT), "mouse fixture holds the button during marker focus"):
+				return
+			button.grab_focus()
+			button.pressed.emit()
 
 
 func _has_label_containing(node: Node, text: String) -> bool:
