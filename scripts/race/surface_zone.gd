@@ -4,6 +4,7 @@ extends Area2D
 var surface_name: StringName = &"track"
 var grip_multiplier: float = 1.0
 var speed_multiplier: float = 1.0
+var carry_profile: Dictionary = {}
 
 
 func configure(
@@ -12,9 +13,11 @@ func configure(
 		grip: float,
 		speed: float,
 		visual_color: Color = Color.TRANSPARENT,
-		label_text: String = ""
+		label_text: String = "",
+		carry: Dictionary = {}
 ) -> void:
 	surface_name = zone_name
+	carry_profile = carry.duplicate(true)
 	grip_multiplier = clampf(grip, 0.2, 1.5)
 	speed_multiplier = clampf(speed, 0.2, 1.5)
 	collision_layer = 0
@@ -60,7 +63,7 @@ func _exit_tree() -> void:
 
 func _on_body_entered(body: Node2D) -> void:
 	if body.has_method("apply_surface_modifier"):
-		body.call("apply_surface_modifier", get_instance_id(), surface_name, grip_multiplier, speed_multiplier)
+		body.call("apply_surface_modifier", get_instance_id(), surface_name, grip_multiplier, speed_multiplier, carry_profile)
 
 
 func _on_body_exited(body: Node2D) -> void:

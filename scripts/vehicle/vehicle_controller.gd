@@ -4,6 +4,8 @@ extends RigidBody2D
 const IDENTITIES := preload("res://scripts/presentation/procedural_identity_library.gd")
 const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_policy.gd")
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
+const SURFACE_CARRY := preload("res://scripts/vehicle/surface_carry.gd")
+const SURFACE_TRAIL := preload("res://scripts/vehicle/surface_trail_painter.gd")
 const CONTACT_RELEASE_GRACE := 0.12
 ## A small steer is not tyre sound. The bed stays at zero until the wheel is
 ## well past a correction, then rises slowly toward full lock.
@@ -71,6 +73,9 @@ var _external_power_multiplier: float = 1.0
 var _base_surface: StringName = &"polished counter"
 var _surface_modifiers: Dictionary = {}
 var _surface_sequence: int = 0
+var surface_carry := SURFACE_CARRY.new()
+var surface_trail: Node2D
+var _carry_sprite: Sprite2D
 var _contact_elapsed := 0.0
 var _contact_pair_last_seen: Dictionary = {}
 var _last_output_velocity := Vector2.ZERO
@@ -116,6 +121,12 @@ var _slide: Dictionary = {}
 
 func _ready() -> void:
 	apply_stats(stats)
+	if _visual_key.is_empty():
+		surface_carry.set_seed(stats.resource_path.hash())
+	surface_trail = SURFACE_TRAIL.new()
+	surface_trail.name = "SurfaceTrail"
+	add_child(surface_trail)
+	_carry_sprite = get_node_or_null("VisualRoot/CarSprite") as Sprite2D
 	gravity_scale = 0.0
 	linear_damp = 0.0
 	angular_damp = 0.0 if stats.physics_model_version != 0 else LEGACY_ANGULAR_DAMP
@@ -131,6 +142,9 @@ func _physics_process(delta: float) -> void:
 	if is_instance_valid(_racer_tag):
 		_racer_tag.global_position = global_position + _racer_tag_offset
 	_read_input()
+	update_surface_carry(delta)
+	if not controls_locked:
+		_steer_input = clampf(_steer_input + surface_carry.steering_noise, -1.0, 1.0)
 	_update_car_animation(delta)
 	var ver := stats.physics_model_version
 	if ver == 1:
@@ -364,6 +378,7 @@ func configure_visual_identity(identity: Variant) -> void:
 		visual_key = String(identity)
 	elif identity is Dictionary:
 		visual_key = String((identity as Dictionary).get("visual_key", (identity as Dictionary).get("vehicle_id", "")))
+	surface_carry.set_seed(visual_key.hash())
 	var visual_root := get_node_or_null("VisualRoot") as Node2D
 	if visual_root == null:
 		return
@@ -480,7 +495,8 @@ func configure_base_surface(surface_name: StringName) -> void:
 	_refresh_surface_modifier()
 
 
-func apply_surface_modifier(source_id: int, surface_name: StringName, grip_multiplier: float, speed_multiplier: float) -> void:
+func apply_surface_modifier(source_id: int, surface_name: StringName, grip_multiplier: float, speed_multiplier: float, carry_profile: Dictionary = {}) -> void:
+	surface_carry.enter(source_id, surface_name, carry_profile)
 	_surface_sequence += 1
 	_surface_modifiers[source_id] = {
 		"name": surface_name,
@@ -492,13 +508,26 @@ func apply_surface_modifier(source_id: int, surface_name: StringName, grip_multi
 
 
 func clear_surface_modifier(source_id: int) -> void:
+	surface_carry.leave(source_id)
 	_surface_modifiers.erase(source_id)
 	_refresh_surface_modifier()
 
 
 func reset_surface_modifiers() -> void:
+	surface_carry.reset()
+	if is_instance_valid(surface_trail):
+		surface_trail.reset()
 	_surface_modifiers.clear()
+	update_surface_carry(0.0)
+
+
+func update_surface_carry(delta: float) -> void:
+	surface_carry.step(delta)
 	_refresh_surface_modifier()
+	if is_instance_valid(_carry_sprite):
+		_carry_sprite.modulate = Color.WHITE.lerp(surface_carry.color, surface_carry.amount * 0.7)
+	if is_instance_valid(surface_trail):
+		surface_trail.step(delta, global_transform, surface_carry.color, surface_carry.amount)
 
 
 func _refresh_surface_modifier() -> void:
@@ -513,6 +542,7 @@ func _refresh_surface_modifier() -> void:
 		current_surface = modifier["name"]
 		surface_grip_multiplier = float(modifier["grip"])
 		surface_speed_multiplier = float(modifier["speed"])
+	surface_grip_multiplier *= surface_carry.grip_multiplier
 
 
 # ═══════════════════════════════════════════════════════════════════════
