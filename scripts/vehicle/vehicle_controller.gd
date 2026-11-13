@@ -6,6 +6,7 @@ const COLLISION_RESPONSE := preload("res://scripts/vehicle/collision_response_po
 const DYNAMICS := preload("res://scripts/vehicle/vehicle_dynamics.gd")
 const SURFACE_CARRY := preload("res://scripts/vehicle/surface_carry.gd")
 const SURFACE_TRAIL := preload("res://scripts/vehicle/surface_trail_painter.gd")
+const CARRY_TINT_WEIGHT := 0.7
 const CONTACT_RELEASE_GRACE := 0.12
 ## A small steer is not tyre sound. The bed stays at zero until the wheel is
 ## well past a correction, then rises slowly toward full lock.
@@ -518,14 +519,17 @@ func reset_surface_modifiers() -> void:
 	if is_instance_valid(surface_trail):
 		surface_trail.reset()
 	_surface_modifiers.clear()
+	_refresh_surface_modifier()
 	update_surface_carry(0.0)
 
 
 func update_surface_carry(delta: float) -> void:
+	var previous_grip := surface_carry.grip_multiplier
 	surface_carry.step(delta)
-	_refresh_surface_modifier()
+	if previous_grip != surface_carry.grip_multiplier:
+		_refresh_surface_modifier()
 	if is_instance_valid(_carry_sprite):
-		_carry_sprite.modulate = Color.WHITE.lerp(surface_carry.color, surface_carry.amount * 0.7)
+		_carry_sprite.modulate = Color.WHITE.lerp(surface_carry.color, surface_carry.amount * CARRY_TINT_WEIGHT)
 	if is_instance_valid(surface_trail):
 		surface_trail.step(delta, global_transform, surface_carry.color, surface_carry.amount)
 

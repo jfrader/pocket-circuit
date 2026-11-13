@@ -7,6 +7,7 @@ const MIN_DISTANCE := 2.0
 const MAX_DISTANCE := 100.0
 const TYRE_OFFSET := Vector2(14.0, 22.0)
 const WIDTH := 5.0
+const OPACITY := 0.65
 
 var _starts := PackedVector2Array()
 var _ends := PackedVector2Array()
@@ -24,6 +25,7 @@ func _init() -> void:
 	_colors.resize(MAX_SEGMENTS)
 	_ages.resize(MAX_SEGMENTS)
 	_ages.fill(LIFETIME)
+	top_level = true
 	z_as_relative = false
 	z_index = -1
 
@@ -43,7 +45,7 @@ func step(delta: float, pose: Transform2D, color: Color, carry: float) -> void:
 				var offset := Vector2(TYRE_OFFSET.x * side, TYRE_OFFSET.y)
 				_starts[_cursor] = _previous * offset
 				_ends[_cursor] = pose * offset
-				_colors[_cursor] = Color(color, carry * 0.65)
+				_colors[_cursor] = Color(color, carry * OPACITY)
 				_ages[_cursor] = 0.0
 				_cursor = (_cursor + 1) % MAX_SEGMENTS
 		_previous = pose
