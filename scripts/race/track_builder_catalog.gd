@@ -11,7 +11,7 @@ const DUST_CARRY := {"build_rate": 0.8, "decay_rate": 0.35, "grip_penalty": 0.18
 const PAPER_CARRY := {"build_rate": 0.9, "decay_rate": 0.45, "grip_penalty": 0.12, "steering_noise": 0.045, "color": Color("e8dcc2")}
 const SLOPPY_CARRY := {"build_rate": 2.0, "decay_rate": 0.6, "grip_penalty": 0.1, "steering_noise": 0.12, "color": Color("78adbf")}
 const OIL_CARRY := {"build_rate": 1.8, "decay_rate": 0.4, "grip_penalty": 0.14, "steering_noise": 0.14, "color": Color("615849")}
-const STICKY_CARRY := {"build_rate": 0.35, "decay_rate": 0.12, "grip_penalty": 0.42, "steering_noise": 0.025, "color": Color("b47539")}
+const STICKY_CARRY := {"build_rate": 0.35, "decay_rate": 0.28, "grip_penalty": 0.42, "steering_noise": 0.025, "color": Color("b47539")}
 const CLEAN_CARRY := {"build_rate": 0.0, "decay_rate": 0.0, "grip_penalty": 0.0, "steering_noise": 0.0, "color": Color.WHITE}
 
 

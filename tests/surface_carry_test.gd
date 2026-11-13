@@ -34,6 +34,7 @@ func _run() -> void:
 	await _test_ai_carried_grip()
 	await _test_controller_and_cleanup()
 	await _test_live_zone()
+	await _test_sticky_recovery()
 	_test_generated_profiles()
 	if _failed:
 		quit(1)
@@ -379,6 +380,38 @@ func _test_generated_profiles() -> void:
 			_expect(presenter.surface_zones[index].carry_profile == definitions[index]["carry"], "presenter forwards carry even with transparent zone visuals")
 		track.free()
 	_expect(saw_debris, "generated profile coverage includes actual corner debris")
+
+
+func _test_sticky_recovery() -> void:
+	_expect(1.0 / float(DATA.STICKY_CARRY["decay_rate"]) <= 4.0, "saturated sticky carry clears within four seconds after exit")
+	for vehicle_id: String in ["rustbug", "pinbolt", "scrapjaw", "flicker"]:
+		var world := Node2D.new()
+		root.add_child(world)
+		var car := (load("res://scenes/vehicles/rustbug.tscn") as PackedScene).instantiate() as VehicleController
+		car.stats = load("res://data/vehicles/%s.tres" % vehicle_id)
+		car.set_player_controlled(false)
+		world.add_child(car)
+		car.set_physics_process(false)
+		car.start_surface_carry(1427, 0)
+		car.apply_surface_modifier(1, &"sticky", 0.55, 1.0, DATA.STICKY_CARRY)
+		car.update_surface_carry(10.0)
+		_expect(is_equal_approx(car.surface_grip_multiplier, 0.319), "saturated sticky on a low-grip patch retains configured grip")
+		car.clear_surface_modifier(1)
+		car.linear_velocity = Vector2.UP * 280.0
+		car.set_external_controls(0.5, 0.25, 0.6)
+		car.set_physics_process(true)
+		for tick in 30:
+			await physics_frame
+		var heading := absf(car.rotation)
+		_expect(heading > 0.05 and heading < PI * 0.5 and absf(car.position.x) > 10.0, "%s can steer clear with saturated sticky carry without spinning" % vehicle_id)
+		car.set_external_controls(0.5, 0.0, 0.0)
+		for tick in 210:
+			await physics_frame
+		_expect(car.surface_carry.amount == 0.0 and car.surface_grip_multiplier == 1.0, "%s recovers dry grip within four seconds" % vehicle_id)
+		_expect(is_finite(car.rotation) and car.linear_velocity.is_finite() and absf(car.slip_angle) < 15.0, "%s settles after steering out of sticky carry" % vehicle_id)
+		print("STICKY_RECOVERY %s heading=%.3f exit_x=%.2f final_slip=%.3f" % [vehicle_id, heading, car.position.x, car.slip_angle])
+		world.queue_free()
+		await process_frame
 
 
 func _expect(condition: bool, message: String) -> void:
