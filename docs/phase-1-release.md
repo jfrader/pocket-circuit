@@ -122,9 +122,12 @@ The current surface configuration is exact:
 
 Surface multipliers are transient vehicle state and never mutate the selected
 VehicleStats resource. They apply equally to player and AI, support overlapping
-zones, and reset to the room's base surface after exit or recovery. Slippery
-surfaces and on-course obstacles sit only on calm stretches, away from corners
-in both race directions. There is no moving hazard.
+zones, and reset to the room's base surface after exit or recovery. On-course
+obstacles keep a bounded calm clearance from corners in both race directions
+and never occupy the racing line through a corner. Slippery patches and technical
+surface zones stay on calm stretches outside corners; seeded corner water/debris
+is the bounded exception, leaving a driveable line rather than covering the full
+corridor. There is no moving hazard.
 
 Generated events vary their layout, room canvas, surface zones and permanent
 obstacles. They do not share one learned racing line across acts.
@@ -148,7 +151,8 @@ A hot connector becomes a chase sprint through traffic. Capture requires 1.5
 seconds within two car widths, in the same route section with clear sight.
 At 180 seconds rescue stops the pursuer, not the drive: reach the finish to arrive.
 Capture impounds the haul; a parts van can ransom a car for 10 points as its one
-action. Banking at a bench or resolving an act rival secures carried haul.
+action. Chase arrival, banking at a bench or resolving an act rival secures
+carried haul.
 At night end only collection-safe won cars transfer: unbanked, impounded and
 unanswered-offer cars are excluded. Night endings include VIEW GARAGE.
 

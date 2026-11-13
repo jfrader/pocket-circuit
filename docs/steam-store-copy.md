@@ -5,29 +5,37 @@ multiplayer, live-service, or future-content promise.
 
 ## Short description
 
-Race tiny machines across giant kitchen, workshop, and office circuits in a
-complete offline arcade championship. Master nine brisk events, outdrive three
-rivals, and unlock four tuned handling builds before sunrise.
+Race tiny machines across the house in an offline night-by-night Run. Pick your
+route, win cars, escape pursuit and bank your haul before the Basement finale.
+A nine-event championship is also included.
 
 ## About this game
 
-The Grand Household Circuit begins after dark. Rookie Rae Sparks has one repaired
-Rustbug, one night, and one chance to prove that the household's biggest race
-belongs to every driver—not only the reigning champion.
+The Run begins after dark: pick branching stops, race six-car fields, challenge
+duels, buy parts and keep your haul safe. Beat each act rival and win the
+three-lap Basement finale before sunrise. A loss can end the night; only
+collection-safe won cars reach the garage.
+
+In the secondary Grand Household Circuit championship, rookie Rae Sparks has one
+repaired Rustbug, one night, and one chance to prove that the household's biggest
+race belongs to every driver—not only the reigning champion.
 
 Pocket Circuit is a top-down arcade racer built around immediate handling and
 miniature spectacle. Thread between oversized mugs, tools, papers and spills in
-two-to-five-minute races. Earn points without a lives system,
-unlock side-grade vehicles, and replay completed events with any machine you
-have earned.
+two-to-five-minute championship races. In the championship, earn points without
+a lives system, unlock side-grade vehicles, and replay completed events with any
+machine you have earned.
 
-Three acts build from kitchen qualifier to workshop league and office final.
+The championship's three acts build from kitchen qualifier to workshop league
+and office final.
 Short event cards and rival exchanges keep the story moving while the racing
 stays in control. The whole championship, settings, unlocks, and replays work
 offline with no account required.
 
 ## Features
 
+- A branching single-player Run with parts vans, benches, lockups, errands,
+  car offers, haul chases and a Basement finale.
 - A complete nine-event single-player championship across three room themes.
 - Four handling identities: balanced Rustbug, grip-focused Pinbolt, heavy
   Scrapjaw, and drift-focused Flicker.
@@ -109,9 +117,9 @@ Steamworks submission.
 - Pocket Circuit requires no account or network connection and contains no
   advertising, analytics, telemetry, live AI, voice chat, or user-generated
   content upload.
-- The game stores championship progress and settings locally. Steam Cloud may
-  synchronize those files when the publisher enables it and the Steam client is
-  online.
+- The game stores Run and championship progress, the garage and settings locally.
+  Steam Cloud may synchronize those files when the publisher enables it and the
+  Steam client is online.
 
 Publish equivalent wording on the studio privacy/support page before entering a
 privacy-policy URL in Steamworks.
