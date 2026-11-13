@@ -981,6 +981,7 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 			"role": &"technical",
 			"lane": &"full",
 			"grip": float(technical_data["grip"]),
+			"carry": technical_data["carry"],
 			"speed": float(technical_data["speed"]),
 			"points": technical_polygon,
 			"decal": String(technical_data["decal"]),
@@ -1011,6 +1012,7 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 		"role": &"shortcut",
 		"lane": &"inside",
 		"grip": float(shortcut_data["grip"]),
+		"carry": shortcut_data["carry"],
 		"speed": maxf(float(shortcut_data["speed"]), 1.06),
 		"points": shortcut_polygon,
 		"decal": String(shortcut_data["decal"]),
@@ -1114,6 +1116,7 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 				"role": &"patch",
 				"lane": &"mixed",
 				"grip": float(data["grip"]),
+				"carry": data["carry"],
 				"speed": float(data.get("speed", data["grip"])),
 				"points": poly,
 				"decal": String(data["decal"]),
@@ -1180,6 +1183,7 @@ static func build_generated_surfaces(root: Node2D, parent: Node2D, story: Dictio
 				"role": &"debris",
 				"lane": &"mixed",
 				"grip": float(data["grip"]),
+				"carry": data["carry"],
 				"speed": float(data.get("speed", data["grip"])),
 				"points": poly,
 				"decal": String(data["decal"]),
@@ -1220,7 +1224,7 @@ static func build_open_generated_surfaces(root: Node2D, parent: Node2D, story: D
 		node.set_meta("moment_kind", &"grip_patch")
 		parent.add_child(node)
 		add_surface_decals(node, centerline, index, TECHNICAL_HALF_SPAN, String(data["decal"]), lateral)
-		definitions.append({"name": StringName(data["name"]), "role": &"patch", "lane": &"mixed", "grip": float(data["grip"]), "speed": float(data["speed"]), "points": polygon, "decal": String(data["decal"]), "centerline_index": index, "lateral_mm": lateral})
+		definitions.append({"name": StringName(data["name"]), "role": &"patch", "lane": &"mixed", "carry": data["carry"], "grip": float(data["grip"]), "speed": float(data["speed"]), "points": polygon, "decal": String(data["decal"]), "centerline_index": index, "lateral_mm": lateral})
 	root.set_meta("generated_surfaces", definitions)
 
 
