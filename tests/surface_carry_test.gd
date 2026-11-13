@@ -7,10 +7,18 @@ const ZONE := preload("res://scripts/race/surface_zone.gd")
 const TRAIL := preload("res://scripts/vehicle/surface_trail_painter.gd")
 const PRESENTER := preload("res://scripts/presentation/track_variant_presenter.gd")
 const BUILDER := preload("res://scripts/race/track_builder_core.gd")
+const AI := preload("res://scripts/vehicle/ai_vehicle_controller.gd")
 const FIXED_FPS := 60
 const DELTA := 1.0 / FIXED_FPS
 
 var _failed := false
+
+
+class RecordingTrail extends TRAIL:
+	var commands: Array[Dictionary] = []
+
+	func _draw_segment(start: Vector2, end: Vector2, tint: Color) -> void:
+		commands.append({"start": start, "end": end, "color": tint})
 
 
 func _initialize() -> void:
@@ -21,6 +29,9 @@ func _run() -> void:
 	_test_rates_and_overlaps()
 	_test_determinism()
 	_test_profiles()
+	_test_trail_draw_commands()
+	await _test_race_identity_and_finish()
+	await _test_ai_carried_grip()
 	await _test_controller_and_cleanup()
 	await _test_live_zone()
 	_test_generated_profiles()
@@ -60,6 +71,24 @@ func _test_rates_and_overlaps() -> void:
 	_expect(is_equal_approx(float(overlap.layers[&"water"]["amount"]), 0.5), "new material has an independent curve")
 	overlap.reset()
 	_expect(overlap.layers.is_empty() and overlap.amount == 0.0, "recovery clears coating")
+	var single := CARRY.new()
+	var stacked := CARRY.new()
+	var reversed := CARRY.new()
+	single.enter(1, &"bench oil", DATA.OIL_CARRY)
+	stacked.enter(1, &"bench oil", DATA.OIL_CARRY)
+	stacked.enter(2, &"oil slick", DATA.OIL_CARRY)
+	reversed.enter(2, &"oil slick", DATA.OIL_CARRY)
+	reversed.enter(1, &"bench oil", DATA.OIL_CARRY)
+	for tick in 180:
+		for carry in [single, stacked, reversed]:
+			carry.step(DELTA)
+		_expect(single.amount == stacked.amount and single.grip_multiplier == stacked.grip_multiplier and single.steering_noise == stacked.steering_noise, "differently named identical coatings never double-charge grip or wander")
+	_expect(stacked.grip_multiplier == reversed.grip_multiplier and stacked.color == reversed.color, "overlap result ignores entry order")
+	stacked.enter(3, &"water", DATA.SLOPPY_CARRY)
+	stacked.leave(1)
+	stacked.leave(2)
+	stacked.step(0.4)
+	_expect(is_equal_approx(stacked.amount, 0.84) and is_equal_approx(stacked.grip_multiplier, 1.0 - 0.84 * float(DATA.OIL_CARRY["grip_penalty"])) and stacked.color == DATA.OIL_CARRY["color"], "highest remaining contribution owns its complete profile, not the newest contact")
 
 
 func _test_determinism() -> void:
@@ -110,8 +139,62 @@ func _make_vehicle(world: Node2D, player: bool) -> VehicleController:
 	car.freeze = true
 	world.add_child(car)
 	car.set_physics_process(false)
-	car.surface_carry.set_seed(1427)
+	car.start_surface_carry(1427, 0)
 	return car
+
+
+func _test_race_identity_and_finish() -> void:
+	var baseline := get_node_count()
+	var samples: Array[float] = []
+	for replay in 2:
+		var world := Node2D.new()
+		root.add_child(world)
+		var manager := RaceManager.new()
+		world.add_child(manager)
+		manager.set_physics_process(false)
+		manager.race_seed = 1427
+		var first := _make_vehicle(world, true)
+		var second := _make_vehicle(world, false)
+		for car in [first, second]:
+			car.configure_identity("Same driver", "Rustbug", "rustbug")
+			manager.register_racer(car, "Same driver", "Rustbug", car == first)
+		manager.prepare_race()
+		for car in [first, second]:
+			car.apply_surface_modifier(1, &"wet", 0.8, 1.0, DATA.SLOPPY_CARRY)
+		for tick in 10 + replay * 15:
+			first._physics_process(DELTA)
+		_expect(first.surface_carry.amount == 0.0, "countdown contact does not acquire carry or advance race noise")
+		manager.start_race()
+		var differs := false
+		for tick in 30:
+			for car in [first, second]:
+				car.update_surface_carry(DELTA)
+			if replay == 0:
+				samples.append(first.surface_carry.steering_noise)
+			else:
+				_expect(first.surface_carry.steering_noise == samples[tick], "production race seed reproduces despite different countdown lengths")
+			differs = differs or not is_equal_approx(first.surface_carry.steering_noise, second.surface_carry.steering_noise)
+		_expect(differs, "same-livery racers receive distinct slot-seeded noise, including the player")
+		var phase_sample := first.surface_carry.steering_noise
+		first.configure_identity("Cosmetic change", "Rustbug", "rustbug")
+		_expect(first.surface_carry.steering_noise == phase_sample, "cosmetics do not reset gameplay noise")
+		first.position += Vector2(5.0, 0.0)
+		first.update_surface_carry(0.1)
+		_expect(first.surface_trail.active_segments() == 2, "two tyre marks emitted before finish")
+		var trail_id := first.surface_trail.get_instance_id()
+		var carry_ref: WeakRef = weakref(first.surface_carry)
+		manager._finish_racer(first, manager._racers[first])
+		for tick in 60:
+			first.apply_surface_modifier(1, &"wet", 0.8, 1.0, DATA.SLOPPY_CARRY)
+			first.position += Vector2(5.0, 0.0)
+			first._physics_process(DELTA)
+		_expect(first.surface_carry.amount == 0.0 and first.surface_carry.layers.is_empty(), "finish inside a zone stops acquisition")
+		_expect(first.surface_trail.active_segments() == 0, "finish clears existing marks and emits no new segments")
+		_expect(first.get_node("VisualRoot/CarSprite").modulate == Color.WHITE, "finish clears coating tint")
+		manager.stop_race()
+		world.queue_free()
+		await process_frame
+		_expect(not is_instance_id_valid(trail_id) and carry_ref.get_ref() == null and get_node_count() == baseline, "finished race teardown releases carry and trail without node leaks")
 
 
 func _test_controller_and_cleanup() -> void:
@@ -151,7 +234,14 @@ func _test_controller_and_cleanup() -> void:
 			ai._physics_process(DELTA)
 			_expect(player.surface_carry.amount == ai.surface_carry.amount, "player and AI share every build/decay sample")
 			_expect(is_equal_approx(player._steer_input, ai._steer_input), "both inputs receive identical seeded steering wander")
+			var expected_steer := clampf(0.2 + player.surface_carry.steering_noise, -1.0, 1.0)
+			_expect(is_equal_approx(player._steer_input, expected_steer) and is_equal_approx(ai._steer_input, expected_steer), "player and external controls apply the actual noise sample")
 			if tick == 60:
+				var phase := float(posmod("0:1427".hash(), 65536)) / 65536.0 * TAU
+				var elapsed := 61.0 * DELTA
+				var weight := float(DATA.DUST_CARRY["build_rate"]) * elapsed
+				var noise := float(DATA.DUST_CARRY["steering_noise"]) * weight * lerpf(sin(elapsed * 4.1 + phase * 1.7), sin(elapsed * 2.3 + phase), 0.65)
+				_expect(absf(noise) > 0.001 and is_equal_approx(player._steer_input, 0.2 + noise) and is_equal_approx(ai._steer_input, 0.2 + noise), "known seeded steering delta is nonzero on both production input paths")
 				_expect(player.get_node("VisualRoot/CarSprite").modulate != Color.WHITE, "coating visibly tints existing car sprite")
 				_expect(player.surface_grip_multiplier < 0.8, "contact grip also includes carry penalty")
 			if tick == 120:
@@ -161,7 +251,7 @@ func _test_controller_and_cleanup() -> void:
 		Input.action_release("steer_right")
 		_expect(player.surface_carry.amount == 0.0, "controller coating reaches zero after exit")
 		_expect(player.get_node("VisualRoot/CarSprite").modulate == Color.WHITE, "clean tyre tint is restored")
-		_expect(player.surface_trail.active_segments() > 0, "trail actually paints, not an empty bounded stub")
+		_expect(player.surface_trail.active_segments() > 0, "controller emits segments into its bounded trail node")
 		_expect(player.surface_trail.global_transform == Transform2D.IDENTITY, "world-space trail does not inherit car movement or rotation")
 		player.update_surface_carry(TRAIL.LIFETIME)
 		_expect(player.surface_trail.active_segments() == 0, "trail fades away with time even when stationary")
@@ -180,6 +270,61 @@ func _resource_values(resource: Resource) -> Dictionary:
 		if int(property["usage"]) & PROPERTY_USAGE_STORAGE:
 			values[property["name"]] = resource.get(property["name"])
 	return values
+
+
+func _test_trail_draw_commands() -> void:
+	var painter := RecordingTrail.new()
+	root.add_child(painter)
+	var nodes := get_node_count()
+	painter.step(0.1, Transform2D.IDENTITY, Color.RED, 0.5)
+	painter.step(0.1, Transform2D(0.0, Vector2(10.0, 0.0)), Color.RED, 0.5)
+	painter._draw()
+	_expect(painter.active_segments() == 2 and painter.commands.size() == 2, "two tyre segments produce exactly two draw commands")
+	if painter.commands.size() == 2:
+		var first: Dictionary = painter.commands[0]
+		_expect(first["start"] == Vector2(-14.0, 22.0) and first["end"] == Vector2(-4.0, 22.0), "draw commands contain emitted world-space tyre geometry")
+		_expect(is_equal_approx((first["color"] as Color).a, 0.5 * TRAIL.OPACITY), "draw command carries coating opacity")
+		painter.commands.clear()
+		painter.step(TRAIL.LIFETIME * 0.5, Transform2D.IDENTITY, Color.WHITE, 0.0)
+		painter._draw()
+		_expect(painter.commands.size() == 2 and is_equal_approx((painter.commands[0]["color"] as Color).a, 0.25 * TRAIL.OPACITY), "drawn segments fade to half alpha halfway through lifetime")
+	painter.commands.clear()
+	painter.step(TRAIL.LIFETIME, Transform2D.IDENTITY, Color.WHITE, 0.0)
+	painter._draw()
+	_expect(painter.commands.is_empty() and painter.active_segments() == 0, "expired marks issue no draw commands")
+	_expect(painter.get_child_count() == 0 and get_node_count() == nodes, "emitting and fading allocate no per-segment nodes")
+	painter.free()
+
+
+func _test_ai_carried_grip() -> void:
+	var world := Node2D.new()
+	root.add_child(world)
+	var car := _make_vehicle(world, false)
+	var manager := RaceManager.new()
+	world.add_child(manager)
+	manager.set_physics_process(false)
+	manager.register_racer(car, "AI", "Rustbug")
+	var ai := AI.new() as AIVehicleController
+	car.add_child(ai)
+	ai.configure(car, manager, 0.0)
+	ai.set_physics_process(false)
+	var plan := {"risk": 0.8, "grip_scale": 0.48}
+	var dry_grip := ai._planned_surface_grip(plan)
+	var dry_target := ai._surface_driving_speed_scale(1.0, 0.48, Vector2.RIGHT)
+	ai._anticipated_grip = dry_grip
+	ai._prepare_v1_speed_envelope()
+	var dry_braking := ai._envelope_braking_accel
+	var dry_corner := ai._prepared_v1_speed_envelope(100.0, 0.0)
+	car.apply_surface_modifier(1, &"sticky", 1.0, 1.0, DATA.STICKY_CARRY)
+	car.update_surface_carry(10.0)
+	var carried_grip := ai._planned_surface_grip(plan)
+	_expect(is_equal_approx(carried_grip, 0.48 * 0.58), "AI anticipates zone grip multiplied by existing carried grip")
+	_expect(ai._surface_driving_speed_scale(1.0, 0.48, Vector2.RIGHT) < dry_target, "AI correction speed target accounts for carried grip")
+	ai._anticipated_grip = carried_grip
+	ai._prepare_v1_speed_envelope()
+	_expect(ai._envelope_braking_accel < dry_braking and ai._prepared_v1_speed_envelope(100.0, 0.0) < dry_corner, "AI braking capacity and corner target decrease before entering the upcoming zone")
+	world.queue_free()
+	await process_frame
 
 
 func _test_live_zone() -> void:

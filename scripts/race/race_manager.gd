@@ -24,6 +24,7 @@ var checkpoints: Array[Node] = []
 var current_checkpoint_index: int = 0
 var lap_count: int = 0
 var race_time: float = 0.0
+var race_seed: int = 0
 var is_running: bool = false
 var last_recovery_transform: Transform2D = Transform2D.IDENTITY
 
@@ -213,6 +214,8 @@ func prepare_race() -> void:
 		state["wrong_way_time"] = 0.0
 		_racers[vehicle] = state
 		_set_vehicle_controls_locked(vehicle, true)
+		if vehicle.has_method("prepare_surface_carry"):
+			vehicle.prepare_surface_carry()
 	_prepared = true
 	_rankings_dirty = true
 	_sync_player_compatibility()
@@ -234,6 +237,8 @@ func start_race() -> void:
 	is_running = true
 	for vehicle: Node2D in _registration_order:
 		if is_instance_valid(vehicle):
+			if vehicle.has_method("start_surface_carry"):
+				vehicle.start_surface_carry(race_seed, int(_racers[vehicle]["registration_index"]))
 			_set_vehicle_controls_locked(vehicle, false)
 	race_started.emit()
 
@@ -243,6 +248,12 @@ func stop_race() -> void:
 	for vehicle: Node2D in _registration_order:
 		if is_instance_valid(vehicle):
 			_set_vehicle_controls_locked(vehicle, true)
+			_end_vehicle_carry(vehicle)
+
+
+func _end_vehicle_carry(vehicle: Node2D) -> void:
+	if vehicle.has_method("finish_surface_carry"):
+		vehicle.finish_surface_carry()
 
 
 func advance_race_time(delta: float) -> void:
@@ -313,6 +324,7 @@ func report_checkpoint(checkpoint: Area2D, body: Node2D) -> bool:
 
 
 func _finish_strip_player(vehicle: Node2D, state: Dictionary) -> void:
+	_end_vehicle_carry(vehicle)
 	state["finished"] = true
 	state["finish_time"] = race_time
 	state["progress"] = float(_strip_finish)
@@ -442,6 +454,7 @@ func finalize_remaining_racers_as_dnf() -> void:
 			continue
 		state["finished"] = true
 		state["dnf"] = true
+		_end_vehicle_carry(vehicle)
 		state["finish_position"] = _finish_order.size() + 1
 		state["finish_time"] = float(state["elapsed"])
 		_racers[vehicle] = state
@@ -694,6 +707,7 @@ func _recovery_transform_on_route(position: Vector2) -> Dictionary:
 
 
 func _finish_racer(vehicle: Node2D, state: Dictionary) -> void:
+	_end_vehicle_carry(vehicle)
 	state["finished"] = true
 	state["dnf"] = false
 	state["finish_position"] = _finish_order.size() + 1

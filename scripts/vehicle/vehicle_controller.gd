@@ -117,13 +117,13 @@ var _rear_grip_recovery := 1.0  # 0..1 interpolation factor during recovery
 var _front_lateral_force := 0.0  # cached for friction circle
 var _rear_lateral_force := 0.0  # cached for friction circle
 var _slide: Dictionary = {}
+var _carry_active := true
+var _carry_finished := false
 
 
 
 func _ready() -> void:
 	apply_stats(stats)
-	if _visual_key.is_empty():
-		surface_carry.set_seed(stats.resource_path.hash())
 	surface_trail = SURFACE_TRAIL.new()
 	surface_trail.name = "SurfaceTrail"
 	add_child(surface_trail)
@@ -379,7 +379,6 @@ func configure_visual_identity(identity: Variant) -> void:
 		visual_key = String(identity)
 	elif identity is Dictionary:
 		visual_key = String((identity as Dictionary).get("visual_key", (identity as Dictionary).get("vehicle_id", "")))
-	surface_carry.set_seed(visual_key.hash())
 	var visual_root := get_node_or_null("VisualRoot") as Node2D
 	if visual_root == null:
 		return
@@ -496,11 +495,37 @@ func configure_base_surface(surface_name: StringName) -> void:
 	_refresh_surface_modifier()
 
 
+func start_surface_carry(race_seed: int, racer_slot: int) -> void:
+	surface_carry.set_seed((str(racer_slot) + ":" + str(race_seed)).hash())
+	_carry_active = true
+	_carry_finished = false
+
+
+func prepare_surface_carry() -> void:
+	_carry_active = false
+	_carry_finished = false
+	surface_carry.reset()
+	for source_id: int in _surface_modifiers:
+		var modifier: Dictionary = _surface_modifiers[source_id]
+		surface_carry.enter(source_id, modifier["name"], modifier["carry"])
+	if is_instance_valid(surface_trail):
+		surface_trail.reset()
+	_refresh_surface_modifier()
+
+
+func finish_surface_carry() -> void:
+	_carry_active = false
+	_carry_finished = true
+	reset_surface_modifiers()
+
+
 func apply_surface_modifier(source_id: int, surface_name: StringName, grip_multiplier: float, speed_multiplier: float, carry_profile: Dictionary = {}) -> void:
-	surface_carry.enter(source_id, surface_name, carry_profile)
+	if not _carry_finished:
+		surface_carry.enter(source_id, surface_name, carry_profile)
 	_surface_sequence += 1
 	_surface_modifiers[source_id] = {
 		"name": surface_name,
+		"carry": carry_profile,
 		"grip": clampf(grip_multiplier, 0.2, 1.5),
 		"speed": clampf(speed_multiplier, 0.2, 1.5),
 		"sequence": _surface_sequence,
@@ -516,6 +541,8 @@ func clear_surface_modifier(source_id: int) -> void:
 
 func reset_surface_modifiers() -> void:
 	surface_carry.reset()
+	if is_instance_valid(_carry_sprite):
+		_carry_sprite.modulate = Color.WHITE
 	if is_instance_valid(surface_trail):
 		surface_trail.reset()
 	_surface_modifiers.clear()
@@ -524,6 +551,8 @@ func reset_surface_modifiers() -> void:
 
 
 func update_surface_carry(delta: float) -> void:
+	if not _carry_active:
+		return
 	var previous_grip := surface_carry.grip_multiplier
 	surface_carry.step(delta)
 	if previous_grip != surface_carry.grip_multiplier:
@@ -546,7 +575,11 @@ func _refresh_surface_modifier() -> void:
 		current_surface = modifier["name"]
 		surface_grip_multiplier = float(modifier["grip"])
 		surface_speed_multiplier = float(modifier["speed"])
-	surface_grip_multiplier *= surface_carry.grip_multiplier
+	surface_grip_multiplier = effective_surface_grip(surface_grip_multiplier)
+
+
+func effective_surface_grip(zone_grip: float) -> float:
+	return zone_grip * surface_carry.grip_multiplier
 
 
 # ═══════════════════════════════════════════════════════════════════════

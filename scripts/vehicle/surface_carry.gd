@@ -1,6 +1,7 @@
 extends RefCounted
 ## Transient tyre coating. Contacts of the same material share one layer;
-## different materials build/decay independently, independent of entry order.
+## different materials build/decay independently. The highest contribution owns
+## the applied profile; equal contributions use material name order, never entry order.
 const MIN_GRIP := 0.2
 const MAX_STEERING_NOISE := 0.25
 const WANDER_FREQUENCIES := Vector2(2.3, 4.1)
@@ -43,7 +44,9 @@ func step(delta: float) -> void:
 	color = Color.WHITE
 	var noise_strength := 0.0
 	var touching_materials := _contacts.values()
-	for material: StringName in layers.keys():
+	var materials := layers.keys()
+	materials.sort()
+	for material: StringName in materials:
 		var layer: Dictionary = layers[material]
 		var profile: Dictionary = layer["profile"]
 		var touching := touching_materials.has(material)
@@ -53,11 +56,11 @@ func step(delta: float) -> void:
 		if weight <= 0.0 and not touching:
 			layers.erase(material)
 			continue
-		grip_multiplier -= float(profile["grip_penalty"]) * weight
-		noise_strength += float(profile["steering_noise"]) * weight
 		if weight > amount:
 			amount = weight
 			color = profile["color"]
+			grip_multiplier = 1.0 - float(profile["grip_penalty"]) * weight
+			noise_strength = float(profile["steering_noise"]) * weight
 	grip_multiplier = clampf(grip_multiplier, MIN_GRIP, 1.0)
 	# Two smooth waves, never per-frame randomness or a shared RNG stream.
 	steering_noise = minf(noise_strength, MAX_STEERING_NOISE) * lerpf(

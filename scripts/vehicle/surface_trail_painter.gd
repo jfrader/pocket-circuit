@@ -74,4 +74,8 @@ func _draw() -> void:
 			continue
 		var tint := _colors[index]
 		tint.a *= 1.0 - _ages[index] / LIFETIME
-		draw_line(to_local(_starts[index]), to_local(_ends[index]), tint, WIDTH, true)
+		_draw_segment(to_local(_starts[index]), to_local(_ends[index]), tint)
+
+
+func _draw_segment(start: Vector2, end: Vector2, tint: Color) -> void:
+	draw_line(start, end, tint, WIDTH, true)

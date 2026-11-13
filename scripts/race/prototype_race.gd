@@ -259,6 +259,7 @@ func _ready() -> void:
 
 
 func _complete_race_setup(start_countdown: bool = true) -> void:
+	race_manager.race_seed = int((_session.get("event", {}) as Dictionary).get("seed", 0))
 	_create_pause_overlay()
 	_pause_overlay.enabled = start_countdown
 	_configure_racers()
