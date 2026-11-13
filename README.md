@@ -3,13 +3,16 @@
 Tiny racing. Big stakes.
 
 A premium offline top-down arcade racer where tiny vehicles compete across
-oversized kitchens, workshops, and offices. The complete Grand Household
-Circuit spans nine brisk events, three rival acts, and four unlockable handling
-archetypes. The implementation, setting, characters, vehicles, and content are
+oversized kitchens, workshops, offices and a basement. PLAY starts or resumes
+the Run: choose a route, race for points and cars, manage wear and haul, and
+reach the Basement finale. The secondary Grand Household Circuit spans nine
+events, three rival acts and four unlockable handling archetypes.
+The implementation, setting, characters, vehicles, and content are
 original; see the design spec IP note (§109).
 
 **Engine:** Godot 4.7.2 (GDScript) · **Version:** 1.0.0 · **Status:** Phase 1
-release candidate
+release candidate; manual controller and clean-machine Windows/Linux/Deck
+acceptance remains required for the exact candidate hash.
 **Presentation:** top-down **2D** sprites (Node2D / CanvasLayer). The original
 spec (§7) describes a 3D camera — the project renders as **2D**; where spec
 and 2D conflict, 2D wins and the spec's *feel* (readable at speed, follow
@@ -30,16 +33,22 @@ rules → networking → authoritative server → persistence → basic progress
 matchmaking → content. **Do not reverse this order.** A beautiful MMO garage
 attached to mediocre racing is a dead project.
 
-## Phase 1 — Single-Player Championship (GURI-255)
+## Phase 1 — Offline Run and Championship
 
 Phase 1 is a self-contained offline game:
 
-- Nine championship events across Kitchen, Workshop, and Office themes.
-- Four vehicles with balanced, grip, heavy, and drift handling identities.
-- Four-racer AI fields, rival duels, reverse races, surfaces, moving hazards,
-  checkpoints, recovery, finish order, and DNF grace.
-- A complete three-act story with persistent points, unlocks, event replay, and
-  an ending.
+- The primary Run: branching tabletop stops, six-car races, optional rival
+  duels, mandatory act rivals and an authored three-lap Basement finale.
+- Run points, parts vans, benches, errands, lockups, per-car wear, tow recovery
+  and one-use nitro. Races resolve once per night, with no retries.
+- Won-car offers, haul chase sprints, impound, ransom and banking. Only secured
+  won cars join the collection after the night; unbanked haul can be lost.
+- A secondary nine-event championship across Kitchen, Workshop and Office,
+  with four-car fields, rival duels, four handling archetypes, persistent points,
+  unlocks, event replay and a three-act story ending.
+- Quick Race, Quick Strip and Circuit Discovery.
+- Reverse circuits, surface zones, permanent obstacles, the Basement boiler
+  leak, checkpoints, recovery, finish order and DNF grace.
 - Keyboard and controller menus, pause/results flow, volume controls, reduced
   motion, reduced camera shake, and versioned local saves with backup recovery.
 - Native Windows x86_64 and Linux x86_64 release exports for Steam and Steam

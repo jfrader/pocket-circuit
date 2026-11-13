@@ -18,11 +18,17 @@ and line of copy is original.
 
 > Tiny racing. Big stakes. Win the Grand Household Circuit before sunrise.
 
-Races last two to five minutes. The full first championship should take about
-two to four hours on a first playthrough, with immediate event replay and
-faster subsequent runs.
+The primary Run follows branching stops across three acts. Each race counts
+once; there are no retries or replays within the night. Win each mandatory act
+rival to advance and win the three-lap Basement finale to finish the night.
+
+The secondary championship targets two-to-five-minute races and a two-to-four-hour
+first playthrough, with immediate event replay and faster subsequent playthroughs.
 
 ## Championship Story
+
+This story and cast belong to the secondary championship. The primary Run assigns
+opponents to each race stop and ends in the Basement, not the Office final.
 
 The annual Grand Household Circuit is an after-hours championship built across
 three enormous rooms. Retired racer and garage owner Inez "Spanner" Solis
@@ -46,6 +52,31 @@ short post-race exchanges. It never interrupts driving with long cutscenes.
 
 ## Event Structure
 
+### Primary Run
+
+Pick a reachable stop to inspect its route, opponents, reward and cost, then
+confirm travel. Unused stops can be reopened after Back or a restart until the
+next route is taken. Each stop offers one action; races must be resolved before
+moving on. Parts vans, benches, lockups and errands sit between race stops.
+
+| Stop | Field / action | Points / outcome |
+|---|---|---|
+| Race | Six cars | 1st–6th pay 6 / 4 / 3 / 2 / 1 / 0 |
+| Optional rival | One-on-one duel | Win: 6 points and a car offer; loss: up to 10 points, plus wear if funds are insufficient |
+| Act rival | Six cars; must win | Win advances the act; any other finish ends the night; final win completes the Run |
+| Parts van | Buy one part, tow, nitro or ransom one car | Listed part price; tow 10, nitro 5, ransom 10 |
+| Bench | Repair, fit a held part, swap car or bank haul | One action per visit; a tow consumes the next bench action |
+| Lockup | Reveal a car | One free car per act; DRIVE IT or SEND IT HOME |
+| Errand | Take pay, tune up or take a tow | 6 points, a seeded wear repair or one tow |
+
+Points are the Run's only currency. Third place or worse, and DNF, add wear in
+ordinary races. Quitting or closing the game after countdown begins settles the
+race once as a last-place DNF; cancelling before countdown costs nothing.
+An optional duel loss uses its own points/wear penalty, not the ordinary finish
+penalty. Act-rival loss ends the night even with a tow available.
+
+### Secondary championship
+
 Each act contains two four-car races and one rival event. A race awards points
 for the player's best finish: 10 for first, 7 for second, 5 for third, and 3
 for fourth. Retrying never removes points. Ten points unlock the next event;
@@ -64,20 +95,21 @@ meaningful without creating a lives system or progression dead end.
 | office_keyboard_cut | 3 | Keyboard Cut | Office Desk reverse | 3-lap circuit | 10 act points |
 | office_last_light | 3 | Last Light Grand Final | Office Desk | 4-car, 4-lap final | 20 act points; Flicker and ending |
 
-Reverse events use the finish line followed by checkpoints 7 through 1. Their
+In both modes, reverse circuits use the finish line followed by the route's
+checkpoints in reverse order. Their
 recovery transforms rotate and mirror the forward recovery offset, their start
 grid faces into the reverse route, and AI reads the same RaceManager order as
 the player. They are not implemented by merely negating vehicle input.
 
 ## Track Design
 
-All three room themes use a shared, tested championship course footprint.
-Kitchen keeps its authored texture and dressing art. Workshop and Office are
-runtime-authored variants created from Node2D, Polygon2D, Line2D, and Label
-nodes: they hide Kitchen texture/dressing sprites, reveal and recolor
-collision-matched polygon fallbacks, safely reposition and recontextualize
-selected obstacle bodies, and add room-specific world markings and oversized
-props.
+Kitchen, Workshop and Office circuits use generated routes and household room
+dressing. Championship events retain their own saved circuit identities. Run
+stops derive their route and direction from the night, act and stop, so returning
+to the same stop preserves its circuit.
+
+The final Run act rival uses the authored Basement circuit: a long, three-lap
+route with 17 anchors, boiler-room props and a stationary boiler-leak surface.
 
 The current surface configuration is exact:
 
@@ -86,6 +118,7 @@ The current surface configuration is exact:
 | Kitchen | Polished counter | Wet spill (0.58 / 0.88) |
 | Workshop | Workbench | Oil slick (0.45 / 0.92); sawdust (0.78 / 0.72) |
 | Office | Desk mat | Loose paper (0.84 / 0.78); keyboard (0.70 / 0.64) |
+| Basement finale | Concrete | Boiler leak (0.48 / 0.82) |
 
 Surface multipliers are transient vehicle state and never mutate the selected
 VehicleStats resource. They apply equally to player and AI, support overlapping
@@ -93,12 +126,33 @@ zones, and reset to the room's base surface after exit or recovery. Slippery
 surfaces and on-course obstacles sit only on calm stretches, away from corners
 in both race directions. There is no moving hazard.
 
-All three rooms use the championship's homologated collision and checkpoint
-footprint, letting players carry learned racing lines between acts. Distinct
-room dressing, surface physics, on-course obstacles, lap counts,
-field formats, and reverse events change how that footprint races in each act.
+Generated events vary their layout, room canvas, surface zones and permanent
+obstacles. They do not share one learned racing line across acts.
 
 ## Vehicles
+
+The primary Run starts with a generated compact or buggy. Won cars can replace
+the current car; each car retains its own clean, dusty, rusty or dented wear.
+A bench fully repairs wear or fits a held part instead of repairing. Parts last
+only for that night and do not transfer into the collection. Wearing out consumes
+a tow if available, repairs the wreck immediately and consumes the next bench
+visit without moving the player to another map node. Without a tow, the night ends.
+
+Robbed-driver offers show RACE IT NOW, SEND IT AHEAD or SEND IT HOME. RACE IT NOW
+requires an available same-band spare for the chaser; SEND IT AHEAD spends this
+win's points and avoids pursuit. Both leave the car unbanked. SEND IT HOME keeps
+the points and makes the car collection-safe. Intermediate act-rival wins offer
+a car; the final victory has no extra offer screen.
+
+A hot connector becomes a chase sprint through traffic. Capture requires 1.5
+seconds within two car widths, in the same route section with clear sight.
+At 180 seconds rescue stops the pursuer, not the drive: reach the finish to arrive.
+Capture impounds the haul; a parts van can ransom a car for 10 points as its one
+action. Banking at a bench or resolving an act rival secures carried haul.
+At night end only collection-safe won cars transfer: unbanked, impounded and
+unanswered-offer cars are excluded. Night endings include VIEW GARAGE.
+
+The secondary championship has these starters and unlocks:
 
 | Vehicle | Archetype | Strength | Tradeoff | Unlock |
 |---|---|---|---|---|
@@ -107,8 +161,8 @@ field formats, and reverse events change how that footprint races in each act.
 | Scrapjaw | Heavy | Stability, collisions, and straight-line speed | Slow turn-in and recovery | Win Act II |
 | Flicker | Drift | Rotation and boost generation | Demands precise counter-steer | Complete championship |
 
-Vehicle unlocks are permanent on the local save. They are side-grades, not a
-power ladder. Any unlocked vehicle can replay any completed event.
+Championship vehicle unlocks are permanent on the local save. They are
+side-grades, not a power ladder. Any unlocked vehicle can replay any completed event.
 
 The four machines use explicit deterministic Procedural 2D mappings shared by
 the garage and live race. Rustbug, Pinbolt, Scrapjaw, and Flicker keep distinct
@@ -137,18 +191,26 @@ persisted Master, Music, and SFX settings.
 ```text
 BOOT
   -> TITLE
-  -> NEW CHAMPIONSHIP / CONTINUE / QUICK RACE PICKER / SETTINGS / CREDITS / QUIT
-  -> CHAMPIONSHIP MAP
-  -> EVENT CARD + RIVAL LINE
-  -> VEHICLE SELECT
-  -> COUNTDOWN
-  -> RACE
-  -> PAUSE / AUDIO + COMFORT SETTINGS
-  -> RESULTS + POINTS + UNLOCKS
-  -> CHAMPIONSHIP MAP
-  -> FINAL ENDING
-  -> POST-CHAMPIONSHIP REPLAY
+     -> PLAY: NEW / RESUMED RUN
+        -> RUN INTRO / CONTROLS -> BOARD -> PICK + CONFIRM STOP
+        -> RACE / DUEL / BENCH / PARTS VAN / LOCKUP / ERRAND
+        -> RESULTS / CAR OFFER -> CHASE SPRINT WHEN PURSUED -> BOARD
+        -> ACT RIVAL -> NEXT ACT / NIGHT DEFEAT
+        -> BASEMENT FINALE -> SUNRISE VICTORY / NIGHT DEFEAT
+        -> VIEW GARAGE / NEW RUN / TITLE
+     -> CHAMPIONSHIP: NEW / CONTINUE -> CHAMPIONSHIP MAP
+        -> EVENT CARD -> VEHICLE SELECT -> COUNTDOWN -> RACE
+        -> RESULTS + POINTS + UNLOCKS -> MAP -> ENDING -> EVENT REPLAY
+     -> QUICK RACE / QUICK STRIP / CIRCUIT DISCOVERY
+     -> OPTIONS / CREDITS / QUIT
+
+RACE -> PAUSE / AUDIO + COMFORT SETTINGS -> RACE
+WORN-OUT RUN CAR -> TOW RECOVERY / NIGHT DEFEAT
 ```
+
+Run actions and countdown starts persist. An interrupted race is settled as DNF
+on return, not offered again. Night-end collection transfer and clearing the Run
+are saved together; a failed write retains the ended Run and offers SAVE AGAIN.
 
 The last selected vehicle and settings persist. Save data is written when a
 championship result is finalized, as well as after an unlock or setting change.
@@ -157,7 +219,9 @@ its acknowledgment, so a restart before Continue presents it again. A missing
 or corrupt primary save recovers a validated backup when available, otherwise
 it falls back to defaults without blocking the title screen. A save from a
 newer game version remains untouched: the current build enters read-only mode,
-disables New Championship, and explains how to preserve the existing progress.
+disables New Championship, and reports the read-only state. PLAY can open a
+Run, but Run writes fail visibly and countdown cannot start without saving its
+in-flight state; existing newer-version data is not overwritten.
 
 The comfort settings expose reduced camera shake and reduced motion separately,
 including from the pause menu. Reduced motion skips AppShell screen entrance
@@ -197,12 +261,23 @@ Sunday Drive.
 
 Phase 1 is release-ready only after all of the following are verified:
 
-- Fresh, continued, completed, backup-recovery, and corrupt-save flows pass.
-- Every event is completable by the player and by AI simulation.
+- Fresh, continued, completed, backup-recovery, and corrupt-save flows pass in
+  both Run and championship, including Run restart after countdown and after a
+  failed night-end write.
+- Every championship event and Run race format, including the six-car fields,
+  optional duels and three-lap Basement finale, is completable by the player
+  and by AI simulation.
+- Run stop actions resolve once and remain reopenable until used or left.
+  Verify each van, bench, lockup and errand choice, affordability and persistence.
+- Verify both car-offer variants, chase arrival, capture, 180-second rescue
+  followed by arrival, ransom, banking, unbanked/impounded/pending-offer loss,
+  and night-end collection transfer.
+- Verify worn-out recovery with a tow, the consumed next bench action, failure
+  without a tow, optional-duel penalties and act-rival elimination.
 - Keyboard and one controller operate every menu and race action.
 - The debug overlay is unavailable in release exports.
-- Master, music, and effects volumes persist; reduced camera shake and reduced
-  motion persist independently.
+- Master, music, effects, Engine and Tyres volumes persist; reduced camera shake
+  and reduced motion persist independently.
 - Windows x86_64 and Linux x86_64 release exports build without errors.
 - The game runs offline and contains no login, premium currency, or
   unavailable-online-mode prompts.
@@ -213,6 +288,10 @@ tests, headless boot/race smokes, release-config validation, Linux packaged
 startup, and Windows/Linux export generation are covered by the release
 pipeline. Controller-wide playthroughs and clean-machine Windows, Linux, and
 Steam Deck checks must still be recorded against the exact candidate hash.
+
+The release flow smoke is championship-only and forces a finish; it does not
+certify the primary Run. Complete the Run and its loss/recovery cases manually
+in the packaged candidate as well.
 
 ## Deferred Releases
 
@@ -226,6 +305,9 @@ scores a point, the field resets, first to the target score wins) is **deferred*
 to the competitive/online phase. Phase 1 ships the `circuit` and `rival_duel`
 formats in the championship catalog; no Screen King mode, HUD or reset logic is
 implemented for this release.
+
+Quick Strip and the Run's haul chase sprints also ship separately from the
+championship catalog.
 
 ## Exact Release Commands
 
