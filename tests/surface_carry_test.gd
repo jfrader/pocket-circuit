@@ -123,9 +123,21 @@ func _test_profiles() -> void:
 		for story: Dictionary in stories:
 			for surface: Dictionary in story["surfaces"]:
 				_expect(surface.has("carry") and (surface["carry"] as Dictionary).size() == 5, "every story surface defines a full carry profile")
+				_expect_valid_carry(surface["carry"] as Dictionary)
 	for layout: Dictionary in (catalog["layouts"] as Dictionary).values():
 		for surface: Dictionary in layout["grip_patches"]:
 			_expect(surface.has("carry"), "every patch/debris material has a carry profile")
+			_expect_valid_carry(surface["carry"] as Dictionary)
+
+
+func _expect_valid_carry(profile: Dictionary) -> void:
+	var build := float(profile["build_rate"])
+	var decay := float(profile["decay_rate"])
+	var penalty := float(profile["grip_penalty"])
+	var noise := float(profile["steering_noise"])
+	_expect(build >= 0.0 and decay >= 0.0 and (build == 0.0 or decay > 0.0), "every carry profile can decay back to dry grip")
+	_expect(penalty >= 0.0 and penalty < 1.0 and noise >= 0.0, "every carry profile keeps grip penalty and wander in bounds")
+	_expect(profile.has("color"), "every carry profile defines its trail colour")
 
 
 func _make_vehicle(world: Node2D, player: bool) -> VehicleController:
