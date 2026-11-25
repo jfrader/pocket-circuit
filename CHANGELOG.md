@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 ### Added
+- Tyres pick up spills and loose debris, carrying a fading grip penalty and surface-specific steering wander after exit. Coating colours the car and leaves fading cosmetic tyre trails. Overlapping coatings apply only the strongest contribution; sticky carry clears within four seconds of exit. Rivals anticipate carried grip, and coating and trails stop at the finish.
 - Run points pay 6 / 4 / 3 / 2 / 1 / 0 for first through sixth. Parts vans sell one part, a 10-point tow, a 5-point nitro or a 10-point ransom per visit. Errands offer 6 points, a tune-up or a tow.
 - Run benches offer one repair, part fitting, car swap or haul bank per visit. Clean cars cannot spend the visit on a repair.
 - The first Run has a board intro and driving controls; controls can be reopened. Night endings include VIEW GARAGE and show which cars were secured or lost.

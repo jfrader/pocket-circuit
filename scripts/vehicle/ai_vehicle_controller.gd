@@ -1669,7 +1669,7 @@ func _shortcut_route_is_suitable(track: Node) -> bool:
 
 func _planned_surface_grip(surface_plan: Dictionary) -> float:
 	if float(surface_plan.get("risk", 0.0)) > 0.0:
-		return float(surface_plan.get("grip_scale", 1.0))
+		return vehicle.effective_surface_grip(float(surface_plan.get("grip_scale", 1.0)))
 	return vehicle.surface_grip_multiplier
 
 
@@ -1690,7 +1690,7 @@ func _surface_anticipation(desired_direction: Vector2) -> Dictionary:
 		if vehicle.stats.physics_model_version != 0:
 			plan["speed_scale"] = _surface_driving_speed_scale(shortcut_zone.speed_multiplier, shortcut_zone.grip_multiplier, desired_direction)
 		else:
-			var combined_grip := vehicle.stats.grip * shortcut_zone.grip_multiplier
+			var combined_grip := vehicle.stats.grip * vehicle.effective_surface_grip(shortcut_zone.grip_multiplier)
 			plan["speed_scale"] = clampf(0.74 + combined_grip * 0.32, 0.78, 0.94)
 		return plan
 	var center_model := _surface_model(desired_direction)
@@ -1727,6 +1727,7 @@ func _surface_driving_speed_scale(speed_scale: float, grip_scale: float, directi
 	# Low grip limits correction/turning authority, not forward speed by
 	# itself. A straight, aligned car may carry its momentum across a slick.
 	var forward := Vector2.UP.rotated(vehicle.rotation)
+	grip_scale = vehicle.effective_surface_grip(grip_scale)
 	var correction := maxf(absf(forward.angle_to(direction)) / 0.12, absf(vehicle.slip_angle) / 8.0)
 	var traction_limit := lerpf(1.0, sqrt(maxf(grip_scale, 0.01)), clampf(correction, 0.0, 1.0))
 	return minf(speed_scale, traction_limit)

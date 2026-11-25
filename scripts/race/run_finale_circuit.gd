@@ -61,6 +61,7 @@ static func spec(base: Dictionary) -> Dictionary:
 		"ambient_props": [], "gate_props": [], "corridor_patterns": [],
 		"signature_hazards": [{
 			"id": "BoilerLeak", "name": &"boiler leak", "grip": 0.48, "speed": 0.82,
+			"carry": TrackBuilderCatalog.SLOPPY_CARRY,
 			"points": PackedVector2Array([Vector2(1000, -20), Vector2(1200, -20), Vector2(1200, 300), Vector2(1000, 300)]),
 			"warning_position": Vector2(1020, 440), "label": "WET FLOOR",
 			"color": Color(0.28, 0.68, 0.78, 0.65),

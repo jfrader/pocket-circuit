@@ -2,6 +2,7 @@ class_name TrackVariantPresenter
 extends Node2D
 
 const SURFACE_ZONE_SCRIPT := preload("res://scripts/race/surface_zone.gd")
+const SURFACE_DATA := preload("res://scripts/race/track_builder_catalog.gd")
 
 const INK := Color("172033")
 const PAPER := Color("f2ead7")
@@ -52,26 +53,26 @@ func _create_surface_zones() -> void:
 		match theme:
 			&"workshop":
 				definitions = [
-					{"name": &"oil slick", "label": "", "grip": 0.45, "speed": 0.92, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(610, -170), Vector2(860, -170), Vector2(860, 120), Vector2(610, 120)])},
-					{"name": &"sawdust", "label": "", "grip": 0.78, "speed": 0.72, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(-600, 245), Vector2(-300, 245), Vector2(-300, 490), Vector2(-600, 490)])},
-					{"name": &"spark strip", "label": "", "grip": 1.0, "speed": 1.2, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(300, 245), Vector2(600, 245), Vector2(600, 490), Vector2(300, 490)])},
+					{"name": &"oil slick", "carry": SURFACE_DATA.OIL_CARRY, "label": "", "grip": 0.45, "speed": 0.92, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(610, -170), Vector2(860, -170), Vector2(860, 120), Vector2(610, 120)])},
+					{"name": &"sawdust", "carry": SURFACE_DATA.DUST_CARRY, "label": "", "grip": 0.78, "speed": 0.72, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(-600, 245), Vector2(-300, 245), Vector2(-300, 490), Vector2(-600, 490)])},
+					{"name": &"spark strip", "carry": SURFACE_DATA.CLEAN_CARRY, "label": "", "grip": 1.0, "speed": 1.2, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(300, 245), Vector2(600, 245), Vector2(600, 490), Vector2(300, 490)])},
 				]
 			&"office":
 				definitions = [
-					{"name": &"loose paper", "label": "", "grip": 0.84, "speed": 0.78, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(-520, 245), Vector2(-100, 245), Vector2(-100, 490), Vector2(-520, 490)])},
-					{"name": &"keyboard", "label": "", "grip": 0.7, "speed": 0.64, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(610, 120), Vector2(860, 120), Vector2(860, 430), Vector2(610, 430)])},
-					{"name": &"mail shoot", "label": "", "grip": 1.0, "speed": 1.18, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(300, 245), Vector2(600, 245), Vector2(600, 490), Vector2(300, 490)])},
+					{"name": &"loose paper", "carry": SURFACE_DATA.PAPER_CARRY, "label": "", "grip": 0.84, "speed": 0.78, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(-520, 245), Vector2(-100, 245), Vector2(-100, 490), Vector2(-520, 490)])},
+					{"name": &"keyboard", "carry": SURFACE_DATA.CLEAN_CARRY, "label": "", "grip": 0.7, "speed": 0.64, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(610, 120), Vector2(860, 120), Vector2(860, 430), Vector2(610, 430)])},
+					{"name": &"mail shoot", "carry": SURFACE_DATA.CLEAN_CARRY, "label": "", "grip": 1.0, "speed": 1.18, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(300, 245), Vector2(600, 245), Vector2(600, 490), Vector2(300, 490)])},
 				]
 			_:
 				definitions = [
-					{"name": &"wet spill", "label": "", "grip": 0.58, "speed": 0.88, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(-70, -485), Vector2(350, -485), Vector2(350, -255), Vector2(-70, -255)])},
-					{"name": &"polish strip", "label": "", "grip": 1.0, "speed": 1.18, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(-560, 245), Vector2(-260, 245), Vector2(-260, 490), Vector2(-560, 490)])},
+					{"name": &"wet spill", "carry": SURFACE_DATA.SLOPPY_CARRY, "label": "", "grip": 0.58, "speed": 0.88, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(-70, -485), Vector2(350, -485), Vector2(350, -255), Vector2(-70, -255)])},
+					{"name": &"polish strip", "carry": SURFACE_DATA.CLEAN_CARRY, "label": "", "grip": 1.0, "speed": 1.18, "color": Color.TRANSPARENT, "points": PackedVector2Array([Vector2(-560, 245), Vector2(-260, 245), Vector2(-260, 490), Vector2(-560, 490)])},
 				]
 	for data: Dictionary in definitions:
 		var zone := SURFACE_ZONE_SCRIPT.new() as SurfaceZone
 		zone.name = "%sSurface" % String(data["name"]).to_pascal_case()
 		add_child(zone)
-		zone.configure(data["name"], data["points"], float(data["grip"]), float(data["speed"]), data["color"], String(data["label"]))
+		zone.configure(data["name"], data["points"], float(data["grip"]), float(data["speed"]), data["color"], String(data["label"]), data.get("carry", {}))
 		for key: String in ["role", "lane", "centerline_index", "inside_sign", "ai_path_clear"]:
 			if data.has(key):
 				zone.set_meta(key, data[key])

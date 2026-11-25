@@ -7,6 +7,12 @@ const PROP_SCALE := preload("res://scripts/race/world_prop_scale.gd")
 const WORLD_SCALE := TrackSeedGen.WORLD_SCALE
 const VEHICLE_WIDTH := 44.0
 const OBSTACLE_ROUTE_CLEARANCE := VEHICLE_WIDTH * 0.5 + 8.0
+const DUST_CARRY := {"build_rate": 0.8, "decay_rate": 0.35, "grip_penalty": 0.18, "steering_noise": 0.035, "color": Color("c7aa78")}
+const PAPER_CARRY := {"build_rate": 0.9, "decay_rate": 0.45, "grip_penalty": 0.12, "steering_noise": 0.045, "color": Color("e8dcc2")}
+const SLOPPY_CARRY := {"build_rate": 2.0, "decay_rate": 0.6, "grip_penalty": 0.1, "steering_noise": 0.12, "color": Color("78adbf")}
+const OIL_CARRY := {"build_rate": 1.8, "decay_rate": 0.4, "grip_penalty": 0.14, "steering_noise": 0.14, "color": Color("615849")}
+const STICKY_CARRY := {"build_rate": 0.35, "decay_rate": 0.28, "grip_penalty": 0.42, "steering_noise": 0.025, "color": Color("b47539")}
+const CLEAN_CARRY := {"build_rate": 0.0, "decay_rate": 0.0, "grip_penalty": 0.0, "steering_noise": 0.0, "color": Color.WHITE}
 
 
 static var GENERATED_OBSTACLE_TYPES := {
@@ -228,8 +234,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_spoon.png", "assets": ["res://assets/textures/imagine/kitchen_spoon.png", "res://assets/textures/tabletop/teaspoon.png", "res://assets/textures/tabletop/dessert_spoon.png"], "count": 2},
 			"landmarks": ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png"],
 			"surfaces": [
-				{"name": &"breakfast crumbs", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/crumb_cluster.png"},
-				{"name": &"tea spill", "grip": 0.56, "speed": 0.88, "decal": "res://assets/textures/kitchen/wet_spill.png"},
+				{"name": &"breakfast crumbs", "carry": DUST_CARRY, "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/crumb_cluster.png"},
+				{"name": &"tea spill", "carry": SLOPPY_CARRY, "grip": 0.56, "speed": 0.88, "decal": "res://assets/textures/kitchen/wet_spill.png"},
 			],
 		},
 		{
@@ -243,8 +249,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "assets": ["res://assets/textures/imagine/kitchen_fork.png", "res://assets/textures/tabletop/dinner_fork.png", "res://assets/textures/tabletop/pastry_fork.png"], "count": 2},
 			"landmarks": ["res://assets/textures/giant_props/giant_toaster.png", "res://assets/textures/imagine/watermelon.png"],
 			"surfaces": [
-				{"name": &"prep crumbs", "grip": 0.8, "speed": 0.74, "decal": "res://assets/textures/kitchen/crumb_cluster_02.png"},
-				{"name": &"chopping spill", "grip": 0.6, "speed": 0.86, "decal": "res://assets/textures/kitchen/spill_decal.png"},
+				{"name": &"prep crumbs", "carry": DUST_CARRY, "grip": 0.8, "speed": 0.74, "decal": "res://assets/textures/kitchen/crumb_cluster_02.png"},
+				{"name": &"chopping spill", "carry": SLOPPY_CARRY, "grip": 0.6, "speed": 0.86, "decal": "res://assets/textures/kitchen/spill_decal.png"},
 			],
 		},
 		{
@@ -260,8 +266,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/kitchen_fork.png", "assets": ["res://assets/textures/imagine/kitchen_fork.png", "res://assets/textures/tabletop/pastry_fork.png", "res://assets/textures/track_boundary/kitchen_butter_knife.png"], "count": 2},
 			"landmarks": ["res://assets/textures/kitchen_hero/hero_kitchen_mug.png", "res://assets/textures/kitchen_hero/hero_kitchen_plate_stack.png"],
 			"surfaces": [
-				{"name": &"tea biscuits", "grip": 0.84, "speed": 0.78, "decal": "res://assets/textures/imagine/crumb_cluster.png"},
-				{"name": &"saucer spill", "grip": 0.54, "speed": 0.9, "decal": "res://assets/textures/kitchen/wet_spill.png"},
+				{"name": &"tea biscuits", "carry": DUST_CARRY, "grip": 0.84, "speed": 0.78, "decal": "res://assets/textures/imagine/crumb_cluster.png"},
+				{"name": &"saucer spill", "carry": SLOPPY_CARRY, "grip": 0.54, "speed": 0.9, "decal": "res://assets/textures/kitchen/wet_spill.png"},
 			],
 		},
 		{
@@ -276,8 +282,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/track_boundary/kitchen_craft_stick.png", "assets": ["res://assets/textures/track_boundary/kitchen_craft_stick.png", "res://assets/textures/track_boundary/kitchen_butter_knife.png", "res://assets/textures/track_boundary/kitchen_chopsticks_pair.png"], "count": 2},
 			"landmarks": ["res://assets/textures/giant_props/giant_toaster.png", "res://assets/textures/imagine/teapot_top.png"],
 			"surfaces": [
-				{"name": &"cleanup suds", "grip": 0.62, "speed": 0.82, "decal": "res://assets/textures/kitchen/spill_decal.png"},
-				{"name": &"wipe crumbs", "grip": 0.86, "speed": 0.8, "decal": "res://assets/textures/kitchen/crumb_cluster_01.png"},
+				{"name": &"cleanup suds", "carry": SLOPPY_CARRY, "grip": 0.62, "speed": 0.82, "decal": "res://assets/textures/kitchen/spill_decal.png"},
+				{"name": &"wipe crumbs", "carry": DUST_CARRY, "grip": 0.86, "speed": 0.8, "decal": "res://assets/textures/kitchen/crumb_cluster_01.png"},
 			],
 		},
 	],
@@ -293,8 +299,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "assets": ["res://assets/textures/imagine/plank_wood.png", "res://assets/textures/track_boundary/workshop_paint_stirrer_rail.png", "res://assets/textures/track_boundary/workshop_dowel_rail.png"], "count": 2},
 			"landmarks": ["res://assets/textures/imagine/tape_roll.png", "res://assets/textures/workshop_hero/hero_workshop_wrench.png"],
 			"surfaces": [
-				{"name": &"carpentry sawdust", "grip": 0.76, "speed": 0.7, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
-				{"name": &"bench oil", "grip": 0.46, "speed": 0.9, "decal": "res://assets/textures/imagine/oil_stain.png"},
+				{"name": &"carpentry sawdust", "carry": DUST_CARRY, "grip": 0.76, "speed": 0.7, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
+				{"name": &"bench oil", "carry": OIL_CARRY, "grip": 0.46, "speed": 0.9, "decal": "res://assets/textures/imagine/oil_stain.png"},
 			],
 		},
 		{
@@ -308,8 +314,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "assets": ["res://assets/textures/imagine/plank_wood.png", "res://assets/textures/track_boundary/workshop_clamp_rail.png", "res://assets/textures/track_boundary/workshop_ruler_rail.png"], "count": 2},
 			"landmarks": ["res://assets/textures/imagine/tape_roll.png", "res://assets/textures/workshop_hero/hero_workshop_wrench.png"],
 			"surfaces": [
-				{"name": &"paint dust", "grip": 0.74, "speed": 0.72, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
-				{"name": &"paint station oil", "grip": 0.44, "speed": 0.88, "decal": "res://assets/textures/imagine/oil_stain.png"},
+				{"name": &"paint dust", "carry": DUST_CARRY, "grip": 0.74, "speed": 0.72, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
+				{"name": &"paint station oil", "carry": OIL_CARRY, "grip": 0.44, "speed": 0.88, "decal": "res://assets/textures/imagine/oil_stain.png"},
 			],
 		},
 		{
@@ -323,8 +329,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "assets": ["res://assets/textures/imagine/plank_wood.png", "res://assets/textures/track_boundary/workshop_ruler_rail.png", "res://assets/textures/track_boundary/workshop_paint_stirrer_rail.png"], "count": 2},
 			"landmarks": ["res://assets/textures/imagine/tape_roll.png", "res://assets/textures/workshop_hero/hero_workshop_paint_can.png"],
 			"surfaces": [
-				{"name": &"repair oil", "grip": 0.43, "speed": 0.9, "decal": "res://assets/textures/imagine/oil_stain.png"},
-				{"name": &"repair sawdust", "grip": 0.78, "speed": 0.7, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
+				{"name": &"repair oil", "carry": OIL_CARRY, "grip": 0.43, "speed": 0.9, "decal": "res://assets/textures/imagine/oil_stain.png"},
+				{"name": &"repair sawdust", "carry": DUST_CARRY, "grip": 0.78, "speed": 0.7, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
 			],
 		},
 		{
@@ -338,8 +344,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/plank_wood.png", "assets": ["res://assets/textures/imagine/plank_wood.png", "res://assets/textures/track_boundary/workshop_dowel_rail.png", "res://assets/textures/track_boundary/workshop_clamp_rail.png"], "count": 2},
 			"landmarks": ["res://assets/textures/workshop_hero/hero_workshop_paint_can.png", "res://assets/textures/workshop_hero/hero_workshop_wrench.png"],
 			"surfaces": [
-				{"name": &"garage oil", "grip": 0.42, "speed": 0.88, "decal": "res://assets/textures/imagine/oil_stain.png"},
-				{"name": &"garage dust", "grip": 0.75, "speed": 0.68, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
+				{"name": &"garage oil", "carry": OIL_CARRY, "grip": 0.42, "speed": 0.88, "decal": "res://assets/textures/imagine/oil_stain.png"},
+				{"name": &"garage dust", "carry": DUST_CARRY, "grip": 0.75, "speed": 0.68, "decal": "res://assets/textures/imagine/sawdust_patch.png"},
 			],
 		},
 	],
@@ -356,8 +362,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/remote_control.png", "assets": ["res://assets/textures/imagine/remote_control.png", "res://assets/textures/imagine/pencil.png", "res://assets/textures/track_boundary/office_pen_rail.png"], "count": 2},
 			"landmarks": ["res://assets/textures/imagine/monitor_top.png", "res://assets/textures/office_hero/hero_office_notebook.png"],
 			"surfaces": [
-				{"name": &"workstation papers", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/paper_sheet.png"},
-				{"name": &"workstation coffee", "grip": 0.6, "speed": 0.86, "decal": "res://assets/textures/imagine/stain_ring.png"},
+				{"name": &"workstation papers", "carry": PAPER_CARRY, "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/imagine/paper_sheet.png"},
+				{"name": &"workstation coffee", "carry": STICKY_CARRY, "grip": 0.6, "speed": 0.86, "decal": "res://assets/textures/imagine/stain_ring.png"},
 			],
 		},
 		{
@@ -371,8 +377,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/tape_roll.png", "assets": ["res://assets/textures/imagine/tape_roll.png", "res://assets/textures/track_boundary/office_ruler_rail.png", "res://assets/textures/track_boundary/office_book_spine_rail.png"], "count": 2},
 			"landmarks": ["res://assets/textures/imagine/monitor_top.png", "res://assets/textures/imagine/tape_roll.png"],
 			"surfaces": [
-				{"name": &"mail papers", "grip": 0.8, "speed": 0.74, "decal": "res://assets/textures/imagine/paper_sheet.png"},
-				{"name": &"mailroom coffee", "grip": 0.58, "speed": 0.86, "decal": "res://assets/textures/imagine/stain_ring.png"},
+				{"name": &"mail papers", "carry": PAPER_CARRY, "grip": 0.8, "speed": 0.74, "decal": "res://assets/textures/imagine/paper_sheet.png"},
+				{"name": &"mailroom coffee", "carry": STICKY_CARRY, "grip": 0.58, "speed": 0.86, "decal": "res://assets/textures/imagine/stain_ring.png"},
 			],
 		},
 		{
@@ -387,8 +393,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/pencil.png", "assets": ["res://assets/textures/imagine/pencil.png", "res://assets/textures/track_boundary/office_ruler_rail.png", "res://assets/textures/track_boundary/office_pen_rail.png"], "count": 2},
 			"landmarks": ["res://assets/textures/office_hero/hero_office_notebook.png", "res://assets/textures/imagine/plant_small.png"],
 			"surfaces": [
-				{"name": &"sketch papers", "grip": 0.83, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
-				{"name": &"sketch coffee", "grip": 0.61, "speed": 0.85, "decal": "res://assets/textures/imagine/stain_ring.png"},
+				{"name": &"sketch papers", "carry": PAPER_CARRY, "grip": 0.83, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
+				{"name": &"sketch coffee", "carry": STICKY_CARRY, "grip": 0.61, "speed": 0.85, "decal": "res://assets/textures/imagine/stain_ring.png"},
 			],
 		},
 		{
@@ -403,8 +409,8 @@ static var ROOM_COMPOSITIONS := {
 			"delimiter": {"asset": "res://assets/textures/imagine/pencil.png", "assets": ["res://assets/textures/imagine/pencil.png", "res://assets/textures/track_boundary/office_ruler_rail.png", "res://assets/textures/track_boundary/office_pen_rail.png"], "count": 2},
 			"landmarks": ["res://assets/textures/office_hero/hero_office_notebook.png", "res://assets/textures/imagine/plant_small.png"],
 			"surfaces": [
-				{"name": &"coffee papers", "grip": 0.81, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
-				{"name": &"coffee ring", "grip": 0.55, "speed": 0.84, "decal": "res://assets/textures/imagine/stain_ring.png"},
+				{"name": &"coffee papers", "carry": PAPER_CARRY, "grip": 0.81, "speed": 0.75, "decal": "res://assets/textures/imagine/paper_sheet.png"},
+				{"name": &"coffee ring", "carry": STICKY_CARRY, "grip": 0.55, "speed": 0.84, "decal": "res://assets/textures/imagine/stain_ring.png"},
 			],
 		},
 	],
@@ -623,10 +629,10 @@ static var LAYOUTS := {
 			"res://assets/textures/giant_props/giant_toaster.png",
 		],
 		"grip_patches": [
-			{"name": &"soapy spill", "grip": 0.58, "speed": 0.85, "decal": "res://assets/textures/grip_patches/soapy_spill.png"},
-			{"name": &"paper scatter", "grip": 0.85, "speed": 0.78, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
-			{"name": &"flour dust", "grip": 0.76, "speed": 0.74, "decal": "res://assets/textures/grip_patches/kitchen_flour_dust.png"},
-			{"name": &"syrup smear", "grip": 0.52, "speed": 0.84, "decal": "res://assets/textures/grip_patches/kitchen_syrup_smear.png"},
+			{"name": &"soapy spill", "carry": SLOPPY_CARRY, "grip": 0.58, "speed": 0.85, "decal": "res://assets/textures/grip_patches/soapy_spill.png"},
+			{"name": &"paper scatter", "carry": PAPER_CARRY, "grip": 0.85, "speed": 0.78, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
+			{"name": &"flour dust", "carry": DUST_CARRY, "grip": 0.76, "speed": 0.74, "decal": "res://assets/textures/grip_patches/kitchen_flour_dust.png"},
+			{"name": &"syrup smear", "carry": STICKY_CARRY, "grip": 0.52, "speed": 0.84, "decal": "res://assets/textures/grip_patches/kitchen_syrup_smear.png"},
 		],
 		"corridor_patterns": [
 			"res://assets/textures/edge_dressing/wood_grain_faint.png",
@@ -732,11 +738,11 @@ static var LAYOUTS := {
 			"res://assets/textures/giant_props/giant_wrench.png",
 		],
 		"grip_patches": [
-			{"name": &"bench sawdust", "grip": 0.72, "speed": 0.72, "decal": "res://assets/textures/grip_patches/sawdust_patch.png"},
-			{"name": &"oil slick", "grip": 0.48, "speed": 0.88, "decal": "res://assets/textures/grip_patches/oil_slick_small.png"},
-			{"name": &"paint dust", "grip": 0.78, "speed": 0.74, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
-			{"name": &"metal filings", "grip": 0.7, "speed": 0.72, "decal": "res://assets/textures/grip_patches/workshop_metal_filings.png"},
-			{"name": &"paint smear", "grip": 0.57, "speed": 0.82, "decal": "res://assets/textures/grip_patches/workshop_paint_smear.png"},
+			{"name": &"bench sawdust", "carry": DUST_CARRY, "grip": 0.72, "speed": 0.72, "decal": "res://assets/textures/grip_patches/sawdust_patch.png"},
+			{"name": &"oil slick", "carry": OIL_CARRY, "grip": 0.48, "speed": 0.88, "decal": "res://assets/textures/grip_patches/oil_slick_small.png"},
+			{"name": &"paint dust", "carry": DUST_CARRY, "grip": 0.78, "speed": 0.74, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
+			{"name": &"metal filings", "carry": DUST_CARRY, "grip": 0.7, "speed": 0.72, "decal": "res://assets/textures/grip_patches/workshop_metal_filings.png"},
+			{"name": &"paint smear", "carry": STICKY_CARRY, "grip": 0.57, "speed": 0.82, "decal": "res://assets/textures/grip_patches/workshop_paint_smear.png"},
 		],
 		"corridor_patterns": [
 			"res://assets/textures/edge_dressing/wood_grain_faint.png",
@@ -869,11 +875,11 @@ static var LAYOUTS := {
 			"res://assets/textures/giant_props/giant_mouse.png",
 		],
 		"grip_patches": [
-			{"name": &"papers", "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
-			{"name": &"coffee ring", "grip": 0.55, "speed": 0.85, "decal": "res://assets/textures/grip_patches/coffee_ring.png"},
-			{"name": &"soapy desk", "grip": 0.62, "speed": 0.82, "decal": "res://assets/textures/grip_patches/soapy_spill.png"},
-			{"name": &"eraser dust", "grip": 0.78, "speed": 0.75, "decal": "res://assets/textures/grip_patches/office_eraser_dust.png"},
-			{"name": &"ink blot", "grip": 0.5, "speed": 0.83, "decal": "res://assets/textures/grip_patches/office_ink_blot.png"},
+			{"name": &"papers", "carry": PAPER_CARRY, "grip": 0.82, "speed": 0.76, "decal": "res://assets/textures/grip_patches/paper_scatter.png"},
+			{"name": &"coffee ring", "carry": STICKY_CARRY, "grip": 0.55, "speed": 0.85, "decal": "res://assets/textures/grip_patches/coffee_ring.png"},
+			{"name": &"soapy desk", "carry": SLOPPY_CARRY, "grip": 0.62, "speed": 0.82, "decal": "res://assets/textures/grip_patches/soapy_spill.png"},
+			{"name": &"eraser dust", "carry": DUST_CARRY, "grip": 0.78, "speed": 0.75, "decal": "res://assets/textures/grip_patches/office_eraser_dust.png"},
+			{"name": &"ink blot", "carry": STICKY_CARRY, "grip": 0.5, "speed": 0.83, "decal": "res://assets/textures/grip_patches/office_ink_blot.png"},
 		],
 		"corridor_patterns": [
 			"res://assets/textures/edge_dressing/desk_pad_grid.png",

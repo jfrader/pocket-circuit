@@ -5,6 +5,7 @@ const STRIP_THEMES := preload("res://scripts/race/strip_themes.gd")
 const PRESENTER := preload("res://scripts/presentation/track_variant_presenter.gd")
 const CORE := preload("res://scripts/race/track_builder_core.gd")
 const CATALOG := preload("res://scripts/race/world_environment_catalog.gd")
+const SURFACES := preload("res://scripts/race/track_builder_catalog.gd")
 const THEME := &"basement"
 
 
@@ -55,8 +56,8 @@ func _run() -> void:
 	spec["edge_texture"] = identity["floor"]["texture"]
 	spec["seed_obstacles"] = false
 	spec["story_kit"] = {"surfaces": [
-		{"name": &"basement puddle", "grip": 0.58, "speed": 0.88, "decal": CATALOG.PREFIX + "ground_dressing/basement_puddle.png"},
-		{"name": &"basement oil stain", "grip": 0.45, "speed": 0.92, "decal": CATALOG.PREFIX + "ground_dressing/basement_oil_stain.png"},
+		{"name": &"basement puddle", "carry": SURFACES.SLOPPY_CARRY, "grip": 0.58, "speed": 0.88, "decal": CATALOG.PREFIX + "ground_dressing/basement_puddle.png"},
+		{"name": &"basement oil stain", "carry": SURFACES.OIL_CARRY, "grip": 0.45, "speed": 0.92, "decal": CATALOG.PREFIX + "ground_dressing/basement_oil_stain.png"},
 	]}
 	spec["environment_plan"] = {"placements": [], "diagnostics": {}}
 	var track := Node2D.new()
