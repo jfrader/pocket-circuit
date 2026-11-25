@@ -117,7 +117,7 @@ var _rear_grip_recovery := 1.0  # 0..1 interpolation factor during recovery
 var _front_lateral_force := 0.0  # cached for friction circle
 var _rear_lateral_force := 0.0  # cached for friction circle
 var _slide: Dictionary = {}
-var _carry_active := true
+var _carry_active := false
 var _carry_finished := false
 
 
