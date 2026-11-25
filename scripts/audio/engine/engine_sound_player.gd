@@ -17,6 +17,10 @@ const SAMPLE_RATE := 22050
 ## only the local engine voice on the Engine bus — the score lives on the Music
 ## bus — so the extra depth adds no audible latency to the music.
 const BUFFER_SECONDS := 0.5
+## Synthesizing is ~1 us per sample in a debug build, so refilling a full drained
+## 0.5 s buffer in one frame costs ~12 ms and turns one stall into another. Cap
+## each frame's refill; a drained queue refills over a few frames instead.
+const MAX_REFILL_FRAMES := 2048
 ## A buffer with all but this many frames free has run dry: the server drained
 ## everything queued before this frame rendered. Slack absorbs the priming frame.
 const STARVATION_SLACK_FRAMES := 8
@@ -77,7 +81,7 @@ func _process(delta: float) -> void:
 		return
 	# `available` is bounded by the generator's own capacity, so filling it can
 	# never allocate unbounded — it just restores the queue after a stall.
-	_fill_buffer(available)
+	_fill_buffer(mini(available, MAX_REFILL_FRAMES))
 	if _playback.push_buffer(_buffer):
 		_primed = true
 
@@ -142,7 +146,7 @@ func _prefill_buffer() -> void:
 	var available := _playback.get_frames_available()
 	if available <= 0:
 		return
-	_fill_buffer(available)
+	_fill_buffer(mini(available, MAX_REFILL_FRAMES))
 	if _playback.push_buffer(_buffer):
 		_primed = true
 

@@ -85,12 +85,14 @@ func _update_looping_effects(drifting: bool, boosting: bool) -> void:
 func _spawn_skid_mark() -> void:
 	var mark := Sprite2D.new()
 	mark.texture = SKID_MARK
-	mark.global_position = _vehicle.global_position + Vector2.DOWN.rotated(_vehicle.rotation) * 18.0
-	mark.global_rotation = _vehicle.rotation + PI * 0.5
 	mark.scale = Vector2(0.22, 0.22)
 	mark.modulate = Color(0.15, 0.14, 0.13, 0.3)
 	mark.z_index = -1
-	get_tree().current_scene.add_child(mark)
+	# The world that owns the car, not the tree's current scene: tests and
+	# previews build races that are never installed as the current scene.
+	_vehicle.get_parent().add_child(mark)
+	mark.global_position = _vehicle.global_position + Vector2.DOWN.rotated(_vehicle.rotation) * 18.0
+	mark.global_rotation = _vehicle.rotation + PI * 0.5
 	_skid_marks.append(mark)
 	var fade := mark.create_tween()
 	fade.tween_property(mark, "modulate:a", 0.0, 2.2)
