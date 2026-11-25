@@ -96,14 +96,23 @@ func _run() -> void:
 	completed.emit()
 
 
-## Suspends the coroutine until the menu shell is visible again. This is the
-## whole gate: as soon as a race begins (loading screen or race scene) the shell
-## hides, so a quick race start always wins and the precompute never competes
-## with a live load or rasterizes wheels during gameplay.
+## Suspends the coroutine until the menu shell is visible and no race owns the
+## frame. Menu visibility alone is not enough: the shell can remain visible
+## behind an overlaid race scene, and prewarming there caused hitches.
 func _wait_until_menu() -> bool:
-	while is_inside_tree() and is_instance_valid(_app) and _app.has_method("is_menu_visible") and not _app.is_menu_visible():
+	while is_inside_tree() and is_instance_valid(_app):
+		if _is_menu_window():
+			return true
 		await get_tree().process_frame
 	return is_inside_tree()
+
+
+func _is_menu_window() -> bool:
+	if not is_instance_valid(_app):
+		return false
+	if bool(_app.call("is_race_loading")) or get_tree().get_first_node_in_group("race_manager") != null:
+		return false
+	return bool(_app.call("is_menu_visible"))
 
 
 ## Loads the race scene, scripts and all, on the App's race loader during menu
@@ -220,6 +229,8 @@ func _run_roster_pass() -> void:
 	_roster_worker.name = "RaceRosterMotionWorker"
 	add_child(_roster_worker)
 	while not _roster_keys.is_empty():
+		if not await _wait_outside_live_race():
+			break
 		var visual_key: String = _roster_keys.pop_front()
 		var plan := IDENTITIES.motion_preparation_plan_for_key(visual_key)
 		if (plan["jobs"] as Array).is_empty():
@@ -227,6 +238,12 @@ func _run_roster_pass() -> void:
 		var rendered: Dictionary = await _roster_worker.run_data_job(IDENTITIES.render_motion_plan.bind(plan))
 		if rendered.is_empty():
 			continue
+		# Installing a pose creates an ImageTexture on the main thread. Finish a
+		# key while a menu or the loading screen is up, but never upload the
+		# batch into a live race: park the key for the next menu window instead.
+		if not _is_prewarm_window():
+			_roster_keys.push_front(visual_key)
+			break
 		var jobs: Array = rendered["jobs"]
 		var images: Array = rendered["images"]
 		for index in jobs.size():
@@ -234,6 +251,28 @@ func _run_roster_pass() -> void:
 	if _roster_worker != null:
 		_roster_worker.queue_free()
 	_roster_worker = null
+
+
+## Roster motion installs belong to menu idle and the loading screen. A live
+## race owns the main thread: wait for the next window instead of uploading
+## car poses while the player is driving.
+func _wait_outside_live_race() -> bool:
+	while is_inside_tree() and is_instance_valid(_app):
+		if _is_prewarm_window():
+			return true
+		await get_tree().process_frame
+	return is_inside_tree()
+
+
+func _is_prewarm_window() -> bool:
+	if not is_instance_valid(_app):
+		return false
+	# The shell can stay visible behind an overlaid race scene, so visibility
+	# alone is not proof that gameplay is not live. A race manager in the tree
+	# means the race scene owns the frame.
+	if not bool(_app.call("is_race_loading")) and get_tree().get_first_node_in_group("race_manager") != null:
+		return false
+	return bool(_app.call("is_menu_visible")) or bool(_app.call("is_race_loading"))
 
 
 ## Shared implementation. count_toward_index only for the boot full-pool pass.
