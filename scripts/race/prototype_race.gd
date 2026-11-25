@@ -148,6 +148,10 @@ const REDUCED_BEAT_SECONDS := 0.25
 const GRID_ROW_SPACING := 120.0
 const COUNTDOWN_STEP_SECONDS := 0.65
 const PAUSE_STRIP_HEIGHT := 12.0
+## The HUD is a readout, not an animation: redrawing its plates and text every
+## rendered frame costs several milliseconds on the main thread. 30 Hz is
+## visually indistinguishable at speed and leaves the frame budget to the race.
+const HUD_REFRESH_SECONDS := 1.0 / 30.0
 ## The victory/defeat outro is a four-bar phrase. Hold the menu phase off it for
 ## roughly that long so the finish reads as an outro rather than a cut.
 const RESULTS_OUTRO_SECONDS := 7.0
@@ -193,6 +197,7 @@ var _left_results := false
 var _countdown_label: Label
 var _race_flash_label: Label
 var _race_hud: RaceHUD
+var _hud_refresh_remaining := 0.0
 var _position_label: Label
 var _results_panel: PanelContainer
 var _results_entrance: Tween
@@ -479,11 +484,14 @@ func _exit_tree() -> void:
 		director.call("set_positional_vehicles", no_vehicles)
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if is_instance_valid(_player_wear_overlay):
 		var sprite := _player_wear_overlay.get_parent() as Sprite2D
 		_player_wear_overlay.visible = sprite.texture != _player_wear_texture
-	_update_race_hud()
+	_hud_refresh_remaining -= delta
+	if _hud_refresh_remaining <= 0.0:
+		_hud_refresh_remaining = HUD_REFRESH_SECONDS
+		_update_race_hud()
 	_update_personal_ghost()
 
 
